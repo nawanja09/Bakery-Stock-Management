@@ -1,0 +1,267 @@
+.item-container {
+  background-color: #ffffff;
+  padding: 20px;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+
+.header-buttons {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.btn-back,
+.btn-add {
+  padding: 10px 15px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.btn-back {
+  background-color: #6c757d;
+  color: white;
+}
+
+.btn-add {
+  background-color: #28a745;
+  color: white;
+}
+
+.btn-back:hover {
+  background-color: #5a6268;
+}
+
+.btn-add:hover {
+  background-color: #218838;
+}
+
+.btn-save {
+  padding: 10px 20px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  justify-content: center;
+}
+
+.btn-save:hover {
+  background-color: #0069d9;
+}
+
+.message {
+  margin-top: 15px;
+  padding: 10px;
+  border-radius: 4px;
+  text-align: center;
+}
+
+.message.error {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.items-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+}
+
+.items-table th,
+.items-table td {
+  border: 1px solid #dee2e6;
+  padding: 12px;
+  text-align: left;
+}
+
+.items-table th {
+  background-color: #e9ecef;
+  font-weight: bold;
+}
+
+.items-table tr:nth-child(even) {
+  background-color: #f8f9fa;
+}
+
+.items-table tr:hover {
+  background-color: #e2e6ea;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+}
+
+.btn-edit,
+.btn-delete {
+  padding: 6px 10px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-edit {
+  background-color: #ffc107;
+  color: #212529;
+}
+
+.btn-delete {
+  background-color: #dc3545;
+  color: white;
+}
+
+.btn-edit:hover {
+  background-color: #e0a800;
+}
+
+.btn-delete:hover {
+  background-color: #bd2130;
+}
+
+/*Add New Form Css */
+
+/* Container for the form */
+.item-management-container {
+  background: #ffffff;
+  padding: 40px;
+  max-width: 600px;
+  margin: 50px auto;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  transition: all 0.3s ease;
+}
+
+/* Heading */
+.item-management-container h2 {
+  text-align: center;
+  margin-bottom: 30px;
+  color: #343a40;
+  font-size: 28px;
+  font-weight: 600;
+}
+
+/* Back button */
+.btn-back {
+  background-color: #6c757d;
+  color: white;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 20px;
+  transition: background-color 0.3s ease;
+}
+
+.btn-back:hover {
+  background-color: #5a6268;
+}
+
+/* Form layout */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Each field group */
+.form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Labels */
+.form-group label {
+  font-weight: 500;
+  margin-bottom: 8px;
+  color: #495057;
+}
+
+/* Inputs and Selects */
+.form-group input,
+.form-group select {
+  padding: 12px;
+  font-size: 15px;
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+  background-color: #f8f9fa;
+  transition: border 0.3s, box-shadow 0.3s;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  border-color: #007bff;
+  background-color: #fff;
+  box-shadow: 0 0 6px rgba(0, 123, 255, 0.3);
+  outline: none;
+}
+
+/* Helper text under inputs */
+.form-group small {
+  margin-top: 5px;
+  font-size: 12px;
+  color: #6c757d;
+}
+
+/* Submit button */
+.btn-save {
+  background-color: #007bff;
+  color: #fff;
+  padding: 14px 20px;
+  font-size: 16px;
+  font-weight: 500;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: background-color 0.3s ease;
+}
+
+.btn-save:hover {
+  background-color: #0056b3;
+}
+
+/* Message box */
+.message {
+  margin-top: 25px;
+  padding: 14px;
+  border-radius: 6px;
+  font-size: 15px;
+  text-align: center;
+  font-weight: 500;
+}
+
+.message.success {
+  background-color: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.message.error {
+  background-color: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+.form-button-wrapper {
+  display: flex;
+  justify-content: center;
+}

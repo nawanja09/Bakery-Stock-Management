@@ -1,0 +1,36 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Poppins', sans-serif;
+  background-color: var(--secondary-color);
+}
+
+.app {
+  min-height: 100vh;
+  display:block;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(
+      rgba(255, 255, 255, 0.7), 
+      rgba(255, 255, 255, 0.7)
+    ),
+    /* Use local image instead of URL */
+    url('../src/images/cake.jpg') center/cover no-repeat;
+  padding: 20px;
+}
+
+.login-container {
+  max-width: 400px;
+  margin: 5rem auto;
+  padding: 2.5rem;
+  background: #f4f0ff;
+  border-radius: 15px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  font-family: 'Poppins', sans-serif;
+}
