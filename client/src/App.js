@@ -14,6 +14,8 @@ import ChangePassword from './components/ChangePassword';
 import Layout from './components/Layout';
 import AddOpeningBalance from './components/OpeningBalance/AddOpeningBalance';
 import OpeningBalanceHistory from './components/OpeningBalance/OpeningBalanceHistory';
+import IssueToDepartment from './components/issuance/IssueToDepartment';
+import IssuanceHistory from './components/issuance/IssuanceHistory';
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
@@ -48,6 +50,8 @@ function App() {
             <Route path="admin/password" element={<ChangePassword />} />
             <Route path="opening/add" element={<AddOpeningBalance />} />
             <Route path="opening/history" element={<OpeningBalanceHistory />} />
+            <Route path="issuance/issue" element={<IssueToDepartment />} />
+            <Route path="issuance/history" element={<IssuanceHistory />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/login" replace />} />

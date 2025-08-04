@@ -107,7 +107,7 @@ INSERT INTO departments (name) VALUES
 ('Staff');
 
 
-CREATE TABLE opening_balances (
+CREATE TABLE backery_system.opening_balances (
     id INT AUTO_INCREMENT PRIMARY KEY,
     date DATE NOT NULL,
     item_id INT NOT NULL,
@@ -127,3 +127,43 @@ VALUES
   ('2025-07-01', 3, 100, 15.00, 1),
   ('2025-07-01', 4, 5000, 0.80, 1),
   ('2025-07-01', 9, 20, 120.00, 1);
+
+  -- Create issuances table
+CREATE TABLE backery_system.issuances (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    issuance_date DATETIME NOT NULL,
+    issued_by INT NOT NULL,
+    department_id INT NOT NULL,
+    received_by VARCHAR(255) NOT NULL,
+    remarks TEXT,
+    approved_by VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (department_id) REFERENCES departments(id),
+    FOREIGN KEY (issued_by) REFERENCES users(id)
+);
+
+-- Create issuance_items table
+CREATE TABLE backery_system.issuance_items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    issuance_id INT NOT NULL,
+    item_id INT NOT NULL,
+    quantity DECIMAL(10) NOT NULL,
+    FOREIGN KEY (issuance_id) REFERENCES issuances(id) ON DELETE CASCADE,
+    FOREIGN KEY (item_id) REFERENCES items(id)
+);
+
+-- Insert sample issuances
+INSERT INTO backery_system.issuances (issuance_date, issued_by, department_id, received_by, remarks, approved_by) VALUES
+('2024-06-01 10:00:00', 1, 8, 'John Doe', 'Monthly supply for Cake department', 'Jane Smith'),
+('2024-06-05 14:30:00', 1, 9, 'Alice Brown', 'Weekly supply for Bakery department', 'Bob Johnson'),
+('2024-06-10 09:15:00', 1, 12, 'Charlie White', 'Daily supply for Pastry department', 'Diana Green');    
+
+
+-- Insert sample issuance items
+INSERT INTO issuance_items (issuance_id, item_id, quantity) VALUES    
+(6, 1, 20),
+(6, 2, 10),
+(7, 3, 50),
+(7, 4, 30),
+(8, 9, 15), 
+(8, 1, 25);
