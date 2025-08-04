@@ -1,8 +1,7 @@
 .sidebar {
   width: 300px;
   height: 100vh;
-  background: #f6f0ff;
-  box-shadow: 3px 0 10px rgba(0, 0, 0, 0.1);
+  background-color: var(--secondary-color);  box-shadow: 3px 0 10px rgba(190, 189, 189, 0.1);
   display: flex;
   flex-direction: column;
   font-family: 'Poppins', sans-serif;
@@ -181,4 +180,11 @@
   .dropdown-menu .icon-container {
     left: 1rem;
   }
+}
+
+.nav-link.active {
+  color: #6d22e6;
+  cursor: default;
+  font-weight: 600;
+  background: #e7d7f9;
 }

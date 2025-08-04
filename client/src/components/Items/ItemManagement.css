@@ -1,3 +1,5 @@
+/* View Items Page CSS */
+
 .item-container {
   background-color: #ffffff;
   padding: 20px;
@@ -5,11 +7,12 @@
   margin: 0 auto;
 }
 
-
 .header-buttons {
   display: flex;
   justify-content: space-between;
   margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .btn-back,
@@ -40,24 +43,6 @@
 
 .btn-add:hover {
   background-color: #218838;
-}
-
-.btn-save {
-  padding: 10px 20px;
-  background-color: #007bff;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 16px;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  justify-content: center;
-}
-
-.btn-save:hover {
-  background-color: #0069d9;
 }
 
 .message {
@@ -129,9 +114,8 @@
   background-color: #bd2130;
 }
 
-/*Add New Form Css */
+/* Add New Form CSS */
 
-/* Container for the form */
 .item-management-container {
   background: #ffffff;
   padding: 40px;
@@ -143,7 +127,6 @@
   transition: all 0.3s ease;
 }
 
-/* Heading */
 .item-management-container h2 {
   text-align: center;
   margin-bottom: 30px;
@@ -152,47 +135,23 @@
   font-weight: 600;
 }
 
-/* Back button */
-.btn-back {
-  background-color: #6c757d;
-  color: white;
-  padding: 8px 16px;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 20px;
-  transition: background-color 0.3s ease;
-}
-
-.btn-back:hover {
-  background-color: #5a6268;
-}
-
-/* Form layout */
 .form {
   display: flex;
   flex-direction: column;
   gap: 20px;
 }
 
-/* Each field group */
 .form-group {
   display: flex;
   flex-direction: column;
 }
 
-/* Labels */
 .form-group label {
   font-weight: 500;
   margin-bottom: 8px;
   color: #495057;
 }
 
-/* Inputs and Selects */
 .form-group input,
 .form-group select {
   padding: 12px;
@@ -211,14 +170,12 @@
   outline: none;
 }
 
-/* Helper text under inputs */
 .form-group small {
   margin-top: 5px;
   font-size: 12px;
   color: #6c757d;
 }
 
-/* Submit button */
 .btn-save {
   background-color: #007bff;
   color: #fff;
@@ -239,16 +196,6 @@
   background-color: #0056b3;
 }
 
-/* Message box */
-.message {
-  margin-top: 25px;
-  padding: 14px;
-  border-radius: 6px;
-  font-size: 15px;
-  text-align: center;
-  font-weight: 500;
-}
-
 .message.success {
   background-color: #d4edda;
   color: #155724;
@@ -264,4 +211,75 @@
 .form-button-wrapper {
   display: flex;
   justify-content: center;
+}
+
+/* ============================= */
+/* 📱 Media Queries for Responsive Design */
+/* ============================= */
+@media (max-width: 768px) {
+  .header-buttons {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .btn-back,
+  .btn-add {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .items-table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .items-table th,
+  .items-table td {
+    font-size: 13px;
+    padding: 8px;
+  }
+
+  .actions {
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .item-management-container {
+    padding: 20px;
+    margin: 20px;
+  }
+
+  .item-management-container h2 {
+    font-size: 22px;
+  }
+
+  .form-group input,
+  .form-group select {
+    font-size: 14px;
+    padding: 10px;
+  }
+
+  .btn-save {
+    padding: 12px;
+    font-size: 15px;
+  }
+}
+
+/* Desktops and large screens */
+@media (min-width: 993px) and (max-width: 1400px) {
+  .items-table {
+    font-size: 15px;
+  }
+}
+
+/* Extra large desktops (like Dell UltraSharp) */
+@media (min-width: 1401px) {
+  .item-container {
+    max-width: 1200px;
+  }
+
+  .items-table {
+    font-size: 16px;
+  }
 }

@@ -10,6 +10,8 @@ import Suppliers from './components/Suppliers/Suppliers';
 import AddItem from './components/Items/AddNewItems';
 import ViewItems from './components/Items/ViewItems';
 import EditItem from './components/Items/EditItem';
+import ChangePassword from './components/ChangePassword';
+import Layout from './components/Layout';
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
@@ -22,72 +24,28 @@ function App() {
     <BrowserRouter>
       <div className="app">
         <Routes>
-          <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<Login />} />
-          <Route 
-            path="/dashboard" 
+          <Route path="/" element={<Navigate to="/login" replace />} />
+
+          <Route
+            path="/"
             element={
               <ProtectedRoute>
-                <Dashboard />
+                <Layout />
               </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/purchase/new" 
-            element={
-              <ProtectedRoute>
-                <AddPurchase />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/purchase/history" 
-            element={
-              <ProtectedRoute>
-                <PurchaseHistory />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/purchases/:id" 
-            element={
-              <ProtectedRoute>
-                <PurchaseDetails />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/suppliers" 
-            element={
-              <ProtectedRoute>
-                <Suppliers />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/items/add" 
-            element={
-              <ProtectedRoute>
-                <AddItem />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/items" 
-            element={
-              <ProtectedRoute>
-                <ViewItems />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/items/edit/:id" 
-            element={
-              <ProtectedRoute>
-                <EditItem />
-              </ProtectedRoute>
-            } 
-          />
+            }
+          >
+            <Route path="dashboard" element={<Dashboard />} />
+            <Route path="purchase/new" element={<AddPurchase />} />
+            <Route path="purchase/history" element={<PurchaseHistory />} />
+            <Route path="purchase/:id" element={<PurchaseDetails />} />
+            <Route path="suppliers" element={<Suppliers />} />
+            <Route path="items/add" element={<AddItem />} />
+            <Route path="items" element={<ViewItems />} />
+            <Route path="items/edit/:id" element={<EditItem />} />
+            <Route path="admin/password" element={<ChangePassword />} />
+          </Route>
+
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </div>

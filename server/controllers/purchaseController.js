@@ -79,9 +79,12 @@ const getPurchaseById = async (req, res) => {
   const { id } = req.params;
   
   try {
-    // Get purchase header
     const [purchase] = await pool.query(`
-      SELECT p.*, s.name AS supplier_name, s.contact_info
+      SELECT 
+        p.*, 
+        s.name AS supplier_name,
+        s.contact_name,
+        s.contact_phone
       FROM purchases p
       JOIN supplier s ON p.supplier_id = s.id
       WHERE p.id = ?
@@ -91,7 +94,6 @@ const getPurchaseById = async (req, res) => {
       return res.status(404).json({ error: 'Purchase not found' });
     }
     
-    // Get purchase items
     const [items] = await pool.query(
       `SELECT * FROM purchase_items WHERE purchase_id = ?`,
       [id]
@@ -99,7 +101,11 @@ const getPurchaseById = async (req, res) => {
     
     res.json({
       ...purchase[0],
-      items
+      items,
+      contact_info: [
+        purchase[0].contact_name, 
+        purchase[0].contact_phone
+      ].filter(Boolean).join(' | ')
     });
     
   } catch (error) {
@@ -108,7 +114,7 @@ const getPurchaseById = async (req, res) => {
   }
 };
 
-// Add this method to purchaseController
+// Add Supplier List 
 const getAllSuppliers = async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT id, name FROM supplier');
@@ -123,5 +129,5 @@ module.exports = {
   createPurchase,
   getAllPurchases,
   getPurchaseById,
-  getAllSuppliers
+  getAllSuppliers,
 };
