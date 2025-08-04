@@ -1,7 +1,6 @@
 //client/src/components/Suppliers/Supplier.jsx
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus } from '@fortawesome/free-solid-svg-icons';
 import './Suppliers.css';
@@ -18,7 +17,6 @@ const Suppliers = () => {
     contact_email: ''
   });
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
 
   useEffect(() => {
     fetchSuppliers();

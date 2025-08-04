@@ -105,3 +105,25 @@ INSERT INTO departments (name) VALUES
 ('Chinese'),
 ('Savory'),
 ('Staff');
+
+
+CREATE TABLE opening_balances (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    date DATE NOT NULL,
+    item_id INT NOT NULL,
+    quantity DECIMAL(10) NOT NULL,
+    unit_cost DECIMAL(10,2) NOT NULL,
+    total_value DECIMAL(10,2) GENERATED ALWAYS AS (quantity * unit_cost) STORED,
+    entered_by INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (item_id) REFERENCES items(id),
+    FOREIGN KEY (entered_by) REFERENCES users(id)
+);
+
+INSERT INTO opening_balances (date, item_id, quantity, unit_cost, entered_by)
+VALUES 
+  ('2025-07-01', 1, 50, 120.00, 1),
+  ('2025-07-01', 2, 30, 50.00, 1),
+  ('2025-07-01', 3, 100, 15.00, 1),
+  ('2025-07-01', 4, 5000, 0.80, 1),
+  ('2025-07-01', 9, 20, 120.00, 1);

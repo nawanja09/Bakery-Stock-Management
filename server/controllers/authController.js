@@ -46,4 +46,34 @@ const loginUser = async (req, res) => {
   }
 };
 
-module.exports = { loginUser };
+const changePassword = async (req, res) => {
+  const { currentPassword, newPassword } = req.body;  
+  const userId = req.user.userId; // Assuming user ID is stored in req.user after authentication
+
+  try {
+    const [rows] = await pool.query(
+      'SELECT * FROM users WHERE id = ?', 
+      [userId]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    const user = rows[0];
+    const match = await bcrypt.compare(currentPassword, user.password);
+    if (!match) {
+      return res.status(401).json({ error: 'Current password is incorrect' });
+    }
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await pool.query(
+      'UPDATE users SET password = ? WHERE id = ?', 
+      [hashedPassword, userId]
+    );
+
+    res.json({ message: 'Password changed successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+module.exports = { loginUser, changePassword };

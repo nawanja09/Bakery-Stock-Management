@@ -15,17 +15,42 @@ const ChangePassword = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
-        
         if (!currentPassword || !newPassword || !confirmPassword) {
             setMessage('All fields are required');
+            setLoading(false);
             return;
         }
-        
         if (newPassword !== confirmPassword) {
             setMessage('New passwords do not match');
+            setLoading(false);
             return;
         }
-    };
+
+        try {
+            const response = await fetch('http://localhost:5000/api/change-password', { 
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    currentPassword,
+                    newPassword,
+                }),
+            });
+            if (!response.ok) {
+                throw new Error('Failed to change password');
+            }
+            const data = await response.json();
+            setMessage(data.message || 'Password changed successfully');
+            setCurrentPassword('');
+            setNewPassword('');
+            setConfirmPassword('');
+        } catch (error) {
+            setMessage(error.message || 'An error occurred while changing password');
+        } finally {
+            setLoading(false);
+        }
+    }
 
     return (
         <div className="change-password-container">
