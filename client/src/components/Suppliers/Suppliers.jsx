@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faArrowLeft, faPlus } from '@fortawesome/free-solid-svg-icons';
+import { faPlus } from '@fortawesome/free-solid-svg-icons';
 import './Suppliers.css';
 
 const Suppliers = () => {
@@ -74,10 +74,6 @@ const Suppliers = () => {
   return (
     <div className="suppliers-container">
       <div className="header-buttons">
-        <button onClick={() => navigate('/dashboard')} className="btn-back">
-          <FontAwesomeIcon icon={faArrowLeft} /> Back to Dashboard
-        </button>
-
         <button onClick={() => setShowForm(true)} className="btn-add">
           <FontAwesomeIcon icon={faPlus} /> Add New Supplier
         </button>
@@ -131,7 +127,6 @@ const Suppliers = () => {
           <table className="supplier-table">
             <thead>
               <tr>
-                <th>ID</th>
                 <th>Name</th>
                 <th>Address</th>
                 <th>City</th>
@@ -143,7 +138,6 @@ const Suppliers = () => {
             <tbody>
               {suppliers.map(supplier => (
                 <tr key={supplier.id}>
-                  <td>{supplier.id}</td>
                   <td>{supplier.name}</td>
                   <td>{supplier.address}</td>
                   <td>{supplier.city}</td>

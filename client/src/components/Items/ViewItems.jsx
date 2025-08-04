@@ -1,8 +1,9 @@
 // client/src/components/Items/ViewItems.jsx
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faArrowLeft, faPlus, faEdit, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { faEdit, faTrash } from '@fortawesome/free-solid-svg-icons';
 import './ItemManagement.css';
 
 const ViewItems = () => {
@@ -60,15 +61,6 @@ const ViewItems = () => {
 
   return (
     <div className="item-container">
-      <div className="header-buttons">
-        <button onClick={() => navigate(-1)} className="btn-back">
-          <FontAwesomeIcon icon={faArrowLeft} /> Back
-        </button>
-        <button onClick={() => navigate('/items/add')} className="btn-add">
-          <FontAwesomeIcon icon={faPlus} /> Add New Item
-        </button>
-      </div>
-
       <h2>Item List</h2>
 
       {loading ? (

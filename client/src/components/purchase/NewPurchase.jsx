@@ -2,12 +2,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
+import './Purchase.css'; 
 
 const AddPurchase = () => {
   const navigate = useNavigate();
   const [suppliers, setSuppliers] = useState([]);
+  const [departments, setDepartments] = useState([]);
+  const [itemsList, setItemsList] = useState([]); // For item dropdown
+  const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
   const [formData, setFormData] = useState({
     purchase_date: new Date().toISOString().split('T')[0],
@@ -16,6 +18,7 @@ const AddPurchase = () => {
     paid_amount: 0,
     payment_method: 'CASH',
     remarks: '',
+    department_id: '',
     items: [
       { item_name: '', quantity: 1, unit_price: 0 }
     ]
@@ -24,7 +27,7 @@ const AddPurchase = () => {
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('user'));
     setCurrentUser(user);
-    
+
     const fetchSuppliers = async () => {
       try {
         const response = await fetch('http://localhost:5000/api/suppliers');
@@ -38,12 +41,54 @@ const AddPurchase = () => {
         alert(`Error loading suppliers: ${error.message}`);
       }
     };
-    
+
+    const fetchItems = async () => {
+      try {
+        const response = await fetch('http://localhost:5000/api/items');
+        if (!response.ok) {
+          throw new Error(`Server error: ${response.status}`);
+        }
+        const data = await response.json();
+        console.log('Fetched items:', data); // Add this line
+        setItemsList(data);
+      } catch (error) {
+        console.error('Error fetching items:', error);
+        alert(`Error loading items: ${error.message}`);
+      }
+    };
+
     fetchSuppliers();
+    fetchItems();
+  }, []);
+
+  useEffect(() => {
+    const fetchDepartments = async () => {
+      try {
+        const response = await fetch('http://localhost:5000/api/departments');
+        if (!response.ok) {
+          throw new Error(`Server error: ${response.status}`);
+        }
+        const data = await response.json();
+        setDepartments(data);
+      } catch (error) {
+        console.error('Error fetching departments:', error);
+        alert(`Error loading departments: ${error.message}`);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDepartments();
   }, []);
 
   const handleItemChange = (index, field, value) => {
     const newItems = [...formData.items];
+    
+    // Convert to number for numeric fields
+    if (field === 'quantity' || field === 'unit_price') {
+      value = parseFloat(value) || 0;
+    }
+    
     newItems[index][field] = value;
     
     // Calculate total price if quantity or price changes
@@ -97,7 +142,7 @@ const AddPurchase = () => {
     };
 
     try {
-      const response = await fetch('http://localhost:5000d/api/purchases', {
+      const response = await fetch('http://localhost:5000/api/purchases', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedFormData)
@@ -118,16 +163,7 @@ const AddPurchase = () => {
   };
 
   return (
-    <div className="container">
-      {/* Add back button at the top */}
-      <button 
-        onClick={() => navigate('/dashboard')}
-        className="btn-back"
-        style={{ marginBottom: '20px' }}
-      >
-        <FontAwesomeIcon icon={faArrowLeft} /> Back to Dashboard
-      </button>
-
+    <div className="new-purchase-container">
       <h2>Add New Purchase</h2>
       <form onSubmit={handleSubmit}>
         <div className="form-row">
@@ -184,15 +220,32 @@ const AddPurchase = () => {
             />
           </div>
         </div>
-        
-        <div className="form-group">
-          <label>Remarks</label>
-          <textarea 
-            value={formData.remarks}
-            onChange={(e) => setFormData({...formData, remarks: e.target.value})}
-          />
+
+        <div className="form-row">
+          <div className="form-group">
+            <label>Which Department</label>
+            <select
+              value={formData.department_id}
+              onChange={(e) => setFormData({...formData, department_id: e.target.value})}
+              required
+            >
+              <option value="">Select Department</option>
+              {departments.map(department => (
+                <option key={department.id} value={department.id}>
+                  {department.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="form-group">
+            <label>Remarks</label>
+            <textarea 
+              value={formData.remarks}
+              onChange={(e) => setFormData({...formData, remarks: e.target.value})}
+            />
+          </div>
         </div>
-        
+
         <h3>Purchased Items</h3>
         <table className="item-table">
           <thead>
@@ -208,18 +261,24 @@ const AddPurchase = () => {
             {formData.items.map((item, index) => (
               <tr key={index}>
                 <td>
-                  <input
-                    type="text"
+                  <select
                     value={item.item_name}
                     onChange={(e) => handleItemChange(index, 'item_name', e.target.value)}
                     required
-                  />
+                  >
+                    <option value="">Select Item</option>
+                    {itemsList.map((itm) => (
+                      <option key={itm.id} value={itm.name}>
+                        {itm.name}
+                      </option>
+                    ))}
+                  </select>
                 </td>
                 <td>
                   <input
                     type="number"
-                    min="0.001"
-                    step="0.001"
+                    min="1"
+                    step="1"
                     value={item.quantity}
                     onChange={(e) => handleItemChange(index, 'quantity', parseFloat(e.target.value))}
                     required

@@ -1,4 +1,19 @@
 /* Purchase Form */
+.new-purchase-container{
+  background-color: #ffffff;
+  padding: 20px;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.new-purchase-container h2 {
+  margin-bottom: 40px;
+}
+
+.new-purchase-container form {
+  margin-top: 20px;
+}
+
 .purchase-form {
   background: white;
   border-radius: 10px;
@@ -54,7 +69,7 @@
 
 .items-table h3 {
   margin-bottom: 1rem;
-  color: #6722e6;
+  color: #9062e6;
 }
 
 .items-table table {
@@ -72,7 +87,7 @@
 
 .items-table th {
   background-color: #f6f0ff;
-  color: #6722e6;
+  color: #996fe7;
 }
 
 .items-table input[type="number"] {
@@ -160,7 +175,7 @@
 }
 
 .purchase-table th {
-  background-color: #6722e6;
+  background-color: #bc99fc;
   color: white;
   font-weight: 600;
 }

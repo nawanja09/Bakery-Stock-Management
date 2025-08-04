@@ -91,3 +91,17 @@ INSERT INTO items (item_code, name, unit, reorder_level) VALUES
 ('I003', 'Eggs', 'quantity', 100),
 ('I004', 'Butter', 'g', 5000),
 ('I005', 'Milk', 'L', 20);
+
+CREATE TABLE backery_system.departments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL UNIQUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO departments (name) VALUES
+('Cake'),
+('Bakery'),
+('Pastry'),
+('Chinese'),
+('Savory'),
+('Staff');

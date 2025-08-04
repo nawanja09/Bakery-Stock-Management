@@ -44,7 +44,6 @@
 }
 
 .supplier-form {
-  background-color: #ffffff;
   padding: 25px;
   border-radius: 10px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
@@ -103,7 +102,7 @@
 .form-actions {
   grid-column: span 2;
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 10px;
   margin-top: 20px;
 }
@@ -166,4 +165,66 @@
   text-align: center;
   padding: 40px;
   font-size: 16px;
+}
+
+/* Scroll on small screens */
+@media (max-width: 768px) {
+  .form-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .header-buttons {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .btn-back,
+  .btn-add {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .form-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .btn-save,
+  .btn-cancel {
+    width: 100%;
+  }
+
+  .supplier-table {
+    overflow-x: auto;
+    display: block;
+  }
+}
+
+/* Large desktop (≥1200px) */
+@media (min-width: 1200px) {
+  .suppliers-container {
+    max-width: 1200px;
+    padding: 40px;
+  }
+
+  .supplier-form {
+    max-width: 900px;
+  }
+
+  .form-group input {
+    font-size: 16px;
+    padding: 12px;
+  }
+
+  .btn-save,
+  .btn-cancel {
+    font-size: 18px;
+    padding: 12px 24px;
+  }
+
+  .supplier-table th,
+  .supplier-table td {
+    padding: 16px;
+    font-size: 16px;
+  }
 }

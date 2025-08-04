@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faArrowLeft, faSave } from '@fortawesome/free-solid-svg-icons';
+import { faSave } from '@fortawesome/free-solid-svg-icons';
 import './ItemManagement.css';
 
 const AddItem = () => {
@@ -64,10 +64,6 @@ const AddItem = () => {
 
   return (
     <div className="item-management-container">
-      <button onClick={() => navigate(-1)} className="btn-back">
-        <FontAwesomeIcon icon={faArrowLeft} /> Back
-      </button>
-
       <h2>Add New Item</h2>
       
       <form onSubmit={handleSubmit} className="form">

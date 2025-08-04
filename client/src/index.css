@@ -16,7 +16,7 @@ body {
 /* Add this at the top of your global CSS file (App.css or index.css) */
 :root {
   --primary-color: #60079c;      /* Dark Purple */
-  --secondary-color: #F5F0E1;    /* Cream/Off-white */
+  --secondary-color: #fdfbf2;    /* Cream/Off-white */
   --accent-gold: #C69C6D;        /* Wheat/Gold */
   --accent-red: #9C1C24;         /* Deep Red */
   --neutral-light: #FFFFFF;      /* White */
