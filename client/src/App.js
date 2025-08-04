@@ -12,6 +12,8 @@ import ViewItems from './components/Items/ViewItems';
 import EditItem from './components/Items/EditItem';
 import ChangePassword from './components/ChangePassword';
 import Layout from './components/Layout';
+import AddOpeningBalance from './components/OpeningBalance/AddOpeningBalance';
+import OpeningBalanceHistory from './components/OpeningBalance/OpeningBalanceHistory';
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
@@ -44,6 +46,8 @@ function App() {
             <Route path="items" element={<ViewItems />} />
             <Route path="items/edit/:id" element={<EditItem />} />
             <Route path="admin/password" element={<ChangePassword />} />
+            <Route path="opening/add" element={<AddOpeningBalance />} />
+            <Route path="opening/history" element={<OpeningBalanceHistory />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/login" replace />} />
