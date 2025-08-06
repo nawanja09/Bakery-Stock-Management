@@ -16,11 +16,21 @@ import AddOpeningBalance from './components/OpeningBalance/AddOpeningBalance';
 import OpeningBalanceHistory from './components/OpeningBalance/OpeningBalanceHistory';
 import IssueToDepartment from './components/issuance/IssueToDepartment';
 import IssuanceHistory from './components/issuance/IssuanceHistory';
+import AddWastage from './components/wastage/AddWastage';
+import WastageHistory from './components/wastage/WastageHistory';
+import StockReport from './components/report/StockReport';
+
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('token');
   return token ? children : <Navigate to="/login" replace />;
+};
+
+// Add this function above the ProtectedRoute component
+const AuthCheck = () => {
+  const token = localStorage.getItem('token');
+  return token ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />;
 };
 
 function App() {
@@ -30,7 +40,9 @@ function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/" element={<Navigate to="/login" replace />} />
+          <Route path="/auth-check" element={<AuthCheck />} />
 
+          {/* Protected Routes */}  
           <Route
             path="/"
             element={
@@ -52,6 +64,9 @@ function App() {
             <Route path="opening/history" element={<OpeningBalanceHistory />} />
             <Route path="issuance/issue" element={<IssueToDepartment />} />
             <Route path="issuance/history" element={<IssuanceHistory />} />
+            <Route path="wastage/add" element={<AddWastage />} />
+            <Route path="wastage/history" element={<WastageHistory />} />
+            <Route path="reports/stock" element={<StockReport />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/login" replace />} />

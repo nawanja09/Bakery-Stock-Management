@@ -9,6 +9,8 @@ const itemRoutes = require('./routes/itemRoutes');
 const departmentRoutes = require('./routes/departmentRoutes');
 const openingBalanceRoutes = require('./routes/openingBalanceRoutes');
 const issuanceRoutes = require('./routes/issuanceRoutes');
+const wastageRoutes = require('./routes/wastageRoutes');
+const reportRoutes = require('./routes/reportRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -29,6 +31,8 @@ app.use('/api/items', itemRoutes);
 app.use('/api', departmentRoutes);  
 app.use('/api/opening-balances', openingBalanceRoutes);
 app.use('/api/issuances', issuanceRoutes);
+app.use('/api/wastages', wastageRoutes);
+app.use('/api/reports', reportRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

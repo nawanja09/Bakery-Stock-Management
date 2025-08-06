@@ -33,11 +33,10 @@ const Login = () => {
       const data = await response.json();
       
       if (response.ok) {
+        // Store token without quotes
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
-        setMessage(`Welcome back! ${data.message}`);
-
-        // Redirect to dashboard after 1.5 seconds
+        
         setTimeout(() => {
           navigate('/dashboard');
         }, 1500);

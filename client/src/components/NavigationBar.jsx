@@ -196,12 +196,12 @@ const NavigationBar = () => {
           
           {/* Wastage */}
           <li className={`dropdown ${activeDropdown === 'wastage' ? 'active' : ''}`}>
-            <div className="dropdown-header" onClick={() => toggleDropdown('wastage')}>
+            <NavLink to="/wastage/history" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
               <span className="icon-container">
                 <FontAwesomeIcon icon={faTrashAlt} className="icon" />
               </span>
               <span>Wastage</span>
-            </div>
+            </NavLink>
           </li>
           
           {/* Reports */}
@@ -247,14 +247,6 @@ const NavigationBar = () => {
                     <FontAwesomeIcon icon={faShareSquare} className="icon" />
                   </span>
                   <span>Department Issues</span>
-                </NavLink>
-              </li>
-              <li>
-                <NavLink to="/reports/supplier" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                  <span className="icon-container">
-                    <FontAwesomeIcon icon={faTruckLoading} className="icon" />
-                  </span>
-                  <span>Supplier Details</span>
                 </NavLink>
               </li>
             </ul>

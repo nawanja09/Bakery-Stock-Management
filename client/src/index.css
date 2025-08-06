@@ -1,3 +1,52 @@
+/* Responsive Design for Desktop, Laptop, and Medium Devices */
+@media (max-width: 1200px) {
+  .dashboard-container,
+  .main-content,
+  .wastage-container {
+    padding: 10px;
+  }
+  .details-row > div {
+    min-width: 160px;
+  }
+}
+
+@media (max-width: 900px) {
+  .dashboard-container {
+    flex-direction: column;
+  }
+  .main-content {
+    padding: 1rem;
+  }
+  .wastage-table,
+  .item-table {
+    font-size: 0.95rem;
+  }
+  .details-row {
+    flex-direction: column;
+    gap: 10px;
+  }
+}
+
+@media (max-width: 600px) {
+  .dashboard-container,
+  .main-content,
+  .wastage-container {
+    padding: 5px;
+  }
+  .wastage-table,
+  .item-table {
+    font-size: 0.9rem;
+    overflow-x: auto;
+    display: block;
+  }
+  .wastage-table th, .wastage-table td,
+  .item-table th, .item-table td {
+    padding: 6px;
+  }
+  .details-row > div {
+    min-width: 120px;
+  }
+}
 body {
   margin: 0;
   padding: 0;

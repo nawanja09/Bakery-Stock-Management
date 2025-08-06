@@ -1,5 +1,3 @@
-//client/src/components/Suppliers/Supplier.jsx
-
 import React, { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus } from '@fortawesome/free-solid-svg-icons';
@@ -122,30 +120,32 @@ const Suppliers = () => {
       ) : (
         <>
           <h2>Suppliers</h2>
-          <table className="supplier-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Address</th>
-                <th>City</th>
-                <th>Contact Name</th>
-                <th>Phone</th>
-                <th>Email</th>
-              </tr>
-            </thead>
-            <tbody>
-              {suppliers.map(supplier => (
-                <tr key={supplier.id}>
-                  <td>{supplier.name}</td>
-                  <td>{supplier.address}</td>
-                  <td>{supplier.city}</td>
-                  <td>{supplier.contact_name}</td>
-                  <td>{supplier.contact_phone}</td>
-                  <td>{supplier.contact_email}</td>
+          <div className="table-wrapper">
+            <table className="supplier-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Address</th>
+                  <th>City</th>
+                  <th>Contact Name</th>
+                  <th>Phone</th>
+                  <th>Email</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {suppliers.map(supplier => (
+                  <tr key={supplier.id} className="supplier-row">
+                    <td>{supplier.name}</td>
+                    <td>{supplier.address}</td>
+                    <td>{supplier.city}</td>
+                    <td>{supplier.contact_name}</td>
+                    <td>{supplier.contact_phone}</td>
+                    <td>{supplier.contact_email}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </>
       )}
     </div>
