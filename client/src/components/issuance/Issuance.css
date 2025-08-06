@@ -171,3 +171,43 @@
   flex: 1;
   min-width: 200px;
 }
+
+.issuance-container h2 {
+  margin-bottom: 20px;
+  font-size: 24px;
+  color: #333;
+  text-align: center;
+}
+
+@media (max-width: 768px) {
+  .form-row {
+    flex-direction: column;
+  }
+  .form-group {
+    width: 100%;
+  }
+  .item-table th, .item-table td {
+    font-size: 0.9rem;
+  }
+  .btn-remove, .btn-add, .btn-submit {
+    width: 100%;
+    margin-bottom: 10px;
+  } 
+  
+}
+
+@media (min-width: 768px) {
+  .form-row {
+    flex-direction: row;
+  }
+  .form-group {
+    width: auto;
+  }
+  .item-table th, .item-table td {
+    font-size: 1rem;
+  }
+  .btn-remove, .btn-add, .btn-submit {
+    width: auto;
+    margin-bottom: 0;
+  }
+}

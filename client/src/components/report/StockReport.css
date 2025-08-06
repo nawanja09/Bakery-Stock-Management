@@ -1,0 +1,76 @@
+.stock-report-container {
+  max-width: 1200px;
+  margin: 20px auto;
+  padding: 20px;
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.report-controls {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 20px;
+  align-items: center;
+}
+
+.report-controls label {
+  display: flex;
+  flex-direction: column;
+  font-weight: 500;
+}
+
+.report-controls input[type="date"] {
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.btn-generate, .btn-download {
+  padding: 8px 15px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.3s;
+}
+
+.btn-generate {
+  background-color: #4CAF50;
+  color: white;
+}
+
+.btn-download {
+  background-color: #2196F3;
+  color: white;
+}
+
+.btn-generate:hover {
+  background-color: #45a049;
+}
+
+.btn-download:hover {
+  background-color: #0b7dda;
+}
+
+.stock-report-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.stock-report-table th {
+  background-color: #f2f2f2;
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid #ddd;
+}
+
+.stock-report-table td {
+  padding: 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.stock-report-table tr:hover {
+  background-color: #f9f9f9;
+}

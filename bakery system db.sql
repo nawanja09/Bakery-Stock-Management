@@ -167,3 +167,45 @@ INSERT INTO issuance_items (issuance_id, item_id, quantity) VALUES
 (7, 4, 30),
 (8, 9, 15), 
 (8, 1, 25);
+
+-- Wastages Table
+CREATE TABLE backery_system.wastages (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    wastage_note_number VARCHAR(20) UNIQUE NOT NULL,
+    date DATE NOT NULL,
+    approved_by VARCHAR(255) NOT NULL,
+    reason ENUM('Expired', 'Damaged', 'Overproduction', 'Poor Storage', 'Forecasting errors', 'Human error', 'Other') NOT NULL,
+    department_id INT,
+    remarks TEXT,
+    attachment_path VARCHAR(255),
+    entered_by INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (entered_by) REFERENCES users(id),
+    FOREIGN KEY (department_id) REFERENCES departments(id);
+);
+
+-- Wastage Items Table
+CREATE TABLE backery_system.wastage_items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    wastage_id INT NOT NULL,
+    item_id INT NOT NULL,
+    quantity DECIMAL(10,3) NOT NULL,
+    estimated_loss DECIMAL(10,2),
+    FOREIGN KEY (wastage_id) REFERENCES wastages(id) ON DELETE CASCADE,
+    FOREIGN KEY (item_id) REFERENCES items(id)
+);
+
+-- Insert sample wastages
+INSERT INTO backery_system.wastages (wastage_note_number, date, approved_by, reason, remarks, attachment_path, entered_by) VALUES
+('WST-20240601-001', '2024-06-01', 'Jane Smith', 'Expired', 'Expired flour batch', NULL, 1),
+('WST-20240605-002', '2024-06-05', 'Bob Johnson', 'Damaged', 'Damaged sugar bags during transport', NULL, 1),
+('WST-20240610-003', '2024-06-10', 'Diana Green', 'Overproduction', 'Excess bread production for the day', NULL, 1);    
+
+-- Insert sample wastage items
+INSERT INTO backery_system.wastage_items (wastage_id, item_id, quantity, estimated_loss) VALUES
+(1, 1, 10, 120.00),
+(1, 2, 5, 50.00),
+(2, 3, 20, 300.00),
+(2, 4, 15, 180.00),
+(3, 9, 30, 360.00),
+(3, 1, 25, 300.00);

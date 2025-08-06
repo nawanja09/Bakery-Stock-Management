@@ -171,12 +171,12 @@
 .purchase-table td {
   padding: 1rem;
   text-align: left;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid #e7e0e0;
 }
 
 .purchase-table th {
   background-color: #dee2e6;
-  color: white;
+  color: rgb(7, 7, 7);
   font-weight: 600;
 }
 
@@ -261,3 +261,8 @@
 .attachment-section {
   margin-top: 1.5rem;
 }
+
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+} 
