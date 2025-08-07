@@ -13,7 +13,7 @@ const IssueToDepartment = () => {
     received_by: '',
     remarks: '',
     approved_by: '',
-    items: [{ item_id: '', quantity: 1 }]
+    items: [{ item_id: '', quantity: 1, unit: '' }]
   });
 
   useEffect(() => {
@@ -46,14 +46,27 @@ const IssueToDepartment = () => {
 
   const handleItemChange = (index, field, value) => {
     const newItems = [...formData.items];
+    
+    if (field === 'quantity' || field === 'unit_price') {
+      value = Number(value) || 0;
+    }
+
     newItems[index][field] = value;
+
+    // AUTO-SELECT UNIT WHEN ITEM IS SELECTED
+    if (field === 'item_id') {
+      // item.id may be number, value from select is string
+      const selectedItem = items.find(item => String(item.id) === String(value));
+      newItems[index].unit = selectedItem ? selectedItem.unit : '';
+    }
+
     setFormData({ ...formData, items: newItems });
   };
 
   const addItemRow = () => {
     setFormData({
       ...formData,
-      items: [...formData.items, { item_id: '', quantity: 1 }]
+      items: [...formData.items, { item_id: '', quantity: 1, unit: '' }]
     });
   };
 
@@ -197,18 +210,13 @@ const IssueToDepartment = () => {
                   />
                 </td>
                 <td>
-                  <select
+                  {/* Auto-selected unit display */}
+                  <input
+                    type="text"
                     value={item.unit}
-                    onChange={(e) => handleItemChange(index, 'unit', e.target.value)}
-                    required
-                  >
-                    <option value="">Select Unit</option>
-                    <option value="kg">Kilograms (kg)</option>
-                    <option value="g">Grams (g)</option>
-                    <option value="L">Liters (L)</option>
-                    <option value="ml">Milliliters (ml)</option>
-                    <option value="quantity">Quantity</option>
-                  </select>
+                    readOnly
+                    className="unit-display"
+                  />
                 </td>
                 <td>
                   <button 

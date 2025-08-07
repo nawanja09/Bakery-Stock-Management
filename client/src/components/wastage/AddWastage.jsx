@@ -55,20 +55,19 @@ const AddWastage = () => {
     const newItems = [...formData.items];
     
     // Convert to number for numeric fields
-    if (field === 'quantity' || field === 'estimated_loss') {
+    if (field === 'quantity' || field === 'estimated_loss' || field === 'unit_price') {
       value = Number(value) || 0;
     }
-    
+
     newItems[index][field] = value;
-    
+
     // Auto-set unit when item is selected
     if(field === 'item_id') {
-      const selectedItem = items.find(item => item.id === value);
-      if(selectedItem) {
-        newItems[index].unit = selectedItem.unit;
-      }
+      // item.id may be number, value from select is string
+      const selectedItem = items.find(item => String(item.id) === String(value));
+      newItems[index].unit = selectedItem ? selectedItem.unit : '';
     }
-    
+
     setFormData({ ...formData, items: newItems });
   };
 
@@ -81,7 +80,7 @@ const AddWastage = () => {
   const addItemRow = () => {
     setFormData({
       ...formData,
-      items: [...formData.items, { item_id: '', quantity: 1, estimated_loss: 0 }]
+      items: [...formData.items, { item_id: '', quantity: 1, estimated_loss: 0, unit: '' }]
     });
   };
 
@@ -227,18 +226,12 @@ const AddWastage = () => {
                   />
                 </td>
                <td>
-                  <select
+                  <input
+                    type="text"
                     value={item.unit}
-                    onChange={(e) => handleItemChange(index, 'unit', e.target.value)}
-                    required
-                  >
-                    <option value="">Select Unit</option>
-                    <option value="kg">Kilograms (kg)</option>
-                    <option value="g">Grams (g)</option>
-                    <option value="L">Liters (L)</option>
-                    <option value="ml">Milliliters (ml)</option>
-                    <option value="quantity">Quantity</option>
-                  </select>
+                    readOnly
+                    className="unit-display"
+                  />
                 </td>
                 <td>
                   <input
