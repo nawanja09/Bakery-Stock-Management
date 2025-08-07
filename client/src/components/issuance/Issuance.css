@@ -179,6 +179,15 @@
   text-align: center;
 }
 
+.unit-display {
+  background-color: #f8f9fa;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  padding: 8px;
+  width: 100%;
+  cursor: not-allowed;
+}
+
 @media (max-width: 768px) {
   .form-row {
     flex-direction: column;
