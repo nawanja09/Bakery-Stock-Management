@@ -23,23 +23,28 @@ ChartJS.register(
   Legend
 );
 
-const ChartStats = () => {
-  const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const ChartStats = ({ chartData }) => {
+  const {
+    totalSalesData,
+    openingBalanceData,
+    purchasingData,
+    issuesVsWastageData
+  } = chartData;
 
-  const totalSalesData = {
-    labels,
+  const totalSalesChart = {
+    labels: totalSalesData.labels,
     datasets: [{
       label: 'Total Sales',
-      data: [800, 600, 400, 700, 500, 300, 900],
+      data: totalSalesData.data,
       backgroundColor: '#4e73df',
     }]
   };
 
-  const openingBalanceData = {
-    labels,
+  const openingBalanceChart = {
+    labels: openingBalanceData.labels,
     datasets: [{
       label: 'Opening Balance',
-      data: [300, 500, 400, 600, 450, 480, 520],
+      data: openingBalanceData.data,
       borderColor: '#f6c23e',
       backgroundColor: '#f6c23e',
       tension: 0.4,
@@ -47,11 +52,11 @@ const ChartStats = () => {
     }]
   };
 
-  const purchasingData = {
-    labels,
+  const purchasingChart = {
+    labels: purchasingData.labels,
     datasets: [{
       label: 'Purchasing',
-      data: [200, 350, 300, 400, 390, 370, 420],
+      data: purchasingData.data,
       borderColor: '#1cc88a',
       backgroundColor: '#1cc88a',
       tension: 0.4,
@@ -59,109 +64,84 @@ const ChartStats = () => {
     }]
   };
 
-    return (
+  return (
     <>
-        {/* First Chart Row */}
-        <div className="chart-stats-row">
+      {/* First Chart Row */}
+      <div className="chart-stats-row">
         <div className="chart-box">
-            <h3>Total Sales</h3>
-            <Bar data={totalSalesData} />
-        </div>
-        <div className="chart-box">
-            <h3>Opening Balance</h3>
-            <Line data={openingBalanceData} />
+          <h3>Total Sales</h3>
+          <Bar data={totalSalesChart} />
         </div>
         <div className="chart-box">
-            <h3>Purchasing</h3>
-            <Line data={purchasingData} />
+          <h3>Opening Balance</h3>
+          <Line data={openingBalanceChart} />
         </div>
+        <div className="chart-box">
+          <h3>Purchasing</h3>
+          <Line data={purchasingChart} />
         </div>
+      </div>
 
-        {/* Second Chart Row (Stacked) */}
-        <div className="chart-stats-row">
+      {/* Second Chart Row */}
+      <div className="chart-stats-row">
         <div className="chart-box">
-            <h3>Opening Balance vs Purchasing</h3>
-            <Bar
+          <h3>Opening Balance vs Purchasing</h3>
+          <Bar
             data={{
-                labels,
-                datasets: [
+              labels: issuesVsWastageData.labels,
+              datasets: [
                 {
-                    label: 'Opening Balance',
-                    data: [300, 500, 400, 600, 450, 480, 520],
-                    backgroundColor: '#f6c23e',
+                  label: 'Opening Balance',
+                  data: openingBalanceData.data,
+                  backgroundColor: '#f6c23e',
                 },
                 {
-                    label: 'Purchasing',
-                    data: [200, 350, 300, 400, 390, 370, 420],
-                    backgroundColor: '#1cc88a',
+                  label: 'Purchasing',
+                  data: purchasingData.data,
+                  backgroundColor: '#1cc88a',
                 },
-                ],
+              ],
             }}
             options={{
-                responsive: true,
-                plugins: {
-                legend: {
-                    position: 'top',
-                },
-                title: {
-                    display: false,
-                },
-                },
-                scales: {
-                x: {
-                    stacked: true,
-                },
-                y: {
-                    stacked: true,
-                },
-                },
+              responsive: true,
+              scales: {
+                x: { stacked: true },
+                y: { stacked: true }
+              }
             }}
-            />
+          />
         </div>
 
         <div className="chart-box">
-            <h3>Issues vs Westage</h3>
-            <Bar
+          <h3>Issues vs Wastage</h3>
+          <Bar
             data={{
-                labels,
-                datasets: [
+              labels: issuesVsWastageData.labels,
+              datasets: [
                 {
-                    label: 'Issues',
-                    data: [2, 3, 4, 1, 5, 2, 3],
-                    backgroundColor: '#6f42c1',
+                  label: 'Issues',
+                  data: issuesVsWastageData.issues,
+                  backgroundColor: '#6f42c1',
                 },
                 {
-                    label: 'Westage',
-                    data: [1, 2, 2, 1, 2, 3, 2],
-                    backgroundColor: '#ff6384',
+                  label: 'Wastage',
+                  data: issuesVsWastageData.wastage,
+                  backgroundColor: '#ff6384',
                 },
-                ],
+              ],
             }}
             options={{
-                responsive: true,
-                plugins: {
-                legend: {
-                    position: 'top',
-                },
-                title: {
-                    display: false,
-                },
-                },
-                scales: {
-                x: {
-                    stacked: true,
-                },
-                y: {
-                    stacked: true,
-                },
-                },
+              responsive: true,
+              scales: {
+                x: { stacked: true },
+                y: { stacked: true }
+              }
             }}
-            />
+          />
         </div>
-        </div>
+      </div>
     </>
-    );
-
+  );
 };
 
 export default ChartStats;
