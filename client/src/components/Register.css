@@ -1,0 +1,93 @@
+.register-container {
+  max-width: 400px;
+  margin: 40px auto;
+  padding: 25px;
+  background: #fff;
+  border-radius: 15px;
+  box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.15);
+  text-align: center;
+  font-family: 'Poppins', sans-serif;
+}
+
+.logo-header {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 15px;
+}
+
+.logo-image {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.register-container h2 {
+  color: #333;
+  font-size: 1.8rem;
+  margin-bottom: 20px;
+}
+
+.form-group {
+  text-align: left;
+  margin-bottom: 15px;
+}
+
+label {
+  font-size: 14px;
+  color: #555;
+  font-weight: 500;
+  margin-bottom: 5px;
+  display: block;
+}
+
+input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.3s;
+}
+
+input:focus {
+  border-color: #ff9800;
+  box-shadow: 0 0 4px rgba(255, 152, 0, 0.3);
+}
+
+button {
+  background: #ff9800;
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 20px;
+  cursor: pointer;
+  transition: background 0.3s;
+  margin-top: 10px;
+}
+
+button:hover {
+  background: #e68900;
+}
+
+.login-link {
+  margin-top: 15px;
+}
+
+.login-link h4 {
+  font-size: 14px;
+  color: #666;
+  font-weight: 400;
+}
+
+.login-link a {
+  color: #ff9800;
+  text-decoration: none;
+}
+
+.login-link a:hover {
+  text-decoration: underline;
+}

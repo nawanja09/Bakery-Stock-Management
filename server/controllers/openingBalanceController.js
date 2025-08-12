@@ -31,7 +31,7 @@ const getAllOpeningBalances = async (req, res) => {
                 i.unit, 
                 ob.unit_cost, 
                 ob.total_value,
-                u.email AS entered_by
+                u.name AS entered_by
             FROM opening_balances ob
             JOIN items i ON ob.item_id = i.id
             JOIN users u ON ob.entered_by = u.id

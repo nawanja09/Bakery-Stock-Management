@@ -18,10 +18,10 @@ const getStockReport = async (req, res) => {
         COALESCE(purchases.total_purchased, 0) AS total_purchased,
         COALESCE(issues.total_issued, 0) AS total_issued,
         COALESCE(wastage.total_wasted, 0) AS total_wasted,
-        (COALESCE(ob.opening_balance, 0) + 
-         COALESCE(purchases.total_purchased, 0) - 
-         COALESCE(issues.total_issued, 0) - 
-         COALESCE(wastage.total_wasted, 0)) AS closing_balance
+        (COALESCE(ob.opening_balance, 0) - 
+         (COALESCE(purchases.total_purchased, 0) + 
+          COALESCE(issues.total_issued, 0) + 
+          COALESCE(wastage.total_wasted, 0))) AS closing_balance
       FROM items i
       LEFT JOIN (
         SELECT item_id, SUM(quantity) AS opening_balance
@@ -62,3 +62,7 @@ const getStockReport = async (req, res) => {
 };
 
 module.exports = { getStockReport };
+
+
+//fomula for closing balance
+// Closing Balance = Opening Balance - (Total Purchased + Total Issued + Total Wasted)

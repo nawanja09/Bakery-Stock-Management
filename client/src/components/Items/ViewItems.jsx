@@ -4,14 +4,15 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faEdit, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { usePopup } from '../context/PopupContext';
 import './ItemManagement.css';
 
 const ViewItems = () => {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const navigate = useNavigate();
+  const { showPopup } = usePopup();
 
   useEffect(() => {
     const fetchItems = async () => {
@@ -21,17 +22,17 @@ const ViewItems = () => {
         if (response.ok) {
           setItems(data);
         } else {
-          setError(data.error || 'Failed to fetch items');
+          showPopup('error', data.error || 'Failed to fetch items');
         }
       } catch (err) {
-        setError('Network error. Please try again.');
+        showPopup('error', 'Network error. Please try again.');
       } finally {
         setLoading(false);
       }
     };
 
     fetchItems();
-  }, []);
+  }, [showPopup]);
 
   const handleEdit = (id) => {
     navigate(`/items/edit/${id}`);
@@ -65,8 +66,6 @@ const ViewItems = () => {
 
       {loading ? (
         <p>Loading items...</p>
-      ) : error ? (
-        <p className="error">{error}</p>
       ) : items.length === 0 ? (
         <p>No items found</p>
       ) : (

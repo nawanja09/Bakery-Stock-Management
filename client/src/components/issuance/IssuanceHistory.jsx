@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-
+import { usePopup } from '../context/PopupContext';
 import './Issuance.css';
 
 // Modal version of IssuanceDetails for popup use
 const IssuanceDetailsModal = ({ id }) => {
   const [issuance, setIssuance] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const { showPopup } = usePopup();
 
   useEffect(() => {
     const fetchIssuance = async () => {
@@ -15,16 +15,15 @@ const IssuanceDetailsModal = ({ id }) => {
         const data = await response.json();
         setIssuance(data);
       } catch (err) {
-        setError('Failed to fetch issuance details');
+        showPopup('error', 'Failed to fetch issuance details');
       } finally {
         setLoading(false);
       }
     };
     fetchIssuance();
-  }, [id]);
+  }, [id, showPopup]);
 
   if (loading) return <div className="loading">Loading...</div>;
-  if (error) return <div className="error">{error}</div>;
   if (!issuance) return <div>No issuance data found</div>;
 
   return (

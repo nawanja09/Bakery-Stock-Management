@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import bakeryLogo from '../images/icon.jpeg';
+import { usePopup } from './context/PopupContext';
+import { Link } from 'react-router-dom';
 import './Login.css';
 
 const Login = () => {
@@ -8,9 +10,9 @@ const Login = () => {
     email: '',
     password: ''
   });
-  const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-   const navigate = useNavigate(); 
+  const navigate = useNavigate();
+  const { showPopup } = usePopup();
 
   const handleChange = (e) => {
     setFormData({
@@ -36,15 +38,15 @@ const Login = () => {
         // Store token without quotes
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
-        
+        showPopup('success', 'Login successful!');
         setTimeout(() => {
           navigate('/dashboard');
         }, 1500);
       } else {
-        setMessage(data.error || 'Login failed');
+        showPopup('error', data.error || 'Login failed');
       }
     } catch (error) {
-      setMessage('Network error. Please try again.');
+      showPopup('error', 'Network error. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -89,9 +91,10 @@ const Login = () => {
         >
           {isLoading ? 'Logging in...' : 'Login'}
         </button>
+        <p className="register-link">
+          <h4>Don't have an account? <Link to="/register">Register</Link></h4>
+        </p>
       </form>
-      
-      {message && <p className="message">{message}</p>}
     </div>
   );
 };

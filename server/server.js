@@ -25,7 +25,7 @@ app.use(cors({
 
 app.use(express.json());
 
-app.use('/api/auth', authRoutes);
+app.use('/api', authRoutes);
 app.use('/api/purchases', purchaseRoutes);
 app.use('/api/suppliers', supplierRoutes);
 app.use('/api/items', itemRoutes);

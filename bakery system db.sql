@@ -1,13 +1,48 @@
---User Table
-CREATE TABLE backery_system.users(
-	id INT AUTO_INCREMENT PRIMARY KEY,
-	email VARCHAR(255) NOT NULL,
-	password VARCHAR(255) NOT NULL,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+-- Create database if not exists
+CREATE DATABASE IF NOT EXISTS backery_system;
+USE backery_system;
+
+-- Users Table 
+CREATE TABLE users(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Purchases Table
-CREATE TABLE backery_system.purchases (
+-- Supplier Table 
+CREATE TABLE supplier (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    address VARCHAR(255) NOT NULL,
+    city VARCHAR(100) NOT NULL,
+    contact_name VARCHAR(255) NOT NULL,
+    contact_phone VARCHAR(10) NOT NULL,
+    contact_email VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CHECK (contact_phone REGEXP '^[0-9]{10}$'),
+    CHECK (contact_email IS NULL OR contact_email REGEXP '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$')
+);
+
+-- Items Table 
+CREATE TABLE items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    item_code VARCHAR(20) NOT NULL UNIQUE,
+    name VARCHAR(255) NOT NULL,
+    unit ENUM('kg', 'g', 'L', 'ml', 'quantity') NOT NULL,
+    reorder_level DECIMAL(10) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Departments Table 
+CREATE TABLE departments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL UNIQUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Purchases Table 
+CREATE TABLE purchases (
     id INT AUTO_INCREMENT PRIMARY KEY,
     invoice_no VARCHAR(50) UNIQUE NOT NULL,
     purchase_date DATETIME NOT NULL,
@@ -18,11 +53,12 @@ CREATE TABLE backery_system.purchases (
     remarks TEXT,
     prepared_by INT NOT NULL,
     attachment_path VARCHAR(255),
-    FOREIGN KEY (supplier_id) REFERENCES supplier(id)
+    FOREIGN KEY (supplier_id) REFERENCES supplier(id),
+    FOREIGN KEY (prepared_by) REFERENCES users(id)
 );
 
 -- Purchase Items Table
-CREATE TABLE backery_system.purchase_items (
+CREATE TABLE purchase_items (
     id INT AUTO_INCREMENT PRIMARY KEY,
     purchase_id INT NOT NULL,
     item_name VARCHAR(255) NOT NULL,
@@ -32,86 +68,12 @@ CREATE TABLE backery_system.purchase_items (
     FOREIGN KEY (purchase_id) REFERENCES purchases(id) ON DELETE CASCADE
 );
 
--- Insert sample users
-INSERT INTO users(email,password) VALUES
-('user@bakery.com', '$2a$12$AqOQrrSSoh8hDm47A9tfkuUyhQTvpON5rdUCrDQ/YZK9JjH1zFtNi');
-
-
--- Insert sample purchases
-INSERT INTO purchases (invoice_no, purchase_date, supplier_id, bill_amount, paid_amount, payment_method, remarks, prepared_by) VALUES
-('PUR-20240601-1234', '2024-06-01 10:00:00', 1, 25000.00, 25000.00, 'CASH', 'Monthly flour order', 1),
-('PUR-20240605-5678', '2024-06-05 14:30:00', 2, 15000.00, 10000.00, 'BANK_TRANSFER', 'Sugar for cakes', 1),
-('PUR-20240610-9012', '2024-06-10 09:15:00', 3, 18000.00, 18000.00, 'CREDIT', 'Dairy products', 1);
-
--- Insert sample purchase items
-INSERT INTO purchase_items (purchase_id, item_name, quantity, unit_price) VALUES
-(1, 'Wheat Flour', 500, 40.00),
-(1, 'Bread Flour', 300, 45.00),
-(2, 'White Sugar', 200, 50.00),
-(2, 'Brown Sugar', 100, 55.00),
-(3, 'Fresh Milk', 150, 80.00),
-(3, 'Butter', 50, 120.00),
-(3, 'Cheese', 30, 200.00);
-
-CREATE TABLE supplier (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(255) NOT NULL,
-  address VARCHAR(255) NOT NULL,
-  city VARCHAR(100) NOT NULL,
-  contact_name VARCHAR(255) NOT NULL,
-  contact_phone VARCHAR(10) NOT NULL,
-  contact_email VARCHAR(255),
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  
-  CHECK (contact_phone REGEXP '^[0-9]{10}$'),
-  CHECK (contact_email IS NULL OR contact_email REGEXP '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$')
-);
-
-INSERT INTO supplier (name, address, city, contact_name, contact_phone, contact_email)
-VALUES 
-  ('Golden Grain Flour Mills', '123 Mill Road', 'Colombo', 'Nimal Perera', '0771234567', 'nimal@goldenflour.lk'),
-  ('SweetSugar Distributors', '45 Sweet Street', 'Kandy', 'Ruwan Silva', '0712345678', 'ruwan@sweetsugar.com'),
-  ('Bakers Butter Supply', '10 Dairy Lane', 'Galle', 'Sunil Fernando', '0759876543', 'sunil@bakersbutter.lk'),
-  ('FreshEggs Ltd.', '88 Farm Avenue', 'Kurunegala', 'Kumari Jayasinghe', '0761231234', NULL),
-  ('ChocoDelight Suppliers', '200 Cocoa Drive', 'Matara', 'Anura Wijesinghe', '0784567890', 'anura@chocodelight.lk');
-
-
-CREATE TABLE backery_system.items (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    item_code VARCHAR(20) NOT NULL UNIQUE,
-    name VARCHAR(255) NOT NULL,
-    unit ENUM('kg', 'g', 'L', 'ml', 'quantity') NOT NULL,
-    reorder_level DECIMAL(10) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-INSERT INTO items (item_code, name, unit, reorder_level) VALUES
-('I001', 'Wheat Flour', 'kg', 50),
-('I002', 'Sugar', 'kg', 30),
-('I003', 'Eggs', 'quantity', 100),
-('I004', 'Butter', 'g', 5000),
-('I005', 'Milk', 'L', 20);
-
-CREATE TABLE backery_system.departments (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(255) NOT NULL UNIQUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-INSERT INTO departments (name) VALUES
-('Cake'),
-('Bakery'),
-('Pastry'),
-('Chinese'),
-('Savory'),
-('Staff');
-
-
-CREATE TABLE backery_system.opening_balances (
+-- Opening Balances Table 
+CREATE TABLE opening_balances (
     id INT AUTO_INCREMENT PRIMARY KEY,
     date DATE NOT NULL,
     item_id INT NOT NULL,
-    quantity DECIMAL(10) NOT NULL,
+    quantity DECIMAL(10,3) NOT NULL,
     unit_cost DECIMAL(10,2) NOT NULL,
     total_value DECIMAL(10,2) GENERATED ALWAYS AS (quantity * unit_cost) STORED,
     entered_by INT NOT NULL,
@@ -120,16 +82,8 @@ CREATE TABLE backery_system.opening_balances (
     FOREIGN KEY (entered_by) REFERENCES users(id)
 );
 
-INSERT INTO opening_balances (date, item_id, quantity, unit_cost, entered_by)
-VALUES 
-  ('2025-07-01', 1, 50, 120.00, 1),
-  ('2025-07-01', 2, 30, 50.00, 1),
-  ('2025-07-01', 3, 100, 15.00, 1),
-  ('2025-07-01', 4, 5000, 0.80, 1),
-  ('2025-07-01', 9, 20, 120.00, 1);
-
-  -- Create issuances table
-CREATE TABLE backery_system.issuances (
+-- Issuances Table 
+CREATE TABLE issuances (
     id INT AUTO_INCREMENT PRIMARY KEY,
     issuance_date DATETIME NOT NULL,
     issued_by INT NOT NULL,
@@ -142,34 +96,18 @@ CREATE TABLE backery_system.issuances (
     FOREIGN KEY (issued_by) REFERENCES users(id)
 );
 
--- Create issuance_items table
-CREATE TABLE backery_system.issuance_items (
+-- Issuance Items Table 
+CREATE TABLE issuance_items (
     id INT AUTO_INCREMENT PRIMARY KEY,
     issuance_id INT NOT NULL,
     item_id INT NOT NULL,
-    quantity DECIMAL(10) NOT NULL,
+    quantity DECIMAL(10,3) NOT NULL,
     FOREIGN KEY (issuance_id) REFERENCES issuances(id) ON DELETE CASCADE,
     FOREIGN KEY (item_id) REFERENCES items(id)
 );
 
--- Insert sample issuances
-INSERT INTO backery_system.issuances (issuance_date, issued_by, department_id, received_by, remarks, approved_by) VALUES
-('2024-06-01 10:00:00', 1, 8, 'John Doe', 'Monthly supply for Cake department', 'Jane Smith'),
-('2024-06-05 14:30:00', 1, 9, 'Alice Brown', 'Weekly supply for Bakery department', 'Bob Johnson'),
-('2024-06-10 09:15:00', 1, 12, 'Charlie White', 'Daily supply for Pastry department', 'Diana Green');    
-
-
--- Insert sample issuance items
-INSERT INTO issuance_items (issuance_id, item_id, quantity) VALUES    
-(6, 1, 20),
-(6, 2, 10),
-(7, 3, 50),
-(7, 4, 30),
-(8, 9, 15), 
-(8, 1, 25);
-
 -- Wastages Table
-CREATE TABLE backery_system.wastages (
+CREATE TABLE wastages (
     id INT AUTO_INCREMENT PRIMARY KEY,
     wastage_note_number VARCHAR(20) UNIQUE NOT NULL,
     date DATE NOT NULL,
@@ -181,11 +119,11 @@ CREATE TABLE backery_system.wastages (
     entered_by INT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (entered_by) REFERENCES users(id),
-    FOREIGN KEY (department_id) REFERENCES departments(id);
+    FOREIGN KEY (department_id) REFERENCES departments(id)
 );
 
--- Wastage Items Table
-CREATE TABLE backery_system.wastage_items (
+-- Wastage Items Table 
+CREATE TABLE wastage_items (
     id INT AUTO_INCREMENT PRIMARY KEY,
     wastage_id INT NOT NULL,
     item_id INT NOT NULL,
@@ -195,17 +133,102 @@ CREATE TABLE backery_system.wastage_items (
     FOREIGN KEY (item_id) REFERENCES items(id)
 );
 
--- Insert sample wastages
-INSERT INTO backery_system.wastages (wastage_note_number, date, approved_by, reason, remarks, attachment_path, entered_by) VALUES
-('WST-20240601-001', '2024-06-01', 'Jane Smith', 'Expired', 'Expired flour batch', NULL, 1),
-('WST-20240605-002', '2024-06-05', 'Bob Johnson', 'Damaged', 'Damaged sugar bags during transport', NULL, 1),
-('WST-20240610-003', '2024-06-10', 'Diana Green', 'Overproduction', 'Excess bread production for the day', NULL, 1);    
+-- =================================================================
+-- SAMPLE DATA INSERTION (in proper dependency order)
+-- =================================================================
 
--- Insert sample wastage items
-INSERT INTO backery_system.wastage_items (wastage_id, item_id, quantity, estimated_loss) VALUES
-(1, 1, 10, 120.00),
-(1, 2, 5, 50.00),
-(2, 3, 20, 300.00),
-(2, 4, 15, 180.00),
-(3, 9, 30, 360.00),
-(3, 1, 25, 300.00);
+-- 1. Insert users
+INSERT INTO users (email, password) VALUES
+('admin@bakery.com', '$2a$12$SD046euRGXliGfAAedXiQ.mECP/0NgOiZnIMAx.k.vaIbcxd0JuCi');
+
+-- 2. Insert suppliers
+INSERT INTO supplier (name, address, city, contact_name, contact_phone, contact_email) VALUES
+('Golden Grain Flour Mills', '123 Mill Road', 'Colombo', 'Nimal Perera', '0771234567', 'nimal@goldenflour.lk'),
+('SweetSugar Distributors', '45 Sweet Street', 'Kandy', 'Ruwan Silva', '0712345678', 'ruwan@sweetsugar.com'),
+('Bakers Butter Supply', '10 Dairy Lane', 'Galle', 'Sunil Fernando', '0759876543', 'sunil@bakersbutter.lk'),
+('FreshEggs Ltd.', '88 Farm Avenue', 'Kurunegala', 'Kumari Jayasinghe', '0761231234', NULL),
+('ChocoDelight Suppliers', '200 Cocoa Drive', 'Matara', 'Anura Wijesinghe', '0784567890', 'anura@chocodelight.lk');
+
+-- 3. Insert items
+INSERT INTO items (item_code, name, unit, reorder_level) VALUES
+('I001', 'Wheat Flour', 'kg', 50),
+('I002', 'Sugar', 'kg', 30),
+('I003', 'Eggs', 'quantity', 100),
+('I004', 'Butter', 'g', 5000),
+('I005', 'Milk', 'L', 20),
+('I006', 'Bread Flour', 'kg', 40),
+('I007', 'Brown Sugar', 'kg', 25),
+('I008', 'Cheese', 'g', 3000),
+('I009', 'Fresh Milk', 'L', 30);
+
+-- 4. Insert departments
+INSERT INTO departments (name) VALUES
+('Cake'),
+('Bakery'),
+('Pastry'),
+('Chinese'),
+('Savory'),
+('Staff');
+
+-- 5. Insert purchases (after suppliers and users)
+INSERT INTO purchases (invoice_no, purchase_date, supplier_id, bill_amount, paid_amount, payment_method, remarks, prepared_by) VALUES
+('PUR-20240601-1234', '2024-06-01 10:00:00', 1, 25000.00, 25000.00, 'CASH', 'Monthly flour order', 1),
+('PUR-20240605-5678', '2024-06-05 14:30:00', 2, 15000.00, 10000.00, 'BANK_TRANSFER', 'Sugar for cakes', 1),
+('PUR-20240610-9012', '2024-06-10 09:15:00', 3, 18000.00, 18000.00, 'CREDIT', 'Dairy products', 1);
+
+-- 6. Insert purchase items (after purchases)
+INSERT INTO purchase_items (purchase_id, item_name, quantity, unit_price) VALUES
+(1, 'Wheat Flour', 500.000, 40.00),
+(1, 'Bread Flour', 300.000, 45.00),
+(2, 'White Sugar', 200.000, 50.00),
+(2, 'Brown Sugar', 100.000, 55.00),
+(3, 'Fresh Milk', 150.000, 80.00),
+(3, 'Butter', 50.000, 120.00),
+(3, 'Cheese', 30.000, 200.00);
+
+-- 7. Insert opening balances (after items and users)
+INSERT INTO opening_balances (date, item_id, quantity, unit_cost, entered_by) VALUES 
+('2025-07-01', 1, 50.000, 120.00, 1),
+('2025-07-01', 2, 30.000, 50.00, 1),
+('2025-07-01', 3, 100.000, 15.00, 1),
+('2025-07-01', 4, 5000.000, 0.80, 1),
+('2025-07-01', 9, 20.000, 120.00, 1);
+
+-- 8. Insert issuances (after departments and users)
+INSERT INTO issuances (issuance_date, issued_by, department_id, received_by, remarks, approved_by) VALUES
+('2024-06-01 10:00:00', 1, 1, 'John Doe', 'Monthly supply for Cake department', 'Jane Smith'),
+('2024-06-05 14:30:00', 1, 2, 'Alice Brown', 'Weekly supply for Bakery department', 'Bob Johnson'),
+('2024-06-10 09:15:00', 1, 3, 'Charlie White', 'Daily supply for Pastry department', 'Diana Green');
+
+-- 9. Insert issuance items (after issuances and items)
+INSERT INTO issuance_items (issuance_id, item_id, quantity) VALUES    
+(1, 1, 20.000),
+(1, 2, 10.000),
+(2, 3, 50.000),
+(2, 4, 30.000),
+(3, 9, 15.000),
+(3, 1, 25.000);
+
+-- 10. Insert wastages (after departments and users)
+INSERT INTO wastages (wastage_note_number, date, approved_by, reason, department_id, remarks, entered_by) VALUES
+('WST-20240601-001', '2024-06-01', 'Jane Smith', 'Expired', 1, 'Expired flour batch', 1),
+('WST-20240605-002', '2024-06-05', 'Bob Johnson', 'Damaged', 2, 'Damaged sugar bags during transport', 1),
+('WST-20240610-003', '2024-06-10', 'Diana Green', 'Overproduction', 3, 'Excess bread production', 1);
+
+-- 11. Insert wastage items (after wastages and items)
+INSERT INTO wastage_items (wastage_id, item_id, quantity, estimated_loss) VALUES
+(1, 1, 10.000, 120.00),
+(1, 2, 5.000, 50.00),
+(2, 3, 20.000, 300.00),
+(2, 4, 15.000, 180.00),
+(3, 9, 30.000, 360.00),
+(3, 1, 25.000, 300.00);
+
+INSERT INTO `wastage_items` VALUES 
+(1,1,10.000,120.00),
+(1,5.000,50.00),
+(2,20.000,300.00),
+(2,15.000,180.00),
+(3,30.000,360.00),
+(3,25.000,300.00),
+(4,1.000,100.00);

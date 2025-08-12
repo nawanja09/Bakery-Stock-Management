@@ -3,14 +3,15 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Purchase.css'; 
+import { usePopup } from '../context/PopupContext';
 
 const AddPurchase = () => {
   const navigate = useNavigate();
   const [suppliers, setSuppliers] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [itemsList, setItemsList] = useState([]); // For item dropdown
-  const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
+  const { showPopup } = usePopup();
   const [formData, setFormData] = useState({
     purchase_date: new Date().toISOString().split('T')[0],
     supplier_id: '',
@@ -73,8 +74,6 @@ const AddPurchase = () => {
       } catch (error) {
         console.error('Error fetching departments:', error);
         alert(`Error loading departments: ${error.message}`);
-      } finally {
-        setLoading(false);
       }
     };
 
@@ -150,15 +149,15 @@ const AddPurchase = () => {
 
       if (response.ok) {
         const result = await response.json();
-        alert(`Purchase created successfully! Invoice: ${result.invoice_no}`);
+        showPopup('success', `Purchase created successfully! Invoice: ${result.invoice_no}`);
         navigate('/purchase/history');
       } else {
         const errorData = await response.json();
-        alert(`Error: ${errorData.error}`);
+        showPopup('error', `Error: ${errorData.error}`);
       }
     } catch (error) {
       console.error('Error creating purchase:', error);
-      alert('Server error');
+      showPopup('error', 'Server error');
     }
   };
 

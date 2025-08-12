@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSave } from '@fortawesome/free-solid-svg-icons';
 import './ChangePassword.css';
+import { usePopup } from '../components/context/PopupContext'
 
 const ChangePassword = () => {
     const [currentPassword, setCurrentPassword] = useState('');
@@ -11,6 +12,7 @@ const ChangePassword = () => {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [message, setMessage] = useState('');
     const [loading, setLoading] = useState(false);
+    const { showPopup } = usePopup();
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -31,6 +33,7 @@ const ChangePassword = () => {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
                 },
                 body: JSON.stringify({
                     currentPassword,
@@ -41,12 +44,12 @@ const ChangePassword = () => {
                 throw new Error('Failed to change password');
             }
             const data = await response.json();
-            setMessage(data.message || 'Password changed successfully');
+            showPopup('success', data.message || 'Password changed successfully');
             setCurrentPassword('');
             setNewPassword('');
             setConfirmPassword('');
         } catch (error) {
-            setMessage(error.message || 'An error occurred while changing password');
+            showPopup('error', error.message || 'An error occurred while changing password');
         } finally {
             setLoading(false);
         }
