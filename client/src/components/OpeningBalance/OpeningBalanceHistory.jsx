@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './OpeningBalance.css';
+import api from '../../api';
 
 const OpeningBalanceHistory = () => {
   const [balances, setBalances] = useState([]);
@@ -11,12 +12,8 @@ const OpeningBalanceHistory = () => {
   useEffect(() => {
     const fetchBalances = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/opening-balances');
-        if (!response.ok) {
-          throw new Error('Failed to fetch opening balances');
-        }
-        const data = await response.json();
-        setBalances(data);
+        const response = await api.get('/opening-balances');
+        setBalances(response.data);
       } catch (err) {
         setError(err.message);
       } finally {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Wastage.css';
+import api from '../../api';
 
 const WastageHistory = () => {
   const [wastages, setWastages] = useState([]);
@@ -21,25 +22,13 @@ const WastageHistory = () => {
           return;
         }
 
-        const response = await fetch('http://localhost:5000/api/wastages', {
+        const response = await api.get('/wastages', {
           headers: {
             'Authorization': `Bearer ${token}`
           }
         });
 
-        if (response.status === 401) {
-          // Token expired or invalid
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          navigate('/login');
-          return;
-        }
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch wastages: ${response.status}`);
-        }
-
-        const data = await response.json();
+        const data = response.data;
         setWastages(data);
       } catch (error) {
         console.error('Error fetching wastages:', error);
@@ -58,7 +47,7 @@ const WastageHistory = () => {
     setSelectedWastage(null);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/wastages/${id}`, {
+      const response = await api.get(`/wastages/${id}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

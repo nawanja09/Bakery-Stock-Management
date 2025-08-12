@@ -4,6 +4,7 @@ import bakeryLogo from '../images/icon.jpeg';
 import { usePopup } from './context/PopupContext';
 import { Link } from 'react-router-dom';
 import './Login.css';
+import api from '../api';
 
 const Login = () => {
   const [formData, setFormData] = useState({
@@ -26,15 +27,10 @@ const Login = () => {
     setIsLoading(true);
     
     try {
-      const response = await fetch('http://localhost:5000/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      });
-      
-      const data = await response.json();
-      
-      if (response.ok) {
+      const response = await api.post('/login', formData);
+      const data = await response.data;
+
+      if (response.status === 200) {
         // Store token without quotes
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));

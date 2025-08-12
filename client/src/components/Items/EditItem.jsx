@@ -6,6 +6,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowLeft, faSave } from '@fortawesome/free-solid-svg-icons';
 import { usePopup } from '../context/PopupContext';
 import './ItemManagement.css';
+import api from '../../api';
 
 const EditItem = () => {
   const { id } = useParams();
@@ -23,17 +24,16 @@ const EditItem = () => {
   useEffect(() => {
     const fetchItem = async () => {
       try {
-        const response = await fetch(`http://localhost:5000/api/items/${id}`);
-        const data = await response.json();
-        
-        if (response.ok) {
+        const response = await api.get(`/items/${id}`);
+        const data = response.data;
+
+        if (response.status === 200) {
           setFormData({
             item_code: data.item_code,
             item_name: data.name,
             unit: data.unit,
             reorder_level: data.reorder_level
           });
-          showPopup('success', `Fetched item details for ID: ${id}`);
         } else {
           showPopup('error', data.error || 'Failed to fetch item');
         }
@@ -62,15 +62,11 @@ const EditItem = () => {
         reorder_level: formData.reorder_level
       };
 
-      const response = await fetch(`http://localhost:5000/api/items/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+      const response = await api.put(`/items/${id}`, payload);
 
-      const data = await response.json();
-      
-      if (response.ok) {
+      const data = response.data;
+
+      if (response.status === 200) {
         setMessage('Item updated successfully!');
         setTimeout(() => navigate('/items'), 1500); 
       } else {

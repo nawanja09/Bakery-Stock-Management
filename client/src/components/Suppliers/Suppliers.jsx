@@ -3,6 +3,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus } from '@fortawesome/free-solid-svg-icons';
 import './Suppliers.css';
 import { usePopup } from '../context/PopupContext';
+import api from '../../api';
 
 const Suppliers = () => {
   const [suppliers, setSuppliers] = useState([]);
@@ -24,9 +25,8 @@ const Suppliers = () => {
 
   const fetchSuppliers = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/suppliers');
-      const data = await response.json();
-      setSuppliers(data);
+      const response = await api.get('/suppliers');
+      setSuppliers(response.data);
     } catch (error) {
       console.error('Error fetching suppliers:', error);
     } finally {
@@ -42,12 +42,7 @@ const Suppliers = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch('http://localhost:5000/api/suppliers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newSupplier)
-      });
-
+      const response = await api.post('/suppliers', newSupplier);
       if (response.ok) {
         await fetchSuppliers();
         setShowForm(false);

@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import './StockReport.css';
+import api from '../../api';
 
 const StockReport = () => {
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -12,9 +13,8 @@ const StockReport = () => {
   const fetchStockReport = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`http://localhost:5000/api/reports/stock?date=${selectedDate}`);
-      const data = await response.json();
-      setStockData(data);
+      const response = await api.get(`/reports/stock?date=${selectedDate}`);
+      setStockData(response.data);
     } catch (error) {
       console.error('Error fetching stock report:', error);
       alert('Failed to fetch stock report');

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { usePopup } from '../context/PopupContext';
 import './Issuance.css';
+import api from '../../api';
 
 // Modal version of IssuanceDetails for popup use
 const IssuanceDetailsModal = ({ id }) => {
@@ -11,9 +12,8 @@ const IssuanceDetailsModal = ({ id }) => {
   useEffect(() => {
     const fetchIssuance = async () => {
       try {
-        const response = await fetch(`http://localhost:5000/api/issuances/${id}`);
-        const data = await response.json();
-        setIssuance(data);
+        const response = await api.get(`/issuances/${id}`);
+        setIssuance(response.data);
       } catch (err) {
         showPopup('error', 'Failed to fetch issuance details');
       } finally {
@@ -93,9 +93,8 @@ const IssuanceHistory = () => {
   useEffect(() => {
     const fetchIssuances = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/issuances');
-        const data = await response.json();
-        setIssuances(data);
+        const response = await api.get('/issuances');
+        setIssuances(response.data);
       } catch (error) {
         console.error('Error fetching issuances:', error);
       } finally {

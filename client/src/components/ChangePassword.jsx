@@ -4,7 +4,8 @@ import React, { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSave } from '@fortawesome/free-solid-svg-icons';
 import './ChangePassword.css';
-import { usePopup } from '../components/context/PopupContext'
+import { usePopup } from '../components/context/PopupContext';
+import api from '../api';
 
 const ChangePassword = () => {
     const [currentPassword, setCurrentPassword] = useState('');
@@ -29,21 +30,14 @@ const ChangePassword = () => {
         }
 
         try {
-            const response = await fetch('http://localhost:5000/api/change-password', { 
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                },
-                body: JSON.stringify({
-                    currentPassword,
-                    newPassword,
-                }),
+            const response = await api.post('/change-password', { 
+                currentPassword,
+                newPassword,
             });
-            if (!response.ok) {
+            if (response.status !== 200) {
                 throw new Error('Failed to change password');
             }
-            const data = await response.json();
+            const data = await response.data;
             showPopup('success', data.message || 'Password changed successfully');
             setCurrentPassword('');
             setNewPassword('');
