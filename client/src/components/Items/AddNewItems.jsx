@@ -14,7 +14,6 @@ const AddItem = () => {
     unit: 'kg', 
     reorder_level: ''
   });
-  const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { showPopup } = usePopup();
@@ -129,7 +128,6 @@ const AddItem = () => {
         </div>
       </form>
 
-      {message && <p className="message">{message}</p>}
     </div>
   );
 };
