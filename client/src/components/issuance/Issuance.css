@@ -160,10 +160,9 @@
   position: relative;
 }
 
-.details-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 20px;
+.details-row.vertical {
+  display: block;
+  flex-direction: column;
   margin-bottom: 20px;
 }
 

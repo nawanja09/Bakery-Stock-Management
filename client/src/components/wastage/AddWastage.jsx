@@ -155,29 +155,13 @@ const AddWastage = () => {
               <option value="Other">Other</option>
             </select>
           </div>
-          <div className="form-group">
-            <label>Which Department</label>
-            <select
-              value={formData.department_id}
-              onChange={(e) => setFormData({ ...formData, department_id: e.target.value })}
-              required
-            >
-              <option value="">Select Department</option>
-              {departments.map(department => (
-                <option key={department.id} value={department.id}>
-                  {department.name}
-                </option>
-              ))}
-            </select>
+           <div className="form-group">
+            <label>Remarks / Notes</label>
+            <textarea
+              value={formData.remarks}
+              onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
+            />
           </div>
-        </div>
-
-        <div className="form-group">
-          <label>Remarks / Notes</label>
-          <textarea
-            value={formData.remarks}
-            onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
-          />
         </div>
 
         <h3>Wasted Items</h3>

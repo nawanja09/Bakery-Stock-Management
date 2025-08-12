@@ -45,6 +45,7 @@ const WastageHistory = () => {
     setModalLoading(true);
     setModalError('');
     setSelectedWastage(null);
+
     try {
       const token = localStorage.getItem('token');
       const response = await api.get(`/wastages/${id}`, {
@@ -52,11 +53,13 @@ const WastageHistory = () => {
           'Authorization': `Bearer ${token}`
         }
       });
-      if (!response.ok) throw new Error('Failed to fetch wastage details');
-      const data = await response.json();
+
+      const data = response.data;
       setSelectedWastage(data);
+
     } catch (err) {
-      setModalError(err.message);
+      console.error('Error fetching wastage details:', err);
+      setModalError(err.message || 'Something went wrong');
     } finally {
       setModalLoading(false);
     }
@@ -113,23 +116,13 @@ const WastageHistory = () => {
             {selectedWastage && (
               <div className="wastage-details-modal">
                 <h2>Wastage Note: {selectedWastage.wastage_note_number}</h2>
-                <div className="details-row">
-                  <div>
-                    <label>Date:</label>
-                    <div>{new Date(selectedWastage.date).toLocaleDateString()}</div>
-                  </div>
-                  <div>
-                    <label>Approved By:</label>
-                    <div>{selectedWastage.approved_by}</div>
-                  </div>
-                  <div>
-                    <label>Reason:</label>
-                    <div>{selectedWastage.reason}</div>
-                  </div>
-                  <div>
-                    <label>Entered By:</label>
-                    <div>{selectedWastage.entered_by}</div>
-                  </div>
+                <div className="details-row vertical">
+                  <ul className="details-list">
+                    <li><strong>Date:</strong> {new Date(selectedWastage.date).toLocaleDateString()}</li>
+                    <li><strong>Approved By:</strong> {selectedWastage.approved_by}</li>
+                    <li><strong>Reason:</strong> {selectedWastage.reason}</li>
+                    <li><strong>Entered By:</strong> {selectedWastage.entered_by}</li>
+                  </ul>
                 </div>
                 <div className="remarks-section">
                   <strong>Remarks:</strong> <span>{selectedWastage.remarks || 'N/A'}</span>

@@ -255,7 +255,6 @@
 .remarks-section {
   margin-top: 2rem;
   padding-top: 1rem;
-  border-top: 1px solid #eee;
 }
 
 .attachment-section {
@@ -266,3 +265,71 @@
   width: 100%;
   overflow-x: auto;
 } 
+
+/* Better readability and spacing for details list */
+.purchase-details ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.purchase-details ul li {
+  margin-bottom: 1rem;
+  font-size: 1rem;
+  color: #333;
+}
+
+/* Invoice and supplier card styling */
+.details-row.vertical {
+  padding: 1.5rem;
+}
+
+/* Enhanced totals box */
+.totals-section {
+  padding: 1rem 1.5rem;
+  margin-top: 2rem;
+}
+
+.totals-row {
+  font-size: 1rem;
+  color: #444;
+}
+
+.totals-row span:last-child {
+  font-weight: 600;
+}
+
+/* Highlight due amount in red */
+.totals-row.due span:last-child {
+  color: #dc3545;
+}
+
+/* Remarks box */
+.remarks-section {
+  padding: 1rem 1.5rem;
+  border: 1px;
+  border-radius: 8px;
+  margin-top: 2rem;
+  font-size: 1rem;
+}
+
+/* Enhanced items table */
+.items-table table {
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.03);
+}
+
+.items-table th,
+.items-table td {
+  padding: 1rem;
+  font-size: 0.95rem;
+}
+
+.items-table tr:nth-child(even) {
+  background-color: #fdfbff;
+}
+
+.items-table tr:hover {
+  background-color: #f4efff;
+}

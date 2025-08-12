@@ -31,29 +31,27 @@ const IssuanceDetailsModal = ({ id }) => {
       <div className="header-with-actions">
         <h2>Issuance ID: {issuance.id}</h2>
       </div>
-      <div className="details-row">
-        <div>
-          <label>Date:</label>
-          <div>{new Date(issuance.issuance_date).toLocaleDateString()}</div>
-        </div>
-        <div>
-          <label>Department:</label>
-          <div>{issuance.department_name}</div>
-        </div>
-        <div>
-          <label>Issued By:</label>
-          <div>{issuance.issued_by_email}</div>
-        </div>
-        <div>
-          <label>Received By:</label>
-          <div>{issuance.received_by}</div>
-        </div>
-        {issuance.approved_by && (
-          <div>
-            <label>Approved By</label>
-            <div>{issuance.approved_by}</div>
-          </div>
-        )}
+      <div className="details-row vertical">
+        <ul className="details-list">
+          <li>
+            <strong>Date:</strong> {new Date(issuance.issuance_date).toLocaleDateString()}
+          </li>
+          <li>
+            <strong>Approved By:</strong> {issuance.approved_by}
+          </li>
+          <li>
+            <strong>Reason:</strong> {issuance.reason}
+          </li>
+          <li>
+            <strong>Entered By:</strong> {issuance.entered_by}
+          </li>
+          {issuance.approved_by && (
+            <li>
+              <strong>Approved By:</strong> {issuance.approved_by}
+            </li>
+          )}
+        </ul>
+        
       </div>
       <div className="remarks-section">
         <strong>Remarks:</strong> <span>{issuance.remarks || 'N/A'}</span>

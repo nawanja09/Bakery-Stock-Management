@@ -51,34 +51,24 @@ const PurchaseDetails = () => {
       </div>
 
       <div className="purchase-details">
-        <div className="details-row">
-          <div>
-            <label>Invoice No.</label>
-            <p>{purchase.invoice_no}</p>
-          </div>
-          <div>
-            <label>Date</label>
-            <p>{new Date(purchase.purchase_date).toLocaleDateString()}</p>
-          </div>
-          <div>
-            <label>Payment Method</label>
-            <p>{purchase.payment_method}</p>
-          </div>
-        </div>
-
-        <div className="details-row">
-          <div>
-            <label>Supplier</label>
-            <p>{purchase.supplier_name}</p>
-          </div>
-          <div>
-            <label>Contact</label>
-            <p>{purchase.contact_name} | {purchase.contact_phone}</p>
-          </div>
-          <div>
-            <label>Prepared By</label>
-            <p>User ID {purchase.prepared_by}</p>
-          </div>
+        <div className="details-row vertical">
+          <ul>
+            <li>
+              <strong>Invoice No.:</strong> {purchase.invoice_no}
+            </li>
+            <li>
+              <strong> Date:</strong> {purchase.purchase_date}
+            </li>
+            <li>
+              <strong>Payment Method:</strong> {purchase.payment_method}
+            </li>
+            <li>
+              <strong>Supplier:</strong> {purchase.supplier_name}
+            </li>
+            <li>
+              <strong>Contact:</strong> {purchase.contact_name} | {purchase.contact_phone}
+            </li>
+          </ul>
         </div>
 
         <div className="totals-section">
