@@ -70,11 +70,10 @@
 /* Stats Cards */
 .stats-container {
   display: flex;
+  flex-wrap: wrap; /* wrap to new line if needed */
+  gap: 15px;
   justify-content: space-between;
-  gap: 20px;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  margin-bottom: 30p;
+  margin-bottom:20px;
 }
 
 .stat-card {
@@ -93,7 +92,7 @@
   box-shadow: 0 12px 32px rgba(78, 115, 223, 0.12), 0 2px 8px rgba(0,0,0,0.06);
 }
 
-.sales-card { background: #ffe0e6; }
+.wastage-card { background: #ffe0e6; }
 .balance-card { background: #fff5d9; }
 .purchasing-card { background: #e6fff5; }
 .issues-card { background: #e6e6ff; }
@@ -116,7 +115,7 @@
   font-size: 22px;
 }
 
-.sales-card .stat-icon { background: #ff6384; color: white; }
+.wastage-card .stat-icon { background: #ff6384; color: white; }
 .balance-card .stat-icon { background: #f6c23e; color: white; }
 .purchasing-card .stat-icon { background: #1cc88a; color: white; }
 .issues-card .stat-icon { background: #6f42c1; color: white; }
@@ -491,15 +490,14 @@
   margin-bottom: 15px;
 }
 
-@media (max-width: 1024px) {
-  .header-controls {
-    flex-wrap: wrap;
-    justify-content: flex-start;
-    gap: 10px;
+@media (min-width: 1024px) {
+  .stats-container {
+    flex-wrap: nowrap;
+    justify-content: space-between;
   }
 
-  .dashboard-header {
-    flex-direction: column;
-    align-items: flex-start;
+  .stat-card {
+    flex: 0 0 24%;
+    max-width: 24%;
   }
 }

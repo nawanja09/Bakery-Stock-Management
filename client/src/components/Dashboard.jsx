@@ -5,10 +5,10 @@ import icon from '../images/icon.jpeg';
 
 const Dashboard = () => {
   const [stats, setStats] = useState({
-    totalSales: 0,
     openingBalance: 0,
     purchasing: 0,
-    issues: 0
+    issues: 0,
+    wastage: 0
   });
   
   const [chartData, setChartData] = useState(null);
@@ -61,40 +61,40 @@ const Dashboard = () => {
 
       {/* Stats Cards */}
       <div className="stats-container">
-        <div className="stat-card sales-card">
-          <div className="stat-header">
-            <div className="stat-icon">&#128200;</div>
-            <div className="stat-title">Total Sales</div>
-          </div>
-          <div className="stat-value">${(stats.totalSales || 0).toLocaleString()}</div>
-          <div className="stat-change positive">+95% from yesterday</div>
-        </div>
-        
         <div className="stat-card balance-card">
           <div className="stat-header">
             <div className="stat-icon">&#128176;</div>
             <div className="stat-title">Opening Balance</div>
           </div>
-          <div className="stat-value">{(stats.openingBalance || 0).toLocaleString()}</div>
-          <div className="stat-change positive">+125% from yesterday</div>
+          <div className="stat-value">Rs. {stats.openingBalance.toLocaleString()}</div>
+          <div className="stat-change positive"></div>
         </div>
-        
+
         <div className="stat-card purchasing-card">
           <div className="stat-header">
             <div className="stat-icon">&#128722;</div>
             <div className="stat-title">Purchasing</div>
           </div>
-          <div className="stat-value">{stats.purchasing || 0}</div>
-          <div className="stat-change positive">+125% from yesterday</div>
+          <div className="stat-value">{stats.purchasing.toLocaleString()}</div>
+          <div className="stat-change positive"></div>
         </div>
-        
+
         <div className="stat-card issues-card">
           <div className="stat-header">
             <div className="stat-icon">&#9888;</div>
             <div className="stat-title">Issues</div>
           </div>
-          <div className="stat-value">{stats.issues || 0}</div>
-          <div className="stat-change neutral">0.75% from yesterday</div>
+          <div className="stat-value">{stats.issues.toLocaleString()}</div>
+          <div className="stat-change neutral"></div>
+        </div>
+
+        <div className="stat-card wastage-card">
+          <div className="stat-header">
+            <div className="stat-icon">&#128200;</div>
+            <div className="stat-title">Wastage</div>
+          </div>
+          <div className="stat-value">{stats.wastage.toLocaleString()}</div>
+          <div className="stat-change positive"></div>
         </div>
       </div>
 

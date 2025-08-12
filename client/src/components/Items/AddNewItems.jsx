@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSave } from '@fortawesome/free-solid-svg-icons';
 import './ItemManagement.css';
+import { usePopup } from '../context/PopupContext';
 
 const AddItem = () => {
   const [formData, setFormData] = useState({
@@ -16,6 +17,7 @@ const AddItem = () => {
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const { showPopup } = usePopup();
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -44,8 +46,8 @@ const AddItem = () => {
       const data = await response.json();
       
       if (response.ok) {
-        setMessage(`Item added successfully! ID: ${data.id}`);
-        setTimeout(() => navigate('/items'), 1500); 
+        showPopup('success', `Item added successfully! ID: ${data.id}`);
+        setTimeout(() => navigate('/items'), 1500);
         setFormData({
           item_code: '',
           item_name: '',
@@ -53,10 +55,10 @@ const AddItem = () => {
           reorder_level: ''
         });
       } else {
-        setMessage(data.error || 'Failed to add item');
+        showPopup('error', data.error || 'Failed to add item');
       }
     } catch (error) {
-      setMessage('Network error. Please try again.');
+      showPopup('error', 'Network error. Please try again.');
     } finally {
       setIsLoading(false);
     }

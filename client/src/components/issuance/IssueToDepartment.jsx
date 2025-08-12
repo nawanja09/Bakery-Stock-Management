@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { usePopup } from '../context/PopupContext';
 import './Issuance.css';
 
 const IssueToDepartment = () => {
@@ -7,6 +8,7 @@ const IssueToDepartment = () => {
   const [departments, setDepartments] = useState([]);
   const [items, setItems] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
+  const { showPopup } = usePopup();
   const [formData, setFormData] = useState({
     issuance_date: new Date().toISOString().split('T')[0],
     department_id: '',
@@ -99,15 +101,15 @@ const IssueToDepartment = () => {
 
       if (response.ok) {
         const result = await response.json();
-        alert(`Issuance created successfully! ID: ${result.issuance_id}`);
+        showPopup('success', `Issuance created successfully! ID: ${result.issuance_id}`);
         navigate('/issuance/history');
       } else {
         const errorData = await response.json();
-        alert(`Error: ${errorData.error}`);
+        showPopup('error', `Error: ${errorData.error}`);
       }
     } catch (error) {
       console.error('Error creating issuance:', error);
-      alert('Server error');
+      showPopup('error', 'Server error');
     }
   };
 

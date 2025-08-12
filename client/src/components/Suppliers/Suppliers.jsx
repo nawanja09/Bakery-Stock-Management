@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus } from '@fortawesome/free-solid-svg-icons';
 import './Suppliers.css';
+import { usePopup } from '../context/PopupContext';
 
 const Suppliers = () => {
   const [suppliers, setSuppliers] = useState([]);
@@ -15,6 +16,7 @@ const Suppliers = () => {
     contact_email: ''
   });
   const [loading, setLoading] = useState(true);
+  const { showPopup } = usePopup();
 
   useEffect(() => {
     fetchSuppliers();
@@ -57,11 +59,12 @@ const Suppliers = () => {
           contact_phone: '',
           contact_email: ''
         });
+        showPopup('success', 'Supplier added successfully!');
       } else {
-        console.error('Failed to add supplier');
+        showPopup('error', 'Failed to add supplier');
       }
     } catch (error) {
-      console.error('Error adding supplier:', error);
+      showPopup('error', `Error adding supplier: ${error.message}`);
     }
   };
 

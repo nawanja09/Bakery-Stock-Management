@@ -1,0 +1,93 @@
+/* src/components/common/Popup.css */
+.popup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.popup-container {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  width: 350px;
+  overflow: hidden;
+}
+
+.popup-header {
+  padding: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #eee;
+}
+
+.popup-header h3 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #888;
+}
+
+.popup-content {
+  padding: 20px;
+  min-height: 80px;
+  display: flex;
+  align-items: center;
+}
+
+.popup-footer {
+  padding: 12px 16px;
+  text-align: right;
+  background: #f9f9f9;
+}
+
+.btn-ok {
+  padding: 8px 16px;
+  background: #4a6cf7;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+/* Success styling */
+.success .popup-header {
+  background: #4CAF50;
+  color: white;
+}
+
+.success .popup-header h3 {
+  color: white;
+}
+
+.success .popup-header .close-btn {
+  color: white;
+}
+
+/* Error styling */
+.error .popup-header {
+  background: #f44336;
+  color: white;
+}
+
+.error .popup-header h3 {
+  color: white;
+}
+
+.error .popup-header .close-btn {
+  color: white;
+}

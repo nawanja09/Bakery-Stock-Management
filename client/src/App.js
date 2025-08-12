@@ -19,6 +19,7 @@ import IssuanceHistory from './components/issuance/IssuanceHistory';
 import AddWastage from './components/wastage/AddWastage';
 import WastageHistory from './components/wastage/WastageHistory';
 import StockReport from './components/report/StockReport';
+import Register from './components/Register'
 
 import './App.css';
 
@@ -39,6 +40,7 @@ function App() {
       <div className="app">
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path='/register' element={<Register />} />
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/auth-check" element={<AuthCheck />} />
 
@@ -51,6 +53,7 @@ function App() {
               </ProtectedRoute>
             }
           >
+            
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="purchase/new" element={<AddPurchase />} />
             <Route path="purchase/history" element={<PurchaseHistory />} />

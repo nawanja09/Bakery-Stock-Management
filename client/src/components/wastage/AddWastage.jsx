@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Wastage.css';
+import { usePopup } from '../context/PopupContext';
 
 const AddWastage = () => {
   const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [departments, setDepartments] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { showPopup } = usePopup();
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     approved_by: '',
@@ -42,8 +43,6 @@ const AddWastage = () => {
         } catch (error) {
           console.error('Error fetching departments:', error);
           alert(`Error loading departments: ${error.message}`);
-        } finally {
-          setLoading(false);
         }
       };
   
@@ -107,15 +106,15 @@ const AddWastage = () => {
 
       if (response.ok) {
         const result = await response.json();
-        alert(`Wastage recorded successfully! Note #: ${result.wastage_note_number}`);
+        showPopup('success', `Wastage recorded successfully! Note #: ${result.wastage_note_number}`);
         navigate('/wastage/history');
       } else {
         const errorData = await response.json();
-        alert(`Error: ${errorData.error}`);
+        showPopup('error', `Error: ${errorData.error}`);
       }
     } catch (error) {
       console.error('Error creating wastage:', error);
-      alert('Server error');
+      showPopup('error', 'Server error');
     }
   };
 

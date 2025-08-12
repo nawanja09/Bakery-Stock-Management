@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowLeft, faSave } from '@fortawesome/free-solid-svg-icons';
+import { usePopup } from '../context/PopupContext';
 import './ItemManagement.css';
 
 const EditItem = () => {
@@ -17,6 +18,7 @@ const EditItem = () => {
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const { showPopup } = usePopup();
 
   useEffect(() => {
     const fetchItem = async () => {
@@ -31,16 +33,17 @@ const EditItem = () => {
             unit: data.unit,
             reorder_level: data.reorder_level
           });
+          showPopup('success', `Fetched item details for ID: ${id}`);
         } else {
-          setMessage(data.error || 'Failed to fetch item');
+          showPopup('error', data.error || 'Failed to fetch item');
         }
       } catch (error) {
-        setMessage('Network error. Please try again.');
+        showPopup('error', 'Network error. Please try again.');
       }
     };
 
     fetchItem();
-  }, [id]);
+  }, [id, showPopup]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;

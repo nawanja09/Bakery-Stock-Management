@@ -11,13 +11,6 @@ const getDateRange = (days = 7) => {
 // Dashboard stats
 exports.getDashboardStats = async (req, res) => {
   try {
-    // Total Sales (last 30 days)
-    const [salesResult] = await pool.query(
-      `SELECT SUM(bill_amount) AS totalSales 
-       FROM purchases 
-       WHERE purchase_date BETWEEN CURDATE() - INTERVAL 30 DAY AND CURDATE()`
-    );
-    
     // Opening Balance (latest)
     const [openingResult] = await pool.query(
       `SELECT SUM(total_value) AS openingBalance
@@ -39,11 +32,18 @@ exports.getDashboardStats = async (req, res) => {
        WHERE issuance_date BETWEEN CURDATE() - INTERVAL 7 DAY AND CURDATE()`
     );
 
+    // Wastage (last 7 days count)
+    const [wastageResult] = await pool.query(
+      `SELECT COUNT(*) AS wastage 
+       FROM wastages 
+       WHERE date BETWEEN CURDATE() - INTERVAL 7 DAY AND CURDATE()`
+    );
+
     res.json({
-      totalSales: salesResult[0].totalSales || 0,
       openingBalance: openingResult[0].openingBalance || 0,
       purchasing: purchasingResult[0].purchasing || 0,
-      issues: issuesResult[0].issues || 0
+      issues: issuesResult[0].issues || 0,
+      wastage: wastageResult[0].wastage || 0
     });
     
   } catch (error) {

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSave } from '@fortawesome/free-solid-svg-icons';
+import { usePopup } from '../context/PopupContext';
 import './OpeningBalance.css';
 
 const AddOpeningBalance = () => {
@@ -15,6 +16,7 @@ const AddOpeningBalance = () => {
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const { showPopup } = usePopup();
 
   useEffect(() => {
     const fetchItems = async () => {
@@ -65,13 +67,13 @@ const AddOpeningBalance = () => {
       const data = await response.json();
       
       if (response.ok) {
-        setMessage('Opening balance added successfully!');
+        showPopup('success', 'Opening balance added successfully!');
         setTimeout(() => navigate('/opening/history'), 1500);
       } else {
-        setMessage(data.error || 'Failed to add opening balance');
+        showPopup('error', data.error || 'Failed to add opening balance');
       }
     } catch (error) {
-      setMessage('Network error. Please try again.');
+      showPopup('error', 'Network error. Please try again.');
     } finally {
       setIsLoading(false);
     }

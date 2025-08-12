@@ -31,6 +31,17 @@ const ChartStats = ({ chartData }) => {
     issuesVsWastageData
   } = chartData;
 
+  // Get last 7 days for Opening Balance and Purchasing
+  const last7OpeningLabels = openingBalanceData.labels.slice(-7);
+  const last7OpeningData = openingBalanceData.data.slice(-7);
+  const last7PurchasingLabels = purchasingData.labels.slice(-7);
+  const last7PurchasingData = purchasingData.data.slice(-7);
+
+  // Get last 7 days for Issues vs Wastage
+  const last7IssuesLabels = issuesVsWastageData.labels.slice(-7);
+  const last7IssuesData = issuesVsWastageData.issues.slice(-7);
+  const last7WastageData = issuesVsWastageData.wastage.slice(-7);
+
   const totalSalesChart = {
     labels: totalSalesData.labels,
     datasets: [{
@@ -88,16 +99,16 @@ const ChartStats = ({ chartData }) => {
           <h3>Opening Balance vs Purchasing</h3>
           <Bar
             data={{
-              labels: issuesVsWastageData.labels,
+              labels: last7OpeningLabels,
               datasets: [
                 {
                   label: 'Opening Balance',
-                  data: openingBalanceData.data,
+                  data: last7OpeningData,
                   backgroundColor: '#f6c23e',
                 },
                 {
                   label: 'Purchasing',
-                  data: purchasingData.data,
+                  data: last7PurchasingData,
                   backgroundColor: '#1cc88a',
                 },
               ],
@@ -116,16 +127,16 @@ const ChartStats = ({ chartData }) => {
           <h3>Issues vs Wastage</h3>
           <Bar
             data={{
-              labels: issuesVsWastageData.labels,
+              labels: last7IssuesLabels,
               datasets: [
                 {
                   label: 'Issues',
-                  data: issuesVsWastageData.issues,
+                  data: last7IssuesData,
                   backgroundColor: '#6f42c1',
                 },
                 {
                   label: 'Wastage',
-                  data: issuesVsWastageData.wastage,
+                  data: last7WastageData,
                   backgroundColor: '#ff6384',
                 },
               ],
