@@ -6,6 +6,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faEdit, faTrash } from '@fortawesome/free-solid-svg-icons';
 import { usePopup } from '../context/PopupContext';
 import './ItemManagement.css';
+import api from '../../api';
 
 const ViewItems = () => {
   const [items, setItems] = useState([]);
@@ -17,9 +18,9 @@ const ViewItems = () => {
   useEffect(() => {
     const fetchItems = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/items');
-        const data = await response.json();
-        if (response.ok) {
+        const response = await api.get('/items');
+        const data = response.data;
+        if (response.status === 200) {
           setItems(data);
         } else {
           showPopup('error', data.error || 'Failed to fetch items');
@@ -42,16 +43,14 @@ const ViewItems = () => {
     const handleDelete = async (id) => {
         if (window.confirm('Are you sure you want to delete this item?')) {
             try {
-            const response = await fetch(`http://localhost:5000/api/items/${id}`, {
-                method: 'DELETE'
-            });
+            const response = await api.delete(`/items/${id}`);
 
-            if (response.ok) {
+            if (response.status === 200) {
                 setItems(items.filter(item => item.id !== id));
                 setMessage('Item deleted successfully!');
                 setTimeout(() => navigate('/items'), 1500); 
             } else {
-                const data = await response.json();
+                const data = response.data;
                 alert(data.error || 'Failed to delete item');
             }
             } catch (error) {

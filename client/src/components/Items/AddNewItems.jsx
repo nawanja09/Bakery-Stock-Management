@@ -6,6 +6,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSave } from '@fortawesome/free-solid-svg-icons';
 import './ItemManagement.css';
 import { usePopup } from '../context/PopupContext';
+import api from '../../api';
 
 const AddItem = () => {
   const [formData, setFormData] = useState({
@@ -36,15 +37,11 @@ const AddItem = () => {
         reorder_level: formData.reorder_level
       };
 
-      const response = await fetch('http://localhost:5000/api/items', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+      const response = await api.post('/items', payload);
 
-      const data = await response.json();
-      
-      if (response.ok) {
+      const data = response.data;
+
+      if (response.status === 201) {
         showPopup('success', `Item added successfully! ID: ${data.id}`);
         setTimeout(() => navigate('/items'), 1500);
         setFormData({

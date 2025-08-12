@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePopup } from '../context/PopupContext';
 import './Issuance.css';
+import api from '../../api';
 
 const IssueToDepartment = () => {
   const navigate = useNavigate();
@@ -24,9 +25,8 @@ const IssueToDepartment = () => {
 
     const fetchDepartments = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/departments');
-        const data = await response.json();
-        setDepartments(data);
+        const response = await api.get('/departments');
+        setDepartments(response.data);
       } catch (error) {
         console.error('Error fetching departments:', error);
       }
@@ -34,9 +34,8 @@ const IssueToDepartment = () => {
 
     const fetchItems = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/items');
-        const data = await response.json();
-        setItems(data);
+        const response = await api.get('/items');
+        setItems(response.data);
       } catch (error) {
         console.error('Error fetching items:', error);
       }
@@ -93,19 +92,13 @@ const IssueToDepartment = () => {
     };
 
     try {
-      const response = await fetch('http://localhost:5000/api/issuances', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedFormData)
-      });
+      const response = await api.post('/issuances', updatedFormData);
 
-      if (response.ok) {
-        const result = await response.json();
-        showPopup('success', `Issuance created successfully! ID: ${result.issuance_id}`);
+      if (response.status === 201) {
+        showPopup('success', `Issuance created successfully! ID: ${response.data.issuance_id}`);
         navigate('/issuance/history');
       } else {
-        const errorData = await response.json();
-        showPopup('error', `Error: ${errorData.error}`);
+        showPopup('error', `Error: ${response.data.error}`);
       }
     } catch (error) {
       console.error('Error creating issuance:', error);

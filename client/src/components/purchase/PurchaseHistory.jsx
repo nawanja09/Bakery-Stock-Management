@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSearch } from '@fortawesome/free-solid-svg-icons';
 import './Purchase.css';
+import api from '../../api';
 
 const PurchaseHistory = () => {
   const [purchases, setPurchases] = useState([]);
@@ -11,12 +12,8 @@ const PurchaseHistory = () => {
   useEffect(() => {
     const fetchPurchases = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/purchases');
-        if (!response.ok) {
-          throw new Error('Failed to fetch purchases');
-        }
-        const data = await response.json();
-        setPurchases(data);
+        const response = await api.get('/purchases');
+        setPurchases(response.data);
       } catch (error) {
         console.error('Error fetching purchases:', error);
         alert('Failed to load purchase history');
@@ -24,7 +21,6 @@ const PurchaseHistory = () => {
         setLoading(false);
       }
     };
-
     fetchPurchases();
   }, []);
 

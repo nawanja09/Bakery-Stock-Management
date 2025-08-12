@@ -5,6 +5,7 @@ import { usePopup } from './context/PopupContext';
 import { useState } from 'react';
 import { Link } from 'react-router-dom'
 import bakeryLogo from '../images/icon.jpeg';
+import api from '../api';
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -28,15 +29,11 @@ const Register = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://localhost:5000/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      });
+      const response = await api.post('/register', formData);
 
-      const data = await response.json();
+      const data = await response.data;
 
-      if (response.ok) {
+      if (response.status === 200) {
         showPopup('success', 'Registration successful!');
         setTimeout(() => {
           navigate('/login');

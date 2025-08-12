@@ -4,6 +4,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSave } from '@fortawesome/free-solid-svg-icons';
 import { usePopup } from '../context/PopupContext';
 import './OpeningBalance.css';
+import api from '../../api';
 
 const AddOpeningBalance = () => {
   const [formData, setFormData] = useState({
@@ -21,9 +22,8 @@ const AddOpeningBalance = () => {
   useEffect(() => {
     const fetchItems = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/items');
-        const data = await response.json();
-        setItems(data);
+        const response = await api.get('/items');
+        setItems(response.data);
       } catch (error) {
         console.error('Error fetching items:', error);
       }
@@ -58,15 +58,10 @@ const AddOpeningBalance = () => {
     };
 
     try {
-      const response = await fetch('http://localhost:5000/api/opening-balances', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+      const response = await api.post('/opening-balances', payload);
+      const data = response.data;
 
-      const data = await response.json();
-      
-      if (response.ok) {
+      if (response.status === 201) {
         showPopup('success', 'Opening balance added successfully!');
         setTimeout(() => navigate('/opening/history'), 1500);
       } else {

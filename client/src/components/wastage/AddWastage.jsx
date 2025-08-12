@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Wastage.css';
 import { usePopup } from '../context/PopupContext';
+import api from '../../api';
 
 const AddWastage = () => {
   const navigate = useNavigate();
@@ -20,9 +21,8 @@ const AddWastage = () => {
   useEffect(() => {
     const fetchItems = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/items');
-        const data = await response.json();
-        setItems(data);
+        const response = await api.get('/items');
+        setItems(response.data);
       } catch (error) {
         console.error('Error fetching items:', error);
       }
@@ -32,27 +32,22 @@ const AddWastage = () => {
   }, []);
 
   useEffect(() => {
-      const fetchDepartments = async () => {
-        try {
-          const response = await fetch('http://localhost:5000/api/departments');
-          if (!response.ok) {
-            throw new Error(`Server error: ${response.status}`);
-          }
-          const data = await response.json();
-          setDepartments(data);
-        } catch (error) {
-          console.error('Error fetching departments:', error);
-          alert(`Error loading departments: ${error.message}`);
-        }
-      };
-  
-      fetchDepartments();
-    }, []);
+    const fetchDepartments = async () => {
+      try {
+        const response = await api.get('/departments');
+        setDepartments(response.data);
+      } catch (error) {
+        console.error('Error fetching departments:', error);
+        alert(`Error loading departments: ${error.message}`);
+      }
+    };
 
+    fetchDepartments();
+  }, []);
 
   const handleItemChange = (index, field, value) => {
     const newItems = [...formData.items];
-    
+
     // Convert to number for numeric fields
     if (field === 'quantity' || field === 'estimated_loss' || field === 'unit_price') {
       value = Number(value) || 0;
@@ -61,8 +56,7 @@ const AddWastage = () => {
     newItems[index][field] = value;
 
     // Auto-set unit when item is selected
-    if(field === 'item_id') {
-      // item.id may be number, value from select is string
+    if (field === 'item_id') {
       const selectedItem = items.find(item => String(item.id) === String(value));
       newItems[index].unit = selectedItem ? selectedItem.unit : '';
     }
@@ -91,13 +85,13 @@ const AddWastage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     const token = localStorage.getItem('token');
-    
+
     try {
-      const response = await fetch('http://localhost:5000/api/wastages', {
+      const response = await api.post('/wastages', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
@@ -125,31 +119,31 @@ const AddWastage = () => {
         <div className="form-row">
           <div className="form-group">
             <label>Date</label>
-            <input 
-              type="date" 
+            <input
+              type="date"
               value={formData.date}
-              onChange={(e) => setFormData({...formData, date: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, date: e.target.value })}
               required
             />
           </div>
-          
+
           <div className="form-group">
             <label>Approved By</label>
-            <input 
+            <input
               type="text"
               value={formData.approved_by}
-              onChange={(e) => setFormData({...formData, approved_by: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, approved_by: e.target.value })}
               required
             />
           </div>
         </div>
-        
+
         <div className="form-row">
           <div className="form-group">
             <label>Reason for Wastage</label>
             <select
               value={formData.reason}
-              onChange={(e) => setFormData({...formData, reason: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
               required
             >
               <option value="Expired">Expired</option>
@@ -165,7 +159,7 @@ const AddWastage = () => {
             <label>Which Department</label>
             <select
               value={formData.department_id}
-              onChange={(e) => setFormData({...formData, department_id: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, department_id: e.target.value })}
               required
             >
               <option value="">Select Department</option>
@@ -180,9 +174,9 @@ const AddWastage = () => {
 
         <div className="form-group">
           <label>Remarks / Notes</label>
-          <textarea 
+          <textarea
             value={formData.remarks}
-            onChange={(e) => setFormData({...formData, remarks: e.target.value})}
+            onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
           />
         </div>
 
@@ -224,7 +218,7 @@ const AddWastage = () => {
                     required
                   />
                 </td>
-               <td>
+                <td>
                   <input
                     type="text"
                     value={item.unit}
@@ -242,8 +236,8 @@ const AddWastage = () => {
                   />
                 </td>
                 <td>
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     className="btn-remove"
                     onClick={() => removeItemRow(index)}
                   >
@@ -254,22 +248,22 @@ const AddWastage = () => {
             ))}
           </tbody>
         </table>
-        
-        <button 
-          type="button" 
+
+        <button
+          type="button"
           className="btn-add"
           onClick={addItemRow}
         >
           + Add Item
         </button>
-        
+
         <div className="summary">
           <div className="total-loss">
             <strong>Total Estimated Loss:</strong>
             <span>Rs. {calculateTotalLoss()}</span>
           </div>
         </div>
-        
+
         <button type="submit" className="btn-submit">Save Wastage</button>
       </form>
     </div>

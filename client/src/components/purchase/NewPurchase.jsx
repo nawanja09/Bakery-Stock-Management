@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Purchase.css'; 
 import { usePopup } from '../context/PopupContext';
+import api from '../../api';
 
 const AddPurchase = () => {
   const navigate = useNavigate();
@@ -31,12 +32,8 @@ const AddPurchase = () => {
 
     const fetchSuppliers = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/suppliers');
-        if (!response.ok) {
-          throw new Error(`Server error: ${response.status}`);
-        }
-        const data = await response.json();
-        setSuppliers(data);
+        const response = await api.get('/suppliers');
+        setSuppliers(response.data);
       } catch (error) {
         console.error('Error fetching suppliers:', error);
         alert(`Error loading suppliers: ${error.message}`);
@@ -45,13 +42,8 @@ const AddPurchase = () => {
 
     const fetchItems = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/items');
-        if (!response.ok) {
-          throw new Error(`Server error: ${response.status}`);
-        }
-        const data = await response.json();
-        console.log('Fetched items:', data); // Add this line
-        setItemsList(data);
+        const response = await api.get('/items');
+        setItemsList(response.data);
       } catch (error) {
         console.error('Error fetching items:', error);
         alert(`Error loading items: ${error.message}`);
@@ -65,12 +57,8 @@ const AddPurchase = () => {
   useEffect(() => {
     const fetchDepartments = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/departments');
-        if (!response.ok) {
-          throw new Error(`Server error: ${response.status}`);
-        }
-        const data = await response.json();
-        setDepartments(data);
+        const response = await api.get('/departments');
+        setDepartments(response.data);
       } catch (error) {
         console.error('Error fetching departments:', error);
         alert(`Error loading departments: ${error.message}`);
@@ -141,12 +129,7 @@ const AddPurchase = () => {
     };
 
     try {
-      const response = await fetch('http://localhost:5000/api/purchases', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedFormData)
-      });
-
+      const response = await api.post('/purchases', updatedFormData);
       if (response.ok) {
         const result = await response.json();
         showPopup('success', `Purchase created successfully! Invoice: ${result.invoice_no}`);
@@ -204,36 +187,6 @@ const AddPurchase = () => {
               <option value="CASH">Cash</option>
               <option value="BANK_TRANSFER">Bank Transfer</option>
               <option value="CREDIT">Credit</option>
-            </select>
-          </div>
-          
-          <div className="form-group">
-            <label>Paid Amount (Rs.)</label>
-            <input 
-              type="number"
-              min="0"
-              step="0.01"
-              value={formData.paid_amount}
-              onChange={(e) => setFormData({...formData, paid_amount: parseFloat(e.target.value)})}
-              required
-            />
-          </div>
-        </div>
-
-        <div className="form-row">
-          <div className="form-group">
-            <label>Which Department</label>
-            <select
-              value={formData.department_id}
-              onChange={(e) => setFormData({...formData, department_id: e.target.value})}
-              required
-            >
-              <option value="">Select Department</option>
-              {departments.map(department => (
-                <option key={department.id} value={department.id}>
-                  {department.name}
-                </option>
-              ))}
             </select>
           </div>
           <div className="form-group">
@@ -315,6 +268,23 @@ const AddPurchase = () => {
         >
           + Add Item
         </button>
+        
+        <div className="form-row">
+          <div className="form-group">
+            <label>Paid Amount (Rs.)</label>
+            <input 
+              type="number"
+              min="0"
+              step="0.01"
+              value={formData.paid_amount}
+              onChange={(e) => setFormData({
+                ...formData, 
+                paid_amount: parseFloat(e.target.value) || 0
+              })}
+              required
+            />
+          </div>
+        </div>
         
         <div className="summary">
           <div className="total">

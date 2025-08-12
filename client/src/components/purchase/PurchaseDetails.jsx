@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import './Purchase.css';
+import api from '../../api';
 
 const PurchaseDetails = () => {
   const { id } = useParams();
@@ -12,12 +13,8 @@ const PurchaseDetails = () => {
   useEffect(() => {
     const fetchPurchase = async () => {
       try {
-        const response = await fetch(`http://localhost:5000/api/purchases/${id}`);
-        if (!response.ok) {
-          throw new Error(`HTTP error! Status: ${response.status}`);
-        }
-
-        const data = await response.json();
+        const response = await api.get(`/purchases/${id}`);
+        const data = response.data;
         const processedData = {
           ...data,
           bill_amount: Number(data.bill_amount),
