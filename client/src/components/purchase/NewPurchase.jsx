@@ -98,33 +98,28 @@ const AddPurchase = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Check if user is available
     if (!currentUser || !currentUser.id) {
-      alert('User information is missing. Please login again.');
+      showPopup('error', 'User information is missing. Please login again.');
       navigate('/login');
       return;
     }
     
-    // Update form data with user ID
     const updatedFormData = {
       ...formData,
       bill_amount: calculateTotal(),
-      prepared_by: currentUser.id // Add user ID here
+      prepared_by: currentUser.id
     };
 
     try {
       const response = await api.post('/purchases', updatedFormData);
-      if (response.ok) {
-        const result = await response.json();
-        showPopup('success', `Purchase created successfully! Invoice: ${result.invoice_no}`);
-        navigate('/purchase/history');
-      } else {
-        const errorData = await response.json();
-        showPopup('error', `Error: ${errorData.error}`);
-      }
+      // Axios puts response data in response.data
+      showPopup('success', `Purchase created successfully! Invoice: ${response.data.invoice_no}`);
+      navigate('/purchase/history');
     } catch (error) {
       console.error('Error creating purchase:', error);
-      showPopup('error', 'Server error');
+      // Axios error response is in error.response.data
+      const errorMessage = error.response?.data?.error || 'Server error';
+      showPopup('error', `Error: ${errorMessage}`);
     }
   };
 
