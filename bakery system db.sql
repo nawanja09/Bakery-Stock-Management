@@ -113,13 +113,11 @@ CREATE TABLE wastages (
     date DATE NOT NULL,
     approved_by VARCHAR(255) NOT NULL,
     reason ENUM('Expired', 'Damaged', 'Overproduction', 'Poor Storage', 'Forecasting errors', 'Human error', 'Other') NOT NULL,
-    department_id INT,
     remarks TEXT,
     attachment_path VARCHAR(255),
     entered_by INT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (entered_by) REFERENCES users(id),
-    FOREIGN KEY (department_id) REFERENCES departments(id)
 );
 
 -- Wastage Items Table 
@@ -210,10 +208,10 @@ INSERT INTO issuance_items (issuance_id, item_id, quantity) VALUES
 (3, 1, 25.000);
 
 -- 10. Insert wastages (after departments and users)
-INSERT INTO wastages (wastage_note_number, date, approved_by, reason, department_id, remarks, entered_by) VALUES
-('WST-20240601-001', '2024-06-01', 'Jane Smith', 'Expired', 1, 'Expired flour batch', 1),
-('WST-20240605-002', '2024-06-05', 'Bob Johnson', 'Damaged', 2, 'Damaged sugar bags during transport', 1),
-('WST-20240610-003', '2024-06-10', 'Diana Green', 'Overproduction', 3, 'Excess bread production', 1);
+INSERT INTO wastages (wastage_note_number, date, approved_by, reason, remarks, entered_by) VALUES
+('WST-20240601-001', '2024-06-01', 'Jane Smith', 'Expired', 'Expired flour batch', 1),
+('WST-20240605-002', '2024-06-05', 'Bob Johnson', 'Damaged', 'Damaged sugar bags during transport', 1),
+('WST-20240610-003', '2024-06-10', 'Diana Green', 'Overproduction', 'Excess bread production', 1);
 
 -- 11. Insert wastage items (after wastages and items)
 INSERT INTO wastage_items (wastage_id, item_id, quantity, estimated_loss) VALUES

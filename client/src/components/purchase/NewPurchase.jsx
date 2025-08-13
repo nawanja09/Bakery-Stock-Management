@@ -248,7 +248,7 @@ const AddPurchase = () => {
           + Add Item
         </button>
         
-        <div className="form-row">
+        <div className="form">
           <div className="form-group">
             <label>Paid Amount (Rs.)</label>
             <input 
