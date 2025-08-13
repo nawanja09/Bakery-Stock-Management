@@ -16,7 +16,6 @@ const EditItem = () => {
     unit: 'kg',
     reorder_level: ''
   });
-  const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { showPopup } = usePopup();
@@ -67,13 +66,13 @@ const EditItem = () => {
       const data = response.data;
 
       if (response.status === 200) {
-        setMessage('Item updated successfully!');
-        setTimeout(() => navigate('/items'), 1500); 
+        showPopup('success', 'Item updated successfully!');
+        setTimeout(() => navigate('/items'), 1500);
       } else {
-        setMessage(data.error || 'Failed to update item');
+        showPopup('error', data.error || 'Failed to update item');
       }
     } catch (error) {
-      setMessage('Network error. Please try again.');
+      showPopup('error', 'Network error. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -145,8 +144,6 @@ const EditItem = () => {
             </button>
         </div>
       </form>
-
-      {message && <p className="message">{message}</p>}
     </div>
   );
 };

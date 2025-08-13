@@ -11,7 +11,6 @@ import api from '../../api';
 const ViewItems = () => {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState('');
   const navigate = useNavigate();
   const { showPopup } = usePopup();
 
@@ -47,14 +46,14 @@ const ViewItems = () => {
 
             if (response.status === 200) {
                 setItems(items.filter(item => item.id !== id));
-                setMessage('Item deleted successfully!');
-                setTimeout(() => navigate('/items'), 1500); 
+                showPopup('success', 'Item deleted successfully!');
+                setTimeout(() => navigate('/items'), 1500);
             } else {
                 const data = response.data;
-                alert(data.error || 'Failed to delete item');
+                showPopup('error', data.error || 'Failed to delete item');
             }
             } catch (error) {
-            alert('Network error. Please try again.');
+            showPopup('error', 'Network error. Please try again.');
             }
         }
     };
@@ -98,8 +97,6 @@ const ViewItems = () => {
           </tbody>
         </table>
       )}
-
-      {message && <p className="message">{message}</p>}
     </div>
   );
 };
