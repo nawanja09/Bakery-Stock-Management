@@ -230,3 +230,7 @@ INSERT INTO `wastage_items` VALUES
 (3,30.000,360.00),
 (3,25.000,300.00),
 (4,1.000,100.00);
+
+--delete the department_id column in the wastages table
+ALTER TABLE backery_system.wastages DROP FOREIGN KEY wastages_ibfk_2;
+ALTER TABLE backery_system.wastages DROP COLUMN department_id;
