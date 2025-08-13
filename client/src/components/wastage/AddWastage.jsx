@@ -7,14 +7,12 @@ import api from '../../api';
 const AddWastage = () => {
   const navigate = useNavigate();
   const [items, setItems] = useState([]);
-  const [departments, setDepartments] = useState([]);
   const { showPopup } = usePopup();
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     approved_by: '',
     reason: 'Expired',
     remarks: '',
-    department_id: '',
     items: [{ item_id: '', quantity: 1, estimated_loss: 0, unit: '' }]
   });
 
@@ -29,20 +27,6 @@ const AddWastage = () => {
     };
 
     fetchItems();
-  }, []);
-
-  useEffect(() => {
-    const fetchDepartments = async () => {
-      try {
-        const response = await api.get('/departments');
-        setDepartments(response.data);
-      } catch (error) {
-        console.error('Error fetching departments:', error);
-        alert(`Error loading departments: ${error.message}`);
-      }
-    };
-
-    fetchDepartments();
   }, []);
 
   const handleItemChange = (index, field, value) => {

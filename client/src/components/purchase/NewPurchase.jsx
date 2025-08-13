@@ -9,7 +9,6 @@ import api from '../../api';
 const AddPurchase = () => {
   const navigate = useNavigate();
   const [suppliers, setSuppliers] = useState([]);
-  const [departments, setDepartments] = useState([]);
   const [itemsList, setItemsList] = useState([]); // For item dropdown
   const [currentUser, setCurrentUser] = useState(null);
   const { showPopup } = usePopup();
@@ -20,7 +19,6 @@ const AddPurchase = () => {
     paid_amount: 0,
     payment_method: 'CASH',
     remarks: '',
-    department_id: '',
     items: [
       { item_name: '', quantity: 1, unit_price: 0 }
     ]
@@ -52,20 +50,6 @@ const AddPurchase = () => {
 
     fetchSuppliers();
     fetchItems();
-  }, []);
-
-  useEffect(() => {
-    const fetchDepartments = async () => {
-      try {
-        const response = await api.get('/departments');
-        setDepartments(response.data);
-      } catch (error) {
-        console.error('Error fetching departments:', error);
-        alert(`Error loading departments: ${error.message}`);
-      }
-    };
-
-    fetchDepartments();
   }, []);
 
   const handleItemChange = (index, field, value) => {
@@ -285,7 +269,7 @@ const AddPurchase = () => {
             />
           </div>
         </div>
-        
+
         <div className="summary">
           <div className="total">
             <strong>Total Bill Amount:</strong>

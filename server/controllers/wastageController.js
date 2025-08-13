@@ -3,7 +3,7 @@ const { v4: uuidv4 } = require('uuid');
 
 // Create new wastage
 const createWastage = async (req, res) => {
- const { date, approved_by, reason, remarks, items, department_id } = req.body;  const user_id = req.user.userId;
+ const { date, approved_by, reason, remarks, items} = req.body;  const user_id = req.user.userId;
   const wastage_note_number = `WN-${uuidv4().substr(0, 8).toUpperCase()}`;
   
   const connection = await pool.getConnection();
@@ -14,9 +14,9 @@ const createWastage = async (req, res) => {
     // Insert wastage
     const [wastageResult] = await connection.query(
       `INSERT INTO wastages 
-      (wastage_note_number, date, approved_by, reason, remarks, entered_by, department_id) 
-      VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [wastage_note_number, date, approved_by, reason, remarks, user_id, department_id]
+      (wastage_note_number, date, approved_by, reason, remarks, entered_by) 
+      VALUES (?, ?, ?, ?, ?, ?)`,
+      [wastage_note_number, date, approved_by, reason, remarks, user_id]
     );
     
     const wastageId = wastageResult.insertId;
