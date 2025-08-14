@@ -36,9 +36,9 @@ const createPurchase = async (req, res) => {
     for (const item of items) {
       await connection.query(
         `INSERT INTO purchase_items 
-        (purchase_id, item_name, quantity, unit_price) 
-        VALUES (?, ?, ?, ?)`,
-        [purchaseId, item.item_name, item.quantity, item.unit_price]
+        (purchase_id, item_name, quantity, unit_price, item_id) 
+        VALUES (?, ?, ?, ?, ?)`,
+        [purchaseId, item.item_name, item.quantity, item.unit_price, item.id]
       );
     }
 
