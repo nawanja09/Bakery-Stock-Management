@@ -1,76 +1,137 @@
 .stock-report-container {
-  max-width: 1200px;
-  margin: 20px auto;
   padding: 20px;
   background-color: #fff;
   border-radius: 8px;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
-.report-controls {
+.report-header {
   display: flex;
-  gap: 15px;
-  margin-bottom: 20px;
+  justify-content: space-between;
   align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 15px;
 }
 
-.report-controls label {
-  display: flex;
-  flex-direction: column;
-  font-weight: 500;
+.header-info {
+  flex: 1;
+  min-width: 300px;
 }
 
-.report-controls input[type="date"] {
-  padding: 8px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+.item-details {
+  margin-top: 8px;
   font-size: 14px;
+  color: #666;
 }
 
-.btn-generate, .btn-download {
-  padding: 8px 15px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: 500;
-  transition: background-color 0.3s;
+.item-details span {
+  margin-right: 15px;
 }
 
-.btn-generate {
-  background-color: #4CAF50;
-  color: white;
-}
-
-.btn-download {
-  background-color: #2196F3;
-  color: white;
-}
-
-.btn-generate:hover {
-  background-color: #45a049;
-}
-
-.btn-download:hover {
-  background-color: #0b7dda;
+.report-actions {
+  display: flex;
+  gap: 10px;
 }
 
 .stock-report-table {
   width: 100%;
   border-collapse: collapse;
+  margin-top: 20px;
+}
+
+.stock-report-table th,
+.stock-report-table td {
+  padding: 12px 15px;
+  text-align: center;
+  border: 1px solid #e0e0e0;
 }
 
 .stock-report-table th {
-  background-color: #f2f2f2;
-  padding: 12px;
-  text-align: left;
-  border-bottom: 1px solid #ddd;
+  background-color: #f5f7fa;
+  font-weight: 600;
+  color: #333;
 }
 
-.stock-report-table td {
-  padding: 10px;
-  border-bottom: 1px solid #eee;
+.stock-report-table tbody tr:nth-child(even) {
+  background-color: #f9fafb;
 }
 
-.stock-report-table tr:hover {
-  background-color: #f9f9f9;
+.positive {
+  color: #2e7d32;
+  font-weight: 500;
+}
+
+.negative {
+  color: #d32f2f;
+  font-weight: 500;
+}
+
+.report-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 15px;
+  flex-wrap: wrap;
+}
+
+/* Buttons */
+.btn-back,
+.btn-print,
+.btn-excel {
+  padding: 8px 15px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.btn-back {
+  background-color: #f0f2f5;
+  color: #333;
+}
+
+.btn-print {
+  background-color: #e3f2fd;
+  color: #1565c0;
+}
+
+.btn-excel {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+}
+
+.btn-back:hover,
+.btn-print:hover,
+.btn-excel:hover {
+  opacity: 0.9;
+  transform: translateY(-2px);
+}
+
+.no-data {
+  text-align: center;
+  padding: 30px;
+  color: #666;
+  font-size: 16px;
+}
+
+/* Print styles */
+@media print {
+  .report-actions,
+  .btn-back {
+    display: none;
+  }
+
+  .stock-report-container {
+    box-shadow: none;
+    padding: 0;
+  }
+
+  .stock-report-table {
+    font-size: 12px;
+  }
 }
