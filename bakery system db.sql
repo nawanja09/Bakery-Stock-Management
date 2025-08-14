@@ -1,6 +1,6 @@
 -- Create database if not exists
-CREATE DATABASE IF NOT EXISTS backery_system;
-USE backery_system;
+CREATE DATABASE IF NOT EXISTS backery;
+USE backery;
 
 -- Users Table 
 CREATE TABLE users(
@@ -117,7 +117,7 @@ CREATE TABLE wastages (
     attachment_path VARCHAR(255),
     entered_by INT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (entered_by) REFERENCES users(id),
+    FOREIGN KEY (entered_by) REFERENCES users(id)
 );
 
 -- Wastage Items Table 
@@ -137,7 +137,8 @@ CREATE TABLE wastage_items (
 
 -- 1. Insert users
 INSERT INTO users (email, password) VALUES
-('admin@bakery.com', '$2a$12$SD046euRGXliGfAAedXiQ.mECP/0NgOiZnIMAx.k.vaIbcxd0JuCi');
+('admin@bakery.com', '$2a$12$SD046euRGXliGfAAedXiQ.mECP/0NgOiZnIMAx.k.vaIbcxd0JuCi'),
+('admin1@bakery.com', '$2a$12$eqtWphr./ecI48be8feIf.UJTeKloEvyYu6Ma1rgG3kh8imSjdpZq');
 
 -- 2. Insert suppliers
 INSERT INTO supplier (name, address, city, contact_name, contact_phone, contact_email) VALUES
@@ -170,9 +171,9 @@ INSERT INTO departments (name) VALUES
 
 -- 5. Insert purchases (after suppliers and users)
 INSERT INTO purchases (invoice_no, purchase_date, supplier_id, bill_amount, paid_amount, payment_method, remarks, prepared_by) VALUES
-('PUR-20240601-1234', '2024-06-01 10:00:00', 1, 25000.00, 25000.00, 'CASH', 'Monthly flour order', 1),
-('PUR-20240605-5678', '2024-06-05 14:30:00', 2, 15000.00, 10000.00, 'BANK_TRANSFER', 'Sugar for cakes', 1),
-('PUR-20240610-9012', '2024-06-10 09:15:00', 3, 18000.00, 18000.00, 'CREDIT', 'Dairy products', 1);
+('PUR-20240601-1234', '2024-07-01 10:00:00', 1, 25000.00, 25000.00, 'CASH', 'Monthly flour order', 1),
+('PUR-20240605-5678', '2024-08-05 14:30:00', 2, 15000.00, 10000.00, 'BANK_TRANSFER', 'Sugar for cakes', 1),
+('PUR-20240610-9012', '2024-07-10 09:15:00', 3, 18000.00, 18000.00, 'CREDIT', 'Dairy products', 1);
 
 -- 6. Insert purchase items (after purchases)
 INSERT INTO purchase_items (purchase_id, item_name, quantity, unit_price) VALUES
@@ -194,9 +195,9 @@ INSERT INTO opening_balances (date, item_id, quantity, unit_cost, entered_by) VA
 
 -- 8. Insert issuances (after departments and users)
 INSERT INTO issuances (issuance_date, issued_by, department_id, received_by, remarks, approved_by) VALUES
-('2024-06-01 10:00:00', 1, 1, 'John Doe', 'Monthly supply for Cake department', 'Jane Smith'),
-('2024-06-05 14:30:00', 1, 2, 'Alice Brown', 'Weekly supply for Bakery department', 'Bob Johnson'),
-('2024-06-10 09:15:00', 1, 3, 'Charlie White', 'Daily supply for Pastry department', 'Diana Green');
+('2024-07-01 10:00:00', 1, 1, 'John Doe', 'Monthly supply for Cake department', 'Jane Smith'),
+('2024-07-05 14:30:00', 1, 2, 'Alice Brown', 'Weekly supply for Bakery department', 'Bob Johnson'),
+('2024-07-10 09:15:00', 1, 3, 'Charlie White', 'Daily supply for Pastry department', 'Diana Green');
 
 -- 9. Insert issuance items (after issuances and items)
 INSERT INTO issuance_items (issuance_id, item_id, quantity) VALUES    
@@ -209,9 +210,9 @@ INSERT INTO issuance_items (issuance_id, item_id, quantity) VALUES
 
 -- 10. Insert wastages (after departments and users)
 INSERT INTO wastages (wastage_note_number, date, approved_by, reason, remarks, entered_by) VALUES
-('WST-20240601-001', '2024-06-01', 'Jane Smith', 'Expired', 'Expired flour batch', 1),
-('WST-20240605-002', '2024-06-05', 'Bob Johnson', 'Damaged', 'Damaged sugar bags during transport', 1),
-('WST-20240610-003', '2024-06-10', 'Diana Green', 'Overproduction', 'Excess bread production', 1);
+('WST-20240601-001', '2024-07-01', 'Jane Smith', 'Expired', 'Expired flour batch', 2),
+('WST-20240605-002', '2024-07-05', 'Bob Johnson', 'Damaged', 'Damaged sugar bags during transport', 2),
+('WST-20240610-003', '2024-07-10', 'Diana Green', 'Overproduction', 'Excess bread production', 2);
 
 -- 11. Insert wastage items (after wastages and items)
 INSERT INTO wastage_items (wastage_id, item_id, quantity, estimated_loss) VALUES
@@ -222,15 +223,7 @@ INSERT INTO wastage_items (wastage_id, item_id, quantity, estimated_loss) VALUES
 (3, 9, 30.000, 360.00),
 (3, 1, 25.000, 300.00);
 
-INSERT INTO `wastage_items` VALUES 
-(1,1,10.000,120.00),
-(1,5.000,50.00),
-(2,20.000,300.00),
-(2,15.000,180.00),
-(3,30.000,360.00),
-(3,25.000,300.00),
-(4,1.000,100.00);
 
 --delete the department_id column in the wastages table
-ALTER TABLE backery_system.wastages DROP FOREIGN KEY wastages_ibfk_2;
-ALTER TABLE backery_system.wastages DROP COLUMN department_id;
+ALTER TABLE backery.wastages DROP FOREIGN KEY wastages_ibfk_2;
+ALTER TABLE backery.wastages DROP COLUMN department_id;

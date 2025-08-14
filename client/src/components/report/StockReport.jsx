@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { format } from 'date-fns';
-import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
+import { format, subDays } from 'date-fns';
+import  jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import './StockReport.css';
 import api from '../../api';
 
@@ -24,61 +24,51 @@ const StockReport = () => {
   };
 
   const downloadPDF = () => {
-    import('jspdf').then((jsPDFModule) => {
-      import('jspdf-autotable').then((autoTableModule) => {
-        const { jsPDF } = jsPDFModule;
-        const autoTable = autoTableModule.default;
-        
-        const doc = new jsPDF();
-        const dateStr = new Date(selectedDate).toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric'
-        });
-        
-        // Title
-        doc.setFontSize(16);
-        doc.text(`Stock Report of ${dateStr}`, 15, 15);
-        
-        // Table data
-        const tableData = stockData.map(item => [
-          item.item_code,
-          item.item_name,
-          item.unit,
-          item.opening_balance,
-          item.total_purchased,
-          item.total_issued,
-          item.total_wasted,
-          item.closing_balance,
-        ]);
-        
-        // Table headers
-        const headers = [
-          'Item Code',
-          'Item Name',
-          'Unit',
-          'Opening',
-          'Purchased',
-          'Issued',
-          'Wasted',
-          'Closing'
-        ];
-        
-        // Generate table
-        autoTable(doc, {
-          head: [headers],
-          body: tableData,
-          startY: 25,
-          styles: { fontSize: 8 },
-          headStyles: { fillColor: [22, 160, 133] }
-        });
-        
-        doc.save(`stock-report-${selectedDate}.pdf`);
-      });
-    }).catch(error => {
-      console.error('Error generating PDF:', error);
-      alert('Failed to generate PDF. Please try again.');
+    const doc = new jsPDF();
+    const dateStr = new Date(selectedDate).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
     });
+    
+    // Title
+    doc.setFontSize(16);
+    doc.text(`Stock Report - ${dateStr}`, 15, 15);
+    
+    // Table data
+    const tableData = stockData.map(item => [
+      item.item_code,
+      item.item_name,
+      item.unit,
+      Number(item.opening_balance).toFixed(2),
+      Number(item.total_purchased).toFixed(2),
+      Number(item.total_issued).toFixed(2),
+      Number(item.total_wasted).toFixed(2),
+      Number(item.closing_balance).toFixed(2)
+    ]);
+    
+    // Table headers
+    const headers = [
+      'Item Code',
+      'Item Name',
+      'Unit',
+      'Opening',
+      'Purchased',
+      'Issued',
+      'Wasted',
+      'Closing'
+    ];
+    
+    // ✅ Use autoTable from the import, passing the doc instance
+    autoTable(doc, {
+      head: [headers],
+      body: tableData,
+      startY: 25,
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [22, 160, 133] }
+    });
+    
+    doc.save(`stock-report-${selectedDate}.pdf`);
   };
 
   return (
@@ -87,11 +77,12 @@ const StockReport = () => {
       
       <div className="report-controls">
         <label>
-          Select Date:
+          Report Date:
           <input 
             type="date" 
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
+            max={format(new Date(), 'yyyy-MM-dd')}
           />
         </label>
         
@@ -131,11 +122,23 @@ const StockReport = () => {
                   <td>{item.item_code}</td>
                   <td>{item.item_name}</td>
                   <td>{item.unit}</td>
-                   <td>{Number(item.opening_balance)}</td>
-                  <td>{Number(item.total_purchased)}</td>
-                  <td>{Number(item.total_issued)}</td>
-                  <td>{Number(item.total_wasted)}</td>
-                  <td>{Number(item.closing_balance)}</td>
+                  <td>
+                    {Number(item.opening_balance) % 1 === 0
+                      ? Number(item.opening_balance)
+                      : Number(item.opening_balance).toFixed(2)}
+                  </td>
+                  <td>{Number(item.total_purchased) % 1 === 0
+                    ? Number(item.total_purchased)
+                    : Number(item.total_purchased).toFixed(2)}</td>
+                  <td>{Number(item.total_issued) % 1 === 0
+                    ? Number(item.total_issued)
+                    : Number(item.total_issued).toFixed(2)}</td>
+                  <td>{Number(item.total_wasted) % 1 === 0
+                    ? Number(item.total_wasted)
+                    : Number(item.total_wasted).toFixed(2)}</td>
+                  <td>{Number(item.closing_balance) % 1 === 0
+                    ? Number(item.closing_balance)
+                    : Number(item.closing_balance).toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>

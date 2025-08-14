@@ -8,54 +8,100 @@ const getStockReport = async (req, res) => {
   }
 
   try {
+    // Calculate the previous date
+    const prevDate = new Date(date);
+    prevDate.setDate(prevDate.getDate() - 1);
+    const prevDateStr = prevDate.toISOString().split('T')[0];
+
     const query = `
       SELECT 
         i.id,
         i.item_code,
         i.name AS item_name,
         i.unit,
-        COALESCE(ob.opening_balance, 0) AS opening_balance,
+        COALESCE(prev.closing_balance, 0) AS opening_balance,
         COALESCE(purchases.total_purchased, 0) AS total_purchased,
         COALESCE(issues.total_issued, 0) AS total_issued,
         COALESCE(wastage.total_wasted, 0) AS total_wasted,
         (
-          COALESCE(ob.opening_balance, 0) + 
+          COALESCE(prev.closing_balance, 0) + 
           COALESCE(purchases.total_purchased, 0) - 
           COALESCE(issues.total_issued, 0) - 
           COALESCE(wastage.total_wasted, 0)
         ) AS closing_balance
       FROM items i
       LEFT JOIN (
-        SELECT item_id, SUM(quantity) AS opening_balance
-        FROM opening_balances
-        WHERE date <= ?
-        GROUP BY item_id
-      ) ob ON i.id = ob.item_id
+        -- Get previous day's closing balance
+        SELECT 
+          i2.id AS item_id,
+          (
+            COALESCE(ob.opening_balance, 0) + 
+            COALESCE(purchases.total_purchased, 0) - 
+            COALESCE(issues.total_issued, 0) - 
+            COALESCE(wastage.total_wasted, 0)
+          ) AS closing_balance
+        FROM items i2
+        LEFT JOIN (
+          SELECT item_id, SUM(quantity) AS opening_balance
+          FROM opening_balances
+          WHERE date <= ?
+          GROUP BY item_id
+        ) ob ON i2.id = ob.item_id
+        LEFT JOIN (
+          SELECT i.id AS item_id, SUM(pi.quantity) AS total_purchased
+          FROM purchase_items pi
+          JOIN purchases p ON pi.purchase_id = p.id
+          JOIN items i ON pi.item_name = i.name
+          WHERE p.purchase_date <= ?
+          GROUP BY i.id
+        ) purchases ON i2.id = purchases.item_id
+        LEFT JOIN (
+          SELECT ii.item_id, SUM(ii.quantity) AS total_issued
+          FROM issuance_items ii
+          JOIN issuances iss ON ii.issuance_id = iss.id
+          WHERE iss.issuance_date <= ?
+          GROUP BY ii.item_id
+        ) issues ON i2.id = issues.item_id
+        LEFT JOIN (
+          SELECT wi.item_id, SUM(wi.quantity) AS total_wasted
+          FROM wastage_items wi
+          JOIN wastages w ON wi.wastage_id = w.id
+          WHERE w.date <= ?
+          GROUP BY wi.item_id
+        ) wastage ON i2.id = wastage.item_id
+      ) prev ON i.id = prev.item_id
       LEFT JOIN (
+        -- Today's purchases
         SELECT i.id AS item_id, SUM(pi.quantity) AS total_purchased
         FROM purchase_items pi
         JOIN purchases p ON pi.purchase_id = p.id
         JOIN items i ON pi.item_name = i.name
-        WHERE p.purchase_date <= ?
+        WHERE DATE(p.purchase_date) = ?
         GROUP BY i.id
       ) purchases ON i.id = purchases.item_id
       LEFT JOIN (
+        -- Today's issues
         SELECT ii.item_id, SUM(ii.quantity) AS total_issued
         FROM issuance_items ii
         JOIN issuances iss ON ii.issuance_id = iss.id
-        WHERE iss.issuance_date <= ?
+        WHERE DATE(iss.issuance_date) = ?
         GROUP BY ii.item_id
       ) issues ON i.id = issues.item_id
       LEFT JOIN (
+        -- Today's wastage
         SELECT wi.item_id, SUM(wi.quantity) AS total_wasted
         FROM wastage_items wi
         JOIN wastages w ON wi.wastage_id = w.id
-        WHERE w.date <= ?
+        WHERE w.date = ?
         GROUP BY wi.item_id
       ) wastage ON i.id = wastage.item_id
     `;
 
-    const [rows] = await pool.query(query, [date, date, date, date]);
+    const [rows] = await pool.query(query, [
+      prevDateStr, prevDateStr, prevDateStr, prevDateStr, 
+      date, date, date
+    ]);
+    
     res.json(rows);
   } catch (error) {
     console.error('Error generating stock report:', error);
@@ -64,6 +110,3 @@ const getStockReport = async (req, res) => {
 };
 
 module.exports = { getStockReport };
-
-//formular of stock report
-//closing balance = opening balance + total purchased - total issued - total wasted
