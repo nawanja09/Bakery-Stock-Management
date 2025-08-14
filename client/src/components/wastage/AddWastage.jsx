@@ -69,30 +69,25 @@ const AddWastage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    const token = localStorage.getItem('token');
-
+    
     try {
-      const response = await api.post('/wastages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(formData)
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        showPopup('success', `Wastage recorded successfully! Note #: ${result.wastage_note_number}`);
+      const response = await api.post('/wastages', formData);
+      
+      if (response.status === 201) {
+        showPopup('success', `Wastage recorded successfully! Note #: ${response.data.wastage_note_number}`);
         navigate('/wastage/history');
-      } else {
-        const errorData = await response.json();
-        showPopup('error', `Error: ${errorData.error}`);
       }
     } catch (error) {
       console.error('Error creating wastage:', error);
-      showPopup('error', 'Server error');
+      
+      // Handle specific error cases
+      if (error.response?.status === 401) {
+        showPopup('error', 'Session expired. Please login again.');
+        navigate('/login');
+      } else {
+        const errorMessage = error.response?.data?.error || 'Server error';
+        showPopup('error', `Error: ${errorMessage}`);
+      }
     }
   };
 
