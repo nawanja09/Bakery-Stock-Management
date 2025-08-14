@@ -20,7 +20,7 @@ const AddPurchase = () => {
     payment_method: 'CASH',
     remarks: '',
     items: [
-      { item_name: '', quantity: 1, unit_price: 0 }
+      { id: '', item_name: '', quantity: 1, unit_price: 0 }
     ]
   });
 
@@ -83,6 +83,22 @@ const AddPurchase = () => {
     });
   };
 
+  // Create a new handler for item selection
+  const handleItemSelect = (index, itemId) => {
+    const selectedItem = itemsList.find(item => item.id == itemId);
+    if (!selectedItem) return;
+
+    const newItems = [...formData.items];
+    newItems[index] = {
+      ...newItems[index],
+      id: selectedItem.id,
+      item_name: selectedItem.name,
+      unit_price: selectedItem.purchase_price || 0
+    };
+    
+    setFormData({ ...formData, items: newItems });
+  };
+
   const removeItemRow = (index) => {
     if (formData.items.length <= 1) return;
     const newItems = formData.items.filter((_, i) => i !== index);
@@ -97,6 +113,12 @@ const AddPurchase = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Validate all items have IDs
+    if (formData.items.some(item => !item.id)) {
+      showPopup('error', 'Please select valid items for all rows');
+      return;
+    }
     
     if (!currentUser || !currentUser.id) {
       showPopup('error', 'User information is missing. Please login again.');
@@ -193,13 +215,13 @@ const AddPurchase = () => {
               <tr key={index}>
                 <td>
                   <select
-                    value={item.item_name}
-                    onChange={(e) => handleItemChange(index, 'item_name', e.target.value)}
+                    value={item.id}
+                    onChange={(e) => handleItemSelect(index, e.target.value)}
                     required
                   >
                     <option value="">Select Item</option>
                     {itemsList.map((itm) => (
-                      <option key={itm.id} value={itm.name}>
+                      <option key={itm.id} value={itm.id}>
                         {itm.name}
                       </option>
                     ))}
