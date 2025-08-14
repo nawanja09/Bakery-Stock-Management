@@ -85,7 +85,7 @@ const AddPurchase = () => {
 
   // Create a new handler for item selection
   const handleItemSelect = (index, itemId) => {
-    const selectedItem = itemsList.find(item => item.id == itemId);
+    const selectedItem = itemsList.find(item => item.id === parseInt(itemId));
     if (!selectedItem) return;
 
     const newItems = [...formData.items];
