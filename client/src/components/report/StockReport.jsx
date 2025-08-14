@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { format, subDays } from 'date-fns';
+import { format } from 'date-fns';
 import  jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import './StockReport.css';
