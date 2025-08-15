@@ -119,6 +119,60 @@
   font-size: 16px;
 }
 
+/* Button styles */
+.btn-generate,
+.download-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.3s ease;
+}
+
+/* Generate Report button */
+.btn-generate {
+  background-color: #3498db;
+  color: #fff;
+}
+
+.btn-generate:hover {
+  background-color: #2980b9;
+  transform: translateY(-2px);
+}
+
+/* Download PDF button */
+.download-btn {
+  background-color: #16a085;
+  color: #fff;
+}
+
+.download-btn:hover {
+  background-color: #138d75;
+  transform: translateY(-2px);
+}
+
+/* Keep both buttons aligned nicely */
+.report-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.report-controls label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+
+
 /* Print styles */
 @media print {
   .report-actions,

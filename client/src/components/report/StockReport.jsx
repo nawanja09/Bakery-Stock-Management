@@ -95,7 +95,7 @@ const StockReport = () => {
         </button>
         
         {stockData.length > 0 && (
-          <button onClick={downloadPDF} className="btn-download">
+          <button onClick={downloadPDF} className="download-btn">
             Download PDF
           </button>
         )}
