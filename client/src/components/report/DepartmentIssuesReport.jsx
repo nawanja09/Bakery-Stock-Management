@@ -8,7 +8,7 @@ import api from '../../api';
 
 const DepartmentIssuesReport = () => {
     const [departments, setDepartments] = useState([]);
-    const [selectedDepartment, setSelectedDepartment] = useState('all'); // Changed default to 'all'
+    const [selectedDepartment, setSelectedDepartment] = useState('all'); 
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [reportData, setReportData] = useState([]);
@@ -37,7 +37,7 @@ const DepartmentIssuesReport = () => {
     }, []);
 
     const generateReport = async () => {
-        if (!startDate || !endDate) { // Removed department check
+        if (!startDate || !endDate) { 
             alert('Please select a date range');
             return;
         }
@@ -54,7 +54,7 @@ const DepartmentIssuesReport = () => {
                 params.departmentId = selectedDepartment;
             }
 
-            const response = await api.get('/reports/department', { // Fixed endpoint
+            const response = await api.get('/reports/department', {
                 params
             });
             setReportData(response.data);
@@ -74,7 +74,7 @@ const DepartmentIssuesReport = () => {
         // Determine department name
         let departmentName = 'All Departments';
         if (selectedDepartment !== 'all') {
-            const department = departments.find(d => d.id == selectedDepartment);
+            const department = departments.find(d => d.id === parseInt(selectedDepartment));
             departmentName = department ? department.name : 'Selected Department';
         }
         
@@ -88,7 +88,7 @@ const DepartmentIssuesReport = () => {
         const tableData = reportData.map(item => [
             new Date(item.issuance_date).toLocaleDateString(),
             item.issuance_id,
-            item.department_name || 'N/A', // Added department name
+            item.department_name || 'N/A', 
             item.item_code,
             item.item_name,
             item.quantity,
@@ -100,7 +100,7 @@ const DepartmentIssuesReport = () => {
         const headers = [
             'Date',
             'Issuance ID',
-            'Department', // New column
+            'Department', 
             'Item Code',
             'Item Name',
             'Quantity',
@@ -151,7 +151,7 @@ const DepartmentIssuesReport = () => {
                 </button>
                 
                 {reportData.length > 0 && (
-                    <button onClick={downloadPDF} className="btn-download">
+                    <button onClick={downloadPDF} className="download-btn">
                         <FontAwesomeIcon icon={faDownload} /> Download PDF
                     </button>
                 )}
@@ -164,7 +164,7 @@ const DepartmentIssuesReport = () => {
                             <tr>
                                 <th>Date</th>
                                 <th>Issuance ID</th>
-                                <th>Department</th> {/* Added column */}
+                                <th>Department</th>
                                 <th>Item Code</th>
                                 <th>Item Name</th>
                                 <th>Quantity</th>
@@ -177,7 +177,7 @@ const DepartmentIssuesReport = () => {
                                 <tr key={index}>
                                     <td>{new Date(item.issuance_date).toLocaleDateString()}</td>
                                     <td>{item.issuance_id}</td>
-                                    <td>{item.department_name}</td> {/* Added data */}
+                                    <td>{item.department_name}</td>
                                     <td>{item.item_code}</td>
                                     <td>{item.item_name}</td>
                                     <td>{item.quantity}</td>

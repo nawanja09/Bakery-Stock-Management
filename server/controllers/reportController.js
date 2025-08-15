@@ -110,7 +110,6 @@ const getStockReport = async (req, res) => {
 };
 
 // Get department issues report
-// Get department issues report
 const getDepartmentIssuesReport = async (req, res) => {
     const { startDate, endDate, departmentId } = req.query;
 
@@ -155,8 +154,95 @@ const getDepartmentIssuesReport = async (req, res) => {
     }
 };
 
+const getPurchasingReport = async (req, res) => {
+  const { startDate, endDate } = req.query;
+
+  if (!startDate || !endDate) {
+    return res.status(400).json({ error: 'Start date and end date are required' });
+  }
+
+  try {
+    const [rows] = await pool.query(`
+      SELECT 
+        p.id,
+        p.invoice_no,
+        p.purchase_date,
+        s.name AS supplier_name,
+        p.payment_method,
+        p.bill_amount,
+        p.paid_amount
+      FROM purchases p
+      JOIN supplier s ON p.supplier_id = s.id
+      WHERE DATE(p.purchase_date) BETWEEN ? AND ?
+      ORDER BY p.purchase_date DESC
+    `, [startDate, endDate]);
+    
+    res.json(rows);
+  } catch (error) {
+    console.error('Error generating purchasing report:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+const getWastageReport = async (req, res) => {
+  const { startDate, endDate } = req.query;
+
+  if (!startDate || !endDate) {
+    return res.status(400).json({ error: 'Start date and end date are required' });
+  }
+
+  try {
+    const [wastages] = await pool.query(`
+      SELECT 
+        w.id,
+        w.wastage_note_number,
+        w.date,
+        w.approved_by,
+        w.reason,
+        w.remarks,
+        u.email AS entered_by
+      FROM wastages w
+      JOIN users u ON w.entered_by = u.id
+      WHERE w.date BETWEEN ? AND ?
+      ORDER BY w.date DESC
+    `, [startDate, endDate]);
+
+    if (wastages.length === 0) {
+      return res.json([]);
+    }
+
+    // Fetch items for each wastage
+    const wastageIds = wastages.map(w => w.id);
+    const [items] = await pool.query(`
+      SELECT 
+        wi.wastage_id,
+        i.item_code,
+        i.name AS item_name,
+        wi.quantity,
+        i.unit,
+        wi.estimated_loss
+      FROM wastage_items wi
+      JOIN items i ON wi.item_id = i.id
+      WHERE wi.wastage_id IN (?)
+    `, [wastageIds]);
+
+    // Attach items to their wastages
+    const result = wastages.map(wastage => ({
+      ...wastage,
+      items: items.filter(item => item.wastage_id === wastage.id)
+    }));
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error generating wastage report:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
 // Add to module.exports
 module.exports = {
   getStockReport,
   getDepartmentIssuesReport,
+  getPurchasingReport,
+  getWastageReport
 };
