@@ -25,43 +25,24 @@ ChartJS.register(
 
 const ChartStats = ({ chartData }) => {
   const {
-    totalSalesData,
     openingBalanceData,
     purchasingData,
     issuesVsWastageData
   } = chartData;
 
-  // Get last 7 days for Opening Balance and Purchasing
-  const last7OpeningLabels = openingBalanceData.labels.slice(-7);
-  const last7OpeningData = openingBalanceData.data.slice(-7);
-  const last7PurchasingLabels = purchasingData.labels.slice(-7);
-  const last7PurchasingData = purchasingData.data.slice(-7);
+  // Get last 7 days - align using common labels
+  const commonLabels = openingBalanceData.labels.slice(-7); 
 
-  // Get last 7 days for Issues vs Wastage
+  const last7PurchasingData = commonLabels.map(label => {
+    const idx = purchasingData.labels.indexOf(label);
+    return idx !== -1 ? purchasingData.data[idx] : 0;
+  });
+
+  // Issues vs Wastage
   const last7IssuesLabels = issuesVsWastageData.labels.slice(-7);
   const last7IssuesData = issuesVsWastageData.issues.slice(-7);
   const last7WastageData = issuesVsWastageData.wastage.slice(-7);
 
-  const totalSalesChart = {
-    labels: totalSalesData.labels,
-    datasets: [{
-      label: 'Total Sales',
-      data: totalSalesData.data,
-      backgroundColor: '#4e73df',
-    }]
-  };
-
-  const openingBalanceChart = {
-    labels: openingBalanceData.labels,
-    datasets: [{
-      label: 'Opening Balance',
-      data: openingBalanceData.data,
-      borderColor: '#f6c23e',
-      backgroundColor: '#f6c23e',
-      tension: 0.4,
-      fill: false,
-    }]
-  };
 
   const purchasingChart = {
     labels: purchasingData.labels,
@@ -80,32 +61,47 @@ const ChartStats = ({ chartData }) => {
       {/* First Chart Row */}
       <div className="chart-stats-row">
         <div className="chart-box">
-          <h3>Total Sales</h3>
-          <Bar data={totalSalesChart} />
-        </div>
-        <div className="chart-box">
-          <h3>Opening Balance</h3>
-          <Line data={openingBalanceChart} />
-        </div>
-        <div className="chart-box">
           <h3>Purchasing</h3>
           <Line data={purchasingChart} />
+        </div>
+        <div className="chart-box">
+          <h3>Issues</h3>
+          <Line data={{
+            labels: last7IssuesLabels,
+            datasets: [{
+              label: 'Issues',
+              data: last7IssuesData,
+              borderColor: '#6f42c1',
+              backgroundColor: '#6f42c1',
+              tension: 0.4,
+              fill: false,
+            }]
+          }} />
+        </div>
+        <div className="chart-box">
+          <h3>Wastage</h3>
+          <Line data={{
+            labels: last7IssuesLabels,
+            datasets: [{
+              label: 'Wastage',
+              data: last7WastageData,
+              borderColor: '#ff6384',
+              backgroundColor: '#ff6384',
+              tension: 0.4,
+              fill: false,
+            }]
+          }} />
         </div>
       </div>
 
       {/* Second Chart Row */}
       <div className="chart-stats-row">
         <div className="chart-box">
-          <h3>Opening Balance vs Purchasing</h3>
+          <h3>Purchasing</h3>
           <Bar
             data={{
-              labels: last7OpeningLabels,
+              labels: commonLabels,
               datasets: [
-                {
-                  label: 'Opening Balance',
-                  data: last7OpeningData,
-                  backgroundColor: '#f6c23e',
-                },
                 {
                   label: 'Purchasing',
                   data: last7PurchasingData,
