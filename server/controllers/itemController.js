@@ -89,10 +89,27 @@ const deleteItem = async (req, res) => {
   }
 };
 
+const getItemsWithoutOpeningBalance = async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT i.* 
+      FROM items i
+      LEFT JOIN opening_balances ob ON i.id = ob.item_id
+      WHERE ob.item_id IS NULL
+    `);
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching items without opening balance:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+// Add to module exports
 module.exports = {
   getAllItems,
   createItem,
   getItemById,
-  updateItem,   
-  deleteItem   
+  updateItem,
+  deleteItem,
+  getItemsWithoutOpeningBalance
 };
