@@ -109,4 +109,54 @@ const getStockReport = async (req, res) => {
   }
 };
 
-module.exports = { getStockReport };
+// Get department issues report
+// Get department issues report
+const getDepartmentIssuesReport = async (req, res) => {
+    const { startDate, endDate, departmentId } = req.query;
+
+    if (!startDate || !endDate) {
+        return res.status(400).json({ error: 'Missing required parameters' });
+    }
+
+    try {
+        let query = `
+            SELECT 
+                i.id AS issuance_id,
+                i.issuance_date,
+                d.name AS department_name,
+                i.received_by,
+                it.item_code,
+                it.name AS item_name,
+                ii.quantity,
+                it.unit,
+                i.remarks
+            FROM issuances i
+            JOIN issuance_items ii ON i.id = ii.issuance_id
+            JOIN items it ON ii.item_id = it.id
+            JOIN departments d ON i.department_id = d.id
+            WHERE DATE(i.issuance_date) BETWEEN ? AND ?
+        `;
+        
+        const params = [startDate, endDate];
+        
+        // Add department filter if provided
+        if (departmentId) {
+            query += ' AND i.department_id = ?';
+            params.push(departmentId);
+        }
+        
+        query += ' ORDER BY i.issuance_date DESC, i.id';
+        
+        const [rows] = await pool.query(query, params);
+        res.json(rows);
+    } catch (error) {
+        console.error('Error fetching department issues report:', error);
+        res.status(500).json({ error: 'Server error' });
+    }
+};
+
+// Add to module.exports
+module.exports = {
+  getStockReport,
+  getDepartmentIssuesReport,
+};

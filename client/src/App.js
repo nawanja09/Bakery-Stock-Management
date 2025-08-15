@@ -19,8 +19,8 @@ import IssuanceHistory from './components/issuance/IssuanceHistory';
 import AddWastage from './components/wastage/AddWastage';
 import WastageHistory from './components/wastage/WastageHistory';
 import StockReport from './components/report/StockReport';
-import Register from './components/Register'
-
+import Register from './components/Register';
+import DepartmentIssuesReport from './components/report/DepartmentIssuesReport';
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
@@ -70,6 +70,7 @@ function App() {
             <Route path="wastage/add" element={<AddWastage />} />
             <Route path="wastage/history" element={<WastageHistory />} />
             <Route path="reports/stock" element={<StockReport />} />
+            <Route path="reports/department" element={<DepartmentIssuesReport />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/login" replace />} />
