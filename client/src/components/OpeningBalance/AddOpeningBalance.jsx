@@ -14,29 +14,34 @@ const AddOpeningBalance = () => {
     unit_cost: 0
   });
   const [items, setItems] = useState([]);
-  const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { showPopup } = usePopup();
 
   useEffect(() => {
-    const fetchItems = async () => {
-      try {
-        const response = await api.get('/items');
-        setItems(response.data);
-      } catch (error) {
-        console.error('Error fetching items:', error);
+  const fetchItems = async () => {
+    try {
+      const response = await api.get('/items/without-opening');
+      if (response.data.length === 0) {
+        showPopup('info', 'All items already have opening balances');
+        navigate('/opening/history');
       }
-    };
+      setItems(response.data);
+    } catch (error) {
+      console.error('Error fetching items:', error);
+      showPopup('error', 'Failed to load items');
+    }
+  };
 
-    fetchItems();
-  }, []);
+  fetchItems();
+}, [showPopup, navigate]); // Added dependencies
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ 
       ...prev, 
-      [name]: name === 'quantity' || name === 'unit_cost' ? parseFloat(value) : value
+      [name]: name === 'quantity' || name === 'unit_cost' ? 
+        parseFloat(value) : value
     }));
   };
 
@@ -44,10 +49,9 @@ const AddOpeningBalance = () => {
     e.preventDefault();
     setIsLoading(true);
     
-    // Get the current user from localStorage
     const user = JSON.parse(localStorage.getItem('user'));
     if (!user || !user.id) {
-      setMessage('User not authenticated');
+      showPopup('error', 'User not authenticated');
       setIsLoading(false);
       return;
     }
@@ -59,22 +63,25 @@ const AddOpeningBalance = () => {
 
     try {
       const response = await api.post('/opening-balances', payload);
-      const data = response.data;
-
+      
       if (response.status === 201) {
         showPopup('success', 'Opening balance added successfully!');
         setTimeout(() => navigate('/opening/history'), 1500);
       } else {
-        showPopup('error', data.error || 'Failed to add opening balance');
+        showPopup('error', response.data.error || 'Failed to add opening balance');
       }
     } catch (error) {
-      showPopup('error', 'Network error. Please try again.');
+      // Handle duplicate item error specifically
+      if (error.response?.status === 400) {
+        showPopup('error', error.response.data.error);
+      } else {
+        showPopup('error', 'Network error. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Calculate total value
   const totalValue = (formData.quantity * formData.unit_cost).toFixed(2);
 
   return (
@@ -152,8 +159,6 @@ const AddOpeningBalance = () => {
           </button>
         </div>
       </form>
-
-      {message && <p className="message">{message}</p>}
     </div>
   );
 };
