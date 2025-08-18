@@ -6,6 +6,7 @@
   border-radius: 15px;
   box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.12);
   font-family: 'Poppins', sans-serif;
+  text-align: center;
 }
 
 .login-header {
@@ -56,16 +57,17 @@
 }
 
 .login-button {
-  width: 100%;
-  padding: 10px;
-  background: linear-gradient(135deg, #ffb347, #ff9800);
+  background: #ff9800;
   color: white;
   font-size: 14px;
   font-weight: 500;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
+  padding: 8px 20px;
   cursor: pointer;
-  transition: background 0.3s ease, transform 0.2s ease;
+  transition: background 0.3s;
+  margin-top: 10px;
+  text-align: center;
 }
 
 .login-button:hover {

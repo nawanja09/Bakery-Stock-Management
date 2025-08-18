@@ -80,13 +80,16 @@ const Login = () => {
           />
         </div>
         
-        <button 
-          type="submit" 
-          className="login-button"
-          disabled={isLoading}
-        >
-          {isLoading ? 'Logging in...' : 'Login'}
-        </button>
+        <div className="button-container">
+          <button 
+            type="submit" 
+            className="login-button"
+            disabled={isLoading}
+          >
+            {isLoading ? 'Logging in...' : 'Login'}
+          </button>
+        </div>
+        
         <p className="register-link">
           <h4>Don't have an account? <Link to="/register">Register</Link></h4>
         </p>

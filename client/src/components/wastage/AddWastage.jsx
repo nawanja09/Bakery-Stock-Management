@@ -93,6 +93,9 @@ const AddWastage = () => {
 
   return (
     <div className="wastage-container">
+      <button onClick={() => navigate('/wastage/history')} className="btn-secondary">
+        ← Back to History
+      </button>
       <h2>Record Wastage</h2>
       <form onSubmit={handleSubmit}>
         <div className="form-row">
