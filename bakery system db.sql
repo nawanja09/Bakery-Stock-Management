@@ -18,8 +18,8 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` VALUES 
-(2,'Admin','admin@bakery.com','$2b$10$OBIeLkeX/uU.uXtwxWlJL.77zUs3oQ6l8BZ/lsHXAi6Jx9PqkkWjy','Admin','2025-08-11 09:45:42'),
-(5,'User 1','user@bakery.com','$2b$10$Jgx.T4oQUmam5fTM7gAUKe13YdI6EKUcV4yTf4EqC4gtMIbezzv3W','Staff','2025-08-11 11:00:53');
+(2,'Admin','admin@bakery.com','$2b$10$OBIeLkeX/uU.uXtwxWlJL.77zUs3oQ6l8BZ/lsHXAi6Jx9PqkkWjy','Admin','2025-08-11 09:45:42'), -- Password : Admin@123
+(5,'User 1','user@bakery.com','$2b$10$Jgx.T4oQUmam5fTM7gAUKe13YdI6EKUcV4yTf4EqC4gtMIbezzv3W','Staff','2025-08-11 11:00:53'); -- Password : User@123
 
 --
 -- Table structure for table `supplier`
