@@ -16,7 +16,7 @@ const StockReport = () => {
       const response = await api.get(`/reports/stock?date=${selectedDate}`);
       setStockData(response.data);
     } catch (error) {
-      console.error('Error fetching stock report:', error);
+      console.error('Error fetching stock report:', error.message);
       alert('Failed to fetch stock report');
     } finally {
       setLoading(false);
