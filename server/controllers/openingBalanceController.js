@@ -58,27 +58,27 @@ const getItemsWithoutOpeningBalance = async (req, res) => {
 };
 
 const getAllOpeningBalances = async (req, res) => {
-    try {
-        const [rows] = await pool.query(`
-            SELECT 
-                ob.id, 
-                ob.date, 
-                i.name AS item_name, 
-                ob.quantity, 
-                i.unit, 
-                ob.unit_cost, 
-                ob.total_value,
-                u.name AS entered_by
-            FROM opening_balances ob
-            JOIN items i ON ob.item_id = i.id
-            JOIN users u ON ob.entered_by = u.id
-            ORDER BY ob.date DESC
-        `);
-        res.json(rows);
-    } catch (error) {
-        console.error('Error fetching opening balances:', error);
-        res.status(500).json({ error: 'Server error' });
-    }
+  try {
+    const [rows] = await pool.query(`
+      SELECT 
+        ob.id, 
+        ob.date, 
+        i.name AS item_name, 
+        ob.quantity, 
+        i.unit, 
+        ob.unit_cost, 
+        ob.total_value,
+        u.name AS entered_by
+      FROM opening_balances ob
+      JOIN items i ON ob.item_id = i.id
+      JOIN users u ON ob.entered_by = u.id
+      ORDER BY ob.date DESC
+    `);
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching opening balances:', error.message);
+    res.status(500).json({ error: 'Server error', details: error.message });
+  }
 };
 
 module.exports = {

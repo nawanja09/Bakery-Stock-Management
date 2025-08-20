@@ -19,7 +19,7 @@ const WastageReport = () => {
       setWastageData(response.data);
     } catch (error) {
       console.error('Error fetching wastage report:', error);
-      alert('Failed to fetch wastage report');
+      alert('Failed to fetcwh wastage report');
     } finally {
       setLoading(false);
     }

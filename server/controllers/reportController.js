@@ -1,15 +1,22 @@
 const pool = require('../config/db');
 
 const getStockReport = async (req, res) => {
-  const { date } = req.query;
-
-  if (!date) {
-    return res.status(400).json({ error: 'Date parameter is required' });
-  }
-
   try {
-    // Calculate the previous date
-    const prevDate = new Date(date);
+    const { date } = req.query;
+
+    // Validate date parameter presence
+    if (!date) {
+      return res.status(400).json({ error: 'Date parameter is required' });
+    }
+
+    // Validate date format
+    const parsedDate = new Date(date);
+    if (isNaN(parsedDate.getTime())) {
+      return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD' });
+    }
+
+    // Calculate previous date string in 'YYYY-MM-DD' format
+    const prevDate = new Date(parsedDate);
     prevDate.setDate(prevDate.getDate() - 1);
     const prevDateStr = prevDate.toISOString().split('T')[0];
 
@@ -31,7 +38,7 @@ const getStockReport = async (req, res) => {
         ) AS closing_balance
       FROM items i
       LEFT JOIN (
-        -- Get previous day's closing balance
+        -- Previous day's closing balance calculation
         SELECT 
           i2.id AS item_id,
           (
@@ -95,19 +102,28 @@ const getStockReport = async (req, res) => {
         WHERE w.date = ?
         GROUP BY wi.item_id
       ) wastage ON i.id = wastage.item_id
+
+      -- Sort by item code for consistent ordering
+      ORDER BY i.item_code
     `;
 
-    const [rows] = await pool.query(query, [
-      prevDateStr, prevDateStr, prevDateStr, prevDateStr, 
-      date, date, date
-    ]);
-    
+    // Parameters for the query
+    const params = [
+      prevDateStr, prevDateStr, prevDateStr, prevDateStr,  // previous day (x4)
+      date, date, date                                       // current day (x3)
+    ];
+
+    const [rows] = await pool.query(query, params);
+
     res.json(rows);
   } catch (error) {
-    console.error('Error generating stock report:', error);
-    res.status(500).json({ error: 'Server error' });
+    console.error('Error generating stock report:', error.message, error.stack);
+    res.status(500).json({ error: 'Server error: ' + error.message });
   }
 };
+
+//stock report formula
+// opening_balance = previous day's closing balance + today's purchases - today's issues - today's wastage
 
 // Get department issues report
 const getDepartmentIssuesReport = async (req, res) => {
