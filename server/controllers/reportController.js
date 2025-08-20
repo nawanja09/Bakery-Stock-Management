@@ -1,15 +1,22 @@
 const pool = require('../config/db');
 
 const getStockReport = async (req, res) => {
-  const { date } = req.query;
+    try {
+    const { date } = req.query;
 
-  if (!date) {
-    return res.status(400).json({ error: 'Date parameter is required' });
-  }
+    // Validate date parameter presence
+    if (!date) {
+      return res.status(400).json({ error: 'Date parameter is required' });
+    }
 
-  try {
-    // Calculate the previous date
-    const prevDate = new Date(date);
+    // Validate date format
+    const parsedDate = new Date(date);
+    if (isNaN(parsedDate.getTime())) {
+      return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD' });
+    }
+
+    // Calculate previous date string in 'YYYY-MM-DD' format
+    const prevDate = new Date(parsedDate);
     prevDate.setDate(prevDate.getDate() - 1);
     const prevDateStr = prevDate.toISOString().split('T')[0];
 
@@ -31,7 +38,7 @@ const getStockReport = async (req, res) => {
         ) AS closing_balance
       FROM items i
       LEFT JOIN (
-        -- Get previous day's closing balance
+        -- Previous day's closing balance calculation
         SELECT 
           i2.id AS item_id,
           (
@@ -97,17 +104,23 @@ const getStockReport = async (req, res) => {
       ) wastage ON i.id = wastage.item_id
     `;
 
-    const [rows] = await pool.query(query, [
-      prevDateStr, prevDateStr, prevDateStr, prevDateStr, 
+    // Parameters for the query: prevDateStr repeated 4 times, date repeated 3 times
+    const params = [
+      prevDateStr, prevDateStr, prevDateStr, prevDateStr,
       date, date, date
-    ]);
-    
+    ];
+
+    const [rows] = await pool.query(query, params);
+
     res.json(rows);
   } catch (error) {
-    console.error('Error generating stock report:', error);
-    res.status(500).json({ error: 'Server error' });
+    console.error('Error generating stock report:', error.message, error.stack);
+    res.status(500).json({ error: 'Server error: ' + error.message });
   }
 };
+
+//stock report formula
+// opening_balance = previous day's closing balance + today's purchases - today's issues - today's wastage
 
 // Get department issues report
 const getDepartmentIssuesReport = async (req, res) => {

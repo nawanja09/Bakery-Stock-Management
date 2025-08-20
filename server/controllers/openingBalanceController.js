@@ -76,8 +76,8 @@ const getAllOpeningBalances = async (req, res) => {
     `);
     res.json(rows);
   } catch (error) {
-    console.error('Error fetching opening balances:', error);
-    res.status(500).json({ error: 'Server error' });
+    console.error('Error fetching opening balances:', error.message);
+    res.status(500).json({ error: 'Server error', details: error.message });
   }
 };
 
