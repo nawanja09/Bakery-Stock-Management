@@ -23,6 +23,7 @@ import Register from './components/Register';
 import DepartmentIssuesReport from './components/report/DepartmentIssuesReport';
 import PurchasingReport from './components/report/PurchasingReport/PurchasingReport';
 import WastageReport from './components/report/WastageReport/WastageReport';
+import ManageUsers from './components/admin/ManageUsers';
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
@@ -75,6 +76,7 @@ function App() {
             <Route path="reports/department" element={<DepartmentIssuesReport />} />
             <Route path="reports/purchasing" element={<PurchasingReport />} />
             <Route path="reports/wastage" element={<WastageReport />} />
+            <Route path="admin/users" element={<ManageUsers />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/login" replace />} />
