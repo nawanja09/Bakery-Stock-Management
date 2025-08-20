@@ -104,7 +104,6 @@ const ManageUsers = () => {
             <th>Name</th>
             <th>Email</th>
             <th>Role</th>
-            <th>Status</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -114,7 +113,6 @@ const ManageUsers = () => {
               <td>{user.name}</td>
               <td>{user.email}</td>
               <td>{user.role}</td>
-              <td>{user.status}</td>
               <td>
                 <button 
                   className="btn-edit"
