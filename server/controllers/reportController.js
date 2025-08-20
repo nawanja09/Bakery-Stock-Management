@@ -1,7 +1,7 @@
 const pool = require('../config/db');
 
 const getStockReport = async (req, res) => {
-    try {
+  try {
     const { date } = req.query;
 
     // Validate date parameter presence
@@ -102,12 +102,15 @@ const getStockReport = async (req, res) => {
         WHERE w.date = ?
         GROUP BY wi.item_id
       ) wastage ON i.id = wastage.item_id
+
+      -- Sort by item code for consistent ordering
+      ORDER BY i.item_code
     `;
 
-    // Parameters for the query: prevDateStr repeated 4 times, date repeated 3 times
+    // Parameters for the query
     const params = [
-      prevDateStr, prevDateStr, prevDateStr, prevDateStr,
-      date, date, date
+      prevDateStr, prevDateStr, prevDateStr, prevDateStr,  // previous day (x4)
+      date, date, date                                       // current day (x3)
     ];
 
     const [rows] = await pool.query(query, params);
