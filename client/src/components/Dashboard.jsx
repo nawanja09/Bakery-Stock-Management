@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import ChartStats from './ChartStats';
 import './Dashboard.css';
 import icon from '../images/icon.jpeg';
+import api from '../api';
 
 const Dashboard = () => {
   const [stats, setStats] = useState({
@@ -18,15 +19,13 @@ const Dashboard = () => {
     const fetchData = async () => {
       try {
         // Fetch stats
-        const statsResponse = await fetch('/api/dashboard/stats');
-        const statsData = await statsResponse.json();
-        setStats(statsData);
-        
+        const statsResponse = await api.get('/dashboard/stats');
+        setStats(statsResponse.data);
+
         // Fetch chart data
-        const chartsResponse = await fetch('/api/dashboard/charts');
-        const chartsData = await chartsResponse.json();
-        setChartData(chartsData);
-        
+        const chartsResponse = await api.get('/dashboard/charts');
+        setChartData(chartsResponse.data);
+
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
       } finally {
