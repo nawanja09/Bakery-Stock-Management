@@ -65,12 +65,15 @@ const getAllWastages = async (req, res) => {
         w.remarks,
         u.email AS entered_by
       FROM wastages w
-      JOIN users u ON w.entered_by = u.id
+      LEFT JOIN users u ON w.entered_by = u.id
       ORDER BY w.date DESC
     `);
+
+    console.log("Fetched wastages:", wastages); // Debug line
     res.json(wastages);
+
   } catch (error) {
-    console.error('Error fetching wastages:', error);
+    console.error('Error fetching wastages:', error); // 👈 Check this in your logs
     res.status(500).json({ error: 'Server error' });
   }
 };
