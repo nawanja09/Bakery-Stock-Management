@@ -1,18 +1,22 @@
 const jwt = require('jsonwebtoken');
 
-module.exports = (req, res, next) => {
-  // Get token from Authorization header
-  const token = req.headers.authorization?.split(' ')[1];
-  
-  if (!token) {
-    return res.status(401).json({ error: 'Authorization token required' });
+const authenticate = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Authorization header missing or invalid' });
   }
 
+  const token = authHeader.split(' ')[1];
+
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET); // Make sure you have JWT_SECRET in your .env
     req.user = decoded;
     next();
   } catch (err) {
+    console.error('JWT Error:', err);
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
 };
+
+module.exports = authenticate;
