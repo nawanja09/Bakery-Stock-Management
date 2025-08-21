@@ -3,13 +3,13 @@ const pool = require('../config/db');
 const createOpeningBalance = async (req, res) => {
   const { date, item_id, quantity, unit_cost, entered_by } = req.body;
 
-  console.log("Received Payload:", { date, item_id, quantity, unit_cost, entered_by });
+  if (!date || !item_id || !quantity || !unit_cost || !entered_by) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  const total_value = parseFloat(quantity) * parseFloat(unit_cost); // manually calculate
 
   try {
-    if (!item_id || !quantity || !unit_cost || !entered_by) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
-
     const [existing] = await pool.query(
       'SELECT id FROM opening_balances WHERE item_id = ?',
       [item_id]
@@ -21,23 +21,18 @@ const createOpeningBalance = async (req, res) => {
 
     const [result] = await pool.query(
       `INSERT INTO opening_balances 
-       (date, item_id, quantity, unit_cost, entered_by)
-       VALUES (?, ?, ?, ?, ?)`,
-      [date, item_id, quantity, unit_cost, entered_by]
+       (date, item_id, quantity, unit_cost, total_value, entered_by)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [date, item_id, quantity, unit_cost, total_value, entered_by]
     );
 
-    res.status(201).json({
-      id: result.insertId,
-      message: 'Opening balance recorded successfully'
-    });
-
+    return res.status(201).json({ message: 'Opening balance added successfully' });
   } catch (error) {
-    console.error("🔥 Backend Error:", error);
-    res.status(500).json({ error: 'Server error', details: error.message });
+    console.error("Error:", error);
+    return res.status(500).json({ error: 'Server error', details: error.message });
   }
 };
 
-// Add new controller function
 const getItemsWithoutOpeningBalance = async (req, res) => {
   try {
     const [rows] = await pool.query(`
@@ -78,7 +73,7 @@ const getAllOpeningBalances = async (req, res) => {
 };
 
 module.exports = {
-    createOpeningBalance,
-    getAllOpeningBalances,
-    getItemsWithoutOpeningBalance
+  createOpeningBalance,
+  getAllOpeningBalances,
+  getItemsWithoutOpeningBalance
 };

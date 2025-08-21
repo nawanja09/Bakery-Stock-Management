@@ -12,7 +12,7 @@ const OpeningBalanceHistory = () => {
   useEffect(() => {
     const fetchBalances = async () => {
       try {
-        const response = await api.get('/opening-balances');
+        const response = await api.get('/opening-balance');
         setBalances(response.data);
       } catch (err) {
         setError(err.message);
@@ -31,7 +31,7 @@ const OpeningBalanceHistory = () => {
           + Add New
         </button>
       </div>
-      
+
       <h2>Opening Balance History</h2>
 
       {loading ? (
@@ -60,8 +60,8 @@ const OpeningBalanceHistory = () => {
                 <td>{balance.item_name}</td>
                 <td>{balance.quantity}</td>
                 <td>{balance.unit}</td>
-                <td>{isNaN(Number(balance.unit_cost)) ? '-' : Number(balance.unit_cost).toFixed(2)}</td>
-                <td>{isNaN(Number(balance.total_value)) ? '-' : Number(balance.total_value).toFixed(2)}</td>
+                <td>{Number(balance.unit_cost).toFixed(2)}</td>
+                <td>{Number(balance.total_value).toFixed(2)}</td>
                 <td>{balance.entered_by}</td>
               </tr>
             ))}
