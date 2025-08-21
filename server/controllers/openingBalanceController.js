@@ -2,42 +2,38 @@ const pool = require('../config/db');
 
 const createOpeningBalance = async (req, res) => {
   const { date, item_id, quantity, unit_cost, entered_by } = req.body;
-  
+
+  console.log("Received Payload:", { date, item_id, quantity, unit_cost, entered_by });
+
   try {
-    // Check if opening balance already exists for item
+    if (!item_id || !quantity || !unit_cost || !entered_by) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
     const [existing] = await pool.query(
       'SELECT id FROM opening_balances WHERE item_id = ?',
       [item_id]
     );
 
     if (existing.length > 0) {
-      return res.status(400).json({ 
-        error: 'Opening balance already exists for this item' 
-      });
+      return res.status(400).json({ error: 'Opening balance already exists for this item' });
     }
 
-    // Calculate total value
-    const total_value = quantity * unit_cost;
-    
     const [result] = await pool.query(
       `INSERT INTO opening_balances 
-      (date, item_id, quantity, unit_cost, total_value, entered_by)
-      VALUES (?, ?, ?, ?, ?, ?)`,
-      [date, item_id, quantity, unit_cost, total_value, entered_by]
+       (date, item_id, quantity, unit_cost, entered_by)
+       VALUES (?, ?, ?, ?, ?)`,
+      [date, item_id, quantity, unit_cost, entered_by]
     );
-    
+
     res.status(201).json({
       id: result.insertId,
       message: 'Opening balance recorded successfully'
     });
+
   } catch (error) {
-    if (error.code === 'ER_DUP_ENTRY') {
-      return res.status(400).json({ 
-        error: 'Opening balance already exists for this item' 
-      });
-    }
-    console.error('Error creating opening balance:', error);
-    res.status(500).json({ error: 'Server error' });
+    console.error("🔥 Backend Error:", error);
+    res.status(500).json({ error: 'Server error', details: error.message });
   }
 };
 
