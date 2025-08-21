@@ -175,20 +175,20 @@ INSERT INTO `purchase_items` (`id`, `purchase_id`, `item_name`, `quantity`, `uni
 --
 
 CREATE TABLE `opening_balances` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `date` date NOT NULL,
-  `item_id` int NOT NULL,
-  `quantity` decimal(10,0) DEFAULT NULL,
-  `unit_cost` decimal(10,2) NOT NULL,
-  `total_value` decimal(10,2) GENERATED ALWAYS AS ((`quantity` * `unit_cost`)) STORED,
-  `entered_by` int NOT NULL,
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `date` DATE NOT NULL,
+  `item_id` INT NOT NULL,
+  `quantity` DECIMAL(10,0) NOT NULL,
+  `unit_cost` DECIMAL(10,2) NOT NULL,
+  `total_value` DECIMAL(10,2) NOT NULL, -- remove GENERATED part
+  `entered_by` INT NOT NULL,
+  `created_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `unique_item_id` (`item_id`),
-  KEY `entered_by` (`entered_by`),
-  CONSTRAINT `opening_balances_ibfk_1` FOREIGN KEY (`item_id`) REFERENCES `items` (`id`),
-  CONSTRAINT `opening_balances_ibfk_2` FOREIGN KEY (`entered_by`) REFERENCES `users` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+  KEY `fk_entered_by` (`entered_by`),
+  CONSTRAINT `fk_ob_item_id` FOREIGN KEY (`item_id`) REFERENCES `items` (`id`),
+  CONSTRAINT `fk_ob_entered_by` FOREIGN KEY (`entered_by`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 --
 -- Dumping data for table `opening_balances`
