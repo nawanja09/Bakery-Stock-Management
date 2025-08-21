@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSave } from '@fortawesome/free-solid-svg-icons';
 import { usePopup } from '../context/PopupContext';
-import './OpeningBalance.css';
 import api from '../../api';
+import './OpeningBalance.css';
 
 const AddOpeningBalance = () => {
   const [formData, setFormData] = useState({
@@ -22,10 +22,11 @@ const AddOpeningBalance = () => {
   useEffect(() => {
     const fetchItems = async () => {
       try {
-        const response = await api.get('/items/without-opening');
+        const response = await api.get('/opening-balance/items/without-opening');
         if (response.data.length === 0) {
           showPopup('info', 'All items already have opening balances');
           navigate('/opening/history');
+          return;
         }
         setItems(response.data);
       } catch (error) {
@@ -41,8 +42,7 @@ const AddOpeningBalance = () => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: name === 'quantity' || name === 'unit_cost' ?
-        parseFloat(value) : value
+      [name]: name === 'quantity' || name === 'unit_cost' ? parseFloat(value) : value,
     }));
   };
 
@@ -50,22 +50,24 @@ const AddOpeningBalance = () => {
     e.preventDefault();
     setIsLoading(true);
 
-    const user = JSON.parse(localStorage.getItem('user'));
-
-    const total_value = formData.quantity * formData.unit_cost;
-
-    const payload = {
-      ...formData,
-      entered_by: user.id,
-      total_value // now we include this
-    };
-
     try {
+      const user = JSON.parse(localStorage.getItem('user'));
+      if (!user) {
+        showPopup('error', 'User not logged in');
+        setIsLoading(false);
+        return;
+      }
+
+      const payload = {
+        ...formData,
+        entered_by: user.id,
+      };
+
       await api.post('/opening-balance', payload);
       showPopup('success', 'Opening balance added!');
       navigate('/opening/history');
     } catch (error) {
-      showPopup('error', error.response?.data?.error || 'Error');
+      showPopup('error', error.response?.data?.error || 'Error adding opening balance');
     } finally {
       setIsLoading(false);
     }
@@ -76,7 +78,6 @@ const AddOpeningBalance = () => {
   return (
     <div className="opening-balance-container">
       <h2>Add Opening Balance</h2>
-
       <form onSubmit={handleSubmit} className="form">
         <div className="form-group">
           <label>Date</label>
