@@ -82,7 +82,7 @@ const StockReport = () => {
             type="date" 
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
-            //max={format(new Date(), 'yyyy-MM-dd')}
+            max={format(new Date(), 'yyyy-MM-dd')}
           />
         </label>
         
