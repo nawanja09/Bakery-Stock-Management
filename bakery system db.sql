@@ -252,6 +252,59 @@ INSERT INTO `issuance_items` VALUES
 (3,3,2,20);
 
 
+--
+-- Table structure for table `wastage_items`
+--
+
+CREATE TABLE `wastage_items` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `wastage_id` int NOT NULL,
+  `item_id` int NOT NULL,
+  `quantity` decimal(10,0) DEFAULT NULL,
+  `estimated_loss` decimal(10,2) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `wastage_id` (`wastage_id`),
+  KEY `item_id` (`item_id`),
+  CONSTRAINT `wastage_items_ibfk_1` FOREIGN KEY (`wastage_id`) REFERENCES `wastages` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `wastage_items_ibfk_2` FOREIGN KEY (`item_id`) REFERENCES `items` (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Dumping data for table `wastage_items`
+--
+
+INSERT INTO `wastage_items` VALUES (3,12,2,10,1200.00);
+
+--
+-- Table structure for table `wastages`
+--
+
+CREATE TABLE `wastages` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `wastage_note_number` varchar(20) NOT NULL,
+  `date` date NOT NULL,
+  `approved_by` varchar(255) NOT NULL,
+  `reason` enum('Expired','Damaged','Overproduction','Poor Storage','Forecasting errors','Human error','Other') NOT NULL,
+  `remarks` text,
+  `attachment_path` varchar(255) DEFAULT NULL,
+  `entered_by` int NOT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `wastage_note_number` (`wastage_note_number`),
+  KEY `entered_by` (`entered_by`),
+  CONSTRAINT `wastages_ibfk_1` FOREIGN KEY (`entered_by`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Dumping data for table `wastages`
+--
+
+INSERT INTO `wastages` VALUES (12,'WN-008193CB','2025-08-14','Admin','Human error','',NULL,5,'2025-08-14 09:41:30');
+
+
+
+
+
 
 
 
