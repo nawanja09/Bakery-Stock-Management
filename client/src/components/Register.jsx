@@ -67,8 +67,10 @@ const Register = () => {
                 <label htmlFor="password">Password</label>
                 <input type="password" id="password" name="password" value={formData.password} onChange={handleChange} required />
             </div>
-            <button type="submit">Register</button>
-
+            <button type="submit" disabled={isLoading}>
+              {isLoading ? 'Registering...' : 'Register'}
+            </button>
+            
             <p className="login-link">
               <h4>Already have an account? <Link to="/login">Login</Link></h4>
             </p>
