@@ -122,23 +122,11 @@ const StockReport = () => {
                   <td>{item.item_code}</td>
                   <td>{item.item_name}</td>
                   <td>{item.unit}</td>
-                  <td>
-                    {Number(item.opening_balance) % 1 === 0
-                      ? Number(item.opening_balance)
-                      : Number(item.opening_balance).toFixed(2)}
-                  </td>
-                  <td>{Number(item.total_purchased) % 1 === 0
-                    ? Number(item.total_purchased)
-                    : Number(item.total_purchased).toFixed(2)}</td>
-                  <td>{Number(item.total_issued) % 1 === 0
-                    ? Number(item.total_issued)
-                    : Number(item.total_issued).toFixed(2)}</td>
-                  <td>{Number(item.total_wasted) % 1 === 0
-                    ? Number(item.total_wasted)
-                    : Number(item.total_wasted).toFixed(2)}</td>
-                  <td>{Number(item.closing_balance) % 1 === 0
-                    ? Number(item.closing_balance)
-                    : Number(item.closing_balance).toFixed(2)}</td>
+                  <td>{Number(item.opening_balance).toFixed(2)}</td>
+                  <td>{Number(item.total_purchased).toFixed(2)}</td>
+                  <td>{Number(item.total_issued).toFixed(2)}</td>
+                  <td>{Number(item.total_wasted).toFixed(2)}</td>
+                  <td>{Number(item.closing_balance).toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>
