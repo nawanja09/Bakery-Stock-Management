@@ -31,7 +31,7 @@ app.use('/api/purchases', purchaseRoutes);
 app.use('/api/suppliers', supplierRoutes);
 app.use('/api/items', itemRoutes);
 app.use('/api', departmentRoutes);  
-app.use('/api/opening-balances', openingBalanceRoutes);
+app.use('/api/opening-balance', openingBalanceRoutes);
 app.use('/api/issuances', issuanceRoutes);
 app.use('/api/wastages', wastageRoutes);
 app.use('/api/reports', reportRoutes);

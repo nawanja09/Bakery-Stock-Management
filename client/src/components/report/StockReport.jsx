@@ -109,11 +109,11 @@ const StockReport = () => {
                 <th>Item Code</th>
                 <th>Item Name</th>
                 <th>Unit</th>
-                <th>Opening Balance</th>
+                <th>Today's opening balance</th>
                 <th>Purchased</th>
                 <th>Issued</th>
                 <th>Wastage</th>
-                <th>Closing Balance</th>
+                <th>Closing Balance at the end of today</th>
               </tr>
             </thead>
             <tbody>
