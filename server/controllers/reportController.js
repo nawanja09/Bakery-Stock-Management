@@ -4,18 +4,16 @@ const getStockReport = async (req, res) => {
   try {
     const { date } = req.query;
 
-    // Validate date parameter presence
     if (!date) {
       return res.status(400).json({ error: 'Date parameter is required' });
     }
 
-    // Validate date format
     const parsedDate = new Date(date);
     if (isNaN(parsedDate.getTime())) {
       return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD' });
     }
 
-    // Calculate previous date string in 'YYYY-MM-DD' format
+    // yesterday
     const prevDate = new Date(parsedDate);
     prevDate.setDate(prevDate.getDate() - 1);
     const prevDateStr = prevDate.toISOString().split('T')[0];
@@ -26,25 +24,27 @@ const getStockReport = async (req, res) => {
         i.item_code,
         i.name AS item_name,
         i.unit,
-        COALESCE(prev.closing_balance, 0) AS opening_balance,
+        -- opening balance for today = yesterday closing + today's manual opening
+        COALESCE(prev.closing_balance, 0) + COALESCE(ob_today.opening_balance_today, 0) AS opening_balance,
         COALESCE(purchases.total_purchased, 0) AS total_purchased,
         COALESCE(issues.total_issued, 0) AS total_issued,
         COALESCE(wastage.total_wasted, 0) AS total_wasted,
         (
-          COALESCE(prev.closing_balance, 0) + 
-          COALESCE(purchases.total_purchased, 0) - 
-          COALESCE(issues.total_issued, 0) - 
+          COALESCE(prev.closing_balance, 0) +
+          COALESCE(ob_today.opening_balance_today, 0) +
+          COALESCE(purchases.total_purchased, 0) -
+          COALESCE(issues.total_issued, 0) -
           COALESCE(wastage.total_wasted, 0)
         ) AS closing_balance
       FROM items i
       LEFT JOIN (
-        -- Previous day's closing balance calculation
+        -- previous day's closing balance
         SELECT 
           i2.id AS item_id,
           (
-            COALESCE(ob.opening_balance, 0) + 
-            COALESCE(purchases.total_purchased, 0) - 
-            COALESCE(issues.total_issued, 0) - 
+            COALESCE(ob.opening_balance, 0) +
+            COALESCE(purchases.total_purchased, 0) -
+            COALESCE(issues.total_issued, 0) -
             COALESCE(wastage.total_wasted, 0)
           ) AS closing_balance
         FROM items i2
@@ -78,7 +78,14 @@ const getStockReport = async (req, res) => {
         ) wastage ON i2.id = wastage.item_id
       ) prev ON i.id = prev.item_id
       LEFT JOIN (
-        -- Today's purchases
+        -- today's manual opening balance
+        SELECT item_id, SUM(quantity) AS opening_balance_today
+        FROM opening_balances
+        WHERE date = ?
+        GROUP BY item_id
+      ) ob_today ON i.id = ob_today.item_id
+      LEFT JOIN (
+        -- today's purchases
         SELECT i.id AS item_id, SUM(pi.quantity) AS total_purchased
         FROM purchase_items pi
         JOIN purchases p ON pi.purchase_id = p.id
@@ -87,7 +94,7 @@ const getStockReport = async (req, res) => {
         GROUP BY i.id
       ) purchases ON i.id = purchases.item_id
       LEFT JOIN (
-        -- Today's issues
+        -- today's issues
         SELECT ii.item_id, SUM(ii.quantity) AS total_issued
         FROM issuance_items ii
         JOIN issuances iss ON ii.issuance_id = iss.id
@@ -95,27 +102,25 @@ const getStockReport = async (req, res) => {
         GROUP BY ii.item_id
       ) issues ON i.id = issues.item_id
       LEFT JOIN (
-        -- Today's wastage
+        -- today's wastage
         SELECT wi.item_id, SUM(wi.quantity) AS total_wasted
         FROM wastage_items wi
         JOIN wastages w ON wi.wastage_id = w.id
         WHERE w.date = ?
         GROUP BY wi.item_id
       ) wastage ON i.id = wastage.item_id
-
-      -- Sort by item code for consistent ordering
       ORDER BY i.item_code
     `;
 
-    // Parameters for the query
     const params = [
-      prevDateStr, prevDateStr, prevDateStr, prevDateStr,  // previous day (x4)
-      date, date, date                                       // current day (x3)
+      prevDateStr, prevDateStr, prevDateStr, prevDateStr, // yesterday x4
+      date,                                              // today opening
+      date, date, date                                   // today purchases/issues/wastage
     ];
 
     const [rows] = await pool.query(query, params);
-
     res.json(rows);
+
   } catch (error) {
     console.error('Error generating stock report:', error.message, error.stack);
     res.status(500).json({ error: 'Server error: ' + error.message });
@@ -123,7 +128,8 @@ const getStockReport = async (req, res) => {
 };
 
 //stock report formula
-// opening_balance = previous day's closing balance + today's purchases - today's issues - today's wastage
+// Today's opening balance = closing balance at the end of yesterday + today's opening balance
+// Closing balance at the end of today = Today's opening balance + purchased - Issued - wastage
 
 // Get department issues report
 const getDepartmentIssuesReport = async (req, res) => {
