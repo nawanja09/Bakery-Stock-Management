@@ -3,7 +3,8 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'https://api-stock.ravonbakers.lk/api',
+  //baseURL: 'https://api-stock.ravonbakers.lk/api',
+  baseURL: 'http://localhost:5000/api',
   withCredentials: true,
 });
 

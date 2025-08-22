@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback} from 'react';
 import { usePopup } from '../context/PopupContext';
 import './ManageUsers.css';
 import api from '../../api';
@@ -17,11 +17,7 @@ const ManageUsers = () => {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('user');
 
-  useEffect(() => {
-    fetchUsers();
-  }, []);
-
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       const response = await api.get('/users');
       setUsers(response.data);
@@ -30,7 +26,11 @@ const ManageUsers = () => {
       showPopup('error', 'Failed to fetch users');
       setLoading(false);
     }
-  };
+  }, [showPopup]);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
 
   const handleAddUser = async (e) => {
     e.preventDefault();

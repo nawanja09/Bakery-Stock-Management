@@ -33,7 +33,7 @@ const StockReport = () => {
     
     // Title
     doc.setFontSize(16);
-    doc.text(`Stock Report - ${dateStr}`, 15, 15);
+    doc.text(`.Stock Report - ${dateStr}`, 15, 15);
     
     // Table data
     const tableData = stockData.map(item => [
