@@ -103,7 +103,8 @@ INSERT INTO `departments` VALUES
 (4,'Chinese','2025-08-11 09:36:31'),
 (5,'Savory','2025-08-11 09:36:31'),
 (6,'Staff','2025-08-11 09:36:31'),
-(7, 'Cafe', '2025-08-25 08:22:46');
+(7, 'Cafe', '2025-08-25 08:22:46'),
+(8, 'Office', '2025-08-25 08:59:43');
 
 --
 -- Table structure for table `purchases`
