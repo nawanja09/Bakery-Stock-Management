@@ -261,10 +261,51 @@ const getWastageReport = async (req, res) => {
   }
 };
 
+// Item-wise summary report
+const getDepartmentItemsSummary = async (req, res) => {
+  const { startDate, endDate, departmentId } = req.query;
+
+  if (!startDate || !endDate) {
+    return res.status(400).json({ error: "Missing required parameters" });
+  }
+
+  try {
+    let query = `
+      SELECT 
+        i.id AS issuance_id,
+        d.name AS department_name,
+        it.item_code,
+        it.name AS item_name,
+        SUM(ii.quantity) AS total_issued,
+        it.unit
+      FROM issuances i
+      JOIN issuance_items ii ON i.id = ii.issuance_id
+      JOIN items it ON ii.item_id = it.id
+      JOIN departments d ON i.department_id = d.id
+      WHERE DATE(i.issuance_date) BETWEEN ? AND ?
+    `;
+    const params = [startDate, endDate];
+
+    if (departmentId) {
+      query += " AND i.department_id = ?";
+      params.push(departmentId);
+    }
+
+    query += " GROUP BY d.name, it.item_code, it.name, it.unit ORDER BY d.name, it.item_code";
+
+    const [rows] = await pool.query(query, params);
+    res.json(rows);
+  } catch (error) {
+    console.error("Error fetching department item summary:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
 // Add to module.exports
 module.exports = {
   getStockReport,
   getDepartmentIssuesReport,
   getPurchasingReport,
-  getWastageReport
+  getWastageReport,
+  getDepartmentItemsSummary
 };
