@@ -246,7 +246,7 @@ const NavigationBar = () => {
                   <span className="icon-container">
                     <FontAwesomeIcon icon={faShareSquare} className="icon" />
                   </span>
-                  <span>Department Issues</span>
+                  <span>Issuance Report</span>
                 </NavLink>
               </li>
             </ul>

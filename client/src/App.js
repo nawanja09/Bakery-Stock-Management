@@ -24,6 +24,7 @@ import DepartmentIssuesReport from './components/report/DepartmentIssuesReport';
 import PurchasingReport from './components/report/PurchasingReport/PurchasingReport';
 import WastageReport from './components/report/WastageReport/WastageReport';
 import ManageUsers from './components/admin/ManageUsers';
+
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
