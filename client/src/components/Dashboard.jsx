@@ -99,6 +99,12 @@ const Dashboard = () => {
 
       {/* Chart Stats Section */}
       {chartData && <ChartStats chartData={chartData} />}
+
+      {/* Footer Section */}
+      <footer className="dashboard-footer">
+        <p>© {new Date().getFullYear()} Bakery Stock Management System. All rights reserved.</p>
+        <p>Developed by <span className="dev-name">Nawanjana Nethmini</span></p>
+      </footer>
     </div>
   );
 };
