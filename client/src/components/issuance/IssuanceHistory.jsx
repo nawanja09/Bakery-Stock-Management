@@ -37,13 +37,10 @@ const IssuanceDetailsModal = ({ id }) => {
             <strong>Date:</strong> {new Date(issuance.issuance_date).toLocaleDateString()}
           </li>
           <li>
-            <strong>Approved By:</strong> {issuance.approved_by}
+            <strong>Received By:</strong> {issuance.received_by}
           </li>
           <li>
             <strong>Reason:</strong> {issuance.reason}
-          </li>
-          <li>
-            <strong>Entered By:</strong> {issuance.entered_by}
           </li>
           {issuance.approved_by && (
             <li>
@@ -92,6 +89,10 @@ const IssuanceHistory = () => {
     const fetchIssuances = async () => {
       try {
         const response = await api.get('/issuances');
+        
+        // 🔽 Sort the issuances by ID in descending order (latest first)
+        const sorted = response.data.sort((a, b) => b.id - a.id);
+        
         setIssuances(response.data);
       } catch (error) {
         console.error('Error fetching issuances:', error);
