@@ -301,11 +301,235 @@ const getDepartmentItemsSummary = async (req, res) => {
   }
 };
 
+const getDateRange = (start, end) => {
+  const dates = [];
+  let current = new Date(start);
+  const last = new Date(end);
+
+  while (current <= last) {
+    dates.push(current.toISOString().slice(0, 10)); // format YYYY-MM-DD
+    current.setDate(current.getDate() + 1);
+  }
+
+  return dates;
+};
+
+/*
+const getStockReportByRangeAndItem = async (req, res) => {
+  try {
+    const { startDate, endDate, itemId } = req.query;
+
+    if (!startDate || !endDate || !itemId) {
+      return res.status(400).json({ error: 'startDate, endDate, and itemId are required (format: YYYY-MM-DD)' });
+    }
+
+    const dateRange = getDateRange(startDate, endDate);
+    const report = [];
+
+    // Step 1: Get opening balance info
+    const [[openingRow]] = await pool.query(
+      `SELECT date, quantity FROM opening_balances WHERE item_id = ?`,
+      [itemId]
+    );
+
+    let openingBalanceDate = null;
+    let openingBalanceQty = 0;
+
+    if (openingRow) {
+      openingBalanceDate = openingRow.date.toISOString().slice(0, 10);
+      openingBalanceQty = parseFloat(openingRow.quantity);
+    }
+
+    let closingBalance = 0; // very first day opening is 0
+
+    for (let i = 0; i < dateRange.length; i++) {
+      const date = dateRange[i];
+
+      let opening = (i === 0) ? 0 : closingBalance;
+      let purchased = 0;
+      let issued = 0;
+      let wasted = 0;
+
+      // If opening balance date matches current date, add to purchased
+      if (date === openingBalanceDate) {
+        purchased += openingBalanceQty;
+      }
+
+      const [[{ purchased: dbPurchased = 0 }]] = await pool.query(
+        `SELECT SUM(pi.quantity) AS purchased
+         FROM purchase_items pi
+         JOIN purchases p ON pi.purchase_id = p.id
+         WHERE pi.item_id = ? AND DATE(p.purchase_date) = ?`,
+        [itemId, date]
+      );
+
+      const [[{ issued: dbIssued = 0 }]] = await pool.query(
+        `SELECT SUM(ii.quantity) AS issued
+         FROM issuance_items ii
+         JOIN issuances i ON ii.issuance_id = i.id
+         WHERE ii.item_id = ? AND DATE(i.issuance_date) = ?`,
+        [itemId, date]
+      );
+
+      const [[{ wasted: dbWasted = 0 }]] = await pool.query(
+        `SELECT SUM(wi.quantity) AS wasted
+         FROM wastage_items wi
+         JOIN wastages w ON wi.wastage_id = w.id
+         WHERE wi.item_id = ? AND DATE(w.date) = ?`,
+        [itemId, date]
+      );
+
+      purchased += parseFloat(dbPurchased || 0);
+      issued = parseFloat(dbIssued || 0);
+      wasted = parseFloat(dbWasted || 0);
+
+      closingBalance = opening + purchased - issued - wasted;
+
+      report.push({
+        date,
+        opening,
+        purchased,
+        issued,
+        wasted,
+        closing: closingBalance
+      });
+    }
+
+    res.json(report);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error: ' + err.message });
+  }
+};
+*/
+
+const getStockReportByRangeAndItem = async (req, res) => {
+  try {
+    const { startDate, endDate, itemId } = req.query;
+
+    if (!startDate || !endDate || !itemId) {
+      return res.status(400).json({ error: 'startDate, endDate, and itemId are required (format: YYYY-MM-DD)' });
+    }
+
+    const dateRange = getDateRange(startDate, endDate);
+    const report = [];
+
+    // Get the opening balance from before the start date
+    const [[openingRow]] = await pool.query(
+      `SELECT date, quantity FROM opening_balances 
+       WHERE item_id = ? AND date < ? 
+       ORDER BY date DESC LIMIT 1`,
+      [itemId, startDate]
+    );
+
+    let openingBalance = 0;
+    if (openingRow) {
+      openingBalance = parseFloat(openingRow.quantity);
+    }
+
+    // Get all transactions before the start date to calculate the initial opening
+    const [[{ purchased: prePurchased = 0 }]] = await pool.query(
+      `SELECT SUM(pi.quantity) AS purchased
+       FROM purchase_items pi
+       JOIN purchases p ON pi.purchase_id = p.id
+       WHERE pi.item_id = ? AND DATE(p.purchase_date) < ?`,
+      [itemId, startDate]
+    );
+
+    const [[{ issued: preIssued = 0 }]] = await pool.query(
+      `SELECT SUM(ii.quantity) AS issued
+       FROM issuance_items ii
+       JOIN issuances i ON ii.issuance_id = i.id
+       WHERE ii.item_id = ? AND DATE(i.issuance_date) < ?`,
+      [itemId, startDate]
+    );
+
+    const [[{ wasted: preWasted = 0 }]] = await pool.query(
+      `SELECT SUM(wi.quantity) AS wasted
+       FROM wastage_items wi
+       JOIN wastages w ON wi.wastage_id = w.id
+       WHERE wi.item_id = ? AND DATE(w.date) < ?`,
+      [itemId, startDate]
+    );
+
+    // Calculate initial opening balance
+    let runningBalance = openingBalance + parseFloat(prePurchased || 0) - 
+                         parseFloat(preIssued || 0) - parseFloat(preWasted || 0);
+
+    for (const date of dateRange) {
+      let opening = runningBalance;
+      let purchased = 0;
+      let issued = 0;
+      let wasted = 0;
+
+      // Check if there's an opening balance specifically for this date
+      const [[specificOpening]] = await pool.query(
+        `SELECT quantity FROM opening_balances 
+         WHERE item_id = ? AND DATE(date) = ?`,
+        [itemId, date]
+      );
+
+      if (specificOpening) {
+        opening = parseFloat(specificOpening.quantity);
+        runningBalance = opening; // Reset running balance to the opening balance
+      }
+
+      const [[{ purchased: dbPurchased = 0 }]] = await pool.query(
+        `SELECT SUM(pi.quantity) AS purchased
+         FROM purchase_items pi
+         JOIN purchases p ON pi.purchase_id = p.id
+         WHERE pi.item_id = ? AND DATE(p.purchase_date) = ?`,
+        [itemId, date]
+      );
+
+      const [[{ issued: dbIssued = 0 }]] = await pool.query(
+        `SELECT SUM(ii.quantity) AS issued
+         FROM issuance_items ii
+         JOIN issuances i ON ii.issuance_id = i.id
+         WHERE ii.item_id = ? AND DATE(i.issuance_date) = ?`,
+        [itemId, date]
+      );
+
+      const [[{ wasted: dbWasted = 0 }]] = await pool.query(
+        `SELECT SUM(wi.quantity) AS wasted
+         FROM wastage_items wi
+         JOIN wastages w ON wi.wastage_id = w.id
+         WHERE wi.item_id = ? AND DATE(w.date) = ?`,
+        [itemId, date]
+      );
+
+      // Add database values
+      purchased = parseFloat(dbPurchased || 0);
+      issued = parseFloat(dbIssued || 0);
+      wasted = parseFloat(dbWasted || 0);
+
+      const closing = opening + purchased - issued - wasted;
+      runningBalance = closing;
+
+      report.push({
+        date,
+        opening,
+        purchased,
+        issued,
+        wasted,
+        closing
+      });
+    }
+
+    res.json(report);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error: ' + err.message });
+  }
+};
+
+
 // Add to module.exports
 module.exports = {
   getStockReport,
   getDepartmentIssuesReport,
   getPurchasingReport,
   getWastageReport,
-  getDepartmentItemsSummary
+  getDepartmentItemsSummary,
+  getStockReportByRangeAndItem
 };

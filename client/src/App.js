@@ -23,6 +23,7 @@ import Register from './components/Register';
 import DepartmentIssuesReport from './components/report/DepartmentIssuesReport';
 import PurchasingReport from './components/report/PurchasingReport/PurchasingReport';
 import WastageReport from './components/report/WastageReport/WastageReport';
+import ItemWiseStockReport from './components/report/StockReportByRangeAndItem';
 import ManageUsers from './components/admin/ManageUsers';
 
 import './App.css';
@@ -78,6 +79,7 @@ function App() {
             <Route path="reports/purchasing" element={<PurchasingReport />} />
             <Route path="reports/wastage" element={<WastageReport />} />
             <Route path="admin/users" element={<ManageUsers />} />
+            <Route path="reports/stock/items" element={<ItemWiseStockReport/>} />
           </Route>
 
           <Route path="*" element={<Navigate to="/login" replace />} />

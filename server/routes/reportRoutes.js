@@ -7,5 +7,6 @@ router.get('/department', reportController.getDepartmentIssuesReport);
 router.get('/purchasing', reportController.getPurchasingReport);
 router.get('/wastage', reportController.getWastageReport);
 router.get('/department/items', reportController.getDepartmentItemsSummary);
+router.get('/stock-range-item', reportController.getStockReportByRangeAndItem);
 
 module.exports = router;
