@@ -97,7 +97,7 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Chart Stats Section */}
+      {/* Chart Stats Section */}       
       {chartData && <ChartStats chartData={chartData} />}
 
       {/* Footer Section */}
