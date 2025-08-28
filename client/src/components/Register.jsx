@@ -50,30 +50,30 @@ const Register = () => {
 
   return (
     <div className="register-container">
-        <h2>Register</h2>
         <form onSubmit={handleSubmit}>
             <div className="logo-header">
                 <img src={bakeryLogo} alt="Bakery Logo" className="logo-image" />
             </div>
+            <h2>Sign Up Here ...</h2>
             <div className="form-group">
-                <label htmlFor="name">Name</label>
+                <label htmlFor="name">Name :                          </label>
                 <input type="text" id="name" name="name" value={formData.name} onChange={handleChange} required />
             </div>
             <div className="form-group">
-                <label htmlFor="email">Email</label>
+                <label htmlFor="email">Email :</label>
                 <input type="email" id="email" name="email" value={formData.email} onChange={handleChange} required />
             </div>
             <div className="form-group">
-                <label htmlFor="password">Password</label>
+                <label htmlFor="password">Password :</label>
                 <input type="password" id="password" name="password" value={formData.password} onChange={handleChange} required />
             </div>
             <button type="submit" disabled={isLoading}>
               {isLoading ? 'Registering...' : 'Register'}
             </button>
             
-            <p className="login-link">
+            <div className="login-link">
               <h4>Already have an account? <Link to="/login">Login</Link></h4>
-            </p>
+            </div>
         </form>
     </div>
   )

@@ -523,7 +523,6 @@ const getStockReportByRangeAndItem = async (req, res) => {
   }
 };
 
-
 // Add to module.exports
 module.exports = {
   getStockReport,

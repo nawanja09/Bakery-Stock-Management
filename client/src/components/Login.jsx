@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import bakeryLogo from '../images/icon.jpeg';
 import { usePopup } from './context/PopupContext';
 import { Link } from 'react-router-dom';
+import { FaEnvelope, FaLock } from 'react-icons/fa';
 import './Login.css';
 import api from '../api';
 
@@ -54,10 +55,9 @@ const Login = () => {
         <img src={bakeryLogo} alt="Bakery Logo" className="logo-image" />
         <h2>Welcome back!</h2>
       </div>
-      
       <form onSubmit={handleSubmit}>
         <div className="form-group">
-          <label htmlFor="email">Email</label>
+          <label htmlFor="email">Email :</label>
           <input
             type="email"
             id="email"
@@ -69,7 +69,7 @@ const Login = () => {
         </div>
         
         <div className="form-group">
-          <label htmlFor="password">Password</label>
+          <label htmlFor="password">Password :</label>
           <input
             type="password"
             id="password"
@@ -87,9 +87,9 @@ const Login = () => {
         >
           {isLoading ? 'Logging in...' : 'Login'}
         </button>
-        <p className="register-link">
+        <div className="register-link">
           <h4>Don't have an account? <Link to="/register">Register</Link></h4>
-        </p>
+        </div>
       </form>
     </div>
   );
