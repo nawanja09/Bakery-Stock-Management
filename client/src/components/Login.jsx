@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import bakeryLogo from '../images/icon.jpeg';
 import { usePopup } from './context/PopupContext';
 import { Link } from 'react-router-dom';
-import { FaEnvelope, FaLock } from 'react-icons/fa';
 import './Login.css';
 import api from '../api';
 
