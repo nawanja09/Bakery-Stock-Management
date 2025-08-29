@@ -153,7 +153,6 @@ const DepartmentIssuesReport = () => {
         <table className="styled-table">
           <thead>
             <tr>
-              <th>Issuance ID</th>
               <th>Department</th>
               <th>Item Code</th>
               <th>Item Name</th>
@@ -164,7 +163,6 @@ const DepartmentIssuesReport = () => {
           <tbody>
             {itemData.map((row, idx) => (
               <tr key={idx}>
-                <td>{row.issuance_id}</td>
                 <td>{row.department_name}</td>
                 <td>{row.item_code}</td>
                 <td>{row.item_name}</td>
