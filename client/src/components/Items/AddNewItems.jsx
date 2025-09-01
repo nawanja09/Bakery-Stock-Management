@@ -67,16 +67,13 @@ const AddItem = () => {
       <form onSubmit={handleSubmit} className="form">
         <div className="form-group">
           <label>Item Code</label>
-          <input 
-            type="text" 
-            name="item_code" 
-            value={formData.item_code} 
-            onChange={handleChange} 
-            required 
-            pattern="I\d{3}"
-            title="Item code must be in format IXXX"
+          <input
+            type="text"
+            name="item_code"
+            value={formData.item_code}
+            onChange={handleChange}
+            required
           />
-          <small>Format: IXXX (e.g. I001)</small>
         </div>        
         <div className="form-group">
           <label>Item Name</label>

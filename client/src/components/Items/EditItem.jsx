@@ -95,8 +95,6 @@ const EditItem = () => {
             value={formData.item_code} 
             onChange={handleChange} 
             required 
-            pattern="[I]\\d{3}"
-            title="Item code must be in format IXXX"
             readOnly // Typically item code shouldn't be changed
           />
         </div>
