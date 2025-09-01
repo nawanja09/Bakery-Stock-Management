@@ -230,8 +230,8 @@ const AddPurchase = () => {
                 <td>
                   <input
                     type="number"
-                    min="1"
-                    step="1"
+                    min="0"
+                    step="0.001"
                     value={item.quantity}
                     onChange={(e) => handleItemChange(index, 'quantity', parseFloat(e.target.value))}
                     required
