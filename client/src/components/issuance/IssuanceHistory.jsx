@@ -69,7 +69,7 @@ const IssuanceDetailsModal = ({ id }) => {
               <tr key={index}>
                 <td>{item.item_code}</td>
                 <td>{item.item_name}</td>
-                <td>{item.quantity}</td>
+                <td>{Number(item.quantity).toFixed(3)}</td>
                 <td>{item.unit}</td>
               </tr>
             ))}

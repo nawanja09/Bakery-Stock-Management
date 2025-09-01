@@ -112,8 +112,8 @@ const AddOpeningBalance = () => {
           <input
             type="number"
             name="quantity"
-            min="1"
-            step="1"
+            min="0"
+            step="0.001"
             value={formData.quantity}
             onChange={handleChange}
             required

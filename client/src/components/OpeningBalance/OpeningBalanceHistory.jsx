@@ -58,7 +58,7 @@ const OpeningBalanceHistory = () => {
               <tr key={balance.id}>
                 <td>{new Date(balance.date).toLocaleDateString()}</td>
                 <td>{balance.item_name}</td>
-                <td>{balance.quantity}</td>
+                <td>{Number(balance.quantity).toFixed(3)}</td>
                 <td>{balance.unit}</td>
                 <td>{Number(balance.unit_cost).toFixed(2)}</td>
                 <td>{Number(balance.total_value).toFixed(2)}</td>

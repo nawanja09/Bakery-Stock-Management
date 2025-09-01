@@ -106,9 +106,9 @@ const PurchaseDetails = () => {
               {purchase.items.map((item, index) => (
                 <tr key={index}>
                   <td>{item.item_name}</td>
-                  <td>{item.quantity.toFixed(2)}</td>
-                  <td>{item.unit_price.toFixed(2)}</td>
-                  <td>{(item.quantity * item.unit_price).toFixed(2)}</td>
+                  <td>{Number(item.quantity).toFixed(3)}</td>
+                  <td>{Number(item.unit_price).toFixed(2)}</td>
+                  <td>{(Number(item.quantity) * Number(item.unit_price)).toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>
