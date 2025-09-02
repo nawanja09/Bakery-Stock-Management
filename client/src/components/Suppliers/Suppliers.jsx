@@ -4,10 +4,13 @@ import { faPlus, faEdit, faTrash } from '@fortawesome/free-solid-svg-icons';
 import './Suppliers.css';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
+import { useNavigate } from "react-router-dom";
+
 
 const Suppliers = () => {
   const [suppliers, setSuppliers] = useState([]);
   const [showForm, setShowForm] = useState(false);
+  const navigate = useNavigate();
   const [editingSupplier, setEditingSupplier] = useState(null);
   const [newSupplier, setNewSupplier] = useState({
     name: '',
