@@ -64,6 +64,8 @@ const Suppliers = () => {
         contact_phone: '',
         contact_email: ''
       });
+
+      navigate("/suppliers");
     } catch (error) {
       showPopup('error', `Error saving supplier: ${error.message}`);
     }
