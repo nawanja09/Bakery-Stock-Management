@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus } from '@fortawesome/free-solid-svg-icons';
+import { faPlus, faEdit, faTrash } from '@fortawesome/free-solid-svg-icons';
 import './Suppliers.css';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
@@ -8,6 +8,7 @@ import api from '../../api';
 const Suppliers = () => {
   const [suppliers, setSuppliers] = useState([]);
   const [showForm, setShowForm] = useState(false);
+  const [editingSupplier, setEditingSupplier] = useState(null);
   const [newSupplier, setNewSupplier] = useState({
     name: '',
     address: '',
@@ -42,24 +43,47 @@ const Suppliers = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await api.post('/suppliers', newSupplier);
-      if (response.ok) {
-        await fetchSuppliers();
-        setShowForm(false);
-        setNewSupplier({
-          name: '',
-          address: '',
-          city: '',
-          contact_name: '',
-          contact_phone: '',
-          contact_email: ''
-        });
-        showPopup('success', 'Supplier added successfully!');
+      if (editingSupplier) {
+        // Update supplier
+        await api.put(`/suppliers/${editingSupplier.id}`, newSupplier);
+        showPopup('success', 'Supplier updated successfully!');
       } else {
-        showPopup('error', 'Failed to add supplier');
+        // Add new supplier
+        await api.post('/suppliers', newSupplier);
+        showPopup('success', 'Supplier added successfully!');
       }
+
+      await fetchSuppliers();
+      setShowForm(false);
+      setEditingSupplier(null);
+      setNewSupplier({
+        name: '',
+        address: '',
+        city: '',
+        contact_name: '',
+        contact_phone: '',
+        contact_email: ''
+      });
     } catch (error) {
-      showPopup('error', `Error adding supplier: ${error.message}`);
+      showPopup('error', `Error saving supplier: ${error.message}`);
+    }
+  };
+
+  const handleEdit = (supplier) => {
+    setEditingSupplier(supplier);
+    setNewSupplier(supplier);
+    setShowForm(true);
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this supplier?')) return;
+
+    try {
+      await api.delete(`/suppliers/${id}`);
+      showPopup('success', 'Supplier deleted successfully!');
+      fetchSuppliers();
+    } catch (error) {
+      showPopup('error', `Error deleting supplier: ${error.message}`);
     }
   };
 
@@ -68,14 +92,14 @@ const Suppliers = () => {
   return (
     <div className="suppliers-container">
       <div className="header-buttons">
-        <button onClick={() => setShowForm(true)} className="btn-add">
+        <button onClick={() => { setShowForm(true); setEditingSupplier(null); }} className="btn-add">
           <FontAwesomeIcon icon={faPlus} /> Add New Supplier
         </button>
       </div>
 
       {showForm ? (
         <div className="supplier-form">
-          <h2>Add Supplier</h2>
+          <h2>{editingSupplier ? 'Edit Supplier' : 'Add Supplier'}</h2>
           <form onSubmit={handleSubmit} className="form-layout">
             <div className="form-group">
               <label>Supplier Name</label>
@@ -108,10 +132,12 @@ const Suppliers = () => {
             </div>
 
             <div className="form-actions">
-              <button type="button" className="btn-cancel" onClick={() => setShowForm(false)}>
+              <button type="button" className="btn-cancel" onClick={() => { setShowForm(false); setEditingSupplier(null); }}>
                 Cancel
               </button>
-              <button type="submit" className="btn-save">Save</button>
+              <button type="submit" className="btn-save">
+                {editingSupplier ? 'Update' : 'Save'}
+              </button>
             </div>
           </form>
         </div>
@@ -128,6 +154,7 @@ const Suppliers = () => {
                   <th>Contact Name</th>
                   <th>Phone</th>
                   <th>Email</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -139,6 +166,14 @@ const Suppliers = () => {
                     <td>{supplier.contact_name}</td>
                     <td>{supplier.contact_phone}</td>
                     <td>{supplier.contact_email}</td>
+                    <td>
+                      <button className="btn-edit" onClick={() => handleEdit(supplier)}>
+                        <FontAwesomeIcon icon={faEdit} />
+                      </button>
+                      <button className="btn-delete" onClick={() => handleDelete(supplier.id)}>
+                        <FontAwesomeIcon icon={faTrash} />
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
