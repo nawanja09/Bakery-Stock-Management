@@ -181,17 +181,17 @@ CREATE TABLE `opening_balances` (
   `date` DATE NOT NULL,
   `item_id` INT NOT NULL,
   `quantity` DECIMAL(10,3) NOT NULL,
-  `entered_by` INT NOT NULL,
   `created_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `unique_item_id` (`item_id`),
-  KEY `fk_entered_by` (`entered_by`),
-  CONSTRAINT `fk_ob_item_id` FOREIGN KEY (`item_id`) REFERENCES `items` (`id`),
-  CONSTRAINT `fk_ob_entered_by` FOREIGN KEY (`entered_by`) REFERENCES `users` (`id`)
+  CONSTRAINT `fk_ob_item_id` FOREIGN KEY (`item_id`) REFERENCES `items` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+ALTER TABLE opening_balances DROP FOREIGN KEY opening_balances_ibfk_2;
 
 ALTER TABLE opening_balances
 DROP COLUMN unit_cost,
+DROP COLUMN entered_by,
 DROP COLUMN total_value;
 
 --
