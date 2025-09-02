@@ -1,3 +1,76 @@
+/* Minimalist Add Opening Balance Styles */
+.opening-balance-minimal {
+  max-width: 400px;
+  margin: 40px auto;
+  padding: 32px 24px;
+  background: #fafbfc;
+  border-radius: 12px;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.07);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.ob-title {
+  font-size: 1.6rem;
+  font-weight: 600;
+  margin-bottom: 24px;
+  color: #222;
+  letter-spacing: 0.5px;
+}
+
+.ob-minimal-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.ob-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ob-label {
+  font-size: 1rem;
+  color: #444;
+  margin-bottom: 2px;
+}
+
+.ob-input {
+  padding: 8px 10px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 1rem;
+  background: #fff;
+  transition: border-color 0.2s;
+}
+.ob-input:focus {
+  border-color: #6722e6;
+  outline: none;
+}
+
+.ob-btn {
+  background: #6722e6;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 12px 0;
+  font-size: 1.1rem;
+  font-weight: 500;
+  cursor: pointer;
+  margin-top: 10px;
+  transition: background 0.2s;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ob-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
 .opening-balance-container {
   max-width: 1000px;
   margin: 20px auto;

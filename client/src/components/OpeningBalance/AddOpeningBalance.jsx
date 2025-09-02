@@ -11,7 +11,6 @@ const AddOpeningBalance = () => {
     date: new Date().toISOString().split('T')[0],
     item_id: '',
     quantity: 1,
-    unit_cost: 0,
   });
 
   const [items, setItems] = useState([]);
@@ -42,7 +41,7 @@ const AddOpeningBalance = () => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: name === 'quantity' || name === 'unit_cost' ? parseFloat(value) : value,
+      [name]: name === 'quantity' ? parseFloat(value) : value,
     }));
   };
 
@@ -73,82 +72,61 @@ const AddOpeningBalance = () => {
     }
   };
 
-  const totalValue = (formData.quantity * formData.unit_cost).toFixed(2);
-
   return (
     <div className="opening-balance-container">
-      <h2>Add Opening Balance</h2>
-      <form onSubmit={handleSubmit} className="form">
-        <div className="form-group">
-          <label>Date</label>
-          <input
-            type="date"
-            name="date"
-            value={formData.date}
-            onChange={handleChange}
-            required
-          />
+        <div className="opening-balance-minimal">
+          <form onSubmit={handleSubmit} className="ob-minimal-form">
+            <h2 className="ob-title">Add Opening Balance</h2>
+            <div className="ob-field">
+              <label htmlFor="date" className="ob-label">Date</label>
+              <input
+                type="date"
+                name="date"
+                id="date"
+                className="ob-input"
+                value={formData.date}
+                onChange={handleChange}
+                required
+              />
+            </div>
+            <div className="ob-field">
+              <label htmlFor="item_id" className="ob-label">Item</label>
+              <select
+                name="item_id"
+                id="item_id"
+                className="ob-input"
+                value={formData.item_id}
+                onChange={handleChange}
+                required
+              >
+                <option value="">Select Item</option>
+                {items.map(item => (
+                  <option key={item.id} value={item.id}>
+                    {item.name} ({item.item_code})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="ob-field">
+              <label htmlFor="quantity" className="ob-label">Quantity</label>
+              <input
+                type="number"
+                name="quantity"
+                id="quantity"
+                className="ob-input"
+                min="0"
+                step="0.001"
+                value={formData.quantity}
+                onChange={handleChange}
+                required
+              />
+            </div>
+            <button type="submit" className="ob-btn" disabled={isLoading}>
+              <FontAwesomeIcon icon={faSave} style={{ marginRight: '8px' }} />
+              {isLoading ? 'Adding...' : 'Add Opening Balance'}
+            </button>
+          </form>
         </div>
-
-        <div className="form-group">
-          <label>Item</label>
-          <select
-            name="item_id"
-            value={formData.item_id}
-            onChange={handleChange}
-            required
-          >
-            <option value="">Select Item</option>
-            {items.map(item => (
-              <option key={item.id} value={item.id}>
-                {item.name} ({item.item_code})
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="form-group">
-          <label>Quantity</label>
-          <input
-            type="number"
-            name="quantity"
-            min="0"
-            step="0.001"
-            value={formData.quantity}
-            onChange={handleChange}
-            required
-          />
-        </div>
-
-        <div className="form-group">
-          <label>Unit Cost (Rs.)</label>
-          <input
-            type="number"
-            name="unit_cost"
-            min="0.01"
-            step="0.01"
-            value={formData.unit_cost}
-            onChange={handleChange}
-            required
-          />
-        </div>
-
-        <div className="form-group">
-          <label>Total Value (Rs.)</label>
-          <input
-            type="text"
-            value={totalValue}
-            readOnly
-          />
-        </div>
-
-        <div className="form-button-wrapper">
-          <button type="submit" className="btn-save" disabled={isLoading}>
-            <FontAwesomeIcon icon={faSave} />
-            {isLoading ? 'Adding...' : 'Add Opening Balance'}
-          </button>
-        </div>
-      </form>
     </div>
   );
 };
