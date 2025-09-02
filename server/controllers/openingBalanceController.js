@@ -2,15 +2,15 @@ const pool = require('../config/db');
 
 const createOpeningBalance = async (req, res) => {
   try {
-    const { date, item_id, quantity, entered_by } = req.body;
+    const { date, item_id, quantity } = req.body;
 
-    if (!date || !item_id || !quantity || !entered_by) {
+    if (!date || !item_id || quantity === undefined) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
     const qtyNum = parseFloat(quantity);
-    if (isNaN(qtyNum) || qtyNum <= 0) {
-      return res.status(400).json({ error: 'Quantity must be a positive number' });
+    if (isNaN(qtyNum)) {
+      return res.status(400).json({ error: 'Invalid quantity value' });
     }
 
     // Check if opening balance already exists
@@ -22,17 +22,15 @@ const createOpeningBalance = async (req, res) => {
       return res.status(400).json({ error: 'Opening balance already exists for this item' });
     }
 
-    // Insert new opening balance
     await pool.query(
-      `INSERT INTO opening_balances (date, item_id, quantity, entered_by)
-       VALUES (?, ?, ?, ?)`,
-      [date, item_id, qtyNum, entered_by]
+      'INSERT INTO opening_balances (date, item_id, quantity) VALUES (?, ?, ?)',
+      [date, item_id, qtyNum]
     );
 
     return res.status(201).json({ message: 'Opening balance added successfully' });
-  } catch (error) {
-    console.error('Error in createOpeningBalance:', error);
-    return res.status(500).json({ error: 'Server error', details: error.message });
+  } catch (err) {
+    console.error('Error creating opening balance:', err);
+    return res.status(500).json({ error: 'Server error' });
   }
 };
 
@@ -44,8 +42,8 @@ const getItemsWithoutOpeningBalance = async (req, res) => {
       WHERE ob.item_id IS NULL
     `);
     res.json(rows);
-  } catch (error) {
-    console.error('Error fetching items without opening balances:', error);
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
 };
@@ -53,15 +51,14 @@ const getItemsWithoutOpeningBalance = async (req, res) => {
 const getAllOpeningBalances = async (req, res) => {
   try {
     const [rows] = await pool.query(`
-      SELECT ob.id, ob.date, i.name AS item_name, ob.quantity, i.unit, u.name AS entered_by
+      SELECT ob.id, ob.date, i.name AS item_name, ob.quantity, i.unit
       FROM opening_balances ob
       JOIN items i ON ob.item_id = i.id
-      JOIN users u ON ob.entered_by = u.id
       ORDER BY ob.date DESC
     `);
     res.json(rows);
-  } catch (error) {
-    console.error('Error fetching opening balances:', error);
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
 };

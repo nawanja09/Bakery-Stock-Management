@@ -1,132 +1,106 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSave } from '@fortawesome/free-solid-svg-icons';
-import { usePopup } from '../context/PopupContext';
 import api from '../../api';
+import { usePopup } from '../context/PopupContext';
 import './OpeningBalance.css';
 
 const AddOpeningBalance = () => {
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     item_id: '',
-    quantity: 1,
+    quantity: 0, // now allows positive, zero, negative
   });
 
   const [items, setItems] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const navigate = useNavigate();
   const { showPopup } = usePopup();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchItems = async () => {
       try {
-        const response = await api.get('/opening-balance/items/without-opening');
-        if (response.data.length === 0) {
-          showPopup('info', 'All items already have opening balances');
-          navigate('/opening/history');
-          return;
-        }
-        setItems(response.data);
-      } catch (error) {
-        console.error('Error fetching items:', error);
+        const res = await api.get('/opening-balance/items/without-opening');
+        setItems(res.data);
+      } catch (err) {
+        console.error(err);
         showPopup('error', 'Failed to load items');
       }
     };
-
     fetchItems();
-  }, [showPopup, navigate]);
+  }, [showPopup]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: name === 'quantity' ? parseFloat(value) : value,
+      [name]: name === 'quantity' ? parseFloat(value) : value
     }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsLoading(true);
-
     try {
-      const user = JSON.parse(localStorage.getItem('user'));
-      if (!user) {
-        showPopup('error', 'User not logged in');
-        setIsLoading(false);
+      if (isNaN(formData.quantity)) {
+        showPopup('Quantity must be a valid number', 'error');
         return;
       }
 
-      const payload = {
-        ...formData,
-        entered_by: user.id,
-      };
-
-      await api.post('/opening-balance', payload);
-      showPopup('success', 'Opening balance added!');
+      await api.post('/opening-balance', formData);
+      showPopup('Opening balance added!', 'success');
       navigate('/opening/history');
-    } catch (error) {
-      showPopup('error', error.response?.data?.error || 'Error adding opening balance');
-    } finally {
-      setIsLoading(false);
+    } catch (err) {
+      console.error(err);
+      showPopup(err.response?.data?.error || 'Error adding opening balance', 'error');
     }
   };
 
   return (
     <div className="opening-balance-container">
-        <div className="opening-balance-minimal">
-          <form onSubmit={handleSubmit} className="ob-minimal-form">
-            <h2 className="ob-title">Add Opening Balance</h2>
-            <div className="ob-field">
-              <label htmlFor="date" className="ob-label">Date</label>
-              <input
-                type="date"
-                name="date"
-                id="date"
-                className="ob-input"
-                value={formData.date}
-                onChange={handleChange}
-                required
-              />
-            </div>
-            <div className="ob-field">
-              <label htmlFor="item_id" className="ob-label">Item</label>
-              <select
-                name="item_id"
-                id="item_id"
-                className="ob-input"
-                value={formData.item_id}
-                onChange={handleChange}
-                required
-              >
-                <option value="">Select Item</option>
-                {items.map(item => (
-                  <option key={item.id} value={item.id}>
-                    {item.name} ({item.item_code})
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="ob-field">
-              <label htmlFor="quantity" className="ob-label">Quantity</label>
-              <input
-                type="number"
-                name="quantity"
-                id="quantity"
-                className="ob-input"
-                min="0"
-                step="0.001"
-                value={formData.quantity}
-                onChange={handleChange}
-                required
-              />
-            </div>
-            <button type="submit" className="ob-btn" disabled={isLoading}>
-              <FontAwesomeIcon icon={faSave} style={{ marginRight: '8px' }} />
-              {isLoading ? 'Adding...' : 'Add Opening Balance'}
-            </button>
-          </form>
+      <h2>Add Opening Balance</h2>
+      <form onSubmit={handleSubmit} className="form">
+        <div className="form-group">
+          <label>Date</label>
+          <input
+            type="date"
+            name="date"
+            value={formData.date}
+            onChange={handleChange}
+            required
+          />
         </div>
+
+        <div className="form-group">
+          <label>Item</label>
+          <select
+            name="item_id"
+            value={formData.item_id}
+            onChange={handleChange}
+            required
+          >
+            <option value="">Select Item</option>
+            {items.map(item => (
+              <option key={item.id} value={item.id}>
+                {item.name} ({item.item_code})
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="form-group">
+          <label>Quantity</label>
+          <input
+            type="number"
+            name="quantity"
+            value={formData.quantity}
+            onChange={handleChange}
+            required
+          />
+            <small style={{color: '#888'}}>You can enter negative, zero, or positive values.</small>
+        </div>
+
+        <div className="form-button-wrapper">
+          <button type="submit" className="btn-save">Add Opening Balance</button>
+        </div>
+      </form>
     </div>
   );
 };

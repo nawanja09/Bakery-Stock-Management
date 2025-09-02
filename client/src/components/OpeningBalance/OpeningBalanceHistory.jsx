@@ -55,7 +55,12 @@ const OpeningBalanceHistory = () => {
               <tr key={balance.id}>
                 <td>{new Date(balance.date).toLocaleDateString()}</td>
                 <td>{balance.item_name}</td>
-                <td>{Number(balance.quantity).toFixed(3)}</td>
+                <td style={{
+                  color: Number(balance.quantity) < 0 ? 'red' : Number(balance.quantity) === 0 ? 'orange' : 'green',
+                  fontWeight: 'bold'
+                }}>
+                  {Number(balance.quantity).toFixed(3)}
+                </td>
                 <td>{balance.unit}</td>
               </tr>
             ))}
