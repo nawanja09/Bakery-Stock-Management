@@ -54,13 +54,16 @@ const AddOpeningBalance = () => {
   };
 
   return (
-    <div className="opening-balance-container">
-      <h2>Add Opening Balance</h2>
-      <form onSubmit={handleSubmit} className="form">
-        <div className="form-group">
-          <label>Date</label>
+    <div className="ob-box-container">
+      <h2 className="ob-heading">Add Opening Balance</h2>
+
+      <form onSubmit={handleSubmit} className="ob-form-box">
+
+        <div className="ob-form-group">
+          <label htmlFor="date">Date</label>
           <input
             type="date"
+            id="date"
             name="date"
             value={formData.date}
             onChange={handleChange}
@@ -68,16 +71,17 @@ const AddOpeningBalance = () => {
           />
         </div>
 
-        <div className="form-group">
-          <label>Item</label>
+        <div className="ob-form-group">
+          <label htmlFor="item_id">Item</label>
           <select
+            id="item_id"
             name="item_id"
             value={formData.item_id}
             onChange={handleChange}
             required
           >
             <option value="">Select Item</option>
-            {items.map(item => (
+            {items.map((item) => (
               <option key={item.id} value={item.id}>
                 {item.name} ({item.item_code})
               </option>
@@ -85,23 +89,28 @@ const AddOpeningBalance = () => {
           </select>
         </div>
 
-        <div className="form-group">
-          <label>Quantity</label>
+        <div className="ob-form-group">
+          <label htmlFor="quantity">Quantity</label>
           <input
             type="number"
+            id="quantity"
             name="quantity"
             value={formData.quantity}
             onChange={handleChange}
             required
           />
-            <small style={{color: '#888'}}>You can enter negative, zero, or positive values.</small>
+          <small>You can enter negative, zero, or positive values.</small>
         </div>
 
-        <div className="form-button-wrapper">
-          <button type="submit" className="btn-save">Add Opening Balance</button>
+        <div className="ob-button-wrapper">
+          <button type="submit" className="ob-btn-submit">
+            Add Balance 
+          </button>
         </div>
+
       </form>
     </div>
+
   );
 };
 

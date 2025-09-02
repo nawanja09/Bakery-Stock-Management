@@ -152,17 +152,24 @@
 }
 
 .btn-save {
-  background-color: #6722e6;
+  background: linear-gradient(90deg, #6722e6 70%, #a98cf7 100%);
   color: white;
   border: none;
-  padding: 10px 20px;
-  border-radius: 4px;
+  padding: 11px 22px;
+  border-radius: 8px;
   cursor: pointer;
   font-size: 16px;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(103,34,230,0.07);
+  transition: background 0.2s, box-shadow 0.2s;
 }
-
+.btn-save:hover:not(:disabled) {
+  background: linear-gradient(90deg, #7a3cf7 70%, #b6a2f7 100%);
+  box-shadow: 0 4px 16px rgba(103,34,230,0.10);
+}
 .btn-save:disabled {
-  background-color: #cccccc;
+  background-color: #e0e0e0;
+  color: #aaa;
   cursor: not-allowed;
 }
 
@@ -185,4 +192,90 @@
   font-size: 24px;
   color: #333;
   text-align: center;
+}
+
+/* Container Box */
+.ob-box-container {
+  max-width: 480px;
+  margin: 60px auto;
+  padding: 32px;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  background: #fefefe;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+  font-family: 'Inter', sans-serif;
+}
+
+/* Heading */
+.ob-heading {
+  text-align: center;
+  font-size: 1.6rem;
+  margin-bottom: 28px;
+  font-weight: 600;
+  color: #1f1f1f;
+}
+
+/* Form Layout */
+.ob-form-box {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* Each Form Group */
+.ob-form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.ob-form-group label {
+  margin-bottom: 6px;
+  font-weight: 500;
+  color: #333;
+  font-size: 0.95rem;
+}
+
+.ob-form-group input,
+.ob-form-group select {
+  padding: 10px 12px;
+  font-size: 1rem;
+  border: 1px solid #dcdcdc;
+  border-radius: 6px;
+  background: #fff;
+  transition: border-color 0.2s;
+}
+
+.ob-form-group input:focus,
+.ob-form-group select:focus {
+  border-color: #6722e6;
+  outline: none;
+}
+
+/* Hint text */
+.ob-form-group small {
+  margin-top: 6px;
+  font-size: 0.85rem;
+  color: #888;
+}
+
+/* Button */
+.ob-button-wrapper {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.ob-btn-submit {
+  background: #6722e6;
+  color: white;
+  border: none;
+  padding: 12px 20px;
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.ob-btn-submit:hover {
+  background: #7a3cf7;
 }
