@@ -181,8 +181,6 @@ CREATE TABLE `opening_balances` (
   `date` DATE NOT NULL,
   `item_id` INT NOT NULL,
   `quantity` DECIMAL(10,3) NOT NULL,
-  `unit_cost` DECIMAL(10,2) NOT NULL,
-  `total_value` DECIMAL(10,2) NOT NULL, -- remove GENERATED part
   `entered_by` INT NOT NULL,
   `created_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
@@ -191,6 +189,10 @@ CREATE TABLE `opening_balances` (
   CONSTRAINT `fk_ob_item_id` FOREIGN KEY (`item_id`) REFERENCES `items` (`id`),
   CONSTRAINT `fk_ob_entered_by` FOREIGN KEY (`entered_by`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+ALTER TABLE opening_balances
+DROP COLUMN unit_cost,
+DROP COLUMN total_value;
 
 --
 -- Dumping data for table `opening_balances`

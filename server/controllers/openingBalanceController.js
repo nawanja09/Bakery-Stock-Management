@@ -2,38 +2,31 @@ const pool = require('../config/db');
 
 const createOpeningBalance = async (req, res) => {
   try {
-    const { date, item_id, quantity, unit_cost, entered_by } = req.body;
+    const { date, item_id, quantity, entered_by } = req.body;
 
-    // Validate inputs
-    if (!date || !item_id || !quantity || !unit_cost || !entered_by) {
+    if (!date || !item_id || !quantity || !entered_by) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // Validate numeric fields
     const qtyNum = parseFloat(quantity);
-    const costNum = parseFloat(unit_cost);
-
-    if (isNaN(qtyNum) || qtyNum <= 0 || isNaN(costNum) || costNum <= 0) {
-      return res.status(400).json({ error: 'Quantity and Unit Cost must be positive numbers' });
+    if (isNaN(qtyNum) || qtyNum <= 0) {
+      return res.status(400).json({ error: 'Quantity must be a positive number' });
     }
 
-    const total_value = qtyNum * costNum;
-
-    // Check if opening balance already exists for this item
+    // Check if opening balance already exists
     const [existing] = await pool.query(
       'SELECT id FROM opening_balances WHERE item_id = ?',
       [item_id]
     );
-
     if (existing.length > 0) {
       return res.status(400).json({ error: 'Opening balance already exists for this item' });
     }
 
-    // Insert opening balance
-    const [result] = await pool.query(
-      `INSERT INTO opening_balances (date, item_id, quantity, unit_cost, total_value, entered_by)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [date, item_id, qtyNum, costNum, total_value, entered_by]
+    // Insert new opening balance
+    await pool.query(
+      `INSERT INTO opening_balances (date, item_id, quantity, entered_by)
+       VALUES (?, ?, ?, ?)`,
+      [date, item_id, qtyNum, entered_by]
     );
 
     return res.status(201).json({ message: 'Opening balance added successfully' });
@@ -60,7 +53,7 @@ const getItemsWithoutOpeningBalance = async (req, res) => {
 const getAllOpeningBalances = async (req, res) => {
   try {
     const [rows] = await pool.query(`
-      SELECT ob.id, ob.date, i.name AS item_name, ob.quantity, i.unit, ob.unit_cost, ob.total_value, u.name AS entered_by
+      SELECT ob.id, ob.date, i.name AS item_name, ob.quantity, i.unit, u.name AS entered_by
       FROM opening_balances ob
       JOIN items i ON ob.item_id = i.id
       JOIN users u ON ob.entered_by = u.id

@@ -48,9 +48,6 @@ const OpeningBalanceHistory = () => {
               <th>Item Name</th>
               <th>Quantity</th>
               <th>Unit</th>
-              <th>Unit Cost (Rs.)</th>
-              <th>Total Value (Rs.)</th>
-              <th>Entered By</th>
             </tr>
           </thead>
           <tbody>
@@ -60,9 +57,6 @@ const OpeningBalanceHistory = () => {
                 <td>{balance.item_name}</td>
                 <td>{Number(balance.quantity).toFixed(3)}</td>
                 <td>{balance.unit}</td>
-                <td>{Number(balance.unit_cost).toFixed(2)}</td>
-                <td>{Number(balance.total_value).toFixed(2)}</td>
-                <td>{balance.entered_by}</td>
               </tr>
             ))}
           </tbody>
