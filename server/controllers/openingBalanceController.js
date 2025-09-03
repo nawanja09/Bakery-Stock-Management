@@ -63,8 +63,39 @@ const getAllOpeningBalances = async (req, res) => {
   }
 };
 
+const updateOpeningBalance = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { date, quantity } = req.body;
+
+    if (!date || quantity === undefined) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const qtyNum = parseFloat(quantity);
+    if (isNaN(qtyNum)) {
+      return res.status(400).json({ error: 'Invalid quantity value' });
+    }
+
+    const [result] = await pool.query(
+      'UPDATE opening_balances SET date = ?, quantity = ? WHERE id = ?',
+      [date, qtyNum, id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Opening balance not found' });
+    }
+
+    res.json({ message: 'Opening balance updated successfully' });
+  } catch (err) {
+    console.error('Error updating opening balance:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
 module.exports = {
   createOpeningBalance,
   getItemsWithoutOpeningBalance,
-  getAllOpeningBalances
+  getAllOpeningBalances,
+  updateOpeningBalance
 };

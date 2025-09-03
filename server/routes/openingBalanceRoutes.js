@@ -5,5 +5,6 @@ const openingBalanceController = require('../controllers/openingBalanceControlle
 router.post('/', openingBalanceController.createOpeningBalance);
 router.get('/', openingBalanceController.getAllOpeningBalances);
 router.get('/items/without-opening', openingBalanceController.getItemsWithoutOpeningBalance);
+router.put('/:id', openingBalanceController.updateOpeningBalance);
 
 module.exports = router;
