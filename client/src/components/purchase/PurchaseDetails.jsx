@@ -60,6 +60,9 @@ const PurchaseDetails = () => {
               <strong> Date:</strong> {purchase.purchase_date}
             </li>
             <li>
+              <strong>Company:</strong> {purchase.company_name}
+            </li>
+            <li>
               <strong>Payment Method:</strong> {purchase.payment_method}
             </li>
             <li>

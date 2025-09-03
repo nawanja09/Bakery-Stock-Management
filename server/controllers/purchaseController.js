@@ -13,7 +13,8 @@ const createPurchase = async (req, res) => {
     paid_amount, 
     payment_method, 
     remarks, 
-    prepared_by 
+    prepared_by,
+    company_id  // ✅ Added company_id
   } = req.body;
 
   const invoice_no = `PUR-${uuidv4().substr(0, 8).toUpperCase()}`;
@@ -22,12 +23,14 @@ const createPurchase = async (req, res) => {
   try {
     await connection.beginTransaction();
 
-    // Insert purchase
+    // Insert purchase with company_id
     const [purchaseResult] = await connection.query(
       `INSERT INTO purchases 
-      (invoice_no, purchase_date, supplier_id, bill_amount, paid_amount, payment_method, remarks, prepared_by) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [invoice_no, purchase_date, supplier_id, bill_amount, paid_amount, payment_method, remarks, prepared_by]
+      (invoice_no, purchase_date, supplier_id, bill_amount, paid_amount, 
+       payment_method, remarks, prepared_by, company_id) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [invoice_no, purchase_date, supplier_id, bill_amount, paid_amount, 
+       payment_method, remarks, prepared_by, company_id]
     );
     
     const purchaseId = purchaseResult.insertId;
@@ -62,9 +65,10 @@ const createPurchase = async (req, res) => {
 const getAllPurchases = async (req, res) => {
   try {
     const [purchases] = await pool.query(`
-      SELECT p.*, s.name AS supplier_name 
+      SELECT p.*, s.name AS supplier_name, c.name AS company_name
       FROM purchases p
       JOIN supplier s ON p.supplier_id = s.id
+      JOIN company c ON p.company_id = c.id
       ORDER BY p.purchase_date DESC
     `);
     res.json(purchases);
@@ -84,9 +88,11 @@ const getPurchaseById = async (req, res) => {
         p.*, 
         s.name AS supplier_name,
         s.contact_name,
-        s.contact_phone
+        s.contact_phone,
+        c.name AS company_name
       FROM purchases p
       JOIN supplier s ON p.supplier_id = s.id
+      JOIN company c ON p.company_id = c.id
       WHERE p.id = ?
     `, [id]);
     
@@ -114,6 +120,17 @@ const getPurchaseById = async (req, res) => {
   }
 };
 
+// Get all companies
+const getAllCompanies = async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT id, name FROM company');
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching companies:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
 // Add Supplier List 
 const getAllSuppliers = async (req, res) => {
   try {
@@ -130,4 +147,5 @@ module.exports = {
   getAllPurchases,
   getPurchaseById,
   getAllSuppliers,
+  getAllCompanies, // ✅ Added this function
 };

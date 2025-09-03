@@ -6,7 +6,8 @@ const purchaseController = require('../controllers/purchaseController');
 
 router.post('/', purchaseController.createPurchase);
 router.get('/', purchaseController.getAllPurchases);
-router.get('/:id', purchaseController.getPurchaseById);
 router.get('/suppliers', purchaseController.getAllSuppliers);
+router.get('/companies', purchaseController.getAllCompanies);
+router.get('/:id', purchaseController.getPurchaseById);
 
 module.exports = router;
