@@ -7,22 +7,50 @@ const OpeningBalanceHistory = () => {
   const [balances, setBalances] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [editing, setEditing] = useState(null); // store record being edited
+  const [editData, setEditData] = useState({ date: '', quantity: '' });
   const navigate = useNavigate();
 
   useEffect(() => {
-    const fetchBalances = async () => {
-      try {
-        const response = await api.get('/opening-balance');
-        setBalances(response.data);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchBalances();
   }, []);
+
+  const fetchBalances = async () => {
+    try {
+      const response = await api.get('/opening-balance');
+      setBalances(response.data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEditClick = (balance) => {
+    setEditing(balance.id);
+    setEditData({
+      date: balance.date.split('T')[0],
+      quantity: balance.quantity
+    });
+  };
+
+  const handleEditChange = (e) => {
+    const { name, value } = e.target;
+    setEditData(prev => ({
+      ...prev,
+      [name]: name === 'quantity' ? parseFloat(value) : value
+    }));
+  };
+
+  const handleUpdate = async (id) => {
+    try {
+      await api.put(`/opening-balance/${id}`, editData);
+      setEditing(null);
+      fetchBalances(); // reload table
+    } catch (err) {
+      alert(err.response?.data?.error || 'Update failed');
+    }
+  };
 
   return (
     <div className="opening-balance-container">
@@ -48,20 +76,51 @@ const OpeningBalanceHistory = () => {
               <th>Item Name</th>
               <th>Quantity</th>
               <th>Unit</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {balances.map(balance => (
               <tr key={balance.id}>
-                <td>{new Date(balance.date).toLocaleDateString()}</td>
+                <td>
+                  {editing === balance.id ? (
+                    <input
+                      type="date"
+                      name="date"
+                      value={editData.date}
+                      onChange={handleEditChange}
+                    />
+                  ) : (
+                    new Date(balance.date).toLocaleDateString()
+                  )}
+                </td>
                 <td>{balance.item_name}</td>
                 <td style={{
                   color: Number(balance.quantity) < 0 ? 'red' : Number(balance.quantity) === 0 ? 'orange' : 'green',
                   fontWeight: 'bold'
                 }}>
-                  {Number(balance.quantity).toFixed(3)}
+                  {editing === balance.id ? (
+                    <input
+                      type="number"
+                      name="quantity"
+                      value={editData.quantity}
+                      onChange={handleEditChange}
+                    />
+                  ) : (
+                    Number(balance.quantity).toFixed(3)
+                  )}
                 </td>
                 <td>{balance.unit}</td>
+                <td>
+                  {editing === balance.id ? (
+                    <>
+                      <button onClick={() => handleUpdate(balance.id)}>Save</button>
+                      <button onClick={() => setEditing(null)}>Cancel</button>
+                    </>
+                  ) : (
+                    <button onClick={() => handleEditClick(balance)}>Edit</button>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
