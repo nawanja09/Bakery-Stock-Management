@@ -120,14 +120,17 @@ CREATE TABLE `purchases` (
   `payment_method` enum('CASH','BANK_TRANSFER','CREDIT') NOT NULL,
   `remarks` text,
   `prepared_by` int NOT NULL,
+  `company_id` int DEFAULT NULL,
   `attachment_path` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `invoice_no` (`invoice_no`),
   KEY `supplier_id` (`supplier_id`),
   KEY `prepared_by` (`prepared_by`),
+  KEY `fk_purchases_company` (`company_id`),
+  CONSTRAINT `fk_purchases_company` FOREIGN KEY (`company_id`) REFERENCES `company` (`id`),
   CONSTRAINT `purchases_ibfk_1` FOREIGN KEY (`supplier_id`) REFERENCES `supplier` (`id`),
   CONSTRAINT `purchases_ibfk_2` FOREIGN KEY (`prepared_by`) REFERENCES `users` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=17 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=18 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
 -- Dumping data for table `purchases`
@@ -158,7 +161,7 @@ CREATE TABLE `purchase_items` (
   KEY `item_id` (`item_id`),
   CONSTRAINT `purchase_items_ibfk_1` FOREIGN KEY (`purchase_id`) REFERENCES `purchases` (`id`) ON DELETE CASCADE,
   CONSTRAINT `purchase_items_ibfk_2` FOREIGN KEY (`item_id`) REFERENCES `items` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=18 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=19 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
 -- Dumping data for table `purchase_items`
@@ -305,11 +308,23 @@ CREATE TABLE `wastages` (
 
 INSERT INTO `wastages` VALUES (12,'WN-008193CB','2025-08-14','Admin','Human error','',NULL,5,'2025-08-14 09:41:30');
 
+--
+-- Table structure for `company`
+--
 
+--
+-- Table structure for table `company`
+--
 
+CREATE TABLE `company` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `name` varchar(255) NOT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+--
+-- Dumping data for table `company`
+--
 
-
-
-
-
+INSERT INTO `company` VALUES (1,'JH','2025-08-24 21:21:26'),(2,'RR','2025-08-24 21:59:12');

@@ -10,6 +10,7 @@ const AddPurchase = () => {
   const navigate = useNavigate();
   const [suppliers, setSuppliers] = useState([]);
   const [itemsList, setItemsList] = useState([]); // For item dropdown
+  const [companies, setCompanies] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
   const { showPopup } = usePopup();
   const [formData, setFormData] = useState({
@@ -19,6 +20,7 @@ const AddPurchase = () => {
     paid_amount: 0,
     payment_method: 'CASH',
     remarks: '',
+    company_id : '',   // ✅ new field
     items: [
       { id: '', item_name: '', quantity: 1, unit_price: 0 }
     ]
@@ -48,9 +50,21 @@ const AddPurchase = () => {
       }
     };
 
+    // ✅ Added fetchCompanies function
+    const fetchCompanies = async () => {
+      try {
+        const response = await api.get('/purchases/companies');
+        setCompanies(response.data);
+      } catch (error) {
+        console.error('Error fetching companies:', error);
+        alert(`Error loading companies: ${error.message}`);
+      }
+    };
+
     fetchSuppliers();
     fetchItems();
-  }, []);
+    fetchCompanies(); // ✅ Call the function
+  }, []);  
 
   const handleItemChange = (index, field, value) => {
     const newItems = [...formData.items];
@@ -129,7 +143,8 @@ const AddPurchase = () => {
     const updatedFormData = {
       ...formData,
       bill_amount: calculateTotal(),
-      prepared_by: currentUser.id
+      prepared_by: currentUser.id,
+      company_id: formData.company_id === '' ? null : formData.company_id
     };
 
     try {
@@ -190,12 +205,28 @@ const AddPurchase = () => {
               <option value="CREDIT">Credit</option>
             </select>
           </div>
+            <div className="form-group">
+              <label>Company</label>
+              <select
+                value={formData.company_id}
+                onChange={(e) => setFormData({...formData, company_id: e.target.value})}
+                required
+              >
+                <option value="">Select Company</option>
+                {companies.map(company => (
+                  <option key={company.id} value={company.id}>{company.name}</option>
+                ))}
+              </select>
+            </div>
+        </div>
+
+        <div className="form-row">
           <div className="form-group">
             <label>Remarks</label>
-            <textarea 
-              value={formData.remarks}
-              onChange={(e) => setFormData({...formData, remarks: e.target.value})}
-            />
+              <textarea 
+                value={formData.remarks}
+                onChange={(e) => setFormData({...formData, remarks: e.target.value})}
+              />
           </div>
         </div>
 
