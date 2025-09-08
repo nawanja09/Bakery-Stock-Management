@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api';
 import { usePopup } from '../context/PopupContext';
+import Select from 'react-select'; // 🔎 import react-select
 import './OpeningBalance.css';
 
 const AddOpeningBalance = () => {
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     item_id: '',
-    quantity: 0, // now allows positive, zero, negative
+    quantity: 0,
   });
 
   const [items, setItems] = useState([]);
@@ -40,18 +41,24 @@ const AddOpeningBalance = () => {
     e.preventDefault();
     try {
       if (isNaN(formData.quantity)) {
-        showPopup('Quantity must be a valid number', 'error');
+        showPopup('error', 'Quantity must be a valid number');
         return;
       }
 
       await api.post('/opening-balance', formData);
-      showPopup('Opening balance added!', 'success');
+      showPopup('success', 'Opening balance added!');
       navigate('/opening/history');
     } catch (err) {
       console.error(err);
-      showPopup(err.response?.data?.error || 'Error adding opening balance', 'error');
+      showPopup('error', err.response?.data?.error || 'Error adding opening balance');
     }
   };
+
+  // 🔎 convert items to react-select format
+  const itemOptions = items.map(item => ({
+    value: item.id,
+    label: `${item.name} (${item.item_code})`
+  }));
 
   return (
     <div className="ob-box-container">
@@ -71,22 +78,19 @@ const AddOpeningBalance = () => {
           />
         </div>
 
+        {/* 🔎 Searchable Select */}
         <div className="ob-form-group">
           <label htmlFor="item_id">Item</label>
-          <select
+          <Select
             id="item_id"
-            name="item_id"
-            value={formData.item_id}
-            onChange={handleChange}
-            required
-          >
-            <option value="">Select Item</option>
-            {items.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name} ({item.item_code})
-              </option>
-            ))}
-          </select>
+            options={itemOptions}
+            value={itemOptions.find(opt => opt.value === formData.item_id) || null}
+            onChange={(selected) =>
+              setFormData(prev => ({ ...prev, item_id: selected.value }))
+            }
+            isSearchable
+            placeholder="Select or search item..."
+          />
         </div>
 
         <div className="ob-form-group">
@@ -104,13 +108,12 @@ const AddOpeningBalance = () => {
 
         <div className="ob-button-wrapper">
           <button type="submit" className="ob-btn-submit">
-            Add Balance 
+            Add Balance
           </button>
         </div>
 
       </form>
     </div>
-
   );
 };
 

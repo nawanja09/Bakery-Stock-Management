@@ -308,23 +308,5 @@ CREATE TABLE `wastages` (
 
 INSERT INTO `wastages` VALUES (12,'WN-008193CB','2025-08-14','Admin','Human error','',NULL,5,'2025-08-14 09:41:30');
 
---
--- Table structure for `company`
---
 
---
--- Table structure for table `company`
---
 
-CREATE TABLE `company` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `name` varchar(255) NOT NULL,
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
---
--- Dumping data for table `company`
---
-
-INSERT INTO `company` VALUES (1,'JH','2025-08-24 21:21:26'),(2,'RR','2025-08-24 21:59:12');
