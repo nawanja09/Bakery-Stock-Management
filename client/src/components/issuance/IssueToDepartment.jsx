@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { usePopup } from '../context/PopupContext';
 import './Issuance.css';
 import api from '../../api';
+import Select from 'react-select'; // 🔎 Import react-select
 
 const IssueToDepartment = () => {
   const navigate = useNavigate();
@@ -10,6 +11,7 @@ const IssueToDepartment = () => {
   const [items, setItems] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
   const { showPopup } = usePopup();
+
   const [formData, setFormData] = useState({
     issuance_date: new Date().toISOString().split('T')[0],
     department_id: '',
@@ -47,8 +49,8 @@ const IssueToDepartment = () => {
 
   const handleItemChange = (index, field, value) => {
     const newItems = [...formData.items];
-    
-    if (field === 'quantity' || field === 'unit_price') {
+
+    if (field === 'quantity') {
       value = Number(value) || 0;
     }
 
@@ -56,7 +58,6 @@ const IssueToDepartment = () => {
 
     // AUTO-SELECT UNIT WHEN ITEM IS SELECTED
     if (field === 'item_id') {
-      // item.id may be number, value from select is string
       const selectedItem = items.find(item => String(item.id) === String(value));
       newItems[index].unit = selectedItem ? selectedItem.unit : '';
     }
@@ -79,13 +80,13 @@ const IssueToDepartment = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!currentUser || !currentUser.id) {
       alert('User information is missing. Please login again.');
       navigate('/login');
       return;
     }
-    
+
     const updatedFormData = {
       ...formData,
       issued_by: currentUser.id
@@ -106,6 +107,13 @@ const IssueToDepartment = () => {
     }
   };
 
+  // 🔎 Map items to react-select format
+  const itemOptions = items.map(itm => ({
+    value: itm.id,
+    label: `${itm.name} (${itm.item_code})`,
+    unit: itm.unit
+  }));
+
   return (
     <div className="issuance-container">
       <h2>Issue Items to Department</h2>
@@ -113,19 +121,19 @@ const IssueToDepartment = () => {
         <div className="form-row">
           <div className="form-group">
             <label>Issuance Date</label>
-            <input 
-              type="date" 
+            <input
+              type="date"
               value={formData.issuance_date}
-              onChange={(e) => setFormData({...formData, issuance_date: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, issuance_date: e.target.value })}
               required
             />
           </div>
-          
+
           <div className="form-group">
             <label>Department</label>
             <select
               value={formData.department_id}
-              onChange={(e) => setFormData({...formData, department_id: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, department_id: e.target.value })}
               required
             >
               <option value="">Select Department</option>
@@ -137,34 +145,25 @@ const IssueToDepartment = () => {
             </select>
           </div>
         </div>
-        
+
         <div className="form-row">
           <div className="form-group">
             <label>Received By</label>
-            <input 
+            <input
               type="text"
               value={formData.received_by}
-              onChange={(e) => setFormData({...formData, received_by: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, received_by: e.target.value })}
               required
             />
           </div>
-          
+
           <div className="form-group">
-            <label>Approved By</label>
-            <input 
-              type="text"
-              value={formData.approved_by}
-              onChange={(e) => setFormData({...formData, approved_by: e.target.value})}
+            <label>Remarks</label>
+            <textarea
+              value={formData.remarks}
+              onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
             />
           </div>
-        </div>
-
-        <div className="form-group">
-          <label>Remarks</label>
-          <textarea 
-            value={formData.remarks}
-            onChange={(e) => setFormData({...formData, remarks: e.target.value})}
-          />
         </div>
 
         <h3>Issued Items</h3>
@@ -181,18 +180,16 @@ const IssueToDepartment = () => {
             {formData.items.map((item, index) => (
               <tr key={index}>
                 <td>
-                  <select
-                    value={item.item_id}
-                    onChange={(e) => handleItemChange(index, 'item_id', e.target.value)}
-                    required
-                  >
-                    <option value="">Select Item</option>
-                    {items.map((itm) => (
-                      <option key={itm.id} value={itm.id}>
-                        {itm.name} ({itm.item_code})
-                      </option>
-                    ))}
-                  </select>
+                  {/* 🔎 Replace <select> with react-select */}
+                  <Select
+                    options={itemOptions}
+                    value={itemOptions.find(opt => String(opt.value) === String(item.item_id)) || null}
+                    onChange={(selected) => {
+                      handleItemChange(index, 'item_id', selected.value);
+                    }}
+                    isSearchable
+                    placeholder="Search or select item..."
+                  />
                 </td>
                 <td>
                   <input
@@ -205,7 +202,6 @@ const IssueToDepartment = () => {
                   />
                 </td>
                 <td>
-                  {/* Auto-selected unit display */}
                   <input
                     type="text"
                     value={item.unit}
@@ -214,8 +210,8 @@ const IssueToDepartment = () => {
                   />
                 </td>
                 <td>
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     className="btn-remove"
                     onClick={() => removeItemRow(index)}
                   >
@@ -226,15 +222,15 @@ const IssueToDepartment = () => {
             ))}
           </tbody>
         </table>
-        
-        <button 
-          type="button" 
+
+        <button
+          type="button"
           className="btn-add"
           onClick={addItemRow}
         >
           + Add Item
         </button>
-        
+
         <button type="submit" className="btn-submit">Save Issuance</button>
       </form>
     </div>

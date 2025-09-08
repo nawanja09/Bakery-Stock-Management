@@ -90,7 +90,6 @@ const WastageHistory = () => {
             <th>Date</th>
             <th>Approved By</th>
             <th>Reason</th>
-            <th>Entered By</th>
           </tr>
         </thead>
         <tbody>
@@ -100,7 +99,6 @@ const WastageHistory = () => {
               <td>{new Date(wastage.date).toLocaleDateString()}</td>
               <td>{wastage.approved_by}</td>
               <td>{wastage.reason}</td>
-              <td>{wastage.entered_by}</td>
             </tr>
           ))}
         </tbody>

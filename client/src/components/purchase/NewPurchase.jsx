@@ -1,18 +1,20 @@
-//src/components/purchase/NewPurchase.jsx
+// src/components/purchase/NewPurchase.jsx
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Purchase.css'; 
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
+import Select from 'react-select'; // ✅ import react-select
 
 const AddPurchase = () => {
   const navigate = useNavigate();
   const [suppliers, setSuppliers] = useState([]);
-  const [itemsList, setItemsList] = useState([]); // For item dropdown
+  const [itemsList, setItemsList] = useState([]);
   const [companies, setCompanies] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
   const { showPopup } = usePopup();
+
   const [formData, setFormData] = useState({
     purchase_date: new Date().toISOString().split('T')[0],
     supplier_id: '',
@@ -20,10 +22,8 @@ const AddPurchase = () => {
     paid_amount: 0,
     payment_method: 'CASH',
     remarks: '',
-    company_id : '',   // ✅ new field
-    items: [
-      { id: '', item_name: '', quantity: 1, unit_price: 0 }
-    ]
+    company_id: '',
+    items: [{ id: '', item_name: '', quantity: 1, unit_price: 0 }]
   });
 
   useEffect(() => {
@@ -36,7 +36,6 @@ const AddPurchase = () => {
         setSuppliers(response.data);
       } catch (error) {
         console.error('Error fetching suppliers:', error);
-        alert(`Error loading suppliers: ${error.message}`);
       }
     };
 
@@ -46,41 +45,36 @@ const AddPurchase = () => {
         setItemsList(response.data);
       } catch (error) {
         console.error('Error fetching items:', error);
-        alert(`Error loading items: ${error.message}`);
       }
     };
 
-    // ✅ Added fetchCompanies function
     const fetchCompanies = async () => {
       try {
         const response = await api.get('/purchases/companies');
         setCompanies(response.data);
       } catch (error) {
         console.error('Error fetching companies:', error);
-        alert(`Error loading companies: ${error.message}`);
       }
     };
 
     fetchSuppliers();
     fetchItems();
-    fetchCompanies(); // ✅ Call the function
-  }, []);  
+    fetchCompanies();
+  }, []);
 
   const handleItemChange = (index, field, value) => {
     const newItems = [...formData.items];
-    
-    // Convert to number for numeric fields
+
     if (field === 'quantity' || field === 'unit_price') {
       value = parseFloat(value) || 0;
     }
-    
+
     newItems[index][field] = value;
-    
-    // Calculate total price if quantity or price changes
+
     if (field === 'quantity' || field === 'unit_price') {
       newItems[index].total = newItems[index].quantity * newItems[index].unit_price;
     }
-    
+
     setFormData({
       ...formData,
       items: newItems
@@ -90,16 +84,13 @@ const AddPurchase = () => {
   const addItemRow = () => {
     setFormData({
       ...formData,
-      items: [
-        ...formData.items,
-        { item_name: '', quantity: 1, unit_price: 0 }
-      ]
+      items: [...formData.items, { id: '', item_name: '', quantity: 1, unit_price: 0 }]
     });
   };
 
-  // Create a new handler for item selection
-  const handleItemSelect = (index, itemId) => {
-    const selectedItem = itemsList.find(item => item.id === parseInt(itemId));
+  const handleItemSelect = (index, selectedOption) => {
+    if (!selectedOption) return;
+    const selectedItem = itemsList.find(item => item.id === selectedOption.value);
     if (!selectedItem) return;
 
     const newItems = [...formData.items];
@@ -109,7 +100,7 @@ const AddPurchase = () => {
       item_name: selectedItem.name,
       unit_price: selectedItem.purchase_price || 0
     };
-    
+
     setFormData({ ...formData, items: newItems });
   };
 
@@ -128,18 +119,17 @@ const AddPurchase = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validate all items have IDs
     if (formData.items.some(item => !item.id)) {
       showPopup('error', 'Please select valid items for all rows');
       return;
     }
-    
+
     if (!currentUser || !currentUser.id) {
       showPopup('error', 'User information is missing. Please login again.');
       navigate('/login');
       return;
     }
-    
+
     const updatedFormData = {
       ...formData,
       bill_amount: calculateTotal(),
@@ -149,21 +139,26 @@ const AddPurchase = () => {
 
     try {
       const response = await api.post('/purchases', updatedFormData);
-      // Axios puts response data in response.data
       showPopup('success', `Purchase created successfully! Invoice: ${response.data.invoice_no}`);
       navigate('/purchase/history');
     } catch (error) {
       console.error('Error creating purchase:', error);
-      // Axios error response is in error.response.data
       const errorMessage = error.response?.data?.error || 'Server error';
       showPopup('error', `Error: ${errorMessage}`);
     }
   };
 
+  // ✅ convert items list to react-select options
+  const itemOptions = itemsList.map(itm => ({
+    value: itm.id,
+    label: `${itm.name} (${itm.item_code || ''})`
+  }));
+
   return (
     <div className="new-purchase-container">
       <h2>Add New Purchase</h2>
       <form onSubmit={handleSubmit}>
+        {/* Basic Info */}
         <div className="form-row">
           <div className="form-group">
             <label>Purchase Date</label>
@@ -174,7 +169,7 @@ const AddPurchase = () => {
               required
             />
           </div>
-          
+
           <div className="form-group">
             <label>Supplier</label>
             <select
@@ -191,7 +186,8 @@ const AddPurchase = () => {
             </select>
           </div>
         </div>
-        
+
+        {/* Payment & Company */}
         <div className="form-row">
           <div className="form-group">
             <label>Payment Method</label>
@@ -205,36 +201,38 @@ const AddPurchase = () => {
               <option value="CREDIT">Credit</option>
             </select>
           </div>
-            <div className="form-group">
-              <label>Company</label>
-              <select
-                value={formData.company_id}
-                onChange={(e) => setFormData({...formData, company_id: e.target.value})}
-                required
-              >
-                <option value="">Select Company</option>
-                {companies.map(company => (
-                  <option key={company.id} value={company.id}>{company.name}</option>
-                ))}
-              </select>
-            </div>
-        </div>
-
-        <div className="form-row">
           <div className="form-group">
-            <label>Remarks</label>
-              <textarea 
-                value={formData.remarks}
-                onChange={(e) => setFormData({...formData, remarks: e.target.value})}
-              />
+            <label>Company</label>
+            <select
+              value={formData.company_id}
+              onChange={(e) => setFormData({...formData, company_id: e.target.value})}
+              required
+            >
+              <option value="">Select Company</option>
+              {companies.map(company => (
+                <option key={company.id} value={company.id}>{company.name}</option>
+              ))}
+            </select>
           </div>
         </div>
 
+        {/* Remarks */}
+        <div className="form-row">
+          <div className="form-group">
+            <label>Remarks</label>
+            <textarea 
+              value={formData.remarks}
+              onChange={(e) => setFormData({...formData, remarks: e.target.value})}
+            />
+          </div>
+        </div>
+
+        {/* Purchased Items */}
         <h3>Purchased Items</h3>
         <table className="item-table">
           <thead>
             <tr>
-              <th>Item Name</th>
+              <th>Item</th>
               <th>Quantity</th>
               <th>Unit Price (Rs.)</th>
               <th>Total (Rs.)</th>
@@ -244,19 +242,15 @@ const AddPurchase = () => {
           <tbody>
             {formData.items.map((item, index) => (
               <tr key={index}>
-                <td>
-                  <select
-                    value={item.id}
-                    onChange={(e) => handleItemSelect(index, e.target.value)}
-                    required
-                  >
-                    <option value="">Select Item</option>
-                    {itemsList.map((itm) => (
-                      <option key={itm.id} value={itm.id}>
-                        {itm.name}
-                      </option>
-                    ))}
-                  </select>
+                <td style={{ minWidth: '250px' }}>
+                  {/* ✅ Searchable dropdown */}
+                  <Select
+                    options={itemOptions}
+                    value={itemOptions.find(opt => opt.value === item.id) || null}
+                    onChange={(selected) => handleItemSelect(index, selected)}
+                    isSearchable
+                    placeholder="Select or search item..."
+                  />
                 </td>
                 <td>
                   <input
@@ -292,15 +286,12 @@ const AddPurchase = () => {
             ))}
           </tbody>
         </table>
-        
-        <button 
-          type="button" 
-          className="btn-add"
-          onClick={addItemRow}
-        >
+
+        <button type="button" className="btn-add" onClick={addItemRow}>
           + Add Item
         </button>
-        
+
+        {/* Payment */}
         <div className="form">
           <div className="form-group">
             <label>Paid Amount (Rs.)</label>
@@ -318,6 +309,7 @@ const AddPurchase = () => {
           </div>
         </div>
 
+        {/* Summary */}
         <div className="summary">
           <div className="total">
             <strong>Total Bill Amount:</strong>
@@ -328,7 +320,7 @@ const AddPurchase = () => {
             <span>Rs. {(calculateTotal() - formData.paid_amount).toFixed(2)}</span>
           </div>
         </div>
-        
+
         <button type="submit" className="btn-submit">Save Purchase</button>
       </form>
     </div>
