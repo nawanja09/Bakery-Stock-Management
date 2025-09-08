@@ -118,8 +118,9 @@ const IssuanceHistory = () => {
             <tr>
               <th>ID</th>
               <th>Date</th>
-              <th>Issued By</th>
               <th>Department</th>
+              <th>Received By</th>
+
             </tr>
           </thead>
           <tbody>
@@ -135,8 +136,8 @@ const IssuanceHistory = () => {
                 >
                   <td>{issuance.id}</td>
                   <td>{new Date(issuance.issuance_date).toLocaleDateString()}</td>
-                  <td>{issuance.issued_by_email}</td>
                   <td>{issuance.department_name}</td>
+                  <td>{issuance.received_by}</td>
                 </tr>
               ))
             ) : (
