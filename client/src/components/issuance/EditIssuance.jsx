@@ -20,6 +20,7 @@ const EditIssuance = () => {
     received_by: '',
     remarks: '',
     approved_by: '',
+    check_number: '',
     items: [{ item_id: '', quantity: 1, unit: '' }]
   });
 
@@ -49,6 +50,7 @@ const EditIssuance = () => {
           received_by: issuanceData.received_by,
           remarks: issuanceData.remarks || '',
           approved_by: issuanceData.approved_by || '',
+          check_number: issuanceData.check_number || '',
           items: issuanceData.items.map(item => ({
             item_id: item.item_id,
             quantity: item.quantity,
@@ -180,14 +182,15 @@ const EditIssuance = () => {
             />
           </div>
 
-          <div className="form-group">
-            <label>Approved By</label>
-            <input
-              type="text"
-              value={formData.approved_by}
-              onChange={(e) => setFormData({ ...formData, approved_by: e.target.value })}
-            />
-          </div>
+            <div className="form-group">
+              <label>Check Number</label>
+              <input
+                type="text"
+                value={formData.check_number}
+                onChange={(e) => setFormData({ ...formData, check_number: e.target.value })}
+                required
+              />
+            </div>
         </div>
 
         <div className="form-row">

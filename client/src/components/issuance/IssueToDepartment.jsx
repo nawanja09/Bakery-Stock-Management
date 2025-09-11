@@ -20,6 +20,7 @@ const IssueToDepartment = () => {
     received_by: '',
     remarks: '',
     approved_by: '',
+    check_number: '',
     items: [{ item_id: '', quantity: 1, unit: '' }]
   });
 
@@ -62,6 +63,7 @@ const IssueToDepartment = () => {
             received_by: issuance.received_by,
             remarks: issuance.remarks,
             approved_by: issuance.approved_by,
+            check_number: issuance.check_number,
             items: issuance.items.map(item => ({
               item_id: item.item_id,
               quantity: item.quantity,
@@ -196,7 +198,18 @@ const IssueToDepartment = () => {
               required
             />
           </div>
+          <div className="form-group">
+            <label>Check Number</label>
+            <input
+              type="text"
+              value={formData.check_number}
+              onChange={(e) => setFormData({ ...formData, check_number: e.target.value })}
+              required
+            />
+          </div>
+        </div>
 
+        <div className="form-row">
           <div className="form-group">
             <label>Remarks</label>
             <textarea
