@@ -49,11 +49,6 @@ const IssuanceDetailsModal = ({ id, onClose }) => {
           <li>
             <strong>Department:</strong> {issuance.department_name}
           </li>
-          {issuance.approved_by && (
-            <li>
-              <strong>Approved By:</strong> {issuance.approved_by}
-            </li>
-          )}
           <li>
             <strong>Time of Day:</strong> <span>{issuance.remarks || 'N/A'}</span>
           </li>
