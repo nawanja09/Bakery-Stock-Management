@@ -54,10 +54,10 @@ const IssuanceDetailsModal = ({ id, onClose }) => {
               <strong>Approved By:</strong> {issuance.approved_by}
             </li>
           )}
+          <li>
+            <strong>Time of Day:</strong> <span>{issuance.remarks || 'N/A'}</span>
+          </li>
         </ul>
-      </div>
-      <div className="remarks-section">
-        <strong>Remarks:</strong> <span>{issuance.remarks || 'N/A'}</span>
       </div>
       <div className="items-table">
         <h3>Issued Items</h3>
@@ -136,6 +136,7 @@ const IssuanceHistory = () => {
             <tr>
               <th>ID</th>
               <th>Date</th>
+              <th>Time of Day</th>
               <th>Check Number</th>
               <th>Department</th>
               <th>Received By</th>
@@ -148,6 +149,7 @@ const IssuanceHistory = () => {
                 <tr key={issuance.id}>
                   <td>{issuance.id}</td>
                   <td>{new Date(issuance.issuance_date).toLocaleDateString()}</td>
+                  <td>{issuance.remarks}</td>
                   <td>{issuance.check_number || 'N/A'}</td>
                   <td>{issuance.department_name}</td>
                   <td>{issuance.received_by}</td>
