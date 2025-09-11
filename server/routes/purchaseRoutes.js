@@ -9,5 +9,6 @@ router.get('/', purchaseController.getAllPurchases);
 router.get('/suppliers', purchaseController.getAllSuppliers);
 router.get('/companies', purchaseController.getAllCompanies);
 router.get('/:id', purchaseController.getPurchaseById);
+router.put('/:id', purchaseController.updatePurchase);
 
 module.exports = router;

@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faEdit } from '@fortawesome/free-solid-svg-icons';
 import { usePopup } from '../context/PopupContext';
 import './Issuance.css';
 import api from '../../api';
 
 // Modal version of IssuanceDetails for popup use
-const IssuanceDetailsModal = ({ id }) => {
+const IssuanceDetailsModal = ({ id, onClose }) => {
   const [issuance, setIssuance] = useState(null);
   const [loading, setLoading] = useState(true);
   const { showPopup } = usePopup();
@@ -30,6 +33,7 @@ const IssuanceDetailsModal = ({ id }) => {
     <div className="issuance-details">
       <div className="header-with-actions">
         <h2>Issuance ID: {issuance.id}</h2>
+        <button className="btn-close" onClick={onClose}>&#10005;</button>
       </div>
       <div className="details-row vertical">
         <ul className="details-list">
@@ -40,7 +44,7 @@ const IssuanceDetailsModal = ({ id }) => {
             <strong>Received By:</strong> {issuance.received_by}
           </li>
           <li>
-            <strong>Reason:</strong> {issuance.reason}
+            <strong>Department:</strong> {issuance.department_name}
           </li>
           {issuance.approved_by && (
             <li>
@@ -48,7 +52,6 @@ const IssuanceDetailsModal = ({ id }) => {
             </li>
           )}
         </ul>
-        
       </div>
       <div className="remarks-section">
         <strong>Remarks:</strong> <span>{issuance.remarks || 'N/A'}</span>
@@ -90,10 +93,10 @@ const IssuanceHistory = () => {
       try {
         const response = await api.get('/issuances');
         
-        // 🔽 Sort the issuances by ID in descending order (latest first)
+        // Sort the issuances by ID in descending order (latest first)
         const sorted = response.data.sort((a, b) => b.id - a.id);
         
-        setIssuances(response.data);
+        setIssuances(sorted);
       } catch (error) {
         console.error('Error fetching issuances:', error);
       } finally {
@@ -104,13 +107,15 @@ const IssuanceHistory = () => {
     fetchIssuances();
   }, []);
 
-
   if (loading) return <div className="loading">Loading...</div>;
 
   return (
     <div className="issuance-container">
       <div className="header-with-actions">
         <h2 style={{ margin: 0 }}>Issuance History</h2>
+        <Link to="/issuance/issue" className="btn-primary">
+          + New Issuance
+        </Link>
       </div>
       <div className="table-responsive">
         <table className="issuance-table styled-table">
@@ -120,29 +125,36 @@ const IssuanceHistory = () => {
               <th>Date</th>
               <th>Department</th>
               <th>Received By</th>
-
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {Array.isArray(issuances) && issuances.length > 0 ? (
               issuances.map(issuance => (
-                <tr
-                  key={issuance.id}
-                  style={{ cursor: 'pointer' }}
-                  onClick={() => setSelectedIssuanceId(issuance.id)}
-                  tabIndex={0}
-                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setSelectedIssuanceId(issuance.id); }}
-                  aria-label={`View details for issuance ${issuance.id}`}
-                >
+                <tr key={issuance.id}>
                   <td>{issuance.id}</td>
                   <td>{new Date(issuance.issuance_date).toLocaleDateString()}</td>
                   <td>{issuance.department_name}</td>
                   <td>{issuance.received_by}</td>
+                  <td className="actions-column">
+                    <button 
+                      onClick={() => setSelectedIssuanceId(issuance.id)}
+                      className="btn-secondary"
+                    >
+                      View
+                    </button>
+                    <Link 
+                      to={`/issuance/edit/${issuance.id}`} 
+                      className="btn-edit"
+                    >
+                      <FontAwesomeIcon icon={faEdit} /> Edit
+                    </Link>
+                  </td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan="6" style={{ textAlign: 'center', color: '#888' }}>No issuance records found.</td>
+                <td colSpan="5" style={{ textAlign: 'center', color: '#888' }}>No issuance records found.</td>
               </tr>
             )}
           </tbody>
@@ -152,8 +164,7 @@ const IssuanceHistory = () => {
       {selectedIssuanceId && (
         <div className="modal-overlay" onClick={() => setSelectedIssuanceId(null)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <button className="btn-back" style={{ float: 'right' }} onClick={() => setSelectedIssuanceId(null)}>&#10005;</button>
-            <IssuanceDetailsModal id={selectedIssuanceId} />
+            <IssuanceDetailsModal id={selectedIssuanceId} onClose={() => setSelectedIssuanceId(null)} />
           </div>
         </div>
       )}

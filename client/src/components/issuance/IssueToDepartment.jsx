@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { usePopup } from '../context/PopupContext';
 import './Issuance.css';
 import api from '../../api';
@@ -7,10 +7,12 @@ import Select from 'react-select'; // 🔎 Import react-select
 
 const IssueToDepartment = () => {
   const navigate = useNavigate();
+  const { id } = useParams(); // Get issuance id from URL if present
   const [departments, setDepartments] = useState([]);
   const [items, setItems] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
   const { showPopup } = usePopup();
+  const [loading, setLoading] = useState(false);
 
   const [formData, setFormData] = useState({
     issuance_date: new Date().toISOString().split('T')[0],
@@ -46,6 +48,31 @@ const IssueToDepartment = () => {
     fetchDepartments();
     fetchItems();
   }, []);
+
+  // If editing, fetch issuance data and prefill form
+  useEffect(() => {
+    if (id) {
+      setLoading(true);
+      api.get(`/issuances/${id}`)
+        .then(res => {
+          const issuance = res.data;
+          setFormData({
+            issuance_date: issuance.issuance_date.split('T')[0],
+            department_id: issuance.department_id,
+            received_by: issuance.received_by,
+            remarks: issuance.remarks,
+            approved_by: issuance.approved_by,
+            items: issuance.items.map(item => ({
+              item_id: item.item_id,
+              quantity: item.quantity,
+              unit: item.unit
+            }))
+          });
+        })
+        .catch(() => showPopup('error', 'Failed to fetch issuance for edit'))
+        .finally(() => setLoading(false));
+    }
+  }, [id, showPopup]);
 
   const handleItemChange = (index, field, value) => {
     const newItems = [...formData.items];
@@ -93,16 +120,27 @@ const IssueToDepartment = () => {
     };
 
     try {
-      const response = await api.post('/issuances', updatedFormData);
-
-      if (response.status === 201) {
-        showPopup('success', `Issuance created successfully! ID: ${response.data.issuance_id}`);
-        navigate('/issuance/history');
+      let response;
+      if (id) {
+        // Edit mode
+        response = await api.put(`/issuances/${id}`, updatedFormData);
+        if (response.status === 200) {
+          showPopup('success', 'Issuance updated successfully!');
+        } else {
+          showPopup('error', `Error: ${response.data.error}`);
+        }
       } else {
-        showPopup('error', `Error: ${response.data.error}`);
+        // Create mode
+        response = await api.post('/issuances', updatedFormData);
+        if (response.status === 201) {
+          showPopup('success', `Issuance created successfully! ID: ${response.data.issuance_id}`);
+        } else {
+          showPopup('error', `Error: ${response.data.error}`);
+        }
       }
+      navigate('/issuance/history');
     } catch (error) {
-      console.error('Error creating issuance:', error);
+      console.error('Error creating/updating issuance:', error);
       showPopup('error', 'Server error');
     }
   };
@@ -114,9 +152,11 @@ const IssueToDepartment = () => {
     unit: itm.unit
   }));
 
+  if (loading) return <div className="loading">Loading...</div>;
+
   return (
     <div className="issuance-container">
-      <h2>Issue Items to Department</h2>
+      <h2>{id ? 'Edit Issuance' : 'Issue Items to Department'}</h2>
       <form onSubmit={handleSubmit}>
         <div className="form-row">
           <div className="form-group">
@@ -180,7 +220,6 @@ const IssueToDepartment = () => {
             {formData.items.map((item, index) => (
               <tr key={index}>
                 <td>
-                  {/* 🔎 Replace <select> with react-select */}
                   <Select
                     options={itemOptions}
                     value={itemOptions.find(opt => String(opt.value) === String(item.item_id)) || null}
@@ -231,7 +270,7 @@ const IssueToDepartment = () => {
           + Add Item
         </button>
 
-        <button type="submit" className="btn-submit">Save Issuance</button>
+        <button type="submit" className="btn-submit">{id ? 'Update Issuance' : 'Save Issuance'}</button>
       </form>
     </div>
   );

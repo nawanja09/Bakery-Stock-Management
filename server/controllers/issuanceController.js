@@ -118,8 +118,64 @@ const getIssuanceById = async (req, res) => {
   }
 };
 
+// Update issuance
+const updateIssuance = async (req, res) => {
+  const { id } = req.params;
+  const { 
+    issuance_date, 
+    issued_by, 
+    department_id, 
+    received_by, 
+    remarks, 
+    approved_by, 
+    items 
+  } = req.body;
+
+  const connection = await pool.getConnection();
+  
+  try {
+    await connection.beginTransaction();
+
+    // Update issuance
+    await connection.query(
+      `UPDATE issuances 
+       SET issuance_date = ?, issued_by = ?, department_id = ?, received_by = ?, 
+           remarks = ?, approved_by = ?
+       WHERE id = ?`,
+      [issuance_date, issued_by, department_id, received_by, remarks, approved_by, id]
+    );
+
+    // Delete existing items
+    await connection.query(
+      `DELETE FROM issuance_items WHERE issuance_id = ?`,
+      [id]
+    );
+
+    // Insert updated items
+    for (const item of items) {
+      await connection.query(
+        `INSERT INTO issuance_items 
+        (issuance_id, item_id, quantity) 
+        VALUES (?, ?, ?)`,
+        [id, item.item_id, item.quantity]
+      );
+    }
+
+    await connection.commit();
+    res.json({ message: 'Issuance updated successfully!' });
+    
+  } catch (error) {
+    await connection.rollback();
+    console.error('Error updating issuance:', error);
+    res.status(500).json({ error: 'Server error' });
+  } finally {
+    connection.release();
+  }
+};
+
 module.exports = {
   createIssuance,
   getAllIssuances,
-  getIssuanceById
+  getIssuanceById,
+  updateIssuance
 };
