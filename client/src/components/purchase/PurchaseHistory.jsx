@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSearch } from '@fortawesome/free-solid-svg-icons';
+import { faSearch, faEdit } from '@fortawesome/free-solid-svg-icons';
 import './Purchase.css';
 import api from '../../api';
 
@@ -9,7 +9,7 @@ const PurchaseHistory = () => {
   const [purchases, setPurchases] = useState([]);
   const [filteredPurchases, setFilteredPurchases] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [companyFilter, setCompanyFilter] = useState(''); // ✅ Added company filter state
+  const [companyFilter, setCompanyFilter] = useState('');
 
   useEffect(() => {
     const fetchPurchases = async () => {
@@ -34,7 +34,7 @@ const PurchaseHistory = () => {
       purchase.invoice_no.toLowerCase().includes(query) ||
       purchase.supplier_name.toLowerCase().includes(query) ||     
       purchase.payment_method.toLowerCase().includes(query) ||
-      purchase.company_name.toLowerCase().includes(query) // ✅ Added company to search
+      purchase.company_name.toLowerCase().includes(query)
     );
     
     // Apply company filter if selected
@@ -48,7 +48,7 @@ const PurchaseHistory = () => {
     }
   };
 
-  // ✅ Added company filter handler
+  // Company filter handler
   const handleCompanyFilter = (e) => {
     const companyId = e.target.value;
     setCompanyFilter(companyId);
@@ -99,13 +99,34 @@ const PurchaseHistory = () => {
         <table className="purchase-table">
           <thead>
             <tr>
-              <th>Invoice No.</th><th>Date</th><th>Supplier</th><th>Company</th><th>Bill Amount (Rs.)</th><th>Paid (Rs.)</th><th>Due (Rs.)</th><th>Payment Method</th><th className="text-center">Actions</th>
+              <th>Invoice No.</th>
+              <th>Date</th>
+              <th>Supplier</th>
+              <th>Company</th>
+              <th>Bill Amount (Rs.)</th>
+              <th>Paid (Rs.)</th>
+              <th>Due (Rs.)</th>
+              <th>Payment Method</th>
+              <th className="text-center">Actions</th>
             </tr>
           </thead>
           <tbody>
             {filteredPurchases.map(purchase => (
               <tr key={purchase.id}>
-                <td>{purchase.invoice_no}</td><td>{new Date(purchase.purchase_date).toLocaleDateString()}</td><td>{purchase.supplier_name}</td><td>{purchase.company_name}</td><td>{Number(purchase.bill_amount).toFixed(2)}</td><td>{Number(purchase.paid_amount).toFixed(2)}</td><td className="due-amount">{(Number(purchase.bill_amount) - Number(purchase.paid_amount)).toFixed(2)}</td><td>{purchase.payment_method}</td><td className="text-center"><Link to={`/purchase/${purchase.id}`} className="btn-secondary">View</Link></td>
+                <td>{purchase.invoice_no}</td>
+                <td>{new Date(purchase.purchase_date).toLocaleDateString()}</td>
+                <td>{purchase.supplier_name}</td>
+                <td>{purchase.company_name}</td>
+                <td>{Number(purchase.bill_amount).toFixed(2)}</td>
+                <td>{Number(purchase.paid_amount).toFixed(2)}</td>
+                <td className="due-amount">{(Number(purchase.bill_amount) - Number(purchase.paid_amount)).toFixed(2)}</td>
+                <td>{purchase.payment_method}</td>
+                <td className="text-center actions-column">
+                  <Link to={`/purchase/${purchase.id}`} className="btn-secondary">View</Link>
+                  <Link to={`/purchase/edit/${purchase.id}`} className="btn-edit">
+                    <FontAwesomeIcon icon={faEdit} /> Edit
+                  </Link>
+                </td>
               </tr>
             ))}
           </tbody>

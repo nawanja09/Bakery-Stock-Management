@@ -1,9 +1,9 @@
-// src/App.js
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import AddPurchase from './components/purchase/NewPurchase';
+import EditPurchase from './components/purchase/EditPurchase';
 import PurchaseHistory from './components/purchase/PurchaseHistory';
 import PurchaseDetails from './components/purchase/PurchaseDetails';
 import Suppliers from './components/Suppliers/Suppliers';
@@ -15,6 +15,7 @@ import Layout from './components/Layout';
 import AddOpeningBalance from './components/OpeningBalance/AddOpeningBalance';
 import OpeningBalanceHistory from './components/OpeningBalance/OpeningBalanceHistory';
 import IssueToDepartment from './components/issuance/IssueToDepartment';
+import EditIssuance from './components/issuance/EditIssuance';
 import IssuanceHistory from './components/issuance/IssuanceHistory';
 import AddWastage from './components/wastage/AddWastage';
 import WastageHistory from './components/wastage/WastageHistory';
@@ -33,7 +34,6 @@ const ProtectedRoute = ({ children }) => {
   return token ? children : <Navigate to="/login" replace />;
 };
 
-// Add this function above the ProtectedRoute component
 const AuthCheck = () => {
   const token = localStorage.getItem('token');
   return token ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />;
@@ -61,6 +61,7 @@ function App() {
             
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="purchase/new" element={<AddPurchase />} />
+            <Route path="purchase/edit/:id" element={<EditPurchase />} />
             <Route path="purchase/history" element={<PurchaseHistory />} />
             <Route path="purchase/:id" element={<PurchaseDetails />} />
             <Route path="suppliers" element={<Suppliers />} />
@@ -71,6 +72,7 @@ function App() {
             <Route path="opening/add" element={<AddOpeningBalance />} />
             <Route path="opening/history" element={<OpeningBalanceHistory />} />
             <Route path="issuance/issue" element={<IssueToDepartment />} />
+            <Route path="issuance/edit/:id" element={<EditIssuance />} />
             <Route path="issuance/history" element={<IssuanceHistory />} />
             <Route path="wastage/add" element={<AddWastage />} />
             <Route path="wastage/history" element={<WastageHistory />} />

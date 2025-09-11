@@ -1,5 +1,3 @@
-//server/controllers/purchaseController.js
-
 const pool = require('../config/db');
 const { v4: uuidv4 } = require('uuid');
 
@@ -14,7 +12,7 @@ const createPurchase = async (req, res) => {
     payment_method, 
     remarks, 
     prepared_by,
-    company_id  // ✅ Added company_id
+    company_id
   } = req.body;
 
   const invoice_no = `PUR-${uuidv4().substr(0, 8).toUpperCase()}`;
@@ -120,6 +118,64 @@ const getPurchaseById = async (req, res) => {
   }
 };
 
+// Update purchase
+const updatePurchase = async (req, res) => {
+  const { id } = req.params;
+  const { 
+    purchase_date, 
+    supplier_id, 
+    items, 
+    bill_amount, 
+    paid_amount, 
+    payment_method, 
+    remarks, 
+    prepared_by,
+    company_id
+  } = req.body;
+
+  const connection = await pool.getConnection();
+  
+  try {
+    await connection.beginTransaction();
+
+    // Update purchase
+    await connection.query(
+      `UPDATE purchases 
+       SET purchase_date = ?, supplier_id = ?, bill_amount = ?, paid_amount = ?, 
+           payment_method = ?, remarks = ?, prepared_by = ?, company_id = ?
+       WHERE id = ?`,
+      [purchase_date, supplier_id, bill_amount, paid_amount, 
+       payment_method, remarks, prepared_by, company_id, id]
+    );
+
+    // Delete existing items
+    await connection.query(
+      `DELETE FROM purchase_items WHERE purchase_id = ?`,
+      [id]
+    );
+
+    // Insert updated items
+    for (const item of items) {
+      await connection.query(
+        `INSERT INTO purchase_items 
+        (purchase_id, item_name, quantity, unit_price, item_id) 
+        VALUES (?, ?, ?, ?, ?)`,
+        [id, item.item_name, item.quantity, item.unit_price, item.id]
+      );
+    }
+
+    await connection.commit();
+    res.json({ message: 'Purchase updated successfully!' });
+    
+  } catch (error) {
+    await connection.rollback();
+    console.error('Error updating purchase:', error);
+    res.status(500).json({ error: 'Server error' });
+  } finally {
+    connection.release();
+  }
+};
+
 // Get all companies
 const getAllCompanies = async (req, res) => {
   try {
@@ -131,7 +187,7 @@ const getAllCompanies = async (req, res) => {
   }
 };
 
-// Add Supplier List 
+// Get all suppliers
 const getAllSuppliers = async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT id, name FROM supplier');
@@ -146,6 +202,7 @@ module.exports = {
   createPurchase,
   getAllPurchases,
   getPurchaseById,
+  updatePurchase,
   getAllSuppliers,
-  getAllCompanies, // ✅ Added this function
+  getAllCompanies
 };
