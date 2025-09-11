@@ -66,6 +66,9 @@ const PurchaseDetails = () => {
               <strong>Payment Method:</strong> {purchase.payment_method}
             </li>
             <li>
+              <strong>Check Number:</strong> {purchase.check_number || 'N/A'}
+            </li>
+            <li>
               <strong>Supplier:</strong> {purchase.supplier_name}
             </li>
             <li>

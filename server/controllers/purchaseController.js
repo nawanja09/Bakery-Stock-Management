@@ -10,6 +10,7 @@ const createPurchase = async (req, res) => {
     bill_amount, 
     paid_amount, 
     payment_method, 
+    check_number,
     remarks, 
     prepared_by,
     company_id
@@ -25,10 +26,10 @@ const createPurchase = async (req, res) => {
     const [purchaseResult] = await connection.query(
       `INSERT INTO purchases 
       (invoice_no, purchase_date, supplier_id, bill_amount, paid_amount, 
-       payment_method, remarks, prepared_by, company_id) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       payment_method, check_number, remarks, prepared_by, company_id) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [invoice_no, purchase_date, supplier_id, bill_amount, paid_amount, 
-       payment_method, remarks, prepared_by, company_id]
+       payment_method, check_number, remarks, prepared_by, company_id]
     );
     
     const purchaseId = purchaseResult.insertId;
@@ -128,6 +129,7 @@ const updatePurchase = async (req, res) => {
     bill_amount, 
     paid_amount, 
     payment_method, 
+    check_number,
     remarks, 
     prepared_by,
     company_id
@@ -142,10 +144,10 @@ const updatePurchase = async (req, res) => {
     await connection.query(
       `UPDATE purchases 
        SET purchase_date = ?, supplier_id = ?, bill_amount = ?, paid_amount = ?, 
-           payment_method = ?, remarks = ?, prepared_by = ?, company_id = ?
+           payment_method = ?, check_number = ?, remarks = ?, prepared_by = ?, company_id = ?
        WHERE id = ?`,
       [purchase_date, supplier_id, bill_amount, paid_amount, 
-       payment_method, remarks, prepared_by, company_id, id]
+       payment_method, check_number, remarks, prepared_by, company_id, id]
     );
 
     // Delete existing items

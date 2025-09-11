@@ -21,6 +21,7 @@ const AddPurchase = () => {
     bill_amount: 0,
     paid_amount: 0,
     payment_method: 'CASH',
+    check_number: '',
     remarks: '',
     company_id: '',
     items: [{ id: '', item_name: '', quantity: 1, unit_price: 0 }]
@@ -218,6 +219,15 @@ const AddPurchase = () => {
 
         {/* Remarks */}
         <div className="form-row">
+          <div className="form-group">
+            <label>Check Number</label>
+            <input
+              type="text"
+              value={formData.check_number}
+              onChange={(e) => setFormData({...formData, check_number: e.target.value})}
+              placeholder="Enter check number"
+            />
+          </div>
           <div className="form-group">
             <label>Remarks</label>
             <textarea 

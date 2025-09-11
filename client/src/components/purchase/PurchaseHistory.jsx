@@ -107,6 +107,7 @@ const PurchaseHistory = () => {
               <th>Paid (Rs.)</th>
               <th>Due (Rs.)</th>
               <th>Payment Method</th>
+              <th>Check Number</th>
               <th className="text-center">Actions</th>
             </tr>
           </thead>
@@ -121,6 +122,7 @@ const PurchaseHistory = () => {
                 <td>{Number(purchase.paid_amount).toFixed(2)}</td>
                 <td className="due-amount">{(Number(purchase.bill_amount) - Number(purchase.paid_amount)).toFixed(2)}</td>
                 <td>{purchase.payment_method}</td>
+                <td>{purchase.check_number}</td>
                 <td className="text-center actions-column">
                   <Link to={`/purchase/${purchase.id}`} className="btn-secondary">View</Link>
                   <Link to={`/purchase/edit/${purchase.id}`} className="btn-edit">

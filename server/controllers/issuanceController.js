@@ -8,7 +8,8 @@ const createIssuance = async (req, res) => {
     department_id, 
     received_by, 
     remarks, 
-    approved_by, 
+    approved_by,
+    check_number,
     items 
   } = req.body;
 
@@ -20,9 +21,9 @@ const createIssuance = async (req, res) => {
     // Insert issuance
     const [issuanceResult] = await connection.query(
       `INSERT INTO issuances 
-      (issuance_date, issued_by, department_id, received_by, remarks, approved_by) 
-      VALUES (?, ?, ?, ?, ?, ?)`,
-      [issuance_date, issued_by, department_id, received_by, remarks, approved_by]
+      (issuance_date, issued_by, department_id, received_by, remarks, approved_by, check_number) 
+      VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [issuance_date, issued_by, department_id, received_by, remarks, approved_by, check_number]
     );
     
     const issuanceId = issuanceResult.insertId;
@@ -56,14 +57,15 @@ const createIssuance = async (req, res) => {
 const getAllIssuances = async (req, res) => {
   try {
     const [issuances] = await pool.query(`
-      SELECT 
-        i.id, 
-        i.issuance_date, 
+      SELECT
+        i.id,
+        i.issuance_date,
         u.email AS issued_by_email,
         d.name AS department_name,
         i.received_by,
         i.remarks,
-        i.approved_by
+        i.approved_by,
+        i.check_number
       FROM issuances i
       JOIN users u ON i.issued_by = u.id
       JOIN departments d ON i.department_id = d.id
@@ -128,6 +130,7 @@ const updateIssuance = async (req, res) => {
     received_by, 
     remarks, 
     approved_by, 
+    check_number,
     items 
   } = req.body;
 
@@ -140,9 +143,9 @@ const updateIssuance = async (req, res) => {
     await connection.query(
       `UPDATE issuances 
        SET issuance_date = ?, issued_by = ?, department_id = ?, received_by = ?, 
-           remarks = ?, approved_by = ?
+           remarks = ?, approved_by = ?, check_number = ?
        WHERE id = ?`,
-      [issuance_date, issued_by, department_id, received_by, remarks, approved_by, id]
+      [issuance_date, issued_by, department_id, received_by, remarks, approved_by, check_number, id]
     );
 
     // Delete existing items

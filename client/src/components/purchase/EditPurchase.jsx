@@ -21,6 +21,7 @@ const EditPurchase = () => {
     bill_amount: 0,
     paid_amount: 0,
     payment_method: 'CASH',
+    check_number: '',
     remarks: '',
     company_id: '',
     items: [{ id: '', item_name: '', quantity: 1, unit_price: 0 }]
@@ -54,6 +55,7 @@ const EditPurchase = () => {
           bill_amount: purchaseData.bill_amount,
           paid_amount: purchaseData.paid_amount,
           payment_method: purchaseData.payment_method,
+          check_number: purchaseData.check_number || '',
           remarks: purchaseData.remarks || '',
           company_id: purchaseData.company_id || '',
           items: purchaseData.items.map(item => ({
@@ -236,6 +238,15 @@ const EditPurchase = () => {
         </div>
 
         <div className="form-row">
+            <div className="form-group">
+                <label>Check Number</label>
+                <input
+                    type="text"
+                    value={formData.check_number}
+                    onChange={(e) => setFormData({...formData, check_number: e.target.value})}
+                    placeholder="Enter check number"
+                />
+            </div>
           <div className="form-group">
             <label>Remarks</label>
             <textarea 

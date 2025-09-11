@@ -41,6 +41,9 @@ const IssuanceDetailsModal = ({ id, onClose }) => {
             <strong>Date:</strong> {new Date(issuance.issuance_date).toLocaleDateString()}
           </li>
           <li>
+            <strong>Check Number:</strong> {issuance.check_number}
+          </li>
+          <li>
             <strong>Received By:</strong> {issuance.received_by}
           </li>
           <li>
@@ -88,6 +91,16 @@ const IssuanceHistory = () => {
   const [loading, setLoading] = useState(true);
   const [selectedIssuanceId, setSelectedIssuanceId] = useState(null);
 
+  // Handle View button: open modal for selected issuance
+  const handleView = (id) => {
+    setSelectedIssuanceId(id);
+  };
+
+  // Handle Edit button: redirect to edit page
+  const handleEdit = (id) => {
+    window.location.href = `/issuance/edit/${id}`;
+  };
+
   useEffect(() => {
     const fetchIssuances = async () => {
       try {
@@ -123,6 +136,7 @@ const IssuanceHistory = () => {
             <tr>
               <th>ID</th>
               <th>Date</th>
+              <th>Check Number</th>
               <th>Department</th>
               <th>Received By</th>
               <th>Actions</th>
@@ -134,22 +148,23 @@ const IssuanceHistory = () => {
                 <tr key={issuance.id}>
                   <td>{issuance.id}</td>
                   <td>{new Date(issuance.issuance_date).toLocaleDateString()}</td>
+                  <td>{issuance.check_number || 'N/A'}</td>
                   <td>{issuance.department_name}</td>
                   <td>{issuance.received_by}</td>
-                  <td className="actions-column">
-                    <button 
-                      onClick={() => setSelectedIssuanceId(issuance.id)}
-                      className="btn-secondary"
-                    >
-                      View
-                    </button>
-                    <Link 
-                      to={`/issuance/edit/${issuance.id}`} 
-                      className="btn-edit"
-                    >
-                      <FontAwesomeIcon icon={faEdit} /> Edit
-                    </Link>
-                  </td>
+                    <td className="actions-column">
+                      <button
+                        className="btn-view"
+                        onClick={() => handleView(issuance.id)}
+                      >
+                        View
+                      </button>
+                      <button
+                        className="btn-edit"
+                        onClick={() => handleEdit(issuance.id)}
+                      >
+                        Edit
+                      </button>
+                    </td>
                 </tr>
               ))
             ) : (
