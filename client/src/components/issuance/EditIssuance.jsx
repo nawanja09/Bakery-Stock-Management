@@ -30,11 +30,9 @@ const EditIssuance = () => {
 
     const fetchIssuanceData = async () => {
       try {
-        // Fetch issuance details
         const issuanceResponse = await api.get(`/issuances/${id}`);
         const issuanceData = issuanceResponse.data;
-        
-        // Fetch dropdown data
+
         const [departmentsRes, itemsRes] = await Promise.all([
           api.get('/departments'),
           api.get('/items')
@@ -43,7 +41,6 @@ const EditIssuance = () => {
         setDepartments(departmentsRes.data);
         setItems(itemsRes.data);
 
-        // Set form data
         setFormData({
           issuance_date: issuanceData.issuance_date.split('T')[0],
           department_id: issuanceData.department_id,
@@ -72,9 +69,7 @@ const EditIssuance = () => {
   const handleItemChange = (index, field, value) => {
     const newItems = [...formData.items];
 
-    if (field === 'quantity') {
-      value = Number(value) || 0;
-    }
+    if (field === 'quantity') value = Number(value) || 0;
 
     newItems[index][field] = value;
 
@@ -85,13 +80,18 @@ const EditIssuance = () => {
     }
 
     setFormData({ ...formData, items: newItems });
+
+    // 🔹 Auto-add new row if last row is edited
+    if ((field === 'quantity' || field === 'item_id') && index === formData.items.length - 1 && value) {
+      addItemRow();
+    }
   };
 
   const addItemRow = () => {
-    setFormData({
-      ...formData,
-      items: [...formData.items, { item_id: '', quantity: 1, unit: '' }]
-    });
+    setFormData(prev => ({
+      ...prev,
+      items: [...prev.items, { item_id: '', quantity: 1, unit: '' }]
+    }));
   };
 
   const removeItemRow = (index) => {
@@ -124,7 +124,6 @@ const EditIssuance = () => {
     }
   };
 
-  // Map items to react-select format
   const itemOptions = items.map(itm => ({
     value: itm.id,
     label: `${itm.name} (${itm.item_code})`,
@@ -141,8 +140,9 @@ const EditIssuance = () => {
           ← Back to History
         </button>
       </div>
-      
+
       <form onSubmit={handleSubmit}>
+        {/* Form Fields */}
         <div className="form-row">
           <div className="form-group">
             <label>Issuance Date</label>
@@ -153,7 +153,6 @@ const EditIssuance = () => {
               required
             />
           </div>
-
           <div className="form-group">
             <label>Department</label>
             <select
@@ -163,9 +162,7 @@ const EditIssuance = () => {
             >
               <option value="">Select Department</option>
               {departments.map(dept => (
-                <option key={dept.id} value={dept.id}>
-                  {dept.name}
-                </option>
+                <option key={dept.id} value={dept.id}>{dept.name}</option>
               ))}
             </select>
           </div>
@@ -181,16 +178,15 @@ const EditIssuance = () => {
               required
             />
           </div>
-
-            <div className="form-group">
-              <label>Check Number</label>
-              <input
-                type="text"
-                value={formData.check_number}
-                onChange={(e) => setFormData({ ...formData, check_number: e.target.value })}
-                required
-              />
-            </div>
+          <div className="form-group">
+            <label>Check Number</label>
+            <input
+              type="text"
+              value={formData.check_number}
+              onChange={(e) => setFormData({ ...formData, check_number: e.target.value })}
+              required
+            />
+          </div>
         </div>
 
         <div className="form-row">
@@ -220,9 +216,7 @@ const EditIssuance = () => {
                   <Select
                     options={itemOptions}
                     value={itemOptions.find(opt => String(opt.value) === String(item.item_id)) || null}
-                    onChange={(selected) => {
-                      handleItemChange(index, 'item_id', selected.value);
-                    }}
+                    onChange={(selected) => handleItemChange(index, 'item_id', selected.value)}
                     isSearchable
                     placeholder="Search or select item..."
                   />
@@ -238,19 +232,10 @@ const EditIssuance = () => {
                   />
                 </td>
                 <td>
-                  <input
-                    type="text"
-                    value={item.unit}
-                    readOnly
-                    className="unit-display"
-                  />
+                  <input type="text" value={item.unit} readOnly className="unit-display" />
                 </td>
                 <td>
-                  <button
-                    type="button"
-                    className="btn-remove"
-                    onClick={() => removeItemRow(index)}
-                  >
+                  <button type="button" className="btn-remove" onClick={() => removeItemRow(index)}>
                     Remove
                   </button>
                 </td>
@@ -259,11 +244,7 @@ const EditIssuance = () => {
           </tbody>
         </table>
 
-        <button
-          type="button"
-          className="btn-add"
-          onClick={addItemRow}
-        >
+        <button type="button" className="btn-add" onClick={addItemRow}>
           + Add Item
         </button>
 
