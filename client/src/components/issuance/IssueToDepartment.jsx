@@ -1,13 +1,14 @@
+// src/components/issuance/IssueToDepartment.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { usePopup } from '../context/PopupContext';
 import './Issuance.css';
 import api from '../../api';
-import Select from 'react-select'; // 🔎 Import react-select
+import Select from 'react-select';
 
 const IssueToDepartment = () => {
   const navigate = useNavigate();
-  const { id } = useParams(); // Get issuance id from URL if present
+  const { id } = useParams();
   const [departments, setDepartments] = useState([]);
   const [items, setItems] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
@@ -50,7 +51,6 @@ const IssueToDepartment = () => {
     fetchItems();
   }, []);
 
-  // If editing, fetch issuance data and prefill form
   useEffect(() => {
     if (id) {
       setLoading(true);
@@ -85,20 +85,25 @@ const IssueToDepartment = () => {
 
     newItems[index][field] = value;
 
-    // AUTO-SELECT UNIT WHEN ITEM IS SELECTED
+    // Auto-select unit when item is selected
     if (field === 'item_id') {
       const selectedItem = items.find(item => String(item.id) === String(value));
       newItems[index].unit = selectedItem ? selectedItem.unit : '';
     }
 
     setFormData({ ...formData, items: newItems });
+
+    // Automatically add a new row if editing quantity or selecting item in last row
+    if ((field === 'quantity' || field === 'item_id') && index === formData.items.length - 1 && value) {
+      addItemRow();
+    }
   };
 
   const addItemRow = () => {
-    setFormData({
-      ...formData,
-      items: [...formData.items, { item_id: '', quantity: 1, unit: '' }]
-    });
+    setFormData(prev => ({
+      ...prev,
+      items: [...prev.items, { item_id: '', quantity: 1, unit: '' }]
+    }));
   };
 
   const removeItemRow = (index) => {
@@ -124,21 +129,14 @@ const IssueToDepartment = () => {
     try {
       let response;
       if (id) {
-        // Edit mode
         response = await api.put(`/issuances/${id}`, updatedFormData);
-        if (response.status === 200) {
-          showPopup('success', 'Issuance updated successfully!');
-        } else {
-          showPopup('error', `Error: ${response.data.error}`);
-        }
+        if (response.status === 200) showPopup('success', 'Issuance updated successfully!');
+        else showPopup('error', `Error: ${response.data.error}`);
       } else {
-        // Create mode
         response = await api.post('/issuances', updatedFormData);
-        if (response.status === 201) {
+        if (response.status === 201)
           showPopup('success', `Issuance created successfully! ID: ${response.data.issuance_id}`);
-        } else {
-          showPopup('error', `Error: ${response.data.error}`);
-        }
+        else showPopup('error', `Error: ${response.data.error}`);
       }
       navigate('/issuance/history');
     } catch (error) {
@@ -147,7 +145,6 @@ const IssueToDepartment = () => {
     }
   };
 
-  // 🔎 Map items to react-select format
   const itemOptions = items.map(itm => ({
     value: itm.id,
     label: `${itm.name} (${itm.item_code})`,
@@ -180,9 +177,7 @@ const IssueToDepartment = () => {
             >
               <option value="">Select Department</option>
               {departments.map(dept => (
-                <option key={dept.id} value={dept.id}>
-                  {dept.name}
-                </option>
+                <option key={dept.id} value={dept.id}>{dept.name}</option>
               ))}
             </select>
           </div>
@@ -236,9 +231,7 @@ const IssueToDepartment = () => {
                   <Select
                     options={itemOptions}
                     value={itemOptions.find(opt => String(opt.value) === String(item.item_id)) || null}
-                    onChange={(selected) => {
-                      handleItemChange(index, 'item_id', selected.value);
-                    }}
+                    onChange={(selected) => handleItemChange(index, 'item_id', selected.value)}
                     isSearchable
                     placeholder="Search or select item..."
                   />
@@ -275,15 +268,13 @@ const IssueToDepartment = () => {
           </tbody>
         </table>
 
-        <button
-          type="button"
-          className="btn-add"
-          onClick={addItemRow}
-        >
+        <button type="button" className="btn-add" onClick={addItemRow}>
           + Add Item
         </button>
 
-        <button type="submit" className="btn-submit">{id ? 'Update Issuance' : 'Save Issuance'}</button>
+        <button type="submit" className="btn-submit">
+          {id ? 'Update Issuance' : 'Save Issuance'}
+        </button>
       </form>
     </div>
   );
