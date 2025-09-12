@@ -1,4 +1,4 @@
-// NavigationBar.js - Updated with vertical separators
+// NavigationBar.js
 import React, { useState, useRef, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -54,6 +54,11 @@ const NavigationBar = () => {
 
   const toggleSidebar = () => {
     setIsCollapsed(!isCollapsed);
+    if (!isCollapsed) {
+      // collapsing: close all dropdowns
+      setActiveDropdown(null);
+      setRawMaterialSelected(false);
+    }
   };
 
   // Close dropdowns when clicking outside
@@ -90,7 +95,11 @@ const NavigationBar = () => {
           {/* Dashboard Section */}
           <div className="nav-section">
             <li>
-              <NavLink to="/dashboard" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <NavLink
+                to="/dashboard"
+                className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+                title="Dashboard"
+              >
                 <span className="icon-container"><FontAwesomeIcon icon={faTachometerAlt} /></span>
                 <span>Dashboard</span>
               </NavLink>
@@ -99,13 +108,13 @@ const NavigationBar = () => {
 
           {/* Raw Material Section */}
           <div className="nav-section">
-            {/* Section Separator */}
             <div className="section-separator"></div>
             
             <li>
-              <div 
-                className={`nav-link raw-toggle ${rawMaterialSelected || activeDropdown === 'raw' ? 'active' : ''}`} 
+              <div
+                className={`nav-link raw-toggle ${rawMaterialSelected || activeDropdown === 'raw' ? 'active' : ''}`}
                 onClick={handleRawMaterialClick}
+                title="Raw Material"
               >
                 <span className="icon-container"><FontAwesomeIcon icon={faBox} /></span>
                 <span>Raw Material</span>
@@ -113,15 +122,12 @@ const NavigationBar = () => {
               </div>
             </li>
 
-            {/* Show when not collapsed */}
             {!isCollapsed && rawMaterialSelected && (
               <>
                 {/* Items Management */}
                 <li className={`dropdown ${activeDropdown === 'items' ? 'active' : ''}`}>
                   <div className="dropdown-header" onClick={() => toggleDropdown('items')}>
-                    <span className="icon-container">
-                      <FontAwesomeIcon icon={faBox} className="icon" />
-                    </span>
+                    <span className="icon-container"><FontAwesomeIcon icon={faBox} className="icon" /></span>
                     <span>Items Management</span>
                     <FontAwesomeIcon icon={faChevronDown} className="chevron" />
                   </div>
@@ -144,9 +150,7 @@ const NavigationBar = () => {
                 {/* Opening Balances */}
                 <li className={`dropdown ${activeDropdown === 'opening' ? 'active' : ''}`}>
                   <div className="dropdown-header" onClick={() => toggleDropdown('opening')}>
-                    <span className="icon-container">
-                      <FontAwesomeIcon icon={faBalanceScale} className="icon" />
-                    </span>
+                    <span className="icon-container"><FontAwesomeIcon icon={faBalanceScale} className="icon" /></span>
                     <span>Opening Balances</span>
                     <FontAwesomeIcon icon={faChevronDown} className="chevron" />
                   </div>
@@ -169,9 +173,7 @@ const NavigationBar = () => {
                 {/* Purchase */}
                 <li className={`dropdown ${activeDropdown === 'purchase' ? 'active' : ''}`}>
                   <div className="dropdown-header" onClick={() => toggleDropdown('purchase')}>
-                    <span className="icon-container">
-                      <FontAwesomeIcon icon={faShoppingCart} className="icon" />
-                    </span>
+                    <span className="icon-container"><FontAwesomeIcon icon={faShoppingCart} className="icon" /></span>
                     <span>Purchase</span>
                     <FontAwesomeIcon icon={faChevronDown} className="chevron" />
                   </div>
@@ -193,10 +195,8 @@ const NavigationBar = () => {
 
                 {/* Suppliers */}
                 <li>
-                  <NavLink to="/suppliers" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                    <span className="icon-container">
-                      <FontAwesomeIcon icon={faTruck} className="icon" />
-                    </span>
+                  <NavLink to="/suppliers" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`} title="Suppliers">
+                    <span className="icon-container"><FontAwesomeIcon icon={faTruck} className="icon" /></span>
                     <span>Suppliers</span>
                   </NavLink>
                 </li>
@@ -204,9 +204,7 @@ const NavigationBar = () => {
                 {/* Issuance */}
                 <li className={`dropdown ${activeDropdown === 'issuance' ? 'active' : ''}`}>
                   <div className="dropdown-header" onClick={() => toggleDropdown('issuance')}>
-                    <span className="icon-container">
-                      <FontAwesomeIcon icon={faShareSquare} className="icon" />
-                    </span>
+                    <span className="icon-container"><FontAwesomeIcon icon={faShareSquare} className="icon" /></span>
                     <span>Issuance</span>
                     <FontAwesomeIcon icon={faChevronDown} className="chevron" />
                   </div>
@@ -228,10 +226,8 @@ const NavigationBar = () => {
 
                 {/* Wastage */}
                 <li>
-                  <NavLink to="/wastage/history" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                    <span className="icon-container">
-                      <FontAwesomeIcon icon={faTrashAlt} className="icon" />
-                    </span>
+                  <NavLink to="/wastage/history" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`} title="Wastage">
+                    <span className="icon-container"><FontAwesomeIcon icon={faTrashAlt} className="icon" /></span>
                     <span>Wastage</span>
                   </NavLink>
                 </li>
@@ -239,9 +235,7 @@ const NavigationBar = () => {
                 {/* Reports */}
                 <li className={`dropdown ${activeDropdown === 'reports' ? 'active' : ''}`}>
                   <div className="dropdown-header" onClick={() => toggleDropdown('reports')}>
-                    <span className="icon-container">
-                      <FontAwesomeIcon icon={faChartBar} className="icon" />
-                    </span>
+                    <span className="icon-container"><FontAwesomeIcon icon={faChartBar} className="icon" /></span>
                     <span>Reports</span>
                     <FontAwesomeIcon icon={faChevronDown} className="chevron" />
                   </div>
@@ -284,7 +278,6 @@ const NavigationBar = () => {
 
           {/* Settings/Admin Section */}
           <div className="nav-section">
-            {/* Section Separator */}
             <div className="section-separator"></div>
             
             <li className={`dropdown ${activeDropdown === 'admin' ? 'active' : ''}`}>

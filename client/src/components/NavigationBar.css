@@ -268,3 +268,34 @@
   background-color: #ddd;
   margin: 0.5rem 0;
 }
+
+/* Collapsed Sidebar */
+.sidebar.collapsed {
+  width: 90px;
+}
+
+.sidebar.collapsed .nav-link span,
+.sidebar.collapsed .dropdown-header span,
+.sidebar.collapsed .logout-btn span {
+  display: none;
+}
+
+.sidebar.collapsed .dropdown-header .chevron {
+  display: none;
+}
+
+.sidebar.collapsed .dropdown-menu {
+  display: none !important;
+}
+
+/* Toggle Button */
+.toggle-button {
+  padding: 1rem;
+  cursor: pointer;
+  font-size: 1.2rem;
+  color: #555;
+}
+.toggle-button:hover {
+  background: #e7d7f9;
+  color: #6d22e6;
+}

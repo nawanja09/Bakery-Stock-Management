@@ -191,7 +191,7 @@ const EditIssuance = () => {
 
         <div className="form-row">
           <div className="form-group">
-            <label>Remarks</label>
+            <label>Time of Day</label>
             <textarea
               value={formData.remarks}
               onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
