@@ -10,11 +10,13 @@ const PurchasingReport = () => {
   const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [reportData, setReportData] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [companyFilter, setCompanyFilter] = useState('');
 
   const fetchPurchasingReport = async () => {
     setLoading(true);
     try {
-      const response = await api.get(`/reports/purchasing?startDate=${startDate}&endDate=${endDate}`);
+      // Add companyFilter to the API request
+      const response = await api.get(`/reports/purchasing?startDate=${startDate}&endDate=${endDate}&companyId=${companyFilter}`);
       setReportData(response.data);
     } catch (error) {
       console.error('Error fetching purchasing report:', error);
@@ -24,6 +26,10 @@ const PurchasingReport = () => {
     }
   };
 
+  const handleCompanyFilter = (e) => {
+    setCompanyFilter(e.target.value);
+  };
+
   const downloadPDF = () => {
     const doc = new jsPDF();
     
@@ -31,14 +37,21 @@ const PurchasingReport = () => {
     doc.setFontSize(16);
     doc.text(`Purchasing Report (${format(new Date(startDate), 'MMM dd, yyyy')} - ${format(new Date(endDate), 'MMM dd, yyyy')})`, 15, 15);
     
+    // Add company info if filtered
+    if (companyFilter) {
+      const companyName = companyFilter === '1' ? 'JH' : 'RR';
+      doc.setFontSize(12);
+      doc.text(`Company: ${companyName}`, 15, 25);
+    }
+    
     // Summary data
     const totalPurchases = reportData.reduce((sum, purchase) => sum + parseFloat(purchase.bill_amount), 0);
     const totalPaid = reportData.reduce((sum, purchase) => sum + parseFloat(purchase.paid_amount), 0);
     
     doc.setFontSize(12);
-    doc.text(`Total Purchases: Rs. ${totalPurchases.toFixed(2)}`, 15, 25);
-    doc.text(`Total Paid: Rs. ${totalPaid.toFixed(2)}`, 15, 32);
-    doc.text(`Total Due: Rs. ${(totalPurchases - totalPaid).toFixed(2)}`, 15, 39);
+    doc.text(`Total Purchases: Rs. ${totalPurchases.toFixed(2)}`, 15, companyFilter ? 35 : 25);
+    doc.text(`Total Paid: Rs. ${totalPaid.toFixed(2)}`, 15, companyFilter ? 42 : 32);
+    doc.text(`Total Due: Rs. ${(totalPurchases - totalPaid).toFixed(2)}`, 15, companyFilter ? 49 : 39);
     
     // Table data
     const tableData = reportData.map(purchase => [
@@ -65,7 +78,7 @@ const PurchasingReport = () => {
     autoTable(doc, {
       head: [headers],
       body: tableData,
-      startY: 45,
+      startY: companyFilter ? 55 : 45,
       styles: { fontSize: 9 },
       headStyles: { fillColor: [41, 128, 185] }
     });
@@ -97,6 +110,18 @@ const PurchasingReport = () => {
             min={startDate}
             max={format(new Date(), 'yyyy-MM-dd')}
           />
+        </div>
+
+        <div className="filter-input">
+          <label>Company:</label>
+          <select
+            value={companyFilter}
+            onChange={handleCompanyFilter}
+          >
+            <option value="">All Companies</option>
+            <option value="1">JH</option>
+            <option value="2">RR</option>
+          </select>
         </div>
         
         <button 
