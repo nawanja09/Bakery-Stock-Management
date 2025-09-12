@@ -86,15 +86,34 @@ const StockReportByRangeAndItem = () => {
           To:
           <input type="date" min={startDate} max={today} value={endDate} onChange={e => setEndDate(e.target.value)} />
         </label>
-        <label style={{ width: 250 }}>
+        <label>
           Item:
           <Select
-            options={items}
-            value={selectedItem}
-            onChange={setSelectedItem}
-            isClearable
-            placeholder="Select an item"
-          />
+          options={items}
+          value={selectedItem}
+          onChange={setSelectedItem}
+          isClearable
+          placeholder="Select an item"
+          styles={{
+            container: (base) => ({
+              ...base,
+              width: 250, // fixed select width
+            }),
+            control: (base) => ({
+              ...base,
+              minHeight: 38,
+            }),
+            menu: (base) => ({
+              ...base,
+              width: 250, // fix dropdown width same as select
+            }),
+            menuList: (base) => ({
+              ...base,
+              maxHeight: 200, // scroll instead of stretching too tall
+            }),
+          }}
+        />
+
         </label>
         <button onClick={fetchStockReport} disabled={loading}>
           {loading ? 'Loading...' : 'Generate Report'}
