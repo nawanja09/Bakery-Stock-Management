@@ -183,7 +183,7 @@ const DepartmentIssuesReport = () => {
                 <th>Quantity</th>
                 <th>Unit</th>
                 <th>Received By</th>
-                <th>Remarks</th>
+                <th>Time of Day</th>
               </tr>
             </thead>
             <tbody>

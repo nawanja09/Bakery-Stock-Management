@@ -162,28 +162,30 @@ const PurchasingReport = () => {
                   <td>{format(new Date(purchase.purchase_date), 'MMM dd, yyyy')}</td>
                   <td>{purchase.supplier_name}</td>
                   <td>{purchase.payment_method}</td>
-                  <td>{parseFloat(purchase.bill_amount).toFixed(2)}</td>
-                  <td>{parseFloat(purchase.paid_amount).toFixed(2)}</td>
-                  <td>{(parseFloat(purchase.bill_amount) - parseFloat(purchase.paid_amount)).toFixed(2)}</td>
+                  <td>{parseFloat(purchase.bill_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td>{parseFloat(purchase.paid_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td>{(parseFloat(purchase.bill_amount) - parseFloat(purchase.paid_amount)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 </tr>
               ))}
               <tr className="summary-row">
                 <td colSpan="4"><strong>Total</strong></td>
                 <td>
                   <strong>
-                    {reportData.reduce((sum, purchase) => sum + parseFloat(purchase.bill_amount), 0).toFixed(2)}
+                    {reportData.reduce((sum, purchase) => sum + parseFloat(purchase.bill_amount), 0)
+                      .toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </strong>
                 </td>
                 <td>
                   <strong>
-                    {reportData.reduce((sum, purchase) => sum + parseFloat(purchase.paid_amount), 0).toFixed(2)}
+                    {reportData.reduce((sum, purchase) => sum + parseFloat(purchase.paid_amount), 0)
+                      .toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </strong>
                 </td>
                 <td>
                   <strong>
                     {reportData.reduce((sum, purchase) => 
-                      sum + (parseFloat(purchase.bill_amount) - parseFloat(purchase.paid_amount)), 0).toFixed(2)
-                    }
+                      sum + (parseFloat(purchase.bill_amount) - parseFloat(purchase.paid_amount)), 0)
+                      .toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </strong>
                 </td>
               </tr>
