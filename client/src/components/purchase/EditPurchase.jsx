@@ -1,3 +1,5 @@
+// src/components/purchase/EditPurchase.jsx
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { usePopup } from '../context/PopupContext';
@@ -8,12 +10,14 @@ import './Purchase.css';
 const EditPurchase = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { showPopup } = usePopup();
+
   const [suppliers, setSuppliers] = useState([]);
   const [itemsList, setItemsList] = useState([]);
   const [companies, setCompanies] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
-  const { showPopup } = usePopup();
   const [loading, setLoading] = useState(true);
+  const [autoAddedRow, setAutoAddedRow] = useState(false); // ✅ prevent multiple auto-adds
 
   const [formData, setFormData] = useState({
     purchase_date: new Date().toISOString().split('T')[0],
@@ -36,7 +40,7 @@ const EditPurchase = () => {
         // Fetch purchase details
         const purchaseResponse = await api.get(`/purchases/${id}`);
         const purchaseData = purchaseResponse.data;
-        
+
         // Fetch dropdown data
         const [suppliersRes, itemsRes, companiesRes] = await Promise.all([
           api.get('/suppliers'),
@@ -77,6 +81,7 @@ const EditPurchase = () => {
     fetchPurchaseData();
   }, [id, showPopup, navigate]);
 
+  // ✅ handle item changes and auto-add row for last item's unit_price
   const handleItemChange = (index, field, value) => {
     const newItems = [...formData.items];
 
@@ -90,10 +95,18 @@ const EditPurchase = () => {
       newItems[index].total = newItems[index].quantity * newItems[index].unit_price;
     }
 
-    setFormData({
-      ...formData,
-      items: newItems
-    });
+    setFormData({ ...formData, items: newItems });
+
+    // Auto-add new row when editing unit_price of last row
+    if (field === 'unit_price' && index === formData.items.length - 1 && !autoAddedRow) {
+      addItemRow();
+      setAutoAddedRow(true);
+    }
+
+    // Reset autoAddedRow if editing other rows
+    if (index !== formData.items.length - 1) {
+      setAutoAddedRow(false);
+    }
   };
 
   const addItemRow = () => {
@@ -126,9 +139,7 @@ const EditPurchase = () => {
   };
 
   const calculateTotal = () => {
-    return formData.items.reduce((total, item) => {
-      return total + (item.quantity * item.unit_price);
-    }, 0).toFixed(2);
+    return formData.items.reduce((total, item) => total + (item.quantity * item.unit_price), 0).toFixed(2);
   };
 
   const handleSubmit = async (e) => {
@@ -163,7 +174,6 @@ const EditPurchase = () => {
     }
   };
 
-  // Convert items list to react-select options
   const itemOptions = itemsList.map(itm => ({
     value: itm.id,
     label: `${itm.name} (${itm.item_code || ''})`
@@ -179,8 +189,9 @@ const EditPurchase = () => {
           ← Back to History
         </button>
       </div>
-      
+
       <form onSubmit={handleSubmit}>
+        {/* Basic Info */}
         <div className="form-row">
           <div className="form-group">
             <label>Purchase Date</label>
@@ -209,6 +220,7 @@ const EditPurchase = () => {
           </div>
         </div>
 
+        {/* Payment & Company */}
         <div className="form-row">
           <div className="form-group">
             <label>Payment Method</label>
@@ -237,16 +249,17 @@ const EditPurchase = () => {
           </div>
         </div>
 
+        {/* Check & Remarks */}
         <div className="form-row">
-            <div className="form-group">
-                <label>Check Number</label>
-                <input
-                    type="text"
-                    value={formData.check_number}
-                    onChange={(e) => setFormData({...formData, check_number: e.target.value})}
-                    placeholder="Enter check number"
-                />
-            </div>
+          <div className="form-group">
+            <label>Check Number</label>
+            <input
+              type="text"
+              value={formData.check_number}
+              onChange={(e) => setFormData({...formData, check_number: e.target.value})}
+              placeholder="Enter check number"
+            />
+          </div>
           <div className="form-group">
             <label>Remarks</label>
             <textarea 
@@ -256,6 +269,7 @@ const EditPurchase = () => {
           </div>
         </div>
 
+        {/* Purchased Items */}
         <h3>Purchased Items</h3>
         <table className="item-table">
           <thead>
@@ -318,6 +332,7 @@ const EditPurchase = () => {
           + Add Item
         </button>
 
+        {/* Payment */}
         <div className="form">
           <div className="form-group">
             <label>Paid Amount (Rs.)</label>
@@ -335,6 +350,7 @@ const EditPurchase = () => {
           </div>
         </div>
 
+        {/* Summary */}
         <div className="summary">
           <div className="total">
             <strong>Total Bill Amount:</strong>
