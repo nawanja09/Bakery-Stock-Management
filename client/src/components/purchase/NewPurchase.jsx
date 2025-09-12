@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import './Purchase.css'; 
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
-import Select from 'react-select'; // ✅ import react-select
+import Select from 'react-select';
 
 const AddPurchase = () => {
   const navigate = useNavigate();
@@ -26,6 +26,9 @@ const AddPurchase = () => {
     company_id: '',
     items: [{ id: '', item_name: '', quantity: 1, unit_price: 0 }]
   });
+
+  // To prevent adding multiple rows repeatedly
+  const [autoAddedRow, setAutoAddedRow] = useState(false);
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('user'));
@@ -80,6 +83,17 @@ const AddPurchase = () => {
       ...formData,
       items: newItems
     });
+
+    // ✅ Auto-add new row when editing unit_price of last row
+    if (field === 'unit_price' && index === formData.items.length - 1 && !autoAddedRow) {
+      addItemRow();
+      setAutoAddedRow(true); // prevent multiple auto adds
+    }
+
+    // Reset autoAddedRow if editing other rows
+    if (index !== formData.items.length - 1) {
+      setAutoAddedRow(false);
+    }
   };
 
   const addItemRow = () => {
@@ -149,7 +163,6 @@ const AddPurchase = () => {
     }
   };
 
-  // ✅ convert items list to react-select options
   const itemOptions = itemsList.map(itm => ({
     value: itm.id,
     label: `${itm.name} (${itm.item_code || ''})`
@@ -253,7 +266,6 @@ const AddPurchase = () => {
             {formData.items.map((item, index) => (
               <tr key={index}>
                 <td style={{ minWidth: '250px' }}>
-                  {/* ✅ Searchable dropdown */}
                   <Select
                     options={itemOptions}
                     value={itemOptions.find(opt => opt.value === item.id) || null}
