@@ -218,10 +218,6 @@ const EditPurchase = () => {
               ))}
             </select>
           </div>
-        </div>
-
-        {/* Payment & Company */}
-        <div className="form-row">
           <div className="form-group">
             <label>Payment Method</label>
             <select
@@ -234,6 +230,10 @@ const EditPurchase = () => {
               <option value="CREDIT">Credit</option>
             </select>
           </div>
+        </div>
+
+        {/* Payment & Company */}
+        <div className="form-row">
           <div className="form-group">
             <label>Company</label>
             <select
@@ -247,10 +247,6 @@ const EditPurchase = () => {
               ))}
             </select>
           </div>
-        </div>
-
-        {/* Check & Remarks */}
-        <div className="form-row">
           <div className="form-group">
             <label>Check Number</label>
             <input

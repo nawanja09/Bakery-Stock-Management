@@ -332,3 +332,81 @@ INSERT INTO `finished_goods_items` (`item_code`, `name`, `category`, `unit_price
 ('FG005', 'Chicken Pie', 'Savory', 400.00),
 ('FG006', 'Cappuccino', 'Beverage', 200.00),
 ('FG007', 'Lemon Tart', 'Pastry', 350.00);
+
+-- Table structure for table `FinishedGoodsOpeningBalances`
+--
+
+CREATE TABLE IF NOT EXISTS `finished_goods_opening_balances` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `date` date NOT NULL,
+  `item_id` int NOT NULL,
+  `quantity` int NOT NULL DEFAULT '0',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_item_id` (`item_id`),
+  KEY `fk_fgob_item_id` (`item_id`),
+  CONSTRAINT `fk_fgob_item_id` FOREIGN KEY (`item_id`) REFERENCES `finished_goods_items` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Insert sample data
+INSERT INTO `finished_goods_opening_balances` (`date`, `item_id`, `quantity`) VALUES 
+('2025-08-25', 1, 10),
+('2025-08-25', 2, 25),
+('2025-08-25', 3, 30),
+('2025-08-25', 4, 50),
+('2025-08-25', 5, 15);
+
+-- Table structure for table `FinishedGoodsProduction`
+--
+CREATE TABLE `finished_goods_productions` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `production_date` date NOT NULL,
+  `prepared_by` varchar(255) NOT NULL,
+  `status` enum('Draft','Completed','Cancelled') NOT NULL DEFAULT 'Draft',
+  `remarks` text,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Table structure for table `FinishedGoodsProductionItems`
+CREATE TABLE `finished_goods_production_items` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `production_id` int NOT NULL,
+  `item_id` int NOT NULL,
+  `quantity` int NOT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `production_id` (`production_id`),
+  KEY `item_id` (`item_id`),
+  CONSTRAINT `production_items_ibfk_1` FOREIGN KEY (`production_id`) REFERENCES `finished_goods_productions` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `production_items_ibfk_2` FOREIGN KEY (`item_id`) REFERENCES `finished_goods_items` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+
+-- Insert sample data into productions table
+INSERT INTO `finished_goods_productions` (`production_date`, `prepared_by`, `remarks`, `status`, `created_at`) VALUES 
+('2025-08-25', 'Chef John', 'Morning batch production', 'Completed', '2025-08-25 08:30:00'),
+('2025-08-25', 'Baker Mary', 'Special orders for events', 'Completed', '2025-08-25 10:15:00'),
+('2025-08-26', 'Pastry Chef Alex', 'Weekly pastry production', 'Completed', '2025-08-26 07:45:00'),
+('2025-08-26', 'Baker Robert', 'Bread and muffin batch', 'Completed', '2025-08-26 09:30:00'),
+('2025-08-27', 'Chef Sarah', 'Draft production for testing', 'Draft', '2025-08-27 08:00:00');
+
+-- Insert sample data into production_items table
+INSERT INTO `finished_goods_productions` (`id`, `item_id`, `quantity`) VALUES 
+(1, 1, 5),   -- Chocolate Cake x5
+(1, 4, 20),  -- Blueberry Muffin x20
+(1, 6, 15),  -- Croissant x15
+(2, 2, 3),   -- Vanilla Cake x3
+(2, 3, 2),   -- Red Velvet Cake x2
+(2, 15, 4),  -- Cheese Cake x4
+(3, 6, 25),  -- Croissant x25
+(3, 7, 20),  -- Danish Pastry x20
+(3, 13, 10), -- Lemon Tart x10
+(3, 14, 8),  -- Apple Pie x8
+(4, 4, 30),  -- Blueberry Muffin x30
+(4, 5, 25),  -- Chocolate Chip Muffin x25
+(4, 9, 15),  -- Chicken Pie x15
+(4, 10, 40), -- Vegetable Samosa x40
+(5, 1, 2),   -- Chocolate Cake x2 (Draft)
+(5, 11, 10); -- Cappuccino x10 (Draft)

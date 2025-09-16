@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowLeft, faSave } from '@fortawesome/free-solid-svg-icons';
-import { usePopup } from '../context/PopupContext';
+import { usePopup } from '../../context/PopupContext';
 import './FinishedGoodsManagement.css';
-import api from '../../api';
+import api from '../../../api';
 
 const EditFinishedGoodsItem = () => {
   const { id } = useParams();

@@ -296,11 +296,26 @@ const NavigationBar = () => {
                 </li>
 
                 {/* Opening Balances */}
-                <li>
-                  <NavLink to="/finished-goods/opening" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                <li className={`dropdown ${activeDropdown === 'finished-opening' ? 'active' : ''}`}>
+                  <div className="dropdown-header" onClick={() => toggleDropdown('finished-opening')}>
                     <span className="icon-container"><FontAwesomeIcon icon={faBalanceScale} /></span>
                     <span>Opening Balances - FS</span>
-                  </NavLink>
+                    <FontAwesomeIcon icon={faChevronDown} className="chevron" />
+                  </div>
+                  <ul className="dropdown-menu">
+                    <li>
+                      <NavLink to="/finished-goods/opening/add" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                        <span className="icon-container"><FontAwesomeIcon icon={faPlusCircle} /></span>
+                        <span>Add Opening Balance</span>
+                      </NavLink>
+                    </li>
+                    <li>
+                      <NavLink to="/finished-goods/opening/history" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                        <span className="icon-container"><FontAwesomeIcon icon={faHistory} /></span>
+                        <span>View History</span>
+                      </NavLink>
+                    </li>
+                  </ul>
                 </li>
 
                 {/* Production Management */}
@@ -310,6 +325,8 @@ const NavigationBar = () => {
                     <span>Production Management </span>
                   </NavLink>
                 </li>
+
+                
 
                 {/* Transfers */}
                 <li>
