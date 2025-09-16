@@ -27,6 +27,10 @@ import WastageReport from './components/report/WastageReport/WastageReport';
 import ItemWiseStockReport from './components/report/StockReportByRangeAndItem';
 import ManageUsers from './components/admin/ManageUsers';
 
+import AddFinishedGoodsItem from './components/FinishedGoods/AddFinishedGoodsItem';
+import EditFinishedGoodsItem from './components/FinishedGoods/EditFinishedGoodsItem';
+import ViewFinishedGoodsItems from './components/FinishedGoods/ViewFinishedGoodsItems';
+
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
@@ -82,6 +86,11 @@ function App() {
             <Route path="reports/wastage" element={<WastageReport />} />
             <Route path="admin/users" element={<ManageUsers />} />
             <Route path="reports/stock/items" element={<ItemWiseStockReport/>} />
+
+            <Route path="finished-goods/items/add" element={<AddFinishedGoodsItem />} />
+            <Route path="finished-goods/items" element={<ViewFinishedGoodsItems />} />
+            <Route path="finished-goods/items/edit/:id" element={<EditFinishedGoodsItem />} />
+            
           </Route>
 
           <Route path="*" element={<Navigate to="/login" replace />} />

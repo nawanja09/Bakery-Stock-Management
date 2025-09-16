@@ -276,6 +276,76 @@ const NavigationBar = () => {
             )}
           </div>
 
+          {/* Finished Goods Section */}
+          <div className="nav-section">
+            <div className="section-separator"></div>
+            
+            <li className={`dropdown ${activeDropdown === 'finished' ? 'active' : ''}`}>
+              <div className="dropdown-header" onClick={() => toggleDropdown('finished')}>
+                <span className="icon-container"><FontAwesomeIcon icon={faBox} /></span>
+                <span>Finished Goods</span>
+                <FontAwesomeIcon icon={faChevronDown} className="chevron" />
+              </div>
+              <ul className="dropdown-menu">
+                {/* Item Management */}
+                <li>
+                  <NavLink to="/finished-goods/items" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                    <span className="icon-container"><FontAwesomeIcon icon={faList} /></span>
+                    <span>Item Management - FS</span>
+                  </NavLink>
+                </li>
+
+                {/* Opening Balances */}
+                <li>
+                  <NavLink to="/finished-goods/opening" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                    <span className="icon-container"><FontAwesomeIcon icon={faBalanceScale} /></span>
+                    <span>Opening Balances - FS</span>
+                  </NavLink>
+                </li>
+
+                {/* Production Management */}
+                <li>
+                  <NavLink to="/finished-goods/production" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                    <span className="icon-container"><FontAwesomeIcon icon={faCog} /></span>
+                    <span>Production Management </span>
+                  </NavLink>
+                </li>
+
+                {/* Transfers */}
+                <li>
+                  <NavLink to="/finished-goods/transfer" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                    <span className="icon-container"><FontAwesomeIcon icon={faTruck} /></span>
+                    <span>Transfers</span>
+                  </NavLink>
+                </li>
+                
+                {/* Production Wastage */}
+                <li>
+                  <NavLink to="/finished-goods/wastage/production" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                    <span className="icon-container"><FontAwesomeIcon icon={faTrash} /></span>
+                    <span>Production Wastage</span>
+                  </NavLink>
+                </li>
+
+                {/* Kitchen Wastage */}
+                <li>
+                  <NavLink to="/finished-goods/wastage/kitchen" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                    <span className="icon-container"><FontAwesomeIcon icon={faTrashAlt} /></span>
+                    <span>Kitchen Wastage</span>
+                  </NavLink>
+                </li>
+
+                {/* Reports */}
+                <li>
+                  <NavLink to="/finished-goods/reports" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                    <span className="icon-container"><FontAwesomeIcon icon={faChartBar} /></span>
+                    <span>Reports</span>
+                  </NavLink>
+                </li>
+              </ul>
+            </li>
+          </div>
+
           {/* Settings/Admin Section */}
           <div className="nav-section">
             <div className="section-separator"></div>

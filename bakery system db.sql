@@ -309,4 +309,26 @@ CREATE TABLE `wastages` (
 INSERT INTO `wastages` VALUES (12,'WN-008193CB','2025-08-14','Admin','Human error','',NULL,5,'2025-08-14 09:41:30');
 
 
+-- Table structure for table `FinishedGoodsItems`
+--
 
+CREATE TABLE IF NOT EXISTS `finished_goods_items` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `item_code` varchar(20) NOT NULL,
+  `name` varchar(255) NOT NULL,
+  `category` enum('Cake','Bakery','Pastry','Chinese','Savory','Beverage','Other') NOT NULL DEFAULT 'Other',
+  `unit_price` decimal(10,2) NOT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `item_code` (`item_code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Insert sample data
+INSERT INTO `finished_goods_items` (`item_code`, `name`, `category`, `unit_price`) VALUES 
+('FG001', 'Chocolate Cake', 'Cake', 1500.00),
+('FG002', 'Blueberry Muffin', 'Bakery', 300.00),
+('FG003', 'Croissant', 'Pastry', 250.00),
+('FG004', 'Spring Roll', 'Chinese', 100.00),
+('FG005', 'Chicken Pie', 'Savory', 400.00),
+('FG006', 'Cappuccino', 'Beverage', 200.00),
+('FG007', 'Lemon Tart', 'Pastry', 350.00);
