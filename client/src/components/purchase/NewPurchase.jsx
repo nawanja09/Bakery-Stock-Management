@@ -199,10 +199,7 @@ const AddPurchase = () => {
               ))}
             </select>
           </div>
-        </div>
 
-        {/* Payment & Company */}
-        <div className="form-row">
           <div className="form-group">
             <label>Payment Method</label>
             <select
@@ -215,6 +212,10 @@ const AddPurchase = () => {
               <option value="CREDIT">Credit</option>
             </select>
           </div>
+        </div>
+
+        {/* Company */}
+        <div className="form-row">
           <div className="form-group">
             <label>Company</label>
             <select
@@ -228,10 +229,6 @@ const AddPurchase = () => {
               ))}
             </select>
           </div>
-        </div>
-
-        {/* Remarks */}
-        <div className="form-row">
           <div className="form-group">
             <label>Check Number</label>
             <input

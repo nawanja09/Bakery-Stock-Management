@@ -166,9 +166,6 @@ const EditIssuance = () => {
               ))}
             </select>
           </div>
-        </div>
-
-        <div className="form-row">
           <div className="form-group">
             <label>Received By</label>
             <input
@@ -187,9 +184,6 @@ const EditIssuance = () => {
               required
             />
           </div>
-        </div>
-
-        <div className="form-row">
           <div className="form-group">
             <label>Time of Day</label>
             <textarea

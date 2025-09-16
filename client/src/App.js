@@ -27,9 +27,14 @@ import WastageReport from './components/report/WastageReport/WastageReport';
 import ItemWiseStockReport from './components/report/StockReportByRangeAndItem';
 import ManageUsers from './components/admin/ManageUsers';
 
-import AddFinishedGoodsItem from './components/FinishedGoods/AddFinishedGoodsItem';
-import EditFinishedGoodsItem from './components/FinishedGoods/EditFinishedGoodsItem';
-import ViewFinishedGoodsItems from './components/FinishedGoods/ViewFinishedGoodsItems';
+import AddFinishedGoodsItem from './components/FinishedGoods/Item Management - FS/AddFinishedGoodsItem';
+import EditFinishedGoodsItem from './components/FinishedGoods/Item Management - FS/EditFinishedGoodsItem';
+import ViewFinishedGoodsItems from './components/FinishedGoods/Item Management - FS/ViewFinishedGoodsItems';
+import AddFinishedGoodsOpeningBalance from './components/FinishedGoods/Opening Management - FS/AddFinishedGoodsOpeningBalance';
+import FinishedGoodsOpeningBalanceHistory from './components/FinishedGoods/Opening Management - FS/FinishedGoodsOpeningBalanceHistory';
+import ProductionManagement from './components/FinishedGoods/Production Management/ProductionManagement';
+import ViewProduction from './components/FinishedGoods/Production Management/ViewProduction';
+import EditProduction from './components/FinishedGoods/Production Management/EditProduction';
 
 import './App.css';
 
@@ -90,7 +95,12 @@ function App() {
             <Route path="finished-goods/items/add" element={<AddFinishedGoodsItem />} />
             <Route path="finished-goods/items" element={<ViewFinishedGoodsItems />} />
             <Route path="finished-goods/items/edit/:id" element={<EditFinishedGoodsItem />} />
-            
+            <Route path="finished-goods/opening/add" element={<AddFinishedGoodsOpeningBalance />} />
+            <Route path="finished-goods/opening/history" element={<FinishedGoodsOpeningBalanceHistory />} />
+            <Route path="finished-goods/production" element={<ProductionManagement />} />
+            <Route path="finished-goods/production/view/:id" element={<ViewProduction />} />
+            <Route path="finished-goods/production/edit/:id" element={<EditProduction />} />
+
           </Route>
 
           <Route path="*" element={<Navigate to="/login" replace />} />

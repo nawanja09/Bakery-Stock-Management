@@ -118,9 +118,6 @@ const AddWastage = () => {
               required
             />
           </div>
-        </div>
-
-        <div className="form-row">
           <div className="form-group">
             <label>Reason for Wastage</label>
             <select
@@ -136,13 +133,6 @@ const AddWastage = () => {
               <option value="Human error">Human error</option>
               <option value="Other">Other</option>
             </select>
-          </div>
-           <div className="form-group">
-            <label>Remarks / Notes</label>
-            <textarea
-              value={formData.remarks}
-              onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
-            />
           </div>
         </div>
 

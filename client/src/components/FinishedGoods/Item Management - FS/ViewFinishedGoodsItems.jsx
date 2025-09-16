@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faEdit, faTrash, faPlus } from '@fortawesome/free-solid-svg-icons';
-import { usePopup } from '../context/PopupContext';
+import { usePopup } from '../../context/PopupContext';
 import './FinishedGoodsManagement.css';
-import api from '../../api';
+import api from '../../../api';
 
 const ViewFinishedGoodsItems = () => {
   const [items, setItems] = useState([]);

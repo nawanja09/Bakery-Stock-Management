@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSave } from '@fortawesome/free-solid-svg-icons';
-import { usePopup } from '../context/PopupContext';
-import api from '../../api';
+import { usePopup } from '../../context/PopupContext';
+import api from '../../../api';
 import './FinishedGoodsManagement.css';
 
 const AddFinishedGoodsItem = () => {
