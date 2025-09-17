@@ -35,6 +35,10 @@ import FinishedGoodsOpeningBalanceHistory from './components/FinishedGoods/Openi
 import ProductionManagement from './components/FinishedGoods/Production Management/ProductionManagement';
 import ViewProduction from './components/FinishedGoods/Production Management/ViewProduction';
 import EditProduction from './components/FinishedGoods/Production Management/EditProduction';
+import TransfersManagement from './components/FinishedGoods/Transfers/TransfersManagement';
+import ViewTransfer from './components/FinishedGoods/Transfers/ViewTransferPopup';
+import EditTransfer from './components/FinishedGoods/Transfers/EditTransferPopup';
+import AddTransferPopup from './components/FinishedGoods/Transfers/AddTransferPopup';
 
 import './App.css';
 
@@ -100,6 +104,10 @@ function App() {
             <Route path="finished-goods/production" element={<ProductionManagement />} />
             <Route path="finished-goods/production/view/:id" element={<ViewProduction />} />
             <Route path="finished-goods/production/edit/:id" element={<EditProduction />} />
+            <Route path="finished-goods/transfer" element={<TransfersManagement />} />
+            <Route path="finished-goods/transfer/view/:id" element={<ViewTransfer />} />
+            <Route path="finished-goods/transfer/edit/:id" element={<EditTransfer />} />
+            <Route path="finished-goods/transfer/add" element={<AddTransferPopup />} />
 
           </Route>
 

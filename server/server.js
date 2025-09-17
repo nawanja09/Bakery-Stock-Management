@@ -17,6 +17,7 @@ const userRoutes = require('./routes/userRoutes');
 const finishedGoodsItemsRouter = require('./routes/finishedGoodsItems');
 const finishedGoodsOpeningBalanceRouter = require('./routes/finishedGoodsOpeningBalance');
 const productionsRouter = require('./routes/productions');
+const finishedGoodsTransfersRouter = require('./routes/finishedGoodsTransfers');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -46,6 +47,8 @@ app.use('/api/users', userRoutes);
 app.use('/api/finished-goods-items', finishedGoodsItemsRouter);
 app.use('/api/finished-goods-opening-balance', finishedGoodsOpeningBalanceRouter);
 app.use('/api/productions', productionsRouter);
+app.use('/api/finished-goods-transfers', finishedGoodsTransfersRouter);
+
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

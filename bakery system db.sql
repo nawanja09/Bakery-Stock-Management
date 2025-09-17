@@ -410,3 +410,63 @@ INSERT INTO `finished_goods_productions` (`id`, `item_id`, `quantity`) VALUES
 (4, 10, 40), -- Vegetable Samosa x40
 (5, 1, 2),   -- Chocolate Cake x2 (Draft)
 (5, 11, 10); -- Cappuccino x10 (Draft)
+
+-- Table for transfer destinations/departments
+CREATE TABLE IF NOT EXISTS `transfer_destinations` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `name` varchar(255) NOT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Insert transfer destinations
+INSERT INTO `transfer_destinations` (`name`) VALUES 
+('Cafe'),
+('MAS Ayathi'),
+('MAS Brew Bar'),
+('MAS Kreedy');
+
+-- Table for finished goods transfers
+CREATE TABLE IF NOT EXISTS `finished_goods_transfers` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `transfer_date` date NOT NULL,
+  `transfer_number` varchar(50) NOT NULL,
+  `transferred_by` varchar(255) NOT NULL,
+  `destination_id` int NOT NULL,
+  `remarks` text,
+  `status` enum('Draft','Completed','Cancelled') NOT NULL DEFAULT 'Draft',
+  `created_by` int NOT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `transfer_number` (`transfer_number`),
+  KEY `destination_id` (`destination_id`),
+  KEY `created_by` (`created_by`),
+  CONSTRAINT `fg_transfers_ibfk_1` FOREIGN KEY (`destination_id`) REFERENCES `transfer_destinations` (`id`),
+  CONSTRAINT `fg_transfers_ibfk_2` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Table for transfer items
+CREATE TABLE IF NOT EXISTS `finished_goods_transfer_items` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `transfer_id` int NOT NULL,
+  `item_id` int NOT NULL,
+  `quantity` int NOT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `transfer_id` (`transfer_id`),
+  KEY `item_id` (`item_id`),
+  CONSTRAINT `fg_transfer_items_ibfk_1` FOREIGN KEY (`transfer_id`) REFERENCES `finished_goods_transfers` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fg_transfer_items_ibfk_2` FOREIGN KEY (`item_id`) REFERENCES `finished_goods_items` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+INSERT INTO `finished_goods_transfers` (`transfer_date`, `transfer_number`, `transferred_by`, `destination_id`, `remarks`, `created_by`) 
+VALUES ('2025-08-25', 'TRF-A1B2C3D4E5', 'John Baker', 1, 'Morning delivery for cafe opening', 2);
+
+-- Transfer items for sample 1
+INSERT INTO `finished_goods_transfer_items` (`transfer_id`, `item_id`, `quantity`) VALUES 
+(1, 1, 5), 
+(1, 2, 20),
+(1, 6, 15),
+(1, 5, 30);
