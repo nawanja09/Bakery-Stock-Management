@@ -10,7 +10,7 @@ const createTransfer = async (req, res) => {
   const { transfer_date, transferred_by, destination_id, remarks, items } = req.body;
   
   // For now, use a default user ID since auth isn't implemented
-  const created_by = 5; // Default admin user ID
+  const created_by = 5; // Default user ID
 
   try {
     await pool.query('START TRANSACTION');

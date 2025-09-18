@@ -20,7 +20,7 @@ const EditPurchase = () => {
   const [autoAddedRow, setAutoAddedRow] = useState(false); // ✅ prevent multiple auto-adds
 
   const [formData, setFormData] = useState({
-    purchase_date: new Date().toISOString().split('T')[0],
+    purchase_date: new Date().toLocaleDateString('en-CA'), // ✅ fixed
     supplier_id: '',
     bill_amount: 0,
     paid_amount: 0,
@@ -54,7 +54,7 @@ const EditPurchase = () => {
 
         // Set form data
         setFormData({
-          purchase_date: purchaseData.purchase_date.split('T')[0],
+          purchase_date: new Date(purchaseData.purchase_date).toLocaleDateString('en-CA'), 
           supplier_id: purchaseData.supplier_id,
           bill_amount: purchaseData.bill_amount,
           paid_amount: purchaseData.paid_amount,
@@ -248,12 +248,12 @@ const EditPurchase = () => {
             </select>
           </div>
           <div className="form-group">
-            <label>Check Number</label>
+            <label>Invoice Number</label>
             <input
               type="text"
               value={formData.check_number}
               onChange={(e) => setFormData({...formData, check_number: e.target.value})}
-              placeholder="Enter check number"
+              placeholder="Enter invoice number"
             />
           </div>
           <div className="form-group">

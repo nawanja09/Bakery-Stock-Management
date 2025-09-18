@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import dayjs from 'dayjs';
 import './Purchase.css';
 import api from '../../api';
 
@@ -54,10 +55,10 @@ const PurchaseDetails = () => {
         <div className="details-row vertical">
           <ul>
             <li>
-              <strong>Invoice No.:</strong> {purchase.invoice_no}
+              <strong>Item Code No.:</strong> {purchase.invoice_no}
             </li>
             <li>
-              <strong> Date:</strong> {purchase.purchase_date}
+              <strong>Date:</strong> {dayjs(purchase.purchase_date).format('YYYY-MM-DD')}
             </li>
             <li>
               <strong>Company:</strong> {purchase.company_name}

@@ -15,7 +15,7 @@ const EditIssuance = () => {
   const [loading, setLoading] = useState(true);
 
   const [formData, setFormData] = useState({
-    issuance_date: new Date().toISOString().split('T')[0],
+    issuance_date: new Date().toLocaleDateString('en-CA'),
     department_id: '',
     received_by: '',
     remarks: '',
@@ -42,7 +42,7 @@ const EditIssuance = () => {
         setItems(itemsRes.data);
 
         setFormData({
-          issuance_date: issuanceData.issuance_date.split('T')[0],
+          issuance_date: new Date(issuanceData.issuance_date).toLocaleDateString('en-CA'),
           department_id: issuanceData.department_id,
           received_by: issuanceData.received_by,
           remarks: issuanceData.remarks || '',

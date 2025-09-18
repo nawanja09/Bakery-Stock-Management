@@ -18,6 +18,7 @@ const finishedGoodsItemsRouter = require('./routes/finishedGoodsItems');
 const finishedGoodsOpeningBalanceRouter = require('./routes/finishedGoodsOpeningBalance');
 const productionsRouter = require('./routes/productions');
 const finishedGoodsTransfersRouter = require('./routes/finishedGoodsTransfers');
+const finishedGoodsWastageRouter = require('./routes/finishedGoodsWastage');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -48,6 +49,7 @@ app.use('/api/finished-goods-items', finishedGoodsItemsRouter);
 app.use('/api/finished-goods-opening-balance', finishedGoodsOpeningBalanceRouter);
 app.use('/api/productions', productionsRouter);
 app.use('/api/finished-goods-transfers', finishedGoodsTransfersRouter);
+app.use('/api/finished-goods-wastages', finishedGoodsWastageRouter);
 
 
 app.listen(PORT, () => {
