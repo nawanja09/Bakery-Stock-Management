@@ -22,7 +22,7 @@ const IssueToDepartment = () => {
     remarks: '',
     approved_by: '',
     check_number: '',
-    items: [{ item_id: '', quantity: 1, unit: '' }]
+    items: [{ item_id: '', quantity: 1, unit: '', current_stock: 0 }]
   });
 
   useEffect(() => {
@@ -40,7 +40,7 @@ const IssueToDepartment = () => {
 
     const fetchItems = async () => {
       try {
-        const response = await api.get('/items');
+        const response = await api.get('/issuances/items/with-stock');
         setItems(response.data);
       } catch (error) {
         console.error('Error fetching items:', error);
@@ -64,17 +64,21 @@ const IssueToDepartment = () => {
             remarks: issuance.remarks,
             approved_by: issuance.approved_by,
             check_number: issuance.check_number,
-            items: issuance.items.map(item => ({
-              item_id: item.item_id,
-              quantity: item.quantity,
-              unit: item.unit
-            }))
+            items: issuance.items.map(item => {
+              const itemData = items.find(i => i.id === item.item_id);
+              return {
+                item_id: item.item_id,
+                quantity: item.quantity,
+                unit: item.unit,
+                current_stock: itemData ? itemData.current_stock : 0
+              };
+            })
           });
         })
         .catch(() => showPopup('error', 'Failed to fetch issuance for edit'))
         .finally(() => setLoading(false));
     }
-  }, [id, showPopup]);
+  }, [id, showPopup, items]);
 
   const handleItemChange = (index, field, value) => {
     const newItems = [...formData.items];
@@ -85,10 +89,11 @@ const IssueToDepartment = () => {
 
     newItems[index][field] = value;
 
-    // Auto-select unit when item is selected
+    // Auto-select unit and current_stock when item is selected
     if (field === 'item_id') {
       const selectedItem = items.find(item => String(item.id) === String(value));
       newItems[index].unit = selectedItem ? selectedItem.unit : '';
+      newItems[index].current_stock = selectedItem ? selectedItem.current_stock : 0;
     }
 
     setFormData({ ...formData, items: newItems });
@@ -102,7 +107,7 @@ const IssueToDepartment = () => {
   const addItemRow = () => {
     setFormData(prev => ({
       ...prev,
-      items: [...prev.items, { item_id: '', quantity: 1, unit: '' }]
+      items: [...prev.items, { item_id: '', quantity: 1, unit: '', current_stock: 0 }]
     }));
   };
 
@@ -114,6 +119,15 @@ const IssueToDepartment = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Validate that issued quantity doesn't exceed available stock
+    for (const item of formData.items) {
+      const selectedItem = items.find(i => String(i.id) === String(item.item_id));
+      if (selectedItem && item.quantity > selectedItem.current_stock) {
+        showPopup('error', `Cannot issue more than available stock for ${selectedItem.name}. Available: ${selectedItem.current_stock}`);
+        return;
+      }
+    }
 
     if (!currentUser || !currentUser.id) {
       alert('User information is missing. Please login again.');
@@ -147,8 +161,9 @@ const IssueToDepartment = () => {
 
   const itemOptions = items.map(itm => ({
     value: itm.id,
-    label: `${itm.name} (${itm.item_code})`,
-    unit: itm.unit
+    label: `${itm.name} (${itm.item_code}) - Stock: ${itm.current_stock} ${itm.unit}`,
+    unit: itm.unit,
+    current_stock: itm.current_stock
   }));
 
   if (loading) return <div className="loading">Loading...</div>;
@@ -213,7 +228,8 @@ const IssueToDepartment = () => {
           <thead>
             <tr>
               <th>Item Name</th>
-              <th>Quantity</th>
+              <th>Current Stock</th>
+              <th>Quantity to Issue</th>
               <th>Unit of Measurement</th>
               <th>Action</th>
             </tr>
@@ -232,9 +248,18 @@ const IssueToDepartment = () => {
                 </td>
                 <td>
                   <input
+                    type="text"
+                    value={item.current_stock}
+                    readOnly
+                    className="stock-display"
+                  />
+                </td>
+                <td>
+                  <input
                     type="number"
                     min="0"
                     step="0.001"
+                    max={item.current_stock}
                     value={item.quantity}
                     onChange={(e) => handleItemChange(index, 'quantity', parseFloat(e.target.value))}
                     required

@@ -120,7 +120,7 @@ const AddFinishedGoodsWastage = () => {
           </div>
 
           <div className="form-group">
-            <label>Wastaged By</label>
+            <label>Approved By</label>
             <input
               type="text"
               value={formData.approved_by}

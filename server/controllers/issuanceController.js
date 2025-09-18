@@ -176,9 +176,53 @@ const updateIssuance = async (req, res) => {
   }
 };
 
+const getItemsWithStock = async (req, res) => {
+  try {
+    const [items] = await pool.query(`
+      SELECT 
+        i.*,
+        COALESCE(
+          (SELECT SUM(ob.quantity) 
+           FROM opening_balances ob 
+           WHERE ob.item_id = i.id AND ob.date <= CURDATE()
+          ), 0
+        ) + 
+        COALESCE(
+          (SELECT SUM(pi.quantity) 
+           FROM purchase_items pi 
+           JOIN purchases p ON pi.purchase_id = p.id 
+           WHERE pi.item_id = i.id AND DATE(p.purchase_date) <= CURDATE()
+          ), 0
+        ) - 
+        COALESCE(
+          (SELECT SUM(ii.quantity) 
+           FROM issuance_items ii 
+           JOIN issuances iss ON ii.issuance_id = iss.id 
+           WHERE ii.item_id = i.id AND DATE(iss.issuance_date) <= CURDATE()
+          ), 0
+        ) - 
+        COALESCE(
+          (SELECT SUM(wi.quantity) 
+           FROM wastage_items wi 
+           JOIN wastages w ON wi.wastage_id = w.id 
+           WHERE wi.item_id = i.id AND w.date <= CURDATE()
+          ), 0
+        ) AS current_stock
+      FROM items i
+      ORDER BY i.name
+    `);
+    
+    res.json(items);
+  } catch (error) {
+    console.error('Error fetching items with stock:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
 module.exports = {
   createIssuance,
   getAllIssuances,
   getIssuanceById,
-  updateIssuance
+  updateIssuance,
+  getItemsWithStock
 };
