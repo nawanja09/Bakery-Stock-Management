@@ -39,6 +39,8 @@ import TransfersManagement from './components/FinishedGoods/Transfers/TransfersM
 import ViewTransfer from './components/FinishedGoods/Transfers/ViewTransferPopup';
 import EditTransfer from './components/FinishedGoods/Transfers/EditTransferPopup';
 import AddTransferPopup from './components/FinishedGoods/Transfers/AddTransferPopup';
+import AddFinishedGoodsWastage from './components/FinishedGoods/Wastage/AddFinishedGoodsWastage'
+import FinishedGoodsWastageHistory from './components/FinishedGoods/Wastage/FinishedGoodsWastageHistory';
 
 import './App.css';
 
@@ -108,6 +110,8 @@ function App() {
             <Route path="finished-goods/transfer/view/:id" element={<ViewTransfer />} />
             <Route path="finished-goods/transfer/edit/:id" element={<EditTransfer />} />
             <Route path="finished-goods/transfer/add" element={<AddTransferPopup />} />
+            <Route path="finished-goods/wastage/kitchen" element={<AddFinishedGoodsWastage />} />
+            <Route path="finished-goods/wastage/history" element={<FinishedGoodsWastageHistory />} />
 
           </Route>
 

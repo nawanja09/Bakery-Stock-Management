@@ -292,8 +292,30 @@ const NavigationBar = () => {
 
                 <li><NavLink to="/finished-goods/production" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faCog} /></span><span>Production Management</span></NavLink></li>
                 <li><NavLink to="/finished-goods/transfer" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faTruck} /></span><span>Transfers</span></NavLink></li>
-                <li><NavLink to="/finished-goods/wastage/production" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faTrash} /></span><span>Production Wastage</span></NavLink></li>
-                <li><NavLink to="/finished-goods/wastage/kitchen" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faTrashAlt} /></span><span>Kitchen Wastage</span></NavLink></li>
+
+                <li className={`dropdown ${activeDropdown === 'items' ? 'active' : ''}`}>
+                  <div className="dropdown-header" onClick={() => toggleDropdown('items')}>
+                    <span className="icon-container"><FontAwesomeIcon icon={faTrash} /></span>
+                    <span> Wastage</span>
+                    <FontAwesomeIcon icon={faChevronDown} className="chevron" />
+                  </div>
+                  <ul className="dropdown-menu">
+                    <li>
+                      <NavLink to="/finished-goods/wastage/kitchen" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                        <span className="icon-container"><FontAwesomeIcon icon={faPlusCircle} /></span>
+                        <span>Add New Wastage</span>
+                      </NavLink>
+                    </li>
+                    <li>
+                      <NavLink to="/finished-goods/wastage/history" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                        <span className="icon-container"><FontAwesomeIcon icon={faList} /></span>
+                        <span>Production Wastage History</span>
+                      </NavLink>
+                    </li>
+                  </ul>
+                </li>
+
+                <li><NavLink to="/finished-goods/wastage/production" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faTrashAlt} /></span><span>Production Wastage</span></NavLink></li>
                 <li><NavLink to="/finished-goods/reports" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faChartBar} /></span><span>Reports</span></NavLink></li>
               </>
             )}

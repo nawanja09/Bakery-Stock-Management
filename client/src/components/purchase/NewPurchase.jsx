@@ -16,7 +16,7 @@ const AddPurchase = () => {
   const { showPopup } = usePopup();
 
   const [formData, setFormData] = useState({
-    purchase_date: new Date().toISOString().split('T')[0],
+    purchase_date: new Date().toLocaleDateString('en-CA'),
     supplier_id: '',
     bill_amount: 0,
     paid_amount: 0,
@@ -230,12 +230,12 @@ const AddPurchase = () => {
             </select>
           </div>
           <div className="form-group">
-            <label>Check Number</label>
+            <label>Invoice Number</label>
             <input
               type="text"
               value={formData.check_number}
               onChange={(e) => setFormData({...formData, check_number: e.target.value})}
-              placeholder="Enter check number"
+              placeholder="Enter invoice number"
             />
           </div>
           <div className="form-group">
