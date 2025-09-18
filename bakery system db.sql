@@ -470,3 +470,45 @@ INSERT INTO `finished_goods_transfer_items` (`transfer_id`, `item_id`, `quantity
 (1, 2, 20),
 (1, 6, 15),
 (1, 5, 30);
+
+-- Table for finished goods wastages
+CREATE TABLE IF NOT EXISTS `finished_goods_wastages` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `wastage_number` varchar(50) NOT NULL,
+  `date` date NOT NULL,
+  `approved_by` varchar(255) NOT NULL,
+  `reason` enum('Expired','Damaged','Overproduction','Poor Storage','Forecasting errors','Human error','Other') NOT NULL,
+  `remarks` text,
+  `created_by` int NOT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `wastage_number` (`wastage_number`),
+  KEY `created_by` (`created_by`),
+  CONSTRAINT `fg_wastages_ibfk_1` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Table for finished goods wastage items
+CREATE TABLE IF NOT EXISTS `finished_goods_wastage_items` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `wastage_id` int NOT NULL,
+  `item_id` int NOT NULL,
+  `quantity` int NOT NULL,
+  `estimated_loss` decimal(10,2) DEFAULT '0.00',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `wastage_id` (`wastage_id`),
+  KEY `item_id` (`item_id`),
+  CONSTRAINT `fg_wastage_items_ibfk_1` FOREIGN KEY (`wastage_id`) REFERENCES `finished_goods_wastages` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fg_wastage_items_ibfk_2` FOREIGN KEY (`item_id`) REFERENCES `finished_goods_items` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Insert sample wastage record
+INSERT INTO `finished_goods_wastages` (`wastage_number`, `date`, `approved_by`, `reason`, `remarks`, `created_by`) 
+VALUES ('WST-0011223344', '2025-08-26', 'Manager Alice', 'Expired', 'Wastage due to expired items in storage', 2);  
+
+-- Insert sample wastage items
+INSERT INTO `finished_goods_wastage_items` (`wastage_id`, `item_id`, `quantity`, `estimated_loss`) VALUES
+(1, 1, 10, 100.00),
+(1, 2, 5, 50.00),
+(1, 3, 2, 20.00);

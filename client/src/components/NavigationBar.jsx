@@ -309,14 +309,48 @@ const NavigationBar = () => {
                     <li>
                       <NavLink to="/finished-goods/wastage/history" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
                         <span className="icon-container"><FontAwesomeIcon icon={faList} /></span>
-                        <span>Production Wastage History</span>
+                        <span>Wastage History</span>
                       </NavLink>
                     </li>
                   </ul>
                 </li>
 
                 <li><NavLink to="/finished-goods/wastage/production" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faTrashAlt} /></span><span>Production Wastage</span></NavLink></li>
-                <li><NavLink to="/finished-goods/reports" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faChartBar} /></span><span>Reports</span></NavLink></li>
+
+                {/* ✅ Finished Goods Reports Dropdown */}
+                <li className={`dropdown ${activeDropdown === 'finished-reports' ? 'active' : ''}`}>
+                  <div className="dropdown-header" onClick={() => toggleDropdown('finished-reports')}>
+                    <span className="icon-container"><FontAwesomeIcon icon={faChartBar} /></span>
+                    <span>Reports</span>
+                    <FontAwesomeIcon icon={faChevronDown} className="chevron" />
+                  </div>
+                  <ul className="dropdown-menu">
+                    <li>
+                      <NavLink to="/finished-goods/reports/stock" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                        <span className="icon-container"><FontAwesomeIcon icon={faBox} /></span>
+                        <span>Stock Report</span>
+                      </NavLink>
+                    </li>
+                    <li>
+                      <NavLink to="/finished-goods/reports/wastage" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                        <span className="icon-container"><FontAwesomeIcon icon={faTrash} /></span>
+                        <span>Wastage Report</span>
+                      </NavLink>
+                    </li>
+                    <li>
+                      <NavLink to="/finished-goods/reports/production" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                        <span className="icon-container"><FontAwesomeIcon icon={faCog} /></span>
+                        <span>Production Report</span>
+                      </NavLink>
+                    </li>
+                    <li>
+                      <NavLink to="/finished-goods/reports/transfer" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                        <span className="icon-container"><FontAwesomeIcon icon={faTruck} /></span>
+                        <span>Transfer Report</span>
+                      </NavLink>
+                    </li>
+                  </ul>
+                </li>
               </>
             )}
           </div>

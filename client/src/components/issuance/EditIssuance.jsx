@@ -21,7 +21,7 @@ const EditIssuance = () => {
     remarks: '',
     approved_by: '',
     check_number: '',
-    items: [{ item_id: '', quantity: 1, unit: '' }]
+    items: [{ item_id: '', quantity: 1, unit: '', current_stock: 0 }]
   });
 
   useEffect(() => {
@@ -30,16 +30,28 @@ const EditIssuance = () => {
 
     const fetchIssuanceData = async () => {
       try {
+        // Fetch items with stock information first
+        const itemsResponse = await api.get('/issuances/items/with-stock');
+        setItems(itemsResponse.data);
+
+        // Then fetch the issuance data
         const issuanceResponse = await api.get(`/issuances/${id}`);
         const issuanceData = issuanceResponse.data;
 
-        const [departmentsRes, itemsRes] = await Promise.all([
-          api.get('/departments'),
-          api.get('/items')
-        ]);
-
+        // Fetch departments
+        const departmentsRes = await api.get('/departments');
         setDepartments(departmentsRes.data);
-        setItems(itemsRes.data);
+
+        // Map items with current stock information
+        const itemsWithStock = issuanceData.items.map(item => {
+          const itemData = itemsResponse.data.find(i => i.id === item.item_id);
+          return {
+            item_id: item.item_id,
+            quantity: item.quantity,
+            unit: item.unit,
+            current_stock: itemData ? itemData.current_stock : 0
+          };
+        });
 
         setFormData({
           issuance_date: new Date(issuanceData.issuance_date).toLocaleDateString('en-CA'),
@@ -48,11 +60,7 @@ const EditIssuance = () => {
           remarks: issuanceData.remarks || '',
           approved_by: issuanceData.approved_by || '',
           check_number: issuanceData.check_number || '',
-          items: issuanceData.items.map(item => ({
-            item_id: item.item_id,
-            quantity: item.quantity,
-            unit: item.unit
-          }))
+          items: itemsWithStock
         });
 
         setLoading(false);
@@ -73,10 +81,11 @@ const EditIssuance = () => {
 
     newItems[index][field] = value;
 
-    // AUTO-SELECT UNIT WHEN ITEM IS SELECTED
+    // AUTO-SELECT UNIT AND CURRENT STOCK WHEN ITEM IS SELECTED
     if (field === 'item_id') {
       const selectedItem = items.find(item => String(item.id) === String(value));
       newItems[index].unit = selectedItem ? selectedItem.unit : '';
+      newItems[index].current_stock = selectedItem ? selectedItem.current_stock : 0;
     }
 
     setFormData({ ...formData, items: newItems });
@@ -90,7 +99,7 @@ const EditIssuance = () => {
   const addItemRow = () => {
     setFormData(prev => ({
       ...prev,
-      items: [...prev.items, { item_id: '', quantity: 1, unit: '' }]
+      items: [...prev.items, { item_id: '', quantity: 1, unit: '', current_stock: 0 }]
     }));
   };
 
@@ -102,6 +111,15 @@ const EditIssuance = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Validate that issued quantity doesn't exceed available stock
+    for (const item of formData.items) {
+      const selectedItem = items.find(i => String(i.id) === String(item.item_id));
+      if (selectedItem && item.quantity > selectedItem.current_stock) {
+        showPopup('error', `Cannot issue more than available stock for ${selectedItem.name}. Available: ${selectedItem.current_stock}`);
+        return;
+      }
+    }
 
     if (!currentUser || !currentUser.id) {
       alert('User information is missing. Please login again.');
@@ -126,8 +144,9 @@ const EditIssuance = () => {
 
   const itemOptions = items.map(itm => ({
     value: itm.id,
-    label: `${itm.name} (${itm.item_code})`,
-    unit: itm.unit
+    label: `${itm.name} (${itm.item_code}) - Stock: ${itm.current_stock} ${itm.unit}`,
+    unit: itm.unit,
+    current_stock: itm.current_stock
   }));
 
   if (loading) return <div className="loading">Loading...</div>;
@@ -198,6 +217,7 @@ const EditIssuance = () => {
           <thead>
             <tr>
               <th>Item Name</th>
+              <th>Current Stock</th>
               <th>Quantity</th>
               <th>Unit of Measurement</th>
               <th>Action</th>
@@ -216,10 +236,19 @@ const EditIssuance = () => {
                   />
                 </td>
                 <td>
+                  <input 
+                    type="text" 
+                    value={item.current_stock} 
+                    readOnly 
+                    className="stock-display" 
+                  />
+                </td>
+                <td>
                   <input
                     type="number"
                     min="0"
                     step="0.001"
+                    max={item.current_stock}
                     value={item.quantity}
                     onChange={(e) => handleItemChange(index, 'quantity', parseFloat(e.target.value))}
                     required
