@@ -512,3 +512,13 @@ INSERT INTO `finished_goods_wastage_items` (`wastage_id`, `item_id`, `quantity`,
 (1, 1, 10, 100.00),
 (1, 2, 5, 50.00),
 (1, 3, 2, 20.00);
+
+-- Add production_id to finished_goods_wastage_items table
+ALTER TABLE finished_goods_wastage_items 
+ADD COLUMN production_id INT NULL AFTER item_id,
+ADD CONSTRAINT fk_wastage_production_id 
+FOREIGN KEY (production_id) REFERENCES finished_goods_productions(id);
+
+-- Add wastage_type to finished_goods_wastages table
+ALTER TABLE finished_goods_wastages 
+ADD COLUMN wastage_type ENUM('General', 'Production') NOT NULL DEFAULT 'General';

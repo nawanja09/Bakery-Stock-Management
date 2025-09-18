@@ -1,3 +1,4 @@
+// server/controllers/finishedGoodsWastageController.js
 const pool = require('../config/db');
 
 const generateWastageNumber = () => {
@@ -5,8 +6,8 @@ const generateWastageNumber = () => {
 };
 
 const createFinishedGoodsWastage = async (req, res) => {
-  const { date, approved_by, reason, remarks, items } = req.body;
-  const created_by = req.user?.id || 5; // Default user if auth not implemented
+  const { date, approved_by, reason, remarks, items, wastage_type, production_id } = req.body;
+  const created_by = req.user?.id || 5;
 
   try {
     await pool.query('START TRANSACTION');
@@ -15,8 +16,8 @@ const createFinishedGoodsWastage = async (req, res) => {
     
     // Insert wastage record
     const [wastageResult] = await pool.query(
-      'INSERT INTO finished_goods_wastages (wastage_number, date, approved_by, reason, remarks, created_by) VALUES (?, ?, ?, ?, ?, ?)',
-      [wastage_number, date, approved_by, reason, remarks, created_by]
+      'INSERT INTO finished_goods_wastages (wastage_number, date, approved_by, reason, remarks, wastage_type, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [wastage_number, date, approved_by, reason, remarks, wastage_type, created_by]
     );
 
     const wastageId = wastageResult.insertId;
@@ -24,8 +25,8 @@ const createFinishedGoodsWastage = async (req, res) => {
     // Insert wastage items
     for (const item of items) {
       await pool.query(
-        'INSERT INTO finished_goods_wastage_items (wastage_id, item_id, quantity, estimated_loss) VALUES (?, ?, ?, ?)',
-        [wastageId, item.item_id, item.quantity, item.estimated_loss || 0]
+        'INSERT INTO finished_goods_wastage_items (wastage_id, item_id, quantity, estimated_loss, production_id) VALUES (?, ?, ?, ?, ?)',
+        [wastageId, item.item_id, item.quantity, item.estimated_loss || 0, production_id || null]
       );
     }
 
@@ -43,17 +44,29 @@ const createFinishedGoodsWastage = async (req, res) => {
   }
 };
 
+// Get all wastages with optional filtering by type
 const getAllFinishedGoodsWastages = async (req, res) => {
+  const { type } = req.query;
+  
   try {
-    const [rows] = await pool.query(`
+    let query = `
       SELECT w.*, 
         COUNT(wi.id) as item_count,
         SUM(wi.estimated_loss) as total_loss
       FROM finished_goods_wastages w
       LEFT JOIN finished_goods_wastage_items wi ON w.id = wi.wastage_id
-      GROUP BY w.id
-      ORDER BY w.date DESC, w.created_at DESC
-    `);
+    `;
+    
+    const params = [];
+    
+    if (type) {
+      query += ' WHERE w.wastage_type = ?';
+      params.push(type);
+    }
+    
+    query += ' GROUP BY w.id ORDER BY w.date DESC, w.created_at DESC';
+    
+    const [rows] = await pool.query(query, params);
     res.json(rows);
   } catch (error) {
     console.error('Error fetching finished goods wastages:', error);
@@ -61,15 +74,19 @@ const getAllFinishedGoodsWastages = async (req, res) => {
   }
 };
 
+// Get wastage by ID
 const getFinishedGoodsWastageById = async (req, res) => {
   const { id } = req.params;
 
   try {
     const [wastageRows] = await pool.query(`
-      SELECT w.*, u.name as entered_by_name
+      SELECT w.*, u.name as entered_by_name, p.id as production_id, p.production_date
       FROM finished_goods_wastages w
       LEFT JOIN users u ON w.created_by = u.id
+      LEFT JOIN finished_goods_wastage_items wi ON w.id = wi.wastage_id
+      LEFT JOIN finished_goods_productions p ON wi.production_id = p.id
       WHERE w.id = ?
+      GROUP BY w.id
     `, [id]);
 
     if (wastageRows.length === 0) {
@@ -77,9 +94,11 @@ const getFinishedGoodsWastageById = async (req, res) => {
     }
 
     const [itemRows] = await pool.query(`
-      SELECT wi.*, fgi.item_code, fgi.name as item_name, fgi.category, fgi.unit_price
+      SELECT wi.*, fgi.item_code, fgi.name as item_name, fgi.category, fgi.unit_price,
+             p.id as production_id, p.production_date, p.prepared_by as production_prepared_by
       FROM finished_goods_wastage_items wi
       JOIN finished_goods_items fgi ON wi.item_id = fgi.id
+      LEFT JOIN finished_goods_productions p ON wi.production_id = p.id
       WHERE wi.wastage_id = ?
     `, [id]);
 
@@ -89,6 +108,29 @@ const getFinishedGoodsWastageById = async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching finished goods wastage:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+// Get production wastages specifically
+const getProductionWastages = async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT w.*, 
+        COUNT(wi.id) as item_count,
+        SUM(wi.estimated_loss) as total_loss,
+        p.production_date,
+        p.prepared_by as production_prepared_by
+      FROM finished_goods_wastages w
+      JOIN finished_goods_wastage_items wi ON w.id = wi.wastage_id
+      JOIN finished_goods_productions p ON wi.production_id = p.id
+      WHERE w.wastage_type = 'Production'
+      GROUP BY w.id
+      ORDER BY w.date DESC, w.created_at DESC
+    `);
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching production wastages:', error);
     res.status(500).json({ error: 'Server error' });
   }
 };
@@ -149,10 +191,12 @@ const deleteFinishedGoodsWastage = async (req, res) => {
   }
 };
 
+
 module.exports = {
   createFinishedGoodsWastage,
   getAllFinishedGoodsWastages,
   getFinishedGoodsWastageById,
   updateFinishedGoodsWastage,
-  deleteFinishedGoodsWastage
+  deleteFinishedGoodsWastage,
+  getProductionWastages
 };
