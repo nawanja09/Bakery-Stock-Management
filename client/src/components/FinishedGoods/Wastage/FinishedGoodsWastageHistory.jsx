@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus, faEye, faEdit, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { faEye, faTrash } from '@fortawesome/free-solid-svg-icons';
 import api from '../../../api';
 import { usePopup } from '../../context/PopupContext';
 import './FinishedGoodsWastage.css';
@@ -11,7 +10,6 @@ const FinishedGoodsWastageHistory = () => {
   const [loading, setLoading] = useState(true);
   const [selectedWastage, setSelectedWastage] = useState(null);
   const [showModal, setShowModal] = useState(false);
-  const navigate = useNavigate();
   const { showPopup } = usePopup();
 
   useEffect(() => {

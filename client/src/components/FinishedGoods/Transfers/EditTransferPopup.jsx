@@ -1,5 +1,6 @@
-// components/FinishedGoods/Transfers/EditTransferPopup.js
-import React, { useState, useEffect } from 'react';
+// src/components/FinishedGoods/Transfers/EditTransferPopup.jsx
+
+import React, { useState, useEffect, useCallback } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faTimes, faTrash } from '@fortawesome/free-solid-svg-icons';
 import Select from 'react-select';
@@ -14,37 +15,42 @@ const EditTransferPopup = ({ transfer, onClose, onSave }) => {
     destination_id: transfer.destination_id,
     remarks: transfer.remarks || ''
   });
-  
+
   const [items, setItems] = useState([]);
   const [finishedGoodsItems, setFinishedGoodsItems] = useState([]);
   const [destinations, setDestinations] = useState([]);
   const [loading, setLoading] = useState(false);
   const { showPopup } = usePopup();
 
-  useEffect(() => {
-    fetchData();
-    // Initialize items from the transfer data
-    if (transfer.items) {
-      setItems(transfer.items.map(item => ({
-        item_id: item.item_id,
-        quantity: item.quantity.toString()
-      })));
-    }
-  }, [transfer]);
-
-  const fetchData = async () => {
+  // ✅ UseCallback to avoid recreation on every render
+  const fetchData = useCallback(async () => {
     try {
       const [itemsResponse, destinationsResponse] = await Promise.all([
         api.get('/finished-goods-items'),
         api.get('/finished-goods-transfers/destinations')
       ]);
-      
+
       setFinishedGoodsItems(itemsResponse.data);
       setDestinations(destinationsResponse.data);
     } catch (err) {
       showPopup('error', 'Failed to load data');
     }
-  };
+  }, [showPopup]);
+
+  // ✅ useEffect with correct dependencies
+  useEffect(() => {
+    fetchData();
+
+    // Initialize items from the transfer data
+    if (transfer.items) {
+      setItems(
+        transfer.items.map(item => ({
+          item_id: item.item_id,
+          quantity: item.quantity.toString()
+        }))
+      );
+    }
+  }, [transfer, fetchData]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -74,20 +80,22 @@ const EditTransferPopup = ({ transfer, onClose, onSave }) => {
     setLoading(true);
 
     try {
-      // Validate form
       if (!formData.transferred_by.trim()) {
         showPopup('error', 'Please enter who is transferring');
+        setLoading(false);
         return;
       }
 
       if (!formData.destination_id) {
         showPopup('error', 'Please select a destination');
+        setLoading(false);
         return;
       }
 
       const validItems = items.filter(item => item.item_id && item.quantity > 0);
       if (validItems.length === 0) {
         showPopup('error', 'Please add at least one transfer item');
+        setLoading(false);
         return;
       }
 
@@ -115,7 +123,7 @@ const EditTransferPopup = ({ transfer, onClose, onSave }) => {
 
   const destinationOptions = destinations.map(dest => ({
     value: dest.id,
-    label: `${dest.name}`
+    label: dest.name
   }));
 
   return (
@@ -158,8 +166,8 @@ const EditTransferPopup = ({ transfer, onClose, onSave }) => {
             <label>Transfer To</label>
             <Select
               options={destinationOptions}
-              value={destinationOptions.find(opt => opt.value == formData.destination_id) || null}
-              onChange={(selected) => 
+              value={destinationOptions.find(opt => opt.value === formData.destination_id) || null}
+              onChange={(selected) =>
                 setFormData(prev => ({ ...prev, destination_id: selected.value }))
               }
               isSearchable
@@ -181,14 +189,14 @@ const EditTransferPopup = ({ transfer, onClose, onSave }) => {
 
           <div className="transfer-items-section">
             <h4>Transfer Items</h4>
-            
+
             {items.map((item, index) => (
               <div key={index} className="transfer-item-row">
                 <div className="item-select">
                   <Select
                     options={itemOptions}
-                    value={itemOptions.find(opt => opt.value == item.item_id) || null}
-                    onChange={(selected) => 
+                    value={itemOptions.find(opt => opt.value === item.item_id) || null}
+                    onChange={(selected) =>
                       handleItemChange(index, 'item_id', selected.value)
                     }
                     isSearchable
@@ -196,20 +204,20 @@ const EditTransferPopup = ({ transfer, onClose, onSave }) => {
                     required
                   />
                 </div>
-                
+
                 <div className="quantity-input">
                   <input
                     type="number"
                     placeholder="Quantity"
                     value={item.quantity}
-                    onChange={(e) => 
+                    onChange={(e) =>
                       handleItemChange(index, 'quantity', e.target.value)
                     }
                     min="1"
                     required
                   />
                 </div>
-                
+
                 <button
                   type="button"
                   className="remove-item-btn"
@@ -220,7 +228,7 @@ const EditTransferPopup = ({ transfer, onClose, onSave }) => {
                 </button>
               </div>
             ))}
-            
+
             <button type="button" className="add-item-btn" onClick={addItem}>
               <FontAwesomeIcon icon={faPlus} /> Add New Item
             </button>
