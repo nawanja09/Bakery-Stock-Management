@@ -73,6 +73,7 @@ const OpeningBalanceHistory = () => {
           <thead>
             <tr>
               <th>Date</th>
+              <th>Item Code</th>
               <th>Item Name</th>
               <th>Quantity</th>
               <th>Unit</th>
@@ -94,6 +95,7 @@ const OpeningBalanceHistory = () => {
                     new Date(balance.date).toLocaleDateString()
                   )}
                 </td>
+                <td>{balance.item_code}</td>
                 <td>{balance.item_name}</td>
                 <td style={{
                   color: Number(balance.quantity) < 0 ? 'red' : Number(balance.quantity) === 0 ? 'orange' : 'green',
