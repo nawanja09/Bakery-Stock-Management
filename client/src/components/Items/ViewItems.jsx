@@ -1,5 +1,3 @@
-// client/src/components/Items/ViewItems.jsx
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -11,6 +9,7 @@ import api from '../../api';
 const ViewItems = () => {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
   const navigate = useNavigate();
   const { showPopup } = usePopup();
 
@@ -38,34 +37,49 @@ const ViewItems = () => {
     navigate(`/items/edit/${id}`);
   };
 
-  
-    const handleDelete = async (id) => {
-        if (window.confirm('Are you sure you want to delete this item?')) {
-            try {
-            const response = await api.delete(`/items/${id}`);
+  const handleDelete = async (id) => {
+    if (window.confirm('Are you sure you want to delete this item?')) {
+      try {
+        const response = await api.delete(`/items/${id}`);
 
-            if (response.status === 200) {
-                setItems(items.filter(item => item.id !== id));
-                showPopup('success', 'Item deleted successfully!');
-                setTimeout(() => navigate('/items'), 1500);
-            } else {
-                const data = response.data;
-                showPopup('error', data.error || 'Failed to delete item');
-            }
-            } catch (error) {
-            showPopup('error', 'Network error. Please try again.');
-            }
+        if (response.status === 200) {
+          setItems(items.filter(item => item.id !== id));
+          showPopup('success', 'Item deleted successfully!');
+          setTimeout(() => navigate('/items'), 1500);
+        } else {
+          const data = response.data;
+          showPopup('error', data.error || 'Failed to delete item');
         }
-    };
+      } catch (error) {
+        showPopup('error', 'Network error. Please try again.');
+      }
+    }
+  };
+
+  // Filter items based on search
+  const filteredItems = items.filter(item =>
+    item.item_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <div className="item-container">
-      <h2>Item List</h2>
+      <div className="item-header">
+        <h2>Item List</h2>
+        <div className="search-bar">
+        <input
+          type="text"
+          placeholder="Search by item code or name"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+        </div>
+      </div>
 
       {loading ? (
         <p>Loading items...</p>
-      ) : items.length === 0 ? (
-        <p>No items found</p>
+      ) : filteredItems.length === 0 ? (
+        <p>No matching items found</p>
       ) : (
         <table className="items-table">
           <thead>
@@ -78,7 +92,7 @@ const ViewItems = () => {
             </tr>
           </thead>
           <tbody>
-            {items.map(item => (
+            {filteredItems.map(item => (
               <tr key={item.id}>
                 <td>{item.item_code}</td>
                 <td>{item.name}</td>

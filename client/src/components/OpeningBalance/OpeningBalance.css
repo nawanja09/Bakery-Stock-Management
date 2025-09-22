@@ -279,3 +279,13 @@
 .ob-btn-submit:hover {
   background: #7a3cf7;
 }
+
+.search-bar {
+  margin-bottom: 16px;
+}
+
+.search-bar input {
+  padding: 8px;
+  width: 300px;
+  font-size: 16px;
+}

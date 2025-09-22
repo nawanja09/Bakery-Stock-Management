@@ -9,6 +9,7 @@ const OpeningBalanceHistory = () => {
   const [error, setError] = useState('');
   const [editing, setEditing] = useState(null); // store record being edited
   const [editData, setEditData] = useState({ date: '', quantity: '' });
+  const [searchTerm, setSearchTerm] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -52,12 +53,27 @@ const OpeningBalanceHistory = () => {
     }
   };
 
+  // Filter balances based on search term
+  const filteredBalances = balances.filter(balance =>
+    balance.item_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    balance.item_name?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
     <div className="opening-balance-container">
       <div className="header-buttons">
         <button onClick={() => navigate('/opening/add')} className="btn-add">
           + Add New
         </button>
+        {/* Search Input */}
+        <div className="search-bar">
+          <input
+            type="text"
+            placeholder="Search by item code or name"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
       </div>
 
       <h2>Opening Balance History</h2>
@@ -66,8 +82,8 @@ const OpeningBalanceHistory = () => {
         <p>Loading...</p>
       ) : error ? (
         <p className="error">{error}</p>
-      ) : balances.length === 0 ? (
-        <p>No opening balances found</p>
+      ) : filteredBalances.length === 0 ? (
+        <p>No matching opening balances found</p>
       ) : (
         <table className="opening-balance-table">
           <thead>
@@ -81,7 +97,7 @@ const OpeningBalanceHistory = () => {
             </tr>
           </thead>
           <tbody>
-            {balances.map(balance => (
+            {filteredBalances.map(balance => (
               <tr key={balance.id}>
                 <td>
                   {editing === balance.id ? (
