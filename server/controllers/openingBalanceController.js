@@ -51,7 +51,7 @@ const getItemsWithoutOpeningBalance = async (req, res) => {
 const getAllOpeningBalances = async (req, res) => {
   try {
     const [rows] = await pool.query(`
-      SELECT ob.id, ob.date, i.name AS item_name, ob.quantity, i.unit
+      SELECT ob.id, ob.date, i.item_code AS item_code, i.name AS item_name, ob.quantity, i.unit
       FROM opening_balances ob
       JOIN items i ON ob.item_id = i.id
       ORDER BY ob.date DESC
