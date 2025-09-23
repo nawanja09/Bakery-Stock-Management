@@ -117,17 +117,11 @@ const IssueToDepartment = () => {
     setFormData({ ...formData, items: newItems });
   };
 
-  const handleSubmit = async (e) => {
+    const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validate that issued quantity doesn't exceed available stock
-    for (const item of formData.items) {
-      const selectedItem = items.find(i => String(i.id) === String(item.item_id));
-      if (selectedItem && item.quantity > selectedItem.current_stock) {
-        showPopup('error', `Cannot issue more than available stock for ${selectedItem.name}. Available: ${selectedItem.current_stock}`);
-        return;
-      }
-    }
+    // ❌ Remove stock restriction check
+    // ✅ Allow negative, zero, and less-than-stock quantities
 
     if (!currentUser || !currentUser.id) {
       alert('User information is missing. Please login again.');
@@ -161,7 +155,7 @@ const IssueToDepartment = () => {
 
   const itemOptions = items.map(itm => ({
     value: itm.id,
-    label: `${itm.name} (${itm.item_code}) - Stock: ${itm.current_stock} ${itm.unit}`,
+    label: `${itm.name} (${itm.item_code})`,
     unit: itm.unit,
     current_stock: itm.current_stock
   }));
@@ -250,7 +244,6 @@ const IssueToDepartment = () => {
                     type="number"
                     min="0"
                     step="0.001"
-                    max={item.current_stock}
                     value={item.quantity}
                     onChange={(e) => handleItemChange(index, 'quantity', parseFloat(e.target.value))}
                     required

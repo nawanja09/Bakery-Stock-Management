@@ -144,7 +144,7 @@ const EditIssuance = () => {
 
   const itemOptions = items.map(itm => ({
     value: itm.id,
-    label: `${itm.name} (${itm.item_code}) - Stock: ${itm.current_stock} ${itm.unit}`,
+    label: `${itm.name} (${itm.item_code})`,
     unit: itm.unit,
     current_stock: itm.current_stock
   }));
@@ -239,7 +239,6 @@ const EditIssuance = () => {
                     type="number"
                     min="0"
                     step="0.001"
-                    max={item.current_stock}
                     value={item.quantity}
                     onChange={(e) => handleItemChange(index, 'quantity', parseFloat(e.target.value))}
                     required
