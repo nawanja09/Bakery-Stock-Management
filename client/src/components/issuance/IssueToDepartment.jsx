@@ -16,7 +16,7 @@ const IssueToDepartment = () => {
   const [loading, setLoading] = useState(false);
 
   const [formData, setFormData] = useState({
-    issuance_date: new Date().toISOString().split('T')[0],
+    issuance_date: new Date().toLocaleDateString('en-CA'),
     department_id: '',
     received_by: '',
     remarks: '',

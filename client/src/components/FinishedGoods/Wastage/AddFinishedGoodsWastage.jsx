@@ -16,6 +16,7 @@ const AddFinishedGoodsWastage = () => {
     approved_by: '',
     reason: 'Expired',
     remarks: '',
+    wastage_type: 'General',
     items: [{ item_id: '', quantity: 1, estimated_loss: 0 }]
   });
   const [loading, setLoading] = useState(false);
@@ -147,14 +148,21 @@ const AddFinishedGoodsWastage = () => {
           </div>
         </div>
 
-        <div className="form-group">
-          <label>Remarks</label>
-          <textarea
-            value={formData.remarks}
-            onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
-            rows="3"
-            placeholder="Add any remarks about this wastage..."
-          />
+        <div className="from-row">
+          <div className="form-group">
+            <label>Wastage Type</label>
+            <select
+              value={formData.wastage_type}
+              onChange={(e) => setFormData({ ...formData, wastage_type: e.target.value })}
+              required
+            >
+              <option value="General">General Wastage</option>
+              <option value="Production">Production Wastage</option>
+            </select>
+          </div>
+
+          
+
         </div>
 
         <h3>Wasted Finished Goods Items</h3>
