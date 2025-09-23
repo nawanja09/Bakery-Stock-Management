@@ -14,10 +14,10 @@ const createFinishedGoodsWastage = async (req, res) => {
 
     const wastage_number = generateWastageNumber();
     
-    // Insert wastage record
+    // Insert wastage record - provide default value if wastage_type is null
     const [wastageResult] = await pool.query(
       'INSERT INTO finished_goods_wastages (wastage_number, date, approved_by, reason, remarks, wastage_type, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [wastage_number, date, approved_by, reason, remarks, wastage_type, created_by]
+      [wastage_number, date, approved_by, reason, remarks, wastage_type || 'General', created_by] // Add fallback value
     );
 
     const wastageId = wastageResult.insertId;
