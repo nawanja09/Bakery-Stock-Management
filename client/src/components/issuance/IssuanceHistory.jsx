@@ -35,21 +35,11 @@ const IssuanceDetailsModal = ({ id, onClose }) => {
       </div>
       <div className="details-row vertical">
         <ul className="details-list">
-          <li>
-            <strong>Date:</strong> {new Date(issuance.issuance_date).toLocaleDateString()}
-          </li>
-          <li>
-            <strong>Check Number:</strong> {issuance.check_number}
-          </li>
-          <li>
-            <strong>Received By:</strong> {issuance.received_by}
-          </li>
-          <li>
-            <strong>Department:</strong> {issuance.department_name}
-          </li>
-          <li>
-            <strong>Time of Day:</strong> <span>{issuance.remarks || 'N/A'}</span>
-          </li>
+          <li><strong>Date:</strong> {new Date(issuance.issuance_date).toLocaleDateString()}</li>
+          <li><strong>Check Number:</strong> {issuance.check_number}</li>
+          <li><strong>Received By:</strong> {issuance.received_by}</li>
+          <li><strong>Department:</strong> {issuance.department_name}</li>
+          <li><strong>Time of Day:</strong> {issuance.remarks || 'N/A'}</li>
         </ul>
       </div>
       <div className="items-table">
@@ -84,24 +74,19 @@ const IssuanceHistory = () => {
   const [loading, setLoading] = useState(true);
   const [selectedIssuanceId, setSelectedIssuanceId] = useState(null);
 
-  // Handle View button: open modal for selected issuance
-  const handleView = (id) => {
-    setSelectedIssuanceId(id);
-  };
+  // Filter states
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [timeOfDay, setTimeOfDay] = useState('');
 
-  // Handle Edit button: redirect to edit page
-  const handleEdit = (id) => {
-    window.location.href = `/issuance/edit/${id}`;
-  };
+  const handleView = (id) => setSelectedIssuanceId(id);
+  const handleEdit = (id) => { window.location.href = `/issuance/edit/${id}`; };
 
   useEffect(() => {
     const fetchIssuances = async () => {
       try {
         const response = await api.get('/issuances');
-        
-        // Sort the issuances by ID in descending order (latest first)
         const sorted = response.data.sort((a, b) => b.id - a.id);
-        
         setIssuances(sorted);
       } catch (error) {
         console.error('Error fetching issuances:', error);
@@ -109,9 +94,24 @@ const IssuanceHistory = () => {
         setLoading(false);
       }
     };
-    
     fetchIssuances();
   }, []);
+
+  // Apply filters
+  const filteredIssuances = issuances.filter((issuance) => {
+    const issuanceDate = new Date(issuance.issuance_date);
+    const from = fromDate ? new Date(fromDate) : null;
+    const to = toDate ? new Date(toDate) : null;
+
+    const matchesDate =
+      (!from || issuanceDate >= from) &&
+      (!to || issuanceDate <= to);
+
+    const matchesTime =
+      !timeOfDay || (issuance.remarks && issuance.remarks.toLowerCase() === timeOfDay.toLowerCase());
+
+    return matchesDate && matchesTime;
+  });
 
   if (loading) return <div className="loading">Loading...</div>;
 
@@ -119,10 +119,47 @@ const IssuanceHistory = () => {
     <div className="issuance-container">
       <div className="header-with-actions">
         <h2 style={{ margin: 0 }}>Issuance History</h2>
-        <Link to="/issuance/issue" className="btn-primary">
-          + New Issuance
-        </Link>
+        <Link to="/issuance/issue" className="btn-primary">+ New Issuance</Link>
       </div>
+
+      {/* Filter Section - Single Line */}
+      <div className="filters-bar single-line">
+        <label>
+          From:
+          <input
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            className="filter-input"
+          />
+        </label>
+        <label>
+          To:
+          <input
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            className="filter-input"
+          />
+        </label>
+        <label>
+          Time:
+          <select
+            value={timeOfDay}
+            onChange={(e) => setTimeOfDay(e.target.value)}
+            className="filter-input"
+          >
+            <option value="">All</option>
+            <option value="Morning">Morning</option>
+            <option value="Afternoon">Afternoon</option>
+            <option value="Evening">Evening</option>
+            <option value="Night">Night</option>
+          </select>
+        </label>
+      </div>
+
+
+      {/* Table */}
       <div className="table-responsive">
         <table className="issuance-table styled-table">
           <thead>
@@ -137,8 +174,8 @@ const IssuanceHistory = () => {
             </tr>
           </thead>
           <tbody>
-            {Array.isArray(issuances) && issuances.length > 0 ? (
-              issuances.map(issuance => (
+            {filteredIssuances.length > 0 ? (
+              filteredIssuances.map(issuance => (
                 <tr key={issuance.id}>
                   <td>{issuance.id}</td>
                   <td>{new Date(issuance.issuance_date).toLocaleDateString()}</td>
@@ -146,25 +183,17 @@ const IssuanceHistory = () => {
                   <td>{issuance.check_number || 'N/A'}</td>
                   <td>{issuance.department_name}</td>
                   <td>{issuance.received_by}</td>
-                    <td className="actions-column">
-                      <button
-                        className="btn-view"
-                        onClick={() => handleView(issuance.id)}
-                      >
-                        View
-                      </button>
-                      <button
-                        className="btn-edit"
-                        onClick={() => handleEdit(issuance.id)}
-                      >
-                        Edit
-                      </button>
-                    </td>
+                  <td className="actions-column">
+                    <button className="btn-view" onClick={() => handleView(issuance.id)}>View</button>
+                    <button className="btn-edit" onClick={() => handleEdit(issuance.id)}>Edit</button>
+                  </td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan="5" style={{ textAlign: 'center', color: '#888' }}>No issuance records found.</td>
+                <td colSpan="7" style={{ textAlign: 'center', color: '#888' }}>
+                  No issuance records found.
+                </td>
               </tr>
             )}
           </tbody>
