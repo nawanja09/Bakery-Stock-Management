@@ -6,12 +6,11 @@ import { usePopup } from '../context/PopupContext';
 import api from '../../api';
 import { useNavigate } from "react-router-dom";
 
-
 const Suppliers = () => {
   const [suppliers, setSuppliers] = useState([]);
   const [showForm, setShowForm] = useState(false);
-  const navigate = useNavigate();
   const [editingSupplier, setEditingSupplier] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [newSupplier, setNewSupplier] = useState({
     name: '',
     address: '',
@@ -22,6 +21,7 @@ const Suppliers = () => {
   });
   const [loading, setLoading] = useState(true);
   const { showPopup } = usePopup();
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchSuppliers();
@@ -47,11 +47,9 @@ const Suppliers = () => {
     e.preventDefault();
     try {
       if (editingSupplier) {
-        // Update supplier
         await api.put(`/suppliers/${editingSupplier.id}`, newSupplier);
         showPopup('success', 'Supplier updated successfully!');
       } else {
-        // Add new supplier
         await api.post('/suppliers', newSupplier);
         showPopup('success', 'Supplier added successfully!');
       }
@@ -92,6 +90,10 @@ const Suppliers = () => {
     }
   };
 
+  const filteredSuppliers = suppliers.filter(supplier =>
+    supplier.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   if (loading) return <div className="loading">Loading suppliers...</div>;
 
   return (
@@ -100,6 +102,15 @@ const Suppliers = () => {
         <button onClick={() => { setShowForm(true); setEditingSupplier(null); }} className="btn-add">
           <FontAwesomeIcon icon={faPlus} /> Add New Supplier
         </button>
+
+         <div className="search-bar">
+            <input
+              type="text"
+              placeholder="Search by supplier name..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
       </div>
 
       {showForm ? (
@@ -149,6 +160,7 @@ const Suppliers = () => {
       ) : (
         <>
           <h2>Suppliers</h2>
+
           <div className="table-wrapper">
             <table className="supplier-table">
               <thead>
@@ -163,7 +175,7 @@ const Suppliers = () => {
                 </tr>
               </thead>
               <tbody>
-                {suppliers.map(supplier => (
+                {filteredSuppliers.map(supplier => (
                   <tr key={supplier.id} className="supplier-row">
                     <td>{supplier.name}</td>
                     <td>{supplier.address}</td>

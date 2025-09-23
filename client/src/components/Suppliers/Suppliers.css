@@ -237,3 +237,14 @@ body {
   }
 }
 
+.search-bar {
+  margin: 1rem 0;
+  text-align: right;
+}
+
+.search-bar input {
+  padding: 0.5rem;
+  width: 250px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
