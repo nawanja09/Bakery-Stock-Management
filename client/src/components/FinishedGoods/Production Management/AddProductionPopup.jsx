@@ -10,7 +10,7 @@ import './ProductionManagement.css';
 
 const AddProductionPopup = ({ onClose, onSave }) => {
   const [formData, setFormData] = useState({
-    production_date: new Date().toISOString().split('T')[0],
+    production_date: new Date().toLocaleDateString('en-CA'),
     prepared_by: '',
     remarks: ''
   });

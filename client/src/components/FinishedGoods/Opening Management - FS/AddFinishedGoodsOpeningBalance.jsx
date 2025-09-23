@@ -7,7 +7,7 @@ import './FinishedGoodsOpeningBalance.css';
 
 const AddFinishedGoodsOpeningBalance = () => {
   const [formData, setFormData] = useState({
-    date: new Date().toISOString().split('T')[0],
+    date: new Date().toLocaleDateString('en-CA'),
     item_id: '',
     quantity: 0,
   });

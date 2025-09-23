@@ -352,15 +352,15 @@ const NavigationBar = () => {
                       </NavLink>
                     </li>
                     <li>
-                      <NavLink to="/finished-goods/reports/wastage" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                        <span className="icon-container"><FontAwesomeIcon icon={faTrash} /></span>
-                        <span>Wastage Report</span>
-                      </NavLink>
-                    </li>
-                    <li>
                       <NavLink to="/finished-goods/reports/production" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
                         <span className="icon-container"><FontAwesomeIcon icon={faCog} /></span>
                         <span>Production Report</span>
+                      </NavLink>
+                    </li>
+                    <li>
+                      <NavLink to="/finished-goods/reports/wastage" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                        <span className="icon-container"><FontAwesomeIcon icon={faTrash} /></span>
+                        <span>Wastage Report</span>
                       </NavLink>
                     </li>
                     <li>
