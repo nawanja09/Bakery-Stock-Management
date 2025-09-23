@@ -442,3 +442,161 @@
 .btn-close:hover {
   color: #000;
 }
+
+/* --- Container --- */
+.new-purchase-container {
+  background-color: #fff;
+  padding: 2rem;
+  max-width: 1200px;
+  margin: auto;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: #333;
+}
+
+/* --- Header --- */
+.header-with-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.header-with-actions h2 {
+  font-size: 1.6rem;
+  margin: 0;
+  font-weight: 500;
+}
+
+.btn-primary {
+  background: #4CAF50;
+  color: #fff;
+  padding: 8px 14px;
+  border-radius: 6px;
+  text-decoration: none;
+  font-size: 0.95rem;
+  transition: background 0.2s ease;
+}
+.btn-primary:hover { background: #43a047; }
+
+/* --- Search + Filters --- */
+.search-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 1.5rem;
+  align-items: center;
+}
+
+.search-input {
+  position: relative;
+  flex: 1;
+  min-width: 220px;
+}
+.search-input input {
+  width: 100%;
+  padding: 10px 12px 10px 36px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+}
+.search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #888;
+}
+
+.search-bar select {
+  padding: 9px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 0.95rem;
+}
+
+/* --- Date Range --- */
+.date-range {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.date-range label {
+  font-size: 0.9rem;
+  color: #555;
+}
+.date-range input[type="date"] {
+  padding: 7px 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+}
+.date-separator {
+  color: #666;
+  font-weight: bold;
+}
+
+/* --- Table --- */
+.table-wrapper {
+  overflow-x: auto;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+.purchase-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+.purchase-table thead {
+  background: #f7f7f7;
+}
+.purchase-table th,
+.purchase-table td {
+  padding: 12px 14px;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+}
+.purchase-table th {
+  font-weight: 600;
+  color: #444;
+}
+.purchase-table tr:hover {
+  background: #fafafa;
+}
+.due-amount {
+  color: #d9534f;
+  font-weight: 600;
+}
+
+/* --- Actions --- */
+.actions-column {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+.btn-secondary,
+.btn-edit {
+  border: 1px solid #ccc;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.2s ease;
+}
+.btn-secondary:hover { background: #f3f3f3; }
+.btn-edit {
+  border-color: #ffc107;
+  color: #ffc107;
+}
+.btn-edit:hover { background: #fff7e6; }
+
+/* --- Responsive --- */
+@media (max-width: 768px) {
+  .search-bar { flex-direction: column; align-items: stretch; }
+  .header-with-actions { flex-direction: column; align-items: flex-start; }
+  .actions-column { flex-direction: column; }
+}
