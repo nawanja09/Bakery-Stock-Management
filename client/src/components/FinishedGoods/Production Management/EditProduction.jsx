@@ -23,7 +23,7 @@ const EditProductionPopup = ({ production, onClose, onSave }) => {
     if (production) {
       // Convert the date to YYYY-MM-DD format for input field
       const productionDate = new Date(production.production_date);
-      const formattedDate = productionDate.toISOString().split('T')[0];
+      const formattedDate = productionDate.toLocaleDateString('en-CA');
       
       setFormData({
         production_date: formattedDate,

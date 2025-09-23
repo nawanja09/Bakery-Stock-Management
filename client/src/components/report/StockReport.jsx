@@ -1,3 +1,5 @@
+//client/src/components/report/StockReport.jsx
+
 import React, { useState } from 'react';
 import { format } from 'date-fns';
 import  jsPDF from 'jspdf';

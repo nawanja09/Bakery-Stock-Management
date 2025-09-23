@@ -206,15 +206,6 @@ const IssueToDepartment = () => {
             />
           </div>
           <div className="form-group">
-            <label>Check Number</label>
-            <input
-              type="text"
-              value={formData.check_number}
-              onChange={(e) => setFormData({ ...formData, check_number: e.target.value })}
-              required
-            />
-          </div>
-          <div className="form-group">
             <label>Time of Day</label>
             <textarea
               value={formData.remarks}

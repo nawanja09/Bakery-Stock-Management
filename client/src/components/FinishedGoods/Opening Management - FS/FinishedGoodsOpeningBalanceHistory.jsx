@@ -101,7 +101,6 @@ const FinishedGoodsOpeningBalanceHistory = () => {
                       name="date"
                       value={editData.date}
                       onChange={handleEditChange}
-                      className="fg-edit-input"
                     />
                   ) : (
                     new Date(balance.date).toLocaleDateString()

@@ -43,6 +43,10 @@ import AddFinishedGoodsWastage from './components/FinishedGoods/Wastage/AddFinis
 import FinishedGoodsWastageHistory from './components/FinishedGoods/Wastage/FinishedGoodsWastageHistory';
 import ProductionWastageHistory from './components/FinishedGoods/Production Wastage/ProductionWastageHistory';
 import AddProductionWastage from './components/FinishedGoods/Production Wastage/AddProductionWastage';
+import ProductionReport from './components/FinishedGoods/Reports/ProductionReport';
+import KitchenWastageReport from './components/FinishedGoods/Reports/WastageReport';
+import TransferReport from './components/FinishedGoods/Reports/TransferReport';
+import FinishedGoodsStockReport from './components/FinishedGoods/Reports/StockReport';
 
 import './App.css';
 
@@ -116,6 +120,11 @@ function App() {
             <Route path="finished-goods/wastage/history" element={<FinishedGoodsWastageHistory />} />
             <Route path="finished-goods/wastage/production" element={<ProductionWastageHistory />} />
             <Route path="finished-goods/wastage/production/add" element={<AddProductionWastage />} />
+
+            <Route path="finished-goods/reports/stock" element={<FinishedGoodsStockReport />} />
+            <Route path="finished-goods/reports/production" element={<ProductionReport />} />
+            <Route path="finished-goods/reports/wastage" element={<KitchenWastageReport />} />
+            <Route path="finished-goods/reports/transfer" element={<TransferReport />} />
 
           </Route>
 
