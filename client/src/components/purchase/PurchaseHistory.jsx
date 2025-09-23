@@ -10,6 +10,9 @@ const PurchaseHistory = () => {
   const [filteredPurchases, setFilteredPurchases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [companyFilter, setCompanyFilter] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   useEffect(() => {
     const fetchPurchases = async () => {
@@ -27,40 +30,62 @@ const PurchaseHistory = () => {
     fetchPurchases();
   }, []);
 
-  // Search function
-  const handleSearch = (event) => {
-    const query = event.target.value.toLowerCase();
-    const filtered = purchases.filter(purchase =>  
-      purchase.invoice_no.toLowerCase().includes(query) ||
-      purchase.supplier_name.toLowerCase().includes(query) ||     
-      purchase.payment_method.toLowerCase().includes(query) ||
-      purchase.company_name.toLowerCase().includes(query)
-    );
-    
-    // Apply company filter if selected
-    if (companyFilter) {
-      const companyFiltered = filtered.filter(purchase => 
-        purchase.company_id.toString() === companyFilter
+  // Unified filter function
+  const applyFilters = (query = searchQuery, companyId = companyFilter, start = startDate, end = endDate) => {
+    let filtered = purchases;
+
+    if (query) {
+      filtered = filtered.filter(purchase =>
+        purchase.invoice_no.toLowerCase().includes(query.toLowerCase()) ||
+        purchase.supplier_name.toLowerCase().includes(query.toLowerCase()) ||
+        purchase.payment_method.toLowerCase().includes(query.toLowerCase()) ||
+        purchase.company_name.toLowerCase().includes(query.toLowerCase())
       );
-      setFilteredPurchases(companyFiltered);
-    } else {
-      setFilteredPurchases(filtered);
     }
+
+    if (companyId) {
+      filtered = filtered.filter(purchase =>
+        purchase.company_id.toString() === companyId
+      );
+    }
+
+    if (start) {
+      filtered = filtered.filter(purchase =>
+        new Date(purchase.purchase_date) >= new Date(start)
+      );
+    }
+    if (end) {
+      filtered = filtered.filter(purchase =>
+        new Date(purchase.purchase_date) <= new Date(end)
+      );
+    }
+
+    setFilteredPurchases(filtered);
   };
 
-  // Company filter handler
+  // Handlers
+  const handleSearch = (event) => {
+    const query = event.target.value;
+    setSearchQuery(query);
+    applyFilters(query, companyFilter, startDate, endDate);
+  };
+
   const handleCompanyFilter = (e) => {
     const companyId = e.target.value;
     setCompanyFilter(companyId);
-    
-    if (companyId) {
-      const filtered = purchases.filter(purchase => 
-        purchase.company_id.toString() === companyId
-      );
-      setFilteredPurchases(filtered);
-    } else {
-      setFilteredPurchases(purchases);
-    }
+    applyFilters(searchQuery, companyId, startDate, endDate);
+  };
+
+  const handleStartDateChange = (e) => {
+    const value = e.target.value;
+    setStartDate(value);
+    applyFilters(searchQuery, companyFilter, value, endDate);
+  };
+
+  const handleEndDateChange = (e) => {
+    const value = e.target.value;
+    setEndDate(value);
+    applyFilters(searchQuery, companyFilter, startDate, value);
   };
 
   if (loading) return <div className="loading">Loading...</div>;
@@ -81,17 +106,29 @@ const PurchaseHistory = () => {
             type="text"
             placeholder="Search by invoice, supplier, company..."
             onChange={handleSearch}
+            value={searchQuery}
           />
         </div>
-        <div>
-          <select
-            value={companyFilter}
-            onChange={handleCompanyFilter}
-          >
-            <option value="">All Companies</option>
-            <option value="1">JH</option>
-            <option value="2">RR</option>
-          </select>
+
+        <select value={companyFilter} onChange={handleCompanyFilter}>
+          <option value="">All Companies</option>
+          <option value="1">JH</option>
+          <option value="2">RR</option>
+        </select>
+
+        <div className="date-range">
+          <label>Date Range:</label>
+          <input
+            type="date"
+            value={startDate}
+            onChange={handleStartDateChange}
+          />
+          <span className="date-separator">→</span>
+          <input
+            type="date"
+            value={endDate}
+            onChange={handleEndDateChange}
+          />
         </div>
       </div>
 
@@ -120,7 +157,9 @@ const PurchaseHistory = () => {
                 <td>{purchase.company_name}</td>
                 <td>{Number(purchase.bill_amount).toFixed(2)}</td>
                 <td>{Number(purchase.paid_amount).toFixed(2)}</td>
-                <td className="due-amount">{(Number(purchase.bill_amount) - Number(purchase.paid_amount)).toFixed(2)}</td>
+                <td className="due-amount">
+                  {(Number(purchase.bill_amount) - Number(purchase.paid_amount)).toFixed(2)}
+                </td>
                 <td>{purchase.payment_method}</td>
                 <td>{purchase.check_number}</td>
                 <td className="text-center actions-column">
