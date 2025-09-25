@@ -112,15 +112,6 @@ const EditIssuance = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validate that issued quantity doesn't exceed available stock
-    for (const item of formData.items) {
-      const selectedItem = items.find(i => String(i.id) === String(item.item_id));
-      if (selectedItem && item.quantity > selectedItem.current_stock) {
-        showPopup('error', `Cannot issue more than available stock for ${selectedItem.name}. Available: ${selectedItem.current_stock}`);
-        return;
-      }
-    }
-
     if (!currentUser || !currentUser.id) {
       alert('User information is missing. Please login again.');
       navigate('/login');

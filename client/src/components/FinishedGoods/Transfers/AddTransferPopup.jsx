@@ -11,12 +11,14 @@ const AddTransferPopup = ({ onClose, onSave }) => {
     transfer_date: new Date().toISOString().split('T')[0],
     transferred_by: '',
     destination_id: '',
+    department_id: '',
     remarks: ''
   });
   
   const [items, setItems] = useState([{ item_id: '', quantity: '' }]);
   const [finishedGoodsItems, setFinishedGoodsItems] = useState([]);
   const [destinations, setDestinations] = useState([]);
+  const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(false);
   const { showPopup } = usePopup();
 
@@ -26,13 +28,15 @@ const AddTransferPopup = ({ onClose, onSave }) => {
 
   const fetchData = async () => {
     try {
-      const [itemsResponse, destinationsResponse] = await Promise.all([
+      const [itemsResponse, destinationsResponse, departmentsResponse] = await Promise.all([
         api.get('/finished-goods-items'),
-        api.get('/finished-goods-transfers/destinations')
+        api.get('/finished-goods-transfers/destinations'),
+        api.get('/departments')
       ]);
       
       setFinishedGoodsItems(itemsResponse.data);
       setDestinations(destinationsResponse.data);
+      setDepartments(departmentsResponse.data);
     } catch (err) {
       showPopup('error', 'Failed to load data');
     }
@@ -69,24 +73,33 @@ const AddTransferPopup = ({ onClose, onSave }) => {
       // Validate form
       if (!formData.transferred_by.trim()) {
         showPopup('error', 'Please enter who is transferring');
+        setLoading(false);
         return;
       }
 
       if (!formData.destination_id) {
         showPopup('error', 'Please select a destination');
+        setLoading(false);
+        return;
+      }
+
+      if (!formData.department_id) {
+        showPopup('error', 'Please select a department');
+        setLoading(false);
         return;
       }
 
       const validItems = items.filter(item => item.item_id && item.quantity > 0);
       if (validItems.length === 0) {
         showPopup('error', 'Please add at least one transfer item');
+        setLoading(false);
         return;
       }
 
       const payload = {
         ...formData,
         items: validItems.map(item => ({
-          item_id: item.item_id,
+          item_id: parseInt(item.item_id),
           quantity: parseInt(item.quantity)
         }))
       };
@@ -107,7 +120,12 @@ const AddTransferPopup = ({ onClose, onSave }) => {
 
   const destinationOptions = destinations.map(dest => ({
     value: dest.id,
-    label: `${dest.name}`
+    label: dest.name
+  }));
+
+  const departmentOptions = departments.map(dept => ({
+    value: dept.id,
+    label: dept.name
   }));
 
   return (
@@ -123,18 +141,19 @@ const AddTransferPopup = ({ onClose, onSave }) => {
         <form onSubmit={handleSubmit} className="transfer-form">
           <div className="form-row">
             <div className="form-group">
-              <label>Transfer Date</label>
+              <label>Transfer Date *</label>
               <input
                 type="date"
                 name="transfer_date"
                 value={formData.transfer_date}
                 onChange={handleInputChange}
                 required
+                className="form-input"
               />
             </div>
 
             <div className="form-group">
-              <label>Transferred By</label>
+              <label>Transferred By *</label>
               <input
                 type="text"
                 name="transferred_by"
@@ -142,22 +161,43 @@ const AddTransferPopup = ({ onClose, onSave }) => {
                 onChange={handleInputChange}
                 placeholder="Enter name of person transferring"
                 required
+                className="form-input"
               />
             </div>
           </div>
 
-          <div className="form-group">
-            <label>Transfer To</label>
-            <Select
-              options={destinationOptions}
-              value={destinationOptions.find(opt => opt.value === formData.destination_id) || null}
-              onChange={(selected) => 
-                setFormData(prev => ({ ...prev, destination_id: selected.value }))
-              }
-              isSearchable
-              placeholder="Select destination..."
-              required
-            />
+          <div className="form-row">
+            <div className="form-group">
+              <label>Department From*</label>
+              <Select
+                options={departmentOptions}
+                value={departmentOptions.find(opt => opt.value.toString() === formData.department_id.toString()) || null}
+                onChange={(selected) => 
+                  setFormData(prev => ({ ...prev, department_id: selected.value }))
+                }
+                isSearchable
+                placeholder="Select department..."
+                required
+                className="react-select-container"
+                classNamePrefix="react-select"
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Transfer To *</label>
+              <Select
+                options={destinationOptions}
+                value={destinationOptions.find(opt => opt.value.toString() === formData.destination_id.toString()) || null}
+                onChange={(selected) => 
+                  setFormData(prev => ({ ...prev, destination_id: selected.value }))
+                }
+                isSearchable
+                placeholder="Select destination..."
+                required
+                className="react-select-container"
+                classNamePrefix="react-select"
+              />
+            </div>
           </div>
 
           <div className="form-group">
@@ -168,24 +208,27 @@ const AddTransferPopup = ({ onClose, onSave }) => {
               onChange={handleInputChange}
               rows="3"
               placeholder="Add any remarks about this transfer..."
+              className="form-input"
             />
           </div>
 
           <div className="transfer-items-section">
-            <h4>Transfer Items</h4>
+            <h4>Transfer Items *</h4>
             
             {items.map((item, index) => (
               <div key={index} className="transfer-item-row">
                 <div className="item-select">
                   <Select
                     options={itemOptions}
-                    value={itemOptions.find(opt => opt.value === item.item_id) || null}
+                    value={itemOptions.find(opt => opt.value.toString() === item.item_id.toString()) || null}
                     onChange={(selected) => 
                       handleItemChange(index, 'item_id', selected.value)
                     }
                     isSearchable
                     placeholder="Select finished goods item..."
                     required
+                    className="react-select-container"
+                    classNamePrefix="react-select"
                   />
                 </div>
                 
@@ -199,6 +242,7 @@ const AddTransferPopup = ({ onClose, onSave }) => {
                     }
                     min="1"
                     required
+                    className="form-input"
                   />
                 </div>
                 
@@ -207,6 +251,7 @@ const AddTransferPopup = ({ onClose, onSave }) => {
                   className="remove-item-btn"
                   onClick={() => removeItem(index)}
                   disabled={items.length === 1}
+                  title="Remove Item"
                 >
                   <FontAwesomeIcon icon={faTrash} />
                 </button>
@@ -214,7 +259,7 @@ const AddTransferPopup = ({ onClose, onSave }) => {
             ))}
             
             <button type="button" className="add-item-btn" onClick={addItem}>
-              <FontAwesomeIcon icon={faPlus} /> Add New Item
+              <FontAwesomeIcon icon={faPlus} /> Add Item
             </button>
           </div>
 

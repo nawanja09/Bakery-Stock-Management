@@ -82,13 +82,13 @@
 }
 
 .item-table th, .item-table td {
-  border: 1px solid #ddd;
+  border: 1px solid #2c2b2b;
   padding: 8px;
   text-align: left;
 }
 
 .item-table th {
-  background-color: #f0f0f0;
+  background-color: #e4e4e4;
 }
 
 .btn-remove, .btn-add, .btn-submit {
@@ -303,4 +303,130 @@
   border-radius: 6px;
   font-size: 14px;
   background: #fff;
+}
+
+/* Filter Section Styles */
+.filter-section {
+  background: #f8f9fa;
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  border: 1px solid #dee2e6;
+}
+
+.filter-section h3 {
+  margin-bottom: 15px;
+  color: #495057;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+  align-items: end;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.filter-group label {
+  font-weight: 600;
+  margin-bottom: 5px;
+  color: #495057;
+  font-size: 14px;
+}
+
+.filter-group select,
+.filter-group input {
+  padding: 8px 12px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.filter-group select:focus,
+.filter-group input:focus {
+  outline: none;
+  border-color: #80bdff;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.btn-apply {
+  background: #28a745;
+  color: white;
+  border: none;
+  padding: 10px 15px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.btn-clear {
+  background: #6c757d;
+  color: white;
+  border: none;
+  padding: 10px 15px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  margin-left: 10px;
+}
+
+.btn-apply:hover {
+  background: #218838;
+}
+
+.btn-clear:hover {
+  background: #545b62;
+}
+
+/* Results Info */
+.results-info {
+  background: #e9ecef;
+  padding: 10px 15px;
+  border-radius: 4px;
+  margin-bottom: 15px;
+  font-weight: 600;
+  color: #495057;
+}
+
+/* Wastage Type Badges */
+.wastage-type {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.wastage-type.general {
+  background: #ffeaa7;
+  color: #e17055;
+}
+
+.wastage-type.production {
+  background: #a29bfe;
+  color: #2d3436;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .filter-row {
+    grid-template-columns: 1fr;
+  }
+  
+  .filter-group {
+    margin-bottom: 10px;
+  }
+  
+  .btn-apply,
+  .btn-clear {
+    width: 100%;
+    margin: 5px 0;
+  }
 }

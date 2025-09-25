@@ -591,3 +591,36 @@
 .btn-delete:hover {
   background-color: #c82333;
 }
+
+.production-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap; /* optional: for small screen wrapping */
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+}
+
+.filter-select {
+  padding: 8px 12px;
+  font-size: 14px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+}
+
+@media (max-width: 600px) {
+  .production-controls {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .btn-add-production,
+  .filter-select {
+    width: 100%;
+  }
+}

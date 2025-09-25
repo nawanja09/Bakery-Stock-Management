@@ -5,8 +5,51 @@ const generateWastageNumber = () => {
   return `FG-WN-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
 };
 
+// Get all wastages with optional filtering by type AND department
+const getAllFinishedGoodsWastages = async (req, res) => {
+  const { type, department_id } = req.query;
+  
+  try {
+    let query = `
+      SELECT w.*, 
+        COUNT(wi.id) as item_count,
+        SUM(wi.estimated_loss) as total_loss,
+        d.name as department_name
+      FROM finished_goods_wastages w
+      LEFT JOIN finished_goods_wastage_items wi ON w.id = wi.wastage_id
+      LEFT JOIN departments d ON w.department_id = d.id
+    `;
+    
+    const params = [];
+    const conditions = [];
+    
+    if (type) {
+      conditions.push('w.wastage_type = ?');
+      params.push(type);
+    }
+    
+    if (department_id) {
+      conditions.push('w.department_id = ?');
+      params.push(department_id);
+    }
+    
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ');
+    }
+    
+    query += ' GROUP BY w.id ORDER BY w.date DESC, w.created_at DESC';
+    
+    const [rows] = await pool.query(query, params);
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching finished goods wastages:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+// Update create function to include department_id
 const createFinishedGoodsWastage = async (req, res) => {
-  const { date, approved_by, reason, remarks, items, wastage_type, production_id } = req.body;
+  const { date, approved_by, reason, remarks, items, wastage_type, production_id, department_id } = req.body;
   const created_by = req.user?.id || 5;
 
   try {
@@ -14,10 +57,10 @@ const createFinishedGoodsWastage = async (req, res) => {
 
     const wastage_number = generateWastageNumber();
     
-    // Insert wastage record - provide default value if wastage_type is null
+    // Insert wastage record - include department_id
     const [wastageResult] = await pool.query(
-      'INSERT INTO finished_goods_wastages (wastage_number, date, approved_by, reason, remarks, wastage_type, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [wastage_number, date, approved_by, reason, remarks, wastage_type || 'General', created_by] // Add fallback value
+      'INSERT INTO finished_goods_wastages (wastage_number, date, approved_by, reason, remarks, wastage_type, created_by, department_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [wastage_number, date, approved_by, reason, remarks, wastage_type || 'General', created_by, department_id || null]
     );
 
     const wastageId = wastageResult.insertId;
@@ -40,36 +83,6 @@ const createFinishedGoodsWastage = async (req, res) => {
   } catch (error) {
     await pool.query('ROLLBACK');
     console.error('Error creating finished goods wastage:', error);
-    res.status(500).json({ error: 'Server error' });
-  }
-};
-
-// Get all wastages with optional filtering by type
-const getAllFinishedGoodsWastages = async (req, res) => {
-  const { type } = req.query;
-  
-  try {
-    let query = `
-      SELECT w.*, 
-        COUNT(wi.id) as item_count,
-        SUM(wi.estimated_loss) as total_loss
-      FROM finished_goods_wastages w
-      LEFT JOIN finished_goods_wastage_items wi ON w.id = wi.wastage_id
-    `;
-    
-    const params = [];
-    
-    if (type) {
-      query += ' WHERE w.wastage_type = ?';
-      params.push(type);
-    }
-    
-    query += ' GROUP BY w.id ORDER BY w.date DESC, w.created_at DESC';
-    
-    const [rows] = await pool.query(query, params);
-    res.json(rows);
-  } catch (error) {
-    console.error('Error fetching finished goods wastages:', error);
     res.status(500).json({ error: 'Server error' });
   }
 };
@@ -191,6 +204,21 @@ const deleteFinishedGoodsWastage = async (req, res) => {
   }
 };
 
+// Get productions for production wastage
+const getProductionsForWastage = async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT p.* 
+      FROM finished_goods_productions p
+      WHERE p.status = 'Completed'
+      ORDER BY p.production_date DESC, p.id DESC
+    `);
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching productions for wastage:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
 
 module.exports = {
   createFinishedGoodsWastage,
@@ -198,5 +226,6 @@ module.exports = {
   getFinishedGoodsWastageById,
   updateFinishedGoodsWastage,
   deleteFinishedGoodsWastage,
-  getProductionWastages
+  getProductionWastages,
+  getProductionsForWastage
 };

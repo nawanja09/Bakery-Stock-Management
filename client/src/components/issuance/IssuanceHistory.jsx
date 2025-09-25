@@ -151,9 +151,7 @@ const IssuanceHistory = () => {
           >
             <option value="">All</option>
             <option value="Morning">Morning</option>
-            <option value="Afternoon">Afternoon</option>
             <option value="Evening">Evening</option>
-            <option value="Night">Night</option>
           </select>
         </label>
       </div>

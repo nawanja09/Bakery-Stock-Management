@@ -41,8 +41,8 @@ import EditTransfer from './components/FinishedGoods/Transfers/EditTransferPopup
 import AddTransferPopup from './components/FinishedGoods/Transfers/AddTransferPopup';
 import AddFinishedGoodsWastage from './components/FinishedGoods/Wastage/AddFinishedGoodsWastage'
 import FinishedGoodsWastageHistory from './components/FinishedGoods/Wastage/FinishedGoodsWastageHistory';
-import ProductionWastageHistory from './components/FinishedGoods/Production Wastage/ProductionWastageHistory';
-import AddProductionWastage from './components/FinishedGoods/Production Wastage/AddProductionWastage';
+//import ProductionWastageHistory from './components/FinishedGoods/Production Wastage/ProductionWastageHistory';
+//import AddProductionWastage from './components/FinishedGoods/Production Wastage/AddProductionWastage';
 import ProductionReport from './components/FinishedGoods/Reports/ProductionReport';
 import KitchenWastageReport from './components/FinishedGoods/Reports/WastageReport';
 import TransferReport from './components/FinishedGoods/Reports/TransferReport';
@@ -118,8 +118,6 @@ function App() {
             <Route path="finished-goods/transfer/add" element={<AddTransferPopup />} />
             <Route path="finished-goods/wastage/kitchen" element={<AddFinishedGoodsWastage />} />
             <Route path="finished-goods/wastage/history" element={<FinishedGoodsWastageHistory />} />
-            <Route path="finished-goods/wastage/production" element={<ProductionWastageHistory />} />
-            <Route path="finished-goods/wastage/production/add" element={<AddProductionWastage />} />
 
             <Route path="finished-goods/reports/stock" element={<FinishedGoodsStockReport />} />
             <Route path="finished-goods/reports/production" element={<ProductionReport />} />
