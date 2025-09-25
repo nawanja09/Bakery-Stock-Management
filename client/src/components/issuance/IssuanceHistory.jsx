@@ -165,7 +165,6 @@ const IssuanceHistory = () => {
               <th>ID</th>
               <th>Date</th>
               <th>Time of Day</th>
-              <th>Check Number</th>
               <th>Department</th>
               <th>Received By</th>
               <th>Actions</th>
@@ -178,7 +177,6 @@ const IssuanceHistory = () => {
                   <td>{issuance.id}</td>
                   <td>{new Date(issuance.issuance_date).toLocaleDateString()}</td>
                   <td>{issuance.remarks}</td>
-                  <td>{issuance.check_number || 'N/A'}</td>
                   <td>{issuance.department_name}</td>
                   <td>{issuance.received_by}</td>
                   <td className="actions-column">

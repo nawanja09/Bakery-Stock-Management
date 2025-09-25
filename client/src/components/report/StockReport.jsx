@@ -1,9 +1,10 @@
-//client/src/components/report/StockReport.jsx
-
 import React, { useState } from 'react';
 import { format } from 'date-fns';
-import  jsPDF from 'jspdf';
+import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faDownload, faFileExcel, faCalendar } from '@fortawesome/free-solid-svg-icons';
 import './StockReport.css';
 import api from '../../api';
 
@@ -33,11 +34,9 @@ const StockReport = () => {
       day: 'numeric'
     });
     
-    // Title
     doc.setFontSize(16);
-    doc.text(`.Stock Report - ${dateStr}`, 15, 15);
+    doc.text(`Stock Report - ${dateStr}`, 15, 15);
     
-    // Table data
     const tableData = stockData.map(item => [
       item.item_code,
       item.item_name,
@@ -49,7 +48,6 @@ const StockReport = () => {
       Number(item.closing_balance).toFixed(2)
     ]);
     
-    // Table headers
     const headers = [
       'Item Code',
       'Item Name',
@@ -61,7 +59,6 @@ const StockReport = () => {
       'Closing'
     ];
     
-    // ✅ Use autoTable from the import, passing the doc instance
     autoTable(doc, {
       head: [headers],
       body: tableData,
@@ -73,49 +70,81 @@ const StockReport = () => {
     doc.save(`stock-report-${selectedDate}.pdf`);
   };
 
+  const downloadExcel = () => {
+    const worksheetData = stockData.map(item => ({
+      'Item Code': item.item_code,
+      'Item Name': item.item_name,
+      'Unit': item.unit,
+      'Opening Balance': Number(item.opening_balance),
+      'Purchased': Number(item.total_purchased),
+      'Issued': Number(item.total_issued),
+      'Wasted': Number(item.total_wasted),
+      'Closing Balance': Number(item.closing_balance)
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Stock Report');
+    XLSX.writeFile(workbook, `stock-report-${selectedDate}.xlsx`);
+  };
+
   return (
-    <div className="stock-report-container">
-      <h2>Stock Report</h2>
-      
-      <div className="report-controls">
-        <label>
-          Report Date:
+    <div className="report-container">
+      <div className="report-header">
+        <h2>Daily Stock Report</h2>
+        <p className="report-subtitle">View opening and closing balances for all items</p>
+      </div>
+
+      <div className="controls-grid">
+        <div className="form-group">
+          <label>
+            <FontAwesomeIcon icon={faCalendar} /> Report Date
+          </label>
           <input 
             type="date" 
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
             max={format(new Date(), 'yyyy-MM-dd')}
           />
-        </label>
-        
+        </div>
+      </div>
+
+      <div className="action-buttons">
         <button 
           onClick={fetchStockReport}
           disabled={loading}
-          className="btn-generate"
+          className="btn btn-primary"
         >
           {loading ? 'Generating...' : 'Generate Report'}
         </button>
         
         {stockData.length > 0 && (
-          <button onClick={downloadPDF} className="download-btn">
-            Download PDF
-          </button>
+          <>
+            <button onClick={downloadPDF} className="btn btn-secondary">
+              <FontAwesomeIcon icon={faDownload} /> PDF
+            </button>
+            <button onClick={downloadExcel} className="btn btn-secondary">
+              <FontAwesomeIcon icon={faFileExcel} /> Excel
+            </button>
+          </>
         )}
       </div>
-      
-      {stockData.length > 0 ? (
-        <div className="table-responsive">
-          <table className="styled-table">
+
+      {loading ? (
+        <div className="loading">Loading stock data...</div>
+      ) : stockData.length > 0 ? (
+        <div style={{ overflowX: 'auto' }}>
+          <table className="report-table">
             <thead>
               <tr>
                 <th>Item Code</th>
                 <th>Item Name</th>
                 <th>Unit</th>
-                <th>Today's opening balance</th>
+                <th>Opening</th>
                 <th>Purchased</th>
                 <th>Issued</th>
-                <th>Wastage</th>
-                <th>Closing Balance at the end of today</th>
+                <th>Wasted</th>
+                <th>Closing</th>
               </tr>
             </thead>
             <tbody>
@@ -135,7 +164,9 @@ const StockReport = () => {
           </table>
         </div>
       ) : (
-        <p>No data to display. Select a date and generate the report.</p>
+        <div className="empty-state">
+          <p>Select a date and generate the report to view stock data.</p>
+        </div>
       )}
     </div>
   );
