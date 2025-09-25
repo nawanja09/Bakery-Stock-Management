@@ -522,3 +522,27 @@ FOREIGN KEY (production_id) REFERENCES finished_goods_productions(id);
 -- Add wastage_type to finished_goods_wastages table
 ALTER TABLE finished_goods_wastages 
 ADD COLUMN wastage_type ENUM('General', 'Production') NOT NULL DEFAULT 'General';
+
+-- Add department_id column to finished_goods_wastages table
+ALTER TABLE finished_goods_wastages 
+ADD COLUMN department_id INT NULL AFTER wastage_type;
+
+-- Add foreign key constraint
+ALTER TABLE finished_goods_wastages 
+ADD CONSTRAINT fk_wastage_department_id 
+FOREIGN KEY (department_id) REFERENCES departments(id);
+
+-- Update existing records if needed (set to a default department or leave as NULL)
+UPDATE finished_goods_wastages SET department_id = 1 WHERE department_id IS NULL;
+
+-- Add department_id to finished_goods_transfers table
+ALTER TABLE finished_goods_transfers 
+ADD COLUMN department_id INT NULL AFTER transferred_by;
+
+-- Add foreign key constraint
+ALTER TABLE finished_goods_transfers 
+ADD CONSTRAINT fk_transfer_department_id 
+FOREIGN KEY (department_id) REFERENCES departments(id);
+
+-- Update existing records with a default department
+UPDATE finished_goods_transfers SET department_id = 1 WHERE department_id IS NULL;

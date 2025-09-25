@@ -11,11 +11,13 @@ const EditProductionPopup = ({ production, onClose, onSave }) => {
     production_date: '',
     prepared_by: '',
     remarks: '',
+    department_id: '',
     status: 'Draft'
   });
   
   const [items, setItems] = useState([]);
   const [finishedGoodsItems, setFinishedGoodsItems] = useState([]);
+  const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(false);
   const { showPopup } = usePopup();
 
@@ -29,6 +31,7 @@ const EditProductionPopup = ({ production, onClose, onSave }) => {
         production_date: formattedDate,
         prepared_by: production.prepared_by,
         remarks: production.remarks || '',
+        department_id:production.department_id,
         status: production.status
       });
       
@@ -42,6 +45,7 @@ const EditProductionPopup = ({ production, onClose, onSave }) => {
     }
     
     fetchFinishedGoodsItems();
+    fetchDepartments();
   }, [production]);
 
   const fetchFinishedGoodsItems = async () => {
@@ -52,6 +56,15 @@ const EditProductionPopup = ({ production, onClose, onSave }) => {
       showPopup('error', 'Failed to load finished goods items');
     }
   };
+
+  const fetchDepartments = async () => {
+      try {
+        const response = await api.get('/departments');
+        setDepartments(response.data);
+      } catch (err) {
+        console.error('Error fetching departments:', err);
+      }
+    };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -154,16 +167,32 @@ const EditProductionPopup = ({ production, onClose, onSave }) => {
             </div>
           </div>
 
-          <div className="form-group">
-            <label>Remarks</label>
-            <textarea
-              name="remarks"
-              value={formData.remarks}
-              onChange={handleInputChange}
-              rows="3"
-              placeholder="Add any remarks about this production..."
-              className="form-input"
-            />
+          <div className="form-row">
+            <div className="form-group">
+              <label>Department From</label>
+              <select
+                name="department_id"
+                value={formData.department_id}
+                onChange={handleInputChange}
+                required
+              >
+                <option value="">Select Department</option>
+                {departments.map(dept => (
+                  <option key={dept.id} value={dept.id}>{dept.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Remarks</label>
+              <textarea
+                name="remarks"
+                value={formData.remarks}
+                onChange={handleInputChange}
+                rows="3"
+                placeholder="Add any remarks about this production..."
+                className="form-input"
+              />
+            </div>
           </div>
 
           <div className="production-items-section">

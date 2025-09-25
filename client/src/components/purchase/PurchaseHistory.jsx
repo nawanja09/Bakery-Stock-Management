@@ -136,7 +136,7 @@ const PurchaseHistory = () => {
         <table className="purchase-table">
           <thead>
             <tr>
-              <th>Invoice No.</th>
+              <th>Number</th>
               <th>Date</th>
               <th>Supplier</th>
               <th>Company</th>
@@ -144,7 +144,7 @@ const PurchaseHistory = () => {
               <th>Paid (Rs.)</th>
               <th>Due (Rs.)</th>
               <th>Payment Method</th>
-              <th>Check Number</th>
+              <th>Invoice No.</th>
               <th className="text-center">Actions</th>
             </tr>
           </thead>

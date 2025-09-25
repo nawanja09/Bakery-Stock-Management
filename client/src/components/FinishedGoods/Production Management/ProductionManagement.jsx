@@ -1,3 +1,4 @@
+// client/src/components/FinishedGoods/Production Management/ProductionManagement.jsx
 import React, { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faEdit, faTrash, faEye } from '@fortawesome/free-solid-svg-icons';
@@ -11,6 +12,8 @@ import './ProductionManagement.css';
 const ProductionManagement = () => {
   const [productions, setProductions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [departments, setDepartments] = useState([]);
+  const [selectedDepartment, setSelectedDepartment] = useState('');
   const [showAddPopup, setShowAddPopup] = useState(false);
   const [showViewPopup, setShowViewPopup] = useState(false);
   const [showEditPopup, setShowEditPopup] = useState(false);
@@ -18,18 +21,36 @@ const ProductionManagement = () => {
   const { showPopup } = usePopup();
 
   useEffect(() => {
+    fetchDepartments();
     fetchProductions();
-  }, []);
+  }, [selectedDepartment]);
+
+  const fetchDepartments = async () => {
+    try {
+      const response = await api.get('/departments');
+      setDepartments(response.data);
+    } catch (err) {
+      console.error('Error fetching departments:', err);
+    }
+  };
 
   const fetchProductions = async () => {
     try {
-      const response = await api.get('/productions');
+      const url = selectedDepartment 
+        ? `/productions?department_id=${selectedDepartment}`
+        : '/productions';
+      
+      const response = await api.get(url);
       setProductions(response.data);
     } catch (err) {
       showPopup('error', 'Failed to fetch productions');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDepartmentChange = (e) => {
+    setSelectedDepartment(e.target.value);
   };
 
   const handleViewProduction = async (id) => {
@@ -81,19 +102,6 @@ const ProductionManagement = () => {
     }
   };
 
-  const getStatusBadgeClass = (status) => {
-    switch (status) {
-      case 'Completed':
-        return 'status-completed';
-      case 'Draft':
-        return 'status-draft';
-      case 'Cancelled':
-        return 'status-cancelled';
-      default:
-        return 'status-draft';
-    }
-  };
-
   return (
     <div className="production-management-container">
       <div className="production-header">
@@ -113,6 +121,7 @@ const ProductionManagement = () => {
             <tr>
               <th>Production Date</th>
               <th>Prepared By</th>
+              <th>Department</th>
               <th>Remarks</th>
               <th>Actions</th>
             </tr>
@@ -122,6 +131,7 @@ const ProductionManagement = () => {
               <tr key={production.id}>
                 <td>{new Date(production.production_date).toLocaleDateString()}</td>
                 <td>{production.prepared_by}</td>
+                <td>{production.department_name || production.department || 'No department'}</td>
                 <td className="remarks-cell">
                   {production.remarks || '-'}
                 </td>
@@ -177,6 +187,20 @@ const ProductionManagement = () => {
       )}
     </div>
   );
+};
+
+// Helper function for status badges
+const getStatusBadgeClass = (status) => {
+  switch (status) {
+    case 'Completed':
+      return 'status-completed';
+    case 'Draft':
+      return 'status-draft';
+    case 'Cancelled':
+      return 'status-cancelled';
+    default:
+      return 'status-draft';
+  }
 };
 
 export default ProductionManagement;

@@ -23,6 +23,10 @@ const ViewProductionPopup = ({ production, onClose }) => {
             <span>{production.prepared_by}</span>
           </div>
           <div className="minimalist-detail-row">
+            <span className="minimalist-label">Department</span>
+            <span>{production.department_name || production.department || 'No department'}</span>
+          </div>
+          <div className="minimalist-detail-row">
             <span className="minimalist-label">Remarks</span>
             <span>{production.remarks || 'No remarks'}</span>
           </div>

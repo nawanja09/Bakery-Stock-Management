@@ -38,11 +38,11 @@
 .transfers-table td {
   padding: 12px;
   text-align: left;
-  border-bottom: 1px solid #ddd;
+  border-bottom: 1px solid #c0c0c0;
 }
 
 .transfers-table th {
-  background: #f8f9fa;
+  background: #b5b5b5;
   font-weight: 600;
 }
 
@@ -266,10 +266,198 @@
 .items-table td {
   padding: 10px;
   text-align: left;
-  border: 1px solid #dee2e6;
+  border: 1px solid #585859;
 }
 
 .items-table th {
   background-color: #f8f9fa;
   font-weight: 600;
+}
+
+/* Form styling */
+.form-row {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.form-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.form-group label {
+  font-weight: 600;
+  margin-bottom: 5px;
+  color: #333;
+}
+
+.form-input {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #007bff;
+}
+
+/* React Select styling */
+.react-select-container {
+  width: 100%;
+}
+
+.react-select__control {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  min-height: 38px;
+}
+
+.react-select__control:hover {
+  border-color: #ccc;
+}
+
+.react-select__control--is-focused {
+  border-color: #007bff;
+  box-shadow: 0 0 0 1px #007bff;
+}
+
+/* Transfer items section */
+.transfer-items-section {
+  margin: 20px 0;
+  padding: 15px;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  background-color: #f8f9fa;
+}
+
+.transfer-item-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+  align-items: center;
+}
+
+.item-select {
+  flex: 2;
+}
+
+.quantity-input {
+  flex: 1;
+}
+
+.remove-item-btn {
+  background: #dc3545;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.remove-item-btn:disabled {
+  background: #6c757d;
+  cursor: not-allowed;
+}
+
+.add-item-btn {
+  background: #28a745;
+  color: white;
+  border: none;
+  padding: 8px 15px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* Popup actions */
+.popup-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+  padding-top: 15px;
+  border-top: 1px solid #e9ecef;
+}
+
+.btn-cancel {
+  background: #6c757d;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-save {
+  background: #007bff;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-save:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+/* View popup styling */
+.view-popup .transfer-details {
+  margin-bottom: 20px;
+}
+
+.detail-row {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 15px;
+}
+
+.detail-group {
+  flex: 1;
+}
+
+.detail-group label {
+  font-weight: 600;
+  color: #495057;
+  display: block;
+  margin-bottom: 5px;
+}
+
+.detail-group span {
+  color: #333;
+}
+
+.full-width {
+  flex: 100%;
+}
+
+.items-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.items-table th,
+.items-table td {
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid #ddd;
+}
+
+.items-table th {
+  background-color: #f8f9fa;
+  font-weight: 600;
+}
+
+.no-items {
+  text-align: center;
+  padding: 20px;
+  color: #6c757d;
+  font-style: italic;
 }

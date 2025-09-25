@@ -315,28 +315,6 @@ const NavigationBar = () => {
                   </ul>
                 </li>
 
-                <li className={`dropdown ${activeDropdown === 'production-wastage' ? 'active' : ''}`}>
-                  <div className="dropdown-header" onClick={() => toggleDropdown('production-wastage')}>
-                    <span className="icon-container"><FontAwesomeIcon icon={faTrashAlt} /></span>
-                    <span>Production Wastage</span>
-                    <FontAwesomeIcon icon={faChevronDown} className="chevron" />
-                  </div>
-                  <ul className="dropdown-menu">
-                    <li>
-                      <NavLink to="/finished-goods/wastage/production/add" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                        <span className="icon-container"><FontAwesomeIcon icon={faPlusCircle} /></span>
-                        <span>Add Production Wastage</span>
-                      </NavLink>
-                    </li>
-                    <li>
-                      <NavLink to="/finished-goods/wastage/production" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                        <span className="icon-container"><FontAwesomeIcon icon={faList} /></span>
-                        <span>Production Wastage History</span>
-                      </NavLink>
-                    </li>
-                  </ul>
-                </li>
-
                 {/* ✅ Finished Goods Reports Dropdown */}
                 <li className={`dropdown ${activeDropdown === 'finished-reports' ? 'active' : ''}`}>
                   <div className="dropdown-header" onClick={() => toggleDropdown('finished-reports')}>

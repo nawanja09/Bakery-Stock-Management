@@ -11,6 +11,8 @@ import './Transfers.css';
 const TransfersManagement = () => {
   const [transfers, setTransfers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [departments, setDepartments] = useState([]);
+  const [selectedDepartment, setSelectedDepartment] = useState('');
   const [showAddPopup, setShowAddPopup] = useState(false);
   const [showViewPopup, setShowViewPopup] = useState(false);
   const [showEditPopup, setShowEditPopup] = useState(false);
@@ -18,18 +20,36 @@ const TransfersManagement = () => {
   const { showPopup } = usePopup();
 
   useEffect(() => {
+    fetchDepartments();
     fetchTransfers();
-  }, []);
+  }, [selectedDepartment]);
+
+  const fetchDepartments = async () => {
+    try {
+      const response = await api.get('/departments');
+      setDepartments(response.data);
+    } catch (err) {
+      console.error('Error fetching departments:', err);
+    }
+  };
 
   const fetchTransfers = async () => {
     try {
-      const response = await api.get('/finished-goods-transfers');
+      const url = selectedDepartment 
+        ? `/finished-goods-transfers?department_id=${selectedDepartment}`
+        : '/finished-goods-transfers';
+      
+      const response = await api.get(url);
       setTransfers(response.data);
     } catch (err) {
       showPopup('error', 'Failed to fetch transfers');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDepartmentChange = (e) => {
+    setSelectedDepartment(e.target.value);
   };
 
   const handleViewTransfer = async (id) => {
@@ -88,7 +108,7 @@ const TransfersManagement = () => {
       </div>
         <div className="header-buttons">    
             <button onClick={handleAddTransfer} className="btn-add">
-            <FontAwesomeIcon icon={faPlus} /> Add New Transfer
+              <FontAwesomeIcon icon={faPlus} /> Add New Transfer
             </button>
         </div>
 
@@ -103,7 +123,8 @@ const TransfersManagement = () => {
               <th>Transfer #</th>
               <th>Date</th>
               <th>Transferred By</th>
-              <th>Destination</th>
+              <th>Department From</th>
+              <th>Transferred To</th>
               <th>Items</th>
               <th>Total Qty</th>
               <th>Actions</th>
@@ -115,6 +136,7 @@ const TransfersManagement = () => {
                 <td>{transfer.transfer_number}</td>
                 <td>{new Date(transfer.transfer_date).toLocaleDateString()}</td>
                 <td>{transfer.transferred_by}</td>
+                <td>{transfer.department_name || 'No department'}</td>
                 <td>{transfer.destination_name}</td>
                 <td>{transfer.item_count}</td>
                 <td>{transfer.total_quantity}</td>
