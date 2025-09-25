@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faDownload } from '@fortawesome/free-solid-svg-icons';
+import { faDownload, faFileExcel, faFilter } from '@fortawesome/free-solid-svg-icons';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 import './StockReport.css';
 import api from '../../api';
@@ -33,7 +34,7 @@ const DepartmentIssuesReport = () => {
 
     fetchInitialData();
 
-    // default date range = last 30 days
+    // Default date range: last 30 days
     const end = new Date();
     const start = new Date();
     start.setDate(end.getDate() - 30);
@@ -53,7 +54,6 @@ const DepartmentIssuesReport = () => {
       if (selectedDepartment !== "all") params.departmentId = selectedDepartment;
       if (selectedItem !== "all") params.itemId = selectedItem;
 
-      // Always fetch detailed data
       const response = await api.get("/reports/department", { params });
       setReportData(response.data);
     } catch (error) {
@@ -89,7 +89,6 @@ const DepartmentIssuesReport = () => {
     doc.text(`Department: ${departmentName}`, 14, 32);
     doc.text(`Item: ${itemName}`, 14, 40);
 
-    // Detailed issuance data
     autoTable(doc, {
       startY: 50,
       head: [["Date", "Department", "Item Code", "Item Name", "Quantity", "Unit", "Received By", "Remarks"]],
@@ -108,13 +107,41 @@ const DepartmentIssuesReport = () => {
     doc.save("issuance_report.pdf");
   };
 
+  const exportExcel = () => {
+    if (reportData.length === 0) {
+      alert("No data to export");
+      return;
+    }
+
+    const worksheetData = reportData.map(row => ({
+      'Date': format(new Date(row.issuance_date), 'MMM dd, yyyy'),
+      'Department': row.department_name,
+      'Item Code': row.item_code,
+      'Item Name': row.item_name,
+      'Quantity': row.quantity,
+      'Unit': row.unit,
+      'Received By': row.received_by,
+      'Remarks': row.remarks || 'N/A'
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Issuance Report');
+    XLSX.writeFile(workbook, `issuance-report-${startDate}-to-${endDate}.xlsx`);
+  };
+
   return (
     <div className="report-container">
-      <h2>Issuance Report</h2>
+      <div className="report-header">
+        <h2>Issuance Report</h2>
+        <p className="report-subtitle">Track item issuance across departments</p>
+      </div>
 
-      <div className="report-controls">
+      <div className="controls-grid">
         <div className="form-group">
-          <label>Department</label>
+          <label>
+            <FontAwesomeIcon icon={faFilter} /> Department
+          </label>
           <select
             value={selectedDepartment}
             onChange={(e) => setSelectedDepartment(e.target.value)}
@@ -129,7 +156,9 @@ const DepartmentIssuesReport = () => {
         </div>
 
         <div className="form-group">
-          <label>Item</label>
+          <label>
+            <FontAwesomeIcon icon={faFilter} /> Item
+          </label>
           <select
             value={selectedItem}
             onChange={(e) => setSelectedItem(e.target.value)}
@@ -160,52 +189,76 @@ const DepartmentIssuesReport = () => {
             onChange={(e) => setEndDate(e.target.value)}
           />
         </div>
+      </div>
 
-        <button onClick={generateReport} disabled={loading} className="btn-generate">
-          {loading ? "Generating..." : "Generate Report"}
+      <div className="action-buttons">
+        <button 
+          onClick={generateReport} 
+          disabled={loading} 
+          className="btn btn-primary"
+        >
+          {loading ? "Generating Report..." : "Generate Report"}
         </button>
 
-        <button onClick={exportPDF} disabled={reportData.length === 0} className="btn-export">
+        <button 
+          onClick={exportPDF} 
+          disabled={reportData.length === 0} 
+          className="btn btn-secondary"
+        >
           <FontAwesomeIcon icon={faDownload} /> Export PDF
+        </button>
+
+        <button 
+          onClick={exportExcel} 
+          disabled={reportData.length === 0} 
+          className="btn btn-secondary"
+        >
+          <FontAwesomeIcon icon={faFileExcel} /> Export Excel
         </button>
       </div>
 
-      {reportData.length > 0 && (
+      {loading ? (
+        <div className="loading">Loading report data...</div>
+      ) : reportData.length > 0 ? (
         <div className="report-summary">
-          <p>Showing {reportData.length} issuance records</p>
-          <table className="styled-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Department</th>
-                <th>Item Code</th>
-                <th>Item Name</th>
-                <th>Quantity</th>
-                <th>Unit</th>
-                <th>Received By</th>
-                <th>Time of Day</th>
-              </tr>
-            </thead>
-            <tbody>
-              {reportData.map((row, idx) => (
-                <tr key={idx}>
-                  <td>{format(new Date(row.issuance_date), 'MMM dd, yyyy')}</td>
-                  <td>{row.department_name}</td>
-                  <td>{row.item_code}</td>
-                  <td>{row.item_name}</td>
-                  <td>{row.quantity}</td>
-                  <td>{row.unit}</td>
-                  <td>{row.received_by}</td>
-                  <td>{row.remarks || 'N/A'}</td>
+          <div style={{ marginBottom: '16px', color: '#666', fontSize: '14px' }}>
+            Showing {reportData.length} issuance records
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table className="report-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Department</th>
+                  <th>Item Code</th>
+                  <th>Item Name</th>
+                  <th>Quantity</th>
+                  <th>Unit</th>
+                  <th>Received By</th>
+                  <th>Remarks</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {reportData.map((row, idx) => (
+                  <tr key={idx}>
+                    <td>{format(new Date(row.issuance_date), 'MMM dd, yyyy')}</td>
+                    <td>{row.department_name}</td>
+                    <td>{row.item_code}</td>
+                    <td>{row.item_name}</td>
+                    <td>{row.quantity}</td>
+                    <td>{row.unit}</td>
+                    <td>{row.received_by}</td>
+                    <td>{row.remarks || 'N/A'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      )}
-
-      {reportData.length === 0 && !loading && (
-        <p>No data available for the selected filters.</p>
+      ) : (
+        <div className="empty-state">
+          <p>No data available for the selected filters. Generate a report to view data.</p>
+        </div>
       )}
     </div>
   );
