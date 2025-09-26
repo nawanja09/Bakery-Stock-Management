@@ -230,10 +230,6 @@ const getDepartmentIssuesReport = async (req, res) => {
 const getPurchasingReport = async (req, res) => {
   const { startDate, endDate, companyId } = req.query;
 
-  if (!startDate || !endDate) {
-    return res.status(400).json({ error: 'Start date and end date are required' });
-  }
-
   try {
     let query = `
       SELECT 
@@ -246,23 +242,22 @@ const getPurchasingReport = async (req, res) => {
         p.paid_amount
       FROM purchases p
       JOIN supplier s ON p.supplier_id = s.id
-      WHERE DATE(p.purchase_date) BETWEEN ? AND ?
+      WHERE p.purchase_date BETWEEN ? AND ?
     `;
-    
+
     const params = [startDate, endDate];
-    
-    // Add company filter if provided
+
     if (companyId) {
       query += ' AND p.company_id = ?';
       params.push(companyId);
     }
-    
+
     query += ' ORDER BY p.purchase_date DESC';
-    
+
     const [rows] = await pool.query(query, params);
     res.json(rows);
   } catch (error) {
-    console.error('Error generating purchasing report:', error);
+    console.error('Error fetching purchasing report:', error);
     res.status(500).json({ error: 'Server error' });
   }
 };
