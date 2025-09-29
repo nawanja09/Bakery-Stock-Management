@@ -579,6 +579,100 @@ const getStockReportByRangeAndItem = async (req, res) => {
   }
 };
 
+// Get daily purchase transactions
+const getDailyPurchaseTransactions = async (req, res) => {
+  try {
+    const { date, itemId } = req.query;
+
+    if (!date || !itemId) {
+      return res.status(400).json({ error: 'Date and itemId are required' });
+    }
+
+    const [rows] = await pool.query(`
+      SELECT 
+        p.id,
+        p.invoice_no,
+        s.name AS supplier_name,
+        pi.quantity,
+        pi.unit_price,
+        (pi.quantity * pi.unit_price) AS total_price
+      FROM purchases p
+      JOIN purchase_items pi ON p.id = pi.purchase_id
+      JOIN supplier s ON p.supplier_id = s.id
+      WHERE DATE(p.purchase_date) = ? 
+        AND pi.item_id = ?
+      ORDER BY p.invoice_no
+    `, [date, itemId]);
+
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching daily purchase transactions:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+// Get daily issuance transactions
+const getDailyIssuanceTransactions = async (req, res) => {
+  try {
+    const { date, itemId } = req.query;
+
+    if (!date || !itemId) {
+      return res.status(400).json({ error: 'Date and itemId are required' });
+    }
+
+    const [rows] = await pool.query(`
+      SELECT 
+        i.id AS issuance_id,
+        d.name AS department_name,
+        i.received_by,
+        ii.quantity,
+        i.remarks
+      FROM issuances i
+      JOIN issuance_items ii ON i.id = ii.issuance_id
+      JOIN departments d ON i.department_id = d.id
+      WHERE DATE(i.issuance_date) = ? 
+        AND ii.item_id = ?
+      ORDER BY i.id
+    `, [date, itemId]);
+
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching daily issuance transactions:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+// Get daily wastage transactions
+const getDailyWastageTransactions = async (req, res) => {
+  try {
+    const { date, itemId } = req.query;
+
+    if (!date || !itemId) {
+      return res.status(400).json({ error: 'Date and itemId are required' });
+    }
+
+    const [rows] = await pool.query(`
+      SELECT 
+        w.id AS wastage_id,
+        w.wastage_note_number,
+        w.approved_by,
+        w.reason,
+        wi.quantity,
+        wi.estimated_loss
+      FROM wastages w
+      JOIN wastage_items wi ON w.id = wi.wastage_id
+      WHERE DATE(w.date) = ? 
+        AND wi.item_id = ?
+      ORDER BY w.wastage_note_number
+    `, [date, itemId]);
+
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching daily wastage transactions:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
 // Add to module.exports
 module.exports = {
   getStockReport,
@@ -586,5 +680,8 @@ module.exports = {
   getPurchasingReport,
   getWastageReport,
   getDepartmentItemsSummary,
-  getStockReportByRangeAndItem
+  getStockReportByRangeAndItem,
+  getDailyIssuanceTransactions,
+  getDailyPurchaseTransactions,
+  getDailyWastageTransactions
 };

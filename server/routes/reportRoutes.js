@@ -8,5 +8,8 @@ router.get('/purchasing', reportController.getPurchasingReport);
 router.get('/wastage', reportController.getWastageReport);
 router.get('/department/items', reportController.getDepartmentItemsSummary);
 router.get('/stock-range-item', reportController.getStockReportByRangeAndItem);
+router.get('/daily-transactions/purchases', reportController.getDailyPurchaseTransactions);
+router.get('/daily-transactions/issuances', reportController.getDailyIssuanceTransactions);
+router.get('/daily-transactions/wastages', reportController.getDailyWastageTransactions);
 
 module.exports = router;
