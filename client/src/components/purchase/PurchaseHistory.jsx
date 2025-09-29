@@ -30,6 +30,27 @@ const PurchaseHistory = () => {
     fetchPurchases();
   }, []);
 
+  // Items bullet list format - safe handling
+  const formatItemsList = (items) => {
+    if (!items || items.length === 0) {
+      return <span style={{ color: '#888' }}>No items</span>;
+    }
+
+    return (
+      <ul className="bullet-items">
+        {items.map((item, index) => {
+          const qty = parseFloat(item.quantity); // convert to number safely
+          const displayQty = isNaN(qty) ? '-' : qty.toFixed(3); // fallback if not a number
+          return (
+            <li key={index}>
+              {item.item_name} – {displayQty} {item.unit || ''}
+            </li>
+          );
+        })}
+      </ul>
+    );
+  };
+
   // Unified filter function
   const applyFilters = (query = searchQuery, companyId = companyFilter, start = startDate, end = endDate) => {
     let filtered = purchases;
@@ -138,6 +159,7 @@ const PurchaseHistory = () => {
             <tr>
               <th>Number</th>
               <th>Date</th>
+              <th>Items</th>
               <th>Supplier</th>
               <th>Company</th>
               <th>Bill Amount (Rs.)</th>
@@ -153,6 +175,11 @@ const PurchaseHistory = () => {
               <tr key={purchase.id}>
                 <td>{purchase.invoice_no}</td>
                 <td>{new Date(purchase.purchase_date).toLocaleDateString()}</td>
+                <td>
+                  <div className="items-list">
+                    {formatItemsList(purchase.items)}
+                  </div>
+                </td>
                 <td>{purchase.supplier_name}</td>
                 <td>{purchase.company_name}</td>
                 <td>{Number(purchase.bill_amount).toFixed(2)}</td>

@@ -430,3 +430,87 @@
     margin: 5px 0;
   }
 }
+
+.items-column, .quantity-column {
+  max-width: 200px;
+  min-width: 150px;
+}
+
+.items-list, .quantities-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.item-row, .quantity-row {
+  padding: 2px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.item-row:last-child, .quantity-row:last-child {
+  border-bottom: none;
+}
+
+.quantity-row {
+  font-family: 'Courier New', monospace;
+  text-align: right;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .items-column, .quantity-column {
+    max-width: 120px;
+    min-width: 100px;
+  }
+  
+  .items-list, .quantities-list {
+    font-size: 0.85rem;
+  }
+}
+
+/* Issuance.css එකට එකතු කරන්න */
+.items-list {
+  max-width: 300px;
+  line-height: 1.4;
+  font-size: 14px;
+}
+
+.issuance-table td {
+  vertical-align: top;
+  padding: 8px 12px;
+}
+
+.actions-column {
+  white-space: nowrap;
+}
+
+.btn-view, .btn-edit {
+  padding: 4px 8px;
+  margin: 0 2px;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.btn-view {
+  background-color: #007bff;
+  color: white;
+}
+
+.btn-edit {
+  background-color: #28a745;
+  color: white;
+}
+
+.bullet-items {
+  margin: 0;
+  padding-left: 18px; /* bullet gap */
+  list-style-type: disc; /* default bullet */
+}
+
+.bullet-items li {
+  margin-bottom: 4px;
+  line-height: 1.4;
+  font-size: 14px;
+}

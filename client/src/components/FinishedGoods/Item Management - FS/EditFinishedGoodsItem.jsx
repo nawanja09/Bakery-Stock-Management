@@ -15,6 +15,7 @@ const EditFinishedGoodsItem = () => {
     unit_price: ''
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [fetchLoading, setFetchLoading] = useState(true);
   const navigate = useNavigate();
   const { showPopup } = usePopup();
 
@@ -36,6 +37,8 @@ const EditFinishedGoodsItem = () => {
         }
       } catch (error) {
         showPopup('error', 'Network error. Please try again.');
+      } finally {
+        setFetchLoading(false);
       }
     };
 
@@ -74,13 +77,21 @@ const EditFinishedGoodsItem = () => {
     }
   };
 
+  if (fetchLoading) {
+    return (
+      <div className="finished-goods-management-container">
+        <div className="loading-state">Loading item details...</div>
+      </div>
+    );
+  }
+
   return (
     <div className="finished-goods-management-container">
       <button onClick={() => navigate(-1)} className="btn-back">
-        <FontAwesomeIcon icon={faArrowLeft} /> Back
+        <FontAwesomeIcon icon={faArrowLeft} /> Back to Items
       </button>
 
-      <h2>Edit Finished Goods Item</h2>
+      <h1 className="page-title">Edit Item</h1>
       
       <form onSubmit={handleSubmit} className="form">
         <div className="form-group">
@@ -103,6 +114,7 @@ const EditFinishedGoodsItem = () => {
             value={formData.name}
             onChange={handleChange}
             required
+            placeholder="Enter item name"
           />
         </div>
         
@@ -134,6 +146,7 @@ const EditFinishedGoodsItem = () => {
             min="0"
             step="0.01"
             required
+            placeholder="0.00"
           />
         </div>
 
