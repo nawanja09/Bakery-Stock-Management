@@ -57,7 +57,7 @@ const AddFinishedGoodsItem = () => {
 
   return (
     <div className="finished-goods-management-container">
-      <h2>Add New Finished Goods Item</h2>
+      <h1 className="page-title">Add New Item</h1>
       
       <form onSubmit={handleSubmit} className="form">
         <div className="form-group">
@@ -68,6 +68,7 @@ const AddFinishedGoodsItem = () => {
             value={formData.item_code}
             onChange={handleChange}
             required
+            placeholder="Enter item code"
           />
         </div>
         
@@ -79,6 +80,7 @@ const AddFinishedGoodsItem = () => {
             value={formData.name}
             onChange={handleChange}
             required
+            placeholder="Enter item name"
           />
         </div>
 
@@ -110,6 +112,7 @@ const AddFinishedGoodsItem = () => {
             min="0"
             step="0.01"
             required
+            placeholder="0.00"
           />
         </div>
 

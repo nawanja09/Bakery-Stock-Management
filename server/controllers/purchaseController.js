@@ -61,16 +61,36 @@ const createPurchase = async (req, res) => {
 };
 
 // Get all purchases
+// Get all purchases
 const getAllPurchases = async (req, res) => {
   try {
     const [purchases] = await pool.query(`
-      SELECT p.*, s.name AS supplier_name, c.name AS company_name
+      SELECT 
+        p.*, 
+        s.name AS supplier_name, 
+        c.name AS company_name
       FROM purchases p
       JOIN supplier s ON p.supplier_id = s.id
       JOIN company c ON p.company_id = c.id
       ORDER BY p.purchase_date DESC
     `);
-    res.json(purchases);
+
+    // එක් එක් purchase සඳහා items ලබා ගන්න
+    const purchasesWithItems = await Promise.all(
+      purchases.map(async (purchase) => {
+        const [items] = await pool.query(
+          `SELECT * FROM purchase_items WHERE purchase_id = ?`,
+          [purchase.id]
+        );
+        
+        return {
+          ...purchase,
+          items
+        };
+      })
+    );
+
+    res.json(purchasesWithItems);
   } catch (error) {
     console.error('Error fetching purchases:', error);
     res.status(500).json({ error: 'Server error' });

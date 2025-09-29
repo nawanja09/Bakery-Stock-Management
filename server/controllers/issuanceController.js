@@ -53,7 +53,7 @@ const createIssuance = async (req, res) => {
   }
 };
 
-// Get all issuances
+// Get all issuances with items and quantities
 const getAllIssuances = async (req, res) => {
   try {
     const [issuances] = await pool.query(`
@@ -71,6 +71,23 @@ const getAllIssuances = async (req, res) => {
       JOIN departments d ON i.department_id = d.id
       ORDER BY i.issuance_date DESC
     `);
+
+    // Get items for each issuance
+    for (let issuance of issuances) {
+      const [items] = await pool.query(`
+        SELECT 
+          it.item_code, 
+          it.name AS item_name,
+          it.unit,
+          ii.quantity
+        FROM issuance_items ii
+        JOIN items it ON ii.item_id = it.id
+        WHERE ii.issuance_id = ?
+      `, [issuance.id]);
+      
+      issuance.items = items;
+    }
+    
     res.json(issuances);
   } catch (error) {
     console.error('Error fetching issuances:', error);
