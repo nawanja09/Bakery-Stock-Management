@@ -1,3 +1,4 @@
+// src/components/issuance/EditIssuance.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { usePopup } from '../context/PopupContext';
@@ -15,7 +16,7 @@ const EditIssuance = () => {
   const [loading, setLoading] = useState(true);
 
   const [formData, setFormData] = useState({
-    issuance_date: new Date().toLocaleDateString('en-CA'),
+    issuance_date: new Date().toISOString().split('T')[0], // YYYY-MM-DD
     department_id: '',
     received_by: '',
     remarks: '',
@@ -28,71 +29,109 @@ const EditIssuance = () => {
     const user = JSON.parse(localStorage.getItem('user'));
     setCurrentUser(user);
 
-    const fetchIssuanceData = async () => {
+    const fetchAll = async () => {
       try {
-        // Fetch items with stock information first
-        const itemsResponse = await api.get('/issuances/items/with-stock');
-        setItems(itemsResponse.data);
+        setLoading(true);
 
-        // Then fetch the issuance data
+        // fetch items first (so we can map stock)
+        const itemsResponse = await api.get('/issuances/items/with-stock');
+        setItems(itemsResponse.data || []);
+
+        // fetch departments
+        const departmentsRes = await api.get('/departments');
+        setDepartments(departmentsRes.data || []);
+
+        // then fetch issuance
         const issuanceResponse = await api.get(`/issuances/${id}`);
         const issuanceData = issuanceResponse.data;
 
-        // Fetch departments
-        const departmentsRes = await api.get('/departments');
-        setDepartments(departmentsRes.data);
+        // normalize date to YYYY-MM-DD for input[type=date]
+        const issuanceDate = issuanceData.issuance_date
+          ? new Date(issuanceData.issuance_date).toISOString().split('T')[0]
+          : new Date().toISOString().split('T')[0];
 
-        // Map items with current stock information
-        const itemsWithStock = issuanceData.items.map(item => {
-          const itemData = itemsResponse.data.find(i => i.id === item.item_id);
+        const itemsWithStock = (issuanceData.items || []).map(item => {
+          const itemData = (itemsResponse.data || []).find(i => String(i.id) === String(item.item_id));
           return {
             item_id: item.item_id,
             quantity: item.quantity,
-            unit: item.unit,
+            unit: item.unit || (itemData ? itemData.unit : ''),
             current_stock: itemData ? itemData.current_stock : 0
           };
         });
 
+        // ensure at least one empty row if none
+        if (itemsWithStock.length === 0) {
+          itemsWithStock.push({ item_id: '', quantity: 1, unit: '', current_stock: 0 });
+        }
+
         setFormData({
-          issuance_date: new Date(issuanceData.issuance_date).toLocaleDateString('en-CA'),
-          department_id: issuanceData.department_id,
-          received_by: issuanceData.received_by,
+          issuance_date: issuanceDate,
+          department_id: issuanceData.department_id || '',
+          received_by: issuanceData.received_by || '',
           remarks: issuanceData.remarks || '',
           approved_by: issuanceData.approved_by || '',
           check_number: issuanceData.check_number || '',
           items: itemsWithStock
         });
 
-        setLoading(false);
       } catch (error) {
         console.error('Error fetching issuance data:', error);
         showPopup('error', 'Failed to load issuance data');
         navigate('/issuance/history');
+      } finally {
+        setLoading(false);
       }
     };
 
-    fetchIssuanceData();
+    if (id) fetchAll();
+    else {
+      // no id? just fetch departments & items
+      const fetchBasics = async () => {
+        try {
+          setLoading(true);
+          const [itemsResponse, departmentsRes] = await Promise.all([
+            api.get('/issuances/items/with-stock'),
+            api.get('/departments')
+          ]);
+          setItems(itemsResponse.data || []);
+          setDepartments(departmentsRes.data || []);
+        } catch (err) {
+          console.error(err);
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchBasics();
+    }
   }, [id, showPopup, navigate]);
 
   const handleItemChange = (index, field, value) => {
     const newItems = [...formData.items];
+    let parsedValue = value;
 
-    if (field === 'quantity') value = Number(value) || 0;
+    if (field === 'quantity') {
+      // allow decimals; ensure numeric fallback
+      parsedValue = value === '' || value === null ? '' : Number(value);
+      if (isNaN(parsedValue)) parsedValue = 0;
+    }
 
-    newItems[index][field] = value;
+    newItems[index] = { ...newItems[index], [field]: parsedValue };
 
-    // AUTO-SELECT UNIT AND CURRENT STOCK WHEN ITEM IS SELECTED
     if (field === 'item_id') {
-      const selectedItem = items.find(item => String(item.id) === String(value));
+      // if value may be object or primitive, we expect id primitive
+      const selectedItem = items.find(it => String(it.id) === String(value));
       newItems[index].unit = selectedItem ? selectedItem.unit : '';
       newItems[index].current_stock = selectedItem ? selectedItem.current_stock : 0;
     }
 
-    setFormData({ ...formData, items: newItems });
+    setFormData(prev => ({ ...prev, items: newItems }));
 
-    // 🔹 Auto-add new row if last row is edited
-    if ((field === 'quantity' || field === 'item_id') && index === formData.items.length - 1 && value) {
-      addItemRow();
+    // auto add row if editing last row and user entered something meaningful
+    const isLast = index === formData.items.length - 1;
+    if (isLast && (field === 'item_id' || field === 'quantity')) {
+      const hasValue = newItems[index].item_id || (Number(newItems[index].quantity) > 0);
+      if (hasValue) addItemRow();
     }
   };
 
@@ -118,13 +157,15 @@ const EditIssuance = () => {
       return;
     }
 
-    const updatedFormData = {
+    const payload = {
       ...formData,
-      issued_by: currentUser.id
+      issued_by: currentUser.id,
+      // optional: filter out completely empty rows
+      items: formData.items.filter(it => it.item_id || (Number(it.quantity) > 0))
     };
 
     try {
-      await api.put(`/issuances/${id}`, updatedFormData);
+      await api.put(`/issuances/${id}`, payload);
       showPopup('success', 'Issuance updated successfully!');
       navigate('/issuance/history');
     } catch (error) {
@@ -135,10 +176,15 @@ const EditIssuance = () => {
 
   const itemOptions = items.map(itm => ({
     value: itm.id,
-    label: `${itm.name} (${itm.item_code})`,
+    label: `${itm.name} (${itm.item_code || ''})`,
     unit: itm.unit,
     current_stock: itm.current_stock
   }));
+
+  // react-select styles to ensure portal z-index
+  const selectStyles = {
+    menuPortal: base => ({ ...base, zIndex: 9999 })
+  };
 
   if (loading) return <div className="loading">Loading...</div>;
 
@@ -152,7 +198,6 @@ const EditIssuance = () => {
       </div>
 
       <form onSubmit={handleSubmit}>
-        {/* Form Fields */}
         <div className="form-row">
           <div className="form-group">
             <label>Issuance Date</label>
@@ -208,21 +253,27 @@ const EditIssuance = () => {
           <tbody>
             {formData.items.map((item, index) => (
               <tr key={index}>
-                <td>
+                <td style={{ minWidth: 240 }}>
                   <Select
                     options={itemOptions}
                     value={itemOptions.find(opt => String(opt.value) === String(item.item_id)) || null}
-                    onChange={(selected) => handleItemChange(index, 'item_id', selected.value)}
+                    onChange={(selected) => {
+                      // selected may be null if cleared
+                      handleItemChange(index, 'item_id', selected ? selected.value : '');
+                    }}
                     isSearchable
                     placeholder="Search or select item..."
+                    menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                    styles={selectStyles}
+                    closeMenuOnScroll={true}
                   />
                 </td>
                 <td>
-                  <input 
-                    type="text" 
-                    value={item.current_stock} 
-                    readOnly 
-                    className="stock-display" 
+                  <input
+                    type="text"
+                    value={item.current_stock}
+                    readOnly
+                    className={`stock-display ${item.current_stock <= 0 ? 'stock-low' : ''}`}
                   />
                 </td>
                 <td>
@@ -231,7 +282,7 @@ const EditIssuance = () => {
                     min="0"
                     step="0.001"
                     value={item.quantity}
-                    onChange={(e) => handleItemChange(index, 'quantity', parseFloat(e.target.value))}
+                    onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
                     required
                   />
                 </td>
