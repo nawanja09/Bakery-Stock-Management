@@ -97,13 +97,6 @@ const IssuanceHistory = () => {
     fetchIssuances();
   }, []);
 
-  // Items ලැයිස්තුව format කිරීම
-  const formatItemsList = (items) => {
-    return items.map(item => 
-      `${item.item_name} - ${Number(item.quantity).toFixed(3)}`
-    ).join(', ');
-  };
-
   // Apply filters
   const filteredIssuances = issuances.filter((issuance) => {
     const issuanceDate = new Date(issuance.issuance_date);
@@ -163,6 +156,7 @@ const IssuanceHistory = () => {
         </label>
       </div>
 
+
       {/* Table */}
       <div className="table-responsive">
         <table className="issuance-table styled-table">
@@ -173,7 +167,6 @@ const IssuanceHistory = () => {
               <th>Time of Day</th>
               <th>Department</th>
               <th>Received By</th>
-              <th>Items Issued</th> {/* නව කොලම් */}
               <th>Actions</th>
             </tr>
           </thead>
@@ -186,21 +179,6 @@ const IssuanceHistory = () => {
                   <td>{issuance.remarks}</td>
                   <td>{issuance.department_name}</td>
                   <td>{issuance.received_by}</td>
-                  <td>
-                    <div className="items-list">
-                      {issuance.items && issuance.items.length > 0 ? (
-                        <ul className="bullet-items">
-                          {issuance.items.map((item, index) => (
-                            <li key={index}>
-                              {item.item_name} - {Number(item.quantity).toFixed(3)} {item.unit}
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <span style={{ color: '#888' }}>No items</span>
-                      )}
-                    </div>
-                  </td>
                   <td className="actions-column">
                     <button className="btn-view" onClick={() => handleView(issuance.id)}>View</button>
                     <button className="btn-edit" onClick={() => handleEdit(issuance.id)}>Edit</button>

@@ -16,7 +16,7 @@ const IssueToDepartment = () => {
   const [loading, setLoading] = useState(false);
 
   const [formData, setFormData] = useState({
-    issuance_date: new Date().toLocaleDateString('en-CA'),
+    issuance_date: new Date().toISOString().split('T')[0],
     department_id: '',
     received_by: '',
     remarks: '',
@@ -29,78 +29,86 @@ const IssueToDepartment = () => {
     const user = JSON.parse(localStorage.getItem('user'));
     setCurrentUser(user);
 
-    const fetchDepartments = async () => {
+    const fetchBasics = async () => {
       try {
-        const response = await api.get('/departments');
-        setDepartments(response.data);
+        const [deptRes, itemsRes] = await Promise.all([
+          api.get('/departments'),
+          api.get('/issuances/items/with-stock')
+        ]);
+        setDepartments(deptRes.data || []);
+        setItems(itemsRes.data || []);
       } catch (error) {
-        console.error('Error fetching departments:', error);
+        console.error('Error fetching basics:', error);
       }
     };
 
-    const fetchItems = async () => {
-      try {
-        const response = await api.get('/issuances/items/with-stock');
-        setItems(response.data);
-      } catch (error) {
-        console.error('Error fetching items:', error);
-      }
-    };
-
-    fetchDepartments();
-    fetchItems();
+    fetchBasics();
   }, []);
 
   useEffect(() => {
-    if (id) {
-      setLoading(true);
-      api.get(`/issuances/${id}`)
-        .then(res => {
-          const issuance = res.data;
-          setFormData({
-            issuance_date: issuance.issuance_date.split('T')[0],
-            department_id: issuance.department_id,
-            received_by: issuance.received_by,
-            remarks: issuance.remarks,
-            approved_by: issuance.approved_by,
-            check_number: issuance.check_number,
-            items: issuance.items.map(item => {
-              const itemData = items.find(i => i.id === item.item_id);
-              return {
-                item_id: item.item_id,
-                quantity: item.quantity,
-                unit: item.unit,
-                current_stock: itemData ? itemData.current_stock : 0
-              };
-            })
-          });
-        })
-        .catch(() => showPopup('error', 'Failed to fetch issuance for edit'))
-        .finally(() => setLoading(false));
-    }
-  }, [id, showPopup, items]);
+    // If editing existing issuance, fetch it and map items AFTER items list is available
+    if (!id) return;
+
+    const fetchIssuance = async () => {
+      try {
+        setLoading(true);
+        const res = await api.get(`/issuances/${id}`);
+        const issuance = res.data;
+
+        const mappedItems = (issuance.items || []).map(item => {
+          const itemData = items.find(i => String(i.id) === String(item.item_id));
+          return {
+            item_id: item.item_id,
+            quantity: item.quantity,
+            unit: item.unit || (itemData ? itemData.unit : ''),
+            current_stock: itemData ? itemData.current_stock : 0
+          };
+        });
+
+        setFormData({
+          issuance_date: issuance.issuance_date ? issuance.issuance_date.split('T')[0] : new Date().toISOString().split('T')[0],
+          department_id: issuance.department_id || '',
+          received_by: issuance.received_by || '',
+          remarks: issuance.remarks || '',
+          approved_by: issuance.approved_by || '',
+          check_number: issuance.check_number || '',
+          items: mappedItems.length > 0 ? mappedItems : [{ item_id: '', quantity: 1, unit: '', current_stock: 0 }]
+        });
+      } catch (err) {
+        console.error(err);
+        showPopup('error', 'Failed to fetch issuance for edit');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // only fetch once items are present (if items empty we still try because user might not have items)
+    fetchIssuance();
+  }, [id, items, showPopup]);
 
   const handleItemChange = (index, field, value) => {
     const newItems = [...formData.items];
+    let parsedValue = value;
 
     if (field === 'quantity') {
-      value = Number(value) || 0;
+      parsedValue = value === '' || value === null ? '' : Number(value);
+      if (isNaN(parsedValue)) parsedValue = 0;
     }
 
-    newItems[index][field] = value;
+    newItems[index] = { ...newItems[index], [field]: parsedValue };
 
-    // Auto-select unit and current_stock when item is selected
     if (field === 'item_id') {
-      const selectedItem = items.find(item => String(item.id) === String(value));
+      const selectedItem = items.find(it => String(it.id) === String(value));
       newItems[index].unit = selectedItem ? selectedItem.unit : '';
       newItems[index].current_stock = selectedItem ? selectedItem.current_stock : 0;
     }
 
-    setFormData({ ...formData, items: newItems });
+    setFormData(prev => ({ ...prev, items: newItems }));
 
-    // Automatically add a new row if editing quantity or selecting item in last row
-    if ((field === 'quantity' || field === 'item_id') && index === formData.items.length - 1 && value) {
-      addItemRow();
+    const isLast = index === formData.items.length - 1;
+    if (isLast && (field === 'item_id' || field === 'quantity')) {
+      const hasValue = newItems[index].item_id || (Number(newItems[index].quantity) > 0);
+      if (hasValue) addItemRow();
     }
   };
 
@@ -117,11 +125,8 @@ const IssueToDepartment = () => {
     setFormData({ ...formData, items: newItems });
   };
 
-    const handleSubmit = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-
-    // ❌ Remove stock restriction check
-    // ✅ Allow negative, zero, and less-than-stock quantities
 
     if (!currentUser || !currentUser.id) {
       alert('User information is missing. Please login again.');
@@ -129,22 +134,23 @@ const IssueToDepartment = () => {
       return;
     }
 
-    const updatedFormData = {
+    const payload = {
       ...formData,
-      issued_by: currentUser.id
+      issued_by: currentUser.id,
+      items: formData.items.filter(it => it.item_id || (Number(it.quantity) > 0))
     };
 
     try {
       let response;
       if (id) {
-        response = await api.put(`/issuances/${id}`, updatedFormData);
+        response = await api.put(`/issuances/${id}`, payload);
         if (response.status === 200) showPopup('success', 'Issuance updated successfully!');
-        else showPopup('error', `Error: ${response.data.error}`);
+        else showPopup('error', `Error: ${response.data?.error || 'Unknown'}`);
       } else {
-        response = await api.post('/issuances', updatedFormData);
+        response = await api.post('/issuances', payload);
         if (response.status === 201)
           showPopup('success', `Issuance created successfully! ID: ${response.data.issuance_id}`);
-        else showPopup('error', `Error: ${response.data.error}`);
+        else showPopup('error', `Error: ${response.data?.error || 'Unknown'}`);
       }
       navigate('/issuance/history');
     } catch (error) {
@@ -155,10 +161,14 @@ const IssueToDepartment = () => {
 
   const itemOptions = items.map(itm => ({
     value: itm.id,
-    label: `${itm.name} (${itm.item_code})`,
+    label: `${itm.name} (${itm.item_code || ''})`,
     unit: itm.unit,
     current_stock: itm.current_stock
   }));
+
+  const selectStyles = {
+    menuPortal: base => ({ ...base, zIndex: 9999 })
+  };
 
   if (loading) return <div className="loading">Loading...</div>;
 
@@ -222,13 +232,16 @@ const IssueToDepartment = () => {
           <tbody>
             {formData.items.map((item, index) => (
               <tr key={index}>
-                <td>
+                <td style={{ minWidth: 240 }}>
                   <Select
                     options={itemOptions}
                     value={itemOptions.find(opt => String(opt.value) === String(item.item_id)) || null}
-                    onChange={(selected) => handleItemChange(index, 'item_id', selected.value)}
+                    onChange={(selected) => handleItemChange(index, 'item_id', selected ? selected.value : '')}
                     isSearchable
                     placeholder="Search or select item..."
+                    menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                    styles={selectStyles}
+                    closeMenuOnScroll={true}
                   />
                 </td>
                 <td>
@@ -236,7 +249,7 @@ const IssueToDepartment = () => {
                     type="text"
                     value={item.current_stock}
                     readOnly
-                    className="stock-display"
+                    className={`stock-display ${item.current_stock <= 0 ? 'stock-low' : ''}`}
                   />
                 </td>
                 <td>
@@ -245,7 +258,7 @@ const IssueToDepartment = () => {
                     min="0"
                     step="0.001"
                     value={item.quantity}
-                    onChange={(e) => handleItemChange(index, 'quantity', parseFloat(e.target.value))}
+                    onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
                     required
                   />
                 </td>
