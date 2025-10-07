@@ -29,6 +29,8 @@ const AddPurchase = () => {
 
   // To prevent adding multiple rows repeatedly
   const [autoAddedRow, setAutoAddedRow] = useState(false);
+  // Store previous purchase prices for items
+  const [previousPurchasePrices, setPreviousPurchasePrices] = useState({});
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('user'));
@@ -64,6 +66,20 @@ const AddPurchase = () => {
     fetchSuppliers();
     fetchItems();
     fetchCompanies();
+  }, []);
+
+  // Fetch previous purchase prices for all items
+  useEffect(() => {
+    const fetchPreviousPurchasePrices = async () => {
+      try {
+        const response = await api.get('/purchases/previous-prices');
+        setPreviousPurchasePrices(response.data);
+      } catch (error) {
+        console.error('Error fetching previous purchase prices:', error);
+      }
+    };
+
+    fetchPreviousPurchasePrices();
   }, []);
 
   const handleItemChange = (index, field, value) => {
@@ -108,12 +124,15 @@ const AddPurchase = () => {
     const selectedItem = itemsList.find(item => item.id === selectedOption.value);
     if (!selectedItem) return;
 
+    // Get previous purchase price for this item
+    const previousPrice = previousPurchasePrices[selectedItem.id] || 0;
+
     const newItems = [...formData.items];
     newItems[index] = {
       ...newItems[index],
       id: selectedItem.id,
       item_name: selectedItem.name,
-      unit_price: selectedItem.purchase_price || 0
+      unit_price: previousPrice // Set to previous purchase price
     };
 
     setFormData({ ...formData, items: newItems });
@@ -165,7 +184,8 @@ const AddPurchase = () => {
 
   const itemOptions = itemsList.map(itm => ({
     value: itm.id,
-    label: `${itm.name} (${itm.item_code || ''})`
+    label: `${itm.name} (${itm.item_code || ''})`,
+    previousPrice: previousPurchasePrices[itm.id] || 0
   }));
 
   return (
@@ -253,6 +273,7 @@ const AddPurchase = () => {
           <thead>
             <tr>
               <th>Item</th>
+              <th>Previous Price (Rs.)</th>
               <th>Quantity</th>
               <th>Unit Price (Rs.)</th>
               <th>Total (Rs.)</th>
@@ -260,49 +281,57 @@ const AddPurchase = () => {
             </tr>
           </thead>
           <tbody>
-            {formData.items.map((item, index) => (
-              <tr key={index}>
-                <td style={{ minWidth: '250px' }}>
-                  <Select
-                    options={itemOptions}
-                    value={itemOptions.find(opt => opt.value === item.id) || null}
-                    onChange={(selected) => handleItemSelect(index, selected)}
-                    isSearchable
-                    placeholder="Select or search item..."
-                  />
-                </td>
-                <td>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.001"
-                    value={item.quantity}
-                    onChange={(e) => handleItemChange(index, 'quantity', parseFloat(e.target.value))}
-                    required
-                  />
-                </td>
-                <td>
-                  <input
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    value={item.unit_price}
-                    onChange={(e) => handleItemChange(index, 'unit_price', parseFloat(e.target.value))}
-                    required
-                  />
-                </td>
-                <td>{(item.quantity * item.unit_price).toFixed(2)}</td>
-                <td>
-                  <button 
-                    type="button" 
-                    className="btn-remove"
-                    onClick={() => removeItemRow(index)}
-                  >
-                    Remove
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {formData.items.map((item, index) => {
+              const selectedItem = itemsList.find(itm => itm.id === item.id);
+              const previousPrice = previousPurchasePrices[item.id] || 0;
+              
+              return (
+                <tr key={index}>
+                  <td style={{ minWidth: '250px' }}>
+                    <Select
+                      options={itemOptions}
+                      value={itemOptions.find(opt => opt.value === item.id) || null}
+                      onChange={(selected) => handleItemSelect(index, selected)}
+                      isSearchable
+                      placeholder="Select or search item..."
+                    />
+                  </td>
+                  <td className="previous-price">
+                    {previousPrice > 0 ? `Rs. ${previousPrice.toFixed(2)}` : 'No history'}
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.001"
+                      value={item.quantity}
+                      onChange={(e) => handleItemChange(index, 'quantity', parseFloat(e.target.value))}
+                      required
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      value={item.unit_price}
+                      onChange={(e) => handleItemChange(index, 'unit_price', parseFloat(e.target.value))}
+                      required
+                    />
+                  </td>
+                  <td>{(item.quantity * item.unit_price).toFixed(2)}</td>
+                  <td>
+                    <button 
+                      type="button" 
+                      className="btn-remove"
+                      onClick={() => removeItemRow(index)}
+                    >
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
 

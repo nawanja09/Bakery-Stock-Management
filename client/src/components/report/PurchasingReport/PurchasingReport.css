@@ -386,3 +386,37 @@
     border: 1px solid #000;
   }
 }
+
+/* Ensure table is properly scrollable on small screens */
+.table-container {
+  overflow-x: auto;
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e9ecef;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+/* Make table responsive */
+.purchasing-report-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  min-width: 1200px; /* Ensure minimum width for all columns */
+}
+
+/* Ensure table headers and cells have proper spacing */
+.purchasing-report-table th,
+.purchasing-report-table td {
+  padding: 12px 8px;
+  text-align: left;
+  border-bottom: 1px solid #f1f3f4;
+}
+
+.purchasing-report-table th {
+  background: #f8f9fa;
+  font-weight: 600;
+  color: #495057;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}

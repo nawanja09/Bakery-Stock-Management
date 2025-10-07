@@ -227,6 +227,7 @@ const getDepartmentIssuesReport = async (req, res) => {
     }
 };
 
+// In your reportController.js
 const getPurchasingReport = async (req, res) => {
   const { startDate, endDate, companyId } = req.query;
 
@@ -254,8 +255,30 @@ const getPurchasingReport = async (req, res) => {
 
     query += ' ORDER BY p.purchase_date DESC';
 
-    const [rows] = await pool.query(query, params);
-    res.json(rows);
+    const [purchases] = await pool.query(query, params);
+
+    // Fetch items for each purchase
+    const purchasesWithItems = await Promise.all(
+      purchases.map(async (purchase) => {
+        const [items] = await pool.query(`
+          SELECT 
+            pi.*,
+            i.item_code,
+            i.name as item_name,
+            i.unit
+          FROM purchase_items pi
+          LEFT JOIN items i ON pi.item_id = i.id
+          WHERE pi.purchase_id = ?
+        `, [purchase.id]);
+        
+        return {
+          ...purchase,
+          items
+        };
+      })
+    );
+
+    res.json(purchasesWithItems);
   } catch (error) {
     console.error('Error fetching purchasing report:', error);
     res.status(500).json({ error: 'Server error' });
@@ -673,6 +696,50 @@ const getDailyWastageTransactions = async (req, res) => {
   }
 };
 
+// Get purchasing item-wise report
+const getPurchasingItemWiseReport = async (req, res) => {
+  const { startDate, endDate, companyId } = req.query;
+
+  try {
+    let query = `
+      SELECT 
+        p.id AS purchase_id,
+        p.invoice_no,
+        p.purchase_date,
+        s.name AS supplier_name,
+        p.payment_method,
+        c.name AS company_name,
+        i.item_code,
+        i.name AS item_name,
+        pi.quantity,
+        i.unit,
+        pi.unit_price,
+        (pi.quantity * pi.unit_price) AS total_price
+      FROM purchases p
+      JOIN purchase_items pi ON p.id = pi.purchase_id
+      JOIN items i ON pi.item_id = i.id
+      JOIN supplier s ON p.supplier_id = s.id
+      LEFT JOIN company c ON p.company_id = c.id
+      WHERE p.purchase_date BETWEEN ? AND ?
+    `;
+
+    const params = [startDate, endDate];
+
+    if (companyId) {
+      query += ' AND p.company_id = ?';
+      params.push(companyId);
+    }
+
+    query += ' ORDER BY p.purchase_date DESC, p.invoice_no, i.item_code';
+
+    const [rows] = await pool.query(query, params);
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching purchasing item-wise report:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
 // Add to module.exports
 module.exports = {
   getStockReport,
@@ -683,5 +750,6 @@ module.exports = {
   getStockReportByRangeAndItem,
   getDailyIssuanceTransactions,
   getDailyPurchaseTransactions,
-  getDailyWastageTransactions
+  getDailyWastageTransactions,
+  getPurchasingItemWiseReport
 };

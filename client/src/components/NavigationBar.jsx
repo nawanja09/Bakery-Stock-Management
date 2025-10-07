@@ -22,7 +22,9 @@ import {
   faUsers,
   faKey,
   faTruck,
-  faBars
+  faBars,
+  faCalculator,
+  faSave
 } from '@fortawesome/free-solid-svg-icons';
 import bakeryLogo from '../images/icon.jpeg';
 import './NavigationBar.css';
@@ -351,6 +353,33 @@ const NavigationBar = () => {
                 </li>
               </>
             )}
+          </div>
+
+          {/* Cost Calculator */}
+          <div className="nav-section">
+            <div className="section-separator"></div>
+
+            <li className={`dropdown ${activeDropdown === 'admin' ? 'active' : ''}`}>
+              <div className="dropdown-header" onClick={() => toggleDropdown('admin')}>
+                <span className="icon-container"><FontAwesomeIcon icon={faCalculator} /></span>
+                <span> Cost Calculator </span>
+                <FontAwesomeIcon icon={faChevronDown} className="chevron" />
+              </div>
+              <ul className="dropdown-menu">
+                <li>
+                  <NavLink to="/cost-calculator/calculate" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                    <span className="icon-container"><FontAwesomeIcon icon={faCalculator} /></span>
+                    <span>Calculate Cost</span>
+                  </NavLink>
+                </li>
+                <li>
+                  <NavLink to="/cost-calculator/saved" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                    <span className="icon-container"><FontAwesomeIcon icon={faSave} /></span>
+                    <span>Saved Costing</span>
+                  </NavLink>
+                </li>
+              </ul>
+            </li>
           </div>
 
           {/* Admin Section */}

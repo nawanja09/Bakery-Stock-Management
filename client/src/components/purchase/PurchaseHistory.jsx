@@ -157,7 +157,6 @@ const PurchaseHistory = () => {
         <table className="purchase-table">
           <thead>
             <tr>
-              <th>Number</th>
               <th>Date</th>
               <th>Items</th>
               <th>Supplier</th>
@@ -173,7 +172,6 @@ const PurchaseHistory = () => {
           <tbody>
             {filteredPurchases.map(purchase => (
               <tr key={purchase.id}>
-                <td>{purchase.invoice_no}</td>
                 <td>{new Date(purchase.purchase_date).toLocaleDateString()}</td>
                 <td>
                   <div className="items-list">
