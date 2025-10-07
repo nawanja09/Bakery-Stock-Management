@@ -11,5 +11,6 @@ router.get('/stock-range-item', reportController.getStockReportByRangeAndItem);
 router.get('/daily-transactions/purchases', reportController.getDailyPurchaseTransactions);
 router.get('/daily-transactions/issuances', reportController.getDailyIssuanceTransactions);
 router.get('/daily-transactions/wastages', reportController.getDailyWastageTransactions);
+router.get('/purchasing-item-wise', reportController.getPurchasingItemWiseReport);
 
 module.exports = router;

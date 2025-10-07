@@ -1,4 +1,4 @@
-//server/routes/purchaseRoutes.js
+// server/routes/purchaseRoutes.js
 
 const express = require('express');
 const router = express.Router();
@@ -8,6 +8,7 @@ router.post('/', purchaseController.createPurchase);
 router.get('/', purchaseController.getAllPurchases);
 router.get('/suppliers', purchaseController.getAllSuppliers);
 router.get('/companies', purchaseController.getAllCompanies);
+router.get('/previous-prices', purchaseController.getPreviousPurchasePrices); // Add this line
 router.get('/:id', purchaseController.getPurchaseById);
 router.put('/:id', purchaseController.updatePurchase);
 

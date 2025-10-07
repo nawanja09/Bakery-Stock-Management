@@ -61,7 +61,6 @@ const createPurchase = async (req, res) => {
 };
 
 // Get all purchases
-// Get all purchases
 const getAllPurchases = async (req, res) => {
   try {
     const [purchases] = await pool.query(`
@@ -220,11 +219,49 @@ const getAllSuppliers = async (req, res) => {
   }
 };
 
+// Get previous purchase prices for all items
+const getPreviousPurchasePrices = async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT 
+        i.id AS item_id,
+        i.name AS item_name,
+        i.item_code,
+        (
+          SELECT pi.unit_price 
+          FROM purchase_items pi
+          JOIN purchases p ON pi.purchase_id = p.id
+          WHERE pi.item_id = i.id
+          ORDER BY p.purchase_date DESC, pi.id DESC 
+          LIMIT 1
+        ) AS previous_unit_price
+      FROM items i
+      WHERE EXISTS (
+        SELECT 1 FROM purchase_items pi WHERE pi.item_id = i.id
+      )
+    `);
+
+    // Convert to object format for easy lookup
+    const priceMap = {};
+    rows.forEach(row => {
+      if (row.previous_unit_price) {
+        priceMap[row.item_id] = parseFloat(row.previous_unit_price);
+      }
+    });
+
+    res.json(priceMap);
+  } catch (error) {
+    console.error('Error fetching previous purchase prices:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
 module.exports = {
   createPurchase,
   getAllPurchases,
   getPurchaseById,
   updatePurchase,
   getAllSuppliers,
-  getAllCompanies
+  getAllCompanies,
+  getPreviousPurchasePrices
 };

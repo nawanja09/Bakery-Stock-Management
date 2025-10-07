@@ -16,8 +16,30 @@ const PurchasingReport = () => {
   const fetchPurchasingReport = async () => {
     setLoading(true);
     try {
+      // First get purchases with basic info
       const response = await api.get(`/reports/purchasing?startDate=${startDate}&endDate=${endDate}&companyId=${companyFilter}`);
-      setReportData(response.data);
+      const purchases = response.data;
+
+      // Fetch detailed item information for each purchase
+      const purchasesWithItems = await Promise.all(
+        purchases.map(async (purchase) => {
+          try {
+            const purchaseDetailResponse = await api.get(`/purchases/${purchase.id}`);
+            return {
+              ...purchase,
+              items: purchaseDetailResponse.data.items || []
+            };
+          } catch (error) {
+            console.error(`Error fetching details for purchase ${purchase.id}:`, error);
+            return {
+              ...purchase,
+              items: []
+            };
+          }
+        })
+      );
+
+      setReportData(purchasesWithItems);
     } catch (error) {
       console.error('Error fetching purchasing report:', error);
       alert('Failed to fetch purchasing report');
@@ -46,20 +68,51 @@ const PurchasingReport = () => {
     doc.text(`Total Paid: Rs. ${totalPaid.toFixed(2)}`, 15, companyFilter ? 42 : 32);
     doc.text(`Total Due: Rs. ${(totalPurchases - totalPaid).toFixed(2)}`, 15, companyFilter ? 49 : 39);
     
-    const tableData = reportData.map(purchase => [
-      purchase.invoice_no,
-      format(new Date(purchase.purchase_date), 'MMM dd, yyyy'),
-      purchase.supplier_name,
-      purchase.payment_method,
-      `Rs. ${parseFloat(purchase.bill_amount).toFixed(2)}`,
-      `Rs. ${parseFloat(purchase.paid_amount).toFixed(2)}`,
-      `Rs. ${(parseFloat(purchase.bill_amount) - parseFloat(purchase.paid_amount)).toFixed(2)}`
-    ]);
+    // Create detailed table with item information
+    const tableData = [];
+    reportData.forEach(purchase => {
+      if (purchase.items && purchase.items.length > 0) {
+        purchase.items.forEach(item => {
+          tableData.push([
+            purchase.invoice_no,
+            format(new Date(purchase.purchase_date), 'MMM dd, yyyy'),
+            purchase.supplier_name,
+            item.item_name || 'N/A',
+            Number(item.quantity).toFixed(3),
+            `Rs. ${Number(item.unit_price).toFixed(2)}`,
+            `Rs. ${(Number(item.quantity) * Number(item.unit_price)).toFixed(2)}`,
+            purchase.payment_method,
+            `Rs. ${parseFloat(purchase.bill_amount).toFixed(2)}`,
+            `Rs. ${parseFloat(purchase.paid_amount).toFixed(2)}`,
+            `Rs. ${(parseFloat(purchase.bill_amount) - parseFloat(purchase.paid_amount)).toFixed(2)}`
+          ]);
+        });
+      } else {
+        // Fallback for purchases without detailed items
+        tableData.push([
+          purchase.invoice_no,
+          format(new Date(purchase.purchase_date), 'MMM dd, yyyy'),
+          purchase.supplier_name,
+          'N/A',
+          'N/A',
+          'N/A',
+          'N/A',
+          purchase.payment_method,
+          `Rs. ${parseFloat(purchase.bill_amount).toFixed(2)}`,
+          `Rs. ${parseFloat(purchase.paid_amount).toFixed(2)}`,
+          `Rs. ${(parseFloat(purchase.bill_amount) - parseFloat(purchase.paid_amount)).toFixed(2)}`
+        ]);
+      }
+    });
     
     const headers = [
       'Invoice #',
       'Date',
       'Supplier',
+      'Item Name',
+      'Quantity',
+      'Unit Price',
+      'Total Price',
       'Payment Method',
       'Bill Amount',
       'Paid Amount',
@@ -70,7 +123,7 @@ const PurchasingReport = () => {
       head: [headers],
       body: tableData,
       startY: companyFilter ? 55 : 45,
-      styles: { fontSize: 9 },
+      styles: { fontSize: 7 },
       headStyles: { fillColor: [41, 128, 185] }
     });
     
@@ -78,45 +131,126 @@ const PurchasingReport = () => {
   };
 
   const downloadExcel = () => {
-    const worksheetData = reportData.map(purchase => ({
-      'Invoice No': purchase.invoice_no,
-      'Date': format(new Date(purchase.purchase_date), 'MMM dd, yyyy'),
-      'Supplier': purchase.supplier_name,
-      'Payment Method': purchase.payment_method,
-      'Bill Amount (Rs.)': parseFloat(purchase.bill_amount),
-      'Paid Amount (Rs.)': parseFloat(purchase.paid_amount),
-      'Due Amount (Rs.)': (parseFloat(purchase.bill_amount) - parseFloat(purchase.paid_amount))
-    }));
+    const worksheetData = [];
+    
+    // Add headers
+    worksheetData.push([
+      'Date',
+      'Supplier',
+      'Item Name',
+      'Quantity',
+      'Unit Price (Rs.)',
+      'Total Price (Rs.)',
+      'Payment Method',
+      'Bill Amount (Rs.)',
+      'Paid Amount (Rs.)',
+      'Due Amount (Rs.)'
+    ]);
 
+    // Add data rows
+    reportData.forEach(purchase => {
+      if (purchase.items && purchase.items.length > 0) {
+        purchase.items.forEach(item => {
+          worksheetData.push([
+            format(new Date(purchase.purchase_date), 'MMM dd, yyyy'),
+            purchase.supplier_name,
+            item.item_name || 'N/A',
+            Number(item.quantity),
+            Number(item.unit_price),
+            Number(item.quantity) * Number(item.unit_price),
+            purchase.payment_method,
+            parseFloat(purchase.bill_amount),
+            parseFloat(purchase.paid_amount),
+            (parseFloat(purchase.bill_amount) - parseFloat(purchase.paid_amount))
+          ]);
+        });
+      } else {
+        worksheetData.push([
+          purchase.invoice_no,
+          format(new Date(purchase.purchase_date), 'MMM dd, yyyy'),
+          purchase.supplier_name,
+          'N/A',
+          null,
+          null,
+          null,
+          purchase.payment_method,
+          parseFloat(purchase.bill_amount),
+          parseFloat(purchase.paid_amount),
+          (parseFloat(purchase.bill_amount) - parseFloat(purchase.paid_amount))
+        ]);
+      }
+    });
+
+    // Add totals
     const totalPurchases = reportData.reduce((sum, purchase) => sum + parseFloat(purchase.bill_amount), 0);
     const totalPaid = reportData.reduce((sum, purchase) => sum + parseFloat(purchase.paid_amount), 0);
     const totalDue = totalPurchases - totalPaid;
 
-    worksheetData.push({});
-    worksheetData.push({
-      'Invoice No': 'TOTAL',
-      'Bill Amount (Rs.)': totalPurchases,
-      'Paid Amount (Rs.)': totalPaid,
-      'Due Amount (Rs.)': totalDue
-    });
+    worksheetData.push([]);
+    worksheetData.push([
+      'TOTAL', '', '', '', '', '', '', '',
+      totalPurchases,
+      totalPaid,
+      totalDue
+    ]);
 
-    const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+    const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Purchasing Report');
 
     const colWidths = [
-      { wch: 15 },
-      { wch: 15 },
-      { wch: 20 },
-      { wch: 15 },
-      { wch: 15 },
-      { wch: 15 },
-      { wch: 15 }
+      { wch: 15 }, // Invoice No
+      { wch: 12 }, // Date
+      { wch: 20 }, // Supplier
+      { wch: 20 }, // Item Name
+      { wch: 10 }, // Quantity
+      { wch: 12 }, // Unit Price
+      { wch: 12 }, // Total Price
+      { wch: 15 }, // Payment Method
+      { wch: 15 }, // Bill Amount
+      { wch: 15 }, // Paid Amount
+      { wch: 15 }  // Due Amount
     ];
     worksheet['!cols'] = colWidths;
 
     XLSX.writeFile(workbook, `purchasing-report-${startDate}-to-${endDate}.xlsx`);
   };
+
+  // Helper function to get all items from purchases for display
+  const getAllItemsFromPurchases = () => {
+    const allItems = [];
+    reportData.forEach(purchase => {
+      if (purchase.items && purchase.items.length > 0) {
+        purchase.items.forEach(item => {
+          allItems.push({
+            ...item,
+            invoice_no: purchase.invoice_no,
+            purchase_date: purchase.purchase_date,
+            supplier_name: purchase.supplier_name,
+            payment_method: purchase.payment_method,
+            bill_amount: purchase.bill_amount,
+            paid_amount: purchase.paid_amount
+          });
+        });
+      } else {
+        // Add purchase as a row even if no items
+        allItems.push({
+          invoice_no: purchase.invoice_no,
+          purchase_date: purchase.purchase_date,
+          supplier_name: purchase.supplier_name,
+          item_name: 'No item details',
+          quantity: null,
+          unit_price: null,
+          payment_method: purchase.payment_method,
+          bill_amount: purchase.bill_amount,
+          paid_amount: purchase.paid_amount
+        });
+      }
+    });
+    return allItems;
+  };
+
+  const allItems = getAllItemsFromPurchases();
 
   return (
     <div className="purchasing-report-container">
@@ -197,9 +331,12 @@ const PurchasingReport = () => {
           <table className="purchasing-report-table">
             <thead>
               <tr>
-                <th>Invoice #</th>
                 <th>Date</th>
                 <th>Supplier</th>
+                <th>Item Name</th>
+                <th>Quantity</th>
+                <th>Unit Price (Rs.)</th>
+                <th>Total Price (Rs.)</th>
                 <th>Payment Method</th>
                 <th>Bill Amount (Rs.)</th>
                 <th>Paid (Rs.)</th>
@@ -207,19 +344,29 @@ const PurchasingReport = () => {
               </tr>
             </thead>
             <tbody>
-              {reportData.map((purchase) => (
-                <tr key={purchase.id}>
-                  <td>{purchase.invoice_no}</td>
-                  <td>{format(new Date(purchase.purchase_date), 'MMM dd, yyyy')}</td>
-                  <td>{purchase.supplier_name}</td>
-                  <td>{purchase.payment_method}</td>
-                  <td>{parseFloat(purchase.bill_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                  <td>{parseFloat(purchase.paid_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                  <td>{(parseFloat(purchase.bill_amount) - parseFloat(purchase.paid_amount)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+              {allItems.map((item, index) => (
+                <tr key={`${item.invoice_no}-${index}`}>
+                  <td>{format(new Date(item.purchase_date), 'MMM dd, yyyy')}</td>
+                  <td>{item.supplier_name}</td>
+                  <td>{item.item_name || 'N/A'}</td>
+                  <td>{item.quantity ? Number(item.quantity).toFixed(3) : 'N/A'}</td>
+                  <td>{item.unit_price ? Number(item.unit_price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'N/A'}</td>
+                  <td>
+                    {item.quantity && item.unit_price 
+                      ? (Number(item.quantity) * Number(item.unit_price)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                      : 'N/A'
+                    }
+                  </td>
+                  <td>{item.payment_method}</td>
+                  <td>{parseFloat(item.bill_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td>{parseFloat(item.paid_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td>{(parseFloat(item.bill_amount) - parseFloat(item.paid_amount)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 </tr>
               ))}
+            </tbody>
+            <tfoot>
               <tr className="summary-row">
-                <td colSpan="4"><strong>Total</strong></td>
+                <td colSpan="8"><strong>Total</strong></td>
                 <td>
                   <strong>
                     {reportData.reduce((sum, purchase) => sum + parseFloat(purchase.bill_amount), 0)
@@ -240,7 +387,7 @@ const PurchasingReport = () => {
                   </strong>
                 </td>
               </tr>
-            </tbody>
+            </tfoot>
           </table>
         </div>
       ) : (
