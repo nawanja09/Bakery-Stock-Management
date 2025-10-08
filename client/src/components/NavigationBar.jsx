@@ -359,8 +359,8 @@ const NavigationBar = () => {
           <div className="nav-section">
             <div className="section-separator"></div>
 
-            <li className={`dropdown ${activeDropdown === 'admin' ? 'active' : ''}`}>
-              <div className="dropdown-header" onClick={() => toggleDropdown('admin')}>
+            <li className={`dropdown ${activeDropdown === 'cost' ? 'active' : ''}`}>
+              <div className="dropdown-header" onClick={() => toggleDropdown('cost')}>
                 <span className="icon-container"><FontAwesomeIcon icon={faCalculator} /></span>
                 <span> Cost Calculator </span>
                 <FontAwesomeIcon icon={faChevronDown} className="chevron" />

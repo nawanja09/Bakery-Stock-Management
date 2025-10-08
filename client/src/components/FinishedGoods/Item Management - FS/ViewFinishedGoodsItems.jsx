@@ -114,7 +114,6 @@ const ViewFinishedGoodsItems = () => {
               <th>Item Code</th>
               <th>Item Name</th>
               <th>Category</th>
-              <th>Unit Price (LKR)</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -134,9 +133,6 @@ const ViewFinishedGoodsItems = () => {
                   }}>
                     {item.category}
                   </span>
-                </td>
-                <td style={{fontWeight: '600', color: '#059669'}}>
-                  {parseFloat(item.unit_price).toFixed(2)}
                 </td>
                 <td className="actions">
                   <button onClick={() => handleEdit(item.id)} className="btn-edit" title="Edit">

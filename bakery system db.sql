@@ -546,3 +546,33 @@ FOREIGN KEY (department_id) REFERENCES departments(id);
 
 -- Update existing records with a default department
 UPDATE finished_goods_transfers SET department_id = 1 WHERE department_id IS NULL;
+
+-- Create cost_calculations table
+CREATE TABLE `cost_calculations` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `finished_good_id` int NOT NULL,
+  `finished_good_name` varchar(255) NOT NULL,
+  `output_quantity` int NOT NULL,
+  `total_cost` decimal(10,2) NOT NULL,
+  `per_unit_cost` decimal(10,2) NOT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `finished_good_id` (`finished_good_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Create cost_calculation_ingredients table
+CREATE TABLE `cost_calculation_ingredients` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `calculation_id` int NOT NULL,
+  `item_id` int NOT NULL,
+  `item_name` varchar(255) NOT NULL,
+  `quantity` decimal(10,3) NOT NULL,
+  `unit` varchar(20) NOT NULL,
+  `unit_price` decimal(10,2) NOT NULL,
+  `cost` decimal(10,2) NOT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `calculation_id` (`calculation_id`),
+  KEY `item_id` (`item_id`),
+  CONSTRAINT `fk_cost_calc_ingredients_calc` FOREIGN KEY (`calculation_id`) REFERENCES `cost_calculations` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

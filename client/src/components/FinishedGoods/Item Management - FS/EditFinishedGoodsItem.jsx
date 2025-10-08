@@ -135,20 +135,6 @@ const EditFinishedGoodsItem = () => {
             <option value="Other">Other</option>
           </select>
         </div>
-        
-        <div className="form-group">
-          <label>Unit Price (LKR)</label>
-          <input
-            type="number"
-            name="unit_price"
-            value={formData.unit_price}
-            onChange={handleChange}
-            min="0"
-            step="0.01"
-            required
-            placeholder="0.00"
-          />
-        </div>
 
         <div className="form-button-wrapper">
           <button type="submit" className="btn-save" disabled={isLoading}>

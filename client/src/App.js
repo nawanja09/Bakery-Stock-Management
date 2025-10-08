@@ -48,6 +48,9 @@ import KitchenWastageReport from './components/FinishedGoods/Reports/WastageRepo
 import TransferReport from './components/FinishedGoods/Reports/TransferReport';
 import FinishedGoodsStockReport from './components/FinishedGoods/Reports/StockReport';
 
+import CalculateCost from './components/CostCalculator/CalculateCost';
+import SavedCosting from './components/CostCalculator/SavedCosting';
+
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
@@ -123,6 +126,9 @@ function App() {
             <Route path="finished-goods/reports/production" element={<ProductionReport />} />
             <Route path="finished-goods/reports/wastage" element={<KitchenWastageReport />} />
             <Route path="finished-goods/reports/transfer" element={<TransferReport />} />
+
+            <Route path="cost-calculator/calculate" element={<CalculateCost />} />
+<Route path="cost-calculator/saved" element={<SavedCosting />} />
 
           </Route>
 
