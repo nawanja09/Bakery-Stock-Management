@@ -23,6 +23,8 @@ const finishedGoodsWastageRouter = require('./routes/finishedGoodsWastage');
 const finishedGoodsReportRoutes = require('./routes/finishedGoodsReports');
 const finishedGoodsStockReportRouter = require('./routes/finishedGoodsStockReport');
 
+const costCalculatorRoutes = require('./routes/costCalculator');
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -56,6 +58,9 @@ app.use('/api/finished-goods-wastages', finishedGoodsWastageRouter);
 //app.use('/api/finished-goods-reports', finishedGoodsStockReportRouter);
 app.use('/api/finished-goods-reports', finishedGoodsReportRoutes);
 app.use('/api/finished-goods-reports', finishedGoodsStockReportRouter);
+
+app.use('/api/cost-calculations', costCalculatorRoutes);
+
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
