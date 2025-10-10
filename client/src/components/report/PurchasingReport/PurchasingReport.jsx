@@ -387,30 +387,6 @@ const PurchasingReport = () => {
                 </tr>
               ))}
             </tbody>
-            <tfoot>
-              <tr className="summary-row">
-                <td colSpan="8"><strong>Total</strong></td>
-                <td>
-                  <strong>
-                    {reportData.reduce((sum, purchase) => sum + parseFloat(purchase.bill_amount), 0)
-                      .toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </strong>
-                </td>
-                <td>
-                  <strong>
-                    {reportData.reduce((sum, purchase) => sum + parseFloat(purchase.paid_amount), 0)
-                      .toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </strong>
-                </td>
-                <td>
-                  <strong>
-                    {reportData.reduce((sum, purchase) => 
-                      sum + (parseFloat(purchase.bill_amount) - parseFloat(purchase.paid_amount)), 0)
-                      .toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </strong>
-                </td>
-              </tr>
-            </tfoot>
           </table>
         </div>
       ) : (

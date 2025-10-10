@@ -17,10 +17,11 @@ const EditPurchase = () => {
   const [companies, setCompanies] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [autoAddedRow, setAutoAddedRow] = useState(false); // ✅ prevent multiple auto-adds
+  const [autoAddedRow, setAutoAddedRow] = useState(false); // prevent multiple auto-adds
+  const [previousPurchasePrices, setPreviousPurchasePrices] = useState({}); // store previous prices
 
   const [formData, setFormData] = useState({
-    purchase_date: new Date().toLocaleDateString('en-CA'), // ✅ fixed
+    purchase_date: new Date().toLocaleDateString('en-CA'),
     supplier_id: '',
     bill_amount: 0,
     paid_amount: 0,
@@ -35,26 +36,28 @@ const EditPurchase = () => {
     const user = JSON.parse(localStorage.getItem('user'));
     setCurrentUser(user);
 
-    const fetchPurchaseData = async () => {
+    const fetchData = async () => {
       try {
-        // Fetch purchase details
-        const purchaseResponse = await api.get(`/purchases/${id}`);
-        const purchaseData = purchaseResponse.data;
+        // Fetch purchase data
+        const purchaseRes = await api.get(`/purchases/${id}`);
+        const purchaseData = purchaseRes.data;
 
         // Fetch dropdown data
-        const [suppliersRes, itemsRes, companiesRes] = await Promise.all([
+        const [suppliersRes, itemsRes, companiesRes, previousPricesRes] = await Promise.all([
           api.get('/suppliers'),
           api.get('/items'),
-          api.get('/purchases/companies')
+          api.get('/purchases/companies'),
+          api.get('/purchases/previous-prices')
         ]);
 
         setSuppliers(suppliersRes.data);
         setItemsList(itemsRes.data);
         setCompanies(companiesRes.data);
+        setPreviousPurchasePrices(previousPricesRes.data);
 
         // Set form data
         setFormData({
-          purchase_date: new Date(purchaseData.purchase_date).toLocaleDateString('en-CA'), 
+          purchase_date: new Date(purchaseData.purchase_date).toLocaleDateString('en-CA'),
           supplier_id: purchaseData.supplier_id,
           bill_amount: purchaseData.bill_amount,
           paid_amount: purchaseData.paid_amount,
@@ -66,7 +69,7 @@ const EditPurchase = () => {
             id: item.item_id,
             item_name: item.item_name,
             quantity: item.quantity,
-            unit_price: item.unit_price
+            unit_price: previousPricesRes.data[item.item_id] || item.unit_price || 0
           }))
         });
 
@@ -78,10 +81,9 @@ const EditPurchase = () => {
       }
     };
 
-    fetchPurchaseData();
-  }, [id, showPopup, navigate]);
+    fetchData();
+  }, [id, navigate, showPopup]);
 
-  // ✅ handle item changes and auto-add row for last item's unit_price
   const handleItemChange = (index, field, value) => {
     const newItems = [...formData.items];
 
@@ -90,10 +92,7 @@ const EditPurchase = () => {
     }
 
     newItems[index][field] = value;
-
-    if (field === 'quantity' || field === 'unit_price') {
-      newItems[index].total = newItems[index].quantity * newItems[index].unit_price;
-    }
+    newItems[index].total = newItems[index].quantity * newItems[index].unit_price;
 
     setFormData({ ...formData, items: newItems });
 
@@ -109,27 +108,29 @@ const EditPurchase = () => {
     }
   };
 
-  const addItemRow = () => {
-    setFormData({
-      ...formData,
-      items: [...formData.items, { id: '', item_name: '', quantity: 1, unit_price: 0 }]
-    });
-  };
-
   const handleItemSelect = (index, selectedOption) => {
     if (!selectedOption) return;
     const selectedItem = itemsList.find(item => item.id === selectedOption.value);
     if (!selectedItem) return;
+
+    const previousPrice = previousPurchasePrices[selectedItem.id] || 0;
 
     const newItems = [...formData.items];
     newItems[index] = {
       ...newItems[index],
       id: selectedItem.id,
       item_name: selectedItem.name,
-      unit_price: selectedItem.purchase_price || 0
+      unit_price: previousPrice
     };
 
     setFormData({ ...formData, items: newItems });
+  };
+
+  const addItemRow = () => {
+    setFormData({
+      ...formData,
+      items: [...formData.items, { id: '', item_name: '', quantity: 1, unit_price: 0 }]
+    });
   };
 
   const removeItemRow = (index) => {
@@ -176,7 +177,8 @@ const EditPurchase = () => {
 
   const itemOptions = itemsList.map(itm => ({
     value: itm.id,
-    label: `${itm.name} (${itm.item_code || ''})`
+    label: `${itm.name} (${itm.item_code || ''})`,
+    previousPrice: previousPurchasePrices[itm.id] || 0
   }));
 
   if (loading) return <div className="loading">Loading...</div>;
@@ -195,10 +197,10 @@ const EditPurchase = () => {
         <div className="form-row">
           <div className="form-group">
             <label>Purchase Date</label>
-            <input 
-              type="date" 
+            <input
+              type="date"
               value={formData.purchase_date}
-              onChange={(e) => setFormData({...formData, purchase_date: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, purchase_date: e.target.value })}
               required
             />
           </div>
@@ -207,22 +209,21 @@ const EditPurchase = () => {
             <label>Supplier</label>
             <select
               value={formData.supplier_id}
-              onChange={(e) => setFormData({...formData, supplier_id: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, supplier_id: e.target.value })}
               required
             >
               <option value="">Select Supplier</option>
               {suppliers.map(supplier => (
-                <option key={supplier.id} value={supplier.id}>
-                  {supplier.name}
-                </option>
+                <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
               ))}
             </select>
           </div>
+
           <div className="form-group">
             <label>Payment Method</label>
             <select
               value={formData.payment_method}
-              onChange={(e) => setFormData({...formData, payment_method: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, payment_method: e.target.value })}
               required
             >
               <option value="CASH">Cash</option>
@@ -232,13 +233,13 @@ const EditPurchase = () => {
           </div>
         </div>
 
-        {/* Payment & Company */}
+        {/* Company & Invoice */}
         <div className="form-row">
           <div className="form-group">
             <label>Company</label>
             <select
               value={formData.company_id}
-              onChange={(e) => setFormData({...formData, company_id: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, company_id: e.target.value })}
               required
             >
               <option value="">Select Company</option>
@@ -247,20 +248,22 @@ const EditPurchase = () => {
               ))}
             </select>
           </div>
+
           <div className="form-group">
             <label>Invoice Number</label>
             <input
               type="text"
               value={formData.check_number}
-              onChange={(e) => setFormData({...formData, check_number: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, check_number: e.target.value })}
               placeholder="Enter invoice number"
             />
           </div>
+
           <div className="form-group">
             <label>Remarks</label>
-            <textarea 
+            <textarea
               value={formData.remarks}
-              onChange={(e) => setFormData({...formData, remarks: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
             />
           </div>
         </div>
@@ -271,6 +274,7 @@ const EditPurchase = () => {
           <thead>
             <tr>
               <th>Item</th>
+              <th>Previous Price (Rs.)</th>
               <th>Quantity</th>
               <th>Unit Price (Rs.)</th>
               <th>Total (Rs.)</th>
@@ -278,49 +282,50 @@ const EditPurchase = () => {
             </tr>
           </thead>
           <tbody>
-            {formData.items.map((item, index) => (
-              <tr key={index}>
-                <td style={{ minWidth: '250px' }}>
-                  <Select
-                    options={itemOptions}
-                    value={itemOptions.find(opt => opt.value === item.id) || null}
-                    onChange={(selected) => handleItemSelect(index, selected)}
-                    isSearchable
-                    placeholder="Select or search item..."
-                  />
-                </td>
-                <td>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.001"
-                    value={item.quantity}
-                    onChange={(e) => handleItemChange(index, 'quantity', parseFloat(e.target.value))}
-                    required
-                  />
-                </td>
-                <td>
-                  <input
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    value={item.unit_price}
-                    onChange={(e) => handleItemChange(index, 'unit_price', parseFloat(e.target.value))}
-                    required
-                  />
-                </td>
-                <td>{(item.quantity * item.unit_price).toFixed(2)}</td>
-                <td>
-                  <button 
-                    type="button" 
-                    className="btn-remove"
-                    onClick={() => removeItemRow(index)}
-                  >
-                    Remove
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {formData.items.map((item, index) => {
+              const previousPrice = previousPurchasePrices[item.id] || 0;
+
+              return (
+                <tr key={index}>
+                  <td style={{ minWidth: '250px' }}>
+                    <Select
+                      options={itemOptions}
+                      value={itemOptions.find(opt => opt.value === item.id) || null}
+                      onChange={(selected) => handleItemSelect(index, selected)}
+                      isSearchable
+                      placeholder="Select or search item..."
+                    />
+                  </td>
+                  <td>{previousPrice > 0 ? `Rs. ${previousPrice.toFixed(2)}` : 'No history'}</td>
+                  <td>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.001"
+                      value={item.quantity}
+                      onChange={(e) => handleItemChange(index, 'quantity', parseFloat(e.target.value))}
+                      required
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      value={item.unit_price}
+                      onChange={(e) => handleItemChange(index, 'unit_price', parseFloat(e.target.value))}
+                      required
+                    />
+                  </td>
+                  <td>{(item.quantity * item.unit_price).toFixed(2)}</td>
+                  <td>
+                    <button type="button" className="btn-remove" onClick={() => removeItemRow(index)}>
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
 
@@ -332,15 +337,12 @@ const EditPurchase = () => {
         <div className="form">
           <div className="form-group">
             <label>Paid Amount (Rs.)</label>
-            <input 
+            <input
               type="number"
               min="0"
               step="0.01"
               value={formData.paid_amount}
-              onChange={(e) => setFormData({
-                ...formData, 
-                paid_amount: parseFloat(e.target.value) || 0
-              })}
+              onChange={(e) => setFormData({ ...formData, paid_amount: parseFloat(e.target.value) || 0 })}
               required
             />
           </div>
