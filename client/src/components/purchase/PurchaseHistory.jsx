@@ -70,14 +70,21 @@ const PurchaseHistory = () => {
       );
     }
 
+    // Normalize start to the start of the day (00:00:00) to include whole day
     if (start) {
+      const startDateObj = new Date(start);
+      startDateObj.setHours(0, 0, 0, 0);
       filtered = filtered.filter(purchase =>
-        new Date(purchase.purchase_date) >= new Date(start)
+        new Date(purchase.purchase_date) >= startDateObj
       );
     }
+
+    // Normalize end to the end of the day (23:59:59.999) to make it inclusive
     if (end) {
+      const endDateObj = new Date(end);
+      endDateObj.setHours(23, 59, 59, 999);
       filtered = filtered.filter(purchase =>
-        new Date(purchase.purchase_date) <= new Date(end)
+        new Date(purchase.purchase_date) <= endDateObj
       );
     }
 
