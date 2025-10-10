@@ -24,7 +24,8 @@ import {
   faTruck,
   faBars,
   faCalculator,
-  faSave
+  faSave,
+  faClipboardList
 } from '@fortawesome/free-solid-svg-icons';
 import bakeryLogo from '../images/icon.jpeg';
 import './NavigationBar.css';
@@ -376,6 +377,27 @@ const NavigationBar = () => {
                   <NavLink to="/cost-calculator/saved" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
                     <span className="icon-container"><FontAwesomeIcon icon={faSave} /></span>
                     <span>Saved Costing</span>
+                  </NavLink>
+                </li>
+              </ul>
+            </li>
+          </div>
+
+          {/* Department Section */}
+          <div className="nav-section">
+            <div className="section-separator"></div>
+
+            <li className={`dropdown ${activeDropdown === 'departments' ? 'active' : ''}`}>
+              <div className="dropdown-header" onClick={() => toggleDropdown('departments')}>
+                <span className="icon-container"><FontAwesomeIcon icon={faUsers} /></span>
+                <span> Departments </span>
+                <FontAwesomeIcon icon={faChevronDown} className="chevron" />
+              </div>
+              <ul className="dropdown-menu">
+                <li>
+                  <NavLink to="/reports/department-usage" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                    <span className="icon-container"><FontAwesomeIcon icon={faClipboardList} /></span>
+                    <span>Usage Report</span>
                   </NavLink>
                 </li>
               </ul>

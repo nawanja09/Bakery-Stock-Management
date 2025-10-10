@@ -1,0 +1,386 @@
+import React, { useState, useEffect } from 'react';
+import { format } from 'date-fns';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faDownload, faFileExcel, faCalendar, faFilter } from '@fortawesome/free-solid-svg-icons';
+import Select from 'react-select';
+import api from '../../api';
+import './DepartmentUsageReport.css';
+
+const DepartmentUsageReport = () => {
+  const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-01')); // First day of current month
+  const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd')); // Today
+  const [reportData, setReportData] = useState([]);
+  const [filteredData, setFilteredData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [items, setItems] = useState([]);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Fetch items for dropdown
+  useEffect(() => {
+    const fetchItems = async () => {
+      try {
+        const response = await api.get('/items');
+        setItems(response.data.map(item => ({
+          value: item.id,
+          label: `${item.item_code} - ${item.name}`,
+          data: item
+        })));
+      } catch (error) {
+        console.error('Error fetching items:', error);
+      }
+    };
+    fetchItems();
+  }, []);
+
+  // Filter data when search term or selected item changes
+  useEffect(() => {
+    let filtered = reportData;
+
+    if (searchTerm) {
+      filtered = filtered.filter(item =>
+        item.item_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.item_name.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    if (selectedItem) {
+      filtered = filtered.filter(item => item.item_code === selectedItem.data.item_code);
+    }
+
+    setFilteredData(filtered);
+  }, [reportData, searchTerm, selectedItem]);
+
+  const generateReport = async () => {
+    if (!startDate || !endDate) {
+      alert('Please select start date and end date');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await api.get('/department-usage-report', {
+        params: { startDate, endDate }
+      });
+      setReportData(response.data);
+    } catch (error) {
+      console.error('Error generating report:', error);
+      alert('Failed to generate department usage report');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const downloadPDF = () => {
+    if (filteredData.length === 0) {
+      alert('No data to export');
+      return;
+    }
+
+    const doc = new jsPDF();
+    const dateRange = `${format(new Date(startDate), 'MMM dd, yyyy')} - ${format(new Date(endDate), 'MMM dd, yyyy')}`;
+
+    // Title
+    doc.setFontSize(16);
+    doc.text('Department Usage Report', 14, 15);
+    
+    // Date range
+    doc.setFontSize(12);
+    doc.text(`Date Range: ${dateRange}`, 14, 25);
+
+    // Table data
+    const tableData = filteredData.map(item => [
+      item.item_code,
+      item.item_name,
+      item.unit,
+      item.opening_balance.toFixed(3),
+      `-${item.bakery.toFixed(3)}`,
+      `-${item.pastry.toFixed(3)}`,
+      `-${item.savory.toFixed(3)}`,
+      `-${item.cake.toFixed(3)}`,
+      item.due_balance.toFixed(3)
+    ]);
+
+    autoTable(doc, {
+      head: [['Item Code', 'Item Name', 'Unit', 'Opening', 'Bakery', 'Pastry', 'Savory', 'Cake', 'Due Balance']],
+      body: tableData,
+      startY: 35,
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [41, 128, 185] },
+      columnStyles: {
+        3: { halign: 'right' }, // Opening balance
+        4: { halign: 'right', textColor: [255, 0, 0] }, // Bakery (red for negative)
+        5: { halign: 'right', textColor: [255, 0, 0] }, // Pastry
+        6: { halign: 'right', textColor: [255, 0, 0] }, // Savory
+        7: { halign: 'right', textColor: [255, 0, 0] }, // Cake
+        8: { halign: 'right' } // Due balance
+      }
+    });
+
+    // Totals
+    const totals = calculateTotals();
+    const finalY = doc.lastAutoTable.finalY + 10;
+    
+    doc.setFontSize(10);
+    doc.text(`Total Opening Balance: ${totals.opening.toFixed(3)}`, 14, finalY);
+    doc.text(`Total Due Balance: ${totals.due.toFixed(3)}`, 14, finalY + 7);
+
+    doc.save(`department-usage-report-${startDate}-to-${endDate}.pdf`);
+  };
+
+  const downloadExcel = () => {
+    if (filteredData.length === 0) {
+      alert('No data to export');
+      return;
+    }
+
+    const worksheetData = [
+      ['Department Usage Report'],
+      [`Date Range: ${format(new Date(startDate), 'MMM dd, yyyy')} - ${format(new Date(endDate), 'MMM dd, yyyy')}`],
+      [],
+      ['Item Code', 'Item Name', 'Unit', 'Opening Balance', 'Bakery', 'Pastry', 'Savory', 'Cake', 'Due Balance']
+    ];
+
+    filteredData.forEach(item => {
+      worksheetData.push([
+        item.item_code,
+        item.item_name,
+        item.unit,
+        item.opening_balance,
+        -item.bakery, // Negative values for issuance
+        -item.pastry,
+        -item.savory,
+        -item.cake,
+        item.due_balance
+      ]);
+    });
+
+    // Add totals
+    const totals = calculateTotals();
+    worksheetData.push([]);
+    worksheetData.push(['TOTALS', '', '', totals.opening, -totals.bakery, -totals.pastry, -totals.savory, -totals.cake, totals.due]);
+
+    const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Department Usage Report');
+
+    // Style the totals row
+    if (!worksheet['!merges']) worksheet['!merges'] = [];
+    worksheet['!merges'].push({ s: { r: worksheetData.length - 1, c: 0 }, e: { r: worksheetData.length - 1, c: 2 } });
+
+    XLSX.writeFile(workbook, `department-usage-report-${startDate}-to-${endDate}.xlsx`);
+  };
+
+  const calculateTotals = () => {
+    return filteredData.reduce((totals, item) => ({
+      opening: totals.opening + item.opening_balance,
+      bakery: totals.bakery + item.bakery,
+      pastry: totals.pastry + item.pastry,
+      savory: totals.savory + item.savory,
+      cake: totals.cake + item.cake,
+      due: totals.due + item.due_balance
+    }), {
+      opening: 0,
+      bakery: 0,
+      pastry: 0,
+      savory: 0,
+      cake: 0,
+      due: 0
+    });
+  };
+
+  const clearFilters = () => {
+    setSearchTerm('');
+    setSelectedItem(null);
+  };
+
+  const totals = calculateTotals();
+
+  return (
+    <div className="department-usage-report-container">
+      <div className="report-header">
+        <h2>Department Usage Report</h2>
+        <p className="report-subtitle">Track item usage across departments with opening and due balances</p>
+      </div>
+
+      {/* Controls Section */}
+      <div className="controls-card">
+        <div className="controls-grid">
+          <div className="control-group">
+            <label>
+              <FontAwesomeIcon icon={faCalendar} /> Start Date
+            </label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              max={endDate}
+              className="control-input"
+            />
+          </div>
+
+          <div className="control-group">
+            <label>
+              <FontAwesomeIcon icon={faCalendar} /> End Date
+            </label>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              min={startDate}
+              max={format(new Date(), 'yyyy-MM-dd')}
+              className="control-input"
+            />
+          </div>
+
+          <div className="control-group">
+            <label>
+              <FontAwesomeIcon icon={faFilter} /> Filter by Item
+            </label>
+            <Select
+              options={items}
+              value={selectedItem}
+              onChange={setSelectedItem}
+              isClearable
+              placeholder="Search items..."
+              className="select-control"
+              classNamePrefix="react-select"
+            />
+          </div>
+        </div>
+
+        <div className="control-actions">
+          <button
+            onClick={generateReport}
+            disabled={loading}
+            className="btn btn-primary generate-btn"
+          >
+            {loading ? (
+              <>
+                <div className="loading-spinner"></div>
+                Generating...
+              </>
+            ) : (
+              'Generate Report'
+            )}
+          </button>
+
+          {(searchTerm || selectedItem) && (
+            <button
+              onClick={clearFilters}
+              className="btn btn-secondary"
+            >
+              Clear Filters
+            </button>
+          )}
+
+          {filteredData.length > 0 && (
+            <>
+              <button onClick={downloadPDF} className="btn btn-success">
+                <FontAwesomeIcon icon={faDownload} /> PDF
+              </button>
+              <button onClick={downloadExcel} className="btn btn-success">
+                <FontAwesomeIcon icon={faFileExcel} /> Excel
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Summary Cards */}
+      {filteredData.length > 0 && (
+        <div className="summary-cards">
+          <div className="summary-card">
+            <div className="summary-label">Total Items</div>
+            <div className="summary-value">{filteredData.length}</div>
+          </div>
+          <div className="summary-card">
+            <div className="summary-label">Total Opening</div>
+            <div className="summary-value">{totals.opening.toFixed(3)}</div>
+          </div>
+          <div className="summary-card">
+            <div className="summary-label">Total Due</div>
+            <div className="summary-value">{totals.due.toFixed(3)}</div>
+          </div>
+          <div className="summary-card">
+            <div className="summary-label">Total Issued</div>
+            <div className="summary-value negative">
+              {(totals.bakery + totals.pastry + totals.savory + totals.cake).toFixed(3)}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Report Table */}
+      {loading ? (
+        <div className="loading-overlay">
+          <div className="loading-spinner"></div>
+          Loading department usage report...
+        </div>
+      ) : filteredData.length > 0 ? (
+        <div className="table-container">
+          <table className="report-table department-usage-table">
+            <thead>
+              <tr>
+                <th>Item Code</th>
+                <th>Item Name</th>
+                <th>Unit</th>
+                <th>Opening Balance</th>
+                <th>Bakery</th>
+                <th>Pastry</th>
+                <th>Savory</th>
+                <th>Cake</th>
+                <th>Due Balance</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredData.map((item, index) => (
+                <tr key={index}>
+                  <td className="item-code">{item.item_code}</td>
+                  <td className="item-name">{item.item_name}</td>
+                  <td className="unit">{item.unit}</td>
+                  <td className="opening-balance">{item.opening_balance.toFixed(3)}</td>
+                  <td className="issuance negative">-{item.bakery.toFixed(3)}</td>
+                  <td className="issuance negative">-{item.pastry.toFixed(3)}</td>
+                  <td className="issuance negative">-{item.savory.toFixed(3)}</td>
+                  <td className="issuance negative">-{item.cake.toFixed(3)}</td>
+                  <td className={`due-balance ${item.due_balance < 0 ? 'negative' : item.due_balance === 0 ? 'zero' : 'positive'}`}>
+                    {item.due_balance.toFixed(3)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="totals-row">
+                <td colSpan="3"><strong>Totals</strong></td>
+                <td><strong>{totals.opening.toFixed(3)}</strong></td>
+                <td className="negative"><strong>-{totals.bakery.toFixed(3)}</strong></td>
+                <td className="negative"><strong>-{totals.pastry.toFixed(3)}</strong></td>
+                <td className="negative"><strong>-{totals.savory.toFixed(3)}</strong></td>
+                <td className="negative"><strong>-{totals.cake.toFixed(3)}</strong></td>
+                <td><strong>{totals.due.toFixed(3)}</strong></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      ) : reportData.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-icon">📊</div>
+          <h3>No Report Generated</h3>
+          <p>Select a date range and generate the department usage report to view data.</p>
+        </div>
+      ) : (
+        <div className="empty-state">
+          <div className="empty-icon">🔍</div>
+          <h3>No Matching Items</h3>
+          <p>No items match your current filters. Try adjusting your search criteria.</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default DepartmentUsageReport;
