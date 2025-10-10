@@ -240,9 +240,13 @@ const getPurchasingReport = async (req, res) => {
         s.name AS supplier_name,
         p.payment_method,
         p.bill_amount,
-        p.paid_amount
+        p.paid_amount,
+        p.check_number,
+        c.name AS company_name,
+        p.company_id
       FROM purchases p
       JOIN supplier s ON p.supplier_id = s.id
+      LEFT JOIN company c ON p.company_id = c.id
       WHERE p.purchase_date BETWEEN ? AND ?
     `;
 
