@@ -89,19 +89,27 @@ const DepartmentIssuesReport = () => {
     doc.text(`Department: ${departmentName}`, 14, 32);
     doc.text(`Item: ${itemName}`, 14, 40);
 
+    // Calculate grand total
+    const grandTotal = reportData.reduce((total, row) => total + (parseFloat(row.total_price) || 0), 0);
+
     autoTable(doc, {
       startY: 50,
-      head: [["Date", "Department", "Item Code", "Item Name", "Quantity", "Unit", "Received By", "Remarks"]],
+      head: [["Date", "Department", "Item Code", "Item Name", "Quantity", "Unit", "Unit Price (Rs.)", "Total Price (Rs.)", "Received By", "Remarks"]],
       body: reportData.map(row => [
         format(new Date(row.issuance_date), 'MMM dd, yyyy'),
         row.department_name,
         row.item_code,
         row.item_name,
-        row.quantity,
+        parseFloat(row.quantity).toFixed(3),
         row.unit,
+        row.unit_price ? `Rs. ${parseFloat(row.unit_price).toFixed(2)}` : 'N/A',
+        row.total_price ? `Rs. ${parseFloat(row.total_price).toFixed(2)}` : 'N/A',
         row.received_by,
         row.remarks || 'N/A'
-      ])
+      ]),
+      foot: [
+        ['', '', '', '', '', '', 'Grand Total:', `Rs. ${grandTotal.toFixed(2)}`, '', '']
+      ]
     });
 
     doc.save("issuance_report.pdf");
@@ -118,8 +126,10 @@ const DepartmentIssuesReport = () => {
       'Department': row.department_name,
       'Item Code': row.item_code,
       'Item Name': row.item_name,
-      'Quantity': row.quantity,
+      'Quantity': parseFloat(row.quantity).toFixed(3),
       'Unit': row.unit,
+      'Unit Price (Rs.)': row.unit_price ? parseFloat(row.unit_price).toFixed(2) : 'N/A',
+      'Total Price (Rs.)': row.total_price ? parseFloat(row.total_price).toFixed(2) : 'N/A',
       'Received By': row.received_by,
       'Remarks': row.remarks || 'N/A'
     }));
@@ -127,6 +137,11 @@ const DepartmentIssuesReport = () => {
     const worksheet = XLSX.utils.json_to_sheet(worksheetData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Issuance Report');
+    
+    // Add grand total
+    const grandTotal = reportData.reduce((total, row) => total + (parseFloat(row.total_price) || 0), 0);
+    XLSX.utils.sheet_add_aoa(worksheet, [['', '', '', '', '', '', 'Grand Total:', `Rs. ${grandTotal.toFixed(2)}`]], { origin: -1 });
+    
     XLSX.writeFile(workbook, `issuance-report-${startDate}-to-${endDate}.xlsx`);
   };
 
@@ -223,6 +238,9 @@ const DepartmentIssuesReport = () => {
         <div className="report-summary">
           <div style={{ marginBottom: '16px', color: '#666', fontSize: '14px' }}>
             Showing {reportData.length} issuance records
+            <span style={{ marginLeft: '20px', fontWeight: 'bold' }}>
+              Grand Total: Rs. {reportData.reduce((total, row) => total + (parseFloat(row.total_price) || 0), 0).toFixed(2)}
+            </span>
           </div>
           <div style={{ overflowX: 'auto' }}>
             <table className="report-table">
@@ -234,6 +252,8 @@ const DepartmentIssuesReport = () => {
                   <th>Item Name</th>
                   <th>Quantity</th>
                   <th>Unit</th>
+                  <th>Unit Price (Rs.)</th>
+                  <th>Total Price (Rs.)</th>
                   <th>Received By</th>
                   <th>Remarks</th>
                 </tr>
@@ -245,13 +265,25 @@ const DepartmentIssuesReport = () => {
                     <td>{row.department_name}</td>
                     <td>{row.item_code}</td>
                     <td>{row.item_name}</td>
-                    <td>{row.quantity}</td>
+                    <td>{parseFloat(row.quantity).toFixed(3)}</td>
                     <td>{row.unit}</td>
+                    <td>{row.unit_price ? `Rs. ${parseFloat(row.unit_price).toFixed(2)}` : 'N/A'}</td>
+                    <td style={{ fontWeight: 'bold' }}>
+                      {row.total_price ? `Rs. ${parseFloat(row.total_price).toFixed(2)}` : 'N/A'}
+                    </td>
                     <td>{row.received_by}</td>
                     <td>{row.remarks || 'N/A'}</td>
                   </tr>
                 ))}
               </tbody>
+              <tfoot>
+                <tr style={{ backgroundColor: '#f8f9fa', fontWeight: 'bold' }}>
+                  <td colSpan="6"></td>
+                  <td>Grand Total:</td>
+                  <td>Rs. {reportData.reduce((total, row) => total + (parseFloat(row.total_price) || 0), 0).toFixed(2)}</td>
+                  <td colSpan="2"></td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         </div>

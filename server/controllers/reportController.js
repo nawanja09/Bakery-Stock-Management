@@ -195,7 +195,27 @@ const getDepartmentIssuesReport = async (req, res) => {
                 it.name AS item_name,
                 ii.quantity,
                 it.unit,
-                i.remarks
+                i.remarks,
+                -- Get the latest purchase price before issuance date
+                (
+                    SELECT pi.unit_price 
+                    FROM purchase_items pi
+                    JOIN purchases p ON pi.purchase_id = p.id
+                    WHERE pi.item_id = it.id 
+                    AND p.purchase_date <= i.issuance_date
+                    ORDER BY p.purchase_date DESC 
+                    LIMIT 1
+                ) AS unit_price,
+                -- Calculate total price
+                ii.quantity * (
+                    SELECT pi.unit_price 
+                    FROM purchase_items pi
+                    JOIN purchases p ON pi.purchase_id = p.id
+                    WHERE pi.item_id = it.id 
+                    AND p.purchase_date <= i.issuance_date
+                    ORDER BY p.purchase_date DESC 
+                    LIMIT 1
+                ) AS total_price
             FROM issuances i
             JOIN issuance_items ii ON i.id = ii.issuance_id
             JOIN items it ON ii.item_id = it.id
@@ -227,7 +247,6 @@ const getDepartmentIssuesReport = async (req, res) => {
     }
 };
 
-// In your reportController.js
 const getPurchasingReport = async (req, res) => {
   const { startDate, endDate, companyId } = req.query;
 
