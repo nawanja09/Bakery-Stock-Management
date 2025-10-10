@@ -576,3 +576,31 @@ CREATE TABLE `cost_calculation_ingredients` (
   KEY `item_id` (`item_id`),
   CONSTRAINT `fk_cost_calc_ingredients_calc` FOREIGN KEY (`calculation_id`) REFERENCES `cost_calculations` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Table for finished goods ingredients
+CREATE TABLE IF NOT EXISTS `finished_goods_ingredients` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `finished_good_id` int NOT NULL,
+  `raw_material_id` int NOT NULL,
+  `quantity` decimal(10,3) NOT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `finished_good_id` (`finished_good_id`),
+  KEY `raw_material_id` (`raw_material_id`),
+  CONSTRAINT `fk_fg_ingredients_fg` FOREIGN KEY (`finished_good_id`) REFERENCES `finished_goods_items` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_fg_ingredients_rm` FOREIGN KEY (`raw_material_id`) REFERENCES `items` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Make sure the finished_goods_ingredients table exists
+CREATE TABLE IF NOT EXISTS `finished_goods_ingredients` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `finished_good_id` int NOT NULL,
+  `raw_material_id` int NOT NULL,
+  `quantity` decimal(10,3) NOT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `finished_good_id` (`finished_good_id`),
+  KEY `raw_material_id` (`raw_material_id`),
+  CONSTRAINT `fk_fg_ingredients_fg` FOREIGN KEY (`finished_good_id`) REFERENCES `finished_goods_items` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_fg_ingredients_rm` FOREIGN KEY (`raw_material_id`) REFERENCES `items` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
