@@ -16,7 +16,7 @@ const IssueToDepartment = () => {
   const [loading, setLoading] = useState(false);
 
   const [formData, setFormData] = useState({
-    issuance_date: new Date().toISOString().split('T')[0],
+    issuance_date: new Date().toLocaleDateString('en-CA'),
     department_id: '',
     received_by: '',
     remarks: '',
@@ -66,7 +66,7 @@ const IssueToDepartment = () => {
         });
 
         setFormData({
-          issuance_date: issuance.issuance_date ? issuance.issuance_date.split('T')[0] : new Date().toISOString().split('T')[0],
+          issuance_date: issuance.issuance_date ? issuance.issuance_date.split('T')[0] : new Date().toLocaleDateString('en-CA'),
           department_id: issuance.department_id || '',
           received_by: issuance.received_by || '',
           remarks: issuance.remarks || '',

@@ -77,6 +77,8 @@ const PurchasingReport = () => {
             purchase.invoice_no,
             format(new Date(purchase.purchase_date), 'MMM dd, yyyy'),
             purchase.supplier_name,
+            purchase.company_name || 'N/A',
+            purchase.check_number || 'N/A',
             item.item_name || 'N/A',
             Number(item.quantity).toFixed(3),
             `Rs. ${Number(item.unit_price).toFixed(2)}`,
@@ -93,7 +95,8 @@ const PurchasingReport = () => {
           purchase.invoice_no,
           format(new Date(purchase.purchase_date), 'MMM dd, yyyy'),
           purchase.supplier_name,
-          'N/A',
+          purchase.company_name || 'N/A',
+          purchase.check_number || 'N/A',
           'N/A',
           'N/A',
           'N/A',
@@ -109,6 +112,8 @@ const PurchasingReport = () => {
       'Invoice #',
       'Date',
       'Supplier',
+      'Company',
+      'Check Number',
       'Item Name',
       'Quantity',
       'Unit Price',
@@ -135,8 +140,11 @@ const PurchasingReport = () => {
     
     // Add headers
     worksheetData.push([
+      'Invoice #',
       'Date',
       'Supplier',
+      'Company',
+      'Check Number',
       'Item Name',
       'Quantity',
       'Unit Price (Rs.)',
@@ -152,8 +160,11 @@ const PurchasingReport = () => {
       if (purchase.items && purchase.items.length > 0) {
         purchase.items.forEach(item => {
           worksheetData.push([
+            purchase.invoice_no,
             format(new Date(purchase.purchase_date), 'MMM dd, yyyy'),
             purchase.supplier_name,
+            purchase.company_name || 'N/A',
+            purchase.check_number || 'N/A',
             item.item_name || 'N/A',
             Number(item.quantity),
             Number(item.unit_price),
@@ -169,6 +180,8 @@ const PurchasingReport = () => {
           purchase.invoice_no,
           format(new Date(purchase.purchase_date), 'MMM dd, yyyy'),
           purchase.supplier_name,
+          purchase.company_name || 'N/A',
+          purchase.check_number || 'N/A',
           'N/A',
           null,
           null,
@@ -202,6 +215,8 @@ const PurchasingReport = () => {
       { wch: 15 }, // Invoice No
       { wch: 12 }, // Date
       { wch: 20 }, // Supplier
+      { wch: 15 }, // Company
+      { wch: 15 }, // Check Number
       { wch: 20 }, // Item Name
       { wch: 10 }, // Quantity
       { wch: 12 }, // Unit Price
@@ -229,7 +244,9 @@ const PurchasingReport = () => {
             supplier_name: purchase.supplier_name,
             payment_method: purchase.payment_method,
             bill_amount: purchase.bill_amount,
-            paid_amount: purchase.paid_amount
+            paid_amount: purchase.paid_amount,
+            company_name: purchase.company_name,
+            check_number: purchase.check_number
           });
         });
       } else {
@@ -243,7 +260,9 @@ const PurchasingReport = () => {
           unit_price: null,
           payment_method: purchase.payment_method,
           bill_amount: purchase.bill_amount,
-          paid_amount: purchase.paid_amount
+          paid_amount: purchase.paid_amount,
+          company_name: purchase.company_name,
+          check_number: purchase.check_number
         });
       }
     });
@@ -330,24 +349,28 @@ const PurchasingReport = () => {
         <div className="table-container">
           <table className="purchasing-report-table">
             <thead>
-              <tr>
-                <th>Date</th>
-                <th>Supplier</th>
-                <th>Item Name</th>
-                <th>Quantity</th>
-                <th>Unit Price (Rs.)</th>
-                <th>Total Price (Rs.)</th>
-                <th>Payment Method</th>
-                <th>Bill Amount (Rs.)</th>
-                <th>Paid (Rs.)</th>
-                <th>Due (Rs.)</th>
-              </tr>
+                <tr>
+                  <th>Date</th>
+                  <th>Supplier</th>
+                  <th>Company</th>
+                  <th>Check #</th>
+                  <th>Item Name</th>
+                  <th>Quantity</th>
+                  <th>Unit Price (Rs.)</th>
+                  <th>Total Price (Rs.)</th>
+                  <th>Payment Method</th>
+                  <th>Bill Amount (Rs.)</th>
+                  <th>Paid (Rs.)</th>
+                  <th>Due (Rs.)</th>
+                </tr>
             </thead>
             <tbody>
               {allItems.map((item, index) => (
                 <tr key={`${item.invoice_no}-${index}`}>
                   <td>{format(new Date(item.purchase_date), 'MMM dd, yyyy')}</td>
                   <td>{item.supplier_name}</td>
+                  <td>{item.company_name || 'N/A'}</td>
+                  <td>{item.check_number || 'N/A'}</td>
                   <td>{item.item_name || 'N/A'}</td>
                   <td>{item.quantity ? Number(item.quantity).toFixed(3) : 'N/A'}</td>
                   <td>{item.unit_price ? Number(item.unit_price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'N/A'}</td>

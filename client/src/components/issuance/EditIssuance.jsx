@@ -16,7 +16,7 @@ const EditIssuance = () => {
   const [loading, setLoading] = useState(true);
 
   const [formData, setFormData] = useState({
-    issuance_date: new Date().toISOString().split('T')[0], // YYYY-MM-DD
+    issuance_date: new Date().toLocaleDateString('en-CA'),
     department_id: '',
     received_by: '',
     remarks: '',
@@ -47,8 +47,8 @@ const EditIssuance = () => {
 
         // normalize date to YYYY-MM-DD for input[type=date]
         const issuanceDate = issuanceData.issuance_date
-          ? new Date(issuanceData.issuance_date).toISOString().split('T')[0]
-          : new Date().toISOString().split('T')[0];
+          ? new Date(issuanceData.issuance_date).toLocaleDateString('en-CA')
+          : new Date().toLocaleDateString('en-CA');
 
         const itemsWithStock = (issuanceData.items || []).map(item => {
           const itemData = (itemsResponse.data || []).find(i => String(i.id) === String(item.item_id));
