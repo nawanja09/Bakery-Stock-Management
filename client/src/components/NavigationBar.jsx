@@ -326,12 +326,23 @@ const NavigationBar = () => {
                     <FontAwesomeIcon icon={faChevronDown} className="chevron" />
                   </div>
                   <ul className="dropdown-menu">
+                    {/* ✅ Item Wise Stock Report (renamed) */}
                     <li>
                       <NavLink to="/finished-goods/reports/stock" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                        <span className="icon-container"><FontAwesomeIcon icon={faBox} /></span>
+                        <span>Item Wise Stock Report</span>
+                      </NavLink>
+                    </li>
+
+                    {/* ✅ New Stock Report */}
+                    <li>
+                      <NavLink to="/finished-goods/reports/stock/summary" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
                         <span className="icon-container"><FontAwesomeIcon icon={faBox} /></span>
                         <span>Stock Report</span>
                       </NavLink>
                     </li>
+
+                    {/* Existing Reports */}
                     <li>
                       <NavLink to="/finished-goods/reports/production" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
                         <span className="icon-container"><FontAwesomeIcon icon={faCog} /></span>
@@ -352,11 +363,34 @@ const NavigationBar = () => {
                     </li>
                   </ul>
                 </li>
+
+                {/* Sales Section under Finished Goods */}
+                  <li className={`dropdown ${activeDropdown === 'sales' ? 'active' : ''}`}>
+                    <div className="dropdown-header" onClick={() => toggleDropdown('sales')}>
+                      <span className="icon-container"><FontAwesomeIcon icon={faShoppingCart} /></span>
+                      <span>Sales</span>
+                      <FontAwesomeIcon icon={faChevronDown} className="chevron" />
+                    </div>
+                    <ul className="dropdown-menu">
+                      <li>
+                        <NavLink to="/finished-goods/sales/new" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                          <span className="icon-container"><FontAwesomeIcon icon={faPlusCircle} /></span>
+                          <span>Add New Sale</span>
+                        </NavLink>
+                      </li>
+                      <li>
+                        <NavLink to="/finished-goods/sales/history" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                          <span className="icon-container"><FontAwesomeIcon icon={faHistory} /></span>
+                          <span>Sales History</span>
+                        </NavLink>
+                      </li>
+                    </ul>
+                  </li>
               </>
             )}
           </div>
 
-          {/* Cost Calculator */}
+          {/* Cost Calculator }
           <div className="nav-section">
             <div className="section-separator"></div>
 
@@ -382,6 +416,7 @@ const NavigationBar = () => {
               </ul>
             </li>
           </div>
+          */}
 
           {/* Department Section */}
           <div className="nav-section">

@@ -26,6 +26,7 @@ const finishedGoodsStockReportRouter = require('./routes/finishedGoodsStockRepor
 const costCalculatorRoutes = require('./routes/costCalculator');
 const finishedGoodsIngredientsRouter = require('./routes/finishedGoodsIngredients');
 const departmentUsageReportRoutes = require('./routes/departmentUsageReport');
+const finishedGoodsSalesRouter = require('./routes/finishedGoodsSalesRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -64,10 +65,8 @@ app.use('/api/finished-goods-reports', finishedGoodsStockReportRouter);
 app.use('/api/cost-calculations', costCalculatorRoutes);
 app.use('/api/finished-goods-ingredients', finishedGoodsIngredientsRouter);
 app.use('/api/department-usage-report', departmentUsageReportRoutes);
+app.use('/api/finished-goods-sales', finishedGoodsSalesRouter);
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
-
-// formular for Usage report
-// Due balance = opening balance - ( bakery + pastry + savory + cake)

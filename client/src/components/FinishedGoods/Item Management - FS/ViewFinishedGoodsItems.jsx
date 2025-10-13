@@ -25,11 +25,15 @@ const ViewFinishedGoodsItems = () => {
       const data = response.data;
 
       if (response.status === 200) {
-        const sortedData = data.sort((a, b) =>
-          a.item_code?.toLowerCase().localeCompare(b.item_code?.toLowerCase())
-        );
-        setItems(sortedData);
-        setFilteredItems(sortedData);
+      // Sort numerically based on item_code (e.g., FG001 -> 1, FG010 -> 10)
+      const sortedData = data.sort((a, b) => {
+        const numA = parseInt(a.item_code.replace(/\D/g, ''), 10);
+        const numB = parseInt(b.item_code.replace(/\D/g, ''), 10);
+        return numA - numB;
+      });
+
+      setItems(sortedData);
+      setFilteredItems(sortedData);
       } else {
         showPopup('error', data.error || 'Failed to fetch items');
       }

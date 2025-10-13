@@ -604,3 +604,38 @@ CREATE TABLE IF NOT EXISTS `finished_goods_ingredients` (
   CONSTRAINT `fk_fg_ingredients_fg` FOREIGN KEY (`finished_good_id`) REFERENCES `finished_goods_items` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_fg_ingredients_rm` FOREIGN KEY (`raw_material_id`) REFERENCES `items` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Table for finished goods sales (designation as foreign key to transfer_destinations)
+CREATE TABLE IF NOT EXISTS `finished_goods_sales` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `sale_number` varchar(50) NOT NULL,
+  `sale_date` date NOT NULL,
+  `designation` int NOT NULL,
+  `cashier_name` varchar(255) NOT NULL,
+  `remarks` text,
+  `created_by` int NOT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `sale_number` (`sale_number`),
+  KEY `created_by` (`created_by`),
+  KEY `designation` (`designation`),
+  CONSTRAINT `fg_sales_ibfk_1` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`),
+  CONSTRAINT `fg_sales_ibfk_2` FOREIGN KEY (`designation`) REFERENCES `transfer_destinations` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Table for finished goods sale items
+CREATE TABLE IF NOT EXISTS `finished_goods_sale_items` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `sale_id` int NOT NULL,
+  `item_id` int NOT NULL,
+  `quantity` int NOT NULL,
+  `unit_price` decimal(10,2) NOT NULL,
+  `total_value` decimal(10,2) NOT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `sale_id` (`sale_id`),
+  KEY `item_id` (`item_id`),
+  CONSTRAINT `fg_sale_items_ibfk_1` FOREIGN KEY (`sale_id`) REFERENCES `finished_goods_sales` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fg_sale_items_ibfk_2` FOREIGN KEY (`item_id`) REFERENCES `finished_goods_items` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

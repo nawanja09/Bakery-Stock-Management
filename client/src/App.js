@@ -51,6 +51,8 @@ import FinishedGoodsStockReport from './components/FinishedGoods/Reports/StockRe
 import CalculateCost from './components/CostCalculator/CalculateCost';
 import SavedCosting from './components/CostCalculator/SavedCosting';
 import DepartmentUsageReport from './components/report/DepartmentUsageReport';
+import AddFinishedGoodsSale from './components/FinishedGoods/Sales/AddFinishedGoodsSale';
+import FinishedGoodsSalesHistory from './components/FinishedGoods/Sales/FinishedGoodsSalesHistory';
 
 import './App.css';
 
@@ -131,6 +133,8 @@ function App() {
             <Route path="cost-calculator/calculate" element={<CalculateCost />} />
             <Route path="cost-calculator/saved" element={<SavedCosting />} />
             <Route path="/reports/department-usage" element={<DepartmentUsageReport />} />
+            <Route path="finished-goods/sales/new" element={<AddFinishedGoodsSale />} />
+            <Route path="finished-goods/sales/history" element={<FinishedGoodsSalesHistory />} />
 
           </Route>
 
