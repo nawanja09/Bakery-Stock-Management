@@ -11,6 +11,8 @@ const AddProductionWastage = () => {
   const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [productions, setProductions] = useState([]);
+  const [departments, setDepartments] = useState([]);
+  const [transferDestinations, setTransferDestinations] = useState([]);
   const { showPopup } = usePopup();
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -19,6 +21,8 @@ const AddProductionWastage = () => {
     remarks: '',
     wastage_type: 'Production',
     production_id: '',
+    department_id: '',
+    destination_id: '',
     items: [{ item_id: '', quantity: 1, estimated_loss: 0 }]
   });
   const [loading, setLoading] = useState(false);
@@ -26,13 +30,17 @@ const AddProductionWastage = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [itemsResponse, productionsResponse] = await Promise.all([
+        const [itemsResponse, productionsResponse, departmentsResponse, destinationsResponse] = await Promise.all([
           api.get('/finished-goods-items'),
-          api.get('/productions?status=Completed')
+          api.get('/productions?status=Completed'),
+          api.get('/departments'),
+          api.get('/transfer-destinations') // You'll need to create this API endpoint
         ]);
         
         setItems(itemsResponse.data);
         setProductions(productionsResponse.data);
+        setDepartments(departmentsResponse.data);
+        setTransferDestinations(destinationsResponse.data);
       } catch (error) {
         showPopup('error', 'Failed to fetch data');
       }
@@ -76,12 +84,30 @@ const AddProductionWastage = () => {
     setFormData({ ...formData, items: newItems });
   };
 
+  const handleWastageTypeChange = (type) => {
+    setFormData({
+      ...formData,
+      wastage_type: type,
+      production_id: type === 'Production' ? formData.production_id : '',
+      department_id: type === 'General' ? formData.department_id : '',
+      destination_id: type === 'General' ? formData.destination_id : ''
+    });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      const response = await api.post('/finished-goods-wastages', formData);
+      const payload = {
+        ...formData,
+        // For production wastage, include production_id
+        // For general wastage, include department_id
+        department_id: formData.wastage_type === 'General' ? formData.department_id : null,
+        production_id: formData.wastage_type === 'Production' ? formData.production_id : null
+      };
+
+      const response = await api.post('/finished-goods-wastages', payload);
       
       if (response.status === 201) {
         showPopup('success', `Production Wastage recorded successfully! Note #: ${response.data.wastage_number}`);
@@ -105,6 +131,16 @@ const AddProductionWastage = () => {
     label: `${new Date(production.production_date).toLocaleDateString()} - ${production.prepared_by}`
   }));
 
+  const departmentOptions = departments.map(dept => ({
+    value: dept.id,
+    label: dept.name
+  }));
+
+  const destinationOptions = transferDestinations.map(dest => ({
+    value: dest.id,
+    label: dest.name
+  }));
+
   const calculateTotalLoss = () => {
     return formData.items.reduce((total, item) => {
       return total + (Number(item.estimated_loss) || 0);
@@ -122,6 +158,27 @@ const AddProductionWastage = () => {
       <h2 className="production-wastage-title">Add Production Wastage</h2>
 
       <form onSubmit={handleSubmit} className="production-wastage-form">
+        {/* Wastage Type Selection */}
+        <div className="form-group">
+          <label>Wastage Type</label>
+          <div className="wastage-type-selector">
+            <button
+              type="button"
+              className={`wastage-type-btn ${formData.wastage_type === 'Production' ? 'active' : ''}`}
+              onClick={() => handleWastageTypeChange('Production')}
+            >
+              Production Wastage
+            </button>
+            <button
+              type="button"
+              className={`wastage-type-btn ${formData.wastage_type === 'General' ? 'active' : ''}`}
+              onClick={() => handleWastageTypeChange('General')}
+            >
+              General Wastage
+            </button>
+          </div>
+        </div>
+
         <div className="form-row">
           <div className="form-group">
             <label>Date</label>
@@ -143,27 +200,79 @@ const AddProductionWastage = () => {
             />
           </div>
 
-          <div className="form-group">
-            <label>Production Batch</label>
-            <Select
-              options={productionOptions}
-              value={productionOptions.find(opt => opt.value === formData.production_id) || null}
-              onChange={(selected) => setFormData({ ...formData, production_id: selected.value })}
-              isSearchable
-              placeholder="Select production batch..."
-              required
-              menuPortalTarget={document.body}
-              styles={{
-                menuPortal: base => ({ ...base, zIndex: 9999 }),
-                control: (provided) => ({
-                  ...provided,
-                  minHeight: '38px',
-                }),
-              }}
-              menuShouldBlockScroll={true}
-              classNamePrefix="select"
-            />
-          </div>
+          {/* Production Details - Show only for Production Wastage */}
+          {formData.wastage_type === 'Production' && (
+            <div className="form-group">
+              <label>Production Batch</label>
+              <Select
+                options={productionOptions}
+                value={productionOptions.find(opt => opt.value === formData.production_id) || null}
+                onChange={(selected) => setFormData({ ...formData, production_id: selected.value })}
+                isSearchable
+                placeholder="Select production batch..."
+                required
+                menuPortalTarget={document.body}
+                styles={{
+                  menuPortal: base => ({ ...base, zIndex: 9999 }),
+                  control: (provided) => ({
+                    ...provided,
+                    minHeight: '38px',
+                  }),
+                }}
+                menuShouldBlockScroll={true}
+                classNamePrefix="select"
+              />
+            </div>
+          )}
+
+          {/* General Details - Show only for General Wastage */}
+          {formData.wastage_type === 'General' && (
+            <>
+              <div className="form-group">
+                <label>Department</label>
+                <Select
+                  options={departmentOptions}
+                  value={departmentOptions.find(opt => opt.value === formData.department_id) || null}
+                  onChange={(selected) => setFormData({ ...formData, department_id: selected.value })}
+                  isSearchable
+                  placeholder="Select department..."
+                  required
+                  menuPortalTarget={document.body}
+                  styles={{
+                    menuPortal: base => ({ ...base, zIndex: 9999 }),
+                    control: (provided) => ({
+                      ...provided,
+                      minHeight: '38px',
+                    }),
+                  }}
+                  menuShouldBlockScroll={true}
+                  classNamePrefix="select"
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Destination</label>
+                <Select
+                  options={destinationOptions}
+                  value={destinationOptions.find(opt => opt.value === formData.destination_id) || null}
+                  onChange={(selected) => setFormData({ ...formData, destination_id: selected.value })}
+                  isSearchable
+                  placeholder="Select destination..."
+                  required
+                  menuPortalTarget={document.body}
+                  styles={{
+                    menuPortal: base => ({ ...base, zIndex: 9999 }),
+                    control: (provided) => ({
+                      ...provided,
+                      minHeight: '38px',
+                    }),
+                  }}
+                  menuShouldBlockScroll={true}
+                  classNamePrefix="select"
+                />
+              </div>
+            </>
+          )}
 
           <div className="form-group">
             <label>Reason for Wastage</label>
@@ -177,6 +286,10 @@ const AddProductionWastage = () => {
               <option value="Recipe error">Recipe error</option>
               <option value="Quality rejection">Quality rejection</option>
               <option value="Overproduction">Overproduction</option>
+              <option value="Expired">Expired</option>
+              <option value="Damaged">Damaged</option>
+              <option value="Poor Storage">Poor Storage</option>
+              <option value="Forecasting errors">Forecasting errors</option>
               <option value="Other">Other</option>
             </select>
           </div>

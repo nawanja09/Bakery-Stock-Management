@@ -49,7 +49,7 @@ const getAllFinishedGoodsWastages = async (req, res) => {
 
 // Update create function to include department_id
 const createFinishedGoodsWastage = async (req, res) => {
-  const { date, approved_by, reason, remarks, items, wastage_type, production_id, department_id } = req.body;
+  const { date, approved_by, reason, remarks, items, wastage_type, production_id, department_id, destination_id } = req.body;
   const created_by = req.user?.id || 5;
 
   try {
@@ -57,10 +57,10 @@ const createFinishedGoodsWastage = async (req, res) => {
 
     const wastage_number = generateWastageNumber();
     
-    // Insert wastage record - include department_id
+    // Insert wastage record - include both department_id and destination_id for general wastage
     const [wastageResult] = await pool.query(
-      'INSERT INTO finished_goods_wastages (wastage_number, date, approved_by, reason, remarks, wastage_type, created_by, department_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [wastage_number, date, approved_by, reason, remarks, wastage_type || 'General', created_by, department_id || null]
+      'INSERT INTO finished_goods_wastages (wastage_number, date, approved_by, reason, remarks, wastage_type, created_by, department_id, destination_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [wastage_number, date, approved_by, reason, remarks, wastage_type || 'General', created_by, department_id || null, destination_id || null]
     );
 
     const wastageId = wastageResult.insertId;

@@ -639,3 +639,10 @@ CREATE TABLE IF NOT EXISTS `finished_goods_sale_items` (
   CONSTRAINT `fg_sale_items_ibfk_1` FOREIGN KEY (`sale_id`) REFERENCES `finished_goods_sales` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fg_sale_items_ibfk_2` FOREIGN KEY (`item_id`) REFERENCES `finished_goods_items` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+ALTER TABLE finished_goods_wastages 
+ADD COLUMN destination_id INT NULL AFTER department_id;
+
+ALTER TABLE finished_goods_wastages 
+ADD CONSTRAINT fk_wastage_destination_id 
+FOREIGN KEY (destination_id) REFERENCES transfer_destinations(id);

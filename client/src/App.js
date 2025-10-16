@@ -54,6 +54,8 @@ import DepartmentUsageReport from './components/report/DepartmentUsageReport';
 import AddFinishedGoodsSale from './components/FinishedGoods/Sales/AddFinishedGoodsSale';
 import FinishedGoodsSalesHistory from './components/FinishedGoods/Sales/FinishedGoodsSalesHistory';
 
+import StockSummary from './components/FinishedGoods/Reports/StockSummary';
+
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
@@ -135,6 +137,8 @@ function App() {
             <Route path="/reports/department-usage" element={<DepartmentUsageReport />} />
             <Route path="finished-goods/sales/new" element={<AddFinishedGoodsSale />} />
             <Route path="finished-goods/sales/history" element={<FinishedGoodsSalesHistory />} />
+
+            <Route path="finished-goods/reports/stock/summary" element={<StockSummary />} />
 
           </Route>
 
