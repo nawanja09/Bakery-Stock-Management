@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import Select from 'react-select';
 import { faArrowLeft, faSave, faPlus, faTrash, faUtensils, faCalculator } from '@fortawesome/free-solid-svg-icons';
 import { usePopup } from '../../context/PopupContext';
 import './FinishedGoodsManagement.css';
@@ -20,13 +21,28 @@ const EditFinishedGoodsItem = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [fetchLoading, setFetchLoading] = useState(true);
   const [isLoadingRawMaterials, setIsLoadingRawMaterials] = useState(false);
+  const [outputQuantity, setOutputQuantity] = useState(1); // New state for output quantity
   const navigate = useNavigate();
   const { showPopup } = usePopup();
 
   useEffect(() => {
-    fetchRawMaterials();
-    fetchPreviousPurchasePrices();
-    fetchItem();
+    // Load raw materials and previous purchase prices first so
+    // when we fetch the item and its ingredients we can correctly
+    // populate unit_price and cost fields.
+    const loadAll = async () => {
+      try {
+        const [rmData, ppData] = await Promise.all([fetchRawMaterials(), fetchPreviousPurchasePrices()]);
+        // Fetch the item and pass the loaded data so ingredients can be formatted immediately
+        await fetchItem(rmData, ppData);
+      } catch (err) {
+        // individual functions already show popups on error
+        console.error('Error preloading data:', err);
+        // still attempt to fetch the item even if supporting data failed
+        await fetchItem();
+      }
+    };
+
+    loadAll();
   }, [id]);
 
   const fetchRawMaterials = async () => {
@@ -35,12 +51,15 @@ const EditFinishedGoodsItem = () => {
       const response = await api.get('/finished-goods-ingredients/raw-materials');
       if (response.status === 200) {
         setRawMaterials(response.data);
+        return response.data;
       } else {
         showPopup('error', 'Failed to fetch raw materials');
+        return [];
       }
     } catch (error) {
       console.error('Error fetching raw materials:', error);
       showPopup('error', 'Network error. Please try again.');
+      return [];
     } finally {
       setIsLoadingRawMaterials(false);
     }
@@ -50,12 +69,14 @@ const EditFinishedGoodsItem = () => {
     try {
       const response = await api.get('/purchases/previous-prices');
       setPreviousPurchasePrices(response.data);
+      return response.data;
     } catch (error) {
       console.error('Error fetching previous purchase prices:', error);
+      return {};
     }
   };
 
-  const fetchItem = async () => {
+  const fetchItem = async (rawMaterialsData = null, previousPricesData = null) => {
     try {
       // Fetch item details
       const itemResponse = await api.get(`/finished-goods-items/${id}`);
@@ -73,16 +94,21 @@ const EditFinishedGoodsItem = () => {
         const ingredientsResponse = await api.get(`/finished-goods-ingredients/${id}`);
         if (ingredientsResponse.status === 200) {
           const ingredientsData = ingredientsResponse.data;
+          // Use passed-in data when available to avoid relying on state updates
+          const rmData = rawMaterialsData || rawMaterials;
+          const ppData = previousPricesData || previousPurchasePrices;
+
           const formattedIngredients = ingredientsData.map(ing => {
-            const selectedMaterial = rawMaterials.find(rm => rm.id === ing.raw_material_id);
-            const unitPrice = previousPurchasePrices[ing.raw_material_id] || ing.unit_price || 0;
-            const cost = (ing.quantity * unitPrice).toFixed(2);
-            
+            const selectedMaterial = rmData.find(rm => Number(rm.id) === Number(ing.raw_material_id));
+            // previousPrices may have keys as strings or numbers
+            const unitPrice = (ppData && (ppData[ing.raw_material_id] ?? ppData[String(ing.raw_material_id)])) || ing.unit_price || (selectedMaterial ? selectedMaterial.unit_price : 0) || 0;
+            const cost = (parseFloat(ing.quantity) * parseFloat(unitPrice) || 0).toFixed(2);
+
             return {
               id: ing.id,
               raw_material_id: ing.raw_material_id?.toString() || '',
-              item_name: ing.item_name || '',
-              unit: ing.unit || '',
+              item_name: ing.item_name || (selectedMaterial ? selectedMaterial.name : ''),
+              unit: ing.unit || (selectedMaterial ? selectedMaterial.unit : ''),
               quantity: ing.quantity?.toString() || '',
               unit_price: unitPrice,
               cost: cost
@@ -90,6 +116,9 @@ const EditFinishedGoodsItem = () => {
           });
           setIngredients(formattedIngredients);
         }
+
+        // Set default output quantity
+        setOutputQuantity(1);
       } else {
         showPopup('error', itemData.error || 'Failed to fetch item');
       }
@@ -104,6 +133,11 @@ const EditFinishedGoodsItem = () => {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleOutputChange = (e) => {
+    const value = parseInt(e.target.value) || 1;
+    setOutputQuantity(Math.max(1, value)); // Ensure minimum output is 1
   };
 
   const handleIngredientChange = (index, field, value) => {
@@ -181,11 +215,21 @@ const EditFinishedGoodsItem = () => {
     }, 0).toFixed(2);
   };
 
+  // Calculate utility cost (70% of total cost)
+  const calculateUtilityCost = () => {
+    const totalCost = parseFloat(calculateTotalCost()) || 0;
+    return (totalCost * 0.7).toFixed(2);
+  };
+
   // Calculate per unit cost
   const calculatePerUnitCost = () => {
-    const totalCost = parseFloat(calculateTotalCost());
-    const unitPrice = parseFloat(formData.unit_price) || 1;
-    return (totalCost / unitPrice).toFixed(2);
+    const totalCost = parseFloat(calculateTotalCost()) || 0;
+    const utilityCost = parseFloat(calculateUtilityCost()) || 0;
+    const output = parseInt(outputQuantity) || 1;
+    
+    if (output <= 0) return '0.00';
+    
+    return ((totalCost + utilityCost) / output).toFixed(2);
   };
 
   const validateForm = () => {
@@ -196,6 +240,11 @@ const EditFinishedGoodsItem = () => {
     
     if (!formData.name.trim()) {
       showPopup('error', 'Product name is required');
+      return false;
+    }
+
+    if (!outputQuantity || outputQuantity <= 0) {
+      showPopup('error', 'Valid output quantity is required');
       return false;
     }
     
@@ -285,7 +334,7 @@ const EditFinishedGoodsItem = () => {
         
         <div className="header-actions">
           <div>
-            <h1 className="page-title">Edit Product</h1>
+            <h1 className="page-title">Edit Item Product</h1>
             <p className="page-subtitle">
               Update product information and ingredients
             </p>
@@ -495,26 +544,57 @@ const EditFinishedGoodsItem = () => {
             Cost Calculation
           </h3>
           
+          {/* Output Input Field */}
+          <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+            <label>Total Output (Quantity) *</label>
+            <input
+              type="number"
+              value={outputQuantity}
+              onChange={handleOutputChange}
+              required
+              min="1"
+              step="1"
+              placeholder="Enter output quantity"
+              className="form-input"
+              style={{ maxWidth: '200px' }}
+            />
+            <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+              Enter the total quantity produced from these ingredients
+            </small>
+          </div>
+          
           <div className="cost-grid">
-            <div className="cost-item">
-              <span className="cost-label">Total Raw Materials:</span>
-              <span className="cost-value">{calculateTotalQuantity()}</span>
-            </div>
-            
             <div className="cost-item">
               <span className="cost-label">Total Cost:</span>
               <span className="cost-value">Rs. {calculateTotalCost()}</span>
             </div>
             
             <div className="cost-item">
-              <span className="cost-label">Selling Price:</span>
-              <span className="cost-value">Rs. {formData.unit_price || '0.00'}</span>
+              <span className="cost-label">Utility Cost (70%):</span>
+              <span className="cost-value">Rs. {calculateUtilityCost()}</span>
             </div>
             
             <div className="cost-item highlight">
               <span className="cost-label">Per Unit Cost:</span>
               <span className="cost-value">Rs. {calculatePerUnitCost()}</span>
             </div>
+          </div>
+
+          {/* Formula Display */}
+          <div className="formula-display" style={{ 
+            marginTop: '1rem', 
+            padding: '1rem',
+            backgroundColor: 'var(--background-light)',
+            borderRadius: 'var(--radius)',
+            border: '1px solid var(--border)',
+            fontSize: '0.875rem',
+            color: 'var(--text-secondary)'
+          }}>
+            <strong>Formula:</strong> Per Unit Cost = (Total Cost + Utility Cost) / Output
+            <br />
+            <span style={{ fontSize: '0.8rem', fontStyle: 'italic' }}>
+              Utility Cost = Total Cost × 0.7
+            </span>
           </div>
         </section>
 

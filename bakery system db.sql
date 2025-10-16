@@ -646,3 +646,33 @@ ADD COLUMN destination_id INT NULL AFTER department_id;
 ALTER TABLE finished_goods_wastages 
 ADD CONSTRAINT fk_wastage_destination_id 
 FOREIGN KEY (destination_id) REFERENCES transfer_destinations(id);
+
+-- Update finished_goods_production_items table
+ALTER TABLE `finished_goods_production_items` 
+ADD COLUMN `unit_price` DECIMAL(10,2) DEFAULT 0,
+ADD COLUMN `cost_price` DECIMAL(10,2) DEFAULT 0,
+ADD COLUMN `total_cost` DECIMAL(10,2) DEFAULT 0,
+ADD COLUMN `output_quantity` INT DEFAULT 1,
+ADD COLUMN `utility_cost` DECIMAL(10,2) DEFAULT 0,
+ADD COLUMN `per_unit_cost` DECIMAL(10,2) DEFAULT 0;
+
+-- Create production_cost_calculations table
+CREATE TABLE IF NOT EXISTS `production_cost_calculations` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `production_id` int NOT NULL,
+  `item_id` int NOT NULL,
+  `total_raw_materials` DECIMAL(10,3) DEFAULT 0,
+  `total_cost` DECIMAL(10,2) DEFAULT 0,
+  `utility_cost` DECIMAL(10,2) DEFAULT 0,
+  `output_quantity` int DEFAULT 1,
+  `per_unit_cost` DECIMAL(10,2) DEFAULT 0,
+  `selling_price` DECIMAL(10,2) DEFAULT 0,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_production_item` (`production_id`, `item_id`),
+  KEY `production_id` (`production_id`),
+  KEY `item_id` (`item_id`),
+  CONSTRAINT `fk_cost_calc_production` FOREIGN KEY (`production_id`) REFERENCES `finished_goods_productions` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_cost_calc_item` FOREIGN KEY (`item_id`) REFERENCES `finished_goods_items` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

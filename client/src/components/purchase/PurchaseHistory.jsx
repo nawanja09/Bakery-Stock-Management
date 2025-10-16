@@ -165,7 +165,6 @@ const PurchaseHistory = () => {
           <thead>
             <tr>
               <th>Date</th>
-              <th>Items</th>
               <th>Supplier</th>
               <th>Company</th>
               <th>Bill Amount (Rs.)</th>
@@ -180,11 +179,6 @@ const PurchaseHistory = () => {
             {filteredPurchases.map(purchase => (
               <tr key={purchase.id}>
                 <td>{new Date(purchase.purchase_date).toLocaleDateString()}</td>
-                <td>
-                  <div className="items-list">
-                    {formatItemsList(purchase.items)}
-                  </div>
-                </td>
                 <td>{purchase.supplier_name}</td>
                 <td>{purchase.company_name}</td>
                 <td>{Number(purchase.bill_amount).toFixed(2)}</td>
