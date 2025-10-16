@@ -12,15 +12,14 @@ const PurchasingReport = () => {
   const [reportData, setReportData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [companyFilter, setCompanyFilter] = useState('');
+  const [searchTerm, setSearchTerm] = useState(''); // <-- Added
 
   const fetchPurchasingReport = async () => {
     setLoading(true);
     try {
-      // First get purchases with basic info
       const response = await api.get(`/reports/purchasing?startDate=${startDate}&endDate=${endDate}&companyId=${companyFilter}`);
       const purchases = response.data;
 
-      // Fetch detailed item information for each purchase
       const purchasesWithItems = await Promise.all(
         purchases.map(async (purchase) => {
           try {
@@ -50,25 +49,24 @@ const PurchasingReport = () => {
 
   const downloadPDF = () => {
     const doc = new jsPDF();
-    
+
     doc.setFontSize(16);
     doc.text(`Purchasing Report (${format(new Date(startDate), 'MMM dd, yyyy')} - ${format(new Date(endDate), 'MMM dd, yyyy')})`, 15, 15);
-    
+
     if (companyFilter) {
       const companyName = companyFilter === '1' ? 'JH' : 'RR';
       doc.setFontSize(12);
       doc.text(`Company: ${companyName}`, 15, 25);
     }
-    
+
     const totalPurchases = reportData.reduce((sum, purchase) => sum + parseFloat(purchase.bill_amount), 0);
     const totalPaid = reportData.reduce((sum, purchase) => sum + parseFloat(purchase.paid_amount), 0);
-    
+
     doc.setFontSize(12);
     doc.text(`Total Purchases: Rs. ${totalPurchases.toFixed(2)}`, 15, companyFilter ? 35 : 25);
     doc.text(`Total Paid: Rs. ${totalPaid.toFixed(2)}`, 15, companyFilter ? 42 : 32);
     doc.text(`Total Due: Rs. ${(totalPurchases - totalPaid).toFixed(2)}`, 15, companyFilter ? 49 : 39);
-    
-    // Create detailed table with item information
+
     const tableData = [];
     reportData.forEach(purchase => {
       if (purchase.items && purchase.items.length > 0) {
@@ -90,7 +88,6 @@ const PurchasingReport = () => {
           ]);
         });
       } else {
-        // Fallback for purchases without detailed items
         tableData.push([
           purchase.invoice_no,
           format(new Date(purchase.purchase_date), 'MMM dd, yyyy'),
@@ -107,7 +104,7 @@ const PurchasingReport = () => {
         ]);
       }
     });
-    
+
     const headers = [
       'Invoice #',
       'Date',
@@ -123,7 +120,7 @@ const PurchasingReport = () => {
       'Paid Amount',
       'Due Amount'
     ];
-    
+
     autoTable(doc, {
       head: [headers],
       body: tableData,
@@ -131,14 +128,13 @@ const PurchasingReport = () => {
       styles: { fontSize: 7 },
       headStyles: { fillColor: [41, 128, 185] }
     });
-    
+
     doc.save(`purchasing-report-${startDate}-to-${endDate}.pdf`);
   };
 
   const downloadExcel = () => {
     const worksheetData = [];
-    
-    // Add headers
+
     worksheetData.push([
       'Invoice #',
       'Date',
@@ -155,7 +151,6 @@ const PurchasingReport = () => {
       'Due Amount (Rs.)'
     ]);
 
-    // Add data rows
     reportData.forEach(purchase => {
       if (purchase.items && purchase.items.length > 0) {
         purchase.items.forEach(item => {
@@ -194,7 +189,6 @@ const PurchasingReport = () => {
       }
     });
 
-    // Add totals
     const totalPurchases = reportData.reduce((sum, purchase) => sum + parseFloat(purchase.bill_amount), 0);
     const totalPaid = reportData.reduce((sum, purchase) => sum + parseFloat(purchase.paid_amount), 0);
     const totalDue = totalPurchases - totalPaid;
@@ -211,27 +205,16 @@ const PurchasingReport = () => {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Purchasing Report');
 
-    const colWidths = [
-      { wch: 15 }, // Invoice No
-      { wch: 12 }, // Date
-      { wch: 20 }, // Supplier
-      { wch: 15 }, // Company
-      { wch: 15 }, // Check Number
-      { wch: 20 }, // Item Name
-      { wch: 10 }, // Quantity
-      { wch: 12 }, // Unit Price
-      { wch: 12 }, // Total Price
-      { wch: 15 }, // Payment Method
-      { wch: 15 }, // Bill Amount
-      { wch: 15 }, // Paid Amount
-      { wch: 15 }  // Due Amount
+    worksheet['!cols'] = [
+      { wch: 15 }, { wch: 12 }, { wch: 20 }, { wch: 15 },
+      { wch: 15 }, { wch: 20 }, { wch: 10 }, { wch: 12 },
+      { wch: 12 }, { wch: 15 }, { wch: 15 }, { wch: 15 },
+      { wch: 15 }
     ];
-    worksheet['!cols'] = colWidths;
 
     XLSX.writeFile(workbook, `purchasing-report-${startDate}-to-${endDate}.xlsx`);
   };
 
-  // Helper function to get all items from purchases for display
   const getAllItemsFromPurchases = () => {
     const allItems = [];
     reportData.forEach(purchase => {
@@ -250,7 +233,6 @@ const PurchasingReport = () => {
           });
         });
       } else {
-        // Add purchase as a row even if no items
         allItems.push({
           invoice_no: purchase.invoice_no,
           purchase_date: purchase.purchase_date,
@@ -271,6 +253,11 @@ const PurchasingReport = () => {
 
   const allItems = getAllItemsFromPurchases();
 
+  // 🔍 Apply search filter here
+  const filteredItems = allItems.filter(item =>
+    item.item_name?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
     <div className="purchasing-report-container">
       <div className="report-header">
@@ -286,7 +273,7 @@ const PurchasingReport = () => {
           </div>
         )}
       </div>
-      
+
       <div className="controls-section">
         <div className="control-group">
           <label>Start Date</label>
@@ -298,7 +285,7 @@ const PurchasingReport = () => {
             className="control-input"
           />
         </div>
-        
+
         <div className="control-group">
           <label>End Date</label>
           <input 
@@ -323,7 +310,18 @@ const PurchasingReport = () => {
             <option value="2">RR</option>
           </select>
         </div>
-        
+
+        <div className="control-group">
+          <label>Search Item</label>
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search by item name..."
+            className="control-input"
+          />
+        </div>
+
         <button 
           onClick={fetchPurchasingReport}
           disabled={loading}
@@ -345,27 +343,27 @@ const PurchasingReport = () => {
           <div className="loading-spinner"></div>
           Loading report data...
         </div>
-      ) : reportData.length > 0 ? (
+      ) : filteredItems.length > 0 ? (
         <div className="table-container">
           <table className="purchasing-report-table">
             <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Supplier</th>
-                  <th>Company</th>
-                  <th>Check #</th>
-                  <th>Item Name</th>
-                  <th>Quantity</th>
-                  <th>Unit Price (Rs.)</th>
-                  <th>Total Price (Rs.)</th>
-                  <th>Payment Method</th>
-                  <th>Bill Amount (Rs.)</th>
-                  <th>Paid (Rs.)</th>
-                  <th>Due (Rs.)</th>
-                </tr>
+              <tr>
+                <th>Date</th>
+                <th>Supplier</th>
+                <th>Company</th>
+                <th>Check #</th>
+                <th>Item Name</th>
+                <th>Quantity</th>
+                <th>Unit Price (Rs.)</th>
+                <th>Total Price (Rs.)</th>
+                <th>Payment Method</th>
+                <th>Bill Amount (Rs.)</th>
+                <th>Paid (Rs.)</th>
+                <th>Due (Rs.)</th>
+              </tr>
             </thead>
             <tbody>
-              {allItems.map((item, index) => (
+              {filteredItems.map((item, index) => (
                 <tr key={`${item.invoice_no}-${index}`}>
                   <td>{format(new Date(item.purchase_date), 'MMM dd, yyyy')}</td>
                   <td>{item.supplier_name}</td>
@@ -373,17 +371,16 @@ const PurchasingReport = () => {
                   <td>{item.check_number || 'N/A'}</td>
                   <td>{item.item_name || 'N/A'}</td>
                   <td>{item.quantity ? Number(item.quantity).toFixed(3) : 'N/A'}</td>
-                  <td>{item.unit_price ? Number(item.unit_price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'N/A'}</td>
+                  <td>{item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}</td>
                   <td>
                     {item.quantity && item.unit_price 
-                      ? (Number(item.quantity) * Number(item.unit_price)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                      : 'N/A'
-                    }
+                      ? (Number(item.quantity) * Number(item.unit_price)).toFixed(2)
+                      : 'N/A'}
                   </td>
                   <td>{item.payment_method}</td>
-                  <td>{parseFloat(item.bill_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                  <td>{parseFloat(item.paid_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                  <td>{(parseFloat(item.bill_amount) - parseFloat(item.paid_amount)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td>{parseFloat(item.bill_amount).toFixed(2)}</td>
+                  <td>{parseFloat(item.paid_amount).toFixed(2)}</td>
+                  <td>{(parseFloat(item.bill_amount) - parseFloat(item.paid_amount)).toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>
