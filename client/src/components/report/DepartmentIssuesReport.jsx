@@ -236,12 +236,6 @@ const DepartmentIssuesReport = () => {
         <div className="loading">Loading report data...</div>
       ) : reportData.length > 0 ? (
         <div className="report-summary">
-          <div style={{ marginBottom: '16px', color: '#666', fontSize: '14px' }}>
-            Showing {reportData.length} issuance records
-            <span style={{ marginLeft: '20px', fontWeight: 'bold' }}>
-              Grand Total: Rs. {reportData.reduce((total, row) => total + (parseFloat(row.total_price) || 0), 0).toFixed(2)}
-            </span>
-          </div>
           <div style={{ overflowX: 'auto' }}>
             <table className="report-table">
               <thead>
@@ -278,9 +272,21 @@ const DepartmentIssuesReport = () => {
               </tbody>
               <tfoot>
                 <tr style={{ backgroundColor: '#f8f9fa', fontWeight: 'bold' }}>
-                  <td colSpan="6"></td>
+                  <td colSpan="4"></td>
+                  <td>Grand Total Quantity:</td>
+                  <td>
+                    {reportData
+                      .reduce((total, row) => total + (parseFloat(row.quantity) || 0), 0)
+                      .toFixed(3)}
+                  </td>
                   <td>Grand Total:</td>
-                  <td>Rs. {reportData.reduce((total, row) => total + (parseFloat(row.total_price) || 0), 0).toFixed(2)}</td>
+                  <td colSpan="1"></td>
+                  <td>
+                    Rs.{" "}
+                    {reportData
+                      .reduce((total, row) => total + (parseFloat(row.total_price) || 0), 0)
+                      .toFixed(2)}
+                  </td>
                   <td colSpan="2"></td>
                 </tr>
               </tfoot>

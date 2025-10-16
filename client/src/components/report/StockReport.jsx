@@ -107,27 +107,27 @@ const StockReport = () => {
             max={format(new Date(), 'yyyy-MM-dd')}
           />
         </div>
-      </div>
 
-      <div className="action-buttons">
-        <button 
-          onClick={fetchStockReport}
-          disabled={loading}
-          className="btn btn-primary"
-        >
-          {loading ? 'Generating...' : 'Generate Report'}
-        </button>
-        
-        {stockData.length > 0 && (
-          <>
-            <button onClick={downloadPDF} className="btn btn-secondary">
-              <FontAwesomeIcon icon={faDownload} /> PDF
-            </button>
-            <button onClick={downloadExcel} className="btn btn-secondary">
-              <FontAwesomeIcon icon={faFileExcel} /> Excel
-            </button>
-          </>
-        )}
+        <div className="action-buttons">
+          <button 
+            onClick={fetchStockReport}
+            disabled={loading}
+            className="btn btn-primary"
+          >
+            {loading ? 'Generating...' : 'Generate Report'}
+          </button>
+          
+          {stockData.length > 0 && (
+            <>
+              <button onClick={downloadPDF} className="btn btn-secondary">
+                <FontAwesomeIcon icon={faDownload} /> PDF
+              </button>
+              <button onClick={downloadExcel} className="btn btn-secondary">
+                <FontAwesomeIcon icon={faFileExcel} /> Excel
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {loading ? (
