@@ -58,7 +58,8 @@ const StockReport = () => {
       ...reportData.map(item => [
         item.item_code,
         item.item_name,
-        item.opening_balance,
+        // keep dot if present
+        item.opening_balance === '.' ? '.' : item.opening_balance,
         item.production,
         item.transfer,
         item.wastage,
@@ -76,12 +77,23 @@ const StockReport = () => {
   };
 
   const calculateTotals = () => {
+    // If viewing all locations, opening balances should remain a dot
+    if (filters.location === 'All locations') {
+      return {
+        opening_balance: '.',
+        production: reportData.reduce((sum, item) => sum + (Number(item.production) || 0), 0),
+        transfer: reportData.reduce((sum, item) => sum + (Number(item.transfer) || 0), 0),
+        wastage: reportData.reduce((sum, item) => sum + (Number(item.wastage) || 0), 0),
+        closing_balance: reportData.reduce((sum, item) => sum + (Number(item.closing_balance) || 0), 0)
+      };
+    }
+
     return {
-      opening_balance: reportData.reduce((sum, item) => sum + item.opening_balance, 0),
-      production: reportData.reduce((sum, item) => sum + item.production, 0),
-      transfer: reportData.reduce((sum, item) => sum + item.transfer, 0),
-      wastage: reportData.reduce((sum, item) => sum + item.wastage, 0),
-      closing_balance: reportData.reduce((sum, item) => sum + item.closing_balance, 0)
+      opening_balance: reportData.reduce((sum, item) => sum + (Number(item.opening_balance) || 0), 0),
+      production: reportData.reduce((sum, item) => sum + (Number(item.production) || 0), 0),
+      transfer: reportData.reduce((sum, item) => sum + (Number(item.transfer) || 0), 0),
+      wastage: reportData.reduce((sum, item) => sum + (Number(item.wastage) || 0), 0),
+      closing_balance: reportData.reduce((sum, item) => sum + (Number(item.closing_balance) || 0), 0)
     };
   };
 
