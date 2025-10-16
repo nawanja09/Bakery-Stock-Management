@@ -189,12 +189,6 @@ const NavigationBar = () => {
                         <span>Add New</span>
                       </NavLink>
                     </li>
-                    <li>
-                      <NavLink to="/purchase/history" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                        <span className="icon-container"><FontAwesomeIcon icon={faFileInvoice} /></span>
-                        <span>Purchase History</span>
-                      </NavLink>
-                    </li>
                   </ul>
                 </li>
 
@@ -247,6 +241,12 @@ const NavigationBar = () => {
                   <ul className="dropdown-menu">
                     <li><NavLink to="/reports/stock" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faBox} /></span><span>Stock Reports</span></NavLink></li>
                     <li><NavLink to="/reports/purchasing" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faShoppingCart} /></span><span>Purchasing Report</span></NavLink></li>
+                    <li>
+                      <NavLink to="/purchase/history" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                        <span className="icon-container"><FontAwesomeIcon icon={faFileInvoice} /></span>
+                        <span>Purchase History</span>
+                      </NavLink>
+                    </li>
                     <li><NavLink to="/reports/wastage" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faTrash} /></span><span>Wastage Report</span></NavLink></li>
                     <li><NavLink to="/reports/department" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faShareSquare} /></span><span>Issuance Report</span></NavLink></li>
                     <li><NavLink to="/reports/stock/items" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faBox} /></span><span>Item Wise Stock Report</span></NavLink></li>
