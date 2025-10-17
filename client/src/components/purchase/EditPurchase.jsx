@@ -1,5 +1,4 @@
 // src/components/purchase/EditPurchase.jsx
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { usePopup } from '../context/PopupContext';
@@ -17,8 +16,8 @@ const EditPurchase = () => {
   const [companies, setCompanies] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [autoAddedRow, setAutoAddedRow] = useState(false); // prevent multiple auto-adds
-  const [previousPurchasePrices, setPreviousPurchasePrices] = useState({}); // store previous prices
+  const [autoAddedRow, setAutoAddedRow] = useState(false);
+  const [previousPurchasePrices, setPreviousPurchasePrices] = useState({});
 
   const [formData, setFormData] = useState({
     purchase_date: new Date().toLocaleDateString('en-CA'),
@@ -38,24 +37,23 @@ const EditPurchase = () => {
 
     const fetchData = async () => {
       try {
-        // Fetch purchase data
-        const purchaseRes = await api.get(`/purchases/${id}`);
-        const purchaseData = purchaseRes.data;
-
-        // Fetch dropdown data
-        const [suppliersRes, itemsRes, companiesRes, previousPricesRes] = await Promise.all([
+        // Fetch data in parallel for better performance
+        const [purchaseRes, suppliersRes, itemsRes, companiesRes, previousPricesRes] = await Promise.all([
+          api.get(`/purchases/${id}`),
           api.get('/suppliers'),
           api.get('/items'),
           api.get('/purchases/companies'),
           api.get('/purchases/previous-prices')
         ]);
 
+        const purchaseData = purchaseRes.data;
+        
         setSuppliers(suppliersRes.data);
         setItemsList(itemsRes.data);
         setCompanies(companiesRes.data);
         setPreviousPurchasePrices(previousPricesRes.data);
 
-        // Set form data
+        // Set form data - IMPORTANT: Use original purchase prices, NOT previous prices
         setFormData({
           purchase_date: new Date(purchaseData.purchase_date).toLocaleDateString('en-CA'),
           supplier_id: purchaseData.supplier_id,
@@ -69,7 +67,7 @@ const EditPurchase = () => {
             id: item.item_id,
             item_name: item.item_name,
             quantity: item.quantity,
-            unit_price: previousPricesRes.data[item.item_id] || item.unit_price || 0
+            unit_price: item.unit_price // Use original unit_price from purchase
           }))
         });
 
@@ -92,17 +90,20 @@ const EditPurchase = () => {
     }
 
     newItems[index][field] = value;
-    newItems[index].total = newItems[index].quantity * newItems[index].unit_price;
+    
+    // Calculate total for the item
+    if (field === 'quantity' || field === 'unit_price') {
+      newItems[index].total = newItems[index].quantity * newItems[index].unit_price;
+    }
 
     setFormData({ ...formData, items: newItems });
 
-    // Auto-add new row when editing unit_price of last row
+    // Auto-add new row only for new purchases, not for edits
     if (field === 'unit_price' && index === formData.items.length - 1 && !autoAddedRow) {
       addItemRow();
       setAutoAddedRow(true);
     }
 
-    // Reset autoAddedRow if editing other rows
     if (index !== formData.items.length - 1) {
       setAutoAddedRow(false);
     }
@@ -110,17 +111,24 @@ const EditPurchase = () => {
 
   const handleItemSelect = (index, selectedOption) => {
     if (!selectedOption) return;
+    
     const selectedItem = itemsList.find(item => item.id === selectedOption.value);
     if (!selectedItem) return;
 
-    const previousPrice = previousPurchasePrices[selectedItem.id] || 0;
-
+    // For EDIT mode: Only use previous price if the current unit_price is 0 or not set
     const newItems = [...formData.items];
+    const currentUnitPrice = newItems[index].unit_price;
+    
+    // Only auto-fill previous price if current price is 0 or empty
+    const newUnitPrice = (currentUnitPrice === 0 || currentUnitPrice === '') 
+      ? (previousPurchasePrices[selectedItem.id] || 0)
+      : currentUnitPrice;
+
     newItems[index] = {
       ...newItems[index],
       id: selectedItem.id,
       item_name: selectedItem.name,
-      unit_price: previousPrice
+      unit_price: newUnitPrice
     };
 
     setFormData({ ...formData, items: newItems });
@@ -146,6 +154,7 @@ const EditPurchase = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    // Validation
     if (formData.items.some(item => !item.id)) {
       showPopup('error', 'Please select valid items for all rows');
       return;
@@ -175,6 +184,7 @@ const EditPurchase = () => {
     }
   };
 
+  // Prepare item options for dropdown
   const itemOptions = itemsList.map(itm => ({
     value: itm.id,
     label: `${itm.name} (${itm.item_code || ''})`,
@@ -240,7 +250,6 @@ const EditPurchase = () => {
             <select
               value={formData.company_id}
               onChange={(e) => setFormData({ ...formData, company_id: e.target.value })}
-              required
             >
               <option value="">Select Company</option>
               {companies.map(company => (
@@ -270,11 +279,16 @@ const EditPurchase = () => {
 
         {/* Purchased Items */}
         <h3>Purchased Items</h3>
+        <div className="info-note">
+          💡 <strong>Note:</strong> When editing, original purchase prices are preserved. 
+          Previous month's prices are shown for reference only.
+        </div>
+        
         <table className="item-table">
           <thead>
             <tr>
               <th>Item</th>
-              <th>Previous Price (Rs.)</th>
+              <th>Last Month Price (Rs.)</th>
               <th>Quantity</th>
               <th>Unit Price (Rs.)</th>
               <th>Total (Rs.)</th>
@@ -284,6 +298,7 @@ const EditPurchase = () => {
           <tbody>
             {formData.items.map((item, index) => {
               const previousPrice = previousPurchasePrices[item.id] || 0;
+              const isPriceDifferent = previousPrice > 0 && item.unit_price !== previousPrice;
 
               return (
                 <tr key={index}>
@@ -296,7 +311,9 @@ const EditPurchase = () => {
                       placeholder="Select or search item..."
                     />
                   </td>
-                  <td>{previousPrice > 0 ? `Rs. ${previousPrice.toFixed(2)}` : 'No history'}</td>
+                  <td className={isPriceDifferent ? 'price-different' : ''}>
+                    {previousPrice > 0 ? `Rs. ${previousPrice.toFixed(2)}` : 'No history'}
+                  </td>
                   <td>
                     <input
                       type="number"
@@ -315,11 +332,22 @@ const EditPurchase = () => {
                       value={item.unit_price}
                       onChange={(e) => handleItemChange(index, 'unit_price', parseFloat(e.target.value))}
                       required
+                      className={isPriceDifferent ? 'current-price-different' : ''}
                     />
+                    {isPriceDifferent && (
+                      <div className="price-change-indicator">
+                        Price changed from last month
+                      </div>
+                    )}
                   </td>
                   <td>{(item.quantity * item.unit_price).toFixed(2)}</td>
                   <td>
-                    <button type="button" className="btn-remove" onClick={() => removeItemRow(index)}>
+                    <button 
+                      type="button" 
+                      className="btn-remove" 
+                      onClick={() => removeItemRow(index)}
+                      disabled={formData.items.length <= 1}
+                    >
                       Remove
                     </button>
                   </td>
@@ -334,7 +362,7 @@ const EditPurchase = () => {
         </button>
 
         {/* Payment */}
-        <div className="form">
+        <div className="form-row">
           <div className="form-group">
             <label>Paid Amount (Rs.)</label>
             <input
@@ -360,7 +388,12 @@ const EditPurchase = () => {
           </div>
         </div>
 
-        <button type="submit" className="btn-submit">Update Purchase</button>
+        <div className="form-actions">
+          <button type="button" className="btn-secondary" onClick={() => navigate('/purchase/history')}>
+            Cancel
+          </button>
+          <button type="submit" className="btn-submit">Update Purchase</button>
+        </div>
       </form>
     </div>
   );
