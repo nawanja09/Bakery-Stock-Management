@@ -5,7 +5,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
-import './StockReport.css';
+import './DepartmentIssuesReport.css';
 import api from '../../api';
 
 const DepartmentIssuesReport = () => {
@@ -147,12 +147,14 @@ const DepartmentIssuesReport = () => {
 
   return (
     <div className="report-container">
-      <div className="report-header">
-        <h2>Issuance Report</h2>
-        <p className="report-subtitle">Track item issuance across departments</p>
-      </div>
+      <header className="report-header">
+        <div>
+          <h2>Issuance Report</h2>
+          <p className="report-subtitle">Track item issuance across departments</p>
+        </div>
+      </header>
 
-      <div className="controls-grid">
+      <section className="controls-grid" aria-label="Report filters">
         <div className="form-group">
           <label>
             <FontAwesomeIcon icon={faFilter} /> Department
@@ -204,31 +206,36 @@ const DepartmentIssuesReport = () => {
             onChange={(e) => setEndDate(e.target.value)}
           />
         </div>
-      </div>
+  </section>
 
-      <div className="action-buttons">
-        <button 
-          onClick={generateReport} 
-          disabled={loading} 
+  <div className="action-buttons" role="toolbar" aria-label="Report actions">
+        <button
+          onClick={generateReport}
+          disabled={loading}
           className="btn btn-primary"
+          title="Generate report"
         >
-          {loading ? "Generating Report..." : "Generate Report"}
+          {loading ? "Generating..." : "Generate"}
         </button>
 
-        <button 
-          onClick={exportPDF} 
-          disabled={reportData.length === 0} 
+        <button
+          onClick={exportPDF}
+          disabled={reportData.length === 0}
           className="btn btn-secondary"
+          title="Export as PDF"
         >
-          <FontAwesomeIcon icon={faDownload} /> Export PDF
+          <FontAwesomeIcon icon={faDownload} />
+          <span>PDF</span>
         </button>
 
-        <button 
-          onClick={exportExcel} 
-          disabled={reportData.length === 0} 
+        <button
+          onClick={exportExcel}
+          disabled={reportData.length === 0}
           className="btn btn-secondary"
+          title="Export as Excel"
         >
-          <FontAwesomeIcon icon={faFileExcel} /> Export Excel
+          <FontAwesomeIcon icon={faFileExcel} />
+          <span>Excel</span>
         </button>
       </div>
 
