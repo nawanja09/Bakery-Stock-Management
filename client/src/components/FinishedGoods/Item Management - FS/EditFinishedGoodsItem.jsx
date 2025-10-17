@@ -17,33 +17,40 @@ const EditFinishedGoodsItem = () => {
   });
   const [ingredients, setIngredients] = useState([]);
   const [rawMaterials, setRawMaterials] = useState([]);
+  const [rawMaterialOptions, setRawMaterialOptions] = useState([]);
   const [previousPurchasePrices, setPreviousPurchasePrices] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [fetchLoading, setFetchLoading] = useState(true);
   const [isLoadingRawMaterials, setIsLoadingRawMaterials] = useState(false);
-  const [outputQuantity, setOutputQuantity] = useState(1); // New state for output quantity
+  const [outputQuantity, setOutputQuantity] = useState(1);
   const navigate = useNavigate();
   const { showPopup } = usePopup();
 
   useEffect(() => {
-    // Load raw materials and previous purchase prices first so
-    // when we fetch the item and its ingredients we can correctly
-    // populate unit_price and cost fields.
     const loadAll = async () => {
       try {
         const [rmData, ppData] = await Promise.all([fetchRawMaterials(), fetchPreviousPurchasePrices()]);
-        // Fetch the item and pass the loaded data so ingredients can be formatted immediately
         await fetchItem(rmData, ppData);
       } catch (err) {
-        // individual functions already show popups on error
         console.error('Error preloading data:', err);
-        // still attempt to fetch the item even if supporting data failed
         await fetchItem();
       }
     };
 
     loadAll();
   }, [id]);
+
+  useEffect(() => {
+    // Convert raw materials to react-select options
+    if (rawMaterials.length > 0) {
+      const options = rawMaterials.map(material => ({
+        value: material.id,
+        label: `${material.name} (${material.item_code})`,
+        data: material
+      }));
+      setRawMaterialOptions(options);
+    }
+  }, [rawMaterials]);
 
   const fetchRawMaterials = async () => {
     setIsLoadingRawMaterials(true);
@@ -94,13 +101,11 @@ const EditFinishedGoodsItem = () => {
         const ingredientsResponse = await api.get(`/finished-goods-ingredients/${id}`);
         if (ingredientsResponse.status === 200) {
           const ingredientsData = ingredientsResponse.data;
-          // Use passed-in data when available to avoid relying on state updates
           const rmData = rawMaterialsData || rawMaterials;
           const ppData = previousPricesData || previousPurchasePrices;
 
           const formattedIngredients = ingredientsData.map(ing => {
             const selectedMaterial = rmData.find(rm => Number(rm.id) === Number(ing.raw_material_id));
-            // previousPrices may have keys as strings or numbers
             const unitPrice = (ppData && (ppData[ing.raw_material_id] ?? ppData[String(ing.raw_material_id)])) || ing.unit_price || (selectedMaterial ? selectedMaterial.unit_price : 0) || 0;
             const cost = (parseFloat(ing.quantity) * parseFloat(unitPrice) || 0).toFixed(2);
 
@@ -137,7 +142,7 @@ const EditFinishedGoodsItem = () => {
 
   const handleOutputChange = (e) => {
     const value = parseInt(e.target.value) || 1;
-    setOutputQuantity(Math.max(1, value)); // Ensure minimum output is 1
+    setOutputQuantity(Math.max(1, value));
   };
 
   const handleIngredientChange = (index, field, value) => {
@@ -146,15 +151,12 @@ const EditFinishedGoodsItem = () => {
     if (field === 'raw_material_id') {
       const selectedMaterial = rawMaterials.find(rm => rm.id === parseInt(value));
       if (selectedMaterial) {
-        // Auto-populate all fields when raw material is selected
         updatedIngredients[index] = {
           ...updatedIngredients[index],
           raw_material_id: value,
           item_name: selectedMaterial.name,
           unit: selectedMaterial.unit,
-          // Set previous purchase price automatically
           unit_price: previousPurchasePrices[selectedMaterial.id] || selectedMaterial.unit_price || 0,
-          // Reset quantity and cost to avoid old values
           quantity: updatedIngredients[index].quantity || '',
           cost: '0.00'
         };
@@ -165,16 +167,24 @@ const EditFinishedGoodsItem = () => {
           const unitPrice = parseFloat(updatedIngredients[index].unit_price) || 0;
           updatedIngredients[index].cost = (quantity * unitPrice).toFixed(2);
         }
+      } else {
+        // Clear fields if no material selected
+        updatedIngredients[index] = {
+          ...updatedIngredients[index],
+          raw_material_id: '',
+          item_name: '',
+          unit: '',
+          unit_price: '',
+          cost: '0.00'
+        };
       }
     } else if (field === 'quantity') {
       updatedIngredients[index][field] = value;
-      // Calculate cost when quantity changes
       const quantity = parseFloat(value) || 0;
       const unitPrice = parseFloat(updatedIngredients[index].unit_price) || 0;
       updatedIngredients[index].cost = (quantity * unitPrice).toFixed(2);
     } else if (field === 'unit_price') {
       updatedIngredients[index][field] = value;
-      // Calculate cost when unit price changes
       const quantity = parseFloat(updatedIngredients[index].quantity) || 0;
       const unitPrice = parseFloat(value) || 0;
       updatedIngredients[index].cost = (quantity * unitPrice).toFixed(2);
@@ -313,6 +323,44 @@ const EditFinishedGoodsItem = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Custom styles for react-select
+  const customStyles = {
+    control: (base, state) => ({
+      ...base,
+      border: '1px solid #e2e8f0',
+      borderRadius: '8px',
+      fontSize: '0.875rem',
+      minHeight: '42px',
+      boxShadow: state.isFocused ? '0 0 0 3px rgba(59, 130, 246, 0.1)' : 'none',
+      borderColor: state.isFocused ? '#3b82f6' : '#e2e8f0',
+      '&:hover': {
+        borderColor: state.isFocused ? '#3b82f6' : '#cbd5e1'
+      }
+    }),
+    menu: (base) => ({
+      ...base,
+      fontSize: '0.875rem',
+      zIndex: 9999
+    }),
+    option: (base, state) => ({
+      ...base,
+      backgroundColor: state.isSelected ? '#3b82f6' : state.isFocused ? '#f1f5f9' : '#ffffff',
+      color: state.isSelected ? '#ffffff' : '#1e293b',
+      '&:active': {
+        backgroundColor: '#3b82f6',
+        color: '#ffffff'
+      }
+    }),
+    singleValue: (base) => ({
+      ...base,
+      color: '#1e293b'
+    }),
+    placeholder: (base) => ({
+      ...base,
+      color: '#94a3b8'
+    })
   };
 
   if (fetchLoading) {
@@ -460,20 +508,24 @@ const EditFinishedGoodsItem = () => {
                   {ingredients.map((ingredient, index) => (
                     <tr key={index}>
                       <td>
-                        <select
-                          value={ingredient.raw_material_id}
-                          onChange={(e) => handleIngredientChange(index, 'raw_material_id', e.target.value)}
+                        <Select
+                          options={rawMaterialOptions}
+                          value={rawMaterialOptions.find(option => 
+                            option.value.toString() === ingredient.raw_material_id.toString()
+                          )}
+                          onChange={(selectedOption) => 
+                            handleIngredientChange(
+                              index, 
+                              'raw_material_id', 
+                              selectedOption ? selectedOption.value : ''
+                            )
+                          }
+                          isSearchable={true}
+                          placeholder="Search raw material..."
+                          noOptionsMessage={() => "No materials found"}
+                          styles={customStyles}
                           required
-                          className="form-input"
-                          style={{ margin: 0 }}
-                        >
-                          <option value="">Select material...</option>
-                          {rawMaterials.map(material => (
-                            <option key={material.id} value={material.id}>
-                              {material.name} ({material.item_code})
-                            </option>
-                          ))}
-                        </select>
+                        />
                       </td>
                       <td>
                         <input
