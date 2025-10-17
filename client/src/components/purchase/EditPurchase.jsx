@@ -400,3 +400,5 @@ const EditPurchase = () => {
 };
 
 export default EditPurchase;
+
+// src/controllers/purchaseController.js
