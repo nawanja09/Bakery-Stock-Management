@@ -768,8 +768,22 @@
 }
 
 /* Ingredients Section */
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+
+.unit-input {
+  background: var(--background) !important;
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+/* Ingredients Section Styles */
 .ingredients-section {
-  background: var(--background-light);
+  background: var(--surface);
   border-radius: var(--radius-lg);
   padding: 2rem;
   margin: 2.5rem 0;
@@ -823,13 +837,32 @@
   background: var(--background-light);
 }
 
-.unit-input {
-  background: var(--background) !important;
-  color: var(--text-muted);
-  cursor: not-allowed;
+/* Table Input Styles */
+.ingredients-table .form-input {
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  background: var(--surface);
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
 }
 
-/* React Select Custom Styles */
+.ingredients-table .form-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+.ingredients-table .unit-input {
+  background: var(--background-light) !important;
+  color: var(--text-muted);
+  cursor: not-allowed;
+  border-color: var(--border-light);
+}
+
+/* React Select Custom Styles for Table */
 .ingredients-table .react-select__control {
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -910,6 +943,54 @@
   color: var(--text-muted);
 }
 
+/* Table Action Buttons */
+.ingredients-table .btn-icon {
+  width: 36px;
+  height: 36px;
+  padding: 0.5rem;
+  border-radius: var(--radius);
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ingredients-table .btn-icon:hover:not(:disabled) {
+  background: var(--background-light);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
+.ingredients-table .btn-icon.error {
+  color: var(--error);
+  border-color: var(--error);
+}
+
+.ingredients-table .btn-icon.error:hover:not(:disabled) {
+  background: var(--error);
+  color: white;
+}
+
+/* Responsive Table */
+@media (max-width: 768px) {
+  .ingredients-table-container {
+    border-radius: var(--radius-sm);
+  }
+  
+  .ingredients-table th,
+  .ingredients-table td {
+    padding: 1rem 0.75rem;
+  }
+  
+  .ingredients-table .form-input {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8rem;
+  }
+}
 /* Cost Calculation */
 .cost-section {
   background: var(--surface);

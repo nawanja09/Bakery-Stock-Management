@@ -6,6 +6,7 @@ import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 import './DepartmentIssuesReport.css';
+import Select from 'react-select';
 import api from '../../api';
 
 const DepartmentIssuesReport = () => {
@@ -71,7 +72,7 @@ const DepartmentIssuesReport = () => {
     }
 
     const doc = new jsPDF();
-    const dateRange = `${format(new Date(startDate), 'MMM dd, yyyy')} - ${format(new Date(endDate), 'MMM dd, yyyy')}`;
+    const dateRange = `${format(new Date(startDate), 'dd,MMM, yyyy')} - ${format(new Date(endDate), 'dd,MMM, yyyy')}`;
 
     const departmentName = selectedDepartment === "all"
       ? "All Departments"
@@ -159,34 +160,34 @@ const DepartmentIssuesReport = () => {
           <label>
             <FontAwesomeIcon icon={faFilter} /> Department
           </label>
-          <select
-            value={selectedDepartment}
-            onChange={(e) => setSelectedDepartment(e.target.value)}
-          >
-            <option value="all">All Departments</option>
-            {departments.map((dept) => (
-              <option key={dept.id} value={dept.id}>
-                {dept.name}
-              </option>
-            ))}
-          </select>
+          <Select
+            value={selectedDepartment === "all" ? { value: "all", label: "All Departments" } : departments.find(d => d.id === Number(selectedDepartment)) && { value: selectedDepartment, label: departments.find(d => d.id === Number(selectedDepartment))?.name }}
+            onChange={(option) => setSelectedDepartment(option.value)}
+            options={[
+              { value: "all", label: "All Departments" },
+              ...departments.map((dept) => ({
+                value: dept.id.toString(),
+                label: dept.name,
+              })),
+            ]}
+          />
         </div>
 
         <div className="form-group">
           <label>
             <FontAwesomeIcon icon={faFilter} /> Item
           </label>
-          <select
-            value={selectedItem}
-            onChange={(e) => setSelectedItem(e.target.value)}
-          >
-            <option value="all">All Items</option>
-            {items.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name} ({item.item_code})
-              </option>
-            ))}
-          </select>
+          <Select
+            value={selectedItem === "all" ? { value: "all", label: "All Items" } : items.find(i => i.id === Number(selectedItem)) && { value: selectedItem, label: items.find(i => i.id === Number(selectedItem))?.name + ` (${items.find(i => i.id === Number(selectedItem))?.item_code})` }}
+            onChange={(option) => setSelectedItem(option.value)}
+            options={[
+              { value: "all", label: "All Items" },
+              ...items.map((item) => ({
+                value: item.id.toString(),
+                label: `${item.name} (${item.item_code})`,
+              })),
+            ]}
+          />
         </div>
 
         <div className="form-group">

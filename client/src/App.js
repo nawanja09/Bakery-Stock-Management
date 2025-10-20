@@ -56,6 +56,8 @@ import FinishedGoodsSalesHistory from './components/FinishedGoods/Sales/Finished
 
 import StockSummary from './components/FinishedGoods/Reports/StockSummary';
 
+import AddReturns from './components/Return/AddNewReturns';
+
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
@@ -139,6 +141,7 @@ function App() {
             <Route path="finished-goods/sales/history" element={<FinishedGoodsSalesHistory />} />
 
             <Route path="finished-goods/reports/stock/summary" element={<StockSummary />} />
+            <Route path="returns/new" element={<AddReturns />} />
 
           </Route>
 
