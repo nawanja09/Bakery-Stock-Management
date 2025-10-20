@@ -25,7 +25,8 @@ import {
   faBars,
   faCalculator,
   faSave,
-  faClipboardList
+  faClipboardList,
+  faUndo
 } from '@fortawesome/free-solid-svg-icons';
 import bakeryLogo from '../images/icon.jpeg';
 import './NavigationBar.css';
@@ -228,6 +229,14 @@ const NavigationBar = () => {
                   <NavLink to="/wastage/history" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
                     <span className="icon-container"><FontAwesomeIcon icon={faTrashAlt} /></span>
                     <span>Wastage</span>
+                  </NavLink>
+                </li>
+
+                {/* Returns */ }
+                <li>
+                  <NavLink to="/returns" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                    <span className="icon-container"><FontAwesomeIcon icon={faUndo} /></span>
+                    <span>Returns</span>
                   </NavLink>
                 </li>
 

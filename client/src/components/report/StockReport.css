@@ -214,13 +214,20 @@
 /* Select Component Fix */
 .react-select-container {
   width: 100%;
+  display: flex;
+  align-items: center;
 }
 
 .react-select__control {
-  min-height: 42px;
+  min-height: 48px;
+  height: 48px;
   border: 1px solid #e0e0e0;
   border-radius: 6px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
 }
+
 
 .react-select__control:hover {
   border-color: #e0e0e0;
@@ -229,6 +236,21 @@
 .react-select__control--is-focused {
   border-color: #007acc !important;
   box-shadow: 0 0 0 3px rgba(0, 122, 204, 0.1) !important;
+}
+
+/* Uniform sizing for filter controls (date inputs and select) */
+.form-group input,
+.form-group select,
+.react-select__control {
+  height: 48px;
+  min-height: 48px;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.form-group input,
+.form-group select {
+  padding: 10px 12px;
 }
 
 /* Clickable rows */

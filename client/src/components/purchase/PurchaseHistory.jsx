@@ -57,10 +57,10 @@ const PurchaseHistory = () => {
 
     if (query) {
       filtered = filtered.filter(purchase =>
-        purchase.invoice_no.toLowerCase().includes(query.toLowerCase()) ||
-        purchase.supplier_name.toLowerCase().includes(query.toLowerCase()) ||
-        purchase.payment_method.toLowerCase().includes(query.toLowerCase()) ||
-        purchase.company_name.toLowerCase().includes(query.toLowerCase())
+        purchase.check_number?.toLowerCase().includes(query.toLowerCase()) ||
+        purchase.supplier_name?.toLowerCase().includes(query.toLowerCase()) ||
+        purchase.payment_method?.toLowerCase().includes(query.toLowerCase()) ||
+        purchase.company_name?.toLowerCase().includes(query.toLowerCase())
       );
     }
 
@@ -127,7 +127,7 @@ const PurchaseHistory = () => {
         </Link>
       </div>
 
-      <div className="search-bar">
+      <div className="filters-row">
         <div className="search-input">
           <FontAwesomeIcon icon={faSearch} className="search-icon" />
           <input
@@ -146,17 +146,9 @@ const PurchaseHistory = () => {
 
         <div className="date-range">
           <label>Date Range:</label>
-          <input
-            type="date"
-            value={startDate}
-            onChange={handleStartDateChange}
-          />
+          <input type="date" value={startDate} onChange={handleStartDateChange} />
           <span className="date-separator">→</span>
-          <input
-            type="date"
-            value={endDate}
-            onChange={handleEndDateChange}
-          />
+          <input type="date" value={endDate} onChange={handleEndDateChange} />
         </div>
       </div>
 
@@ -178,7 +170,7 @@ const PurchaseHistory = () => {
           <tbody>
             {filteredPurchases.map(purchase => (
               <tr key={purchase.id}>
-                <td>{new Date(purchase.purchase_date).toLocaleDateString()}</td>
+                <td>{new Date(purchase.purchase_date).toLocaleDateString('en-GB')}</td>
                 <td>{purchase.supplier_name}</td>
                 <td>{purchase.company_name}</td>
                 <td>{Number(purchase.bill_amount).toFixed(2)}</td>

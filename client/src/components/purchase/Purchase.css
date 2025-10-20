@@ -373,3 +373,31 @@ select, input[type="date"] {
 .btn-submit:hover {
   background: #0056b3;
 }
+
+.filters-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap; /* Optional: allows wrapping on smaller screens */
+}
+
+.search-input {
+  display: flex;
+  align-items: center;
+}
+
+.search-input input {
+  padding: 0.5rem;
+  margin-left: 0.5rem;
+}
+
+.date-range {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.date-separator {
+  font-weight: bold;
+}

@@ -492,27 +492,6 @@ const StockReportByRangeAndItem = () => {
             placeholder="Search items..."
             className="react-select-container"
             classNamePrefix="react-select"
-            styles={{
-              control: (base) => ({
-                ...base,
-                minHeight: '42px',
-                border: '1px solid #e0e0e0',
-                borderRadius: '6px',
-                '&:hover': {
-                  borderColor: '#e0e0e0'
-                }
-              }),
-              menu: (base) => ({
-                ...base,
-                borderRadius: '6px',
-                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
-              }),
-              option: (base, state) => ({
-                ...base,
-                backgroundColor: state.isSelected ? '#007acc' : state.isFocused ? '#f0f8ff' : 'white',
-                color: state.isSelected ? 'white' : '#333'
-              })
-            }}
           />
         </div>
 
