@@ -1,3 +1,4 @@
+// src/components/report/StockReport.jsx
 import React, { useState } from 'react';
 import { format } from 'date-fns';
 import jsPDF from 'jspdf';
@@ -12,18 +13,69 @@ const StockReport = () => {
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [stockData, setStockData] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [itemPrices, setItemPrices] = useState({}); // Store latest unit prices
 
   const fetchStockReport = async () => {
     setLoading(true);
     try {
       const response = await api.get(`/reports/stock?date=${selectedDate}`);
-      setStockData(response.data);
+      const stockData = response.data;
+      setStockData(stockData);
+
+      // Fetch latest unit prices for all items
+      await fetchLatestUnitPrices(stockData);
     } catch (error) {
       console.error('Error fetching stock report:', error.message);
       alert('Failed to fetch stock report');
     } finally {
       setLoading(false);
     }
+  };
+
+  // Fetch latest unit prices before selected date
+  const fetchLatestUnitPrices = async (stockData) => {
+    try {
+      const pricePromises = stockData.map(async (item) => {
+        try {
+          const response = await api.get(`/reports/latest-price?itemId=${item.id}&date=${selectedDate}`);
+          return {
+            itemId: item.id,
+            unitPrice: response.data.unitPrice || 0
+          };
+        } catch (error) {
+          console.error(`Error fetching price for item ${item.id}:`, error);
+          return {
+            itemId: item.id,
+            unitPrice: 0
+          };
+        }
+      });
+
+      const prices = await Promise.all(pricePromises);
+      const priceMap = {};
+      prices.forEach(price => {
+        priceMap[price.itemId] = price.unitPrice;
+      });
+      setItemPrices(priceMap);
+    } catch (error) {
+      console.error('Error fetching latest unit prices:', error);
+    }
+  };
+
+  // Calculate value for an item
+  const calculateValue = (item) => {
+    if (!item) return '0.00';
+    const closingBalance = Number(item.closing_balance) || 0;
+    const unitPrice = itemPrices[item.id] || 0;
+    return (closingBalance * unitPrice).toFixed(2);
+  };
+
+  // Calculate total value for all items (used in table footer)
+  const calculateTotal = () => {
+    const total = stockData.reduce((acc, item) => {
+      return acc + Number(calculateValue(item));
+    }, 0);
+    return total.toFixed(2);
   };
 
   const downloadPDF = () => {
@@ -45,7 +97,8 @@ const StockReport = () => {
       Number(item.total_purchased).toFixed(2),
       Number(item.total_issued).toFixed(2),
       Number(item.total_wasted).toFixed(2),
-      Number(item.closing_balance).toFixed(2)
+      Number(item.closing_balance).toFixed(2),
+      `Rs. ${calculateValue(item)}`
     ]);
     
     const headers = [
@@ -56,7 +109,8 @@ const StockReport = () => {
       'Purchased',
       'Issued',
       'Wasted',
-      'Closing'
+      'Closing',
+      'Value (Rs.)'
     ];
     
     autoTable(doc, {
@@ -79,7 +133,8 @@ const StockReport = () => {
       'Purchased': Number(item.total_purchased),
       'Issued': Number(item.total_issued),
       'Wasted': Number(item.total_wasted),
-      'Closing Balance': Number(item.closing_balance)
+      'Closing Balance': Number(item.closing_balance),
+      'Value (Rs.)': Number(calculateValue(item))
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(worksheetData);
@@ -145,6 +200,7 @@ const StockReport = () => {
                 <th>Issued</th>
                 <th>Wasted</th>
                 <th>Closing</th>
+                <th>Value (Rs.)</th>
               </tr>
             </thead>
             <tbody>
@@ -158,9 +214,20 @@ const StockReport = () => {
                   <td>{Number(item.total_issued).toFixed(2)}</td>
                   <td>{Number(item.total_wasted).toFixed(2)}</td>
                   <td>{Number(item.closing_balance).toFixed(2)}</td>
+                  <td style={{ fontWeight: 'bold', color: '#2e7d32' }}>
+                    Rs. {calculateValue(item)}
+                  </td>
                 </tr>
               ))}
             </tbody>
+            <tfoot>
+              <tr>
+                <td colSpan="8" style={{ fontWeight: 'bold' }}>Total Value (Rs.)</td>
+                <td style={{ fontWeight: 'bold', color: '#2e7d32' }}>
+                  Rs. {calculateTotal()}
+                </td>
+              </tr>
+            </tfoot>
           </table>
         </div>
       ) : (

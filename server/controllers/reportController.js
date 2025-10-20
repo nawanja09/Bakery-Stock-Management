@@ -35,7 +35,17 @@ const getStockReport = async (req, res) => {
           COALESCE(purchases.total_purchased, 0) -
           COALESCE(issues.total_issued, 0) -
           COALESCE(wastage.total_wasted, 0)
-        ) AS closing_balance
+        ) AS closing_balance,
+        -- Get latest unit price
+        (
+          SELECT pi.unit_price 
+          FROM purchase_items pi
+          JOIN purchases p ON pi.purchase_id = p.id
+          WHERE pi.item_id = i.id 
+            AND DATE(p.purchase_date) <= ?
+          ORDER BY p.purchase_date DESC, pi.id DESC 
+          LIMIT 1
+        ) AS unit_price
       FROM items i
       LEFT JOIN (
         -- previous day's closing balance
@@ -113,17 +123,64 @@ const getStockReport = async (req, res) => {
     `;
 
     const params = [
+      date, // For unit price subquery
       prevDateStr, prevDateStr, prevDateStr, prevDateStr, // yesterday x4
       date,                                              // today opening
       date, date, date                                   // today purchases/issues/wastage
     ];
 
     const [rows] = await pool.query(query, params);
-    res.json(rows);
+
+    // Calculate value for each item
+    const stockDataWithValue = rows.map(item => {
+      const closingBalance = Number(item.closing_balance) || 0;
+      const unitPrice = Number(item.unit_price) || 0;
+      const value = (closingBalance * unitPrice).toFixed(2);
+      
+      return {
+        ...item,
+        value: value,
+        unit_price: unitPrice
+      };
+    });
+
+    res.json(stockDataWithValue);
 
   } catch (error) {
     console.error('Error generating stock report:', error.message, error.stack);
     res.status(500).json({ error: 'Server error: ' + error.message });
+  }
+};
+
+// Add this new function for individual price lookup (if needed elsewhere)
+const getLatestUnitPrice = async (req, res) => {
+  try {
+    const { itemId, date } = req.query;
+
+    if (!itemId || !date) {
+      return res.status(400).json({ error: 'Item ID and date are required' });
+    }
+
+    const query = `
+      SELECT pi.unit_price
+      FROM purchase_items pi
+      JOIN purchases p ON pi.purchase_id = p.id
+      WHERE pi.item_id = ? 
+        AND DATE(p.purchase_date) <= ?
+      ORDER BY p.purchase_date DESC, pi.id DESC
+      LIMIT 1
+    `;
+
+    const [rows] = await pool.query(query, [itemId, date]);
+    
+    if (rows.length > 0) {
+      res.json({ unitPrice: parseFloat(rows[0].unit_price) });
+    } else {
+      res.json({ unitPrice: 0 });
+    }
+  } catch (error) {
+    console.error('Error fetching latest unit price:', error);
+    res.status(500).json({ error: 'Server error' });
   }
 };
 
@@ -774,5 +831,6 @@ module.exports = {
   getDailyIssuanceTransactions,
   getDailyPurchaseTransactions,
   getDailyWastageTransactions,
-  getPurchasingItemWiseReport
+  getPurchasingItemWiseReport,
+  getLatestUnitPrice
 };

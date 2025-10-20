@@ -1,8 +1,10 @@
+// server/routes/reportRoutes.js
 const express = require('express');
 const router = express.Router();
 const reportController = require('../controllers/reportController');
 
 router.get('/stock', reportController.getStockReport);
+router.get('/latest-price', reportController.getLatestUnitPrice); // Add this line
 router.get('/department', reportController.getDepartmentIssuesReport);
 router.get('/purchasing', reportController.getPurchasingReport);
 router.get('/wastage', reportController.getWastageReport);
