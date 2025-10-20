@@ -859,3 +859,14 @@
 .table-container::-webkit-scrollbar-thumb:hover {
   background: #a8a8a8;
 }
+
+.report-table th:nth-child(9),
+.report-table td:nth-child(9) {
+  text-align: right;
+  font-weight: bold;
+}
+
+.report-table td:nth-child(9) {
+  color: #2e7d32;
+  background-color: #f8f9fa;
+}
