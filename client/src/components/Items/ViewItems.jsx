@@ -56,7 +56,6 @@ const ViewItems = () => {
     }
   };
 
-  // Filter items based on search
   const filteredItems = items.filter(item =>
     item.item_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
     item.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -67,12 +66,12 @@ const ViewItems = () => {
       <div className="item-header">
         <h2>Item List</h2>
         <div className="search-bar">
-        <input
-          type="text"
-          placeholder="Search by item code or name"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
+          <input
+            type="text"
+            placeholder="Search by item code or name"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
       </div>
 

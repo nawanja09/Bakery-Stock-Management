@@ -1,5 +1,3 @@
-/* View Items Page CSS */
-
 .item-container {
   background-color: #ffffff;
   padding: 20px;
@@ -7,72 +5,44 @@
   margin: 0 auto;
 }
 
-.header-buttons {
+.item-header {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 20px;
+  align-items: center;
   flex-wrap: wrap;
   gap: 10px;
 }
 
-.btn-back,
-.btn-add {
-  padding: 10px 15px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
+.search-bar input {
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
   font-size: 14px;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.btn-back {
-  background-color: #6c757d;
-  color: white;
-}
-
-.btn-add {
-  background-color: #28a745;
-  color: white;
-}
-
-.btn-back:hover {
-  background-color: #5a6268;
-}
-
-.btn-add:hover {
-  background-color: #218838;
-}
-
-.message {
-  margin-top: 15px;
-  padding: 10px;
-  border-radius: 4px;
-  text-align: center;
-}
-
-.message.error {
-  background-color: #f8d7da;
-  color: #721c24;
 }
 
 .items-table {
   width: 100%;
   border-collapse: collapse;
   margin-top: 20px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 .items-table th,
 .items-table td {
-  border: 1px solid #dee2e6;
-  padding: 12px;
   text-align: left;
+  border-bottom: 1px solid #dee2e6;
 }
 
 .items-table th {
-  background-color: #e9ecef;
-  font-weight: bold;
+  background-color: #f1f3f5;
+  font-weight: 600;
+  color: #343a40;
+}
+
+.items-table tr:last-child td {
+  border-bottom: none;
 }
 
 .items-table tr:nth-child(even) {
@@ -80,7 +50,8 @@
 }
 
 .items-table tr:hover {
-  background-color: #e2e6ea;
+  background-color: #e9ecef;
+  transition: background-color 0.3s ease;
 }
 
 .actions {
@@ -237,7 +208,6 @@
   .items-table th,
   .items-table td {
     font-size: 13px;
-    padding: 8px;
   }
 
   .actions {
