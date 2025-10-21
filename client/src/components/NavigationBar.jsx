@@ -234,7 +234,7 @@ const NavigationBar = () => {
 
                 {/* Returns */ }
                 <li>
-                  <NavLink to="/returns" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                  <NavLink to="/returns/history" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
                     <span className="icon-container"><FontAwesomeIcon icon={faUndo} /></span>
                     <span>Returns</span>
                   </NavLink>

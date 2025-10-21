@@ -304,5 +304,3 @@ module.exports = {
   getAllCompanies,
   getPreviousPurchasePrices
 };
-
-//

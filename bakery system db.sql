@@ -676,3 +676,36 @@ CREATE TABLE IF NOT EXISTS `production_cost_calculations` (
   CONSTRAINT `fk_cost_calc_production` FOREIGN KEY (`production_id`) REFERENCES `finished_goods_productions` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_cost_calc_item` FOREIGN KEY (`item_id`) REFERENCES `finished_goods_items` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Table structure for table `returns`
+CREATE TABLE IF NOT EXISTS `returns` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `return_number` varchar(50) NOT NULL,
+  `return_date` date NOT NULL,
+  `department_id` int NOT NULL,
+  `received_by` varchar(255) NOT NULL,
+  `remarks` text,
+  `entered_by` int NOT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `return_number` (`return_number`),
+  KEY `department_id` (`department_id`),
+  KEY `entered_by` (`entered_by`),
+  CONSTRAINT `returns_ibfk_1` FOREIGN KEY (`department_id`) REFERENCES `departments` (`id`),
+  CONSTRAINT `returns_ibfk_2` FOREIGN KEY (`entered_by`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Table structure for table `return_items`
+CREATE TABLE IF NOT EXISTS `return_items` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `return_id` int NOT NULL,
+  `item_id` int NOT NULL,
+  `quantity` decimal(10,3) NOT NULL,
+  `reason` enum('Excess','Damaged','Wrong Issue','Expired','Other') NOT NULL DEFAULT 'Excess',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `return_id` (`return_id`),
+  KEY `item_id` (`item_id`),
+  CONSTRAINT `return_items_ibfk_1` FOREIGN KEY (`return_id`) REFERENCES `returns` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `return_items_ibfk_2` FOREIGN KEY (`item_id`) REFERENCES `items` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
