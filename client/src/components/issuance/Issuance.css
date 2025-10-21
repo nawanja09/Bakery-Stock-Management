@@ -414,23 +414,6 @@
   color: #2d3436;
 }
 
-/* Responsive Design */
-@media (max-width: 768px) {
-  .filter-row {
-    grid-template-columns: 1fr;
-  }
-  
-  .filter-group {
-    margin-bottom: 10px;
-  }
-  
-  .btn-apply,
-  .btn-clear {
-    width: 100%;
-    margin: 5px 0;
-  }
-}
-
 .items-column, .quantity-column {
   max-width: 200px;
   min-width: 150px;
@@ -465,6 +448,20 @@
   
   .items-list, .quantities-list {
     font-size: 0.85rem;
+  }
+  
+  .filter-row {
+    grid-template-columns: 1fr;
+  }
+  
+  .filter-group {
+    margin-bottom: 10px;
+  }
+  
+  .btn-apply,
+  .btn-clear {
+    width: 100%;
+    margin: 5px 0;
   }
 }
 
