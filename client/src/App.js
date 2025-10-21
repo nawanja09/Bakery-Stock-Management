@@ -55,6 +55,8 @@ import AddFinishedGoodsSale from './components/FinishedGoods/Sales/AddFinishedGo
 import FinishedGoodsSalesHistory from './components/FinishedGoods/Sales/FinishedGoodsSalesHistory';
 
 import StockSummary from './components/FinishedGoods/Reports/StockSummary';
+import AddReturn from './components/returns/AddReturn';
+import ReturnsHistory from './components/returns/ReturnsHistory';
 
 import './App.css';
 
@@ -139,6 +141,8 @@ function App() {
             <Route path="finished-goods/sales/history" element={<FinishedGoodsSalesHistory />} />
 
             <Route path="finished-goods/reports/stock/summary" element={<StockSummary />} />
+            <Route path="returns/add" element={<AddReturn />} />
+            <Route path="returns/history" element={<ReturnsHistory />} />
 
           </Route>
 
