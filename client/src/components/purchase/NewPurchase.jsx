@@ -24,7 +24,13 @@ const AddPurchase = () => {
     check_number: '',
     remarks: '',
     company_id: '',
-    items: [{ id: '', item_name: '', quantity: 1, unit_price: 0 }]
+    items: [{ 
+      id: '', 
+      item_name: '', 
+      quantity: 1, 
+      unit_price: 0,
+      unit: ''
+    }]
   });
 
   // To prevent adding multiple rows repeatedly
@@ -120,19 +126,20 @@ const AddPurchase = () => {
   };
 
   const handleItemSelect = (index, selectedOption) => {
-    if (!selectedOption) return;
-    const selectedItem = itemsList.find(item => item.id === selectedOption.value);
-    if (!selectedItem) return;
+  if (!selectedOption) return;
+  const selectedItem = itemsList.find(item => item.id === selectedOption.value);
+  if (!selectedItem) return;
 
-    // Get previous purchase price for this item
-    const previousPrice = previousPurchasePrices[selectedItem.id] || 0;
+  // Get previous purchase price for this item
+  const previousPrice = previousPurchasePrices[selectedItem.id] || 0;
 
     const newItems = [...formData.items];
     newItems[index] = {
       ...newItems[index],
       id: selectedItem.id,
       item_name: selectedItem.name,
-      unit_price: previousPrice // Set to previous purchase price
+      unit_price: previousPrice, // Set to previous purchase price
+      unit: selectedItem.unit// Add this line to auto-load unit of measurement
     };
 
     setFormData({ ...formData, items: newItems });
@@ -275,6 +282,7 @@ const AddPurchase = () => {
               <th>Item</th>
               <th>Previous Price (Rs.)</th>
               <th>Quantity</th>
+              <th>Unit of Measurement</th>
               <th>Unit Price (Rs.)</th>
               <th>Total (Rs.)</th>
               <th>Action</th>
@@ -307,6 +315,16 @@ const AddPurchase = () => {
                       value={item.quantity}
                       onChange={(e) => handleItemChange(index, 'quantity', parseFloat(e.target.value))}
                       required
+                    />
+                  </td>
+                  <td>
+                    {/* Unit of Measurement Display */}
+                    <input
+                      type="text"
+                      value={item.unit || ''}
+                      readOnly
+                      className="unit-display"
+                      placeholder="Auto-filled"
                     />
                   </td>
                   <td>
