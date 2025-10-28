@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faEdit, faTrash, faPlus, faSearch, faBox } from '@fortawesome/free-solid-svg-icons';
+import { faEdit, faTrash, faPlus, faSearch, faBox, faEye } from '@fortawesome/free-solid-svg-icons';
 import { usePopup } from '../../context/PopupContext';
 import './FinishedGoodsManagement.css';
 import api from '../../../api';
@@ -25,15 +25,15 @@ const ViewFinishedGoodsItems = () => {
       const data = response.data;
 
       if (response.status === 200) {
-      // Sort numerically based on item_code (e.g., FG001 -> 1, FG010 -> 10)
-      const sortedData = data.sort((a, b) => {
-        const numA = parseInt(a.item_code.replace(/\D/g, ''), 10);
-        const numB = parseInt(b.item_code.replace(/\D/g, ''), 10);
-        return numA - numB;
-      });
+        // Sort numerically based on item_code (e.g., FG001 -> 1, FG010 -> 10)
+        const sortedData = data.sort((a, b) => {
+          const numA = parseInt(a.item_code.replace(/\D/g, ''), 10);
+          const numB = parseInt(b.item_code.replace(/\D/g, ''), 10);
+          return numA - numB;
+        });
 
-      setItems(sortedData);
-      setFilteredItems(sortedData);
+        setItems(sortedData);
+        setFilteredItems(sortedData);
       } else {
         showPopup('error', data.error || 'Failed to fetch items');
       }
@@ -57,6 +57,10 @@ const ViewFinishedGoodsItems = () => {
     );
     setFilteredItems(filtered);
   }, [searchTerm, items]);
+
+  const handleView = (id) => {
+    navigate(`/finished-goods/items/view/${id}`);
+  };
 
   const handleEdit = (id) => {
     navigate(`/finished-goods/items/edit/${id}`);
@@ -150,7 +154,7 @@ const ViewFinishedGoodsItems = () => {
                 <th>Name</th>
                 <th>Category</th>
                 <th>Ingredients</th>
-                <th style={{ width: '120px' }}>Actions</th>
+                <th style={{ width: '140px' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -182,6 +186,14 @@ const ViewFinishedGoodsItems = () => {
                   </td>
                   <td>
                     <div className="actions">
+                      <button 
+                        onClick={() => handleView(item.id)} 
+                        className="btn-icon"
+                        title="View item details"
+                        style={{ color: '#3b82f6' }}
+                      >
+                        <FontAwesomeIcon icon={faEye} />
+                      </button>
                       <button 
                         onClick={() => handleEdit(item.id)} 
                         className="btn-icon"

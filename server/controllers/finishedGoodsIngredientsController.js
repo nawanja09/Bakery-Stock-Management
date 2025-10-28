@@ -75,13 +75,34 @@ const getIngredientsByFinishedGood = async (req, res) => {
   console.log('Fetching ingredients for finishedGoodId:', finishedGoodId);
 
   try {
+    // First, check if the table exists and has data
+    const [tableCheck] = await pool.query(`
+      SELECT COUNT(*) as table_exists 
+      FROM information_schema.tables 
+      WHERE table_schema = DATABASE() 
+      AND table_name = 'finished_goods_ingredients'
+    `);
+
+    if (tableCheck[0].table_exists === 0) {
+      console.log('Table finished_goods_ingredients does not exist');
+      return res.json([]); // Return empty array if table doesn't exist
+    }
+
+    // Modified query to handle cases where items table might not have unit_price
     const [rows] = await pool.query(`
       SELECT 
         fgi.id,
         fgi.raw_material_id,
         i.name as item_name,
         i.unit,
-        fgi.quantity
+        fgi.quantity,
+        COALESCE(
+          (SELECT unit_price FROM purchase_items 
+           WHERE item_id = i.id 
+           ORDER BY id DESC 
+           LIMIT 1),
+          0
+        ) as unit_price
       FROM finished_goods_ingredients fgi
       JOIN items i ON fgi.raw_material_id = i.id
       WHERE fgi.finished_good_id = ?
@@ -93,8 +114,10 @@ const getIngredientsByFinishedGood = async (req, res) => {
   } catch (error) {
     console.error('Error fetching ingredients:', error);
     
-    if (error.code === 'ER_NO_SUCH_TABLE') {
-      return res.status(500).json({ error: 'Database table not configured properly' });
+    // If table doesn't exist or other SQL errors, return empty array
+    if (error.code === 'ER_NO_SUCH_TABLE' || error.code === 'ER_BAD_FIELD_ERROR') {
+      console.log('Table or column error, returning empty array');
+      return res.json([]);
     }
     
     res.status(500).json({ error: 'Server error: ' + error.message });
