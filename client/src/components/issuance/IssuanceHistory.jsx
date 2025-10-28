@@ -36,7 +36,6 @@ const IssuanceDetailsModal = ({ id, onClose }) => {
       <div className="details-row vertical">
         <ul className="details-list">
           <li><strong>Date:</strong> {new Date(issuance.issuance_date).toLocaleDateString()}</li>
-          <li><strong>Check Number:</strong> {issuance.check_number}</li>
           <li><strong>Received By:</strong> {issuance.received_by}</li>
           <li><strong>Department:</strong> {issuance.department_name}</li>
           <li><strong>Time of Day:</strong> {issuance.remarks || 'N/A'}</li>
