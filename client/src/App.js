@@ -30,6 +30,7 @@ import ManageUsers from './components/admin/ManageUsers';
 import AddFinishedGoodsItem from './components/FinishedGoods/Item Management - FS/AddFinishedGoodsItem';
 import EditFinishedGoodsItem from './components/FinishedGoods/Item Management - FS/EditFinishedGoodsItem';
 import ViewFinishedGoodsItems from './components/FinishedGoods/Item Management - FS/ViewFinishedGoodsItems';
+import ViewFinishedGoodsItem from './components/FinishedGoods/Item Management - FS/ViewFinishedGoodsItem';
 import AddFinishedGoodsOpeningBalance from './components/FinishedGoods/Opening Management - FS/AddFinishedGoodsOpeningBalance';
 import FinishedGoodsOpeningBalanceHistory from './components/FinishedGoods/Opening Management - FS/FinishedGoodsOpeningBalanceHistory';
 import ProductionManagement from './components/FinishedGoods/Production Management/ProductionManagement';
@@ -41,8 +42,6 @@ import EditTransfer from './components/FinishedGoods/Transfers/EditTransferPopup
 import AddTransferPopup from './components/FinishedGoods/Transfers/AddTransferPopup';
 import AddFinishedGoodsWastage from './components/FinishedGoods/Wastage/AddFinishedGoodsWastage'
 import FinishedGoodsWastageHistory from './components/FinishedGoods/Wastage/FinishedGoodsWastageHistory';
-//import ProductionWastageHistory from './components/FinishedGoods/Production Wastage/ProductionWastageHistory';
-//import AddProductionWastage from './components/FinishedGoods/Production Wastage/AddProductionWastage';
 import ProductionReport from './components/FinishedGoods/Reports/ProductionReport';
 import KitchenWastageReport from './components/FinishedGoods/Reports/WastageReport';
 import TransferReport from './components/FinishedGoods/Reports/TransferReport';
@@ -117,6 +116,7 @@ function App() {
             <Route path="finished-goods/items/add" element={<AddFinishedGoodsItem />} />
             <Route path="finished-goods/items" element={<ViewFinishedGoodsItems />} />
             <Route path="finished-goods/items/edit/:id" element={<EditFinishedGoodsItem />} />
+            <Route path="finished-goods/items/view/:id" element={<ViewFinishedGoodsItem />} />
             <Route path="finished-goods/opening/add" element={<AddFinishedGoodsOpeningBalance />} />
             <Route path="finished-goods/opening/history" element={<FinishedGoodsOpeningBalanceHistory />} />
             <Route path="finished-goods/production" element={<ProductionManagement />} />
