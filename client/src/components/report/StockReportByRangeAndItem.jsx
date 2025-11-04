@@ -5,11 +5,11 @@ import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import Select from 'react-select';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faDownload, faFileExcel, faCalendar, faChartLine, faEye } from '@fortawesome/free-solid-svg-icons';
+import { faDownload, faFileExcel, faCalendar, faChartLine, faEye, faSearch } from '@fortawesome/free-solid-svg-icons';
 import api from '../../api';
 import './StockReport.css';
 
-// Transaction Details Modal Component
+// Transaction Details Modal Component (Unchanged)
 const TransactionDetailsModal = ({ date, itemId, itemName, onClose }) => {
   const [transactions, setTransactions] = useState({
     purchases: [],
@@ -182,11 +182,12 @@ const StockReportByRangeAndItem = () => {
     const fetchItems = async () => {
       try {
         const res = await api.get('/items');
-        setItems(res.data.map(item => ({
+        const itemsData = res.data.map(item => ({
           value: item.id,
           label: `${item.item_code} - ${item.name}`,
           data: item
-        })));
+        }));
+        setItems(itemsData);
       } catch (err) {
         console.error('Failed to fetch items:', err);
       }
@@ -456,7 +457,9 @@ const StockReportByRangeAndItem = () => {
         <p className="report-subtitle">Analyze stock movements for specific items over time</p>
       </div>
 
-      <div className="controls-grid">
+      {/* Single Row Layout for Controls */}
+      <div className="controls-row">
+        {/* Start Date */}
         <div className="form-group">
           <label>
             <FontAwesomeIcon icon={faCalendar} /> Start Date
@@ -465,10 +468,12 @@ const StockReportByRangeAndItem = () => {
             type="date" 
             max={endDate} 
             value={startDate} 
-            onChange={e => setStartDate(e.target.value)} 
+            onChange={e => setStartDate(e.target.value)}
+            className="date-input"
           />
         </div>
 
+        {/* End Date */}
         <div className="form-group">
           <label>
             <FontAwesomeIcon icon={faCalendar} /> End Date
@@ -478,41 +483,61 @@ const StockReportByRangeAndItem = () => {
             min={startDate} 
             max={today} 
             value={endDate} 
-            onChange={e => setEndDate(e.target.value)} 
+            onChange={e => setEndDate(e.target.value)}
+            className="date-input"
           />
         </div>
 
-        <div className="form-group">
-          <label>Item Selection</label>
+        {/* Item Selection with Search */}
+        <div className="form-group item-search-container">
+          <label>
+            <FontAwesomeIcon icon={faSearch} /> ITEM SELECTION
+          </label>
           <Select
             options={items}
             value={selectedItem}
             onChange={setSelectedItem}
             isClearable
-            placeholder="Search items..."
+            placeholder="Search items by code or name..."
             className="react-select-container"
             classNamePrefix="react-select"
+            styles={{
+              control: (base) => ({
+                ...base,
+                minHeight: '48px',
+                border: '2px solid #e9ecef',
+                borderRadius: '8px',
+                '&:hover': {
+                  borderColor: '#007acc'
+                }
+              }),
+              placeholder: (base) => ({
+                ...base,
+                color: '#6c757d',
+                fontSize: '14px'
+              })
+            }}
           />
         </div>
 
-        {/* Action Buttons Row - Now inside controls grid */}
+        {/* Action Buttons */}
         <div className="form-group action-buttons-container">
           <label style={{ opacity: 0, pointerEvents: 'none' }}>Actions</label>
           <div className="action-buttons-row">
             <button 
               onClick={fetchStockReport} 
               disabled={loading || !selectedItem}
-              className="btn btn-primary"
+              className="btn btn-generate"
             >
               {loading ? 'Generating Report...' : 'Generate Trend Report'}
             </button>
             
             {stockData.length > 0 && (
               <>
-                <button onClick={downloadPDF} className="btn btn-secondary">
+                <button onClick={downloadPDF} className="btn btn-pdf">
                   <FontAwesomeIcon icon={faDownload} /> Export PDF
                 </button>
-                <button onClick={downloadExcel} className="btn btn-secondary">
+                <button onClick={downloadExcel} className="btn btn-excel">
                   <FontAwesomeIcon icon={faFileExcel} /> Export Excel
                 </button>
               </>
@@ -521,6 +546,7 @@ const StockReportByRangeAndItem = () => {
         </div>
       </div>
 
+      {/* Summary Cards */}
       {summary && stockData.length > 0 && (
         <div className="summary-cards">
           <div className="summary-card">
@@ -545,21 +571,22 @@ const StockReportByRangeAndItem = () => {
         </div>
       )}
 
+      {/* Data Table */}
       {loading ? (
         <div className="loading">Loading stock trend data...</div>
       ) : stockData.length > 0 ? (
-        <div style={{ overflowX: 'auto' }}>
+        <div className="table-container">
           <table className="report-table clickable-rows">
             <thead>
               <tr>
-                <th>Date</th>
-                <th>Opening Balance</th>
-                <th>Purchased</th>
-                <th>Issued</th>
-                <th>Wasted</th>
-                <th>Closing Balance</th>
-                <th>Net Change</th>
-                <th>Actions</th>
+                <th>DATE</th>
+                <th>OPENING BALANCE</th>
+                <th>PURCHASED</th>
+                <th>ISSUED</th>
+                <th>WASTED</th>
+                <th>CLOSING BALANCE</th>
+                <th>NET CHANGE</th>
+                <th>ACTIONS</th>
               </tr>
             </thead>
             <tbody>
