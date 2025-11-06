@@ -370,6 +370,12 @@ const NavigationBar = () => {
                         <span>Transfer Report</span>
                       </NavLink>
                     </li>
+                    <li>
+                      <NavLink to="/finished-goods/reports/bakery-stock" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                        <span className="icon-container"><FontAwesomeIcon icon={faCalculator} /></span>
+                        <span>Bakery Stock Report</span>
+                      </NavLink>
+                    </li>
                   </ul>
                 </li>
 
