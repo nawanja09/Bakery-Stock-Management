@@ -210,21 +210,52 @@
   color: #721c24;
 }
 
+/* Action Buttons - Perfect horizontal alignment */
 .actions {
   display: flex;
   gap: 8px;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 40px;
+  width: 100%;
 }
 
 .btn-view,
 .btn-edit,
 .btn-delete {
-  padding: 6px;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+  position: relative;
+  line-height: 1;
 }
 
+/* Ensure perfect icon alignment */
+.btn-view .svg-inline--fa,
+.btn-edit .svg-inline--fa,
+.btn-delete .svg-inline--fa {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+}
+
+/* Button colors and hover states */
 .btn-view {
   background-color: #17a2b8;
   color: white;
@@ -242,14 +273,33 @@
 
 .btn-view:hover {
   background-color: #138496;
+  transform: translateY(-1px);
 }
 
 .btn-edit:hover {
   background-color: #e0a800;
+  transform: translateY(-1px);
 }
 
 .btn-delete:hover {
   background-color: #c82333;
+  transform: translateY(-1px);
+}
+
+/* Ensure table cell alignment */
+.production-table td.actions {
+  vertical-align: middle;
+  padding: 12px;
+}
+
+/* Force consistent row height and alignment */
+.production-table tbody tr {
+  height: 64px; /* Consistent row height */
+}
+
+.production-table tbody td {
+  vertical-align: middle;
+  padding: 12px;
 }
 
 /* Popup Styles */
@@ -365,10 +415,21 @@
 }
 
 .quantity-input input {
-  padding: 10px;
+  padding: 0 10px;
   border: 1px solid #ced4da;
-  border-radius: 4px;
+  border-radius: 6px;
   font-size: 14px;
+  height: 36px;
+}
+
+/* Make react-select control match button height and align with quantity/remove button */
+.production-item-row .react-select-container .react-select__control {
+  min-height: 36px;
+  height: 36px;
+  border-radius: 6px;
+}
+.production-item-row .react-select-container .react-select__value-container {
+  padding: 0 8px;
 }
 
 .remove-item-btn {
@@ -392,32 +453,28 @@
   background: #c82333;
 }
 
-.add-item-btn {
-  background: #17a2b8;
+.remove-item-btn {
+  background: #dc3545;
   color: white;
   border: none;
-  border-radius: 4px;
-  padding: 8px 12px;
+  border-radius: 6px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
   cursor: pointer;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 5px;
-  font-size: 14px;
-  margin-top: 10px;
+  justify-content: center;
+}
+.remove-item-btn:disabled {
+  background: #6c757d;
+  cursor: not-allowed;
 }
 
-.add-item-btn:hover {
-  background: #138496;
+.remove-item-btn:hover:not(:disabled) {
+  background: #c82333;
 }
-
-.popup-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 20px;
-  padding-top: 20px;
-  border-top: 1px solid #e0e0e0;
-}
+ 
 
 .btn-cancel {
   background: #6c757d;
@@ -558,11 +615,16 @@
 }
 
 .btn-view, .btn-edit, .btn-delete {
-  padding: 6px 10px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .btn-view {
