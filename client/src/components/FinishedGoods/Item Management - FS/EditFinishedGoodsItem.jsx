@@ -22,7 +22,7 @@ const EditFinishedGoodsItem = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [fetchLoading, setFetchLoading] = useState(true);
   const [isLoadingRawMaterials, setIsLoadingRawMaterials] = useState(false);
-  const [outputQuantity, setOutputQuantity] = useState(1);
+  const [outputQuantity, setOutputQuantity] = useState(25); // Changed default to 25
   const navigate = useNavigate();
   const { showPopup } = usePopup();
 
@@ -122,8 +122,17 @@ const EditFinishedGoodsItem = () => {
           setIngredients(formattedIngredients);
         }
 
-        // Set default output quantity
-        setOutputQuantity(1);
+        // Fetch saved output quantity from cost calculations
+        try {
+          const costResponse = await api.get(`/cost-calculations/finished-good/${id}`);
+          if (costResponse.status === 200 && costResponse.data.length > 0) {
+            const latestCalculation = costResponse.data[0];
+            setOutputQuantity(latestCalculation.output_quantity || 25);
+          }
+        } catch (error) {
+          console.log('No cost calculations found, using default output quantity');
+          setOutputQuantity(25);
+        }
       } else {
         showPopup('error', itemData.error || 'Failed to fetch item');
       }
@@ -141,7 +150,7 @@ const EditFinishedGoodsItem = () => {
   };
 
   const handleOutputChange = (e) => {
-    const value = parseInt(e.target.value) || 1;
+    const value = parseInt(e.target.value) || 25;
     setOutputQuantity(Math.max(1, value));
   };
 
@@ -235,7 +244,7 @@ const EditFinishedGoodsItem = () => {
   const calculatePerUnitCost = () => {
     const totalCost = parseFloat(calculateTotalCost()) || 0;
     const utilityCost = parseFloat(calculateUtilityCost()) || 0;
-    const output = parseInt(outputQuantity) || 1;
+    const output = parseInt(outputQuantity) || 25;
     
     if (output <= 0) return '0.00';
     
@@ -307,6 +316,23 @@ const EditFinishedGoodsItem = () => {
         };
 
         await api.put('/finished-goods-ingredients', ingredientsPayload);
+
+        // Update cost calculation with output quantity
+        await api.post('/cost-calculations', {
+          finished_good_id: parseInt(id),
+          finished_good_name: formData.name.trim(),
+          output_quantity: outputQuantity,
+          total_cost: calculateTotalCost(),
+          per_unit_cost: calculatePerUnitCost(),
+          ingredients: ingredients.map(ing => ({
+            item_id: parseInt(ing.raw_material_id),
+            item_name: ing.item_name,
+            quantity: parseFloat(ing.quantity),
+            unit: ing.unit,
+            unit_price: parseFloat(ing.unit_price),
+            cost: parseFloat(ing.cost)
+          }))
+        });
 
         showPopup('success', 'Product updated successfully!');
         setTimeout(() => navigate('/finished-goods/items'), 1500);

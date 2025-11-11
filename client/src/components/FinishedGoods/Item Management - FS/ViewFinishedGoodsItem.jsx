@@ -14,7 +14,7 @@ const ViewFinishedGoodsItem = () => {
   const [item, setItem] = useState(null);
   const [ingredients, setIngredients] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [outputQuantity, setOutputQuantity] = useState(1);
+  const [outputQuantity, setOutputQuantity] = useState(25); // Changed default to 25
   const [costDetails, setCostDetails] = useState({
     totalCost: 0,
     utilityCost: 0,
@@ -54,6 +54,18 @@ const ViewFinishedGoodsItem = () => {
           setIngredients([]);
           calculateCosts([]);
         }
+
+        // Fetch saved output quantity from cost calculations
+        try {
+          const costResponse = await api.get(`/cost-calculations/finished-good/${id}`);
+          if (costResponse.status === 200 && costResponse.data.length > 0) {
+            const latestCalculation = costResponse.data[0];
+            setOutputQuantity(latestCalculation.output_quantity || 25);
+          }
+        } catch (error) {
+          console.log('No cost calculations found, using default output quantity');
+          setOutputQuantity(25);
+        }
       } else {
         showPopup('error', 'Failed to fetch item details');
       }
@@ -77,7 +89,7 @@ const ViewFinishedGoodsItem = () => {
     }, 0);
     
     const utilityCost = totalCost * 0.7;
-    const outputQty = parseInt(outputQuantity) || 1;
+    const outputQty = parseInt(outputQuantity) || 25;
     const perUnitCost = outputQty > 0 ? (totalCost + utilityCost) / outputQty : 0;
     
     setCostDetails({
@@ -88,7 +100,7 @@ const ViewFinishedGoodsItem = () => {
   };
 
   const handleOutputChange = (e) => {
-    const value = parseInt(e.target.value) || 1;
+    const value = parseInt(e.target.value) || 25;
     setOutputQuantity(Math.max(1, value));
   };
 

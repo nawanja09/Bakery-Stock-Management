@@ -20,7 +20,7 @@ const AddFinishedGoodsItem = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingRawMaterials, setIsLoadingRawMaterials] = useState(false);
   const [generatedCode, setGeneratedCode] = useState('FG0001');
-  const [outputQuantity, setOutputQuantity] = useState(1);
+  const [outputQuantity, setOutputQuantity] = useState(25); // Changed default to 25
   const navigate = useNavigate();
   const { showPopup } = usePopup();
 
@@ -76,7 +76,7 @@ const AddFinishedGoodsItem = () => {
   };
 
   const handleOutputChange = (e) => {
-    const value = parseInt(e.target.value) || 1;
+    const value = parseInt(e.target.value) || 25;
     setOutputQuantity(Math.max(1, value));
   };
 
@@ -162,7 +162,7 @@ const AddFinishedGoodsItem = () => {
   const calculatePerUnitCost = () => {
     const totalCost = parseFloat(calculateTotalCost()) || 0;
     const utilityCost = parseFloat(calculateUtilityCost()) || 0;
-    const output = parseInt(outputQuantity) || 1;
+    const output = parseInt(outputQuantity) || 25;
     
     if (output <= 0) return '0.00';
     
@@ -234,6 +234,23 @@ const AddFinishedGoodsItem = () => {
             }))
           });
         }
+
+        // Save cost calculation with output quantity
+        await api.post('/cost-calculations', {
+          finished_good_id,
+          finished_good_name: name.trim(),
+          output_quantity: outputQuantity,
+          total_cost: calculateTotalCost(),
+          per_unit_cost: calculatePerUnitCost(),
+          ingredients: ingredients.map(ing => ({
+            item_id: parseInt(ing.raw_material_id),
+            item_name: ing.item_name,
+            quantity: parseFloat(ing.quantity),
+            unit: ing.unit,
+            unit_price: parseFloat(ing.unit_price),
+            cost: parseFloat(ing.cost)
+          }))
+        });
         
         showPopup('success', `Product "${name}" created successfully with code: ${itemRes.data.item_code}`);
         setTimeout(() => navigate('/finished-goods/items'), 1500);
