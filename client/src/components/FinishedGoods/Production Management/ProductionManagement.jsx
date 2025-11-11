@@ -141,7 +141,7 @@ const ProductionManagement = () => {
                     title="View Details"
                     onClick={() => handleViewProduction(production.id)}
                   >
-                    <FontAwesomeIcon icon={faEye} />
+                  <FontAwesomeIcon icon={faEye} />
                   </button>
                   <button 
                     className="btn-edit" 
