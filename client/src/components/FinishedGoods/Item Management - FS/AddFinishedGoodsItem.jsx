@@ -23,6 +23,8 @@ const AddFinishedGoodsItem = () => {
   const [outputQuantity, setOutputQuantity] = useState(25); // Changed default to 25
   const navigate = useNavigate();
   const { showPopup } = usePopup();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [lastSubmitTime, setLastSubmitTime] = useState(0);
 
   useEffect(() => {
     fetchRawMaterials();
@@ -201,30 +203,46 @@ const AddFinishedGoodsItem = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
+    const now = Date.now();
+    const timeSinceLast = now - lastSubmitTime;
+
+    // 🚫 Prevent double submit within 2 seconds
+    if (timeSinceLast < 2000) {
+      showPopup('warning', '⚠️ Duplicate submission detected! Please wait a moment.');
+      return;
+    }
+
+    if (isSubmitting) {
+      showPopup('warning', 'Submission already in progress...');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setLastSubmitTime(now);
+
     if (!validateForm()) {
+      setIsSubmitting(false);
       return;
     }
 
     setIsLoading(true);
     try {
       const { name, category, unit_price } = formData;
-      
-      // Create the finished goods item
       const itemRes = await api.post('/finished-goods-items', {
         name: name.trim(),
         category,
         unit_price: unit_price || 0
       });
-      
+
       if (itemRes.status === 201) {
         const finished_good_id = itemRes.data.id;
-        
-        // Create ingredients if any
-        const validIngredients = ingredients.filter(i => 
+
+        // Create ingredients
+        const validIngredients = ingredients.filter(i =>
           i.raw_material_id && i.quantity && parseFloat(i.quantity) > 0
         );
-        
+
         if (validIngredients.length > 0) {
           await api.post('/finished-goods-ingredients', {
             finished_good_id,
@@ -235,7 +253,7 @@ const AddFinishedGoodsItem = () => {
           });
         }
 
-        // Save cost calculation with output quantity
+        // Save cost calculation
         await api.post('/cost-calculations', {
           finished_good_id,
           finished_good_name: name.trim(),
@@ -251,18 +269,19 @@ const AddFinishedGoodsItem = () => {
             cost: parseFloat(ing.cost)
           }))
         });
-        
+
         showPopup('success', `Product "${name}" created successfully with code: ${itemRes.data.item_code}`);
         setTimeout(() => navigate('/finished-goods/items'), 1500);
       }
     } catch (error) {
       console.error('Error adding item:', error);
-      if (error.response && error.response.data && error.response.data.error) {
+      if (error.response?.data?.error) {
         showPopup('error', error.response.data.error);
       } else {
         showPopup('error', 'Network error. Please try again.');
       }
     } finally {
+      setIsSubmitting(false);
       setIsLoading(false);
     }
   };
@@ -593,10 +612,10 @@ const AddFinishedGoodsItem = () => {
           <button 
             type="submit" 
             className="btn btn-primary"
-            disabled={isLoading || isLoadingRawMaterials}
+            disabled={isLoading || isSubmitting || isLoadingRawMaterials}
           >
             <FontAwesomeIcon icon={faSave} />
-            {isLoading ? 'Creating...' : 'Create Product'}
+            {isSubmitting ? 'Creating...' : 'Create Product'}
           </button>
         </div>
       </form>

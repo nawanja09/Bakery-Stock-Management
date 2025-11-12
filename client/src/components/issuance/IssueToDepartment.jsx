@@ -14,6 +14,8 @@ const IssueToDepartment = () => {
   const [currentUser, setCurrentUser] = useState(null);
   const { showPopup } = usePopup();
   const [loading, setLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [lastSubmitTime, setLastSubmitTime] = useState(0);
 
   const [formData, setFormData] = useState({
     issuance_date: new Date().toLocaleDateString('en-CA'),
@@ -128,9 +130,27 @@ const IssueToDepartment = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    const now = Date.now();
+    const timeSinceLastSubmit = now - lastSubmitTime;
+
+    // 🕒 Check for double click within 2 seconds
+    if (timeSinceLastSubmit < 2000) {
+      showPopup('warning', 'Duplicate submission detected! Please wait a moment.');
+      return;
+    }
+
+    if (isSubmitting) {
+      showPopup('warning', 'Submission already in progress...');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setLastSubmitTime(now); // record this submit time
+
     if (!currentUser || !currentUser.id) {
       alert('User information is missing. Please login again.');
       navigate('/login');
+      setIsSubmitting(false);
       return;
     }
 
@@ -156,6 +176,8 @@ const IssueToDepartment = () => {
     } catch (error) {
       console.error('Error creating/updating issuance:', error);
       showPopup('error', 'Server error');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -288,8 +310,12 @@ const IssueToDepartment = () => {
           + Add Item
         </button>
 
-        <button type="submit" className="btn-submit">
-          {id ? 'Update Issuance' : 'Save Issuance'}
+        <button
+          type="submit"
+          className="btn-submit"
+          disabled={isSubmitting}  // 👈 prevent double click
+        >
+          {isSubmitting ? 'Submitting...' : (id ? 'Update Issuance' : 'Save Issuance')}
         </button>
       </form>
     </div>

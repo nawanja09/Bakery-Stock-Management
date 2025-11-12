@@ -18,6 +18,8 @@ const EditPurchase = () => {
   const [loading, setLoading] = useState(true);
   const [autoAddedRow, setAutoAddedRow] = useState(false);
   const [previousPurchasePrices, setPreviousPurchasePrices] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [lastSubmitTime, setLastSubmitTime] = useState(0);
 
   const [formData, setFormData] = useState({
     purchase_date: new Date().toLocaleDateString('en-CA'),
@@ -154,15 +156,34 @@ const EditPurchase = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    const now = Date.now();
+    const timeSinceLastSubmit = now - lastSubmitTime;
+
+    // 🕒 Prevent double submission within 2 seconds
+    if (timeSinceLastSubmit < 2000) {
+      showPopup('warning', '⚠️ Duplicate submission detected! Please wait a moment.');
+      return;
+    }
+
+    if (isSubmitting) {
+      showPopup('warning', 'Submission already in progress...');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setLastSubmitTime(now);
+
     // Validation
     if (formData.items.some(item => !item.id)) {
       showPopup('error', 'Please select valid items for all rows');
+      setIsSubmitting(false);
       return;
     }
 
     if (!currentUser || !currentUser.id) {
       showPopup('error', 'User information is missing. Please login again.');
       navigate('/login');
+      setIsSubmitting(false);
       return;
     }
 
@@ -181,6 +202,8 @@ const EditPurchase = () => {
       console.error('Error updating purchase:', error);
       const errorMessage = error.response?.data?.error || 'Server error';
       showPopup('error', `Error: ${errorMessage}`);
+    } finally {
+      setIsSubmitting(false); // ✅ re-enable button after submit
     }
   };
 
@@ -392,7 +415,13 @@ const EditPurchase = () => {
           <button type="button" className="btn-secondary" onClick={() => navigate('/purchase/history')}>
             Cancel
           </button>
-          <button type="submit" className="btn-submit">Update Purchase</button>
+          <button 
+            type="submit" 
+            className="btn-submit" 
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? 'Updating...' : 'Update Purchase'}
+          </button>
         </div>
       </form>
     </div>

@@ -14,6 +14,8 @@ const EditIssuance = () => {
   const [currentUser, setCurrentUser] = useState(null);
   const { showPopup } = usePopup();
   const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [lastSubmitTime, setLastSubmitTime] = useState(0);
 
   const [formData, setFormData] = useState({
     issuance_date: new Date().toLocaleDateString('en-CA'),
@@ -151,16 +153,34 @@ const EditIssuance = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    const now = Date.now();
+    const timeSinceLastSubmit = now - lastSubmitTime;
+
+    // 🕒 check for duplicate submission within 2 seconds
+    if (timeSinceLastSubmit < 2000) {
+      showPopup('warning', '⚠️ Duplicate submission detected! Please wait a moment.');
+      return;
+    }
+
+    if (isSubmitting) {
+      showPopup('warning', 'Submission already in progress...');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setLastSubmitTime(now);
+
     if (!currentUser || !currentUser.id) {
       alert('User information is missing. Please login again.');
       navigate('/login');
+      setIsSubmitting(false);
       return;
     }
 
     const payload = {
       ...formData,
       issued_by: currentUser.id,
-      // optional: filter out completely empty rows
+      // filter out empty rows
       items: formData.items.filter(it => it.item_id || (Number(it.quantity) > 0))
     };
 
@@ -171,6 +191,8 @@ const EditIssuance = () => {
     } catch (error) {
       console.error('Error updating issuance:', error);
       showPopup('error', 'Server error');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -303,7 +325,13 @@ const EditIssuance = () => {
           + Add Item
         </button>
 
-        <button type="submit" className="btn-submit">Update Issuance</button>
+        <button 
+          type="submit" 
+          className="btn-submit"
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? 'Updating...' : 'Update Issuance'}
+        </button>
       </form>
     </div>
   );

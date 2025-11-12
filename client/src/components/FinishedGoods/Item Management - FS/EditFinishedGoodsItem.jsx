@@ -25,6 +25,7 @@ const EditFinishedGoodsItem = () => {
   const [outputQuantity, setOutputQuantity] = useState(25); // Changed default to 25
   const navigate = useNavigate();
   const { showPopup } = usePopup();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const loadAll = async () => {
@@ -283,13 +284,20 @@ const EditFinishedGoodsItem = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
+    // 🛑 Prevent duplicate submits
+    if (isSubmitting) {
+      showPopup('warning', 'Please wait, your request is already being processed...');
+      return;
+    }
+
     if (!validateForm()) {
       return;
     }
 
+    setIsSubmitting(true);
     setIsLoading(true);
-    
+
     try {
       // Update the finished goods item
       const itemPayload = {
@@ -303,7 +311,7 @@ const EditFinishedGoodsItem = () => {
 
       if (itemResponse.status === 200) {
         // Update the ingredients
-        const validIngredients = ingredients.filter(ing => 
+        const validIngredients = ingredients.filter(ing =>
           ing.raw_material_id && ing.quantity && parseFloat(ing.quantity) > 0
         );
 
@@ -317,7 +325,7 @@ const EditFinishedGoodsItem = () => {
 
         await api.put('/finished-goods-ingredients', ingredientsPayload);
 
-        // Update cost calculation with output quantity
+        // Update cost calculation
         await api.post('/cost-calculations', {
           finished_good_id: parseInt(id),
           finished_good_name: formData.name.trim(),
@@ -341,13 +349,14 @@ const EditFinishedGoodsItem = () => {
       }
     } catch (error) {
       console.error('Error updating product:', error);
-      if (error.response && error.response.data && error.response.data.error) {
+      if (error.response?.data?.error) {
         showPopup('error', error.response.data.error);
       } else {
         showPopup('error', 'Network error. Please try again.');
       }
     } finally {
       setIsLoading(false);
+      setIsSubmitting(false); // ✅ Allow submitting again only after completion
     }
   };
 
@@ -689,10 +698,10 @@ const EditFinishedGoodsItem = () => {
           <button 
             type="submit" 
             className="btn btn-primary"
-            disabled={isLoading || isLoadingRawMaterials}
+            disabled={isLoading || isLoadingRawMaterials || isSubmitting}
           >
             <FontAwesomeIcon icon={faSave} />
-            {isLoading ? 'Updating...' : 'Update Product'}
+            {isSubmitting ? 'Updating...' : 'Update Product'}
           </button>
         </div>
       </form>
