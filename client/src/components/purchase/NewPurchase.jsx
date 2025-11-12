@@ -14,6 +14,8 @@ const AddPurchase = () => {
   const [companies, setCompanies] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
   const { showPopup } = usePopup();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [lastSubmitTime, setLastSubmitTime] = useState(0);
 
   const [formData, setFormData] = useState({
     purchase_date: new Date().toLocaleDateString('en-CA'),
@@ -160,14 +162,34 @@ const AddPurchase = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    const now = Date.now();
+    const timeSinceLastSubmit = now - lastSubmitTime;
+
+    // 🕒 Detect double submission within 2 seconds
+    if (timeSinceLastSubmit < 2000) {
+      showPopup('warning', '⚠️ Duplicate submission detected! Please wait a moment.');
+      return;
+    }
+
+    if (isSubmitting) {
+      showPopup('warning', 'Submission already in progress...');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setLastSubmitTime(now);
+
+    // ✅ Validate items
     if (formData.items.some(item => !item.id)) {
       showPopup('error', 'Please select valid items for all rows');
+      setIsSubmitting(false);
       return;
     }
 
     if (!currentUser || !currentUser.id) {
       showPopup('error', 'User information is missing. Please login again.');
       navigate('/login');
+      setIsSubmitting(false);
       return;
     }
 
@@ -186,6 +208,8 @@ const AddPurchase = () => {
       console.error('Error creating purchase:', error);
       const errorMessage = error.response?.data?.error || 'Server error';
       showPopup('error', `Error: ${errorMessage}`);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -387,7 +411,13 @@ const AddPurchase = () => {
           </div>
         </div>
 
-        <button type="submit" className="btn-submit">Save Purchase</button>
+        <button 
+          type="submit" 
+          className="btn-submit"
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? 'Saving...' : 'Save Purchase'}
+        </button>
       </form>
     </div>
   );
