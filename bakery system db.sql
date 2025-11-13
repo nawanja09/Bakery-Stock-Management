@@ -709,3 +709,8 @@ CREATE TABLE IF NOT EXISTS `return_items` (
   CONSTRAINT `return_items_ibfk_1` FOREIGN KEY (`return_id`) REFERENCES `returns` (`id`) ON DELETE CASCADE,
   CONSTRAINT `return_items_ibfk_2` FOREIGN KEY (`item_id`) REFERENCES `items` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+------
+-- Add a deleted column to items table
+ALTER TABLE items ADD COLUMN deleted BOOLEAN DEFAULT FALSE;
+

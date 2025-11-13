@@ -1,5 +1,3 @@
-// server/controllers/itemController.js
-
 const pool = require('../config/db');
 
 const createItem = async (req, res) => {
@@ -17,13 +15,21 @@ const createItem = async (req, res) => {
     });
   } catch (error) {
     console.error('Error adding item:', error);
+    
+    // Handle duplicate item_code error
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({ error: 'Item code already exists' });
+    }
+    
     res.status(500).json({ error: 'Server error' });
   }
 };
 
 const getAllItems = async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT id, item_code, name, unit, reorder_level FROM items');
+    const [rows] = await pool.query(
+      'SELECT id, item_code, name, unit, reorder_level FROM items WHERE deleted = FALSE ORDER BY item_code'
+    );
     res.json(rows);
   } catch (error) {
     console.error('Error fetching items:', error);
@@ -31,12 +37,14 @@ const getAllItems = async (req, res) => {
   }
 };
 
-// Add this function for getting a single item
 const getItemById = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const [rows] = await pool.query('SELECT * FROM items WHERE id = ?', [id]);
+    const [rows] = await pool.query(
+      'SELECT * FROM items WHERE id = ? AND deleted = FALSE', 
+      [id]
+    );
     
     if (rows.length === 0) {
       return res.status(404).json({ error: 'Item not found' });
@@ -49,14 +57,13 @@ const getItemById = async (req, res) => {
   }
 };
 
-// Add this function for updating an item
 const updateItem = async (req, res) => {
   const { id } = req.params;
   const { item_code, name, unit, reorder_level } = req.body;
 
   try {
     const [result] = await pool.query(
-      'UPDATE items SET item_code = ?, name = ?, unit = ?, reorder_level = ? WHERE id = ?',
+      'UPDATE items SET item_code = ?, name = ?, unit = ?, reorder_level = ? WHERE id = ? AND deleted = FALSE',
       [item_code, name, unit, reorder_level, id]
     );
     
@@ -67,16 +74,25 @@ const updateItem = async (req, res) => {
     res.json({ message: 'Item updated successfully' });
   } catch (error) {
     console.error('Error updating item:', error);
+    
+    // Handle duplicate item_code error
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({ error: 'Item code already exists' });
+    }
+    
     res.status(500).json({ error: 'Server error' });
   }
 };
 
-// Add this function for deleting an item
 const deleteItem = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const [result] = await pool.query('DELETE FROM items WHERE id = ?', [id]);
+    // Soft delete - mark as deleted instead of removing
+    const [result] = await pool.query(
+      'UPDATE items SET deleted = TRUE WHERE id = ?', 
+      [id]
+    );
     
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'Item not found' });
@@ -95,7 +111,7 @@ const getItemsWithoutOpeningBalance = async (req, res) => {
       SELECT i.* 
       FROM items i
       LEFT JOIN opening_balances ob ON i.id = ob.item_id
-      WHERE ob.item_id IS NULL
+      WHERE ob.item_id IS NULL AND i.deleted = FALSE
     `);
     res.json(rows);
   } catch (error) {
@@ -104,7 +120,6 @@ const getItemsWithoutOpeningBalance = async (req, res) => {
   }
 };
 
-// Add to module exports
 module.exports = {
   getAllItems,
   createItem,
