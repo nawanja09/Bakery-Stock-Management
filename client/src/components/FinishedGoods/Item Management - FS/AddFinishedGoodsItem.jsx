@@ -20,7 +20,7 @@ const AddFinishedGoodsItem = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingRawMaterials, setIsLoadingRawMaterials] = useState(false);
   const [generatedCode, setGeneratedCode] = useState('FG0001');
-  const [outputQuantity, setOutputQuantity] = useState(25); // Changed default to 25
+  const [outputQuantity, setOutputQuantity] = useState(25);
   const navigate = useNavigate();
   const { showPopup } = usePopup();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -32,7 +32,6 @@ const AddFinishedGoodsItem = () => {
   }, []);
 
   useEffect(() => {
-    // Convert raw materials to react-select options
     if (rawMaterials.length > 0) {
       const options = rawMaterials.map(material => ({
         value: material.id,
@@ -98,14 +97,12 @@ const AddFinishedGoodsItem = () => {
           cost: '0.00'
         };
         
-        // Calculate cost if quantity exists
         if (updatedIngredients[index].quantity) {
           const quantity = parseFloat(updatedIngredients[index].quantity) || 0;
           const unitPrice = parseFloat(updatedIngredients[index].unit_price) || 0;
           updatedIngredients[index].cost = (quantity * unitPrice).toFixed(2);
         }
       } else {
-        // Clear fields if no material selected
         updatedIngredients[index] = {
           ...updatedIngredients[index],
           raw_material_id: '',
@@ -147,20 +144,17 @@ const AddFinishedGoodsItem = () => {
     setIngredients(ingredients.filter((_, i) => i !== index));
   };
 
-  // Calculate total cost
   const calculateTotalCost = () => {
     return ingredients.reduce((total, ingredient) => {
       return total + (parseFloat(ingredient.cost) || 0);
     }, 0).toFixed(2);
   };
 
-  // Calculate utility cost (70% of total cost)
   const calculateUtilityCost = () => {
     const totalCost = parseFloat(calculateTotalCost()) || 0;
     return (totalCost * 0.7).toFixed(2);
   };
 
-  // Calculate per unit cost
   const calculatePerUnitCost = () => {
     const totalCost = parseFloat(calculateTotalCost()) || 0;
     const utilityCost = parseFloat(calculateUtilityCost()) || 0;
@@ -187,7 +181,6 @@ const AddFinishedGoodsItem = () => {
       return false;
     }
     
-    // Check for duplicate raw materials in ingredients
     const rawMaterialIds = ingredients
       .filter(ing => ing.raw_material_id)
       .map(ing => ing.raw_material_id);
@@ -207,7 +200,6 @@ const AddFinishedGoodsItem = () => {
     const now = Date.now();
     const timeSinceLast = now - lastSubmitTime;
 
-    // 🚫 Prevent double submit within 2 seconds
     if (timeSinceLast < 2000) {
       showPopup('warning', '⚠️ Duplicate submission detected! Please wait a moment.');
       return;
@@ -238,7 +230,6 @@ const AddFinishedGoodsItem = () => {
       if (itemRes.status === 201) {
         const finished_good_id = itemRes.data.id;
 
-        // Create ingredients
         const validIngredients = ingredients.filter(i =>
           i.raw_material_id && i.quantity && parseFloat(i.quantity) > 0
         );
@@ -253,7 +244,6 @@ const AddFinishedGoodsItem = () => {
           });
         }
 
-        // Save cost calculation
         await api.post('/cost-calculations', {
           finished_good_id,
           finished_good_name: name.trim(),
@@ -286,7 +276,6 @@ const AddFinishedGoodsItem = () => {
     }
   };
 
-  // Custom styles for react-select
   const customStyles = {
     control: (base, state) => ({
       ...base,
@@ -305,6 +294,10 @@ const AddFinishedGoodsItem = () => {
       fontSize: '0.875rem',
       zIndex: 9999
     }),
+    menuPortal: (base) => ({
+      ...base,
+      zIndex: 9999
+    }),
     option: (base, state) => ({
       ...base,
       backgroundColor: state.isSelected ? '#3b82f6' : state.isFocused ? '#f1f5f9' : '#ffffff',
@@ -318,7 +311,6 @@ const AddFinishedGoodsItem = () => {
 
   return (
     <div className="finished-goods-management-container">
-      {/* Header */}
       <div className="header-section">
         <button onClick={() => navigate(-1)} className="back-button">
           <FontAwesomeIcon icon={faArrowLeft} />
@@ -336,7 +328,6 @@ const AddFinishedGoodsItem = () => {
       </div>
 
       <form onSubmit={handleSubmit} className="form-card">
-        {/* Basic Information */}
         <section style={{ marginBottom: '2rem' }}>
           <h3 className="section-title">Basic Information</h3>
           <div className="form-grid">
@@ -408,7 +399,6 @@ const AddFinishedGoodsItem = () => {
           </div>
         </section>
 
-        {/* Ingredients Section */}
         <section className="ingredients-section">
           <div className="section-header">
             <div>
@@ -473,6 +463,8 @@ const AddFinishedGoodsItem = () => {
                           placeholder="Search raw material..."
                           noOptionsMessage={() => "No materials found"}
                           styles={customStyles}
+                          menuPortalTarget={document.body}
+                          menuPosition="fixed"
                           required
                         />
                       </td>
@@ -538,14 +530,12 @@ const AddFinishedGoodsItem = () => {
           )}
         </section>
 
-        {/* Cost Calculation Section */}
         <section className="cost-section">
           <h3 className="section-title">
             <FontAwesomeIcon icon={faCalculator} style={{ marginRight: '0.5rem' }} />
             Cost Calculation
           </h3>
           
-          {/* Output Input Field */}
           <div className="form-group" style={{ marginBottom: '1.5rem' }}>
             <label>Total Output (Quantity) *</label>
             <input
@@ -581,7 +571,6 @@ const AddFinishedGoodsItem = () => {
             </div>
           </div>
 
-          {/* Formula Display */}
           <div className="formula-display" style={{ 
             marginTop: '1rem', 
             padding: '1rem',
@@ -599,7 +588,6 @@ const AddFinishedGoodsItem = () => {
           </div>
         </section>
 
-        {/* Form Actions */}
         <div className="form-actions">
           <button 
             type="button"
