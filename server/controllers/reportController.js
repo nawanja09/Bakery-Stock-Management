@@ -29,12 +29,14 @@ const getStockReport = async (req, res) => {
         COALESCE(purchases.total_purchased, 0) AS total_purchased,
         COALESCE(issues.total_issued, 0) AS total_issued,
         COALESCE(wastage.total_wasted, 0) AS total_wasted,
+        COALESCE(returns.total_returned, 0) AS total_returned,
         (
           COALESCE(prev.closing_balance, 0) +
           COALESCE(ob_today.opening_balance_today, 0) +
           COALESCE(purchases.total_purchased, 0) -
           COALESCE(issues.total_issued, 0) -
-          COALESCE(wastage.total_wasted, 0)
+          COALESCE(wastage.total_wasted, 0) +
+          COALESCE(returns.total_returned, 0)
         ) AS closing_balance,
         -- Get latest unit price
         (
@@ -55,7 +57,8 @@ const getStockReport = async (req, res) => {
             COALESCE(ob.opening_balance, 0) +
             COALESCE(purchases.total_purchased, 0) -
             COALESCE(issues.total_issued, 0) -
-            COALESCE(wastage.total_wasted, 0)
+            COALESCE(wastage.total_wasted, 0) +
+            COALESCE(returns.total_returned, 0)
           ) AS closing_balance
         FROM items i2
         LEFT JOIN (
@@ -86,6 +89,13 @@ const getStockReport = async (req, res) => {
           WHERE w.date <= ?
           GROUP BY wi.item_id
         ) wastage ON i2.id = wastage.item_id
+        LEFT JOIN (
+          SELECT ri.item_id, SUM(ri.quantity) AS total_returned
+          FROM return_items ri
+          JOIN returns r ON ri.return_id = r.id
+          WHERE r.return_date <= ?
+          GROUP BY ri.item_id
+        ) returns ON i2.id = returns.item_id
       ) prev ON i.id = prev.item_id
       LEFT JOIN (
         -- today's manual opening balance
@@ -119,19 +129,27 @@ const getStockReport = async (req, res) => {
         WHERE w.date = ?
         GROUP BY wi.item_id
       ) wastage ON i.id = wastage.item_id
+      LEFT JOIN (
+        -- today's returns
+        SELECT ri.item_id, SUM(ri.quantity) AS total_returned
+        FROM return_items ri
+        JOIN returns r ON ri.return_id = r.id
+        WHERE DATE(r.return_date) = ?
+        GROUP BY ri.item_id
+      ) returns ON i.id = returns.item_id
       ORDER BY i.item_code
     `;
 
     const params = [
       date, // For unit price subquery
-      prevDateStr, prevDateStr, prevDateStr, prevDateStr, // yesterday x4
+      prevDateStr, prevDateStr, prevDateStr, prevDateStr, prevDateStr, // yesterday x5
       date,                                              // today opening
-      date, date, date                                   // today purchases/issues/wastage
+      date, date, date, date                            // today purchases/issues/wastage/returns
     ];
 
     const [rows] = await pool.query(query, params);
 
-    // Calculate value for each item
+    // Calculate value for each item - CLOSING BALANCE * UNIT PRICE
     const stockDataWithValue = rows.map(item => {
       const closingBalance = Number(item.closing_balance) || 0;
       const unitPrice = Number(item.unit_price) || 0;
@@ -152,87 +170,284 @@ const getStockReport = async (req, res) => {
   }
 };
 
-// Add this new function for individual price lookup (if needed elsewhere)
-const getLatestUnitPrice = async (req, res) => {
+const getDateRange = (start, end) => {
+  const dates = [];
+  let current = new Date(start);
+  const last = new Date(end);
+
+  while (current <= last) {
+    dates.push(current.toISOString().slice(0, 10)); // format YYYY-MM-DD
+    current.setDate(current.getDate() + 1);
+  }
+
+  return dates;
+};
+
+const getStockReportByRangeAndItem = async (req, res) => {
   try {
-    const { itemId, date } = req.query;
+    const { startDate, endDate, itemId } = req.query;
 
-    if (!itemId || !date) {
-      return res.status(400).json({ error: 'Item ID and date are required' });
+    if (!startDate || !endDate || !itemId) {
+      return res.status(400).json({ error: 'startDate, endDate, and itemId are required (format: YYYY-MM-DD)' });
     }
 
-    const query = `
-      SELECT pi.unit_price
-      FROM purchase_items pi
-      JOIN purchases p ON pi.purchase_id = p.id
-      WHERE pi.item_id = ? 
-        AND DATE(p.purchase_date) <= ?
-      ORDER BY p.purchase_date DESC, pi.id DESC
-      LIMIT 1
-    `;
+    const dateRange = getDateRange(startDate, endDate);
+    const report = [];
 
-    const [rows] = await pool.query(query, [itemId, date]);
-    
-    if (rows.length > 0) {
-      res.json({ unitPrice: parseFloat(rows[0].unit_price) });
-    } else {
-      res.json({ unitPrice: 0 });
+    // Get the opening balance from before the start date
+    const [[openingRow]] = await pool.query(
+      `SELECT date, quantity FROM opening_balances 
+       WHERE item_id = ? AND date < ? 
+       ORDER BY date DESC LIMIT 1`,
+      [itemId, startDate]
+    );
+
+    let openingBalance = 0;
+    if (openingRow) {
+      openingBalance = parseFloat(openingRow.quantity);
     }
+
+    // Get all transactions before the start date to calculate the initial opening
+    const [[{ purchased: prePurchased = 0 }]] = await pool.query(
+      `SELECT SUM(pi.quantity) AS purchased
+       FROM purchase_items pi
+       JOIN purchases p ON pi.purchase_id = p.id
+       WHERE pi.item_id = ? AND DATE(p.purchase_date) < ?`,
+      [itemId, startDate]
+    );
+
+    const [[{ issued: preIssued = 0 }]] = await pool.query(
+      `SELECT SUM(ii.quantity) AS issued
+       FROM issuance_items ii
+       JOIN issuances i ON ii.issuance_id = i.id
+       WHERE ii.item_id = ? AND DATE(i.issuance_date) < ?`,
+      [itemId, startDate]
+    );
+
+    const [[{ wasted: preWasted = 0 }]] = await pool.query(
+      `SELECT SUM(wi.quantity) AS wasted
+       FROM wastage_items wi
+       JOIN wastages w ON wi.wastage_id = w.id
+       WHERE wi.item_id = ? AND DATE(w.date) < ?`,
+      [itemId, startDate]
+    );
+
+    const [[{ returned: preReturned = 0 }]] = await pool.query(
+      `SELECT SUM(ri.quantity) AS returned
+       FROM return_items ri
+       JOIN returns r ON ri.return_id = r.id
+       WHERE ri.item_id = ? AND DATE(r.return_date) < ?`,
+      [itemId, startDate]
+    );
+
+    // Calculate initial opening balance
+    let runningBalance = openingBalance + parseFloat(prePurchased || 0) - 
+                         parseFloat(preIssued || 0) - parseFloat(preWasted || 0) +
+                         parseFloat(preReturned || 0);
+
+    for (const date of dateRange) {
+      let opening = runningBalance;
+      let purchased = 0;
+      let issued = 0;
+      let wasted = 0;
+      let returned = 0;
+
+      // Check if there's an opening balance specifically for this date
+      const [[specificOpening]] = await pool.query(
+        `SELECT quantity FROM opening_balances 
+         WHERE item_id = ? AND DATE(date) = ?`,
+        [itemId, date]
+      );
+
+      if (specificOpening) {
+        opening = parseFloat(specificOpening.quantity);
+        runningBalance = opening; // Reset running balance to the opening balance
+      }
+
+      const [[{ purchased: dbPurchased = 0 }]] = await pool.query(
+        `SELECT SUM(pi.quantity) AS purchased
+         FROM purchase_items pi
+         JOIN purchases p ON pi.purchase_id = p.id
+         WHERE pi.item_id = ? AND DATE(p.purchase_date) = ?`,
+        [itemId, date]
+      );
+
+      const [[{ issued: dbIssued = 0 }]] = await pool.query(
+        `SELECT SUM(ii.quantity) AS issued
+         FROM issuance_items ii
+         JOIN issuances i ON ii.issuance_id = i.id
+         WHERE ii.item_id = ? AND DATE(i.issuance_date) = ?`,
+        [itemId, date]
+      );
+
+      const [[{ wasted: dbWasted = 0 }]] = await pool.query(
+        `SELECT SUM(wi.quantity) AS wasted
+         FROM wastage_items wi
+         JOIN wastages w ON wi.wastage_id = w.id
+         WHERE wi.item_id = ? AND DATE(w.date) = ?`,
+        [itemId, date]
+      );
+
+      const [[{ returned: dbReturned = 0 }]] = await pool.query(
+        `SELECT SUM(ri.quantity) AS returned
+         FROM return_items ri
+         JOIN returns r ON ri.return_id = r.id
+         WHERE ri.item_id = ? AND DATE(r.return_date) = ?`,
+        [itemId, date]
+      );
+
+      // Add database values
+      purchased = parseFloat(dbPurchased || 0);
+      issued = parseFloat(dbIssued || 0);
+      wasted = parseFloat(dbWasted || 0);
+      returned = parseFloat(dbReturned || 0);
+
+      const closing = opening + purchased - issued - wasted + returned;
+      runningBalance = closing;
+
+      report.push({
+        date,
+        opening,
+        purchased,
+        issued,
+        wasted,
+        returned,
+        closing
+      });
+    }
+
+    res.json(report);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error: ' + err.message });
+  }
+};
+
+// Get daily purchase transactions
+const getDailyPurchaseTransactions = async (req, res) => {
+  try {
+    const { date, itemId } = req.query;
+
+    if (!date || !itemId) {
+      return res.status(400).json({ error: 'Date and itemId are required' });
+    }
+
+    const [rows] = await pool.query(`
+      SELECT 
+        p.id,
+        p.invoice_no,
+        s.name AS supplier_name,
+        pi.quantity,
+        pi.unit_price,
+        (pi.quantity * pi.unit_price) AS total_price
+      FROM purchases p
+      JOIN purchase_items pi ON p.id = pi.purchase_id
+      JOIN supplier s ON p.supplier_id = s.id
+      WHERE DATE(p.purchase_date) = ? 
+        AND pi.item_id = ?
+      ORDER BY p.invoice_no
+    `, [date, itemId]);
+
+    res.json(rows);
   } catch (error) {
-    console.error('Error fetching latest unit price:', error);
+    console.error('Error fetching daily purchase transactions:', error);
     res.status(500).json({ error: 'Server error' });
   }
 };
 
-//stock report formula
-// Today's opening balance = closing balance at the end of yesterday + today's opening balance
-// Closing balance at the end of today = Today's opening balance + purchased - Issued - wastage
+// Get daily issuance transactions
+const getDailyIssuanceTransactions = async (req, res) => {
+  try {
+    const { date, itemId } = req.query;
 
-/* Get department issues report
-const getDepartmentIssuesReport = async (req, res) => {
-    const { startDate, endDate, departmentId } = req.query;
-
-    if (!startDate || !endDate) {
-        return res.status(400).json({ error: 'Missing required parameters' });
+    if (!date || !itemId) {
+      return res.status(400).json({ error: 'Date and itemId are required' });
     }
 
-    try {
-        let query = `
-            SELECT 
-                i.id AS issuance_id,
-                i.issuance_date,
-                d.name AS department_name,
-                i.received_by,
-                it.item_code,
-                it.name AS item_name,
-                ii.quantity,
-                it.unit,
-                i.remarks
-            FROM issuances i
-            JOIN issuance_items ii ON i.id = ii.issuance_id
-            JOIN items it ON ii.item_id = it.id
-            JOIN departments d ON i.department_id = d.id
-            WHERE DATE(i.issuance_date) BETWEEN ? AND ?
-        `;
-        
-        const params = [startDate, endDate];
-        
-        // Add department filter if provided
-        if (departmentId) {
-            query += ' AND i.department_id = ?';
-            params.push(departmentId);
-        }
-        
-        query += ' ORDER BY i.issuance_date DESC, i.id';
-        
-        const [rows] = await pool.query(query, params);
-        res.json(rows);
-    } catch (error) {
-        console.error('Error fetching department issues report:', error);
-        res.status(500).json({ error: 'Server error' });
-    }
+    const [rows] = await pool.query(`
+      SELECT 
+        i.id AS issuance_id,
+        d.name AS department_name,
+        i.received_by,
+        ii.quantity,
+        i.remarks
+      FROM issuances i
+      JOIN issuance_items ii ON i.id = ii.issuance_id
+      JOIN departments d ON i.department_id = d.id
+      WHERE DATE(i.issuance_date) = ? 
+        AND ii.item_id = ?
+      ORDER BY i.id
+    `, [date, itemId]);
+
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching daily issuance transactions:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
 };
-*/
+
+// Get daily wastage transactions
+const getDailyWastageTransactions = async (req, res) => {
+  try {
+    const { date, itemId } = req.query;
+
+    if (!date || !itemId) {
+      return res.status(400).json({ error: 'Date and itemId are required' });
+    }
+
+    const [rows] = await pool.query(`
+      SELECT 
+        w.id AS wastage_id,
+        w.wastage_note_number,
+        w.approved_by,
+        w.reason,
+        wi.quantity,
+        wi.estimated_loss
+      FROM wastages w
+      JOIN wastage_items wi ON w.id = wi.wastage_id
+      WHERE DATE(w.date) = ? 
+        AND wi.item_id = ?
+      ORDER BY w.wastage_note_number
+    `, [date, itemId]);
+
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching daily wastage transactions:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+// Get daily return transactions
+const getDailyReturnTransactions = async (req, res) => {
+  try {
+    const { date, itemId } = req.query;
+
+    if (!date || !itemId) {
+      return res.status(400).json({ error: 'Date and itemId are required' });
+    }
+
+    const [rows] = await pool.query(`
+      SELECT 
+        r.id AS return_id,
+        r.return_number,
+        d.name AS department_name,
+        r.received_by,
+        ri.quantity,
+        ri.reason
+      FROM returns r
+      JOIN return_items ri ON r.id = ri.return_id
+      JOIN departments d ON r.department_id = d.id
+      WHERE DATE(r.return_date) = ? 
+        AND ri.item_id = ?
+      ORDER BY r.return_number
+    `, [date, itemId]);
+
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching daily return transactions:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
 
 const getDepartmentIssuesReport = async (req, res) => {
     const { startDate, endDate, departmentId, itemId } = req.query;
@@ -460,323 +675,6 @@ const getDepartmentItemsSummary = async (req, res) => {
   }
 };
 
-const getDateRange = (start, end) => {
-  const dates = [];
-  let current = new Date(start);
-  const last = new Date(end);
-
-  while (current <= last) {
-    dates.push(current.toISOString().slice(0, 10)); // format YYYY-MM-DD
-    current.setDate(current.getDate() + 1);
-  }
-
-  return dates;
-};
-
-/*
-const getStockReportByRangeAndItem = async (req, res) => {
-  try {
-    const { startDate, endDate, itemId } = req.query;
-
-    if (!startDate || !endDate || !itemId) {
-      return res.status(400).json({ error: 'startDate, endDate, and itemId are required (format: YYYY-MM-DD)' });
-    }
-
-    const dateRange = getDateRange(startDate, endDate);
-    const report = [];
-
-    // Step 1: Get opening balance info
-    const [[openingRow]] = await pool.query(
-      `SELECT date, quantity FROM opening_balances WHERE item_id = ?`,
-      [itemId]
-    );
-
-    let openingBalanceDate = null;
-    let openingBalanceQty = 0;
-
-    if (openingRow) {
-      openingBalanceDate = openingRow.date.toISOString().slice(0, 10);
-      openingBalanceQty = parseFloat(openingRow.quantity);
-    }
-
-    let closingBalance = 0; // very first day opening is 0
-
-    for (let i = 0; i < dateRange.length; i++) {
-      const date = dateRange[i];
-
-      let opening = (i === 0) ? 0 : closingBalance;
-      let purchased = 0;
-      let issued = 0;
-      let wasted = 0;
-
-      // If opening balance date matches current date, add to purchased
-      if (date === openingBalanceDate) {
-        purchased += openingBalanceQty;
-      }
-
-      const [[{ purchased: dbPurchased = 0 }]] = await pool.query(
-        `SELECT SUM(pi.quantity) AS purchased
-         FROM purchase_items pi
-         JOIN purchases p ON pi.purchase_id = p.id
-         WHERE pi.item_id = ? AND DATE(p.purchase_date) = ?`,
-        [itemId, date]
-      );
-
-      const [[{ issued: dbIssued = 0 }]] = await pool.query(
-        `SELECT SUM(ii.quantity) AS issued
-         FROM issuance_items ii
-         JOIN issuances i ON ii.issuance_id = i.id
-         WHERE ii.item_id = ? AND DATE(i.issuance_date) = ?`,
-        [itemId, date]
-      );
-
-      const [[{ wasted: dbWasted = 0 }]] = await pool.query(
-        `SELECT SUM(wi.quantity) AS wasted
-         FROM wastage_items wi
-         JOIN wastages w ON wi.wastage_id = w.id
-         WHERE wi.item_id = ? AND DATE(w.date) = ?`,
-        [itemId, date]
-      );
-
-      purchased += parseFloat(dbPurchased || 0);
-      issued = parseFloat(dbIssued || 0);
-      wasted = parseFloat(dbWasted || 0);
-
-      closingBalance = opening + purchased - issued - wasted;
-
-      report.push({
-        date,
-        opening,
-        purchased,
-        issued,
-        wasted,
-        closing: closingBalance
-      });
-    }
-
-    res.json(report);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error: ' + err.message });
-  }
-};
-*/
-
-const getStockReportByRangeAndItem = async (req, res) => {
-  try {
-    const { startDate, endDate, itemId } = req.query;
-
-    if (!startDate || !endDate || !itemId) {
-      return res.status(400).json({ error: 'startDate, endDate, and itemId are required (format: YYYY-MM-DD)' });
-    }
-
-    const dateRange = getDateRange(startDate, endDate);
-    const report = [];
-
-    // Get the opening balance from before the start date
-    const [[openingRow]] = await pool.query(
-      `SELECT date, quantity FROM opening_balances 
-       WHERE item_id = ? AND date < ? 
-       ORDER BY date DESC LIMIT 1`,
-      [itemId, startDate]
-    );
-
-    let openingBalance = 0;
-    if (openingRow) {
-      openingBalance = parseFloat(openingRow.quantity);
-    }
-
-    // Get all transactions before the start date to calculate the initial opening
-    const [[{ purchased: prePurchased = 0 }]] = await pool.query(
-      `SELECT SUM(pi.quantity) AS purchased
-       FROM purchase_items pi
-       JOIN purchases p ON pi.purchase_id = p.id
-       WHERE pi.item_id = ? AND DATE(p.purchase_date) < ?`,
-      [itemId, startDate]
-    );
-
-    const [[{ issued: preIssued = 0 }]] = await pool.query(
-      `SELECT SUM(ii.quantity) AS issued
-       FROM issuance_items ii
-       JOIN issuances i ON ii.issuance_id = i.id
-       WHERE ii.item_id = ? AND DATE(i.issuance_date) < ?`,
-      [itemId, startDate]
-    );
-
-    const [[{ wasted: preWasted = 0 }]] = await pool.query(
-      `SELECT SUM(wi.quantity) AS wasted
-       FROM wastage_items wi
-       JOIN wastages w ON wi.wastage_id = w.id
-       WHERE wi.item_id = ? AND DATE(w.date) < ?`,
-      [itemId, startDate]
-    );
-
-    // Calculate initial opening balance
-    let runningBalance = openingBalance + parseFloat(prePurchased || 0) - 
-                         parseFloat(preIssued || 0) - parseFloat(preWasted || 0);
-
-    for (const date of dateRange) {
-      let opening = runningBalance;
-      let purchased = 0;
-      let issued = 0;
-      let wasted = 0;
-
-      // Check if there's an opening balance specifically for this date
-      const [[specificOpening]] = await pool.query(
-        `SELECT quantity FROM opening_balances 
-         WHERE item_id = ? AND DATE(date) = ?`,
-        [itemId, date]
-      );
-
-      if (specificOpening) {
-        opening = parseFloat(specificOpening.quantity);
-        runningBalance = opening; // Reset running balance to the opening balance
-      }
-
-      const [[{ purchased: dbPurchased = 0 }]] = await pool.query(
-        `SELECT SUM(pi.quantity) AS purchased
-         FROM purchase_items pi
-         JOIN purchases p ON pi.purchase_id = p.id
-         WHERE pi.item_id = ? AND DATE(p.purchase_date) = ?`,
-        [itemId, date]
-      );
-
-      const [[{ issued: dbIssued = 0 }]] = await pool.query(
-        `SELECT SUM(ii.quantity) AS issued
-         FROM issuance_items ii
-         JOIN issuances i ON ii.issuance_id = i.id
-         WHERE ii.item_id = ? AND DATE(i.issuance_date) = ?`,
-        [itemId, date]
-      );
-
-      const [[{ wasted: dbWasted = 0 }]] = await pool.query(
-        `SELECT SUM(wi.quantity) AS wasted
-         FROM wastage_items wi
-         JOIN wastages w ON wi.wastage_id = w.id
-         WHERE wi.item_id = ? AND DATE(w.date) = ?`,
-        [itemId, date]
-      );
-
-      // Add database values
-      purchased = parseFloat(dbPurchased || 0);
-      issued = parseFloat(dbIssued || 0);
-      wasted = parseFloat(dbWasted || 0);
-
-      const closing = opening + purchased - issued - wasted;
-      runningBalance = closing;
-
-      report.push({
-        date,
-        opening,
-        purchased,
-        issued,
-        wasted,
-        closing
-      });
-    }
-
-    res.json(report);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error: ' + err.message });
-  }
-};
-
-// Get daily purchase transactions
-const getDailyPurchaseTransactions = async (req, res) => {
-  try {
-    const { date, itemId } = req.query;
-
-    if (!date || !itemId) {
-      return res.status(400).json({ error: 'Date and itemId are required' });
-    }
-
-    const [rows] = await pool.query(`
-      SELECT 
-        p.id,
-        p.invoice_no,
-        s.name AS supplier_name,
-        pi.quantity,
-        pi.unit_price,
-        (pi.quantity * pi.unit_price) AS total_price
-      FROM purchases p
-      JOIN purchase_items pi ON p.id = pi.purchase_id
-      JOIN supplier s ON p.supplier_id = s.id
-      WHERE DATE(p.purchase_date) = ? 
-        AND pi.item_id = ?
-      ORDER BY p.invoice_no
-    `, [date, itemId]);
-
-    res.json(rows);
-  } catch (error) {
-    console.error('Error fetching daily purchase transactions:', error);
-    res.status(500).json({ error: 'Server error' });
-  }
-};
-
-// Get daily issuance transactions
-const getDailyIssuanceTransactions = async (req, res) => {
-  try {
-    const { date, itemId } = req.query;
-
-    if (!date || !itemId) {
-      return res.status(400).json({ error: 'Date and itemId are required' });
-    }
-
-    const [rows] = await pool.query(`
-      SELECT 
-        i.id AS issuance_id,
-        d.name AS department_name,
-        i.received_by,
-        ii.quantity,
-        i.remarks
-      FROM issuances i
-      JOIN issuance_items ii ON i.id = ii.issuance_id
-      JOIN departments d ON i.department_id = d.id
-      WHERE DATE(i.issuance_date) = ? 
-        AND ii.item_id = ?
-      ORDER BY i.id
-    `, [date, itemId]);
-
-    res.json(rows);
-  } catch (error) {
-    console.error('Error fetching daily issuance transactions:', error);
-    res.status(500).json({ error: 'Server error' });
-  }
-};
-
-// Get daily wastage transactions
-const getDailyWastageTransactions = async (req, res) => {
-  try {
-    const { date, itemId } = req.query;
-
-    if (!date || !itemId) {
-      return res.status(400).json({ error: 'Date and itemId are required' });
-    }
-
-    const [rows] = await pool.query(`
-      SELECT 
-        w.id AS wastage_id,
-        w.wastage_note_number,
-        w.approved_by,
-        w.reason,
-        wi.quantity,
-        wi.estimated_loss
-      FROM wastages w
-      JOIN wastage_items wi ON w.id = wi.wastage_id
-      WHERE DATE(w.date) = ? 
-        AND wi.item_id = ?
-      ORDER BY w.wastage_note_number
-    `, [date, itemId]);
-
-    res.json(rows);
-  } catch (error) {
-    console.error('Error fetching daily wastage transactions:', error);
-    res.status(500).json({ error: 'Server error' });
-  }
-};
-
-// Get purchasing item-wise report
 const getPurchasingItemWiseReport = async (req, res) => {
   const { startDate, endDate, companyId } = req.query;
 
@@ -820,9 +718,42 @@ const getPurchasingItemWiseReport = async (req, res) => {
   }
 };
 
-// Add to module.exports
+// Add this function to get latest unit price
+const getLatestUnitPrice = async (req, res) => {
+  try {
+    const { itemId, date } = req.query;
+
+    if (!itemId || !date) {
+      return res.status(400).json({ error: 'Item ID and date are required' });
+    }
+
+    const query = `
+      SELECT pi.unit_price
+      FROM purchase_items pi
+      JOIN purchases p ON pi.purchase_id = p.id
+      WHERE pi.item_id = ? 
+        AND DATE(p.purchase_date) <= ?
+      ORDER BY p.purchase_date DESC, pi.id DESC
+      LIMIT 1
+    `;
+
+    const [rows] = await pool.query(query, [itemId, date]);
+    
+    if (rows.length > 0) {
+      res.json({ unitPrice: parseFloat(rows[0].unit_price) });
+    } else {
+      res.json({ unitPrice: 0 });
+    }
+  } catch (error) {
+    console.error('Error fetching latest unit price:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+
 module.exports = {
   getStockReport,
+  getLatestUnitPrice,
   getDepartmentIssuesReport,
   getPurchasingReport,
   getWastageReport,
@@ -831,6 +762,6 @@ module.exports = {
   getDailyIssuanceTransactions,
   getDailyPurchaseTransactions,
   getDailyWastageTransactions,
-  getPurchasingItemWiseReport,
-  getLatestUnitPrice
+  getDailyReturnTransactions,
+  getPurchasingItemWiseReport
 };

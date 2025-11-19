@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faEdit, faTrash, faPlus, faSearch, faBox, faEye } from '@fortawesome/free-solid-svg-icons';
 import { usePopup } from '../../context/PopupContext';
-import './FinishedGoodsManagement.css';
 import api from '../../../api';
+import './FinishedGoodsManagement.css';
 
 const ViewFinishedGoodsItems = () => {
   const [items, setItems] = useState([]);
@@ -25,7 +25,6 @@ const ViewFinishedGoodsItems = () => {
       const data = response.data;
 
       if (response.status === 200) {
-        // Sort numerically based on item_code (e.g., FG001 -> 1, FG010 -> 10)
         const sortedData = data.sort((a, b) => {
           const numA = parseInt(a.item_code.replace(/\D/g, ''), 10);
           const numB = parseInt(b.item_code.replace(/\D/g, ''), 10);
@@ -58,157 +57,102 @@ const ViewFinishedGoodsItems = () => {
     setFilteredItems(filtered);
   }, [searchTerm, items]);
 
-  const handleView = (id) => {
-    navigate(`/finished-goods/items/view/${id}`);
-  };
-
-  const handleEdit = (id) => {
-    navigate(`/finished-goods/items/edit/${id}`);
-  };
+  const handleView = (id) => navigate(`/finished-goods/items/view/${id}`);
+  const handleEdit = (id) => navigate(`/finished-goods/items/edit/${id}`);
 
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this item? This action cannot be undone.')) {
+    if (window.confirm('Are you sure you want to delete this item?')) {
       try {
         const response = await api.delete(`/finished-goods-items/${id}`);
-
         if (response.status === 200) {
           setItems(items.filter(item => item.id !== id));
           showPopup('success', 'Item deleted successfully!');
-        } else {
-          const data = response.data;
-          showPopup('error', data.error || 'Failed to delete item');
-        }
-      } catch (error) {
-        console.error('Error deleting item:', error);
+        } else showPopup('error', 'Failed to delete item');
+      } catch (err) {
+        console.error(err);
         showPopup('error', 'Network error. Please try again.');
       }
     }
   };
 
   return (
-    <div className="finished-goods-container">
+    <div className="fg-container">
+      
       {/* Header */}
-      <div className="header-buttons">
+      <div className="fg-header">
         <div>
-          <h1 className="page-title">Finished Goods</h1>
-          <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
-            Manage your finished products and their ingredients
-          </p>
+          <h1 className="fg-title">Finished Goods</h1>
+          <p className="fg-subtitle">Minimalist view of your finished products</p>
         </div>
-        <button 
-          onClick={() => navigate('/finished-goods/items/add')} 
-          className="btn btn-primary"
-        >
-          <FontAwesomeIcon icon={faPlus} />
-          Add New Item
+
+        <button onClick={() => navigate('/finished-goods/items/add')} className="fg-btn-primary">
+          <FontAwesomeIcon icon={faPlus} /> Add Item
         </button>
       </div>
 
       {/* Search */}
-      <div className="search-container">
-        <FontAwesomeIcon icon={faSearch} className="search-icon" />
+      <div className="fg-search-box">
+        <FontAwesomeIcon icon={faSearch} className="fg-search-icon" />
         <input
-          type="text"
-          placeholder="Search items by code, name, or category..."
+          placeholder="Search by code, name, or category..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="search-input"
+          className="fg-search-input"
         />
       </div>
 
       {/* Content */}
       {loading ? (
-        <div className="loading-state">
-          <div className="spinner"></div>
-          Loading items...
+        <div className="fg-loading">
+          <div className="fg-spinner"></div>
+          <span>Loading items...</span>
         </div>
       ) : filteredItems.length === 0 ? (
-        <div className="empty-state">
-          <FontAwesomeIcon icon={faBox} size="2x" style={{ marginBottom: '1rem', opacity: 0.5 }} />
-          <div style={{ fontSize: '1.125rem', fontWeight: '500', marginBottom: '0.5rem' }}>
-            {searchTerm ? 'No items found' : 'No finished goods items'}
-          </div>
-          <p style={{ color: 'var(--text-muted)' }}>
-            {searchTerm 
-              ? 'Try adjusting your search terms' 
-              : 'Get started by adding your first finished product'
-            }
-          </p>
+        <div className="fg-empty">
+          <FontAwesomeIcon icon={faBox} size="3x" />
+          <h3>No items found</h3>
+          <p>Try adjusting your search or add a new item.</p>
           {!searchTerm && (
-            <button 
-              onClick={() => navigate('/finished-goods/items/add')} 
-              className="btn btn-primary"
-              style={{ marginTop: '1rem' }}
-            >
-              <FontAwesomeIcon icon={faPlus} />
-              Add New Item
+            <button onClick={() => navigate('/finished-goods/items/add')} className="fg-btn-primary mt">
+              <FontAwesomeIcon icon={faPlus} /> Add First Item
             </button>
           )}
         </div>
       ) : (
-        <div className="table-wrapper">
-          <table className="finished-goods-table">
+        <div className="fg-table-wrapper">
+          <table className="fg-table">
             <thead>
               <tr>
-                <th>Item Code</th>
+                <th>Code</th>
                 <th>Name</th>
                 <th>Category</th>
                 <th>Ingredients</th>
-                <th style={{ width: '140px' }}>Actions</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
               {filteredItems.map(item => (
                 <tr key={item.id}>
-                  <td>
-                    <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>
-                      {item.item_code}
-                    </div>
-                  </td>
-                  <td>
-                    <div style={{ fontWeight: '500' }}>{item.name}</div>
-                  </td>
-                  <td>
-                    <span className="category-badge">
-                      {item.category}
-                    </span>
-                  </td>
+                  <td className="fg-bold">{item.item_code}</td>
+                  <td>{item.name}</td>
+                  <td><span className="fg-tag">{item.category}</span></td>
                   <td>
                     {item.has_ingredients ? (
-                      <span className="ingredients-badge">
-                        {item.has_ingredients}
-                      </span>
+                      <span className="fg-badge">{item.has_ingredients}</span>
                     ) : (
-                      <span style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>
-                        No ingredients
-                      </span>
+                      <span className="fg-empty-text">None</span>
                     )}
                   </td>
-                  <td>
-                    <div className="actions">
-                      <button 
-                        onClick={() => handleView(item.id)} 
-                        className="btn-icon"
-                        title="View item details"
-                        style={{ color: '#3b82f6' }}
-                      >
-                        <FontAwesomeIcon icon={faEye} />
-                      </button>
-                      <button 
-                        onClick={() => handleEdit(item.id)} 
-                        className="btn-icon"
-                        title="Edit item"
-                      >
-                        <FontAwesomeIcon icon={faEdit} />
-                      </button>
-                      <button 
-                        onClick={() => handleDelete(item.id)} 
-                        className="btn-icon error"
-                        title="Delete item"
-                      >
-                        <FontAwesomeIcon icon={faTrash} />
-                      </button>
-                    </div>
+                  <td className="fg-actions">
+                    <button className="fg-icon-btn" onClick={() => handleView(item.id)}>
+                      <FontAwesomeIcon icon={faEye} />
+                    </button>
+                    <button className="fg-icon-btn" onClick={() => handleEdit(item.id)}>
+                      <FontAwesomeIcon icon={faEdit} />
+                    </button>
+                    <button className="fg-icon-btn danger" onClick={() => handleDelete(item.id)}>
+                      <FontAwesomeIcon icon={faTrash} />
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -217,14 +161,9 @@ const ViewFinishedGoodsItems = () => {
         </div>
       )}
 
-      {/* Results Count */}
+      {/* Count */}
       {!loading && filteredItems.length > 0 && (
-        <div style={{ 
-          marginTop: '1rem', 
-          textAlign: 'center', 
-          color: 'var(--text-muted)',
-          fontSize: '0.875rem'
-        }}>
+        <div className="fg-count">
           Showing {filteredItems.length} of {items.length} items
           {searchTerm && ` for "${searchTerm}"`}
         </div>

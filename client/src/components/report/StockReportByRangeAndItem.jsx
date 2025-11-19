@@ -1,3 +1,5 @@
+//src/components/report/StockReportByRangeAndItem.jsx
+
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import jsPDF from 'jspdf';
@@ -9,19 +11,20 @@ import { faDownload, faFileExcel, faCalendar, faChartLine, faEye, faSearch } fro
 import api from '../../api';
 import './StockReport.css';
 
-// Transaction Details Modal Component (Unchanged)
+// Transaction Details Modal Component
 const TransactionDetailsModal = ({ date, itemId, itemName, onClose }) => {
   const [transactions, setTransactions] = useState({
     purchases: [],
     issuances: [],
-    wastages: []
+    wastages: [],
+    returns: []
   });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchTransactionDetails = async () => {
       try {
-        const [purchasesRes, issuancesRes, wastagesRes] = await Promise.all([
+        const [purchasesRes, issuancesRes, wastagesRes, returnsRes] = await Promise.all([
           api.get(`/reports/daily-transactions/purchases`, {
             params: { date, itemId }
           }),
@@ -30,13 +33,17 @@ const TransactionDetailsModal = ({ date, itemId, itemName, onClose }) => {
           }),
           api.get(`/reports/daily-transactions/wastages`, {
             params: { date, itemId }
+          }),
+          api.get(`/reports/daily-transactions/returns`, {
+            params: { date, itemId }
           })
         ]);
 
         setTransactions({
           purchases: purchasesRes.data,
           issuances: issuancesRes.data,
-          wastages: wastagesRes.data
+          wastages: wastagesRes.data,
+          returns: returnsRes.data
         });
       } catch (error) {
         console.error('Error fetching transaction details:', error);
@@ -162,6 +169,39 @@ const TransactionDetailsModal = ({ date, itemId, itemName, onClose }) => {
               <p className="no-data">No wastages for this date</p>
             )}
           </div>
+
+          {/* Returns Section */}
+          <div className="transaction-section">
+            <h4>🔄 Returns ({transactions.returns.length})</h4>
+            {transactions.returns.length > 0 ? (
+              <div className="table-container">
+                <table className="details-table">
+                  <thead>
+                    <tr>
+                      <th>Return Ref</th>
+                      <th>Department</th>
+                      <th>Received By</th>
+                      <th>Quantity</th>
+                      <th>Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {transactions.returns.map((returnItem, index) => (
+                      <tr key={index}>
+                        <td>{returnItem.return_number}</td>
+                        <td>{returnItem.department_name}</td>
+                        <td>{returnItem.received_by}</td>
+                        <td>{Number(returnItem.quantity).toFixed(3)}</td>
+                        <td>{returnItem.reason}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="no-data">No returns for this date</p>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -260,16 +300,17 @@ const StockReportByRangeAndItem = () => {
     // Table
     autoTable(doc, {
       head: [
-        ['Date', 'Opening', 'Purchased', 'Issued', 'Wasted', 'Closing', 'Net Change']
+        ['Date', 'Opening', 'Purchased', 'Issued', 'Wasted', 'Returned', 'Closing', 'Net Change']
       ],
       body: stockData.map(r => {
-        const netChange = Number(r.purchased) - Number(r.issued) - Number(r.wasted);
+        const netChange = Number(r.purchased) - Number(r.issued) - Number(r.wasted) + Number(r.returned);
         return [
           format(new Date(r.date), 'MMM dd, yyyy'),
           Number(r.opening).toFixed(3),
           Number(r.purchased).toFixed(3),
           Number(r.issued).toFixed(3),
           Number(r.wasted).toFixed(3),
+          Number(r.returned).toFixed(3),
           Number(r.closing).toFixed(3),
           netChange.toFixed(3)
         ];
@@ -289,12 +330,13 @@ const StockReportByRangeAndItem = () => {
       },
       columnStyles: {
         0: { cellWidth: 25 },
-        1: { cellWidth: 20 },
-        2: { cellWidth: 20 },
-        3: { cellWidth: 20 },
-        4: { cellWidth: 20 },
-        5: { cellWidth: 20 },
-        6: { cellWidth: 20 }
+        1: { cellWidth: 18 },
+        2: { cellWidth: 18 },
+        3: { cellWidth: 18 },
+        4: { cellWidth: 18 },
+        5: { cellWidth: 18 },
+        6: { cellWidth: 18 },
+        7: { cellWidth: 18 }
       }
     });
 
@@ -312,7 +354,8 @@ const StockReportByRangeAndItem = () => {
       doc.text(`Total Purchased: ${summary.totalPurchased.toFixed(3)}`, 14, finalY + 8);
       doc.text(`Total Issued: ${summary.totalIssued.toFixed(3)}`, 14, finalY + 16);
       doc.text(`Total Wasted: ${summary.totalWasted.toFixed(3)}`, 14, finalY + 24);
-      doc.text(`Average Closing Balance: ${summary.avgClosing.toFixed(3)}`, 14, finalY + 32);
+      doc.text(`Total Returned: ${summary.totalReturned.toFixed(3)}`, 14, finalY + 32);
+      doc.text(`Average Closing Balance: ${summary.avgClosing.toFixed(3)}`, 14, finalY + 40);
     }
 
     // Page numbers
@@ -341,18 +384,19 @@ const StockReportByRangeAndItem = () => {
       [`Period: ${format(new Date(startDate), 'MMM dd, yyyy')} to ${format(new Date(endDate), 'MMM dd, yyyy')}`],
       [`Generated on: ${format(new Date(), 'MMM dd, yyyy HH:mm')}`],
       [''], // Empty row for spacing
-      ['Date', 'Opening Balance', 'Purchased', 'Issued', 'Wasted', 'Closing Balance', 'Net Change']
+      ['Date', 'Opening Balance', 'Purchased', 'Issued', 'Wasted', 'Returned', 'Closing Balance', 'Net Change']
     ];
 
     // Add data rows
     stockData.forEach(r => {
-      const netChange = Number(r.purchased) - Number(r.issued) - Number(r.wasted);
+      const netChange = Number(r.purchased) - Number(r.issued) - Number(r.wasted) + Number(r.returned);
       worksheetData.push([
         format(new Date(r.date), 'MMM dd, yyyy'),
         Number(r.opening),
         Number(r.purchased),
         Number(r.issued),
         Number(r.wasted),
+        Number(r.returned),
         Number(r.closing),
         netChange
       ]);
@@ -365,6 +409,7 @@ const StockReportByRangeAndItem = () => {
     worksheetData.push(['Total Purchased:', summary.totalPurchased]);
     worksheetData.push(['Total Issued:', summary.totalIssued]);
     worksheetData.push(['Total Wasted:', summary.totalWasted]);
+    worksheetData.push(['Total Returned:', summary.totalReturned]);
     worksheetData.push(['Average Closing Balance:', summary.avgClosing]);
 
     // Create workbook and worksheet
@@ -397,7 +442,7 @@ const StockReportByRangeAndItem = () => {
     }
 
     // Summary styling
-    for (let i = worksheetData.length - 5; i < worksheetData.length; i++) {
+    for (let i = worksheetData.length - 6; i < worksheetData.length; i++) {
       const cellRef = XLSX.utils.encode_cell({ r: i, c: 0 });
       if (worksheet[cellRef]) {
         worksheet[cellRef].s = {
@@ -414,6 +459,7 @@ const StockReportByRangeAndItem = () => {
       { wch: 12 }, // Purchased
       { wch: 12 }, // Issued
       { wch: 12 }, // Wasted
+      { wch: 12 }, // Returned
       { wch: 15 }, // Closing
       { wch: 12 }  // Net Change
     ];
@@ -433,6 +479,7 @@ const StockReportByRangeAndItem = () => {
         totalPurchased: 0,
         totalIssued: 0,
         totalWasted: 0,
+        totalReturned: 0,
         avgClosing: 0
       };
     }
@@ -441,6 +488,7 @@ const StockReportByRangeAndItem = () => {
       totalPurchased: stockData.reduce((sum, day) => sum + Number(day.purchased), 0),
       totalIssued: stockData.reduce((sum, day) => sum + Number(day.issued), 0),
       totalWasted: stockData.reduce((sum, day) => sum + Number(day.wasted), 0),
+      totalReturned: stockData.reduce((sum, day) => sum + Number(day.returned), 0),
       avgClosing: stockData.reduce((sum, day) => sum + Number(day.closing), 0) / stockData.length
     };
   };
@@ -563,6 +611,11 @@ const StockReportByRangeAndItem = () => {
             <div className="summary-label">TOTAL WASTED</div>
             <div className="summary-value negative">{summary.totalWasted.toFixed(3)}</div>
           </div>
+
+          <div className="summary-card positive">
+            <div className="summary-label">TOTAL RETURNED</div>
+            <div className="summary-value positive">{summary.totalReturned.toFixed(3)}</div>
+          </div>
           
           <div className="summary-card info">
             <div className="summary-label">AVG CLOSING BALANCE</div>
@@ -584,6 +637,7 @@ const StockReportByRangeAndItem = () => {
                 <th>PURCHASED</th>
                 <th>ISSUED</th>
                 <th>WASTED</th>
+                <th>RETURNED</th>
                 <th>CLOSING BALANCE</th>
                 <th>NET CHANGE</th>
                 <th>ACTIONS</th>
@@ -591,8 +645,8 @@ const StockReportByRangeAndItem = () => {
             </thead>
             <tbody>
               {stockData.map((r, index) => {
-                const netChange = Number(r.purchased) - Number(r.issued) - Number(r.wasted);
-                const hasTransactions = Number(r.purchased) > 0 || Number(r.issued) > 0 || Number(r.wasted) > 0;
+                const netChange = Number(r.purchased) - Number(r.issued) - Number(r.wasted) + Number(r.returned);
+                const hasTransactions = Number(r.purchased) > 0 || Number(r.issued) > 0 || Number(r.wasted) > 0 || Number(r.returned) > 0;
                 
                 return (
                   <tr 
@@ -608,6 +662,7 @@ const StockReportByRangeAndItem = () => {
                     <td className="positive">+{Number(r.purchased).toFixed(3)}</td>
                     <td className="negative">-{Number(r.issued).toFixed(3)}</td>
                     <td className="negative">-{Number(r.wasted).toFixed(3)}</td>
+                    <td className="positive">+{Number(r.returned).toFixed(3)}</td>
                     <td style={{ fontWeight: '600' }}>{Number(r.closing).toFixed(3)}</td>
                     <td style={{ 
                       color: netChange >= 0 ? '#28a745' : '#dc3545',

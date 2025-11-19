@@ -22,7 +22,7 @@ const EditFinishedGoodsItem = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [fetchLoading, setFetchLoading] = useState(true);
   const [isLoadingRawMaterials, setIsLoadingRawMaterials] = useState(false);
-  const [outputQuantity, setOutputQuantity] = useState(25); // Changed default to 25
+  const [outputQuantity, setOutputQuantity] = useState(); 
   const navigate = useNavigate();
   const { showPopup } = usePopup();
   const [isSubmitting, setIsSubmitting] = useState(false);
