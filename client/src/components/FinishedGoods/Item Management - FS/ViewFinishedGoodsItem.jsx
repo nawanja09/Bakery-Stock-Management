@@ -14,7 +14,7 @@ const ViewFinishedGoodsItem = () => {
   const [item, setItem] = useState(null);
   const [ingredients, setIngredients] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [outputQuantity, setOutputQuantity] = useState(25); // Changed default to 25
+  const [outputQuantity, setOutputQuantity] = useState(''); // ✅ Changed from 25 to empty
   const [costDetails, setCostDetails] = useState({
     totalCost: 0,
     utilityCost: 0,
@@ -60,11 +60,11 @@ const ViewFinishedGoodsItem = () => {
           const costResponse = await api.get(`/cost-calculations/finished-good/${id}`);
           if (costResponse.status === 200 && costResponse.data.length > 0) {
             const latestCalculation = costResponse.data[0];
-            setOutputQuantity(latestCalculation.output_quantity || 25);
+            setOutputQuantity(latestCalculation.output_quantity || ''); // ✅ Changed from 25 to empty
           }
         } catch (error) {
-          console.log('No cost calculations found, using default output quantity');
-          setOutputQuantity(25);
+          console.log('No cost calculations found, using empty output quantity');
+          setOutputQuantity(''); // ✅ Changed from 25 to empty
         }
       } else {
         showPopup('error', 'Failed to fetch item details');
@@ -89,7 +89,7 @@ const ViewFinishedGoodsItem = () => {
     }, 0);
     
     const utilityCost = totalCost * 0.7;
-    const outputQty = parseInt(outputQuantity) || 25;
+    const outputQty = parseInt(outputQuantity) || 0; // ✅ Changed from 25 to 0
     const perUnitCost = outputQty > 0 ? (totalCost + utilityCost) / outputQty : 0;
     
     setCostDetails({
@@ -100,8 +100,8 @@ const ViewFinishedGoodsItem = () => {
   };
 
   const handleOutputChange = (e) => {
-    const value = parseInt(e.target.value) || 25;
-    setOutputQuantity(Math.max(1, value));
+    const value = e.target.value === '' ? '' : parseInt(e.target.value); // ✅ Fixed
+    setOutputQuantity(value);
   };
 
   const handleEdit = () => {
@@ -400,7 +400,7 @@ const ViewFinishedGoodsItem = () => {
             </span>
             <br />
             <span style={{ fontSize: '0.8rem', fontStyle: 'italic', marginTop: '0.5rem', display: 'block' }}>
-              Current Calculation: ({costDetails.totalCost} + {costDetails.utilityCost}) ÷ {outputQuantity} = {costDetails.perUnitCost}
+              Current Calculation: ({costDetails.totalCost} + {costDetails.utilityCost}) ÷ {outputQuantity || 0} = {costDetails.perUnitCost}
             </span>
           </div>
         </section>

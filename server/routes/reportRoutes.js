@@ -1,10 +1,9 @@
-// server/routes/reportRoutes.js
 const express = require('express');
 const router = express.Router();
 const reportController = require('../controllers/reportController');
 
 router.get('/stock', reportController.getStockReport);
-router.get('/latest-price', reportController.getLatestUnitPrice); // Add this line
+router.get('/latest-price', reportController.getLatestUnitPrice);
 router.get('/department', reportController.getDepartmentIssuesReport);
 router.get('/purchasing', reportController.getPurchasingReport);
 router.get('/wastage', reportController.getWastageReport);
@@ -13,6 +12,7 @@ router.get('/stock-range-item', reportController.getStockReportByRangeAndItem);
 router.get('/daily-transactions/purchases', reportController.getDailyPurchaseTransactions);
 router.get('/daily-transactions/issuances', reportController.getDailyIssuanceTransactions);
 router.get('/daily-transactions/wastages', reportController.getDailyWastageTransactions);
+router.get('/daily-transactions/returns', reportController.getDailyReturnTransactions);
 router.get('/purchasing-item-wise', reportController.getPurchasingItemWiseReport);
 
 module.exports = router;

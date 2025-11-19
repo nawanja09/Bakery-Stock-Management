@@ -97,6 +97,7 @@ const StockReport = () => {
       Number(item.total_purchased).toFixed(2),
       Number(item.total_issued).toFixed(2),
       Number(item.total_wasted).toFixed(2),
+      Number(item.total_returned).toFixed(2),
       Number(item.closing_balance).toFixed(2),
       `Rs. ${calculateValue(item)}`
     ]);
@@ -109,6 +110,7 @@ const StockReport = () => {
       'Purchased',
       'Issued',
       'Wasted',
+      'Return',
       'Closing',
       'Value (Rs.)'
     ];
@@ -133,6 +135,7 @@ const StockReport = () => {
       'Purchased': Number(item.total_purchased),
       'Issued': Number(item.total_issued),
       'Wasted': Number(item.total_wasted),
+      'Return': Number(item.total_returned),
       'Closing Balance': Number(item.closing_balance),
       'Value (Rs.)': Number(calculateValue(item))
     }));
@@ -199,6 +202,7 @@ const StockReport = () => {
                 <th>Purchased</th>
                 <th>Issued</th>
                 <th>Wasted</th>
+                <th>Return</th>
                 <th>Closing</th>
                 <th>Value (Rs.)</th>
               </tr>
@@ -213,6 +217,7 @@ const StockReport = () => {
                   <td>{Number(item.total_purchased).toFixed(2)}</td>
                   <td>{Number(item.total_issued).toFixed(2)}</td>
                   <td>{Number(item.total_wasted).toFixed(2)}</td>
+                  <td>{Number(item.total_returned).toFixed(2)}</td>
                   <td>{Number(item.closing_balance).toFixed(2)}</td>
                   <td style={{ fontWeight: 'bold', color: '#2e7d32' }}>
                     Rs. {calculateValue(item)}

@@ -20,7 +20,7 @@ const AddFinishedGoodsItem = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingRawMaterials, setIsLoadingRawMaterials] = useState(false);
   const [generatedCode, setGeneratedCode] = useState('FG0001');
-  const [outputQuantity, setOutputQuantity] = useState(25);
+  const [outputQuantity, setOutputQuantity] = useState(''); // ✅ Changed from 25 to empty
   const navigate = useNavigate();
   const { showPopup } = usePopup();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -77,8 +77,8 @@ const AddFinishedGoodsItem = () => {
   };
 
   const handleOutputChange = (e) => {
-    const value = parseInt(e.target.value) || 25;
-    setOutputQuantity(Math.max(1, value));
+    const value = e.target.value === '' ? '' : parseInt(e.target.value); // ✅ Fixed
+    setOutputQuantity(value);
   };
 
   const handleIngredientChange = (index, field, value) => {
@@ -158,7 +158,7 @@ const AddFinishedGoodsItem = () => {
   const calculatePerUnitCost = () => {
     const totalCost = parseFloat(calculateTotalCost()) || 0;
     const utilityCost = parseFloat(calculateUtilityCost()) || 0;
-    const output = parseInt(outputQuantity) || 25;
+    const output = parseInt(outputQuantity) || 0; // ✅ Changed from 25 to 0
     
     if (output <= 0) return '0.00';
     
