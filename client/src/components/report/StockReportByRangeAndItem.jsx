@@ -25,28 +25,20 @@ const TransactionDetailsModal = ({ date, itemId, itemName, onClose }) => {
     const fetchTransactionDetails = async () => {
       try {
         const [purchasesRes, issuancesRes, wastagesRes, returnsRes] = await Promise.all([
-          api.get(`/reports/daily-transactions/purchases`, {
-            params: { date, itemId }
-          }),
-          api.get(`/reports/daily-transactions/issuances`, {
-            params: { date, itemId }
-          }),
-          api.get(`/reports/daily-transactions/wastages`, {
-            params: { date, itemId }
-          }),
-          api.get(`/reports/daily-transactions/returns`, {
-            params: { date, itemId }
-          })
+          api.get(`/reports/daily-transactions/purchases`, { params: { date, itemId }}),
+          api.get(`/reports/daily-transactions/issuances`, { params: { date, itemId }}),
+          api.get(`/reports/daily-transactions/wastages`, { params: { date, itemId }}),
+          api.get(`/reports/daily-transactions/returns`, { params: { date, itemId }}),
         ]);
 
         setTransactions({
           purchases: purchasesRes.data,
           issuances: issuancesRes.data,
           wastages: wastagesRes.data,
-          returns: returnsRes.data
+          returns: returnsRes.data,
         });
-      } catch (error) {
-        console.error('Error fetching transaction details:', error);
+      } catch (err) {
+        console.error(err);
       } finally {
         setLoading(false);
       }
@@ -55,153 +47,162 @@ const TransactionDetailsModal = ({ date, itemId, itemName, onClose }) => {
     fetchTransactionDetails();
   }, [date, itemId]);
 
-  if (loading) return <div className="loading">Loading transaction details...</div>;
+  if (loading) return <div className="modal-loading">Loading...</div>;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content large-modal" onClick={e => e.stopPropagation()}>
-        <div className="modal-header">
-          <h3>Transaction Details - {format(new Date(date), 'MMMM dd, yyyy')}</h3>
-          <button className="btn-close" onClick={onClose}>&#10005;</button>
-        </div>
+    <div className="modern-modal-overlay" onClick={onClose}>
+      <div className="modern-modal" onClick={(e) => e.stopPropagation()}>
         
-        <div className="transaction-info">
-          <p><strong>Item:</strong> {itemName}</p>
-          <p><strong>Date:</strong> {format(new Date(date), 'MMMM dd, yyyy')}</p>
+        {/* Header */}
+        <div className="modern-modal-header">
+          <div>
+            <h2>Transaction Details</h2>
+            <p className="modal-subtitle">
+              {format(new Date(date), "MMMM dd, yyyy")} • {itemName}
+            </p>
+          </div>
+          <button className="modern-close-btn" onClick={onClose}>✕</button>
         </div>
-        
-        <div className="transaction-tabs">
-          {/* Purchases Section */}
-          <div className="transaction-section">
-            <h4>📦 Purchases ({transactions.purchases.length})</h4>
+
+        {/* Scrollable Content */}
+        <div className="modern-modal-body">
+
+          {/* SECTION: PURCHASES */}
+          <div className="modal-section">
+            <div className="modal-section-title purchases-bg">
+              📦 Purchases ({transactions.purchases.length})
+            </div>
+
             {transactions.purchases.length > 0 ? (
-              <div className="table-container">
-                <table className="details-table">
+              <div className="modern-table-wrapper">
+                <table className="modern-table">
                   <thead>
                     <tr>
                       <th>Invoice No</th>
                       <th>Supplier</th>
-                      <th>Quantity</th>
-                      <th>Unit Price (Rs.)</th>
-                      <th>Total (Rs.)</th>
+                      <th>Qty</th>
+                      <th>Unit Price</th>
+                      <th>Total</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {transactions.purchases.map((purchase, index) => (
-                      <tr key={index}>
-                        <td>{purchase.invoice_no}</td>
-                        <td>{purchase.supplier_name}</td>
-                        <td>{Number(purchase.quantity).toFixed(3)}</td>
-                        <td>{Number(purchase.unit_price).toFixed(2)}</td>
-                        <td>{Number(purchase.total_price).toFixed(2)}</td>
+                    {transactions.purchases.map((p, i) => (
+                      <tr key={i}>
+                        <td>{p.invoice_no}</td>
+                        <td>{p.supplier_name}</td>
+                        <td>{Number(p.quantity).toFixed(3)}</td>
+                        <td>{Number(p.unit_price).toFixed(2)}</td>
+                        <td>{Number(p.total_price).toFixed(2)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-            ) : (
-              <p className="no-data">No purchases for this date</p>
-            )}
+            ) : <p className="no-data">No purchases recorded</p>}
           </div>
 
-          {/* Issuances Section */}
-          <div className="transaction-section">
-            <h4>📤 Issuances ({transactions.issuances.length})</h4>
+          {/* SECTION: ISSUANCES */}
+          <div className="modal-section">
+            <div className="modal-section-title issuance-bg">
+              📤 Issuances ({transactions.issuances.length})
+            </div>
+            
             {transactions.issuances.length > 0 ? (
-              <div className="table-container">
-                <table className="details-table">
+              <div className="modern-table-wrapper">
+                <table className="modern-table">
                   <thead>
                     <tr>
-                      <th>Issuance ID</th>
+                      <th>ID</th>
                       <th>Department</th>
                       <th>Received By</th>
-                      <th>Quantity</th>
+                      <th>Qty</th>
                       <th>Remarks</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {transactions.issuances.map((issuance, index) => (
-                      <tr key={index}>
-                        <td>ISS-{issuance.issuance_id}</td>
-                        <td>{issuance.department_name}</td>
-                        <td>{issuance.received_by}</td>
-                        <td>{Number(issuance.quantity).toFixed(3)}</td>
-                        <td>{issuance.remarks || 'N/A'}</td>
+                    {transactions.issuances.map((i, idx) => (
+                      <tr key={idx}>
+                        <td>ISS-{i.issuance_id}</td>
+                        <td>{i.department_name}</td>
+                        <td>{i.received_by}</td>
+                        <td>{Number(i.quantity).toFixed(3)}</td>
+                        <td>{i.remarks || "—"}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-            ) : (
-              <p className="no-data">No issuances for this date</p>
-            )}
+            ) : <p className="no-data">No issuances recorded</p>}
           </div>
 
-          {/* Wastages Section */}
-          <div className="transaction-section">
-            <h4>🗑️ Wastages ({transactions.wastages.length})</h4>
+          {/* SECTION: WASTAGE */}
+          <div className="modal-section">
+            <div className="modal-section-title wastage-bg">
+              🗑️ Wastages ({transactions.wastages.length})
+            </div>
+
             {transactions.wastages.length > 0 ? (
-              <div className="table-container">
-                <table className="details-table">
+              <div className="modern-table-wrapper">
+                <table className="modern-table">
                   <thead>
                     <tr>
-                      <th>Wastage Note</th>
+                      <th>Note</th>
                       <th>Approved By</th>
                       <th>Reason</th>
-                      <th>Quantity</th>
-                      <th>Estimated Loss (Rs.)</th>
+                      <th>Qty</th>
+                      <th>Loss</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {transactions.wastages.map((wastage, index) => (
-                      <tr key={index}>
-                        <td>{wastage.wastage_note_number}</td>
-                        <td>{wastage.approved_by}</td>
-                        <td>{wastage.reason}</td>
-                        <td>{Number(wastage.quantity).toFixed(3)}</td>
-                        <td>{Number(wastage.estimated_loss).toFixed(2)}</td>
+                    {transactions.wastages.map((w, idx) => (
+                      <tr key={idx}>
+                        <td>{w.wastage_note_number}</td>
+                        <td>{w.approved_by}</td>
+                        <td>{w.reason}</td>
+                        <td>{Number(w.quantity).toFixed(3)}</td>
+                        <td>{Number(w.estimated_loss).toFixed(2)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-            ) : (
-              <p className="no-data">No wastages for this date</p>
-            )}
+            ) : <p className="no-data">No wastages recorded</p>}
           </div>
 
-          {/* Returns Section */}
-          <div className="transaction-section">
-            <h4>🔄 Returns ({transactions.returns.length})</h4>
+          {/* SECTION: RETURNS */}
+          <div className="modal-section">
+            <div className="modal-section-title returns-bg">
+              🔄 Returns ({transactions.returns.length})
+            </div>
+
             {transactions.returns.length > 0 ? (
-              <div className="table-container">
-                <table className="details-table">
+              <div className="modern-table-wrapper">
+                <table className="modern-table">
                   <thead>
                     <tr>
-                      <th>Return Ref</th>
+                      <th>Ref</th>
                       <th>Department</th>
                       <th>Received By</th>
-                      <th>Quantity</th>
+                      <th>Qty</th>
                       <th>Reason</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {transactions.returns.map((returnItem, index) => (
-                      <tr key={index}>
-                        <td>{returnItem.return_number}</td>
-                        <td>{returnItem.department_name}</td>
-                        <td>{returnItem.received_by}</td>
-                        <td>{Number(returnItem.quantity).toFixed(3)}</td>
-                        <td>{returnItem.reason}</td>
+                    {transactions.returns.map((r, idx) => (
+                      <tr key={idx}>
+                        <td>{r.return_number}</td>
+                        <td>{r.department_name}</td>
+                        <td>{r.received_by}</td>
+                        <td>{Number(r.quantity).toFixed(3)}</td>
+                        <td>{r.reason}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-            ) : (
-              <p className="no-data">No returns for this date</p>
-            )}
+            ) : <p className="no-data">No returns recorded</p>}
           </div>
+
         </div>
       </div>
     </div>
