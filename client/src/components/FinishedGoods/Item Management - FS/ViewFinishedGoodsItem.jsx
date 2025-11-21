@@ -14,7 +14,6 @@ const ViewFinishedGoodsItem = () => {
   const [item, setItem] = useState(null);
   const [ingredients, setIngredients] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [outputQuantity, setOutputQuantity] = useState(''); // ✅ Changed from 25 to empty
   const [costDetails, setCostDetails] = useState({
     totalCost: 0,
     utilityCost: 0,
@@ -26,9 +25,10 @@ const ViewFinishedGoodsItem = () => {
   }, [id]);
 
   useEffect(() => {
-    // Recalculate costs when output quantity changes
-    calculateCosts(ingredients);
-  }, [outputQuantity, ingredients]);
+    if (item) {
+      calculateCosts(ingredients, item.output_quantity);
+    }
+  }, [item, ingredients]);
 
   const fetchItemDetails = async () => {
     try {
@@ -37,34 +37,23 @@ const ViewFinishedGoodsItem = () => {
       // Fetch item details
       const itemResponse = await api.get(`/finished-goods-items/${id}`);
       if (itemResponse.status === 200) {
-        setItem(itemResponse.data);
+        const itemData = itemResponse.data;
+        setItem(itemData);
         
         try {
-          // Fetch ingredients - handle potential 404 or 500 errors
+          // Fetch ingredients
           const ingredientsResponse = await api.get(`/finished-goods-ingredients/${id}`);
           if (ingredientsResponse.status === 200) {
             const ingredientsData = ingredientsResponse.data;
             setIngredients(ingredientsData);
             
-            // Calculate costs
-            calculateCosts(ingredientsData);
+            // Calculate costs with the saved output quantity
+            calculateCosts(ingredientsData, itemData.output_quantity);
           }
         } catch (ingredientError) {
           console.log('No ingredients found or error fetching ingredients:', ingredientError);
           setIngredients([]);
-          calculateCosts([]);
-        }
-
-        // Fetch saved output quantity from cost calculations
-        try {
-          const costResponse = await api.get(`/cost-calculations/finished-good/${id}`);
-          if (costResponse.status === 200 && costResponse.data.length > 0) {
-            const latestCalculation = costResponse.data[0];
-            setOutputQuantity(latestCalculation.output_quantity || ''); // ✅ Changed from 25 to empty
-          }
-        } catch (error) {
-          console.log('No cost calculations found, using empty output quantity');
-          setOutputQuantity(''); // ✅ Changed from 25 to empty
+          calculateCosts([], itemData.output_quantity);
         }
       } else {
         showPopup('error', 'Failed to fetch item details');
@@ -81,15 +70,16 @@ const ViewFinishedGoodsItem = () => {
     }
   };
 
-  const calculateCosts = (ingredientsData) => {
+  const calculateCosts = (ingredientsData, outputQuantity) => {
     const totalCost = ingredientsData.reduce((total, ing) => {
+      // FIX: Safely parse quantity and unit price
       const quantity = parseFloat(ing.quantity) || 0;
       const unitPrice = parseFloat(ing.unit_price) || 0;
       return total + (quantity * unitPrice);
     }, 0);
     
     const utilityCost = totalCost * 0.7;
-    const outputQty = parseInt(outputQuantity) || 0; // ✅ Changed from 25 to 0
+    const outputQty = parseInt(outputQuantity) || 1;
     const perUnitCost = outputQty > 0 ? (totalCost + utilityCost) / outputQty : 0;
     
     setCostDetails({
@@ -97,11 +87,6 @@ const ViewFinishedGoodsItem = () => {
       utilityCost: utilityCost.toFixed(2),
       perUnitCost: perUnitCost.toFixed(2)
     });
-  };
-
-  const handleOutputChange = (e) => {
-    const value = e.target.value === '' ? '' : parseInt(e.target.value); // ✅ Fixed
-    setOutputQuantity(value);
   };
 
   const handleEdit = () => {
@@ -138,6 +123,7 @@ const ViewFinishedGoodsItem = () => {
     );
   }
 
+  // FIX: Safely parse prices
   const sellingPrice = parseFloat(item.unit_price) || 0;
   const costPrice = parseFloat(costDetails.perUnitCost) || 0;
   const profitMargin = sellingPrice - costPrice;
@@ -145,7 +131,6 @@ const ViewFinishedGoodsItem = () => {
 
   return (
     <div className="finished-goods-management-container">
-      {/* Header */}
       <div className="header-section">
         <button onClick={() => navigate('/finished-goods/items')} className="back-button">
           <FontAwesomeIcon icon={faArrowLeft} />
@@ -171,7 +156,6 @@ const ViewFinishedGoodsItem = () => {
       </div>
 
       <div className="form-card">
-        {/* Basic Information */}
         <section style={{ marginBottom: '2rem' }}>
           <h3 className="section-title">Basic Information</h3>
           <div className="form-grid">
@@ -212,16 +196,29 @@ const ViewFinishedGoodsItem = () => {
               <label>Selling Price (Rs.)</label>
               <input
                 type="number"
-                value={item.unit_price || '0.00'}
+                value={sellingPrice.toFixed(2)}
                 readOnly
                 className="form-input"
                 style={{ backgroundColor: 'var(--background-light)', color: 'var(--text-muted)' }}
               />
             </div>
+
+            <div className="form-group">
+              <label>Total Output (Quantity)</label>
+              <input
+                type="number"
+                value={item.output_quantity || 1}
+                readOnly
+                className="form-input"
+                style={{ backgroundColor: 'var(--background-light)', color: 'var(--text-muted)' }}
+              />
+              <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+                Output quantity can be modified in Edit mode
+              </small>
+            </div>
           </div>
         </section>
 
-        {/* Ingredients Section */}
         <section className="ingredients-section">
           <div className="section-header">
             <div>
@@ -257,7 +254,11 @@ const ViewFinishedGoodsItem = () => {
                 </thead>
                 <tbody>
                   {ingredients.map((ingredient, index) => {
-                    const ingredientCost = (parseFloat(ingredient.quantity) || 0) * (parseFloat(ingredient.unit_price) || 0);
+                    // FIX: Safely calculate ingredient cost
+                    const quantity = parseFloat(ingredient.quantity) || 0;
+                    const unitPrice = parseFloat(ingredient.unit_price) || 0;
+                    const ingredientCost = quantity * unitPrice;
+                    
                     return (
                       <tr key={index}>
                         <td>
@@ -281,7 +282,7 @@ const ViewFinishedGoodsItem = () => {
                         <td>
                           <input
                             type="number"
-                            value={ingredient.quantity || '0.000'}
+                            value={quantity.toFixed(3)}
                             readOnly
                             className="form-input"
                             style={{ margin: 0, backgroundColor: 'var(--background-light)', color: 'var(--text-muted)' }}
@@ -290,7 +291,7 @@ const ViewFinishedGoodsItem = () => {
                         <td>
                           <input
                             type="number"
-                            value={ingredient.unit_price || '0.00'}
+                            value={unitPrice.toFixed(2)}
                             readOnly
                             className="form-input"
                             style={{ margin: 0, backgroundColor: 'var(--background-light)', color: 'var(--text-muted)' }}
@@ -330,43 +331,11 @@ const ViewFinishedGoodsItem = () => {
           )}
         </section>
 
-        {/* Cost Calculation Section */}
         <section className="cost-section">
           <h3 className="section-title">
             <FontAwesomeIcon icon={faCalculator} style={{ marginRight: '0.5rem' }} />
             Cost Calculation
           </h3>
-          
-          {/* Output Quantity Input */}
-          <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-            <label>Total Output (Quantity) *</label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <input
-                type="number"
-                value={outputQuantity}
-                onChange={handleOutputChange}
-                required
-                min="1"
-                step="1"
-                placeholder="Enter output quantity"
-                className="form-input"
-                style={{ maxWidth: '200px' }}
-              />
-              <span style={{ 
-                fontSize: '0.875rem', 
-                color: 'var(--text-muted)',
-                backgroundColor: 'var(--background-light)',
-                padding: '0.5rem 1rem',
-                borderRadius: 'var(--radius)',
-                border: '1px solid var(--border)'
-              }}>
-                Units
-              </span>
-            </div>
-            <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '0.5rem', display: 'block' }}>
-              Enter the total quantity produced from these ingredients. Changing this value will update the per unit cost.
-            </small>
-          </div>
           
           <div className="cost-grid">
             <div className="cost-item">
@@ -390,6 +359,18 @@ const ViewFinishedGoodsItem = () => {
                 Rs. {(parseFloat(costDetails.totalCost) + parseFloat(costDetails.utilityCost)).toFixed(2)}
               </span>
             </div>
+
+            <div className="cost-item">
+              <span className="cost-label">Selling Price:</span>
+              <span className="cost-value">Rs. {sellingPrice.toFixed(2)}</span>
+            </div>
+
+            <div className="cost-item">
+              <span className="cost-label">Profit Margin:</span>
+              <span className="cost-value" style={{ color: profitMargin >= 0 ? '#059669' : '#dc2626' }}>
+                Rs. {profitMargin.toFixed(2)} ({marginPercentage.toFixed(1)}%)
+              </span>
+            </div>
           </div>
 
           <div className="formula-display">
@@ -400,7 +381,7 @@ const ViewFinishedGoodsItem = () => {
             </span>
             <br />
             <span style={{ fontSize: '0.8rem', fontStyle: 'italic', marginTop: '0.5rem', display: 'block' }}>
-              Current Calculation: ({costDetails.totalCost} + {costDetails.utilityCost}) ÷ {outputQuantity || 0} = {costDetails.perUnitCost}
+              Current Calculation: ({costDetails.totalCost} + {costDetails.utilityCost}) ÷ {item.output_quantity || 1} = {costDetails.perUnitCost}
             </span>
           </div>
         </section>

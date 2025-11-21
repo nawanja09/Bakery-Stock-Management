@@ -662,23 +662,7 @@ CREATE TABLE IF NOT EXISTS `production_cost_calculations` (
   `production_id` int NOT NULL,
   `item_id` int NOT NULL,
   `total_raw_materials` DECIMAL(10,3) DEFAULT 0,
-  `total_cost` DECIMAL(10,2) DEFAULT 0,
-  `utility_cost` DECIMAL(10,2) DEFAULT 0,
-  `output_quantity` int DEFAULT 1,
-  `per_unit_cost` DECIMAL(10,2) DEFAULT 0,
-  `selling_price` DECIMAL(10,2) DEFAULT 0,
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `unique_production_item` (`production_id`, `item_id`),
-  KEY `production_id` (`production_id`),
-  KEY `item_id` (`item_id`),
-  CONSTRAINT `fk_cost_calc_production` FOREIGN KEY (`production_id`) REFERENCES `finished_goods_productions` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_cost_calc_item` FOREIGN KEY (`item_id`) REFERENCES `finished_goods_items` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
--- Table structure for table `returns`
-CREATE TABLE IF NOT EXISTS `returns` (
+  
   `id` int NOT NULL AUTO_INCREMENT,
   `return_number` varchar(50) NOT NULL,
   `return_date` date NOT NULL,
@@ -714,3 +698,19 @@ CREATE TABLE IF NOT EXISTS `return_items` (
 -- Add a deleted column to items table
 ALTER TABLE items ADD COLUMN deleted BOOLEAN DEFAULT FALSE;
 
+-- 1. Update finished_goods_items table to make output_quantity required
+ALTER TABLE finished_goods_items 
+MODIFY COLUMN output_quantity INT NOT NULL DEFAULT 1;
+
+-- 2. Update existing records safely
+SET SQL_SAFE_UPDATES = 0;
+
+UPDATE finished_goods_items 
+SET output_quantity = 1 
+WHERE output_quantity IS NULL OR output_quantity = 0;
+
+SET SQL_SAFE_UPDATES = 1;
+
+-- 3. Verify the changes
+SELECT id, item_code, name, output_quantity 
+FROM finished_goods_items;
