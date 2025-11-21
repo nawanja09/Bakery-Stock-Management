@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSave, faPlus, faTrash, faArrowLeft, faUtensils, faCalculator } from '@fortawesome/free-solid-svg-icons';
+import { faSave, faPlus, faTrash, faArrowLeft, faUtensils, faCalculator, faInfoCircle } from '@fortawesome/free-solid-svg-icons';
 import Select from 'react-select';
 import { usePopup } from '../../context/PopupContext';
 import api from '../../../api';
@@ -11,16 +11,14 @@ const AddFinishedGoodsItem = () => {
   const [formData, setFormData] = useState({
     name: '',
     category: 'Cake',
-    unit_price: ''
+    unit_price: '',
+    output_quantity: ''
   });
   const [ingredients, setIngredients] = useState([]);
   const [rawMaterials, setRawMaterials] = useState([]);
   const [rawMaterialOptions, setRawMaterialOptions] = useState([]);
-  const [previousPurchasePrices, setPreviousPurchasePrices] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingRawMaterials, setIsLoadingRawMaterials] = useState(false);
-  const [generatedCode, setGeneratedCode] = useState('FG0001');
-  const [outputQuantity, setOutputQuantity] = useState(''); // ✅ Changed from 25 to empty
   const navigate = useNavigate();
   const { showPopup } = usePopup();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -28,14 +26,13 @@ const AddFinishedGoodsItem = () => {
 
   useEffect(() => {
     fetchRawMaterials();
-    fetchPreviousPurchasePrices();
   }, []);
 
   useEffect(() => {
     if (rawMaterials.length > 0) {
       const options = rawMaterials.map(material => ({
         value: material.id,
-        label: `${material.name} (${material.item_code})`,
+        label: `${material.name} (${material.item_code}) - Rs. ${parseFloat(material.latest_unit_price || 0).toFixed(2)}`,
         data: material
       }));
       setRawMaterialOptions(options);
@@ -59,14 +56,7 @@ const AddFinishedGoodsItem = () => {
     }
   };
 
-  const fetchPreviousPurchasePrices = async () => {
-    try {
-      const response = await api.get('/purchases/previous-prices');
-      setPreviousPurchasePrices(response.data);
-    } catch (error) {
-      console.error('Error fetching previous purchase prices:', error);
-    }
-  };
+
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -77,8 +67,11 @@ const AddFinishedGoodsItem = () => {
   };
 
   const handleOutputChange = (e) => {
-    const value = e.target.value === '' ? '' : parseInt(e.target.value); // ✅ Fixed
-    setOutputQuantity(value);
+    const value = e.target.value === '' ? '' : parseInt(e.target.value);
+    setFormData(prev => ({
+      ...prev,
+      output_quantity: value
+    }));
   };
 
   const handleIngredientChange = (index, field, value) => {
@@ -87,19 +80,23 @@ const AddFinishedGoodsItem = () => {
     if (field === 'raw_material_id') {
       const selectedMaterial = rawMaterials.find(rm => rm.id === parseInt(value));
       if (selectedMaterial) {
+        // Get the latest purchase price for this raw material
+        const latestPrice = parseFloat(selectedMaterial.latest_unit_price) || 0;
+        
         updatedIngredients[index] = {
           ...updatedIngredients[index],
           raw_material_id: value,
           item_name: selectedMaterial.name,
           unit: selectedMaterial.unit,
-          unit_price: previousPurchasePrices[selectedMaterial.id] || selectedMaterial.unit_price || 0,
+          unit_price: latestPrice, // Use latest purchase price
           quantity: updatedIngredients[index].quantity || '',
           cost: '0.00'
         };
         
+        // Calculate cost if quantity exists
         if (updatedIngredients[index].quantity) {
           const quantity = parseFloat(updatedIngredients[index].quantity) || 0;
-          const unitPrice = parseFloat(updatedIngredients[index].unit_price) || 0;
+          const unitPrice = latestPrice;
           updatedIngredients[index].cost = (quantity * unitPrice).toFixed(2);
         }
       } else {
@@ -118,6 +115,7 @@ const AddFinishedGoodsItem = () => {
       const unitPrice = parseFloat(updatedIngredients[index].unit_price) || 0;
       updatedIngredients[index].cost = (quantity * unitPrice).toFixed(2);
     } else if (field === 'unit_price') {
+      // Allow manual override of unit price if needed
       updatedIngredients[index][field] = value;
       const quantity = parseFloat(updatedIngredients[index].quantity) || 0;
       const unitPrice = parseFloat(value) || 0;
@@ -158,7 +156,7 @@ const AddFinishedGoodsItem = () => {
   const calculatePerUnitCost = () => {
     const totalCost = parseFloat(calculateTotalCost()) || 0;
     const utilityCost = parseFloat(calculateUtilityCost()) || 0;
-    const output = parseInt(outputQuantity) || 0; // ✅ Changed from 25 to 0
+    const output = parseInt(formData.output_quantity) || 1;
     
     if (output <= 0) return '0.00';
     
@@ -176,7 +174,7 @@ const AddFinishedGoodsItem = () => {
       return false;
     }
     
-    if (!outputQuantity || outputQuantity <= 0) {
+    if (!formData.output_quantity || formData.output_quantity <= 0) {
       showPopup('error', 'Valid output quantity is required');
       return false;
     }
@@ -220,11 +218,13 @@ const AddFinishedGoodsItem = () => {
 
     setIsLoading(true);
     try {
-      const { name, category, unit_price } = formData;
+      const { name, category, unit_price, output_quantity } = formData;
+      
       const itemRes = await api.post('/finished-goods-items', {
         name: name.trim(),
         category,
-        unit_price: unit_price || 0
+        unit_price: unit_price || 0,
+        output_quantity: output_quantity
       });
 
       if (itemRes.status === 201) {
@@ -247,7 +247,7 @@ const AddFinishedGoodsItem = () => {
         await api.post('/cost-calculations', {
           finished_good_id,
           finished_good_name: name.trim(),
-          output_quantity: outputQuantity,
+          output_quantity: output_quantity,
           total_cost: calculateTotalCost(),
           per_unit_cost: calculatePerUnitCost(),
           ingredients: ingredients.map(ing => ({
@@ -404,7 +404,7 @@ const AddFinishedGoodsItem = () => {
             <div>
               <h3 className="section-title">Ingredients</h3>
               <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginTop: '0.25rem' }}>
-                Add raw materials required for this product
+                Add raw materials required for this product. Unit prices are auto-filled with latest purchase prices.
               </p>
             </div>
             <button 
@@ -438,92 +438,137 @@ const AddFinishedGoodsItem = () => {
                     <th>Raw Material</th>
                     <th style={{ width: '100px' }}>Unit</th>
                     <th style={{ width: '120px' }}>Quantity</th>
-                    <th style={{ width: '120px' }}>Unit Price (Rs.)</th>
+                    <th style={{ width: '150px' }}>
+                      Unit Price (Rs.)
+                      <FontAwesomeIcon 
+                        icon={faInfoCircle} 
+                        title="Auto-filled with latest purchase price" 
+                        style={{ marginLeft: '5px', color: '#6b7280', fontSize: '0.75rem' }}
+                      />
+                    </th>
                     <th style={{ width: '120px' }}>Cost (Rs.)</th>
                     <th style={{ width: '80px' }}></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {ingredients.map((ingredient, index) => (
-                    <tr key={index}>
-                      <td>
-                        <Select
-                          options={rawMaterialOptions}
-                          value={rawMaterialOptions.find(option => 
-                            option.value.toString() === ingredient.raw_material_id.toString()
+                  {ingredients.map((ingredient, index) => {
+                    const selectedMaterial = rawMaterials.find(rm => rm.id === parseInt(ingredient.raw_material_id));
+                    const hasPurchasePrice = parseFloat(selectedMaterial?.latest_unit_price || 0) > 0;
+                    
+                    return (
+                      <tr key={index}>
+                        <td>
+                          <Select
+                            options={rawMaterialOptions}
+                            value={rawMaterialOptions.find(option => 
+                              option.value.toString() === ingredient.raw_material_id.toString()
+                            )}
+                            onChange={(selectedOption) => 
+                              handleIngredientChange(
+                                index, 
+                                'raw_material_id', 
+                                selectedOption ? selectedOption.value : ''
+                              )
+                            }
+                            isSearchable={true}
+                            placeholder="Search raw material..."
+                            noOptionsMessage={() => "No materials found"}
+                            styles={customStyles}
+                            menuPortalTarget={document.body}
+                            menuPosition="fixed"
+                            required
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="text"
+                            value={ingredient.unit}
+                            readOnly
+                            className="form-input unit-input"
+                            style={{ margin: 0 }}
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="number"
+                            value={ingredient.quantity}
+                            onChange={(e) => handleIngredientChange(index, 'quantity', e.target.value)}
+                            required
+                            placeholder="0.000"
+                            step="0.001"
+                            min="0.001"
+                            className="form-input"
+                            style={{ margin: 0 }}
+                          />
+                        </td>
+                        <td>
+                          <div style={{ position: 'relative' }}>
+                            <input
+                              type="number"
+                              value={ingredient.unit_price}
+                              onChange={(e) => handleIngredientChange(index, 'unit_price', e.target.value)}
+                              required
+                              placeholder="0.00"
+                              step="0.01"
+                              min="0"
+                              className="form-input"
+                              style={{ 
+                                margin: 0,
+                                borderColor: hasPurchasePrice ? '#10b981' : '#e5e7eb'
+                              }}
+                            />
+                            {hasPurchasePrice && (
+                              <div style={{
+                                position: 'absolute',
+                                top: '-8px',
+                                right: '8px',
+                                backgroundColor: '#10b981',
+                                color: 'white',
+                                fontSize: '0.6rem',
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                fontWeight: 'bold'
+                              }}>
+                                Latest
+                              </div>
+                            )}
+                          </div>
+                          {selectedMaterial && (
+                            <small style={{ 
+                              color: hasPurchasePrice ? '#059669' : '#6b7280', 
+                              fontSize: '0.7rem',
+                              display: 'block',
+                              marginTop: '2px'
+                            }}>
+                              {hasPurchasePrice 
+                                ? `Latest purchase: Rs. ${parseFloat(selectedMaterial.latest_unit_price).toFixed(2)}`
+                                : 'No purchase history found'
+                              }
+                            </small>
                           )}
-                          onChange={(selectedOption) => 
-                            handleIngredientChange(
-                              index, 
-                              'raw_material_id', 
-                              selectedOption ? selectedOption.value : ''
-                            )
-                          }
-                          isSearchable={true}
-                          placeholder="Search raw material..."
-                          noOptionsMessage={() => "No materials found"}
-                          styles={customStyles}
-                          menuPortalTarget={document.body}
-                          menuPosition="fixed"
-                          required
-                        />
-                      </td>
-                      <td>
-                        <input
-                          type="text"
-                          value={ingredient.unit}
-                          readOnly
-                          className="form-input unit-input"
-                          style={{ margin: 0 }}
-                        />
-                      </td>
-                      <td>
-                        <input
-                          type="number"
-                          value={ingredient.quantity}
-                          onChange={(e) => handleIngredientChange(index, 'quantity', e.target.value)}
-                          required
-                          placeholder="0.000"
-                          step="0.001"
-                          min="0.001"
-                          className="form-input"
-                          style={{ margin: 0 }}
-                        />
-                      </td>
-                      <td>
-                        <input
-                          type="number"
-                          value={ingredient.unit_price}
-                          onChange={(e) => handleIngredientChange(index, 'unit_price', e.target.value)}
-                          required
-                          placeholder="0.00"
-                          step="0.01"
-                          min="0"
-                          className="form-input"
-                          style={{ margin: 0 }}
-                        />
-                      </td>
-                      <td>
-                        <input
-                          type="number"
-                          value={ingredient.cost || '0.00'}
-                          readOnly
-                          className="form-input unit-input"
-                          style={{ margin: 0 }}
-                        />
-                      </td>
-                      <td>
-                        <button
-                          type="button"
-                          onClick={() => removeIngredient(index)}
-                          className="btn-icon error"
-                          title="Remove ingredient"
-                        >
-                          <FontAwesomeIcon icon={faTrash} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td>
+                          <input
+                            type="number"
+                            value={ingredient.cost || '0.00'}
+                            readOnly
+                            className="form-input unit-input"
+                            style={{ margin: 0, fontWeight: '600' }}
+                          />
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            onClick={() => removeIngredient(index)}
+                            className="btn-icon error"
+                            title="Remove ingredient"
+                          >
+                            <FontAwesomeIcon icon={faTrash} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -540,7 +585,8 @@ const AddFinishedGoodsItem = () => {
             <label>Total Output (Quantity) *</label>
             <input
               type="number"
-              value={outputQuantity}
+              name="output_quantity"
+              value={formData.output_quantity}
               onChange={handleOutputChange}
               required
               min="1"
@@ -550,13 +596,16 @@ const AddFinishedGoodsItem = () => {
               style={{ maxWidth: '200px' }}
             />
             <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
-              Enter the total quantity produced from these ingredients
+              {formData.output_quantity ? 
+                `Output is ${formData.output_quantity}: Per Unit Cost = Total Production Cost ÷ ${formData.output_quantity}` :
+                'Enter the total quantity produced from these ingredients'
+              }
             </small>
           </div>
           
           <div className="cost-grid">    
             <div className="cost-item">
-              <span className="cost-label">Total Cost:</span>
+              <span className="cost-label">Total Raw Material Cost:</span>
               <span className="cost-value">Rs. {calculateTotalCost()}</span>
             </div>
             
@@ -564,9 +613,16 @@ const AddFinishedGoodsItem = () => {
               <span className="cost-label">Utility Cost (70%):</span>
               <span className="cost-value">Rs. {calculateUtilityCost()}</span>
             </div>
+
+            <div className="cost-item highlight">
+              <span className="cost-label">Total Production Cost:</span>
+              <span className="cost-value">Rs. {(parseFloat(calculateTotalCost()) + parseFloat(calculateUtilityCost())).toFixed(2)}</span>
+            </div>
             
             <div className="cost-item highlight">
-              <span className="cost-label">Per Unit Cost:</span>
+              <span className="cost-label">
+                {formData.output_quantity === 1 ? 'Cost per Product:' : 'Per Unit Cost:'}
+              </span>
               <span className="cost-value">Rs. {calculatePerUnitCost()}</span>
             </div>
           </div>
@@ -580,11 +636,19 @@ const AddFinishedGoodsItem = () => {
             fontSize: '0.875rem',
             color: 'var(--text-secondary)'
           }}>
-            <strong>Formula:</strong> Per Unit Cost = (Total Cost + Utility Cost) / Output
+            <strong>Formula:</strong> {formData.output_quantity ? 
+              `Per Unit Cost = (Total Raw Material Cost + Utility Cost) ÷ ${formData.output_quantity}` :
+              'Per Unit Cost = (Total Raw Material Cost + Utility Cost) ÷ Output'
+            }
             <br />
             <span style={{ fontSize: '0.8rem', fontStyle: 'italic' }}>
-              Utility Cost = Total Cost × 0.7
+              Utility Cost = Total Raw Material Cost × 0.7
             </span>
+            {formData.output_quantity && (
+              <div style={{ marginTop: '0.5rem', padding: '0.5rem', backgroundColor: 'var(--info-light)', borderRadius: '4px' }}>
+                <strong>Calculation:</strong> ({calculateTotalCost()} + {calculateUtilityCost()}) ÷ {formData.output_quantity} = {calculatePerUnitCost()}
+              </div>
+            )}
           </div>
         </section>
 
@@ -600,7 +664,7 @@ const AddFinishedGoodsItem = () => {
           <button 
             type="submit" 
             className="btn btn-primary"
-            disabled={isLoading || isSubmitting || isLoadingRawMaterials}
+            disabled={isLoading || isSubmitting || isLoadingRawMaterials || !formData.output_quantity}
           >
             <FontAwesomeIcon icon={faSave} />
             {isSubmitting ? 'Creating...' : 'Create Product'}

@@ -2,7 +2,24 @@ const pool = require('../config/db');
 
 const getRawMaterials = async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT id, item_code, name, unit FROM items ORDER BY name');
+    const [rows] = await pool.query(`
+      SELECT 
+        i.id, 
+        i.item_code, 
+        i.name, 
+        i.unit,
+        (
+          SELECT pi.unit_price 
+          FROM purchase_items pi
+          JOIN purchases p ON pi.purchase_id = p.id
+          WHERE pi.item_id = i.id
+          ORDER BY p.purchase_date DESC, pi.id DESC 
+          LIMIT 1
+        ) as latest_unit_price
+      FROM items i 
+      WHERE i.deleted = FALSE
+      ORDER BY i.name
+    `);
     res.json(rows);
   } catch (error) {
     console.error('Error fetching raw materials:', error);

@@ -9,7 +9,7 @@ import Select from 'react-select';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faDownload, faFileExcel, faCalendar, faChartLine, faEye, faSearch } from '@fortawesome/free-solid-svg-icons';
 import api from '../../api';
-import './StockReport.css';
+import './StockReport.css';   
 
 // Transaction Details Modal Component
 const TransactionDetailsModal = ({ date, itemId, itemName, onClose }) => {
