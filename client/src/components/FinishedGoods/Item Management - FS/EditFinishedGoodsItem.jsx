@@ -342,6 +342,7 @@ const EditFinishedGoodsItem = () => {
   const customStyles = {
     control: (base, state) => ({
       ...base,
+      width: '350px',      // ← Add this line for wider search bar
       border: '1px solid #e2e8f0',
       borderRadius: '8px',
       fontSize: '0.875rem',
@@ -352,11 +353,19 @@ const EditFinishedGoodsItem = () => {
         borderColor: state.isFocused ? '#3b82f6' : '#cbd5e1'
       }
     }),
+
     menu: (base) => ({
       ...base,
+      width: '350px',      // ← Add this line for wider dropdown menu
       fontSize: '0.875rem',
       zIndex: 9999
     }),
+
+    menuPortal: (base) => ({
+      ...base,
+      zIndex: 9999
+    }),
+
     option: (base, state) => ({
       ...base,
       backgroundColor: state.isSelected ? '#3b82f6' : state.isFocused ? '#f1f5f9' : '#ffffff',
@@ -365,14 +374,6 @@ const EditFinishedGoodsItem = () => {
         backgroundColor: '#3b82f6',
         color: '#ffffff'
       }
-    }),
-    singleValue: (base) => ({
-      ...base,
-      color: '#1e293b'
-    }),
-    placeholder: (base) => ({
-      ...base,
-      color: '#94a3b8'
     })
   };
 
