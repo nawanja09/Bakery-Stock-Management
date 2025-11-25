@@ -261,7 +261,6 @@ const EditPurchase = () => {
             >
               <option value="CASH">Cash</option>
               <option value="BANK_TRANSFER">Bank Transfer</option>
-              <option value="CREDIT">Credit</option>
             </select>
           </div>
         </div>

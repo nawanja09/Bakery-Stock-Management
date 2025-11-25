@@ -714,3 +714,16 @@ SET SQL_SAFE_UPDATES = 1;
 -- 3. Verify the changes
 SELECT id, item_code, name, output_quantity 
 FROM finished_goods_items;
+
+--To remove the 'CREDIT' option from the payment_method column, you need to modify the enum type.
+
+--1️⃣ First, update all 'CREDIT' records:
+UPDATE purchases 
+SET payment_method = 'CASH' 
+WHERE payment_method = 'CREDIT';
+
+--2️⃣ Then, modify the column to exclude 'CREDIT':
+ALTER TABLE purchases 
+MODIFY payment_method ENUM('CASH', 'BANK_TRANSFER') NOT NULL;
+
+--------------------------------------------------------------------
