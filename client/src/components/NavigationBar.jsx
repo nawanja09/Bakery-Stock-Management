@@ -24,9 +24,11 @@ import {
   faTruck,
   faBars,
   faCalculator,
-  faSave,
   faClipboardList,
-  faUndo
+  faUndo,
+  faCutlery,
+  faMapMarkerAlt,
+  faExchangeAlt
 } from '@fortawesome/free-solid-svg-icons';
 import bakeryLogo from '../images/icon.jpeg';
 import './NavigationBar.css';
@@ -37,6 +39,7 @@ const NavigationBar = () => {
   const [rawMaterialSelected, setRawMaterialSelected] = useState(false);
   const [finishedGoodsSelected, setFinishedGoodsSelected] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [cutlerySelected, setCutlerySelected] = useState(false);
   const sidebarRef = useRef(null);
 
   const handleLogout = () => {
@@ -63,6 +66,15 @@ const NavigationBar = () => {
       setActiveDropdown(null);
     } else {
       setActiveDropdown('finished');
+    }
+  };
+
+  const handleCutleryClick = () => {
+    setCutlerySelected(!cutlerySelected);
+    if (activeDropdown === 'cutlery') {
+      setActiveDropdown(null);
+    } else {
+      setActiveDropdown('cutlery');
     }
   };
 
@@ -432,6 +444,94 @@ const NavigationBar = () => {
             </li>
           </div>
           */}
+
+          {/* Cutlery Section */}
+          <div className="nav-section">
+            <div className="section-separator"></div>
+
+            {/* Main Cutlery Button */}
+            <li>
+              <div
+                className={`nav-link raw-toggle ${cutlerySelected || activeDropdown === 'cutlery' ? 'active' : ''}`}
+                onClick={handleCutleryClick}
+                title="Cutlery"
+              >
+                <span className="icon-container"><FontAwesomeIcon icon={faCutlery} /></span>
+                <span>Cutlery</span>
+                {!isCollapsed && <FontAwesomeIcon icon={faChevronDown} className="chevron" />}
+              </div>
+            </li>
+
+            {/* Submenu - Only when expanded */}
+            {!isCollapsed && cutlerySelected && (
+              <>
+                {/* 1. Management */}
+                <li className={`dropdown ${activeDropdown === 'cutlery-management' ? 'active' : ''}`}>
+                  <div className="dropdown-header" onClick={() => toggleDropdown('cutlery-management')}>
+                    <span className="icon-container"><FontAwesomeIcon icon={faCog} /></span>
+                    <span>Management</span>
+                    <FontAwesomeIcon icon={faChevronDown} className="chevron" />
+                  </div>
+
+                  <ul className="dropdown-menu">
+                    <li>
+                      <NavLink to="/cutlery/locations" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                        <span className="icon-container"><FontAwesomeIcon icon={faMapMarkerAlt} /></span>
+                        <span>Locations</span>
+                      </NavLink>
+                    </li>
+
+                    <li>
+                      <NavLink to="/cutlery/assets" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                        <span className="icon-container"><FontAwesomeIcon icon={faBox} /></span>
+                        <span>Assets</span>
+                      </NavLink>
+                    </li>
+                  </ul>
+                </li>
+
+                {/* 2. Transfer */}
+                <li>
+                  <NavLink to="/cutlery/transfer" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                    <span className="icon-container"><FontAwesomeIcon icon={faExchangeAlt} /></span>
+                    <span>Transfer</span>
+                  </NavLink>
+                </li>
+
+                {/* 3. Purchasing */}
+                <li>
+                  <NavLink to="/cutlery/purchasing" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                    <span className="icon-container"><FontAwesomeIcon icon={faShoppingCart} /></span>
+                    <span>Purchasing</span>
+                  </NavLink>
+                </li>
+
+                {/* 4. Damage */}
+                <li>
+                  <NavLink to="/cutlery/damage" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                    <span className="icon-container"><FontAwesomeIcon icon={faTrash} /></span>
+                    <span>Damage</span>
+                  </NavLink>
+                </li>
+
+                {/* 5. Stock Report */}
+                <li>
+                  <NavLink to="/cutlery/reports/stock" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                    <span className="icon-container"><FontAwesomeIcon icon={faChartBar} /></span>
+                    <span>Stock Report</span>
+                  </NavLink>
+                </li>
+
+                {/* 6. Item Wise Stock Report */}
+                <li>
+                  <NavLink to="/cutlery/reports/items" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                    <span className="icon-container"><FontAwesomeIcon icon={faBox} /></span>
+                    <span>Item Wise Stock Report</span>
+                  </NavLink>
+                </li>
+              </>
+            )}
+          </div>
 
           {/* Department Section */}
           <div className="nav-section">
