@@ -727,3 +727,23 @@ ALTER TABLE purchases
 MODIFY payment_method ENUM('CASH', 'BANK_TRANSFER') NOT NULL;
 
 --------------------------------------------------------------------
+
+-- Table structure for table `cutlery_locations`
+CREATE TABLE `cutlery_locations` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `location_id` varchar(20) NOT NULL,
+  `location_name` varchar(255) NOT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `location_id` (`location_id`),
+  UNIQUE KEY `location_name` (`location_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Insert sample data into cutlery_locations table
+INSERT INTO `cutlery_locations` (`location_id`, `location_name`) VALUES 
+('LOC001', 'Main Dining Area'),
+('LOC002', 'Outdoor Patio'),
+('LOC003', 'Private Room 1'),
+('LOC004', 'Private Room 2'),
+('LOC005', 'Staff Cafeteria');
