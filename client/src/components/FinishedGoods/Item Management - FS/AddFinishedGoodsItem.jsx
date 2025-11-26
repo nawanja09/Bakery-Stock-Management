@@ -56,8 +56,6 @@ const AddFinishedGoodsItem = () => {
     }
   };
 
-
-
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ 
@@ -76,54 +74,79 @@ const AddFinishedGoodsItem = () => {
 
   const handleIngredientChange = (index, field, value) => {
     const updatedIngredients = [...ingredients];
-    
+
+    // WHEN RAW MATERIAL SELECTED
     if (field === 'raw_material_id') {
-      const selectedMaterial = rawMaterials.find(rm => rm.id === parseInt(value));
+      const selectedMaterial = rawMaterials.find(
+        rm => rm.id === parseInt(value)
+      );
+
       if (selectedMaterial) {
-        // Get the latest purchase price for this raw material
         const latestPrice = parseFloat(selectedMaterial.latest_unit_price) || 0;
-        
+
         updatedIngredients[index] = {
           ...updatedIngredients[index],
           raw_material_id: value,
           item_name: selectedMaterial.name,
           unit: selectedMaterial.unit,
-          unit_price: latestPrice, // Use latest purchase price
+          unit_price: latestPrice,
           quantity: updatedIngredients[index].quantity || '',
-          cost: '0.00'
         };
-        
-        // Calculate cost if quantity exists
+
         if (updatedIngredients[index].quantity) {
-          const quantity = parseFloat(updatedIngredients[index].quantity) || 0;
-          const unitPrice = latestPrice;
-          updatedIngredients[index].cost = (quantity * unitPrice).toFixed(2);
+          const q = parseFloat(updatedIngredients[index].quantity) || 0;
+          updatedIngredients[index].cost = (q * latestPrice).toFixed(2);
         }
       } else {
         updatedIngredients[index] = {
-          ...updatedIngredients[index],
           raw_material_id: '',
           item_name: '',
           unit: '',
+          quantity: '',
           unit_price: '',
           cost: '0.00'
         };
       }
-    } else if (field === 'quantity') {
-      updatedIngredients[index][field] = value;
-      const quantity = parseFloat(value) || 0;
-      const unitPrice = parseFloat(updatedIngredients[index].unit_price) || 0;
-      updatedIngredients[index].cost = (quantity * unitPrice).toFixed(2);
-    } else if (field === 'unit_price') {
-      // Allow manual override of unit price if needed
-      updatedIngredients[index][field] = value;
-      const quantity = parseFloat(updatedIngredients[index].quantity) || 0;
-      const unitPrice = parseFloat(value) || 0;
-      updatedIngredients[index].cost = (quantity * unitPrice).toFixed(2);
-    } else {
+    }
+
+    // WHEN QUANTITY ENTERED
+    else if (field === 'quantity') {
+      updatedIngredients[index].quantity = value;
+
+      const qty = parseFloat(value) || 0;
+      const price = parseFloat(updatedIngredients[index].unit_price) || 0;
+
+      updatedIngredients[index].cost = (qty * price).toFixed(2);
+
+      // AUTO CREATE NEW INGREDIENT ROW
+      const isLastRow = index === updatedIngredients.length - 1;
+      if (isLastRow && qty > 0) {
+        updatedIngredients.push({
+          raw_material_id: '',
+          item_name: '',
+          unit: '',
+          quantity: '',
+          unit_price: '',
+          cost: '0.00'
+        });
+      }
+    }
+
+    // WHEN UNIT PRICE CHANGED
+    else if (field === 'unit_price') {
+      updatedIngredients[index].unit_price = value;
+
+      const qty = parseFloat(updatedIngredients[index].quantity) || 0;
+      const price = parseFloat(value) || 0;
+
+      updatedIngredients[index].cost = (qty * price).toFixed(2);
+    }
+
+    // ANY OTHER FIELD
+    else {
       updatedIngredients[index][field] = value;
     }
-    
+
     setIngredients(updatedIngredients);
   };
 
