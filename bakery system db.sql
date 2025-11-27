@@ -754,3 +754,44 @@ CREATE TABLE `cutlery_assets` (
   UNIQUE KEY `asset_name` (`asset_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+-- Table structure for table `cutlery_transfers`
+CREATE TABLE `cutlery_transfers` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `transfer_id` varchar(20) NOT NULL,
+  `transfer_date` date NOT NULL,
+  `location_from_id` int NOT NULL,
+  `location_to_id` int NOT NULL,
+  `asset_id` int NOT NULL,
+  `quantity` int NOT NULL DEFAULT 1,
+  `notes` text,
+  `transferred_by` varchar(255) NOT NULL,
+  `status` enum('Pending','Completed','Cancelled') DEFAULT 'Pending',
+  `created_by` int NOT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `transfer_id` (`transfer_id`),
+  KEY `location_from_id` (`location_from_id`),
+  KEY `location_to_id` (`location_to_id`),
+  KEY `asset_id` (`asset_id`),
+  KEY `created_by` (`created_by`),
+  CONSTRAINT `cutlery_transfers_ibfk_1` FOREIGN KEY (`location_from_id`) REFERENCES `cutlery_locations` (`id`),
+  CONSTRAINT `cutlery_transfers_ibfk_2` FOREIGN KEY (`location_to_id`) REFERENCES `cutlery_locations` (`id`),
+  CONSTRAINT `cutlery_transfers_ibfk_3` FOREIGN KEY (`asset_id`) REFERENCES `cutlery_assets` (`id`),
+  CONSTRAINT `cutlery_transfers_ibfk_4` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Optional: Table for tracking stock at each location
+CREATE TABLE `cutlery_stock` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `location_id` int NOT NULL,
+  `asset_id` int NOT NULL,
+  `quantity` int NOT NULL DEFAULT 0,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `location_asset` (`location_id`,`asset_id`),
+  KEY `asset_id` (`asset_id`),
+  CONSTRAINT `cutlery_stock_ibfk_1` FOREIGN KEY (`location_id`) REFERENCES `cutlery_locations` (`id`),
+  CONSTRAINT `cutlery_stock_ibfk_2` FOREIGN KEY (`asset_id`) REFERENCES `cutlery_assets` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

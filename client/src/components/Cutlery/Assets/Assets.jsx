@@ -155,20 +155,20 @@ const Assets = () => {
                     <FontAwesomeIcon icon={faEye} />
                   </button>
                   <button
-                    className="btn-edit"
-                    onClick={() => handleEditAsset(asset.id)}
-                    title="Edit Asset"
-                  >
-                    <FontAwesomeIcon icon={faPen} />
-                  </button>
+                className="btn-edit"
+                onClick={() => handleEditAsset(asset.id)}
+                title="Edit Asset"
+              >
+                <FontAwesomeIcon icon={faPen} />
+              </button>
 
-                  <button
-                    className="btn-delete"
-                    onClick={() => handleDeleteAsset(asset.id, asset.asset_name)}
-                    title="Delete Asset"
-                  >
-                    <FontAwesomeIcon icon={faTrash} />
-                  </button>
+              <button
+                className="btn-delete"
+                onClick={() => handleDeleteAsset(asset.id, asset.asset_name)}
+                title="Delete Asset"
+              >
+                <FontAwesomeIcon icon={faTrash} />
+              </button>
                 </div>
 
               </div>
