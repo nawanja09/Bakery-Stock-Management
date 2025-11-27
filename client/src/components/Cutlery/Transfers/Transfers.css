@@ -1,0 +1,223 @@
+.transfers-container {
+  padding: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.transfers-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.transfers-header h2 {
+  color: #333;
+  margin: 0;
+  font-size: 1.8rem;
+}
+
+.btn-add-transfer {
+  background: linear-gradient(90deg, #6722e6 70%, #a98cf7 100%);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.btn-add-transfer:hover {
+  background: linear-gradient(90deg, #7a3cf7 70%, #b6a2f7 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(103, 34, 230, 0.2);
+}
+
+.transfers-table-container {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.transfers-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.transfers-table th {
+  background-color: #f8f9fa;
+  padding: 16px;
+  text-align: left;
+  font-weight: 600;
+  color: #495057;
+  border-bottom: 2px solid #e9ecef;
+}
+
+.transfers-table td {
+  padding: 16px;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.transfers-table tbody tr:hover {
+  background-color: #f8f9fa;
+}
+
+.transfer-id {
+  font-weight: 600;
+  color: #6722e6;
+}
+
+.transfer-date {
+  white-space: nowrap;
+}
+
+.from-location,
+.to-location {
+  font-weight: 500;
+}
+
+.asset-info .asset-name {
+  font-weight: 600;
+  color: #333;
+}
+
+.asset-info .asset-code {
+  font-size: 12px;
+  color: #6c757d;
+}
+
+.quantity {
+  text-align: center;
+  font-weight: 600;
+  color: #28a745;
+}
+
+.transferred-by {
+  font-weight: 500;
+}
+
+/* Status Badges */
+.status-badge {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.status-pending {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.status-completed {
+  background-color: #d1edff;
+  color: #004085;
+}
+
+.status-cancelled {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-view {
+  background-color: #17a2b8;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background-color 0.2s;
+}
+
+.btn-view:hover {
+  background-color: #138496;
+}
+
+.btn-edit {
+  background-color: #28a745;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background-color 0.2s;
+}
+
+.btn-edit:hover {
+  background-color: #218838;
+}
+
+.btn-delete {
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background-color 0.2s;
+}
+
+.btn-delete:hover {
+  background-color: #c82333;
+}
+
+.loading {
+  text-align: center;
+  padding: 40px;
+  font-size: 16px;
+  color: #6c757d;
+}
+
+.no-data {
+  text-align: center;
+  padding: 60px 20px;
+  color: #6c757d;
+}
+
+.no-data-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+}
+
+.no-data p {
+  margin: 0;
+  font-size: 16px;
+}
+
+@media (max-width: 768px) {
+  .transfers-table {
+    display: block;
+    overflow-x: auto;
+  }
+  
+  .transfers-header {
+    flex-direction: column;
+    gap: 15px;
+    align-items: flex-start;
+  }
+  
+  .actions {
+    flex-direction: column;
+  }
+  
+  .btn-view,
+  .btn-edit,
+  .btn-delete {
+    width: 100%;
+    margin-bottom: 4px;
+  }
+}
