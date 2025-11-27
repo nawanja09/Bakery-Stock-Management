@@ -1,0 +1,259 @@
+.view-asset-container {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.view-asset-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.view-asset-header h2 {
+  color: #333;
+  margin: 0;
+  font-size: 1.8rem;
+}
+
+.btn-back {
+  background: #6c757d;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.btn-back:hover {
+  background: #5a6268;
+}
+
+.btn-edit-main {
+  background: linear-gradient(90deg, #6722e6 70%, #a98cf7 100%);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.btn-edit-main:hover {
+  background: linear-gradient(90deg, #7a3cf7 70%, #b6a2f7 100%);
+  transform: translateY(-1px);
+}
+
+.asset-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  margin-top: 20px;
+}
+
+.asset-image-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.asset-image-large {
+  width: 100%;
+  max-width: 400px;
+  height: 300px;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.asset-image-large img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.asset-placeholder-large {
+  width: 100%;
+  max-width: 400px;
+  height: 300px;
+  border: 2px dashed #ddd;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #6c757d;
+  background: #f8f9fa;
+}
+
+.cutlery-icon-large {
+  font-size: 64px;
+  margin-bottom: 10px;
+}
+
+.asset-info-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.info-card {
+  background: white;
+  border-radius: 8px;
+  padding: 24px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e9ecef;
+}
+
+.info-card h3 {
+  margin: 0 0 20px 0;
+  color: #333;
+  font-size: 1.2rem;
+  border-bottom: 2px solid #f0f0f0;
+  padding-bottom: 10px;
+}
+
+.info-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.info-item {
+  display: flex;
+  align-items: flex-start;
+}
+
+.info-item.full-width {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.info-item label {
+  font-weight: 600;
+  color: #495057;
+  min-width: 120px;
+  margin-right: 15px;
+  font-size: 14px;
+}
+
+.info-item.full-width label {
+  margin-bottom: 8px;
+}
+
+.info-item span {
+  color: #333;
+  font-size: 14px;
+  word-break: break-word;
+}
+
+.asset-id {
+  background: #6722e6;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.asset-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.asset-description {
+  line-height: 1.5;
+  color: #6c757d;
+  background: #f8f9fa;
+  padding: 12px;
+  border-radius: 6px;
+  border-left: 4px solid #6722e6;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.btn-edit-secondary {
+  background: linear-gradient(90deg, #6722e6 70%, #a98cf7 100%);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s;
+  flex: 1;
+}
+
+.btn-edit-secondary:hover {
+  background: linear-gradient(90deg, #7a3cf7 70%, #b6a2f7 100%);
+  transform: translateY(-1px);
+}
+
+.btn-back-secondary {
+  background: #6c757d;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: background-color 0.2s;
+  flex: 1;
+}
+
+.btn-back-secondary:hover {
+  background: #5a6268;
+}
+
+.loading, .error {
+  text-align: center;
+  padding: 40px;
+  font-size: 16px;
+  color: #6c757d;
+}
+
+.error {
+  color: #dc3545;
+}
+
+@media (max-width: 768px) {
+  .asset-details {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  
+  .view-asset-header {
+    flex-direction: column;
+    gap: 15px;
+    align-items: flex-start;
+  }
+  
+  .action-buttons {
+    flex-direction: column;
+  }
+  
+  .info-item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  
+  .info-item label {
+    min-width: auto;
+    margin-right: 0;
+  }
+}

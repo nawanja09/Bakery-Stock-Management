@@ -740,10 +740,17 @@ CREATE TABLE `cutlery_locations` (
   UNIQUE KEY `location_name` (`location_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
--- Insert sample data into cutlery_locations table
-INSERT INTO `cutlery_locations` (`location_id`, `location_name`) VALUES 
-('LOC001', 'Main Dining Area'),
-('LOC002', 'Outdoor Patio'),
-('LOC003', 'Private Room 1'),
-('LOC004', 'Private Room 2'),
-('LOC005', 'Staff Cafeteria');
+-- Table structure for table `cutlery_assets`
+CREATE TABLE `cutlery_assets` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `asset_id` varchar(20) NOT NULL,
+  `asset_name` varchar(255) NOT NULL,
+  `image_path` varchar(500) DEFAULT NULL,
+  `description` text,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `asset_id` (`asset_id`),
+  UNIQUE KEY `asset_name` (`asset_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
