@@ -1,6 +1,8 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const path = require('path'); 
+const fs = require('fs'); 
 
 const authRoutes = require('./routes/authRoutes');
 const purchaseRoutes = require('./routes/purchaseRoutes');
@@ -30,10 +32,26 @@ const finishedGoodsSalesRouter = require('./routes/finishedGoodsSalesRoutes');
 
 const returnRoutes = require('./routes/returnRoutes');
 const bakeryStockReportRoutes = require('./routes/bakeryStockReportRoutes');
+
 const cutleryLocationsRoutes = require('./routes/cutleryLocations');
+const cutleryAssetsRoutes = require('./routes/cutleryAssets');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// Create uploads directories
+const uploadDirs = [
+  './uploads',
+  './uploads/cutlery-assets'
+];
+
+uploadDirs.forEach(dir => {
+  const fullPath = path.join(__dirname, dir);
+  if (!fs.existsSync(fullPath)) {
+    fs.mkdirSync(fullPath, { recursive: true });
+    console.log(`Created directory: ${fullPath}`);
+  }
+});
 
 app.use(cors({
   //origin: 'https://stock.ravonbakers.lk',
@@ -44,6 +62,9 @@ app.use(cors({
 }));
 
 app.use(express.json());
+
+// Serve static files from uploads directory
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.use('/api', authRoutes);
 app.use('/api/purchases', purchaseRoutes);
@@ -73,8 +94,27 @@ app.use('/api/finished-goods-sales', finishedGoodsSalesRouter);
 
 app.use('/api/returns', returnRoutes);
 app.use('/api/reports', bakeryStockReportRoutes);
+
 app.use('/api/cutlery-locations', cutleryLocationsRoutes);
+app.use('/api/cutlery-assets', cutleryAssetsRoutes);
+
+// Error handling middleware for file uploads
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ error: 'File too large. Maximum size is 5MB.' });
+    }
+  }
+  
+  if (err.message === 'Only image files are allowed!') {
+    return res.status(400).json({ error: 'Only image files are allowed!' });
+  }
+  
+  console.error('Error:', err);
+  res.status(500).json({ error: 'Something went wrong!' });
+});
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  console.log(`Uploads directory: ${path.join(__dirname, 'uploads')}`);
 });

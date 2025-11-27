@@ -57,7 +57,11 @@ import StockSummary from './components/FinishedGoods/Reports/StockSummary';
 import AddReturn from './components/returns/AddReturn';
 import ReturnsHistory from './components/returns/ReturnsHistory';
 import BakeryStockReport from './components/FinishedGoods/Reports/BakeryStockReport';
+
 import Locations from './components/Cutlery/Locations/Locations';
+import Assets from './components/Cutlery/Assets/Assets';
+import ViewAsset from './components/Cutlery/Assets/ViewAsset';
+import EditAsset from './components/Cutlery/Assets/EditAsset';
 
 import './App.css';
 
@@ -148,6 +152,9 @@ function App() {
             <Route path="finished-goods/reports/bakery-stock" element={<BakeryStockReport />} />
 
             <Route path="cutlery/locations" element={<Locations />} />
+            <Route path="cutlery/assets" element={<Assets />} />
+            <Route path="cutlery/assets/view/:id" element={<ViewAsset />} />
+            <Route path="cutlery/assets/edit/:id" element={<EditAsset />} />
 
           </Route>
 
