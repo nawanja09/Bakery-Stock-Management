@@ -27,7 +27,7 @@ const getPurchaseById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Get purchase header
+    // Get purchase header with supplier details
     const [purchaseRows] = await pool.query(`
       SELECT 
         cp.*,
@@ -47,19 +47,30 @@ const getPurchaseById = async (req, res) => {
       return res.status(404).json({ error: 'Purchase not found' });
     }
 
-    // Get purchase items
+    // Get purchase items with asset details
     const [itemRows] = await pool.query(`
       SELECT 
-        cpi.*,
+        cpi.id,
+        cpi.asset_id,
+        cpi.quantity,
+        cpi.unit_price,
+        cpi.total_price,
         ca.asset_name,
         ca.asset_id as asset_code
       FROM cutlery_purchase_items cpi
       LEFT JOIN cutlery_assets ca ON cpi.asset_id = ca.id
       WHERE cpi.purchase_id = ?
+      ORDER BY cpi.id
     `, [id]);
 
     const purchase = purchaseRows[0];
-    purchase.items = itemRows;
+    purchase.items = itemRows || [];
+
+    // Calculate total from items if needed
+    if (!purchase.total_amount && itemRows.length > 0) {
+      const total = itemRows.reduce((sum, item) => sum + (item.total_price || 0), 0);
+      purchase.total_amount = total;
+    }
 
     res.json(purchase);
   } catch (err) {

@@ -42,12 +42,30 @@ const Purchases = () => {
     }
   };
 
-  const handleViewPurchase = (purchase) => {
-    setViewingPurchase(purchase);
+  const handleViewPurchase = async (purchase) => {
+    try {
+      setLoading(true);
+      const response = await api.get(`/cutlery-purchases/${purchase.id}`);
+      setViewingPurchase(response.data);
+    } catch (err) {
+      console.error('Error fetching purchase details:', err);
+      showPopup('error', err.response?.data?.error || 'Failed to load purchase details');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleEditPurchase = (purchase) => {
-    setEditingPurchase(purchase);
+  const handleEditPurchase = async (purchase) => {
+    try {
+      setLoading(true);
+      const response = await api.get(`/cutlery-purchases/${purchase.id}`);
+      setEditingPurchase(response.data);
+    } catch (err) {
+      console.error('Error fetching purchase details for edit:', err);
+      showPopup('error', err.response?.data?.error || 'Failed to load purchase details');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleUpdatePurchase = async (purchaseData) => {
