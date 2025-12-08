@@ -2,6 +2,19 @@ import React from 'react';
 import './ViewTransfer.css';
 
 const ViewTransfer = ({ transfer, onClose, onEdit }) => {
+  // Debug: Check what data is received
+  console.log('ViewTransfer received:', transfer);
+
+  if (!transfer) {
+    return (
+      <div className="view-transfer-overlay">
+        <div className="view-transfer-container">
+          <div className="loading">No transfer data available</div>
+        </div>
+      </div>
+    );
+  }
+
   const getStatusBadge = (status) => {
     const statusConfig = {
       'Pending': { class: 'status-pending', label: 'Pending' },
@@ -17,7 +30,7 @@ const ViewTransfer = ({ transfer, onClose, onEdit }) => {
     <div className="view-transfer-overlay">
       <div className="view-transfer-container">
         <div className="view-transfer-header">
-          <h3>Transfer Details</h3>
+          <h3>Transfer Details - {transfer.transfer_id || 'N/A'}</h3>
           <button 
             type="button" 
             className="btn-close"
@@ -33,19 +46,19 @@ const ViewTransfer = ({ transfer, onClose, onEdit }) => {
             <div className="detail-grid">
               <div className="detail-item">
                 <label>Transfer ID:</label>
-                <span className="transfer-id">{transfer.transfer_id}</span>
+                <span className="transfer-id">{transfer.transfer_id || 'N/A'}</span>
               </div>
               <div className="detail-item">
                 <label>Transfer Date:</label>
-                <span>{new Date(transfer.transfer_date).toLocaleDateString()}</span>
+                <span>{transfer.transfer_date ? new Date(transfer.transfer_date).toLocaleDateString() : 'N/A'}</span>
               </div>
               <div className="detail-item">
                 <label>Status:</label>
-                {getStatusBadge(transfer.status)}
+                {getStatusBadge(transfer.status || 'Pending')}
               </div>
               <div className="detail-item">
                 <label>Transferred By:</label>
-                <span>{transfer.transferred_by}</span>
+                <span>{transfer.transferred_by || 'N/A'}</span>
               </div>
             </div>
           </div>
@@ -56,14 +69,20 @@ const ViewTransfer = ({ transfer, onClose, onEdit }) => {
               <div className="location-from">
                 <label>From Location:</label>
                 <div className="location-detail">
-                  <span className="location-name">{transfer.from_location_name}</span>
+                  <span className="location-name">{transfer.from_location_name || 'N/A'}</span>
+                  {transfer.location_from_id && (
+                    <span className="location-code">ID: {transfer.location_from_id}</span>
+                  )}
                 </div>
               </div>
               <div className="flow-arrow">→</div>
               <div className="location-to">
                 <label>To Location:</label>
                 <div className="location-detail">
-                  <span className="location-name">{transfer.to_location_name}</span>
+                  <span className="location-name">{transfer.to_location_name || 'N/A'}</span>
+                  {transfer.location_to_id && (
+                    <span className="location-code">ID: {transfer.location_to_id}</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -74,15 +93,19 @@ const ViewTransfer = ({ transfer, onClose, onEdit }) => {
             <div className="detail-grid">
               <div className="detail-item">
                 <label>Asset Name:</label>
-                <span className="asset-name">{transfer.asset_name}</span>
+                <span className="asset-name">{transfer.asset_name || 'N/A'}</span>
               </div>
               <div className="detail-item">
                 <label>Asset Code:</label>
-                <span className="asset-code">{transfer.asset_code}</span>
+                <span className="asset-code">{transfer.asset_code || 'N/A'}</span>
               </div>
               <div className="detail-item">
                 <label>Quantity:</label>
-                <span className="quantity">{transfer.quantity}</span>
+                <span className="quantity">{transfer.quantity || 0}</span>
+              </div>
+              <div className="detail-item">
+                <label>Asset ID:</label>
+                <span>{transfer.asset_id || 'N/A'}</span>
               </div>
             </div>
           </div>
@@ -101,15 +124,19 @@ const ViewTransfer = ({ transfer, onClose, onEdit }) => {
             <div className="detail-grid">
               <div className="detail-item">
                 <label>Created By:</label>
-                <span>{transfer.created_by_name || 'System'}</span>
+                <span>{transfer.created_by_name || transfer.created_by || 'System'}</span>
               </div>
               <div className="detail-item">
                 <label>Created Date:</label>
-                <span>{new Date(transfer.created_at).toLocaleString()}</span>
+                <span>{transfer.created_at ? new Date(transfer.created_at).toLocaleString() : 'N/A'}</span>
               </div>
               <div className="detail-item">
                 <label>Last Updated:</label>
-                <span>{new Date(transfer.updated_at).toLocaleString()}</span>
+                <span>{transfer.updated_at ? new Date(transfer.updated_at).toLocaleString() : 'N/A'}</span>
+              </div>
+              <div className="detail-item">
+                <label>Transfer ID (DB):</label>
+                <span>{transfer.id || 'N/A'}</span>
               </div>
             </div>
           </div>

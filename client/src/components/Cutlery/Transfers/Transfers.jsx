@@ -169,25 +169,25 @@ const Transfers = () => {
                   </td>
                   <td className="actions">
                     <button
-                        className="btn-view"
-                        onClick={() => handleViewTransfer(transfer.id)}
-                        title="View Transfer"
-                        >
-                        <FontAwesomeIcon icon={faEye} />
+                      className="btn-view"
+                      onClick={() => handleViewTransfer(transfer)}
+                      title="View Transfer"
+                    >
+                      <FontAwesomeIcon icon={faEye} />
                     </button>
                     <button
-                    className="btn-edit"
-                    onClick={() => handleEditTransfer(transfer.id)}
-                    title="Edit Transfer"
+                      className="btn-edit"
+                      onClick={() => handleEditTransfer(transfer)}
+                      title="Edit Transfer"
                     >
-                    <FontAwesomeIcon icon={faPen} />
+                      <FontAwesomeIcon icon={faPen} />
                     </button>
                     <button
-                    className="btn-delete"
-                    onClick={() => handleDeleteTransfer(transfer.id, transfer.transfer_id)}
-                    title="Delete Transfer"
+                      className="btn-delete"
+                      onClick={() => handleDeleteTransfer(transfer.id, transfer.transfer_id)}
+                      title="Delete Transfer"
                     >
-                    <FontAwesomeIcon icon={faTrash} />
+                      <FontAwesomeIcon icon={faTrash} />
                     </button>
                   </td>
                 </tr>
