@@ -7,7 +7,7 @@ const ViewPurchase = ({ purchase, onClose, onEdit }) => {
       style: 'currency',
       currency: 'LKR',
       minimumFractionDigits: 2
-    }).format(amount);
+    }).format(amount || 0);
   };
 
   const getStatusBadge = (status) => {
@@ -31,6 +31,10 @@ const ViewPurchase = ({ purchase, onClose, onEdit }) => {
     const config = methodConfig[method] || { class: 'method-cash', label: method };
     return <span className={`method-badge ${config.class}`}>{config.label}</span>;
   };
+
+  // Debug: Log purchase data
+  console.log('Purchase data in View:', purchase);
+  console.log('Purchase items:', purchase?.items);
 
   return (
     <div className="view-purchase-overlay">
@@ -65,7 +69,7 @@ const ViewPurchase = ({ purchase, onClose, onEdit }) => {
               <div className="detail-item">
                 <label>Total Amount:</label>
                 <span className="total-amount">
-                  {formatCurrency(purchase.calculated_total || purchase.total_amount)}
+                  {formatCurrency(purchase.total_amount)}
                 </span>
               </div>
             </div>
@@ -110,6 +114,7 @@ const ViewPurchase = ({ purchase, onClose, onEdit }) => {
                 <table>
                   <thead>
                     <tr>
+                      <th>#</th>
                       <th>Asset</th>
                       <th>Quantity</th>
                       <th>Unit Price</th>
@@ -118,11 +123,12 @@ const ViewPurchase = ({ purchase, onClose, onEdit }) => {
                   </thead>
                   <tbody>
                     {purchase.items.map((item, index) => (
-                      <tr key={index}>
+                      <tr key={item.id || index}>
+                        <td className="index">{index + 1}</td>
                         <td>
                           <div className="asset-info">
-                            <div className="asset-name">{item.asset_name}</div>
-                            <div className="asset-code">{item.asset_code}</div>
+                            <div className="asset-name">{item.asset_name || 'Unknown Asset'}</div>
+                            <div className="asset-code">{item.asset_code || 'N/A'}</div>
                           </div>
                         </td>
                         <td className="quantity">{item.quantity}</td>
@@ -133,16 +139,16 @@ const ViewPurchase = ({ purchase, onClose, onEdit }) => {
                   </tbody>
                   <tfoot>
                     <tr>
-                      <td colSpan="3" className="total-label">Grand Total:</td>
+                      <td colSpan="4" className="total-label">Grand Total:</td>
                       <td className="grand-total">
-                        {formatCurrency(purchase.calculated_total || purchase.total_amount)}
+                        {formatCurrency(purchase.total_amount)}
                       </td>
                     </tr>
                   </tfoot>
                 </table>
               </div>
             ) : (
-              <div className="no-items">No items found</div>
+              <div className="no-items">No items found in this purchase</div>
             )}
           </div>
 

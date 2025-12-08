@@ -102,7 +102,7 @@ const AddPurchaseForm = ({ onSubmit, onCancel }) => {
 
     // Validate items
     const validItems = formData.items.filter(item => 
-      item.asset_id && item.quantity > 0 && item.unit_price > 0
+      item.asset_id && item.quantity > 0 && item.unit_price >= 0
     );
     
     if (validItems.length === 0) {
@@ -117,7 +117,12 @@ const AddPurchaseForm = ({ onSubmit, onCancel }) => {
     }
 
     const submitData = {
-      ...formData,
+      purchase_date: formData.purchase_date,
+      supplier_id: formData.supplier_id,
+      invoice_number: formData.invoice_number,
+      payment_method: formData.payment_method,
+      payment_status: formData.payment_status,
+      notes: formData.notes || '',
       items: validItems.map(item => ({
         asset_id: item.asset_id,
         quantity: parseFloat(item.quantity),
@@ -125,11 +130,14 @@ const AddPurchaseForm = ({ onSubmit, onCancel }) => {
       }))
     };
 
+    console.log('Submitting purchase data:', submitData); // Debug log
+
     setSubmitting(true);
     try {
       await onSubmit(submitData);
     } catch (error) {
       console.error('Error submitting form:', error);
+      showPopup('error', 'Failed to submit form');
     } finally {
       setSubmitting(false);
     }
