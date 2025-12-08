@@ -265,14 +265,6 @@ const EditTransfer = ({ transfer, onSubmit, onCancel }) => {
 
           <div className="form-actions">
             <button
-              type="button"
-              className="btn-cancel"
-              onClick={onCancel}
-              disabled={submitting}
-            >
-              Cancel
-            </button>
-            <button
               type="submit"
               className="btn-submit"
               disabled={submitting}
