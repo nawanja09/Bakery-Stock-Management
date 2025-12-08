@@ -795,3 +795,61 @@ CREATE TABLE `cutlery_stock` (
   CONSTRAINT `cutlery_stock_ibfk_1` FOREIGN KEY (`location_id`) REFERENCES `cutlery_locations` (`id`),
   CONSTRAINT `cutlery_stock_ibfk_2` FOREIGN KEY (`asset_id`) REFERENCES `cutlery_assets` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Table structure for table `cutlery_suppliers`
+CREATE TABLE `cutlery_suppliers` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `supplier_name` varchar(255) NOT NULL,
+  `contact_person` varchar(255),
+  `phone` varchar(20),
+  `email` varchar(255),
+  `address` text,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `supplier_name` (`supplier_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Insert some sample suppliers
+INSERT INTO `cutlery_suppliers` (`supplier_name`, `contact_person`, `phone`, `email`, `address`) VALUES
+('Cutlery World Ltd', 'John Smith', '0112345678', 'john@cutleryworld.lk', '123 Main Street, Colombo'),
+('Kitchen Supplies Co', 'Mary Johnson', '0118765432', 'mary@kitchensupplies.lk', '456 High Street, Kandy');
+
+-- Table structure for table `cutlery_purchases`
+CREATE TABLE `cutlery_purchases` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `purchase_id` varchar(20) NOT NULL,
+  `purchase_date` date NOT NULL,
+  `supplier_id` int NOT NULL,
+  `invoice_number` varchar(100) NOT NULL,
+  `total_amount` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `payment_method` enum('CASH','BANK_TRANSFER','CREDIT') DEFAULT 'CASH',
+  `payment_status` enum('PENDING','PAID','PARTIAL') DEFAULT 'PENDING',
+  `notes` text,
+  `created_by` int NOT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `purchase_id` (`purchase_id`),
+  UNIQUE KEY `invoice_number` (`invoice_number`),
+  KEY `supplier_id` (`supplier_id`),
+  KEY `created_by` (`created_by`),
+  CONSTRAINT `cutlery_purchases_ibfk_1` FOREIGN KEY (`supplier_id`) REFERENCES `cutlery_suppliers` (`id`),
+  CONSTRAINT `cutlery_purchases_ibfk_2` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Table structure for table `cutlery_purchase_items`
+CREATE TABLE `cutlery_purchase_items` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `purchase_id` int NOT NULL,
+  `asset_id` int NOT NULL,
+  `quantity` int NOT NULL DEFAULT 1,
+  `unit_price` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `total_price` decimal(10,2) GENERATED ALWAYS AS ((`quantity` * `unit_price`)) STORED,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `purchase_id` (`purchase_id`),
+  KEY `asset_id` (`asset_id`),
+  CONSTRAINT `cutlery_purchase_items_ibfk_1` FOREIGN KEY (`purchase_id`) REFERENCES `cutlery_purchases` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `cutlery_purchase_items_ibfk_2` FOREIGN KEY (`asset_id`) REFERENCES `cutlery_assets` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
