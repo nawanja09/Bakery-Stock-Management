@@ -64,6 +64,7 @@ import ViewAsset from './components/Cutlery/Assets/ViewAsset';
 import EditAsset from './components/Cutlery/Assets/EditAsset';
 import Transfers from './components/Cutlery/Transfers/Transfers';
 import Purchases from './components/Cutlery/Purchases/Purchases';
+import Damages from './components/Cutlery/Damages/Damages';
 
 import './App.css';
 
@@ -159,6 +160,7 @@ function App() {
             <Route path="cutlery/assets/edit/:id" element={<EditAsset />} />
             <Route path="cutlery/transfer" element={<Transfers />} />
             <Route path="cutlery/purchasing" element={<Purchases />} />
+            <Route path="cutlery/damage" element={<Damages />} />
 
           </Route>
 

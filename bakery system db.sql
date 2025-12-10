@@ -853,3 +853,42 @@ CREATE TABLE `cutlery_purchase_items` (
   CONSTRAINT `cutlery_purchase_items_ibfk_1` FOREIGN KEY (`purchase_id`) REFERENCES `cutlery_purchases` (`id`) ON DELETE CASCADE,
   CONSTRAINT `cutlery_purchase_items_ibfk_2` FOREIGN KEY (`asset_id`) REFERENCES `cutlery_assets` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Table structure for table `cutlery_damages`
+CREATE TABLE `cutlery_damages` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `damage_id` varchar(20) NOT NULL,
+  `damage_date` date NOT NULL,
+  `location_id` int NOT NULL,
+  `reason` enum('Broken','Lost','Worn Out','Theft','Other') NOT NULL,
+  `notes` text,
+  `reported_by` varchar(255) NOT NULL,
+  `status` enum('Reported','Confirmed','Repaired','Written Off') DEFAULT 'Reported',
+  `estimated_loss` decimal(10,2) DEFAULT 0.00,
+  `created_by` int NOT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `damage_id` (`damage_id`),
+  KEY `location_id` (`location_id`),
+  KEY `created_by` (`created_by`),
+  CONSTRAINT `cutlery_damages_ibfk_1` FOREIGN KEY (`location_id`) REFERENCES `cutlery_locations` (`id`),
+  CONSTRAINT `cutlery_damages_ibfk_2` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Table structure for table `cutlery_damage_items`
+CREATE TABLE `cutlery_damage_items` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `damage_id` int NOT NULL,
+  `asset_id` int NOT NULL,
+  `quantity` int NOT NULL DEFAULT 1,
+  `unit_price` decimal(10,2) DEFAULT 0.00,
+  `total_loss` decimal(10,2) GENERATED ALWAYS AS ((`quantity` * `unit_price`)) STORED,
+  `notes` text,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `damage_id` (`damage_id`),
+  KEY `asset_id` (`asset_id`),
+  CONSTRAINT `cutlery_damage_items_ibfk_1` FOREIGN KEY (`damage_id`) REFERENCES `cutlery_damages` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `cutlery_damage_items_ibfk_2` FOREIGN KEY (`asset_id`) REFERENCES `cutlery_assets` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

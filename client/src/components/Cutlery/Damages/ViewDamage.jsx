@@ -1,0 +1,188 @@
+import React from 'react';
+import './ViewDamage.css';
+
+const ViewDamage = ({ damage, onClose, onEdit }) => {
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-LK', {
+      style: 'currency',
+      currency: 'LKR',
+      minimumFractionDigits: 2
+    }).format(amount || 0);
+  };
+
+  const getStatusBadge = (status) => {
+    const statusConfig = {
+      'Reported': { class: 'status-reported', label: 'Reported' },
+      'Confirmed': { class: 'status-confirmed', label: 'Confirmed' },
+      'Repaired': { class: 'status-repaired', label: 'Repaired' },
+      'Written Off': { class: 'status-written-off', label: 'Written Off' }
+    };
+    
+    const config = statusConfig[status] || { class: 'status-reported', label: status };
+    return <span className={`status-badge ${config.class}`}>{config.label}</span>;
+  };
+
+  const getReasonBadge = (reason) => {
+    const reasonConfig = {
+      'Broken': { class: 'reason-broken', label: 'Broken' },
+      'Lost': { class: 'reason-lost', label: 'Lost' },
+      'Worn Out': { class: 'reason-worn-out', label: 'Worn Out' },
+      'Theft': { class: 'reason-theft', label: 'Theft' },
+      'Other': { class: 'reason-other', label: 'Other' }
+    };
+    
+    const config = reasonConfig[reason] || { class: 'reason-other', label: reason };
+    return <span className={`reason-badge ${config.class}`}>{config.label}</span>;
+  };
+
+  // Debug log
+  console.log('Damage data in View:', damage);
+  console.log('Damage items:', damage?.items);
+
+  return (
+    <div className="view-damage-overlay">
+      <div className="view-damage-container">
+        <div className="view-damage-header">
+          <h3>Damage Record Details</h3>
+          <button 
+            type="button" 
+            className="btn-close"
+            onClick={onClose}
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="damage-details">
+          <div className="detail-section">
+            <h4>Damage Information</h4>
+            <div className="detail-grid">
+              <div className="detail-item">
+                <label>Damage ID:</label>
+                <span className="damage-id">{damage.damage_id}</span>
+              </div>
+              <div className="detail-item">
+                <label>Damage Date:</label>
+                <span>{new Date(damage.damage_date).toLocaleDateString()}</span>
+              </div>
+              <div className="detail-item">
+                <label>Location:</label>
+                <span className="location">{damage.location_name}</span>
+              </div>
+              <div className="detail-item">
+                <label>Total Loss:</label>
+                <span className="total-loss">
+                  {formatCurrency(damage.total_loss || damage.estimated_loss)}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="detail-section">
+            <h4>Damage Details</h4>
+            <div className="detail-grid">
+              <div className="detail-item">
+                <label>Reason:</label>
+                {getReasonBadge(damage.reason)}
+              </div>
+              <div className="detail-item">
+                <label>Status:</label>
+                {getStatusBadge(damage.status)}
+              </div>
+              <div className="detail-item">
+                <label>Reported By:</label>
+                <span className="reported-by">{damage.reported_by}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="detail-section">
+            <h4>Damaged Items ({damage.items?.length || 0})</h4>
+            {damage.items && damage.items.length > 0 ? (
+              <div className="items-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Asset</th>
+                      <th>Quantity</th>
+                      <th>Unit Price</th>
+                      <th>Total Loss</th>
+                      <th>Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {damage.items.map((item, index) => (
+                      <tr key={item.id || index}>
+                        <td className="index">{index + 1}</td>
+                        <td>
+                          <div className="asset-info">
+                            <div className="asset-name">{item.asset_name || 'Unknown Asset'}</div>
+                            <div className="asset-code">{item.asset_code || 'N/A'}</div>
+                          </div>
+                        </td>
+                        <td className="quantity">{item.quantity}</td>
+                        <td className="unit-price">{formatCurrency(item.unit_price)}</td>
+                        <td className="item-total">{formatCurrency(item.total_loss)}</td>
+                        <td className="item-notes">{item.notes || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td colSpan="4" className="total-label">Total Loss:</td>
+                      <td colSpan="2" className="grand-total">
+                        {formatCurrency(damage.total_loss || damage.estimated_loss)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            ) : (
+              <div className="no-items">No items found in this damage record</div>
+            )}
+          </div>
+
+          {damage.notes && (
+            <div className="detail-section">
+              <h4>Additional Notes</h4>
+              <div className="notes-content">
+                {damage.notes}
+              </div>
+            </div>
+          )}
+
+          <div className="detail-section">
+            <h4>System Information</h4>
+            <div className="detail-grid">
+              <div className="detail-item">
+                <label>Created By:</label>
+                <span>{damage.created_by_name || 'System'}</span>
+              </div>
+              <div className="detail-item">
+                <label>Created Date:</label>
+                <span>{new Date(damage.created_at).toLocaleString()}</span>
+              </div>
+              <div className="detail-item">
+                <label>Last Updated:</label>
+                <span>{new Date(damage.updated_at).toLocaleString()}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="damage-actions">
+          <button
+            type="button"
+            className="btn-edit"
+            onClick={onEdit}
+          >
+            Edit Damage Record
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ViewDamage;
