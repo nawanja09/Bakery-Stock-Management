@@ -43,11 +43,29 @@ const Damages = () => {
   };
 
   const handleViewDamage = (damage) => {
-    setViewingDamage(damage);
+    // Fetch full damage details (including items) before showing view
+    (async () => {
+      try {
+        const response = await api.get(`/cutlery-damages/${damage.id}`);
+        setViewingDamage(response.data);
+      } catch (err) {
+        console.error('Error fetching damage details:', err);
+        showPopup('error', 'Failed to load damage details');
+      }
+    })();
   };
 
   const handleEditDamage = (damage) => {
-    setEditingDamage(damage);
+    // Fetch full damage details (including items) before opening edit form
+    (async () => {
+      try {
+        const response = await api.get(`/cutlery-damages/${damage.id}`);
+        setEditingDamage(response.data);
+      } catch (err) {
+        console.error('Error fetching damage details for edit:', err);
+        showPopup('error', 'Failed to load damage details for edit');
+      }
+    })();
   };
 
   const handleUpdateDamage = async (damageData) => {
