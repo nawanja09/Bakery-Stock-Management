@@ -892,3 +892,18 @@ CREATE TABLE `cutlery_damage_items` (
   CONSTRAINT `cutlery_damage_items_ibfk_1` FOREIGN KEY (`damage_id`) REFERENCES `cutlery_damages` (`id`) ON DELETE CASCADE,
   CONSTRAINT `cutlery_damage_items_ibfk_2` FOREIGN KEY (`asset_id`) REFERENCES `cutlery_assets` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- From your schema
+CREATE TABLE `cutlery_stock` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `location_id` int NOT NULL,
+  `asset_id` int NOT NULL,
+  `quantity` int NOT NULL DEFAULT 0,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `location_asset` (`location_id`,`asset_id`),
+  KEY `asset_id` (`asset_id`),
+  CONSTRAINT `cutlery_stock_ibfk_1` FOREIGN KEY (`location_id`) REFERENCES `cutlery_locations` (`id`),
+  CONSTRAINT `cutlery_stock_ibfk_2` FOREIGN KEY (`asset_id`) REFERENCES `cutlery_assets` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

@@ -65,6 +65,7 @@ import EditAsset from './components/Cutlery/Assets/EditAsset';
 import Transfers from './components/Cutlery/Transfers/Transfers';
 import Purchases from './components/Cutlery/Purchases/Purchases';
 import Damages from './components/Cutlery/Damages/Damages';
+import CutleryStockReport from './components/Cutlery/Reports/CutleryStockReport';
 
 import './App.css';
 
@@ -85,7 +86,6 @@ function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path='/register' element={<Register />} />
-          <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/auth-check" element={<AuthCheck />} />
 
           {/* Protected Routes */}  
@@ -161,7 +161,9 @@ function App() {
             <Route path="cutlery/transfer" element={<Transfers />} />
             <Route path="cutlery/purchasing" element={<Purchases />} />
             <Route path="cutlery/damage" element={<Damages />} />
-
+            <Route path="cutlery/reports/inventory" element={<CutleryStockReport />} />
+            <Route path="cutlery/reports/stock" element={<CutleryStockReport />} />
+            
           </Route>
 
           <Route path="*" element={<Navigate to="/login" replace />} />
