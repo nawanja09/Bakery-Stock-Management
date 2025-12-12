@@ -38,6 +38,7 @@ const cutleryAssetsRoutes = require('./routes/cutleryAssets');
 const cutleryTransfersRoutes = require('./routes/cutleryTransfers');
 const cutleryPurchasesRoutes = require('./routes/cutleryPurchases');
 const cutleryDamagesRoutes = require('./routes/cutleryDamages');
+const cutleryStockReportRoutes = require('./routes/cutleryStockReport');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -103,6 +104,7 @@ app.use('/api/cutlery-assets', cutleryAssetsRoutes);
 app.use('/api/cutlery-transfers', cutleryTransfersRoutes);
 app.use('/api/cutlery-purchases', cutleryPurchasesRoutes);
 app.use('/api/cutlery-damages', cutleryDamagesRoutes);
+app.use('/api/cutlery-reports', cutleryStockReportRoutes);
 
 // Error handling middleware for file uploads
 app.use((err, req, res, next) => {

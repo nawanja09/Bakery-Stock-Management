@@ -524,9 +524,16 @@ const NavigationBar = () => {
 
                 {/* 6. Item Wise Stock Report */}
                 <li>
-                  <NavLink to="/cutlery/reports/items" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                  <NavLink to="/cutlery/reports/stock" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
                     <span className="icon-container"><FontAwesomeIcon icon={faBox} /></span>
                     <span>Item Wise Stock Report</span>
+                  </NavLink>
+                </li>
+
+                <li>
+                  <NavLink to="/cutlery/reports/stock" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                    <span className="icon-container"><FontAwesomeIcon icon={faChartBar} /></span>
+                    <span>Inventory Report</span>
                   </NavLink>
                 </li>
               </>
