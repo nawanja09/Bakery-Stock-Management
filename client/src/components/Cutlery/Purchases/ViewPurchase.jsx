@@ -17,7 +17,7 @@ const ViewPurchase = ({ purchase, onClose, onEdit }) => {
       'PARTIAL': { class: 'status-partial', label: 'Partial' }
     };
     
-    const config = statusConfig[status] || { class: 'status-pending', label: status };
+    const config = statusConfig[status] || { class: 'status-default', label: status };
     return <span className={`status-badge ${config.class}`}>{config.label}</span>;
   };
 
@@ -28,95 +28,89 @@ const ViewPurchase = ({ purchase, onClose, onEdit }) => {
       'CREDIT': { class: 'method-credit', label: 'Credit' }
     };
     
-    const config = methodConfig[method] || { class: 'method-cash', label: method };
+    const config = methodConfig[method] || { class: 'method-default', label: method };
     return <span className={`method-badge ${config.class}`}>{config.label}</span>;
   };
 
-  // Debug: Log purchase data
-  console.log('Purchase data in View:', purchase);
-  console.log('Purchase items:', purchase?.items);
-
   return (
-    <div className="view-purchase-overlay">
-      <div className="view-purchase-container">
-        <div className="view-purchase-header">
+    <div className="overlay">
+      <div className="container">
+        {/* Header */}
+        <div className="header">
           <h3>Purchase Details</h3>
-          <button 
-            type="button" 
-            className="btn-close"
-            onClick={onClose}
-          >
-            ×
-          </button>
+          <button className="btn-close" onClick={onClose}>×</button>
         </div>
 
-        <div className="purchase-details">
-          <div className="detail-section">
+        {/* Main Content */}
+        <div className="content">
+          {/* Purchase Info */}
+          <section className="section">
             <h4>Purchase Information</h4>
-            <div className="detail-grid">
-              <div className="detail-item">
-                <label>Purchase ID:</label>
-                <span className="purchase-id">{purchase.purchase_id}</span>
+            <div className="grid">
+              <div>
+                <label>Purchase ID</label>
+                <span className="highlight">{purchase.purchase_id}</span>
               </div>
-              <div className="detail-item">
-                <label>Purchase Date:</label>
+              <div>
+                <label>Purchase Date</label>
                 <span>{new Date(purchase.purchase_date).toLocaleDateString()}</span>
               </div>
-              <div className="detail-item">
-                <label>Invoice Number:</label>
-                <span className="invoice-number">{purchase.invoice_number}</span>
+              <div>
+                <label>Invoice Number</label>
+                <span>{purchase.invoice_number}</span>
               </div>
-              <div className="detail-item">
-                <label>Total Amount:</label>
-                <span className="total-amount">
-                  {formatCurrency(purchase.total_amount)}
-                </span>
+              <div>
+                <label>Total Amount</label>
+                <span className="amount">{formatCurrency(purchase.total_amount)}</span>
               </div>
             </div>
-          </div>
+          </section>
 
-          <div className="detail-section">
+          {/* Supplier Info */}
+          <section className="section">
             <h4>Supplier Information</h4>
-            <div className="detail-grid">
-              <div className="detail-item">
-                <label>Supplier Name:</label>
-                <span className="supplier-name">{purchase.supplier_name}</span>
+            <div className="grid">
+              <div>
+                <label>Supplier Name</label>
+                <span>{purchase.supplier_name}</span>
               </div>
-              <div className="detail-item">
-                <label>Contact Person:</label>
+              <div>
+                <label>Contact Person</label>
                 <span>{purchase.contact_person || 'N/A'}</span>
               </div>
-              <div className="detail-item">
-                <label>Phone:</label>
+              <div>
+                <label>Phone</label>
                 <span>{purchase.supplier_phone || 'N/A'}</span>
               </div>
             </div>
-          </div>
+          </section>
 
-          <div className="detail-section">
+          {/* Payment Info */}
+          <section className="section">
             <h4>Payment Information</h4>
-            <div className="detail-grid">
-              <div className="detail-item">
-                <label>Payment Method:</label>
+            <div className="grid">
+              <div>
+                <label>Payment Method</label>
                 {getPaymentMethodBadge(purchase.payment_method)}
               </div>
-              <div className="detail-item">
-                <label>Payment Status:</label>
+              <div>
+                <label>Payment Status</label>
                 {getStatusBadge(purchase.payment_status)}
               </div>
             </div>
-          </div>
+          </section>
 
-          <div className="detail-section">
+          {/* Purchase Items */}
+          <section className="section">
             <h4>Purchase Items ({purchase.items?.length || 0})</h4>
             {purchase.items && purchase.items.length > 0 ? (
-              <div className="items-table">
+              <div className="table-wrapper">
                 <table>
                   <thead>
                     <tr>
                       <th>#</th>
                       <th>Asset</th>
-                      <th>Quantity</th>
+                      <th>Qty</th>
                       <th>Unit Price</th>
                       <th>Total</th>
                     </tr>
@@ -124,70 +118,63 @@ const ViewPurchase = ({ purchase, onClose, onEdit }) => {
                   <tbody>
                     {purchase.items.map((item, index) => (
                       <tr key={item.id || index}>
-                        <td className="index">{index + 1}</td>
+                        <td>{index + 1}</td>
                         <td>
-                          <div className="asset-info">
-                            <div className="asset-name">{item.asset_name || 'Unknown Asset'}</div>
-                            <div className="asset-code">{item.asset_code || 'N/A'}</div>
+                          <div className="asset">
+                            <div>{item.asset_name || 'Unknown Asset'}</div>
+                            <small>{item.asset_code || 'N/A'}</small>
                           </div>
                         </td>
-                        <td className="quantity">{item.quantity}</td>
-                        <td className="unit-price">{formatCurrency(item.unit_price)}</td>
-                        <td className="item-total">{formatCurrency(item.total_price)}</td>
+                        <td>{item.quantity}</td>
+                        <td>{formatCurrency(item.unit_price)}</td>
+                        <td>{formatCurrency(item.total_price)}</td>
                       </tr>
                     ))}
                   </tbody>
                   <tfoot>
                     <tr>
-                      <td colSpan="4" className="total-label">Grand Total:</td>
-                      <td className="grand-total">
-                        {formatCurrency(purchase.total_amount)}
-                      </td>
+                      <td colSpan="4" className="total-label">Grand Total</td>
+                      <td>{formatCurrency(purchase.total_amount)}</td>
                     </tr>
                   </tfoot>
                 </table>
               </div>
             ) : (
-              <div className="no-items">No items found in this purchase</div>
+              <p className="no-items">No items found.</p>
             )}
-          </div>
+          </section>
 
+          {/* Notes */}
           {purchase.notes && (
-            <div className="detail-section">
-              <h4>Additional Notes</h4>
-              <div className="notes-content">
-                {purchase.notes}
-              </div>
-            </div>
+            <section className="section">
+              <h4>Notes</h4>
+              <p className="notes">{purchase.notes}</p>
+            </section>
           )}
 
-          <div className="detail-section">
+          {/* System Info */}
+          <section className="section">
             <h4>System Information</h4>
-            <div className="detail-grid">
-              <div className="detail-item">
-                <label>Created By:</label>
+            <div className="grid">
+              <div>
+                <label>Created By</label>
                 <span>{purchase.created_by_name || 'System'}</span>
               </div>
-              <div className="detail-item">
-                <label>Created Date:</label>
+              <div>
+                <label>Created Date</label>
                 <span>{new Date(purchase.created_at).toLocaleString()}</span>
               </div>
-              <div className="detail-item">
-                <label>Last Updated:</label>
+              <div>
+                <label>Last Updated</label>
                 <span>{new Date(purchase.updated_at).toLocaleString()}</span>
               </div>
             </div>
-          </div>
+          </section>
         </div>
 
-        <div className="purchase-actions">
-          <button
-            type="button"
-            className="btn-edit"
-            onClick={onEdit}
-          >
-            Edit Purchase
-          </button>
+        {/* Actions */}
+        <div className="actions">
+          <button className="btn-edit" onClick={onEdit}>Edit Purchase</button>
         </div>
       </div>
     </div>

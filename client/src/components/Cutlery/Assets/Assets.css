@@ -1,133 +1,155 @@
-/* Container */
-.assets-container {
-  padding: 20px;
+/* Page */
+.assets-page {
+  padding: 24px;
+  background: #fafafa;
 }
 
+/* Header */
 .assets-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
-.btn-add-asset {
-  background: #8a2be2;
-  color: white;
+.assets-header h2 {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+/* Primary Button */
+.primary-btn {
+  background: #6d28d9;
+  color: #fff;
   border: none;
   padding: 10px 18px;
-  border-radius: 8px;
-  cursor: pointer;
+  border-radius: 10px;
   font-weight: 600;
+  cursor: pointer;
 }
 
 /* Grid */
-.assets-grid-container {
-  margin-top: 20px;
-}
-
 .assets-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 20px;
+}
+
+/* Responsive Columns */
+@media (max-width: 640px) {
+  .assets-grid { grid-template-columns: 1fr; }
+}
+@media (min-width: 641px) and (max-width: 1024px) {
+  .assets-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (min-width: 1025px) and (max-width: 1440px) {
+  .assets-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (min-width: 1441px) {
+  .assets-grid { grid-template-columns: repeat(4, 1fr); }
 }
 
 /* Card */
 .asset-card {
-  background: #fff;
-  padding: 15px;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.06);
   display: flex;
   flex-direction: column;
-  justify-content: space-between; /* 🔥 ensures button row stays at bottom */
-  height: 100%; /* keep consistent height */
+  overflow: hidden;
+  transition: transform .2s ease;
+}
+
+.asset-card:hover {
+  transform: translateY(-3px);
+}
+
+/* Image */
+.asset-image {
+  height: 180px;
+  background: #f4f4f5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
 }
 
 .asset-image img {
   width: 100%;
-  height: 180px;
+  height: 100%;
   object-fit: contain;
-  border-radius: 10px;
 }
 
-.asset-placeholder {
-  width: 100%;
-  height: 180px;
-  border-radius: 10px;
-  background: #f5f5f5;
+.image-placeholder {
+  font-size: 42px;
+  opacity: 0.4;
+}
+
+/* Body */
+.asset-body {
+  padding: 14px 16px;
+  flex: 1;
+}
+
+.asset-code {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6d28d9;
+}
+
+.asset-body h3 {
+  margin: 4px 0;
+  font-size: 16px;
+}
+
+.desc {
+  font-size: 13px;
+  color: #555;
+  margin-top: 6px;
+}
+
+.dates {
+  margin-top: 10px;
+  font-size: 11px;
+  color: #777;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  align-items: center;
+  gap: 2px;
 }
 
-.asset-info {
-  margin-top: 12px;
+/* Actions */
+.asset-actions {
+  display: flex;
+  gap: 10px;
+  padding: 14px;
 }
 
-.asset-id {
-  font-size: 13px;
-  font-weight: bold;
-  color: #6c2bd9;
-}
-
-.asset-name {
-  margin: 5px 0;
+.icon-btn {
+  flex: 1;
+  border: none;
+  padding: 10px;
+  border-radius: 10px;
   cursor: pointer;
+  font-size: 15px;
 }
 
-.asset-description {
-  font-size: 13px;
-  color: #666;
-}
+.icon-btn.view { background: #3b82f6; color: white; }
+.icon-btn.edit { background: #10b981; color: white; }
+.icon-btn.delete { background: #ef4444; color: white; }
 
-.asset-meta {
-  margin-top: 10px;
-  font-size: 12px;
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 80px 0;
   color: #777;
 }
 
-/* ACTION BUTTONS – Horizontal Alignment */
-.asset-actions {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  margin-top: 15px;
-  flex-wrap: nowrap;    /* 🔥 prevents wrapping */
-  align-items: center;
-  gap: 10px;             /* space between buttons */
-  margin-top: 12px;
+.empty-state span {
+  font-size: 48px;
 }
 
-.asset-actions button {
-  flex: 1;
+/* Loading */
+.loading {
+  padding: 60px;
   text-align: center;
-  border-radius: 6px;
-  cursor: pointer;
   font-weight: 600;
-  border: none;           
-  white-space: nowrap;   /* 🔥 prevents line break inside button */
-  padding: 8px 0;
-  font-size: 14px;
-  cursor: pointer;
-  text-align: center;
 }
-
-/* Individual Button Colors */
-.btn-view {
-  background: #3498db;
-  color: white;
-}
-
-.btn-edit {
-  background: #2ecc71;
-  color: white;
-}
-
-.btn-delete {
-  background: #e74c3c;
-  color: white;
-}
-
-
-

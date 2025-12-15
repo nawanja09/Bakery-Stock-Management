@@ -13,10 +13,8 @@ const AddTransferForm = ({ onSubmit, onCancel }) => {
     notes: '',
     transferred_by: ''
   });
-  const [formOptions, setFormOptions] = useState({
-    locations: [],
-    assets: []
-  });
+
+  const [formOptions, setFormOptions] = useState({ locations: [], assets: [] });
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const { showPopup } = usePopup();
@@ -31,7 +29,7 @@ const AddTransferForm = ({ onSubmit, onCancel }) => {
       const response = await api.get('/cutlery-transfers/form-data');
       setFormOptions(response.data);
     } catch (err) {
-      console.error('Error fetching form data:', err);
+      console.error(err);
       showPopup('error', 'Failed to load form data');
     } finally {
       setLoading(false);
@@ -40,28 +38,23 @@ const AddTransferForm = ({ onSubmit, onCancel }) => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     // Validation
-    if (!formData.transfer_date || !formData.location_from_id || !formData.location_to_id || 
-        !formData.asset_id || !formData.quantity || !formData.transferred_by) {
+    const { transfer_date, location_from_id, location_to_id, asset_id, quantity, transferred_by } = formData;
+    if (!transfer_date || !location_from_id || !location_to_id || !asset_id || !quantity || !transferred_by) {
       showPopup('error', 'Please fill all required fields');
       return;
     }
-
-    if (formData.location_from_id === formData.location_to_id) {
+    if (location_from_id === location_to_id) {
       showPopup('error', 'Source and destination locations cannot be the same');
       return;
     }
-
-    if (formData.quantity <= 0) {
+    if (quantity <= 0) {
       showPopup('error', 'Quantity must be greater than 0');
       return;
     }
@@ -69,8 +62,8 @@ const AddTransferForm = ({ onSubmit, onCancel }) => {
     setSubmitting(true);
     try {
       await onSubmit(formData);
-    } catch (error) {
-      console.error('Error submitting form:', error);
+    } catch (err) {
+      console.error(err);
     } finally {
       setSubmitting(false);
     }
@@ -78,8 +71,8 @@ const AddTransferForm = ({ onSubmit, onCancel }) => {
 
   if (loading) {
     return (
-      <div className="add-transfer-form-overlay">
-        <div className="add-transfer-form-container">
+      <div className="form-overlay">
+        <div className="form-container">
           <div className="loading">Loading form data...</div>
         </div>
       </div>
@@ -87,162 +80,75 @@ const AddTransferForm = ({ onSubmit, onCancel }) => {
   }
 
   return (
-    <div className="add-transfer-form-overlay">
-      <div className="add-transfer-form-container">
-        <div className="add-transfer-form-header">
+    <div className="form-overlay">
+      <div className="form-container">
+        <div className="form-header">
           <h3>Add New Transfer</h3>
-          <button 
-            type="button" 
-            className="btn-close"
-            onClick={onCancel}
-            disabled={submitting}
-          >
-            ×
-          </button>
+          <button type="button" className="btn-close" onClick={onCancel} disabled={submitting}>×</button>
         </div>
 
-        <form onSubmit={handleSubmit} className="add-transfer-form">
-          <div className="form-section">
+        <form onSubmit={handleSubmit} className="form-body">
+          <section className="form-section">
             <h4>Transfer Information</h4>
-            
             <div className="form-row">
               <div className="form-group">
                 <label htmlFor="transfer_date">Transfer Date *</label>
-                <input
-                  type="date"
-                  id="transfer_date"
-                  name="transfer_date"
-                  value={formData.transfer_date}
-                  onChange={handleChange}
-                  required
-                  disabled={submitting}
-                />
+                <input type="date" id="transfer_date" name="transfer_date" value={formData.transfer_date} onChange={handleChange} disabled={submitting} />
               </div>
-
               <div className="form-group">
                 <label htmlFor="transferred_by">Transferred By *</label>
-                <input
-                  type="text"
-                  id="transferred_by"
-                  name="transferred_by"
-                  value={formData.transferred_by}
-                  onChange={handleChange}
-                  placeholder="Enter person name"
-                  required
-                  disabled={submitting}
-                />
+                <input type="text" id="transferred_by" name="transferred_by" value={formData.transferred_by} onChange={handleChange} placeholder="Enter name" disabled={submitting} />
               </div>
             </div>
-          </div>
+          </section>
 
-          <div className="form-section">
+          <section className="form-section">
             <h4>Location Details</h4>
-            
             <div className="form-row">
               <div className="form-group">
                 <label htmlFor="location_from_id">From Location *</label>
-                <select
-                  id="location_from_id"
-                  name="location_from_id"
-                  value={formData.location_from_id}
-                  onChange={handleChange}
-                  required
-                  disabled={submitting}
-                >
-                  <option value="">Select Source Location</option>
-                  {formOptions.locations.map(location => (
-                    <option key={location.id} value={location.id}>
-                      {location.location_name} ({location.location_id})
-                    </option>
-                  ))}
+                <select id="location_from_id" name="location_from_id" value={formData.location_from_id} onChange={handleChange} disabled={submitting}>
+                  <option value="">Select Source</option>
+                  {formOptions.locations.map(loc => <option key={loc.id} value={loc.id}>{loc.location_name} ({loc.location_id})</option>)}
                 </select>
               </div>
-
               <div className="form-group">
                 <label htmlFor="location_to_id">To Location *</label>
-                <select
-                  id="location_to_id"
-                  name="location_to_id"
-                  value={formData.location_to_id}
-                  onChange={handleChange}
-                  required
-                  disabled={submitting}
-                >
-                  <option value="">Select Destination Location</option>
-                  {formOptions.locations.map(location => (
-                    <option key={location.id} value={location.id}>
-                      {location.location_name} ({location.location_id})
-                    </option>
-                  ))}
+                <select id="location_to_id" name="location_to_id" value={formData.location_to_id} onChange={handleChange} disabled={submitting}>
+                  <option value="">Select Destination</option>
+                  {formOptions.locations.map(loc => <option key={loc.id} value={loc.id}>{loc.location_name} ({loc.location_id})</option>)}
                 </select>
               </div>
             </div>
-          </div>
+          </section>
 
-          <div className="form-section">
+          <section className="form-section">
             <h4>Asset Details</h4>
-            
             <div className="form-row">
               <div className="form-group">
                 <label htmlFor="asset_id">Asset *</label>
-                <select
-                  id="asset_id"
-                  name="asset_id"
-                  value={formData.asset_id}
-                  onChange={handleChange}
-                  required
-                  disabled={submitting}
-                >
+                <select id="asset_id" name="asset_id" value={formData.asset_id} onChange={handleChange} disabled={submitting}>
                   <option value="">Select Asset</option>
-                  {formOptions.assets.map(asset => (
-                    <option key={asset.id} value={asset.id}>
-                      {asset.asset_name} ({asset.asset_id})
-                    </option>
-                  ))}
+                  {formOptions.assets.map(asset => <option key={asset.id} value={asset.id}>{asset.asset_name} ({asset.asset_id})</option>)}
                 </select>
               </div>
-
               <div className="form-group">
                 <label htmlFor="quantity">Quantity *</label>
-                <input
-                  type="number"
-                  id="quantity"
-                  name="quantity"
-                  value={formData.quantity}
-                  onChange={handleChange}
-                  min="1"
-                  required
-                  disabled={submitting}
-                />
+                <input type="number" id="quantity" name="quantity" value={formData.quantity} min="1" onChange={handleChange} disabled={submitting} />
               </div>
             </div>
-          </div>
+          </section>
 
-          <div className="form-section">
+          <section className="form-section">
             <h4>Additional Information</h4>
-            
             <div className="form-group">
               <label htmlFor="notes">Notes</label>
-              <textarea
-                id="notes"
-                name="notes"
-                value={formData.notes}
-                onChange={handleChange}
-                placeholder="Enter any additional notes (optional)"
-                rows="3"
-                disabled={submitting}
-              />
+              <textarea id="notes" name="notes" value={formData.notes} onChange={handleChange} placeholder="Optional notes" rows="3" disabled={submitting}></textarea>
             </div>
-          </div>
+          </section>
 
           <div className="form-actions">
-            <button
-              type="submit"
-              className="btn-submit"
-              disabled={submitting}
-            >
-              {submitting ? 'Creating...' : 'Create Transfer'}
-            </button>
+            <button type="submit" className="btn-submit" disabled={submitting}>{submitting ? 'Creating...' : 'Create Transfer'}</button>
           </div>
         </form>
       </div>

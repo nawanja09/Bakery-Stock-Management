@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { usePopup } from '../../context/PopupContext';
 import api from '../../../api';
 import AddLocationForm from './AddLocationForm';
+import { FiTrash2 } from 'react-icons/fi';
 import './Locations.css';
 
 const Locations = () => {
@@ -32,27 +33,25 @@ const Locations = () => {
       const response = await api.post('/cutlery-locations', locationData);
       showPopup('success', response.data.message);
       setShowAddForm(false);
-      fetchLocations(); // Refresh the table
+      fetchLocations();
     } catch (err) {
       showPopup('error', err.response?.data?.error || 'Failed to add location');
     }
   };
 
   const handleDeleteLocation = async (id, locationName) => {
-    if (window.confirm(`Are you sure you want to delete location "${locationName}"?`)) {
+    if (window.confirm(`Are you sure you want to delete "${locationName}"?`)) {
       try {
         await api.delete(`/cutlery-locations/${id}`);
         showPopup('success', 'Location deleted successfully');
-        fetchLocations(); // Refresh the table
+        fetchLocations();
       } catch (err) {
         showPopup('error', err.response?.data?.error || 'Failed to delete location');
       }
     }
   };
 
-  if (loading) {
-    return <div className="loading">Loading locations...</div>;
-  }
+  if (loading) return <div className="loading">Loading locations...</div>;
 
   return (
     <div className="locations-container">
@@ -62,7 +61,7 @@ const Locations = () => {
           className="btn-add-location"
           onClick={() => setShowAddForm(true)}
         >
-          + Add New Location
+          + Add Location
         </button>
       </div>
 
@@ -82,28 +81,29 @@ const Locations = () => {
           <table className="locations-table">
             <thead>
               <tr>
-                <th>Location ID</th>
-                <th>Location Name</th>
-                <th>Created Date</th>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Created</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {locations.map(location => (
-                <tr key={location.id}>
-                  <td className="location-id">{location.location_id}</td>
-                  <td className="location-name">{location.location_name}</td>
+              {locations.map(loc => (
+                <tr key={loc.id}>
+                  <td className="location-id">{loc.location_id}</td>
+                  <td className="location-name">{loc.location_name}</td>
                   <td className="created-date">
-                    {new Date(location.created_at).toLocaleDateString()}
+                    {new Date(loc.created_at).toLocaleDateString()}
                   </td>
                   <td className="actions">
                     <button
                       className="btn-delete"
-                      onClick={() => handleDeleteLocation(location.id, location.location_name)}
+                      onClick={() => handleDeleteLocation(loc.id, loc.location_name)}
                       title="Delete Location"
                     >
-                      Delete
+                      <FiTrash2 />
                     </button>
+                    {/* Add more action buttons here if needed */}
                   </td>
                 </tr>
               ))}

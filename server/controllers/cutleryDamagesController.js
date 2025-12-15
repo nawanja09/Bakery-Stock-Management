@@ -21,51 +21,6 @@ const getDamages = async (req, res) => {
   }
 };
 
-const getDamageById = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    // Get damage header
-    const [damageRows] = await pool.query(`
-      SELECT 
-        cd.*,
-        cl.location_name,
-        u.name as created_by_name
-      FROM cutlery_damages cd
-      LEFT JOIN cutlery_locations cl ON cd.location_id = cl.id
-      LEFT JOIN users u ON cd.created_by = u.id
-      WHERE cd.id = ?
-    `, [id]);
-
-    if (damageRows.length === 0) {
-      return res.status(404).json({ error: 'Damage record not found' });
-    }
-
-    // Get damage items
-    const [itemRows] = await pool.query(`
-      SELECT 
-        cdi.*,
-        ca.asset_name,
-        ca.asset_id as asset_code
-      FROM cutlery_damage_items cdi
-      LEFT JOIN cutlery_assets ca ON cdi.asset_id = ca.id
-      WHERE cdi.damage_id = ?
-    `, [id]);
-
-    const damage = damageRows[0];
-    damage.items = itemRows;
-
-    // Calculate total loss
-    const totalLoss = itemRows.reduce((sum, item) => sum + (item.total_loss || 0), 0);
-    damage.total_loss = totalLoss;
-
-    res.json(damage);
-  } catch (err) {
-    console.error('Error fetching damage:', err);
-    res.status(500).json({ error: 'Server error' });
-  }
-};
-
 const createDamage = async (req, res) => {
   const connection = await pool.getConnection();
   
@@ -311,11 +266,11 @@ const getDamageWithItems = async (connection, damageId) => {
     WHERE cd.id = ?
   `, [damageId]);
 
-  // Get damage items
+  // Get damage items with asset name
   const [itemRows] = await connection.query(`
     SELECT 
       cdi.*,
-      ca.asset_name,
+      ca.asset_name,  -- Make sure this is included
       ca.asset_id as asset_code
     FROM cutlery_damage_items cdi
     LEFT JOIN cutlery_assets ca ON cdi.asset_id = ca.id
@@ -330,6 +285,51 @@ const getDamageWithItems = async (connection, damageId) => {
   damage.total_loss = totalLoss;
 
   return damage;
+};
+
+const getDamageById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Get damage header
+    const [damageRows] = await pool.query(`
+      SELECT 
+        cd.*,
+        cl.location_name,
+        u.name as created_by_name
+      FROM cutlery_damages cd
+      LEFT JOIN cutlery_locations cl ON cd.location_id = cl.id
+      LEFT JOIN users u ON cd.created_by = u.id
+      WHERE cd.id = ?
+    `, [id]);
+
+    if (damageRows.length === 0) {
+      return res.status(404).json({ error: 'Damage record not found' });
+    }
+
+    // Get damage items with asset name
+    const [itemRows] = await pool.query(`
+      SELECT 
+        cdi.*,
+        ca.asset_name,  -- This is crucial
+        ca.asset_id as asset_code
+      FROM cutlery_damage_items cdi
+      LEFT JOIN cutlery_assets ca ON cdi.asset_id = ca.id
+      WHERE cdi.damage_id = ?
+    `, [id]);
+
+    const damage = damageRows[0];
+    damage.items = itemRows;
+
+    // Calculate total loss
+    const totalLoss = itemRows.reduce((sum, item) => sum + (item.total_loss || 0), 0);
+    damage.total_loss = totalLoss;
+
+    res.json(damage);
+  } catch (err) {
+    console.error('Error fetching damage:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
 };
 
 // Helper function to get form data for dropdowns
@@ -367,5 +367,6 @@ module.exports = {
   createDamage,
   updateDamage,
   deleteDamage,
-  getDamageFormData
+  getDamageFormData,
+  getDamageWithItems
 };

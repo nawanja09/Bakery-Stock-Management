@@ -1,26 +1,30 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { FiEye, FiEdit, FiTrash2, FiPlus } from 'react-icons/fi';
 import { usePopup } from '../../context/PopupContext';
 import api from '../../../api';
+
 import AddPurchaseForm from './AddPurchaseForm';
 import ViewPurchase from './ViewPurchase';
 import EditPurchase from './EditPurchase';
+
 import './Purchases.css';
 
 const Purchases = () => {
   const [purchases, setPurchases] = useState([]);
   const [loading, setLoading] = useState(true);
+
   const [showAddForm, setShowAddForm] = useState(false);
   const [viewingPurchase, setViewingPurchase] = useState(null);
   const [editingPurchase, setEditingPurchase] = useState(null);
+
   const { showPopup } = usePopup();
 
   const fetchPurchases = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await api.get('/cutlery-purchases');
-      setPurchases(response.data);
+      const res = await api.get('/cutlery-purchases');
+      setPurchases(res.data);
     } catch (err) {
-      console.error('Error fetching purchases:', err);
       showPopup('error', 'Failed to load purchases');
     } finally {
       setLoading(false);
@@ -31,10 +35,10 @@ const Purchases = () => {
     fetchPurchases();
   }, [fetchPurchases]);
 
-  const handleAddPurchase = async (purchaseData) => {
+  const handleAddPurchase = async (data) => {
     try {
-      const response = await api.post('/cutlery-purchases', purchaseData);
-      showPopup('success', response.data.message);
+      const res = await api.post('/cutlery-purchases', data);
+      showPopup('success', res.data.message);
       setShowAddForm(false);
       fetchPurchases();
     } catch (err) {
@@ -45,11 +49,10 @@ const Purchases = () => {
   const handleViewPurchase = async (purchase) => {
     try {
       setLoading(true);
-      const response = await api.get(`/cutlery-purchases/${purchase.id}`);
-      setViewingPurchase(response.data);
-    } catch (err) {
-      console.error('Error fetching purchase details:', err);
-      showPopup('error', err.response?.data?.error || 'Failed to load purchase details');
+      const res = await api.get(`/cutlery-purchases/${purchase.id}`);
+      setViewingPurchase(res.data);
+    } catch {
+      showPopup('error', 'Failed to load purchase details');
     } finally {
       setLoading(false);
     }
@@ -58,83 +61,134 @@ const Purchases = () => {
   const handleEditPurchase = async (purchase) => {
     try {
       setLoading(true);
-      const response = await api.get(`/cutlery-purchases/${purchase.id}`);
-      setEditingPurchase(response.data);
-    } catch (err) {
-      console.error('Error fetching purchase details for edit:', err);
-      showPopup('error', err.response?.data?.error || 'Failed to load purchase details');
+      const res = await api.get(`/cutlery-purchases/${purchase.id}`);
+      setEditingPurchase(res.data);
+    } catch {
+      showPopup('error', 'Failed to load purchase');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleUpdatePurchase = async (purchaseData) => {
+  const handleUpdatePurchase = async (data) => {
     try {
-      const response = await api.put(`/cutlery-purchases/${editingPurchase.id}`, purchaseData);
-      showPopup('success', response.data.message);
+      const res = await api.put(
+        `/cutlery-purchases/${editingPurchase.id}`,
+        data
+      );
+      showPopup('success', res.data.message);
       setEditingPurchase(null);
       fetchPurchases();
-    } catch (err) {
-      showPopup('error', err.response?.data?.error || 'Failed to update purchase');
+    } catch {
+      showPopup('error', 'Failed to update purchase');
     }
   };
 
   const handleDeletePurchase = async (id, purchaseId) => {
-    if (window.confirm(`Are you sure you want to delete purchase ${purchaseId}?`)) {
-      try {
-        await api.delete(`/cutlery-purchases/${id}`);
-        showPopup('success', 'Purchase deleted successfully');
-        fetchPurchases();
-      } catch (err) {
-        showPopup('error', err.response?.data?.error || 'Failed to delete purchase');
-      }
+    if (!window.confirm(`Delete purchase ${purchaseId}?`)) return;
+
+    try {
+      await api.delete(`/cutlery-purchases/${id}`);
+      showPopup('success', 'Purchase deleted');
+      fetchPurchases();
+    } catch {
+      showPopup('error', 'Failed to delete purchase');
     }
   };
 
-  const getStatusBadge = (status) => {
-    const statusConfig = {
-      'PENDING': { class: 'status-pending', label: 'Pending' },
-      'PAID': { class: 'status-paid', label: 'Paid' },
-      'PARTIAL': { class: 'status-partial', label: 'Partial' }
-    };
-    
-    const config = statusConfig[status] || { class: 'status-pending', label: status };
-    return <span className={`status-badge ${config.class}`}>{config.label}</span>;
-  };
-
-  const getPaymentMethodBadge = (method) => {
-    const methodConfig = {
-      'CASH': { class: 'method-cash', label: 'Cash' },
-      'BANK_TRANSFER': { class: 'method-bank', label: 'Bank Transfer' },
-      'CREDIT': { class: 'method-credit', label: 'Credit' }
-    };
-    
-    const config = methodConfig[method] || { class: 'method-cash', label: method };
-    return <span className={`method-badge ${config.class}`}>{config.label}</span>;
-  };
-
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-LK', {
+  const formatCurrency = (amount) =>
+    new Intl.NumberFormat('en-LK', {
       style: 'currency',
-      currency: 'LKR',
-      minimumFractionDigits: 2
+      currency: 'LKR'
     }).format(amount);
-  };
 
-  if (loading) {
-    return <div className="loading">Loading purchases...</div>;
-  }
+  const statusBadge = (status) => (
+    <span className={`badge status ${status.toLowerCase()}`}>
+      {status}
+    </span>
+  );
+
+  const methodBadge = (method) => (
+    <span className={`badge method`}>
+      {method.replace('_', ' ')}
+    </span>
+  );
+
+  if (loading) return <div className="loading">Loading purchases…</div>;
 
   return (
-    <div className="purchases-container">
-      <div className="purchases-header">
-        <h2>Cutlery Purchases</h2>
-        <button 
-          className="btn-add-purchase"
-          onClick={() => setShowAddForm(true)}
-        >
-          + Add New Purchase
+    <div className="purchases-page">
+      <header className="page-header">
+        <div>
+          <h1>Purchases</h1>
+          <p>Manage cutlery purchase records</p>
+        </div>
+
+        <button className="primary-btn" onClick={() => setShowAddForm(true)}>
+          <FiPlus /> New Purchase
         </button>
+      </header>
+
+      <div className="content-card">
+        {purchases.length === 0 ? (
+          <div className="no-data">
+            <span>🛒</span>
+            <p>No purchases yet</p>
+          </div>
+        ) : (
+          <table className="purchases-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Date</th>
+                <th>Invoice</th>
+                <th>Supplier</th>
+                <th>Total</th>
+                <th>Method</th>
+                <th>Status</th>
+                <th className="actions-header">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {purchases.map((p) => (
+                <tr key={p.id}>
+                  <td>{p.purchase_id}</td>
+                  <td>{new Date(p.purchase_date).toLocaleDateString()}</td>
+                  <td>{p.invoice_number}</td>
+                  <td>{p.supplier_name}</td>
+                  <td>{formatCurrency(p.calculated_total || p.total_amount)}</td>
+                  <td>{methodBadge(p.payment_method)}</td>
+                  <td>{statusBadge(p.payment_status)}</td>
+                  <td className="actions-cell">
+                    <div className="actions">
+                      <button
+                        className="icon-btn"
+                        onClick={() => handleViewPurchase(p)}
+                        title="View"
+                      >
+                        <FiEye />
+                      </button>
+                      <button
+                        className="icon-btn"
+                        onClick={() => handleEditPurchase(p)}
+                        title="Edit"
+                      >
+                        <FiEdit />
+                      </button>
+                      <button
+                        className="icon-btn danger"
+                        onClick={() => handleDeletePurchase(p.id, p.purchase_id)}
+                        title="Delete"
+                      >
+                        <FiTrash2 />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {showAddForm && (
@@ -162,74 +216,6 @@ const Purchases = () => {
           onCancel={() => setEditingPurchase(null)}
         />
       )}
-
-      <div className="purchases-table-container">
-        {purchases.length === 0 ? (
-          <div className="no-data">
-            <div className="no-data-icon">🛒</div>
-            <p>No purchases found. Create your first purchase to get started.</p>
-          </div>
-        ) : (
-          <table className="purchases-table">
-            <thead>
-              <tr>
-                <th>Purchase ID</th>
-                <th>Date</th>
-                <th>Invoice No</th>
-                <th>Supplier</th>
-                <th>Total Amount</th>
-                <th>Payment Method</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {purchases.map(purchase => (
-                <tr key={purchase.id}>
-                  <td className="purchase-id">{purchase.purchase_id}</td>
-                  <td className="purchase-date">
-                    {new Date(purchase.purchase_date).toLocaleDateString()}
-                  </td>
-                  <td className="invoice-number">{purchase.invoice_number}</td>
-                  <td className="supplier">{purchase.supplier_name}</td>
-                  <td className="total-amount">
-                    {formatCurrency(purchase.calculated_total || purchase.total_amount)}
-                  </td>
-                  <td className="payment-method">
-                    {getPaymentMethodBadge(purchase.payment_method)}
-                  </td>
-                  <td className="status">
-                    {getStatusBadge(purchase.payment_status)}
-                  </td>
-                  <td className="actions">
-                    <button
-                      className="btn-view"
-                      onClick={() => handleViewPurchase(purchase)}
-                      title="View Purchase"
-                    >
-                      View
-                    </button>
-                    <button
-                      className="btn-edit"
-                      onClick={() => handleEditPurchase(purchase)}
-                      title="Edit Purchase"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      className="btn-delete"
-                      onClick={() => handleDeletePurchase(purchase.id, purchase.purchase_id)}
-                      title="Delete Purchase"
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
     </div>
   );
 };

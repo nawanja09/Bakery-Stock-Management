@@ -1,66 +1,74 @@
+/* Container */
 .locations-container {
   padding: 20px;
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
+  font-family: 'Inter', sans-serif;
+  color: #333;
 }
 
+/* Header */
 .locations-header {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 30px;
-  padding-bottom: 15px;
-  border-bottom: 2px solid #f0f0f0;
+  flex-direction: column;
+  gap: 15px;
+  margin-bottom: 25px;
 }
 
 .locations-header h2 {
-  color: #333;
-  margin: 0;
   font-size: 1.8rem;
+  margin: 0;
+  font-weight: 600;
 }
 
 .btn-add-location {
-  background: linear-gradient(90deg, #6722e6 70%, #a98cf7 100%);
+  align-self: flex-start;
+  background: linear-gradient(90deg, #6722e6, #a98cf7);
   color: white;
   border: none;
-  padding: 12px 24px;
-  border-radius: 8px;
+  padding: 10px 20px;
+  border-radius: 6px;
   cursor: pointer;
-  font-size: 14px;
   font-weight: 600;
   transition: all 0.2s ease;
 }
 
 .btn-add-location:hover {
-  background: linear-gradient(90deg, #7a3cf7 70%, #b6a2f7 100%);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(103, 34, 230, 0.2);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(103,34,230,0.3);
 }
 
+/* Table container */
 .locations-table-container {
-  background: white;
+  overflow-x: auto;
   border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.08);
+  padding: 10px;
 }
 
+/* Table styling */
 .locations-table {
   width: 100%;
   border-collapse: collapse;
+  min-width: 600px;
+}
+
+.locations-table th,
+.locations-table td {
+  padding: 14px 12px;
+  text-align: left;
 }
 
 .locations-table th {
-  background-color: #f8f9fa;
-  padding: 16px;
-  text-align: left;
+  background: #f8f9fa;
   font-weight: 600;
   color: #495057;
   border-bottom: 2px solid #e9ecef;
 }
 
 .locations-table td {
-  padding: 16px;
-  border-bottom: 1px solid #e9ecef;
+  border-bottom: 1px solid #f1f3f5;
 }
 
 .locations-table tbody tr:hover {
@@ -80,18 +88,22 @@
   color: #6c757d;
 }
 
+/* Actions column */
 .actions {
-  text-align: center;
+  display: flex;
+  justify-content: flex-start; /* Buttons inline, left-aligned */
+  align-items: center;         /* Vertically centered */
+  gap: 8px;                    /* Space between buttons */
 }
 
 .btn-delete {
   background-color: #dc3545;
   color: white;
   border: none;
-  padding: 8px 16px;
+  padding: 6px 12px;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 14px;
   transition: background-color 0.2s;
 }
 
@@ -99,20 +111,38 @@
   background-color: #c82333;
 }
 
-.loading {
-  text-align: center;
-  padding: 40px;
-  font-size: 16px;
-  color: #6c757d;
-}
-
+/* Loading and No Data */
+.loading,
 .no-data {
   text-align: center;
   padding: 40px;
+  font-size: 16px;
   color: #6c757d;
 }
 
-.no-data p {
-  margin: 0;
-  font-size: 16px;
+/* Responsive */
+@media (min-width: 768px) {
+  .locations-header {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+}
+
+@media (max-width: 576px) {
+  .locations-table th,
+  .locations-table td {
+    padding: 12px 8px;
+    font-size: 14px;
+  }
+
+  .btn-add-location {
+    width: 100%;
+    text-align: center;
+  }
+
+  .actions {
+    flex-wrap: wrap; /* Wrap buttons on very small screens */
+    gap: 6px;
+  }
 }
