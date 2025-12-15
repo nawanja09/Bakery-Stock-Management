@@ -23,20 +23,19 @@ const Transfers = () => {
   const fetchTransfers = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/cutlery-transfers');
-      setTransfers(response.data);
-    } catch (err) {
-      console.error('Error fetching transfers:', err);
+      const res = await api.get('/cutlery-transfers');
+      setTransfers(res.data);
+    } catch {
       showPopup('error', 'Failed to load transfers');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleAddTransfer = async (transferData) => {
+  const handleAddTransfer = async (data) => {
     try {
-      const response = await api.post('/cutlery-transfers', transferData);
-      showPopup('success', response.data.message);
+      const res = await api.post('/cutlery-transfers', data);
+      showPopup('success', res.data.message);
       setShowAddForm(false);
       fetchTransfers();
     } catch (err) {
@@ -44,18 +43,10 @@ const Transfers = () => {
     }
   };
 
-  const handleViewTransfer = (transfer) => {
-    setViewingTransfer(transfer);
-  };
-
-  const handleEditTransfer = (transfer) => {
-    setEditingTransfer(transfer);
-  };
-
-  const handleUpdateTransfer = async (transferData) => {
+  const handleUpdateTransfer = async (data) => {
     try {
-      const response = await api.put(`/cutlery-transfers/${editingTransfer.id}`, transferData);
-      showPopup('success', response.data.message);
+      const res = await api.put(`/cutlery-transfers/${editingTransfer.id}`, data);
+      showPopup('success', res.data.message);
       setEditingTransfer(null);
       fetchTransfers();
     } catch (err) {
@@ -64,43 +55,38 @@ const Transfers = () => {
   };
 
   const handleDeleteTransfer = async (id, transferId) => {
-    if (window.confirm(`Are you sure you want to delete transfer ${transferId}?`)) {
-      try {
-        await api.delete(`/cutlery-transfers/${id}`);
-        showPopup('success', 'Transfer deleted successfully');
-        fetchTransfers();
-      } catch (err) {
-        showPopup('error', err.response?.data?.error || 'Failed to delete transfer');
-      }
+    if (!window.confirm(`Delete transfer ${transferId}?`)) return;
+    try {
+      await api.delete(`/cutlery-transfers/${id}`);
+      showPopup('success', 'Transfer deleted');
+      fetchTransfers();
+    } catch {
+      showPopup('error', 'Failed to delete transfer');
     }
   };
 
   const getStatusBadge = (status) => {
-    const statusConfig = {
-      'Pending': { class: 'status-pending', label: 'Pending' },
-      'Completed': { class: 'status-completed', label: 'Completed' },
-      'Cancelled': { class: 'status-cancelled', label: 'Cancelled' }
+    const map = {
+      Pending: 'pending',
+      Completed: 'completed',
+      Cancelled: 'cancelled',
     };
-    
-    const config = statusConfig[status] || { class: 'status-pending', label: status };
-    return <span className={`status-badge ${config.class}`}>{config.label}</span>;
+    return <span className={`status-badge ${map[status]}`}>{status}</span>;
   };
 
-  if (loading) {
-    return <div className="loading">Loading transfers...</div>;
-  }
+  if (loading) return <div className="loading">Loading transfers...</div>;
 
   return (
-    <div className="transfers-container">
-      <div className="transfers-header">
-        <h2>Cutlery Transfers</h2>
-        <button 
-          className="btn-add-transfer"
-          onClick={() => setShowAddForm(true)}
-        >
-          + Add New Transfer
+    <div className="transfers-page">
+      <header className="page-header">
+        <div>
+          <h1>Transfers</h1>
+          <p>Manage cutlery transfer records</p>
+        </div>
+        <button className="primary-btn" onClick={() => setShowAddForm(true)}>
+          + New Transfer
         </button>
-      </div>
+      </header>
 
       {showAddForm && (
         <AddTransferForm
@@ -128,74 +114,65 @@ const Transfers = () => {
         />
       )}
 
-      <div className="transfers-table-container">
+      <section className="content-card">
         {transfers.length === 0 ? (
           <div className="no-data">
-            <div className="no-data-icon">🔄</div>
-            <p>No transfers found. Create your first transfer to get started.</p>
+            <span>🔄</span>
+            <p>No transfers found</p>
           </div>
         ) : (
           <table className="transfers-table">
             <thead>
               <tr>
-                <th>Transfer ID</th>
+                <th>ID</th>
                 <th>Date</th>
-                <th>From Location</th>
-                <th>To Location</th>
+                <th>From</th>
+                <th>To</th>
                 <th>Asset</th>
-                <th>Quantity</th>
-                <th>Transferred By</th>
+                <th>Qty</th>
+                <th>By</th>
                 <th>Status</th>
-                <th>Actions</th>
+                <th className="actions-header">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {transfers.map(transfer => (
-                <tr key={transfer.id}>
-                  <td className="transfer-id">{transfer.transfer_id}</td>
-                  <td className="transfer-date">
-                    {new Date(transfer.transfer_date).toLocaleDateString()}
+              {transfers.map((t) => (
+                <tr key={t.id}>
+                  <td data-label="ID">{t.transfer_id}</td>
+                  <td data-label="Date">
+                    {new Date(t.transfer_date).toLocaleDateString()}
                   </td>
-                  <td className="from-location">{transfer.from_location_name}</td>
-                  <td className="to-location">{transfer.to_location_name}</td>
-                  <td className="asset-info">
-                    <div className="asset-name">{transfer.asset_name}</div>
-                    <div className="asset-code">{transfer.asset_code}</div>
+                  <td data-label="From">{t.from_location_name}</td>
+                  <td data-label="To">{t.to_location_name}</td>
+                  <td data-label="Asset">
+                    <strong>{t.asset_name}</strong>
+                    <div className="muted">{t.asset_code}</div>
                   </td>
-                  <td className="quantity">{transfer.quantity}</td>
-                  <td className="transferred-by">{transfer.transferred_by}</td>
-                  <td className="status">
-                    {getStatusBadge(transfer.status)}
-                  </td>
-                  <td className="actions">
-                    <button
-                      className="btn-view"
-                      onClick={() => handleViewTransfer(transfer)}
-                      title="View Transfer"
-                    >
-                      <FontAwesomeIcon icon={faEye} />
-                    </button>
-                    <button
-                      className="btn-edit"
-                      onClick={() => handleEditTransfer(transfer)}
-                      title="Edit Transfer"
-                    >
-                      <FontAwesomeIcon icon={faPen} />
-                    </button>
-                    <button
-                      className="btn-delete"
-                      onClick={() => handleDeleteTransfer(transfer.id, transfer.transfer_id)}
-                      title="Delete Transfer"
-                    >
-                      <FontAwesomeIcon icon={faTrash} />
-                    </button>
+                  <td data-label="Qty" className="qty">{t.quantity}</td>
+                  <td data-label="By">{t.transferred_by}</td>
+                  <td data-label="Status">{getStatusBadge(t.status)}</td>
+                  <td className="actions-cell" data-label="Actions">
+                    <div className="actions">
+                      <button className="icon-btn" onClick={() => setViewingTransfer(t)}>
+                        <FontAwesomeIcon icon={faEye} />
+                      </button>
+                      <button className="icon-btn" onClick={() => setEditingTransfer(t)}>
+                        <FontAwesomeIcon icon={faPen} />
+                      </button>
+                      <button
+                        className="icon-btn danger"
+                        onClick={() => handleDeleteTransfer(t.id, t.transfer_id)}
+                      >
+                        <FontAwesomeIcon icon={faTrash} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
-      </div>
+      </section>
     </div>
   );
 };

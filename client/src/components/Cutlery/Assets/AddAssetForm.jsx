@@ -13,55 +13,37 @@ const AddAssetForm = ({ onSubmit, onCancel }) => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      // Validate file type
       if (!file.type.startsWith('image/')) {
         alert('Please select an image file');
         return;
       }
-
-      // Validate file size (5MB)
       if (file.size > 5 * 1024 * 1024) {
         alert('File size must be less than 5MB');
         return;
       }
 
-      setFormData(prev => ({
-        ...prev,
-        image: file
-      }));
+      setFormData(prev => ({ ...prev, image: file }));
 
-      // Create preview
       const reader = new FileReader();
-      reader.onload = (e) => {
-        setImagePreview(e.target.result);
-      };
+      reader.onload = (e) => setImagePreview(e.target.result);
       reader.readAsDataURL(file);
     }
   };
 
   const handleRemoveImage = () => {
-    setFormData(prev => ({
-      ...prev,
-      image: null
-    }));
+    setFormData(prev => ({ ...prev, image: null }));
     setImagePreview(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
     if (!formData.asset_name.trim()) {
       alert('Please enter an asset name');
       return;
@@ -77,26 +59,17 @@ const AddAssetForm = ({ onSubmit, onCancel }) => {
     }
   };
 
-  const triggerFileInput = () => {
-    fileInputRef.current?.click();
-  };
+  const triggerFileInput = () => fileInputRef.current?.click();
 
   return (
-    <div className="add-asset-form-overlay">
-      <div className="add-asset-form-container">
-        <div className="add-asset-form-header">
-          <h3>Add New Asset</h3>
-          <button 
-            type="button" 
-            className="btn-close"
-            onClick={onCancel}
-            disabled={submitting}
-          >
-            ×
-          </button>
+    <div className="add-asset-overlay">
+      <div className="add-asset-card">
+        <div className="add-asset-header">
+          <h2>Add New Asset</h2>
+          <button className="btn-close" onClick={onCancel} disabled={submitting}>×</button>
         </div>
 
-        <form onSubmit={handleSubmit} className="add-asset-form">
+        <form className="add-asset-form" onSubmit={handleSubmit}>
           <div className="form-group">
             <label htmlFor="asset_name">Asset Name *</label>
             <input
@@ -106,31 +79,28 @@ const AddAssetForm = ({ onSubmit, onCancel }) => {
               value={formData.asset_name}
               onChange={handleChange}
               placeholder="Enter asset name"
-              required
               disabled={submitting}
             />
             <small>Asset ID will be automatically generated (A001, A002, etc.)</small>
           </div>
 
           <div className="form-group">
-            <label htmlFor="image">Asset Image</label>
-            <div className="image-upload-section" onClick={triggerFileInput}>
+            <label>Asset Image</label>
+            <div className="image-upload-wrapper" onClick={triggerFileInput}>
               <input
                 ref={fileInputRef}
                 type="file"
-                id="image"
-                name="image"
-                onChange={handleImageChange}
                 accept="image/*"
+                onChange={handleImageChange}
                 className="file-input"
                 disabled={submitting}
               />
-              
+
               {imagePreview ? (
                 <div className="image-preview">
                   <img src={imagePreview} alt="Preview" />
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     className="btn-remove-image"
                     onClick={(e) => {
                       e.stopPropagation();
@@ -142,21 +112,17 @@ const AddAssetForm = ({ onSubmit, onCancel }) => {
                   </button>
                 </div>
               ) : (
-                <div className="image-upload-placeholder">
+                <div className="image-placeholder">
                   <div className="upload-icon">📁</div>
-                  <p>Click to upload asset image</p>
-                  <small>Supports JPG, PNG, GIF (Max 5MB)</small>
+                  <p>Click to upload image</p>
+                  <small>JPG, PNG, GIF (Max 5MB)</small>
                 </div>
               )}
             </div>
           </div>
 
           <div className="form-actions">
-            <button
-              type="submit"
-              className="btn-submit"
-              disabled={submitting || !formData.asset_name.trim()}
-            >
+            <button type="submit" className="btn-submit" disabled={submitting || !formData.asset_name.trim()}>
               {submitting ? 'Adding...' : 'Add Asset'}
             </button>
           </div>

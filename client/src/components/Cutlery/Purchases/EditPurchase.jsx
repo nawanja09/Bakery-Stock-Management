@@ -13,27 +13,21 @@ const EditPurchase = ({ purchase, onSubmit, onCancel }) => {
     notes: '',
     items: []
   });
-  const [formOptions, setFormOptions] = useState({
-    suppliers: [],
-    assets: []
-  });
+  const [formOptions, setFormOptions] = useState({ suppliers: [], assets: [] });
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const { showPopup } = usePopup();
 
+  // Fetch form data and initialize form
   const fetchFormData = useCallback(async () => {
     try {
       setLoading(true);
       const response = await api.get('/cutlery-purchases/form-data');
       setFormOptions(response.data);
-      
-      // Debug: Log purchase data
-      console.log('Purchase data for edit:', purchase);
-      console.log('Purchase items:', purchase?.items);
-      
+
       // Initialize form with purchase data
       setFormData({
-        purchase_date: purchase.purchase_date,
+        purchase_date: purchase.purchase_date ? purchase.purchase_date.split('T')[0] : '',
         supplier_id: purchase.supplier_id,
         invoice_number: purchase.invoice_number,
         payment_method: purchase.payment_method,
@@ -61,27 +55,20 @@ const EditPurchase = ({ purchase, onSubmit, onCancel }) => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleItemChange = (index, field, value) => {
     const newItems = [...formData.items];
     newItems[index] = { ...newItems[index], [field]: value };
-    
-    // Calculate total price if quantity or unit price changes
+
     if (field === 'quantity' || field === 'unit_price') {
-      const quantity = field === 'quantity' ? parseFloat(value) : newItems[index].quantity;
-      const unitPrice = field === 'unit_price' ? parseFloat(value) : newItems[index].unit_price;
+      const quantity = parseFloat(newItems[index].quantity) || 0;
+      const unitPrice = parseFloat(newItems[index].unit_price) || 0;
       newItems[index].total_price = quantity * unitPrice;
     }
-    
-    setFormData(prev => ({
-      ...prev,
-      items: newItems
-    }));
+
+    setFormData(prev => ({ ...prev, items: newItems }));
   };
 
   const addItem = () => {
@@ -95,10 +82,7 @@ const EditPurchase = ({ purchase, onSubmit, onCancel }) => {
     if (formData.items.length > 1) {
       const newItems = [...formData.items];
       newItems.splice(index, 1);
-      setFormData(prev => ({
-        ...prev,
-        items: newItems
-      }));
+      setFormData(prev => ({ ...prev, items: newItems }));
     } else {
       showPopup('error', 'At least one item is required');
     }
@@ -108,24 +92,27 @@ const EditPurchase = ({ purchase, onSubmit, onCancel }) => {
     return formData.items.reduce((total, item) => {
       const quantity = parseFloat(item.quantity) || 0;
       const unitPrice = parseFloat(item.unit_price) || 0;
-      return total + (quantity * unitPrice);
+      return total + quantity * unitPrice;
     }, 0);
+  };
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-LK', {
+      style: 'currency',
+      currency: 'LKR',
+      minimumFractionDigits: 2
+    }).format(amount || 0);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // Validation
+
     if (!formData.purchase_date || !formData.supplier_id || !formData.invoice_number) {
       showPopup('error', 'Please fill all required fields');
       return;
     }
 
-    // Validate items
-    const validItems = formData.items.filter(item => 
-      item.asset_id && item.quantity > 0 && item.unit_price >= 0
-    );
-    
+    const validItems = formData.items.filter(item => item.asset_id && item.quantity > 0 && item.unit_price >= 0);
     if (validItems.length === 0) {
       showPopup('error', 'Please add at least one valid item');
       return;
@@ -151,8 +138,6 @@ const EditPurchase = ({ purchase, onSubmit, onCancel }) => {
       }))
     };
 
-    console.log('Updating purchase data:', submitData); // Debug log
-
     setSubmitting(true);
     try {
       await onSubmit(submitData);
@@ -164,19 +149,11 @@ const EditPurchase = ({ purchase, onSubmit, onCancel }) => {
     }
   };
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-LK', {
-      style: 'currency',
-      currency: 'LKR',
-      minimumFractionDigits: 2
-    }).format(amount || 0);
-  };
-
   if (loading) {
     return (
       <div className="edit-purchase-overlay">
         <div className="edit-purchase-container">
-          <div className="loading">Loading form data...</div>
+          <div className="loading">Loading...</div>
         </div>
       </div>
     );
@@ -185,28 +162,20 @@ const EditPurchase = ({ purchase, onSubmit, onCancel }) => {
   return (
     <div className="edit-purchase-overlay">
       <div className="edit-purchase-container">
-        <div className="edit-purchase-header">
+        <div className="header">
           <h3>Edit Purchase - {purchase.purchase_id}</h3>
-          <button 
-            type="button" 
-            className="btn-close"
-            onClick={onCancel}
-            disabled={submitting}
-          >
-            ×
-          </button>
+          <button type="button" className="btn-close" onClick={onCancel} disabled={submitting}>×</button>
         </div>
 
-        <form onSubmit={handleSubmit} className="edit-purchase-form">
-          <div className="form-section">
+        <form onSubmit={handleSubmit} className="form">
+          {/* Purchase Info */}
+          <section>
             <h4>Purchase Information</h4>
-            
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="purchase_date">Purchase Date *</label>
+            <div className="row">
+              <div className="field">
+                <label>Purchase Date *</label>
                 <input
                   type="date"
-                  id="purchase_date"
                   name="purchase_date"
                   value={formData.purchase_date}
                   onChange={handleChange}
@@ -214,12 +183,10 @@ const EditPurchase = ({ purchase, onSubmit, onCancel }) => {
                   disabled={submitting}
                 />
               </div>
-
-              <div className="form-group">
-                <label htmlFor="invoice_number">Invoice Number *</label>
+              <div className="field">
+                <label>Invoice Number *</label>
                 <input
                   type="text"
-                  id="invoice_number"
                   name="invoice_number"
                   value={formData.invoice_number}
                   onChange={handleChange}
@@ -228,13 +195,9 @@ const EditPurchase = ({ purchase, onSubmit, onCancel }) => {
                   disabled={submitting}
                 />
               </div>
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="supplier_id">Supplier *</label>
+              <div className="field">
+                <label>Supplier *</label>
                 <select
-                  id="supplier_id"
                   name="supplier_id"
                   value={formData.supplier_id}
                   onChange={handleChange}
@@ -242,165 +205,101 @@ const EditPurchase = ({ purchase, onSubmit, onCancel }) => {
                   disabled={submitting}
                 >
                   <option value="">Select Supplier</option>
-                  {formOptions.suppliers.map(supplier => (
-                    <option key={supplier.id} value={supplier.id}>
-                      {supplier.supplier_name}
-                    </option>
+                  {formOptions.suppliers.map(s => (
+                    <option key={s.id} value={s.id}>{s.supplier_name}</option>
                   ))}
                 </select>
               </div>
-
-              <div className="form-group">
-                <label htmlFor="payment_method">Payment Method</label>
-                <select
-                  id="payment_method"
-                  name="payment_method"
-                  value={formData.payment_method}
-                  onChange={handleChange}
-                  disabled={submitting}
-                >
+              <div className="field">
+                <label>Payment Method</label>
+                <select name="payment_method" value={formData.payment_method} onChange={handleChange} disabled={submitting}>
                   <option value="CASH">Cash</option>
                   <option value="BANK_TRANSFER">Bank Transfer</option>
                   <option value="CREDIT">Credit</option>
                 </select>
               </div>
-
-              <div className="form-group">
-                <label htmlFor="payment_status">Payment Status</label>
-                <select
-                  id="payment_status"
-                  name="payment_status"
-                  value={formData.payment_status}
-                  onChange={handleChange}
-                  disabled={submitting}
-                >
+              <div className="field">
+                <label>Payment Status</label>
+                <select name="payment_status" value={formData.payment_status} onChange={handleChange} disabled={submitting}>
                   <option value="PENDING">Pending</option>
                   <option value="PAID">Paid</option>
                   <option value="PARTIAL">Partial</option>
                 </select>
               </div>
             </div>
-          </div>
+          </section>
 
-          <div className="form-section">
-            <h4>Purchase Items</h4>
-            
-            <div className="items-header">
-              <span>Items ({formData.items.length})</span>
-              <button 
-                type="button" 
-                className="btn-add-item"
-                onClick={addItem}
-                disabled={submitting}
-              >
-                + Add Item
-              </button>
-            </div>
-
-            <div className="items-list">
-              {formData.items.map((item, index) => (
-                <div key={item.id || index} className="item-row">
-                  <div className="item-fields">
-                    <div className="form-group">
-                      <label>Asset *</label>
-                      <select
-                        value={item.asset_id}
-                        onChange={(e) => handleItemChange(index, 'asset_id', e.target.value)}
-                        required
-                        disabled={submitting}
-                      >
-                        <option value="">Select Asset</option>
-                        {formOptions.assets.map(asset => (
-                          <option key={asset.id} value={asset.id}>
-                            {asset.asset_name} ({asset.asset_id})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="form-group">
-                      <label>Quantity *</label>
-                      <input
-                        type="number"
-                        value={item.quantity}
-                        onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
-                        min="1"
-                        step="1"
-                        required
-                        disabled={submitting}
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label>Unit Price (LKR) *</label>
-                      <input
-                        type="number"
-                        value={item.unit_price}
-                        onChange={(e) => handleItemChange(index, 'unit_price', e.target.value)}
-                        min="0"
-                        step="0.01"
-                        required
-                        disabled={submitting}
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label>Total</label>
-                      <input
-                        type="text"
-                        value={formatCurrency((item.quantity || 0) * (item.unit_price || 0))}
-                        readOnly
-                        className="readonly-input"
-                      />
-                    </div>
-                  </div>
-
-                  {formData.items.length > 1 && (
-                    <button
-                      type="button"
-                      className="btn-remove-item"
-                      onClick={() => removeItem(index)}
+          {/* Items */}
+          <section>
+            <h4>Items</h4>
+            <button type="button" className="btn-add-item" onClick={addItem} disabled={submitting}>+ Add Item</button>
+            {formData.items.map((item, index) => (
+              <div key={item.id || index} className="item-row">
+                <div className="row">
+                  <div className="field">
+                    <label>Asset *</label>
+                    <select
+                      value={item.asset_id}
+                      onChange={(e) => handleItemChange(index, 'asset_id', e.target.value)}
+                      required
                       disabled={submitting}
-                      title="Remove Item"
                     >
-                      ×
-                    </button>
-                  )}
+                      <option value="">Select Asset</option>
+                      {formOptions.assets.map(a => (
+                        <option key={a.id} value={a.id}>{a.asset_name} ({a.asset_id})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label>Quantity *</label>
+                    <input
+                      type="number"
+                      value={item.quantity}
+                      min="1"
+                      step="1"
+                      onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
+                      required
+                      disabled={submitting}
+                    />
+                  </div>
+                  <div className="field">
+                    <label>Unit Price (LKR) *</label>
+                    <input
+                      type="number"
+                      value={item.unit_price}
+                      min="0"
+                      step="0.01"
+                      onChange={(e) => handleItemChange(index, 'unit_price', e.target.value)}
+                      required
+                      disabled={submitting}
+                    />
+                  </div>
+                  <div className="field">
+                    <label>Total</label>
+                    <input
+                      type="text"
+                      value={formatCurrency((item.quantity || 0) * (item.unit_price || 0))}
+                      readOnly
+                      className="readonly"
+                    />
+                  </div>
                 </div>
-              ))}
-            </div>
+                {formData.items.length > 1 && (
+                  <button type="button" className="btn-remove-item" onClick={() => removeItem(index)} disabled={submitting}>×</button>
+                )}
+              </div>
+            ))}
+          </section>
+
+          {/* Total */}
+          <div className="total">
+            <span>Total Amount:</span>
+            <span className="amount">{formatCurrency(calculateTotal())}</span>
           </div>
 
-          <div className="form-section">
-            <h4>Additional Information</h4>
-            
-            <div className="form-group">
-              <label htmlFor="notes">Notes</label>
-              <textarea
-                id="notes"
-                name="notes"
-                value={formData.notes}
-                onChange={handleChange}
-                placeholder="Enter any additional notes (optional)"
-                rows="3"
-                disabled={submitting}
-              />
-            </div>
-          </div>
-
-          <div className="form-total">
-            <div className="total-label">Total Amount:</div>
-            <div className="total-amount">{formatCurrency(calculateTotal())}</div>
-          </div>
-
-          <div className="form-actions">
-            <button
-              type="submit"
-              className="btn-submit"
-              disabled={submitting}
-            >
-              {submitting ? 'Updating...' : 'Update Purchase'}
-            </button>
+          {/* Actions */}
+          <div className="actions">
+            <button type="submit" className="btn-submit" disabled={submitting}>{submitting ? 'Updating...' : 'Update'}</button>
           </div>
         </form>
       </div>

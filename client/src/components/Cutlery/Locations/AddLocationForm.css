@@ -1,141 +1,154 @@
-.add-location-form-overlay {
+/* Overlay */
+.overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.35);
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 1000;
+  padding: 1rem;
 }
 
-.add-location-form-container {
-  background: white;
+/* Form Container */
+.form-container {
+  background: #fff;
   border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-  width: 90%;
-  max-width: 500px;
-  max-height: 90vh;
-  overflow-y: auto;
+  max-width: 480px;
+  width: 100%;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-.add-location-form-header {
+/* Form Header */
+.form-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px 24px;
-  border-bottom: 1px solid #e9ecef;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #eee;
 }
 
-.add-location-form-header h3 {
+.form-header h3 {
   margin: 0;
-  color: #333;
   font-size: 1.4rem;
+  font-weight: 600;
+  color: #222;
 }
 
-.btn-close {
+.close-btn {
   background: none;
   border: none;
-  font-size: 24px;
+  font-size: 1.5rem;
   cursor: pointer;
-  color: #6c757d;
-  padding: 0;
-  width: 30px;
-  height: 30px;
+  color: #888;
+  transition: color 0.2s;
+}
+
+.close-btn:hover {
+  color: #222;
+}
+
+/* Form Body */
+.form-body {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  transition: background-color 0.2s;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem 1.5rem 1.5rem;
 }
 
-.btn-close:hover {
-  background-color: #f8f9fa;
+.input-label {
+  font-weight: 500;
   color: #333;
 }
 
-.add-location-form {
-  padding: 24px;
-}
-
-.form-group {
-  margin-bottom: 20px;
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 8px;
-  font-weight: 600;
-  color: #333;
-}
-
-.form-group input {
-  width: 100%;
-  padding: 12px;
+.input-field {
+  padding: 0.75rem 1rem;
   border: 1px solid #ddd;
-  border-radius: 6px;
-  font-size: 14px;
-  transition: border-color 0.2s;
-  box-sizing: border-box;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: border 0.2s, box-shadow 0.2s;
 }
 
-.form-group input:focus {
+.input-field:focus {
   outline: none;
   border-color: #6722e6;
   box-shadow: 0 0 0 3px rgba(103, 34, 230, 0.1);
 }
 
-.form-group small {
-  display: block;
-  margin-top: 6px;
-  color: #6c757d;
-  font-size: 12px;
+.input-note {
+  font-size: 0.85rem;
+  color: #666;
+  margin-bottom: 1rem;
 }
 
+/* Form Actions */
 .form-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
-  margin-top: 24px;
+  gap: 0.75rem;
+  margin-top: 1rem;
 }
 
-.btn-cancel {
-  background-color: #6c757d;
-  color: white;
-  border: none;
-  padding: 12px 24px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
+.btn {
+  padding: 0.75rem 1.5rem;
   font-weight: 600;
-  transition: background-color 0.2s;
-}
-
-.btn-cancel:hover:not(:disabled) {
-  background-color: #5a6268;
-}
-
-.btn-submit {
-  background: linear-gradient(90deg, #6722e6 70%, #a98cf7 100%);
-  color: white;
+  border-radius: 8px;
   border: none;
-  padding: 12px 24px;
-  border-radius: 6px;
   cursor: pointer;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 0.95rem;
   transition: all 0.2s;
 }
 
-.btn-submit:hover:not(:disabled) {
+.btn.cancel {
+  background-color: #f5f5f5;
+  color: #555;
+}
+
+.btn.cancel:hover {
+  background-color: #e0e0e0;
+}
+
+.btn.submit {
+  background: linear-gradient(90deg, #6722e6 70%, #a98cf7 100%);
+  color: #fff;
+}
+
+.btn.submit:hover:not(:disabled) {
   background: linear-gradient(90deg, #7a3cf7 70%, #b6a2f7 100%);
   transform: translateY(-1px);
 }
 
-.btn-submit:disabled {
+.btn.submit:disabled {
   background-color: #ccc;
   cursor: not-allowed;
   transform: none;
+}
+
+/* Responsive Design */
+@media (max-width: 480px) {
+  .form-container {
+    width: 100%;
+  }
+  .form-header h3 {
+    font-size: 1.2rem;
+  }
+  .btn {
+    padding: 0.6rem 1rem;
+    font-size: 0.9rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .form-container {
+    max-width: 500px;
+  }
+}
+
+@media (min-width: 1440px) {
+  .form-container {
+    max-width: 550px;
+  }
 }

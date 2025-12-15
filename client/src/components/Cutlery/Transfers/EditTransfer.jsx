@@ -24,9 +24,15 @@ const EditTransfer = ({ transfer, onSubmit, onCancel }) => {
 
   useEffect(() => {
     fetchFormData();
+
+    // Format transfer_date to YYYY-MM-DD for input[type="date"]
+    const formattedDate = transfer.transfer_date
+      ? new Date(transfer.transfer_date).toISOString().split('T')[0]
+      : '';
+
     // Initialize form with transfer data
     setFormData({
-      transfer_date: transfer.transfer_date,
+      transfer_date: formattedDate,
       location_from_id: transfer.location_from_id,
       location_to_id: transfer.location_to_id,
       asset_id: transfer.asset_id,

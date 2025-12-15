@@ -28,6 +28,11 @@ const AddDamageForm = ({ onSubmit, onCancel }) => {
       setLoading(true);
       const response = await api.get('/cutlery-damages/form-data');
       setFormOptions(response.data);
+      
+      console.log('Form options loaded:', {
+        assetsCount: response.data.assets?.length,
+        locationsCount: response.data.locations?.length
+      });
     } catch (err) {
       console.error('Error fetching form data:', err);
       showPopup('error', 'Failed to load form data');
@@ -50,13 +55,20 @@ const AddDamageForm = ({ onSubmit, onCancel }) => {
 
   const handleItemChange = (index, field, value) => {
     const newItems = [...formData.items];
-    newItems[index] = { ...newItems[index], [field]: value };
     
-    // Calculate total loss if quantity or unit price changes
-    if (field === 'quantity' || field === 'unit_price') {
-      const quantity = field === 'quantity' ? parseFloat(value) : newItems[index].quantity;
-      const unitPrice = field === 'unit_price' ? parseFloat(value) : newItems[index].unit_price;
-      newItems[index].total_loss = quantity * unitPrice;
+    if (field === 'asset_id') {
+      const assetId = value === '' ? '' : Number(value);
+      const selectedAsset = formOptions.assets.find(asset => asset.id === assetId);
+      newItems[index] = { 
+        ...newItems[index], 
+        asset_id: assetId,
+        asset_name: selectedAsset ? selectedAsset.asset_name : ''
+      };
+    } else if (field === 'quantity' || field === 'unit_price') {
+      const numValue = parseFloat(value) || 0;
+      newItems[index] = { ...newItems[index], [field]: numValue };
+    } else {
+      newItems[index] = { ...newItems[index], [field]: value };
     }
     
     setFormData(prev => ({
@@ -96,6 +108,13 @@ const AddDamageForm = ({ onSubmit, onCancel }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    // Validate that onSubmit is a function
+    if (typeof onSubmit !== 'function') {
+      console.error('onSubmit is not a function:', onSubmit);
+      showPopup('error', 'Form submission error. Please try again.');
+      return;
+    }
+    
     // Validation
     if (!formData.damage_date || !formData.location_id || !formData.reason || !formData.reported_by) {
       showPopup('error', 'Please fill all required fields');
@@ -122,11 +141,15 @@ const AddDamageForm = ({ onSubmit, onCancel }) => {
       }))
     };
 
+    console.log('Submitting new damage:', submitData);
+
     setSubmitting(true);
     try {
+      // Call the onSubmit prop function
       await onSubmit(submitData);
     } catch (error) {
       console.error('Error submitting form:', error);
+      showPopup('error', error.message || 'Failed to create damage record');
     } finally {
       setSubmitting(false);
     }
@@ -137,7 +160,7 @@ const AddDamageForm = ({ onSubmit, onCancel }) => {
       style: 'currency',
       currency: 'LKR',
       minimumFractionDigits: 2
-    }).format(amount);
+    }).format(amount || 0);
   };
 
   if (loading) {
@@ -277,7 +300,7 @@ const AddDamageForm = ({ onSubmit, onCancel }) => {
                     <div className="form-group">
                       <label>Asset *</label>
                       <select
-                        value={item.asset_id}
+                        value={item.asset_id || ''}
                         onChange={(e) => handleItemChange(index, 'asset_id', e.target.value)}
                         required
                         disabled={submitting}
@@ -289,6 +312,11 @@ const AddDamageForm = ({ onSubmit, onCancel }) => {
                           </option>
                         ))}
                       </select>
+                      {item.asset_id && (
+                        <div className="selected-asset-info">
+                          <small>Selected: {item.asset_name || 'Unknown Asset'}</small>
+                        </div>
+                      )}
                     </div>
 
                     <div className="form-group">
@@ -342,23 +370,6 @@ const AddDamageForm = ({ onSubmit, onCancel }) => {
                   )}
                 </div>
               ))}
-            </div>
-          </div>
-
-          <div className="form-section">
-            <h4>Additional Information</h4>
-            
-            <div className="form-group">
-              <label htmlFor="notes">General Notes</label>
-              <textarea
-                id="notes"
-                name="notes"
-                value={formData.notes}
-                onChange={handleChange}
-                placeholder="Enter any additional notes about the damage (optional)"
-                rows="3"
-                disabled={submitting}
-              />
             </div>
           </div>
 

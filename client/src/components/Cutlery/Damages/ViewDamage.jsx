@@ -143,22 +143,9 @@ const ViewDamage = ({ damage, onClose, onEdit }) => {
             )}
           </div>
 
-          {damage.notes && (
-            <div className="detail-section">
-              <h4>Additional Notes</h4>
-              <div className="notes-content">
-                {damage.notes}
-              </div>
-            </div>
-          )}
-
           <div className="detail-section">
             <h4>System Information</h4>
             <div className="detail-grid">
-              <div className="detail-item">
-                <label>Created By:</label>
-                <span>{damage.created_by_name || 'System'}</span>
-              </div>
               <div className="detail-item">
                 <label>Created Date:</label>
                 <span>{new Date(damage.created_at).toLocaleString()}</span>

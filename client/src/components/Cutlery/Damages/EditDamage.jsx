@@ -23,31 +23,44 @@ const EditDamage = ({ damage, onSubmit, onCancel }) => {
   const [submitting, setSubmitting] = useState(false);
   const { showPopup } = usePopup();
 
+  // Fetch form options and initialize form data
   const fetchFormData = useCallback(async () => {
     try {
       setLoading(true);
+      
+      // Fetch dropdown options
       const response = await api.get('/cutlery-damages/form-data');
       setFormOptions(response.data);
-      
-      // Debug: Log damage data
-      console.log('Damage data for edit:', damage);
-      console.log('Damage items:', damage?.items);
-      
+
+      console.log('Fetched form options:', {
+        assetsCount: response.data.assets?.length,
+        assets: response.data.assets,
+        damageItems: damage.items
+      });
+
       // Initialize form with damage data
-      setFormData({
-        damage_date: damage.damage_date,
-        location_id: damage.location_id,
-        reason: damage.reason,
-        notes: damage.notes || '',
-        reported_by: damage.reported_by,
-        status: damage.status,
-        items: damage.items?.map(item => ({
+      const initialItems = damage.items?.map(item => {
+        console.log('Processing damage item:', item);
+        return {
           id: item.id,
           asset_id: item.asset_id,
+          asset_name: item.asset_name || '',
           quantity: item.quantity,
           unit_price: item.unit_price || 0,
           notes: item.notes || ''
-        })) || [{ asset_id: '', quantity: 1, unit_price: 0, notes: '' }]
+        };
+      }) || [{ asset_id: '', asset_name: '', quantity: 1, unit_price: 0, notes: '' }];
+
+      console.log('Initial items:', initialItems);
+
+      setFormData({
+        damage_date: damage.damage_date ? damage.damage_date.split('T')[0] : '',
+        location_id: damage.location_id || '',
+        reason: damage.reason || 'Broken',
+        notes: damage.notes || '',
+        reported_by: damage.reported_by || '',
+        status: damage.status || 'Reported',
+        items: initialItems
       });
     } catch (err) {
       console.error('Error fetching form data:', err);
@@ -63,33 +76,44 @@ const EditDamage = ({ damage, onSubmit, onCancel }) => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleItemChange = (index, field, value) => {
     const newItems = [...formData.items];
-    newItems[index] = { ...newItems[index], [field]: value };
     
-    // Calculate total loss if quantity or unit price changes
-    if (field === 'quantity' || field === 'unit_price') {
-      const quantity = field === 'quantity' ? parseFloat(value) : newItems[index].quantity;
-      const unitPrice = field === 'unit_price' ? parseFloat(value) : newItems[index].unit_price;
-      newItems[index].total_loss = quantity * unitPrice;
+    // If changing asset_id, also update asset_name
+    if (field === 'asset_id') {
+      const assetId = value === '' ? '' : Number(value);
+      const selectedAsset = formOptions.assets.find(asset => asset.id === assetId);
+      
+      newItems[index] = {
+        ...newItems[index],
+        asset_id: assetId,
+        asset_name: selectedAsset ? selectedAsset.asset_name : ''
+      };
+      
+      console.log('Asset changed:', {
+        assetId,
+        selectedAsset,
+        allAssets: formOptions.assets
+      });
+    } else if (field === 'quantity' || field === 'unit_price') {
+      // Ensure numbers are numbers
+      const numValue = parseFloat(value) || 0;
+      newItems[index] = { ...newItems[index], [field]: numValue };
+    } else {
+      // For other fields
+      newItems[index] = { ...newItems[index], [field]: value };
     }
-    
-    setFormData(prev => ({
-      ...prev,
-      items: newItems
-    }));
+
+    setFormData(prev => ({ ...prev, items: newItems }));
   };
 
   const addItem = () => {
     setFormData(prev => ({
       ...prev,
-      items: [...prev.items, { asset_id: '', quantity: 1, unit_price: 0, notes: '' }]
+      items: [...prev.items, { asset_id: '', asset_name: '', quantity: 1, unit_price: 0, notes: '' }]
     }));
   };
 
@@ -97,10 +121,7 @@ const EditDamage = ({ damage, onSubmit, onCancel }) => {
     if (formData.items.length > 1) {
       const newItems = [...formData.items];
       newItems.splice(index, 1);
-      setFormData(prev => ({
-        ...prev,
-        items: newItems
-      }));
+      setFormData(prev => ({ ...prev, items: newItems }));
     } else {
       showPopup('error', 'At least one item is required');
     }
@@ -108,26 +129,26 @@ const EditDamage = ({ damage, onSubmit, onCancel }) => {
 
   const calculateTotalLoss = () => {
     return formData.items.reduce((total, item) => {
-      const quantity = parseFloat(item.quantity) || 0;
-      const unitPrice = parseFloat(item.unit_price) || 0;
-      return total + (quantity * unitPrice);
+      return total + ((item.quantity || 0) * (item.unit_price || 0));
     }, 0);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // Validation
+
+    // Validate that onSubmit is a function
+    if (typeof onSubmit !== 'function') {
+      console.error('onSubmit is not a function:', onSubmit);
+      showPopup('error', 'Form submission error. Please try again.');
+      return;
+    }
+
     if (!formData.damage_date || !formData.location_id || !formData.reason || !formData.reported_by) {
       showPopup('error', 'Please fill all required fields');
       return;
     }
 
-    // Validate items
-    const validItems = formData.items.filter(item => 
-      item.asset_id && item.quantity > 0
-    );
-    
+    const validItems = formData.items.filter(item => item.asset_id && item.quantity > 0);
     if (validItems.length === 0) {
       showPopup('error', 'Please add at least one valid item');
       return;
@@ -142,20 +163,20 @@ const EditDamage = ({ damage, onSubmit, onCancel }) => {
       status: formData.status,
       items: validItems.map(item => ({
         asset_id: item.asset_id,
-        quantity: parseFloat(item.quantity),
-        unit_price: parseFloat(item.unit_price) || 0,
+        quantity: item.quantity,
+        unit_price: item.unit_price || 0,
         notes: item.notes || ''
       }))
     };
 
-    console.log('Updating damage data:', submitData); // Debug log
+    console.log('Submitting data:', submitData);
 
     setSubmitting(true);
     try {
       await onSubmit(submitData);
     } catch (error) {
       console.error('Error submitting form:', error);
-      showPopup('error', 'Failed to update damage record');
+      showPopup('error', error.message || 'Failed to update damage record');
     } finally {
       setSubmitting(false);
     }
@@ -184,20 +205,12 @@ const EditDamage = ({ damage, onSubmit, onCancel }) => {
       <div className="edit-damage-container">
         <div className="edit-damage-header">
           <h3>Edit Damage Record - {damage.damage_id}</h3>
-          <button 
-            type="button" 
-            className="btn-close"
-            onClick={onCancel}
-            disabled={submitting}
-          >
-            ×
-          </button>
+          <button type="button" className="btn-close" onClick={onCancel} disabled={submitting}>×</button>
         </div>
 
         <form onSubmit={handleSubmit} className="edit-damage-form">
           <div className="form-section">
             <h4>Damage Information</h4>
-            
             <div className="form-row">
               <div className="form-group">
                 <label htmlFor="damage_date">Damage Date *</label>
@@ -244,9 +257,7 @@ const EditDamage = ({ damage, onSubmit, onCancel }) => {
                   disabled={submitting}
                 >
                   {formOptions.reasons.map(reason => (
-                    <option key={reason.value} value={reason.value}>
-                      {reason.label}
-                    </option>
+                    <option key={reason.value} value={reason.value}>{reason.label}</option>
                   ))}
                 </select>
               </div>
@@ -259,7 +270,6 @@ const EditDamage = ({ damage, onSubmit, onCancel }) => {
                   name="reported_by"
                   value={formData.reported_by}
                   onChange={handleChange}
-                  placeholder="Enter name of person reporting"
                   required
                   disabled={submitting}
                 />
@@ -275,9 +285,7 @@ const EditDamage = ({ damage, onSubmit, onCancel }) => {
                   disabled={submitting}
                 >
                   {formOptions.statuses.map(status => (
-                    <option key={status.value} value={status.value}>
-                      {status.label}
-                    </option>
+                    <option key={status.value} value={status.value}>{status.label}</option>
                   ))}
                 </select>
               </div>
@@ -286,91 +294,86 @@ const EditDamage = ({ damage, onSubmit, onCancel }) => {
 
           <div className="form-section">
             <h4>Damaged Items</h4>
-            
             <div className="items-header">
               <span>Items ({formData.items.length})</span>
-              <button 
-                type="button" 
-                className="btn-add-item"
-                onClick={addItem}
-                disabled={submitting}
-              >
-                + Add Item
-              </button>
+              <button type="button" className="btn-add-item" onClick={addItem} disabled={submitting}>+ Add Item</button>
             </div>
 
             <div className="items-list">
-              {formData.items.map((item, index) => (
-                <div key={item.id || index} className="item-row">
-                  <div className="item-fields">
-                    <div className="form-group">
-                      <label>Asset *</label>
-                      <select
-                        value={item.asset_id}
-                        onChange={(e) => handleItemChange(index, 'asset_id', e.target.value)}
-                        required
-                        disabled={submitting}
-                      >
-                        <option value="">Select Asset</option>
-                        {formOptions.assets.map(asset => (
-                          <option key={asset.id} value={asset.id}>
-                            {asset.asset_name} ({asset.asset_id})
-                          </option>
-                        ))}
-                      </select>
+              {formData.items.map((item, index) => {
+                console.log('Rendering item:', item, 'at index:', index);
+                return (
+                  <div key={item.id || index} className="item-row">
+                    <div className="item-fields">
+                      <div className="form-group">
+                        <label>Asset *</label>
+                        <select
+                          value={item.asset_id || ''}
+                          onChange={(e) => handleItemChange(index, 'asset_id', e.target.value)}
+                          required
+                          disabled={submitting}
+                        >
+                          <option value="">Select Asset</option>
+                          {formOptions.assets.map(asset => (
+                            <option key={asset.id} value={asset.id}>
+                              {asset.asset_name} ({asset.asset_id})
+                            </option>
+                          ))}
+                        </select>
+                        {item.asset_id && (
+                          <div className="selected-asset-info">
+                            <small>
+                              Selected: {item.asset_name || 'Unknown Asset'} 
+                              {!item.asset_name && ` (ID: ${item.asset_id})`}
+                            </small>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="form-group">
+                        <label>Quantity *</label>
+                        <input
+                          type="number"
+                          value={item.quantity}
+                          onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
+                          min="1"
+                          step="1"
+                          required
+                          disabled={submitting}
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label>Unit Price (LKR)</label>
+                        <input
+                          type="number"
+                          value={item.unit_price}
+                          onChange={(e) => handleItemChange(index, 'unit_price', e.target.value)}
+                          min="0"
+                          step="0.01"
+                          placeholder="0.00"
+                          disabled={submitting}
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label>Item Notes</label>
+                        <input
+                          type="text"
+                          value={item.notes}
+                          onChange={(e) => handleItemChange(index, 'notes', e.target.value)}
+                          placeholder="Optional item notes"
+                          disabled={submitting}
+                        />
+                      </div>
                     </div>
 
-                    <div className="form-group">
-                      <label>Quantity *</label>
-                      <input
-                        type="number"
-                        value={item.quantity}
-                        onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
-                        min="1"
-                        step="1"
-                        required
-                        disabled={submitting}
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label>Unit Price (LKR)</label>
-                      <input
-                        type="number"
-                        value={item.unit_price}
-                        onChange={(e) => handleItemChange(index, 'unit_price', e.target.value)}
-                        min="0"
-                        step="0.01"
-                        placeholder="0.00"
-                        disabled={submitting}
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label>Item Notes</label>
-                      <input
-                        type="text"
-                        value={item.notes}
-                        onChange={(e) => handleItemChange(index, 'notes', e.target.value)}
-                        placeholder="Optional item notes"
-                        disabled={submitting}
-                      />
-                    </div>
+                    {formData.items.length > 1 && (
+                      <button type="button" className="btn-remove-item" onClick={() => removeItem(index)} disabled={submitting} title="Remove Item">×</button>
+                    )}
                   </div>
-
-                  {formData.items.length > 1 && (
-                    <button
-                      type="button"
-                      className="btn-remove-item"
-                      onClick={() => removeItem(index)}
-                      disabled={submitting}
-                      title="Remove Item"
-                    >
-                      ×
-                    </button>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -380,11 +383,7 @@ const EditDamage = ({ damage, onSubmit, onCancel }) => {
           </div>
 
           <div className="form-actions">
-            <button
-              type="submit"
-              className="btn-submit"
-              disabled={submitting}
-            >
+            <button type="submit" className="btn-submit" disabled={submitting}>
               {submitting ? 'Updating...' : 'Update Damage Record'}
             </button>
           </div>

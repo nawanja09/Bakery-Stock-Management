@@ -46,10 +46,7 @@ const EditAsset = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleImageChange = (e) => {
@@ -59,60 +56,39 @@ const EditAsset = () => {
         showPopup('error', 'Please select an image file');
         return;
       }
-
       if (file.size > 5 * 1024 * 1024) {
         showPopup('error', 'File size must be less than 5MB');
         return;
       }
-
-      setFormData(prev => ({
-        ...prev,
-        image: file
-      }));
-
+      setFormData(prev => ({ ...prev, image: file }));
       const reader = new FileReader();
-      reader.onload = (e) => {
-        setImagePreview(e.target.result);
-      };
+      reader.onload = (e) => setImagePreview(e.target.result);
       reader.readAsDataURL(file);
     }
   };
 
   const handleRemoveImage = () => {
-    setFormData(prev => ({
-      ...prev,
-      image: null
-    }));
+    setFormData(prev => ({ ...prev, image: null }));
     setImagePreview(asset?.image_url || null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
     if (!formData.asset_name.trim()) {
       showPopup('error', 'Please enter an asset name');
       return;
     }
-
     setSubmitting(true);
     try {
       const submitData = new FormData();
       submitData.append('asset_name', formData.asset_name);
       submitData.append('description', formData.description || '');
-      
-      if (formData.image) {
-        submitData.append('image', formData.image);
-      }
+      if (formData.image) submitData.append('image', formData.image);
 
       const response = await api.put(`/cutlery-assets/${id}`, submitData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
-      
       showPopup('success', response.data.message);
       navigate('/cutlery/assets');
     } catch (err) {
@@ -122,119 +98,81 @@ const EditAsset = () => {
     }
   };
 
-  const handleCancel = () => {
-    navigate('/cutlery/assets');
-  };
+  const handleCancel = () => navigate('/cutlery/assets');
+  const triggerFileInput = () => fileInputRef.current?.click();
 
-  const triggerFileInput = () => {
-    fileInputRef.current?.click();
-  };
-
-  if (loading) {
-    return <div className="loading">Loading asset...</div>;
-  }
-
-  if (!asset) {
-    return <div className="error">Asset not found</div>;
-  }
+  if (loading) return <div className="loading">Loading asset...</div>;
+  if (!asset) return <div className="error">Asset not found</div>;
 
   return (
-    <div className="edit-asset-container">
+    <div className="edit-asset-wrapper">
       <div className="edit-asset-header">
-        <button className="btn-back" onClick={handleCancel}>
-          ← Back to Assets
-        </button>
+        <button className="btn-back" onClick={handleCancel}>← Back</button>
         <h2>Edit Asset</h2>
-        <div style={{ width: '100px' }}></div> {/* Spacer for alignment */}
+        <div style={{ width: '50px' }}></div>
       </div>
 
-      <div className="edit-asset-content">
-        <form onSubmit={handleSubmit} className="edit-asset-form">
-          <div className="form-section">
-            <h3>Basic Information</h3>
-            
-            <div className="form-group">
-              <label htmlFor="asset_id">Asset ID</label>
-              <input
-                type="text"
-                id="asset_id"
-                value={asset.asset_id}
-                disabled
-                className="disabled-input"
-              />
-              <small>Asset ID cannot be changed</small>
-            </div>
+      <form onSubmit={handleSubmit} className="edit-asset-form">
+        <div className="form-card">
+          <h3>Basic Info</h3>
+          <div className="form-group">
+            <label>Asset ID</label>
+            <input type="text" value={asset.asset_id} disabled className="disabled-input"/>
+            <small>Cannot be changed</small>
+          </div>
+          <div className="form-group">
+            <label>Asset Name *</label>
+            <input
+              name="asset_name"
+              value={formData.asset_name}
+              onChange={handleChange}
+              placeholder="Enter asset name"
+              disabled={submitting}
+            />
+          </div>
+        </div>
 
-            <div className="form-group">
-              <label htmlFor="asset_name">Asset Name *</label>
+        <div className="form-card">
+          <h3>Asset Image</h3>
+          <div className="form-group">
+            <label>Current / New Image</label>
+            <div className="image-upload" onClick={triggerFileInput}>
               <input
-                type="text"
-                id="asset_name"
-                name="asset_name"
-                value={formData.asset_name}
-                onChange={handleChange}
-                placeholder="Enter asset name"
-                required
+                type="file"
+                ref={fileInputRef}
+                accept="image/*"
+                onChange={handleImageChange}
+                className="file-input"
                 disabled={submitting}
               />
+              {imagePreview ? (
+                <div className="image-preview">
+                  <img src={imagePreview} alt="Preview" />
+                  <button
+                    type="button"
+                    className="btn-remove-image"
+                    onClick={(e) => { e.stopPropagation(); handleRemoveImage(); }}
+                    disabled={submitting}
+                  >×</button>
+                </div>
+              ) : (
+                <div className="image-placeholder">
+                  <div className="upload-icon">📁</div>
+                  <p>Click to upload image</p>
+                  <small>JPG, PNG, GIF (Max 5MB)</small>
+                </div>
+              )}
             </div>
+            <small>Leave unchanged to keep current image</small>
           </div>
+        </div>
 
-          <div className="form-section">
-            <h3>Asset Image</h3>
-            
-            <div className="form-group">
-              <label>Current Image</label>
-              <div className="image-upload-section" onClick={triggerFileInput}>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  id="image"
-                  name="image"
-                  onChange={handleImageChange}
-                  accept="image/*"
-                  className="file-input"
-                  disabled={submitting}
-                />
-                
-                {imagePreview ? (
-                  <div className="image-preview">
-                    <img src={imagePreview} alt="Preview" />
-                    <button 
-                      type="button" 
-                      className="btn-remove-image"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRemoveImage();
-                      }}
-                      disabled={submitting}
-                    >
-                      ×
-                    </button>
-                  </div>
-                ) : (
-                  <div className="image-upload-placeholder">
-                    <div className="upload-icon">📁</div>
-                    <p>Click to upload new image</p>
-                    <small>Supports JPG, PNG, GIF (Max 5MB)</small>
-                  </div>
-                )}
-              </div>
-              <small>Leave unchanged to keep current image</small>
-            </div>
-          </div>
-
-          <div className="form-actions">
-            <button
-              type="submit"
-              className="btn-submit"
-              disabled={submitting || !formData.asset_name.trim()}
-            >
-              {submitting ? 'Updating...' : 'Update Asset'}
-            </button>
-          </div>
-        </form>
-      </div>
+        <div className="form-actions">
+          <button type="submit" className="btn-submit" disabled={submitting || !formData.asset_name.trim()}>
+            {submitting ? 'Updating...' : 'Update Asset'}
+          </button>
+        </div>
+      </form>
     </div>
   );
 };
