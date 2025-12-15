@@ -907,3 +907,43 @@ CREATE TABLE `cutlery_stock` (
   CONSTRAINT `cutlery_stock_ibfk_1` FOREIGN KEY (`location_id`) REFERENCES `cutlery_locations` (`id`),
   CONSTRAINT `cutlery_stock_ibfk_2` FOREIGN KEY (`asset_id`) REFERENCES `cutlery_assets` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- First, let's check if purchase_items table has the right structure
+SHOW COLUMNS FROM cutlery_purchase_items;
+
+-- If the asset_id column doesn't exist or has wrong name, fix it:
+ALTER TABLE cutlery_purchase_items 
+CHANGE COLUMN item_id asset_id INT NOT NULL;
+
+-- Or if item_id doesn't exist, add asset_id:
+ALTER TABLE cutlery_purchase_items 
+ADD COLUMN asset_id INT NOT NULL AFTER purchase_id;
+
+-- Add foreign key constraint
+ALTER TABLE cutlery_purchase_items 
+ADD CONSTRAINT fk_cutlery_purchase_items_asset 
+FOREIGN KEY (asset_id) REFERENCES cutlery_assets(id);
+
+-- Also check the damage_items table
+ALTER TABLE cutlery_damage_items 
+CHANGE COLUMN item_id asset_id INT NOT NULL;
+
+-- Add foreign key constraint for damages
+ALTER TABLE cutlery_damage_items 
+ADD CONSTRAINT fk_cutlery_damage_items_asset 
+FOREIGN KEY (asset_id) REFERENCES cutlery_assets(id);
+
+-- Create a view to debug purchase data
+CREATE OR REPLACE VIEW purchase_debug_view AS
+SELECT 
+  cp.id as purchase_id,
+  cp.purchase_date,
+  cp.invoice_number,
+  cpi.asset_id,
+  ca.asset_name,
+  cpi.quantity,
+  cpi.unit_price
+FROM cutlery_purchases cp
+JOIN cutlery_purchase_items cpi ON cp.id = cpi.purchase_id
+JOIN cutlery_assets ca ON cpi.asset_id = ca.id
+ORDER BY cp.purchase_date DESC;
