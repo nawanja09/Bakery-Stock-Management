@@ -20,16 +20,13 @@ const Damages = () => {
       const response = await api.get('/cutlery-damages');
       setDamages(response.data);
     } catch (err) {
-      console.error('Error fetching damages:', err);
       showPopup('error', 'Failed to load damage records');
     } finally {
       setLoading(false);
     }
   }, [showPopup]);
 
-  useEffect(() => {
-    fetchDamages();
-  }, [fetchDamages]);
+  useEffect(() => { fetchDamages(); }, [fetchDamages]);
 
   const handleAddDamage = async (damageData) => {
     try {
@@ -43,26 +40,22 @@ const Damages = () => {
   };
 
   const handleViewDamage = (damage) => {
-    // Fetch full damage details (including items) before showing view
     (async () => {
       try {
         const response = await api.get(`/cutlery-damages/${damage.id}`);
         setViewingDamage(response.data);
-      } catch (err) {
-        console.error('Error fetching damage details:', err);
+      } catch {
         showPopup('error', 'Failed to load damage details');
       }
     })();
   };
 
   const handleEditDamage = (damage) => {
-    // Fetch full damage details (including items) before opening edit form
     (async () => {
       try {
         const response = await api.get(`/cutlery-damages/${damage.id}`);
         setEditingDamage(response.data);
-      } catch (err) {
-        console.error('Error fetching damage details for edit:', err);
+      } catch {
         showPopup('error', 'Failed to load damage details for edit');
       }
     })();
@@ -74,8 +67,8 @@ const Damages = () => {
       showPopup('success', response.data.message);
       setEditingDamage(null);
       fetchDamages();
-    } catch (err) {
-      showPopup('error', err.response?.data?.error || 'Failed to update damage record');
+    } catch {
+      showPopup('error', 'Failed to update damage record');
     }
   };
 
@@ -85,8 +78,8 @@ const Damages = () => {
         await api.delete(`/cutlery-damages/${id}`);
         showPopup('success', 'Damage record deleted successfully');
         fetchDamages();
-      } catch (err) {
-        showPopup('error', err.response?.data?.error || 'Failed to delete damage record');
+      } catch {
+        showPopup('error', 'Failed to delete damage record');
       }
     }
   };
@@ -98,7 +91,6 @@ const Damages = () => {
       'Repaired': { class: 'status-repaired', label: 'Repaired' },
       'Written Off': { class: 'status-written-off', label: 'Written Off' }
     };
-    
     const config = statusConfig[status] || { class: 'status-reported', label: status };
     return <span className={`status-badge ${config.class}`}>{config.label}</span>;
   };
@@ -111,68 +103,33 @@ const Damages = () => {
       'Theft': { class: 'reason-theft', label: 'Theft' },
       'Other': { class: 'reason-other', label: 'Other' }
     };
-    
     const config = reasonConfig[reason] || { class: 'reason-other', label: reason };
     return <span className={`reason-badge ${config.class}`}>{config.label}</span>;
   };
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-LK', {
-      style: 'currency',
-      currency: 'LKR',
-      minimumFractionDigits: 2
-    }).format(amount);
-  };
+  const formatCurrency = (amount) =>
+    new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR', minimumFractionDigits: 2 }).format(amount);
 
-  if (loading) {
-    return <div className="loading">Loading damage records...</div>;
-  }
+  if (loading) return <div className="loading">Loading damage records...</div>;
 
   return (
     <div className="damages-container">
       <div className="damages-header">
         <h2>Cutlery Damages</h2>
-        <button 
-          className="btn-add-damage"
-          onClick={() => setShowAddForm(true)}
-        >
-          + Add New Damage
-        </button>
+        <button className="btn-add-damage" onClick={() => setShowAddForm(true)}>+ Add Damage</button>
       </div>
 
-      {showAddForm && (
-        <AddDamageForm
-          onSubmit={handleAddDamage}
-          onCancel={() => setShowAddForm(false)}
-        />
-      )}
+      {showAddForm && <AddDamageForm onSubmit={handleAddDamage} onCancel={() => setShowAddForm(false)} />}
+      {viewingDamage && <ViewDamage damage={viewingDamage} onClose={() => setViewingDamage(null)} onEdit={() => { setEditingDamage(viewingDamage); setViewingDamage(null); }} />}
+      {editingDamage && <EditDamage damage={editingDamage} onSubmit={handleUpdateDamage} onCancel={() => setEditingDamage(null)} />}
 
-      {viewingDamage && (
-        <ViewDamage
-          damage={viewingDamage}
-          onClose={() => setViewingDamage(null)}
-          onEdit={() => {
-            setEditingDamage(viewingDamage);
-            setViewingDamage(null);
-          }}
-        />
-      )}
-
-      {editingDamage && (
-        <EditDamage
-          damage={editingDamage}
-          onSubmit={handleUpdateDamage}
-          onCancel={() => setEditingDamage(null)}
-        />
-      )}
-
-      <div className="damages-table-container">
-        {damages.length === 0 ? (
-          <div className="no-data">
-            <div className="no-data-icon">💔</div>
-            <p>No damage records found. Create your first damage record to get started.</p>
-          </div>
-        ) : (
+      {damages.length === 0 ? (
+        <div className="no-data">
+          <div className="no-data-icon">💔</div>
+          <p>No damage records found. Create your first damage record to get started.</p>
+        </div>
+      ) : (
+        <div className="table-wrapper">
           <table className="damages-table">
             <thead>
               <tr>
@@ -190,49 +147,23 @@ const Damages = () => {
               {damages.map(damage => (
                 <tr key={damage.id}>
                   <td className="damage-id">{damage.damage_id}</td>
-                  <td className="damage-date">
-                    {new Date(damage.damage_date).toLocaleDateString()}
-                  </td>
-                  <td className="location">{damage.location_name}</td>
-                  <td className="reason">
-                    {getReasonBadge(damage.reason)}
-                  </td>
-                  <td className="reported-by">{damage.reported_by}</td>
-                  <td className="total-loss">
-                    {formatCurrency(damage.total_loss || damage.estimated_loss)}
-                  </td>
-                  <td className="status">
-                    {getStatusBadge(damage.status)}
-                  </td>
-                  <td className="actions">
-                    <button
-                      className="btn-view"
-                      onClick={() => handleViewDamage(damage)}
-                      title="View Damage"
-                    >
-                      View
-                    </button>
-                    <button
-                      className="btn-edit"
-                      onClick={() => handleEditDamage(damage)}
-                      title="Edit Damage"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      className="btn-delete"
-                      onClick={() => handleDeleteDamage(damage.id, damage.damage_id)}
-                      title="Delete Damage"
-                    >
-                      Delete
-                    </button>
+                  <td>{new Date(damage.damage_date).toLocaleDateString()}</td>
+                  <td>{damage.location_name}</td>
+                  <td>{getReasonBadge(damage.reason)}</td>
+                  <td>{damage.reported_by}</td>
+                  <td className="total-loss">{formatCurrency(damage.total_loss || damage.estimated_loss)}</td>
+                  <td>{getStatusBadge(damage.status)}</td>
+                  <td className="actions-col">
+                    <button className="icon-btn" onClick={() => handleViewDamage(damage)} title="View">👁️</button>
+                    <button className="icon-btn" onClick={() => handleEditDamage(damage)} title="Edit">✏️</button>
+                    <button className="icon-btn danger" onClick={() => handleDeleteDamage(damage.id, damage.damage_id)} title="Delete">🗑️</button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };
