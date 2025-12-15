@@ -13,7 +13,6 @@ const CutleryStockReport = () => {
   const { showPopup } = usePopup();
 
   useEffect(() => {
-    // Load default report for today
     fetchReport();
   }, []);
 
@@ -29,9 +28,7 @@ const CutleryStockReport = () => {
         params: filters
       });
       
-      // Process the data to ensure all values are numbers
-      const processedData = processReportData(response.data);
-      setReportData(processedData);
+      setReportData(response.data);
       
     } catch (err) {
       console.error('Error fetching inventory report:', err);
@@ -39,44 +36,6 @@ const CutleryStockReport = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  // Process report data to ensure all values are valid numbers
-  const processReportData = (data) => {
-    if (!data || !data.data) return data;
-    
-    const processedData = {
-      ...data,
-      data: data.data.map(item => ({
-        ...item,
-        opening_balance: safeNumber(item.opening_balance),
-        purchase: safeNumber(item.purchase),
-        damage: safeNumber(item.damage),
-        closing_balance: safeNumber(item.closing_balance),
-        transfer_in_total: safeNumber(item.transfer_in_total),
-        transfer_out_total: safeNumber(item.transfer_out_total),
-        transfers: processTransfers(item.transfers)
-      }))
-    };
-    
-    return processedData;
-  };
-
-  // Process transfer data
-  const processTransfers = (transfers) => {
-    if (!transfers) return {};
-    
-    const processed = {};
-    Object.keys(transfers).forEach(locationId => {
-      const transferData = transfers[locationId];
-      processed[locationId] = {
-        ...transferData,
-        transfer_in: safeNumber(transferData.transfer_in),
-        transfer_out: safeNumber(transferData.transfer_out)
-      };
-    });
-    
-    return processed;
   };
 
   // Safely convert any value to a number
@@ -125,14 +84,14 @@ const CutleryStockReport = () => {
       const row = [
         item.item_id,
         `"${item.item_name}"`,
-        formatNumber(item.opening_balance),
-        formatNumber(item.purchase),
-        ...reportData.locations?.map(loc => formatNumber(item.transfers[loc.id]?.transfer_in || 0)),
-        ...reportData.locations?.map(loc => formatNumber(item.transfers[loc.id]?.transfer_out || 0)),
-        formatNumber(item.transfer_in_total),
-        formatNumber(item.transfer_out_total),
-        formatNumber(item.damage),
-        formatNumber(item.closing_balance)
+        safeNumber(item.opening_balance),
+        safeNumber(item.purchase),
+        ...reportData.locations?.map(loc => safeNumber(item.transfers[loc.id]?.transfer_in || 0)),
+        ...reportData.locations?.map(loc => safeNumber(item.transfers[loc.id]?.transfer_out || 0)),
+        safeNumber(item.transfer_in_total),
+        safeNumber(item.transfer_out_total),
+        safeNumber(item.damage),
+        safeNumber(item.closing_balance)
       ];
       csvContent += row.join(',') + '\n';
     });
@@ -147,15 +106,35 @@ const CutleryStockReport = () => {
     document.body.removeChild(link);
   };
 
-  // Safe format number function
+  // Safe format number function - FIXED to remove trailing zeros
   const formatNumber = (num) => {
     const safeNum = safeNumber(num);
-    return Number.isInteger(safeNum) ? safeNum.toString() : safeNum.toFixed(2);
+    // Return integer without decimal if it's a whole number
+    return Number.isInteger(safeNum) ? safeNum.toString() : safeNum.toFixed(2).replace(/\.?0+$/, '');
   };
+
+  // Calculate totals for display
+  const calculateTotals = () => {
+    if (!reportData) return {};
+    
+    return {
+      opening: reportData.data.reduce((sum, item) => sum + safeNumber(item.opening_balance), 0),
+      purchase: reportData.data.reduce((sum, item) => sum + safeNumber(item.purchase), 0),
+      damage: reportData.data.reduce((sum, item) => sum + safeNumber(item.damage), 0),
+      closing: reportData.data.reduce((sum, item) => sum + safeNumber(item.closing_balance), 0),
+      transferIn: reportData.data.reduce((sum, item) => sum + safeNumber(item.transfer_in_total), 0),
+      transferOut: reportData.data.reduce((sum, item) => sum + safeNumber(item.transfer_out_total), 0),
+    };
+  };
+
+  // Render function
+  // ... (keep your existing render function, but update the validation message)
 
   if (loading) {
     return <div className="loading">Loading inventory report...</div>;
   }
+
+  const totals = calculateTotals();
 
   return (
     <div className="cutlery-stock-report-container">
@@ -184,6 +163,7 @@ const CutleryStockReport = () => {
                 value={filters.start_date}
                 onChange={handleFilterChange}
                 required
+                max={filters.end_date}
               />
             </div>
 
@@ -196,6 +176,7 @@ const CutleryStockReport = () => {
                 value={filters.end_date}
                 onChange={handleFilterChange}
                 required
+                min={filters.start_date}
               />
             </div>
 
@@ -225,10 +206,12 @@ const CutleryStockReport = () => {
               <span className="info-value">{reportData.data.length}</span>
             </div>
             <div className="info-row">
-              <span className="info-label">Locations:</span>
-              <span className="info-value">
-                {reportData.locations?.map(loc => loc.name).join(', ')}
-              </span>
+              <span className="info-label">Opening Balance Total:</span>
+              <span className="info-value">{formatNumber(totals.opening)}</span>
+            </div>
+            <div className="info-row">
+              <span className="info-label">Closing Balance Total:</span>
+              <span className="info-value">{formatNumber(totals.closing)}</span>
             </div>
           </div>
 
@@ -244,14 +227,14 @@ const CutleryStockReport = () => {
                   {/* Transfer In headers */}
                   {reportData.locations && reportData.locations.length > 0 && (
                     <th colSpan={reportData.locations.length}>
-                      Transfer In (-)
+                      Transfer In (+)
                     </th>
                   )}
                   
                   {/* Transfer Out headers */}
                   {reportData.locations && reportData.locations.length > 0 && (
                     <th colSpan={reportData.locations.length}>
-                      Transfer Out (+)
+                      Transfer Out (-)
                     </th>
                   )}
                   
@@ -291,22 +274,22 @@ const CutleryStockReport = () => {
                       <td className="opening-balance">{formatNumber(item.opening_balance)}</td>
                       <td className="purchase positive">{formatNumber(item.purchase)}</td>
                       
-                      {/* Transfer In values (-) */}
+                      {/* Transfer In values (+) */}
                       {reportData.locations?.map(location => (
-                        <td key={`in-val-${location.id}`} className="transfer-in negative">
+                        <td key={`in-val-${location.id}`} className="transfer-in positive">
                           {formatNumber(item.transfers[location.id]?.transfer_in || 0)}
                         </td>
                       ))}
                       
-                      {/* Transfer Out values (+) */}
+                      {/* Transfer Out values (-) */}
                       {reportData.locations?.map(location => (
-                        <td key={`out-val-${location.id}`} className="transfer-out positive">
+                        <td key={`out-val-${location.id}`} className="transfer-out negative">
                           {formatNumber(item.transfers[location.id]?.transfer_out || 0)}
                         </td>
                       ))}
                       
-                      <td className="total-transfer-in negative">{formatNumber(item.transfer_in_total)}</td>
-                      <td className="total-transfer-out positive">{formatNumber(item.transfer_out_total)}</td>
+                      <td className="total-transfer-in positive">{formatNumber(item.transfer_in_total)}</td>
+                      <td className="total-transfer-out negative">{formatNumber(item.transfer_out_total)}</td>
                       <td className="damage negative">{formatNumber(item.damage)}</td>
                       <td className="closing-balance">{formatNumber(item.closing_balance)}</td>
                     </tr>
@@ -318,14 +301,12 @@ const CutleryStockReport = () => {
                 <tr>
                   <th colSpan="3">Total</th>
                   <th className="positive">
-                    {formatNumber(
-                      reportData.data.reduce((sum, item) => sum + safeNumber(item.purchase), 0)
-                    )}
+                    {formatNumber(totals.purchase)}
                   </th>
                   
                   {/* Transfer In totals */}
                   {reportData.locations?.map(location => (
-                    <th key={`total-in-${location.id}`} className="negative">
+                    <th key={`total-in-${location.id}`} className="positive">
                       {formatNumber(
                         reportData.data.reduce((sum, item) => 
                           sum + safeNumber(item.transfers[location.id]?.transfer_in || 0), 0
@@ -336,7 +317,7 @@ const CutleryStockReport = () => {
                   
                   {/* Transfer Out totals */}
                   {reportData.locations?.map(location => (
-                    <th key={`total-out-${location.id}`} className="positive">
+                    <th key={`total-out-${location.id}`} className="negative">
                       {formatNumber(
                         reportData.data.reduce((sum, item) => 
                           sum + safeNumber(item.transfers[location.id]?.transfer_out || 0), 0
@@ -345,29 +326,41 @@ const CutleryStockReport = () => {
                     </th>
                   ))}
                   
-                  <th className="negative">
-                    {formatNumber(
-                      reportData.data.reduce((sum, item) => sum + safeNumber(item.transfer_in_total), 0)
-                    )}
-                  </th>
                   <th className="positive">
-                    {formatNumber(
-                      reportData.data.reduce((sum, item) => sum + safeNumber(item.transfer_out_total), 0)
-                    )}
+                    {formatNumber(totals.transferIn)}
                   </th>
                   <th className="negative">
-                    {formatNumber(
-                      reportData.data.reduce((sum, item) => sum + safeNumber(item.damage), 0)
-                    )}
+                    {formatNumber(totals.transferOut)}
+                  </th>
+                  <th className="negative">
+                    {formatNumber(totals.damage)}
                   </th>
                   <th>
-                    {formatNumber(
-                      reportData.data.reduce((sum, item) => sum + safeNumber(item.closing_balance), 0)
-                    )}
+                    {formatNumber(totals.closing)}
                   </th>
                 </tr>
               </tfoot>
             </table>
+          </div>
+          
+          {/* Validation message */}
+          <div className="validation-message">
+            <p>
+              <strong>Formula Validation:</strong><br />
+              Opening Balance + Purchase + Total Transfer In - Total Transfer Out - Damage = Closing Balance
+            </p>
+            <p>
+              {formatNumber(totals.opening)} + {formatNumber(totals.purchase)} + 
+              {formatNumber(totals.transferIn)} - {formatNumber(totals.transferOut)} - 
+              {formatNumber(totals.damage)} = {formatNumber(
+                totals.opening + totals.purchase + totals.transferIn - totals.transferOut - totals.damage
+              )}
+            </p>
+            <p className={Math.abs((totals.opening + totals.purchase + totals.transferIn - totals.transferOut - totals.damage) - totals.closing) < 0.01 ? 'valid' : 'invalid'}>
+              {Math.abs((totals.opening + totals.purchase + totals.transferIn - totals.transferOut - totals.damage) - totals.closing) < 0.01 
+                ? '✓ Calculation is correct' 
+                : `✗ Calculation mismatch: Expected ${formatNumber(totals.opening + totals.purchase + totals.transferIn - totals.transferOut - totals.damage)} but got ${formatNumber(totals.closing)}`}
+            </p>
           </div>
         </div>
       )}
