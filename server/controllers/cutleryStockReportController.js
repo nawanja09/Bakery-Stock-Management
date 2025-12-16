@@ -4,11 +4,13 @@ const getInventoryReport = async (req, res) => {
   try {
     const { start_date, end_date } = req.query;
 
+    console.log('DEBUG - Report request:', { start_date, end_date });
+
     if (!start_date || !end_date) {
       return res.status(400).json({ error: 'Start date and end date are required' });
     }
 
-    // Get all assets first
+    // Get all assets
     const [assets] = await pool.query(`
       SELECT 
         ca.id,
@@ -18,7 +20,9 @@ const getInventoryReport = async (req, res) => {
       ORDER BY ca.asset_id
     `);
 
-    // Get all locations (store should be first, then others)
+    console.log('DEBUG - Assets found:', assets.length);
+
+    // Get all locations
     const [locations] = await pool.query(`
       SELECT 
         cl.id,
@@ -30,17 +34,23 @@ const getInventoryReport = async (req, res) => {
         cl.location_name
     `);
 
-    // Get opening balance (closing balance of previous day)
-    const openingBalances = await getOpeningBalances(start_date, assets);
+    console.log('DEBUG - Locations found:', locations.length);
+
+    // Get cumulative opening balance up to the day BEFORE start_date
+    const openingBalances = await getCumulativeOpeningBalances(start_date, assets);
+    console.log('DEBUG - Opening balances:', openingBalances);
 
     // Get purchases in date range
     const purchases = await getPurchases(start_date, end_date, assets);
+    console.log('DEBUG - Purchases in range:', purchases);
 
     // Get transfers in date range
     const transfers = await getTransfers(start_date, end_date, assets, locations);
+    console.log('DEBUG - Transfers in range:', transfers);
 
     // Get damages in date range
     const damages = await getDamages(start_date, end_date, assets);
+    console.log('DEBUG - Damages in range:', damages);
 
     // Calculate for each asset
     const reportData = assets.map(asset => {
@@ -48,10 +58,10 @@ const getInventoryReport = async (req, res) => {
       const assetCode = asset.asset_id;
       const assetName = asset.asset_name;
       
-      // Opening balance for this asset
+      // Opening balance for this asset (cumulative up to day before start_date)
       const openingBalance = openingBalances[assetId] || 0;
       
-      // Purchases for this asset
+      // Purchases for this asset in date range
       const purchaseQty = purchases[assetId] || 0;
       
       // Initialize transfer data for each location
@@ -64,7 +74,7 @@ const getInventoryReport = async (req, res) => {
         };
       });
       
-      // Fill transfer data
+      // Fill transfer data for the date range
       if (transfers[assetId]) {
         Object.keys(transfers[assetId]).forEach(locationId => {
           if (transferData[locationId]) {
@@ -74,19 +84,34 @@ const getInventoryReport = async (req, res) => {
         });
       }
       
-      // Damages for this asset
+      // Damages for this asset in date range
       const damageQty = damages[assetId] || 0;
       
-      // Calculate total transfers (in as negative, out as positive)
+      // Calculate total transfers for this asset (for display only)
       let totalTransferIn = 0;
       let totalTransferOut = 0;
       locations.forEach(location => {
-        totalTransferIn += transferData[location.id].transfer_in;
-        totalTransferOut += transferData[location.id].transfer_out;
+        totalTransferIn += transferData[location.id].transfer_in || 0;
+        totalTransferOut += transferData[location.id].transfer_out || 0;
       });
       
-      // Calculate closing balance
-      const closingBalance = openingBalance + purchaseQty - totalTransferIn + totalTransferOut - damageQty;
+      // IMPORTANT: Calculate closing balance CORRECTLY
+      // Formula: Closing = Opening + Purchases - Damages
+      // Transfers don't affect total system stock
+      const closingBalance = openingBalance + purchaseQty - damageQty;
+      
+      // Debug each asset calculation
+      console.log('DEBUG - Asset calculation:', {
+        assetId,
+        assetCode,
+        assetName,
+        openingBalance,
+        purchaseQty,
+        damageQty,
+        closingBalance,
+        totalTransferIn,
+        totalTransferOut
+      });
       
       return {
         item_id: assetCode,
@@ -95,11 +120,24 @@ const getInventoryReport = async (req, res) => {
         purchase: purchaseQty,
         transfers: transferData,
         damage: damageQty,
-        closing_balance: closingBalance,
+        closing_balance: closingBalance, // This should be correctly calculated now
         transfer_in_total: totalTransferIn,
         transfer_out_total: totalTransferOut
       };
     });
+
+    // Calculate totals for debugging
+    const totals = {
+      opening: reportData.reduce((sum, item) => sum + (item.opening_balance || 0), 0),
+      purchase: reportData.reduce((sum, item) => sum + (item.purchase || 0), 0),
+      damage: reportData.reduce((sum, item) => sum + (item.damage || 0), 0),
+      closing: reportData.reduce((sum, item) => sum + (item.closing_balance || 0), 0),
+      transferIn: reportData.reduce((sum, item) => sum + (item.transfer_in_total || 0), 0),
+      transferOut: reportData.reduce((sum, item) => sum + (item.transfer_out_total || 0), 0),
+    };
+
+    console.log('DEBUG - Report totals:', totals);
+    console.log('DEBUG - Expected closing:', totals.opening + totals.purchase - totals.damage);
 
     res.json({
       start_date,
@@ -117,82 +155,50 @@ const getInventoryReport = async (req, res) => {
   }
 };
 
-// Helper function to get opening balances (closing balance of previous day)
-const getOpeningBalances = async (startDate, assets) => {
+// Get cumulative opening balances (all purchases minus damages before start_date)
+const getCumulativeOpeningBalances = async (startDate, assets) => {
   const balances = {};
   
   try {
-    // Get closing balance for each asset from previous day
-    for (const asset of assets) {
-      const [results] = await pool.query(`
-        WITH daily_totals AS (
-          SELECT 
-            asset_id,
-            date,
-            COALESCE(SUM(CASE WHEN type = 'purchase' THEN quantity ELSE 0 END), 0) as purchases,
-            COALESCE(SUM(CASE WHEN type = 'transfer_in' THEN quantity ELSE 0 END), 0) as transfers_in,
-            COALESCE(SUM(CASE WHEN type = 'transfer_out' THEN quantity ELSE 0 END), 0) as transfers_out,
-            COALESCE(SUM(CASE WHEN type = 'damage' THEN quantity ELSE 0 END), 0) as damages
-          FROM (
-            -- Purchases
-            SELECT 
-              cp.purchase_date as date,
-              cpi.asset_id,
-              cpi.quantity,
-              'purchase' as type
-            FROM cutlery_purchases cp
-            JOIN cutlery_purchase_items cpi ON cp.id = cpi.purchase_id
-            WHERE cp.purchase_date < ?
-            
-            UNION ALL
-            
-            -- Transfers (incoming)
-            SELECT 
-              ct.transfer_date as date,
-              ct.asset_id,
-              ct.quantity,
-              'transfer_in' as type
-            FROM cutlery_transfers ct
-            WHERE ct.transfer_date < ?
-            
-            UNION ALL
-            
-            -- Transfers (outgoing)
-            SELECT 
-              ct.transfer_date as date,
-              ct.asset_id,
-              -ct.quantity as quantity,
-              'transfer_out' as type
-            FROM cutlery_transfers ct
-            WHERE ct.transfer_date < ?
-            
-            UNION ALL
-            
-            -- Damages
-            SELECT 
-              cd.damage_date as date,
-              cdi.asset_id,
-              -cdi.quantity as quantity,
-              'damage' as type
-            FROM cutlery_damages cd
-            JOIN cutlery_damage_items cdi ON cd.id = cdi.damage_id
-            WHERE cd.damage_date < ?
-          ) as transactions
-          WHERE asset_id = ?
-          GROUP BY asset_id, date
-        )
-        SELECT 
-          asset_id,
-          COALESCE(SUM(purchases - transfers_in + transfers_out - damages), 0) as closing_balance
-        FROM daily_totals
-        GROUP BY asset_id
-      `, [startDate, startDate, startDate, startDate, asset.id]);
-      
-      balances[asset.id] = results[0]?.closing_balance || 0;
-    }
+    // First, initialize all assets with 0
+    assets.forEach(asset => {
+      balances[asset.id] = 0;
+    });
+
+    // Get all purchases before start_date
+    const [purchases] = await pool.query(`
+      SELECT 
+        cpi.asset_id,
+        SUM(cpi.quantity) as total_quantity
+      FROM cutlery_purchases cp
+      JOIN cutlery_purchase_items cpi ON cp.id = cpi.purchase_id
+      WHERE cp.purchase_date < ?
+      GROUP BY cpi.asset_id
+    `, [startDate]);
+
+    purchases.forEach(row => {
+      balances[row.asset_id] = (balances[row.asset_id] || 0) + (row.total_quantity || 0);
+    });
+
+    // Subtract all damages before start_date
+    const [damages] = await pool.query(`
+      SELECT 
+        cdi.asset_id,
+        SUM(cdi.quantity) as total_quantity
+      FROM cutlery_damages cd
+      JOIN cutlery_damage_items cdi ON cd.id = cdi.damage_id
+      WHERE cd.damage_date < ?
+      GROUP BY cdi.asset_id
+    `, [startDate]);
+
+    damages.forEach(row => {
+      balances[row.asset_id] = (balances[row.asset_id] || 0) - (row.total_quantity || 0);
+    });
+
+    console.log('DEBUG - Calculated opening balances:', balances);
+
   } catch (error) {
     console.error('Error calculating opening balances:', error);
-    // Return empty balances on error
     assets.forEach(asset => {
       balances[asset.id] = 0;
     });
@@ -201,11 +207,16 @@ const getOpeningBalances = async (startDate, assets) => {
   return balances;
 };
 
-// Helper function to get purchases in date range
+// Get purchases in date range
 const getPurchases = async (startDate, endDate, assets) => {
   const purchases = {};
   
   try {
+    // Initialize all assets with 0
+    assets.forEach(asset => {
+      purchases[asset.id] = 0;
+    });
+
     const [results] = await pool.query(`
       SELECT 
         cpi.asset_id,
@@ -217,14 +228,7 @@ const getPurchases = async (startDate, endDate, assets) => {
     `, [startDate, endDate]);
     
     results.forEach(row => {
-      purchases[row.asset_id] = row.total_quantity;
-    });
-    
-    // Initialize all assets with 0
-    assets.forEach(asset => {
-      if (!purchases[asset.id]) {
-        purchases[asset.id] = 0;
-      }
+      purchases[row.asset_id] = row.total_quantity || 0;
     });
     
   } catch (error) {
@@ -237,11 +241,22 @@ const getPurchases = async (startDate, endDate, assets) => {
   return purchases;
 };
 
-// Helper function to get transfers in date range
+// Get transfers in date range
 const getTransfers = async (startDate, endDate, assets, locations) => {
   const transfers = {};
   
   try {
+    // Initialize transfers object for all assets
+    assets.forEach(asset => {
+      transfers[asset.id] = {};
+      locations.forEach(location => {
+        transfers[asset.id][location.id] = {
+          transfer_in: 0,
+          transfer_out: 0
+        };
+      });
+    });
+
     const [results] = await pool.query(`
       SELECT 
         ct.asset_id,
@@ -253,31 +268,22 @@ const getTransfers = async (startDate, endDate, assets, locations) => {
       AND ct.status != 'Cancelled'
     `, [startDate, endDate]);
     
-    // Initialize transfers object for all assets
-    assets.forEach(asset => {
-      transfers[asset.id] = {};
-      locations.forEach(location => {
-        transfers[asset.id][location.id] = {
-          transfer_in: 0,
-          transfer_out: 0
-        };
-      });
-    });
+    console.log('DEBUG - Transfer results:', results.length);
     
     // Fill with actual data
     results.forEach(row => {
       const assetId = row.asset_id;
       const fromLocation = row.location_from_id;
       const toLocation = row.location_to_id;
-      const quantity = row.quantity;
+      const quantity = row.quantity || 0;
       
       if (transfers[assetId]) {
-        // Transfer out from source location
+        // Transfer out FROM source location
         if (fromLocation && transfers[assetId][fromLocation]) {
           transfers[assetId][fromLocation].transfer_out += quantity;
         }
         
-        // Transfer in to destination location
+        // Transfer in TO destination location
         if (toLocation && transfers[assetId][toLocation]) {
           transfers[assetId][toLocation].transfer_in += quantity;
         }
@@ -300,11 +306,16 @@ const getTransfers = async (startDate, endDate, assets, locations) => {
   return transfers;
 };
 
-// Helper function to get damages in date range
+// Get damages in date range
 const getDamages = async (startDate, endDate, assets) => {
   const damages = {};
   
   try {
+    // Initialize all assets with 0
+    assets.forEach(asset => {
+      damages[asset.id] = 0;
+    });
+
     const [results] = await pool.query(`
       SELECT 
         cdi.asset_id,
@@ -316,14 +327,7 @@ const getDamages = async (startDate, endDate, assets) => {
     `, [startDate, endDate]);
     
     results.forEach(row => {
-      damages[row.asset_id] = row.total_quantity;
-    });
-    
-    // Initialize all assets with 0
-    assets.forEach(asset => {
-      if (!damages[asset.id]) {
-        damages[asset.id] = 0;
-      }
+      damages[row.asset_id] = row.total_quantity || 0;
     });
     
   } catch (error) {
