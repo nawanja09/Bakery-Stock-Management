@@ -208,7 +208,6 @@ const CutleryStockReport = () => {
                 <td colSpan={3} className="total-label">
                   <strong>TOTAL</strong>
                 </td>
-                <td></td>
                 {locations.map((location, index) => {
                   const total = filteredData.reduce((sum, item) => 
                     sum + (item.locations[location] || 0), 0
