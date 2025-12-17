@@ -1,8 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const { getInventoryReport } = require('../controllers/cutleryStockReportController');
+const {
+  getStockReport,
+  getStockReportByAsset
+} = require('../controllers/cutleryStockReportController');
 
-// Routes
-router.get('/inventory', getInventoryReport);
+// Get stock report
+router.get('/stock-report', getStockReport);
+router.get('/stock-report/asset', getStockReportByAsset);
 
 module.exports = router;
