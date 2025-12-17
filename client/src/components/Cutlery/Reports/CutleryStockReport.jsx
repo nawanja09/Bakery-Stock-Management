@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { usePopup } from '../../context/PopupContext';
 import api from '../../../api';
 import './CutleryStockReport.css';
@@ -13,13 +13,13 @@ const CutleryStockReport = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const { showPopup } = usePopup();
 
-  const fetchStockReport = async (date = reportDate) => {
+  const fetchStockReport = useCallback(async (date = reportDate) => {
     try {
       setLoading(true);
       const response = await api.get('/cutlery-reports/stock-report', {
         params: { report_date: date }
       });
-      
+
       setStockData(response.data.data);
       setLocations(response.data.locations);
     } catch (err) {
@@ -28,11 +28,11 @@ const CutleryStockReport = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [reportDate, showPopup]);
 
   useEffect(() => {
     fetchStockReport();
-  }, []);
+  }, [fetchStockReport]);
 
   const handleDateChange = (e) => {
     setReportDate(e.target.value);
