@@ -6,7 +6,7 @@ import ViewTransfer from './ViewTransfer';
 import EditTransfer from './EditTransfer';
 import './Transfers.css';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faEye, faPen, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { faEye, faPen, faTrash, faPlus } from '@fortawesome/free-solid-svg-icons';
 
 const Transfers = () => {
   const [transfers, setTransfers] = useState([]);
@@ -24,8 +24,16 @@ const Transfers = () => {
     try {
       setLoading(true);
       const res = await api.get('/cutlery-transfers');
-      setTransfers(res.data);
-    } catch {
+      
+      // Ensure each transfer has items array
+      const transfersWithItems = res.data.map(transfer => ({
+        ...transfer,
+        items: transfer.items || []
+      }));
+      
+      setTransfers(transfersWithItems);
+    } catch (err) {
+      console.error('Error fetching transfers:', err);
       showPopup('error', 'Failed to load transfers');
     } finally {
       setLoading(false);
@@ -74,6 +82,45 @@ const Transfers = () => {
     return <span className={`status-badge ${map[status]}`}>{status}</span>;
   };
 
+  // Helper to calculate total quantity for a transfer
+  const getTotalQuantity = (transfer) => {
+    if (transfer.items && transfer.items.length > 0) {
+      return transfer.items.reduce((sum, item) => sum + (item.quantity || 0), 0);
+    }
+    return transfer.quantity || 0;
+  };
+
+  // Helper to get asset list for display
+  const getAssetDisplay = (transfer) => {
+    if (transfer.items && transfer.items.length > 0) {
+      if (transfer.items.length === 1) {
+        const item = transfer.items[0];
+        return (
+          <div>
+            <strong>{item.asset_name}</strong>
+            <div className="muted">{item.asset_code}</div>
+          </div>
+        );
+      }
+      return (
+        <div className="asset-list">
+          {transfer.items.map((item, idx) => (
+            <div key={idx} className="asset-badge">
+              <strong>{item.asset_name}</strong> × {item.quantity}
+            </div>
+          ))}
+        </div>
+      );
+    }
+    // Fallback for old data structure
+    return (
+      <div>
+        <strong>{transfer.asset_name}</strong>
+        <div className="muted">{transfer.asset_code}</div>
+      </div>
+    );
+  };
+
   if (loading) return <div className="loading">Loading transfers...</div>;
 
   return (
@@ -84,7 +131,7 @@ const Transfers = () => {
           <p>Manage cutlery transfer records</p>
         </div>
         <button className="primary-btn" onClick={() => setShowAddForm(true)}>
-          + New Transfer
+          <FontAwesomeIcon icon={faPlus} /> New Transfer
         </button>
       </header>
 
@@ -119,6 +166,12 @@ const Transfers = () => {
           <div className="no-data">
             <span>🔄</span>
             <p>No transfers found</p>
+            <button 
+              className="btn-add-first" 
+              onClick={() => setShowAddForm(true)}
+            >
+              <FontAwesomeIcon icon={faPlus} /> Create Your First Transfer
+            </button>
           </div>
         ) : (
           <table className="transfers-table">
@@ -128,8 +181,6 @@ const Transfers = () => {
                 <th>Date</th>
                 <th>From</th>
                 <th>To</th>
-                <th>Asset</th>
-                <th>Qty</th>
                 <th>By</th>
                 <th>Status</th>
                 <th className="actions-header">Actions</th>
@@ -144,24 +195,28 @@ const Transfers = () => {
                   </td>
                   <td data-label="From">{t.from_location_name}</td>
                   <td data-label="To">{t.to_location_name}</td>
-                  <td data-label="Asset">
-                    <strong>{t.asset_name}</strong>
-                    <div className="muted">{t.asset_code}</div>
-                  </td>
-                  <td data-label="Qty" className="qty">{t.quantity}</td>
                   <td data-label="By">{t.transferred_by}</td>
                   <td data-label="Status">{getStatusBadge(t.status)}</td>
                   <td className="actions-cell" data-label="Actions">
                     <div className="actions">
-                      <button className="icon-btn" onClick={() => setViewingTransfer(t)}>
+                      <button 
+                        className="icon-btn" 
+                        onClick={() => setViewingTransfer(t)}
+                        title="View Details"
+                      >
                         <FontAwesomeIcon icon={faEye} />
                       </button>
-                      <button className="icon-btn" onClick={() => setEditingTransfer(t)}>
+                      <button 
+                        className="icon-btn" 
+                        onClick={() => setEditingTransfer(t)}
+                        title="Edit Transfer"
+                      >
                         <FontAwesomeIcon icon={faPen} />
                       </button>
                       <button
                         className="icon-btn danger"
                         onClick={() => handleDeleteTransfer(t.id, t.transfer_id)}
+                        title="Delete Transfer"
                       >
                         <FontAwesomeIcon icon={faTrash} />
                       </button>

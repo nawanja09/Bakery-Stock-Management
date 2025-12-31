@@ -9,15 +9,15 @@ const AddTransferForm = ({ onSubmit, onCancel }) => {
     location_from_id: '',
     location_to_id: '',
     transferred_by: '',
-    status: 'Pending', // Add status field
+    status: 'Pending',
     notes: '',
-    assets: [{ // Change from single asset to array
-      asset_id: '',
-      quantity: 1
-    }]
+    items: [{ asset_id: '', quantity: 1 }]
   });
 
-  const [formOptions, setFormOptions] = useState({ locations: [], assets: [] });
+  const [formOptions, setFormOptions] = useState({ 
+    locations: [], 
+    assets: [] 
+  });
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const { showPopup } = usePopup();
@@ -44,27 +44,24 @@ const AddTransferForm = ({ onSubmit, onCancel }) => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  // Handle asset change for specific index
-  const handleAssetChange = (index, field, value) => {
-    const newAssets = [...formData.assets];
-    newAssets[index] = { ...newAssets[index], [field]: value };
-    setFormData(prev => ({ ...prev, assets: newAssets }));
+  const handleItemChange = (index, field, value) => {
+    const newItems = [...formData.items];
+    newItems[index] = { ...newItems[index], [field]: field === 'quantity' ? parseInt(value) || 0 : value };
+    setFormData(prev => ({ ...prev, items: newItems }));
   };
 
-  // Add new asset row
-  const addAsset = () => {
+  const addItem = () => {
     setFormData(prev => ({
       ...prev,
-      assets: [...prev.assets, { asset_id: '', quantity: 1 }]
+      items: [...prev.items, { asset_id: '', quantity: 1 }]
     }));
   };
 
-  // Remove asset row
-  const removeAsset = (index) => {
-    if (formData.assets.length > 1) {
-      const newAssets = [...formData.assets];
-      newAssets.splice(index, 1);
-      setFormData(prev => ({ ...prev, assets: newAssets }));
+  const removeItem = (index) => {
+    if (formData.items.length > 1) {
+      const newItems = [...formData.items];
+      newItems.splice(index, 1);
+      setFormData(prev => ({ ...prev, items: newItems }));
     } else {
       showPopup('error', 'At least one asset is required');
     }
@@ -74,7 +71,7 @@ const AddTransferForm = ({ onSubmit, onCancel }) => {
     e.preventDefault();
 
     // Validation
-    const { transfer_date, location_from_id, location_to_id, transferred_by, assets } = formData;
+    const { transfer_date, location_from_id, location_to_id, transferred_by, items } = formData;
     
     if (!transfer_date || !location_from_id || !location_to_id || !transferred_by) {
       showPopup('error', 'Please fill all required fields');
@@ -86,43 +83,33 @@ const AddTransferForm = ({ onSubmit, onCancel }) => {
       return;
     }
 
-    // Validate all assets
-    const validAssets = assets.filter(asset => 
-      asset.asset_id && asset.quantity > 0
-    );
-    
-    if (validAssets.length === 0) {
-      showPopup('error', 'Please add at least one asset with valid quantity');
+    // Validate items
+    const validItems = items.filter(item => item.asset_id && item.quantity > 0);
+    if (validItems.length === 0) {
+      showPopup('error', 'Please add at least one asset with quantity');
       return;
     }
 
     // Check for duplicate assets
-    const assetIds = validAssets.map(a => a.asset_id);
-    const uniqueAssetIds = [...new Set(assetIds)];
-    if (assetIds.length !== uniqueAssetIds.length) {
-      showPopup('error', 'Duplicate assets found. Please select different assets.');
+    const assetIds = validItems.map(item => item.asset_id);
+    if (new Set(assetIds).size !== assetIds.length) {
+      showPopup('error', 'Duplicate assets are not allowed');
       return;
     }
 
+    const submitData = {
+      ...formData,
+      items: validItems.map(item => ({
+        asset_id: parseInt(item.asset_id),
+        quantity: parseInt(item.quantity)
+      }))
+    };
+
     setSubmitting(true);
     try {
-      // Prepare data for API - multiple assets
-      const submitData = {
-        transfer_date,
-        location_from_id,
-        location_to_id,
-        transferred_by,
-        status: formData.status,
-        notes: formData.notes,
-        assets: validAssets.map(asset => ({
-          asset_id: asset.asset_id,
-          quantity: parseInt(asset.quantity)
-        }))
-      };
-
       await onSubmit(submitData);
     } catch (err) {
-      console.error(err);
+      console.error('Form submission error:', err);
       showPopup('error', 'Failed to create transfer');
     } finally {
       setSubmitting(false);
@@ -144,7 +131,14 @@ const AddTransferForm = ({ onSubmit, onCancel }) => {
       <div className="form-container">
         <div className="form-header">
           <h3>Add New Transfer</h3>
-          <button type="button" className="btn-close" onClick={onCancel} disabled={submitting}>×</button>
+          <button 
+            type="button" 
+            className="btn-close" 
+            onClick={onCancel} 
+            disabled={submitting}
+          >
+            ×
+          </button>
         </div>
 
         <form onSubmit={handleSubmit} className="form-body">
@@ -153,36 +147,36 @@ const AddTransferForm = ({ onSubmit, onCancel }) => {
             <div className="form-row">
               <div className="form-group">
                 <label htmlFor="transfer_date">Transfer Date *</label>
-                <input 
-                  type="date" 
-                  id="transfer_date" 
-                  name="transfer_date" 
-                  value={formData.transfer_date} 
-                  onChange={handleChange} 
-                  disabled={submitting} 
-                  required 
+                <input
+                  type="date"
+                  id="transfer_date"
+                  name="transfer_date"
+                  value={formData.transfer_date}
+                  onChange={handleChange}
+                  disabled={submitting}
+                  required
                 />
               </div>
               <div className="form-group">
                 <label htmlFor="transferred_by">Transferred By *</label>
-                <input 
-                  type="text" 
-                  id="transferred_by" 
-                  name="transferred_by" 
-                  value={formData.transferred_by} 
-                  onChange={handleChange} 
-                  placeholder="Enter name" 
-                  disabled={submitting} 
-                  required 
+                <input
+                  type="text"
+                  id="transferred_by"
+                  name="transferred_by"
+                  value={formData.transferred_by}
+                  onChange={handleChange}
+                  placeholder="Enter name"
+                  disabled={submitting}
+                  required
                 />
               </div>
               <div className="form-group">
                 <label htmlFor="status">Status *</label>
-                <select 
-                  id="status" 
-                  name="status" 
-                  value={formData.status} 
-                  onChange={handleChange} 
+                <select
+                  id="status"
+                  name="status"
+                  value={formData.status}
+                  onChange={handleChange}
                   disabled={submitting}
                   required
                 >
@@ -199,11 +193,11 @@ const AddTransferForm = ({ onSubmit, onCancel }) => {
             <div className="form-row">
               <div className="form-group">
                 <label htmlFor="location_from_id">From Location *</label>
-                <select 
-                  id="location_from_id" 
-                  name="location_from_id" 
-                  value={formData.location_from_id} 
-                  onChange={handleChange} 
+                <select
+                  id="location_from_id"
+                  name="location_from_id"
+                  value={formData.location_from_id}
+                  onChange={handleChange}
                   disabled={submitting}
                   required
                 >
@@ -217,11 +211,11 @@ const AddTransferForm = ({ onSubmit, onCancel }) => {
               </div>
               <div className="form-group">
                 <label htmlFor="location_to_id">To Location *</label>
-                <select 
-                  id="location_to_id" 
-                  name="location_to_id" 
-                  value={formData.location_to_id} 
-                  onChange={handleChange} 
+                <select
+                  id="location_to_id"
+                  name="location_to_id"
+                  value={formData.location_to_id}
+                  onChange={handleChange}
                   disabled={submitting}
                   required
                 >
@@ -237,63 +231,61 @@ const AddTransferForm = ({ onSubmit, onCancel }) => {
           </section>
 
           <section className="form-section">
-            <h4>Asset Details</h4>
             <div className="assets-header">
-              <span>Assets ({formData.assets.length})</span>
-              <button 
-                type="button" 
+              <h4>Asset Details</h4>
+              <button
+                type="button"
                 className="btn-add-asset"
-                onClick={addAsset}
+                onClick={addItem}
                 disabled={submitting}
               >
-                + Add Another Asset
+                + Add Asset
               </button>
             </div>
             
-            {formData.assets.map((asset, index) => (
-              <div key={index} className="asset-row">
+            {formData.items.map((item, index) => (
+              <div key={index} className="asset-item-row">
                 <div className="form-row">
                   <div className="form-group">
                     <label>Asset *</label>
-                    <select 
-                      value={asset.asset_id} 
-                      onChange={(e) => handleAssetChange(index, 'asset_id', e.target.value)}
+                    <select
+                      value={item.asset_id}
+                      onChange={(e) => handleItemChange(index, 'asset_id', e.target.value)}
                       disabled={submitting}
                       required
                     >
                       <option value="">Select Asset</option>
-                      {formOptions.assets.map(assetOption => (
-                        <option key={assetOption.id} value={assetOption.id}>
-                          {assetOption.asset_name} ({assetOption.asset_id})
+                      {formOptions.assets.map(asset => (
+                        <option key={asset.id} value={asset.id}>
+                          {asset.asset_name} ({asset.asset_id})
                         </option>
                       ))}
                     </select>
                   </div>
                   <div className="form-group">
                     <label>Quantity *</label>
-                    <input 
-                      type="number" 
-                      value={asset.quantity} 
-                      onChange={(e) => handleAssetChange(index, 'quantity', e.target.value)}
-                      min="1" 
+                    <input
+                      type="number"
+                      value={item.quantity}
+                      onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
+                      min="1"
+                      step="1"
                       disabled={submitting}
                       required
                     />
                   </div>
-                  {formData.assets.length > 1 && (
-                    <div className="form-group remove-btn-container">
-                      <button 
-                        type="button" 
-                        className="btn-remove-asset"
-                        onClick={() => removeAsset(index)}
-                        disabled={submitting}
-                        title="Remove Asset"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  )}
                 </div>
+                {formData.items.length > 1 && (
+                  <button
+                    type="button"
+                    className="btn-remove-item"
+                    onClick={() => removeItem(index)}
+                    disabled={submitting}
+                    title="Remove Asset"
+                  >
+                    Remove
+                  </button>
+                )}
               </div>
             ))}
           </section>
@@ -302,20 +294,24 @@ const AddTransferForm = ({ onSubmit, onCancel }) => {
             <h4>Additional Information</h4>
             <div className="form-group">
               <label htmlFor="notes">Notes</label>
-              <textarea 
-                id="notes" 
-                name="notes" 
-                value={formData.notes} 
-                onChange={handleChange} 
-                placeholder="Optional notes" 
-                rows="3" 
+              <textarea
+                id="notes"
+                name="notes"
+                value={formData.notes}
+                onChange={handleChange}
+                placeholder="Optional notes"
+                rows="3"
                 disabled={submitting}
-              ></textarea>
+              />
             </div>
           </section>
 
           <div className="form-actions">
-            <button type="submit" className="btn-submit" disabled={submitting}>
+            <button
+              type="submit"
+              className="btn-submit"
+              disabled={submitting}
+            >
               {submitting ? 'Creating...' : 'Create Transfer'}
             </button>
           </div>

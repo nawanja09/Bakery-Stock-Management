@@ -2,156 +2,146 @@ import React from 'react';
 import './ViewTransfer.css';
 
 const ViewTransfer = ({ transfer, onClose, onEdit }) => {
-  console.log('ViewTransfer received:', transfer);
-
-  if (!transfer) {
-    return (
-      <div className="view-transfer-overlay">
-        <div className="view-transfer-container">
-          <div className="loading">No transfer data available</div>
-        </div>
-      </div>
-    );
-  }
-
   const getStatusBadge = (status) => {
-    const statusConfig = {
-      Pending: { class: 'status-pending', label: 'Pending' },
-      Completed: { class: 'status-completed', label: 'Completed' },
-      Cancelled: { class: 'status-cancelled', label: 'Cancelled' },
+    const map = {
+      Pending: 'pending',
+      Completed: 'completed',
+      Cancelled: 'cancelled',
     };
+    return <span className={`status-badge ${map[status]}`}>{status}</span>;
+  };
 
-    const config = statusConfig[status] || { class: 'status-pending', label: status };
-    return <span className={`status-badge ${config.class}`}>{config.label}</span>;
+  const getTotalQuantity = () => {
+    if (transfer.items && transfer.items.length > 0) {
+      return transfer.items.reduce((sum, item) => sum + (item.quantity || 0), 0);
+    }
+    return 0;
   };
 
   return (
     <div className="view-transfer-overlay">
       <div className="view-transfer-container">
         <div className="view-transfer-header">
-          <h3>Transfer Details</h3>
-          <button type="button" className="btn-close" onClick={onClose}>
+          <h3>Transfer Details - {transfer.transfer_id}</h3>
+          <button 
+            type="button" 
+            className="btn-close"
+            onClick={onClose}
+          >
             ×
           </button>
         </div>
 
-        <div className="transfer-details">
-          {/* Basic Info */}
-          <section className="detail-section">
-            <h4>Basic Information</h4>
+        <div className="view-transfer-body">
+          <div className="detail-section">
+            <h4>Transfer Information</h4>
             <div className="detail-grid">
               <div className="detail-item">
-                <label>Transfer ID</label>
-                <span>{transfer.transfer_id || 'N/A'}</span>
+                <label>Transfer ID:</label>
+                <span>{transfer.transfer_id}</span>
               </div>
               <div className="detail-item">
-                <label>Transfer Date</label>
-                <span>
-                  {transfer.transfer_date
-                    ? new Date(transfer.transfer_date).toLocaleDateString()
-                    : 'N/A'}
-                </span>
+                <label>Transfer Date:</label>
+                <span>{new Date(transfer.transfer_date).toLocaleDateString()}</span>
               </div>
               <div className="detail-item">
-                <label>Status</label>
-                {getStatusBadge(transfer.status || 'Pending')}
+                <label>Transferred By:</label>
+                <span>{transfer.transferred_by}</span>
               </div>
               <div className="detail-item">
-                <label>Transferred By</label>
-                <span>{transfer.transferred_by || 'N/A'}</span>
+                <label>Status:</label>
+                <span>{getStatusBadge(transfer.status)}</span>
               </div>
             </div>
-          </section>
+          </div>
 
-          {/* Location Info */}
-          <section className="detail-section">
-            <h4>Location Information</h4>
-            <div className="location-flow">
-              <div className="location-from">
-                <label>From</label>
-                <div className="location-detail">
-                  <span>{transfer.from_location_name || 'N/A'}</span>
-                  {transfer.location_from_id && <span>ID: {transfer.location_from_id}</span>}
-                </div>
-              </div>
-              <div className="flow-arrow">→</div>
-              <div className="location-to">
-                <label>To</label>
-                <div className="location-detail">
-                  <span>{transfer.to_location_name || 'N/A'}</span>
-                  {transfer.location_to_id && <span>ID: {transfer.location_to_id}</span>}
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* Asset Info */}
-          <section className="detail-section">
-            <h4>Asset Information</h4>
+          <div className="detail-section">
+            <h4>Location Details</h4>
             <div className="detail-grid">
               <div className="detail-item">
-                <label>Asset Name</label>
-                <span>{transfer.asset_name || 'N/A'}</span>
+                <label>From Location:</label>
+                <span>{transfer.from_location_name}</span>
               </div>
               <div className="detail-item">
-                <label>Asset Code</label>
-                <span>{transfer.asset_code || 'N/A'}</span>
-              </div>
-              <div className="detail-item">
-                <label>Quantity</label>
-                <span>{transfer.quantity || 0}</span>
-              </div>
-              <div className="detail-item">
-                <label>Asset ID</label>
-                <span>{transfer.asset_id || 'N/A'}</span>
+                <label>To Location:</label>
+                <span>{transfer.to_location_name}</span>
               </div>
             </div>
-          </section>
+          </div>
 
-          {/* Notes */}
+          <div className="detail-section">
+            <div className="assets-header">
+              <h4>Asset Details</h4>
+              <div className="total-quantity">
+                Total Items: <strong>{getTotalQuantity()}</strong>
+              </div>
+            </div>
+            
+            {transfer.items && transfer.items.length > 0 ? (
+              <div className="assets-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Asset ID</th>
+                      <th>Asset Name</th>
+                      <th>Quantity</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {transfer.items.map((item, index) => (
+                      <tr key={index}>
+                        <td>{index + 1}</td>
+                        <td>{item.asset_code}</td>
+                        <td>{item.asset_name}</td>
+                        <td className="quantity">{item.quantity}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="no-assets">
+                <span>No assets found for this transfer</span>
+              </div>
+            )}
+          </div>
+
           {transfer.notes && (
-            <section className="detail-section">
+            <div className="detail-section">
               <h4>Notes</h4>
-              <div className="notes-content">{transfer.notes}</div>
-            </section>
+              <div className="notes-content">
+                {transfer.notes}
+              </div>
+            </div>
           )}
 
-          {/* System Info */}
-          <section className="detail-section">
+          <div className="detail-section">
             <h4>System Information</h4>
             <div className="detail-grid">
               <div className="detail-item">
-                <label>Created By</label>
-                <span>{transfer.created_by_name || transfer.created_by || 'System'}</span>
+                <label>Created By:</label>
+                <span>{transfer.created_by_name}</span>
               </div>
               <div className="detail-item">
-                <label>Created Date</label>
-                <span>
-                  {transfer.created_at
-                    ? new Date(transfer.created_at).toLocaleString()
-                    : 'N/A'}
-                </span>
+                <label>Created At:</label>
+                <span>{new Date(transfer.created_at).toLocaleString()}</span>
               </div>
               <div className="detail-item">
-                <label>Last Updated</label>
-                <span>
-                  {transfer.updated_at
-                    ? new Date(transfer.updated_at).toLocaleString()
-                    : 'N/A'}
-                </span>
-              </div>
-              <div className="detail-item">
-                <label>DB Transfer ID</label>
-                <span>{transfer.id || 'N/A'}</span>
+                <label>Last Updated:</label>
+                <span>{new Date(transfer.updated_at).toLocaleString()}</span>
               </div>
             </div>
-          </section>
-        </div>
+          </div>
 
-        <div className="transfer-actions">
-          <button className="btn-edit" onClick={onEdit}>
-            Edit
-          </button>
+          <div className="view-transfer-actions">
+            <button className="btn-edit" onClick={onEdit}>
+              Edit Transfer
+            </button>
+            <button className="btn-close-secondary" onClick={onClose}>
+              Close
+            </button>
+          </div>
         </div>
       </div>
     </div>
