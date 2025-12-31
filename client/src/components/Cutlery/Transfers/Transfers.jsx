@@ -20,16 +20,10 @@ const Transfers = () => {
     try {
       setLoading(true);
       const res = await api.get('/cutlery-transfers');
-      
-      // Ensure each transfer has items array
-      const transfersWithItems = res.data.map(transfer => ({
-        ...transfer,
-        items: transfer.items || []
-      }));
-      
-      setTransfers(transfersWithItems);
+      setTransfers(
+        res.data.map(t => ({ ...t, items: t.items || [] }))
+      );
     } catch (err) {
-      console.error('Error fetching transfers:', err);
       showPopup('error', 'Failed to load transfers');
     } finally {
       setLoading(false);
@@ -73,25 +67,21 @@ const Transfers = () => {
     }
   };
 
-  const getStatusBadge = (status) => {
-    const map = {
-      Pending: 'pending',
-      Completed: 'completed',
-      Cancelled: 'cancelled',
-    };
-    return <span className={`status-badge ${map[status]}`}>{status}</span>;
-  };
+  const statusClass = (status) =>
+    `status-pill ${status?.toLowerCase()}`;
 
-  if (loading) return <div className="loading">Loading transfers...</div>;
+  if (loading) {
+    return <div className="loading">Loading transfers…</div>;
+  }
 
   return (
     <div className="transfers-page">
       <header className="page-header">
         <div>
           <h1>Transfers</h1>
-          <p>Manage cutlery transfer records</p>
+          <p>Cutlery movement between locations</p>
         </div>
-        <button className="primary-btn" onClick={() => setShowAddForm(true)}>
+        <button className="btn-primary" onClick={() => setShowAddForm(true)}>
           <FontAwesomeIcon icon={faPlus} /> New Transfer
         </button>
       </header>
@@ -122,16 +112,14 @@ const Transfers = () => {
         />
       )}
 
-      <section className="content-card">
+      <section className="table-card">
         {transfers.length === 0 ? (
-          <div className="no-data">
-            <span>🔄</span>
-            <p>No transfers found</p>
-            <button 
-              className="btn-add-first" 
-              onClick={() => setShowAddForm(true)}
-            >
-              <FontAwesomeIcon icon={faPlus} /> Create Your First Transfer
+          <div className="empty-state">
+            <span>📦</span>
+            <h3>No transfers yet</h3>
+            <p>Create your first cutlery transfer</p>
+            <button className="btn-primary" onClick={() => setShowAddForm(true)}>
+              <FontAwesomeIcon icon={faPlus} /> Add Transfer
             </button>
           </div>
         ) : (
@@ -144,11 +132,11 @@ const Transfers = () => {
                 <th>To</th>
                 <th>By</th>
                 <th>Status</th>
-                <th className="actions-header">Actions</th>
+                <th className="right">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {transfers.map((t) => (
+              {transfers.map(t => (
                 <tr key={t.id}>
                   <td data-label="ID">{t.transfer_id}</td>
                   <td data-label="Date">
@@ -157,31 +145,23 @@ const Transfers = () => {
                   <td data-label="From">{t.from_location_name}</td>
                   <td data-label="To">{t.to_location_name}</td>
                   <td data-label="By">{t.transferred_by}</td>
-                  <td data-label="Status">{getStatusBadge(t.status)}</td>
-                  <td className="actions-cell" data-label="Actions">
-                    <div className="actions">
-                      <button 
-                        className="icon-btn" 
-                        onClick={() => setViewingTransfer(t)}
-                        title="View Details"
-                      >
-                        <FontAwesomeIcon icon={faEye} />
-                      </button>
-                      <button 
-                        className="icon-btn" 
-                        onClick={() => setEditingTransfer(t)}
-                        title="Edit Transfer"
-                      >
-                        <FontAwesomeIcon icon={faPen} />
-                      </button>
-                      <button
-                        className="icon-btn danger"
-                        onClick={() => handleDeleteTransfer(t.id, t.transfer_id)}
-                        title="Delete Transfer"
-                      >
-                        <FontAwesomeIcon icon={faTrash} />
-                      </button>
-                    </div>
+                  <td data-label="Status">
+                    <span className={statusClass(t.status)}>{t.status}</span>
+                  </td>
+                  <td className="right actions" data-label="Actions">
+                    <button onClick={() => setViewingTransfer(t)} title="View">
+                      <FontAwesomeIcon icon={faEye} />
+                    </button>
+                    <button onClick={() => setEditingTransfer(t)} title="Edit">
+                      <FontAwesomeIcon icon={faPen} />
+                    </button>
+                    <button
+                      className="danger"
+                      onClick={() => handleDeleteTransfer(t.id, t.transfer_id)}
+                      title="Delete"
+                    >
+                      <FontAwesomeIcon icon={faTrash} />
+                    </button>
                   </td>
                 </tr>
               ))}

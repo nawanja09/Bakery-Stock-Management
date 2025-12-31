@@ -44,16 +44,17 @@ const getStockReport = async (req, res) => {
       WHERE cp.purchase_date <= ?
     `, [targetDate]);
     
-    // Get all transfers up to the report date
+    // Get all transfers up to the report date (CORRECTED)
     const [transfers] = await pool.query(`
       SELECT 
-        asset_id,
-        location_from_id,
-        location_to_id,
-        quantity,
+        cti.asset_id,
+        ct.location_from_id,
+        ct.location_to_id,
+        cti.quantity,
         cl_from.location_name as from_location,
         cl_to.location_name as to_location
       FROM cutlery_transfers ct
+      JOIN cutlery_transfer_items cti ON ct.id = cti.transfer_id
       LEFT JOIN cutlery_locations cl_from ON ct.location_from_id = cl_from.id
       LEFT JOIN cutlery_locations cl_to ON ct.location_to_id = cl_to.id
       WHERE ct.transfer_date <= ?
@@ -108,7 +109,7 @@ const getStockReport = async (req, res) => {
         }
       });
       
-      // Process transfers
+      // Process transfers (CORRECTED - using from_location and to_location)
       transfers.forEach(transfer => {
         if (transfer.asset_id === asset.id) {
           // Subtract from source location
@@ -182,7 +183,7 @@ const getStockReportByAsset = async (req, res) => {
       ORDER BY cs.created_at DESC
     `, [asset_id, targetDate]);
     
-    // Get transactions (purchases, transfers, damages) for this asset
+    // Get transactions (purchases, transfers, damages) for this asset (CORRECTED)
     const [transactions] = await pool.query(`
       (
         SELECT 
@@ -203,13 +204,14 @@ const getStockReportByAsset = async (req, res) => {
           'Transfer' as type,
           ct.transfer_date as date,
           ct.transfer_id as reference,
-          ct.quantity,
+          cti.quantity,
           CONCAT('From: ', cl_from.location_name, ' To: ', cl_to.location_name) as location_name,
           'TRANSFER' as direction
         FROM cutlery_transfers ct
+        JOIN cutlery_transfer_items cti ON ct.id = cti.transfer_id
         LEFT JOIN cutlery_locations cl_from ON ct.location_from_id = cl_from.id
         LEFT JOIN cutlery_locations cl_to ON ct.location_to_id = cl_to.id
-        WHERE ct.asset_id = ?
+        WHERE cti.asset_id = ?
         AND ct.transfer_date <= ?
         AND ct.status = 'Completed'
       )
