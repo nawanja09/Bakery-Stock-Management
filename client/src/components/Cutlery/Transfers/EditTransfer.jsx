@@ -8,8 +8,8 @@ const EditTransfer = ({ transfer, onSubmit, onCancel }) => {
     transfer_date: '',
     location_from_id: '',
     location_to_id: '',
-    asset_id: '',
-    quantity: 1,
+    // support multiple assets
+    items: [{ asset_id: '', quantity: 1 }],
     notes: '',
     transferred_by: '',
     status: 'Pending'
@@ -35,8 +35,7 @@ const EditTransfer = ({ transfer, onSubmit, onCancel }) => {
       transfer_date: formattedDate,
       location_from_id: transfer.location_from_id,
       location_to_id: transfer.location_to_id,
-      asset_id: transfer.asset_id,
-      quantity: transfer.quantity,
+      items: [{ asset_id: transfer.asset_id || '', quantity: transfer.quantity || 1 }],
       notes: transfer.notes || '',
       transferred_by: transfer.transferred_by,
       status: transfer.status
@@ -64,12 +63,27 @@ const EditTransfer = ({ transfer, onSubmit, onCancel }) => {
     }));
   };
 
+  const handleItemChange = (index, field, value) => {
+    const newItems = [...formData.items];
+    newItems[index] = { ...newItems[index], [field]: value };
+    if (field === 'quantity') newItems[index].quantity = parseInt(value || 0, 10);
+    setFormData(prev => ({ ...prev, items: newItems }));
+  };
+
+  const addItem = () => setFormData(prev => ({ ...prev, items: [...prev.items, { asset_id: '', quantity: 1 }] }));
+  const removeItem = (index) => {
+    if (formData.items.length > 1) {
+      const newItems = [...formData.items];
+      newItems.splice(index, 1);
+      setFormData(prev => ({ ...prev, items: newItems }));
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
     // Validation
-    if (!formData.transfer_date || !formData.location_from_id || !formData.location_to_id || 
-        !formData.asset_id || !formData.quantity || !formData.transferred_by) {
+    if (!formData.transfer_date || !formData.location_from_id || !formData.location_to_id || !formData.transferred_by) {
       showPopup('error', 'Please fill all required fields');
       return;
     }
@@ -79,14 +93,33 @@ const EditTransfer = ({ transfer, onSubmit, onCancel }) => {
       return;
     }
 
-    if (formData.quantity <= 0) {
-      showPopup('error', 'Quantity must be greater than 0');
+    const validItems = formData.items.filter(i => i.asset_id && i.quantity > 0);
+    if (validItems.length === 0) {
+      showPopup('error', 'Please add at least one asset with quantity > 0');
       return;
     }
 
     setSubmitting(true);
     try {
-      await onSubmit(formData);
+      const validItems = formData.items.filter(i => i.asset_id && i.quantity > 0);
+      if (validItems.length === 1) {
+        // Convert to legacy single-asset payload expected by server update
+        const payload = {
+          transfer_date: formData.transfer_date,
+          location_from_id: formData.location_from_id,
+          location_to_id: formData.location_to_id,
+          asset_id: validItems[0].asset_id,
+          quantity: validItems[0].quantity,
+          notes: formData.notes,
+          transferred_by: formData.transferred_by,
+          status: formData.status
+        };
+        await onSubmit(payload);
+      } else if (validItems.length > 1) {
+        showPopup('error', 'Editing multiple assets in a single transfer is not supported. Please edit individual transfers or create a new transfer.');
+      } else {
+        showPopup('error', 'Please add at least one asset with quantity > 0');
+      }
     } catch (error) {
       console.error('Error submitting form:', error);
     } finally {
@@ -215,40 +248,33 @@ const EditTransfer = ({ transfer, onSubmit, onCancel }) => {
 
           <div className="form-section">
             <h4>Asset Details</h4>
-            
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="asset_id">Asset *</label>
-                <select
-                  id="asset_id"
-                  name="asset_id"
-                  value={formData.asset_id}
-                  onChange={handleChange}
-                  required
-                  disabled={submitting}
-                >
-                  <option value="">Select Asset</option>
-                  {formOptions.assets.map(asset => (
-                    <option key={asset.id} value={asset.id}>
-                      {asset.asset_name} ({asset.asset_id})
-                    </option>
-                  ))}
-                </select>
-              </div>
+            <div className="items-header">
+              <span>Assets ({formData.items.length})</span>
+              <button type="button" className="btn-add-item" onClick={addItem} disabled={submitting}>+ Add Asset</button>
+            </div>
+            <div className="items-list">
+              {formData.items.map((item, i) => (
+                <div key={i} className="item-row">
+                  <div className="form-group">
+                    <label>Asset *</label>
+                    <select value={item.asset_id} onChange={e => handleItemChange(i, 'asset_id', e.target.value)} required disabled={submitting}>
+                      <option value="">Select Asset</option>
+                      {formOptions.assets.map(asset => (
+                        <option key={asset.id} value={asset.id}>
+                          {asset.asset_name} ({asset.asset_id})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-              <div className="form-group">
-                <label htmlFor="quantity">Quantity *</label>
-                <input
-                  type="number"
-                  id="quantity"
-                  name="quantity"
-                  value={formData.quantity}
-                  onChange={handleChange}
-                  min="1"
-                  required
-                  disabled={submitting}
-                />
-              </div>
+                  <div className="form-group">
+                    <label>Quantity *</label>
+                    <input type="number" value={item.quantity} onChange={e => handleItemChange(i, 'quantity', e.target.value)} min="1" required disabled={submitting} />
+                  </div>
+
+                  {formData.items.length > 1 && <button type="button" className="btn-remove-item" onClick={() => removeItem(i)} disabled={submitting} title="Remove Asset">×</button>}
+                </div>
+              ))}
             </div>
           </div>
 

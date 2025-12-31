@@ -1,15 +1,15 @@
 -- Step 1: Drop dependent tables first (in correct order)
-DROP TABLE IF EXISTS backery_system.cutlery_damage_items;
-DROP TABLE IF EXISTS backery_system.cutlery_damages;
-DROP TABLE IF EXISTS backery_system.cutlery_purchase_items;
-DROP TABLE IF EXISTS backery_system.cutlery_purchases;
-DROP TABLE IF EXISTS backery_system.cutlery_transfers;
-DROP TABLE IF EXISTS backery_system.cutlery_stock;
-DROP TABLE IF EXISTS backery_system.cutlery_suppliers;
-DROP TABLE IF EXISTS backery_system.cutlery_stock_history;
-DROP TABLE IF EXISTS backery_system.location_mapping;
-DROP TABLE IF EXISTS backery_system.cutlery_assets;
-DROP TABLE IF EXISTS backery_system.cutlery_locations;
+DROP TABLE IF EXISTS ravonbak_bakery_system.cutlery_damage_items;
+DROP TABLE IF EXISTS ravonbak_bakery_system.cutlery_damages;
+DROP TABLE IF EXISTS ravonbak_bakery_system.cutlery_purchase_items;
+DROP TABLE IF EXISTS ravonbak_bakery_system.cutlery_purchases;
+DROP TABLE IF EXISTS ravonbak_bakery_system.cutlery_transfers;
+DROP TABLE IF EXISTS ravonbak_bakery_system.cutlery_stock;
+DROP TABLE IF EXISTS ravonbak_bakery_system.cutlery_suppliers;
+DROP TABLE IF EXISTS ravonbak_bakery_system.cutlery_stock_history;
+DROP TABLE IF EXISTS ravonbak_bakery_system.location_mapping;
+DROP TABLE IF EXISTS ravonbak_bakery_system.cutlery_assets;
+DROP TABLE IF EXISTS ravonbak_bakery_system.cutlery_locations;
 
 -- =============================================
 -- 1. LOCATIONS TABLE
@@ -409,7 +409,7 @@ BEGIN
         GROUP BY asset_id, location_id
     ) sh ON a.id = sh.asset_id AND l.id = sh.location_id
     GROUP BY a.id, a.asset_id, a.asset_name, a.description
-    ORDER BY a.asset_code;
+    ORDER BY asset_code;
 END$$
 
 DELIMITER ;

@@ -39,12 +39,19 @@ exports.getDashboardStats = async (req, res) => {
     console.log("Fetching dashboard stats...");
 
     // Opening Balance
-    const [openingResult] = await pool.query(`
-      SELECT SUM(total_value) AS openingBalance
-      FROM opening_balances
-      WHERE date = (SELECT MAX(date) FROM opening_balances)
-    `);
-    const openingBalance = openingResult?.[0]?.openingBalance ?? 0;
+    let openingBalance = 0;
+    try {
+      const [openingResult] = await pool.query(`
+        SELECT SUM(total_value) AS openingBalance
+        FROM opening_balances
+        WHERE date = (SELECT MAX(date) FROM opening_balances)
+      `);
+      openingBalance = openingResult?.[0]?.openingBalance ?? 0;
+    } catch (e) {
+      // If the column doesn't exist (older schema change), fall back to a safe default
+      console.warn('opening_balances.total_value column missing or query failed, falling back to 0', e.message);
+      openingBalance = 0;
+    }
 
     // Purchasing (last 7 days)
     const [purchasingResult] = await pool.query(`
@@ -106,13 +113,27 @@ exports.getChartData = async (req, res) => {
     `, [start, end]);
 
     // Opening Balance
-    const [openingData] = await pool.query(`
-      SELECT date, SUM(total_value) AS amount
-      FROM opening_balances
-      WHERE date BETWEEN ? AND ?
-      GROUP BY date
-      ORDER BY date
-    `, [start, end]);
+    let openingData = [];
+    try {
+      const [od] = await pool.query(`
+        SELECT date, SUM(total_value) AS amount
+        FROM opening_balances
+        WHERE date BETWEEN ? AND ?
+        GROUP BY date
+        ORDER BY date
+      `, [start, end]);
+      openingData = od;
+    } catch (e) {
+      console.warn('opening_balances.total_value missing for chart data, falling back to quantity per date', e.message);
+      const [od2] = await pool.query(`
+        SELECT date, SUM(quantity) AS amount
+        FROM opening_balances
+        WHERE date BETWEEN ? AND ?
+        GROUP BY date
+        ORDER BY date
+      `, [start, end]);
+      openingData = od2;
+    }
 
     // Purchasing
     const [purchasingData] = await pool.query(`
