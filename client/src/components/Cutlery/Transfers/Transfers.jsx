@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { usePopup } from '../../context/PopupContext';
 import api from '../../../api';
 import AddTransferForm from './AddTransferForm';
@@ -16,11 +16,7 @@ const Transfers = () => {
   const [editingTransfer, setEditingTransfer] = useState(null);
   const { showPopup } = usePopup();
 
-  useEffect(() => {
-    fetchTransfers();
-  }, []);
-
-  const fetchTransfers = async () => {
+  const fetchTransfers = useCallback(async () => {
     try {
       setLoading(true);
       const res = await api.get('/cutlery-transfers');
@@ -38,7 +34,11 @@ const Transfers = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showPopup]);
+
+  useEffect(() => {
+    fetchTransfers();
+  }, [fetchTransfers]);
 
   const handleAddTransfer = async (data) => {
     try {
@@ -80,45 +80,6 @@ const Transfers = () => {
       Cancelled: 'cancelled',
     };
     return <span className={`status-badge ${map[status]}`}>{status}</span>;
-  };
-
-  // Helper to calculate total quantity for a transfer
-  const getTotalQuantity = (transfer) => {
-    if (transfer.items && transfer.items.length > 0) {
-      return transfer.items.reduce((sum, item) => sum + (item.quantity || 0), 0);
-    }
-    return transfer.quantity || 0;
-  };
-
-  // Helper to get asset list for display
-  const getAssetDisplay = (transfer) => {
-    if (transfer.items && transfer.items.length > 0) {
-      if (transfer.items.length === 1) {
-        const item = transfer.items[0];
-        return (
-          <div>
-            <strong>{item.asset_name}</strong>
-            <div className="muted">{item.asset_code}</div>
-          </div>
-        );
-      }
-      return (
-        <div className="asset-list">
-          {transfer.items.map((item, idx) => (
-            <div key={idx} className="asset-badge">
-              <strong>{item.asset_name}</strong> × {item.quantity}
-            </div>
-          ))}
-        </div>
-      );
-    }
-    // Fallback for old data structure
-    return (
-      <div>
-        <strong>{transfer.asset_name}</strong>
-        <div className="muted">{transfer.asset_code}</div>
-      </div>
-    );
   };
 
   if (loading) return <div className="loading">Loading transfers...</div>;
