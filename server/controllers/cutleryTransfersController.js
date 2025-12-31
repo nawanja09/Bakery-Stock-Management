@@ -65,9 +65,10 @@ const createTransfer = async (req, res) => {
     const {
       transfer_date,
       location_from_id,
-      location_to_id,
-      asset_id,
-      quantity,
+        location_to_id,
+        asset_id,
+        quantity,
+        items, // optional array of { asset_id, quantity }
       notes,
       transferred_by
     } = req.body;
@@ -85,36 +86,58 @@ const createTransfer = async (req, res) => {
       return res.status(400).json({ error: 'Quantity must be greater than 0' });
     }
 
-    // Get the next transfer ID (T001, T002, etc.)
-    const [maxId] = await connection.query(`
+    // Get user ID from token or session - use a valid user ID (fallback to first user)
+    const [users] = await connection.query('SELECT id FROM users LIMIT 1');
+    const userId = users.length > 0 ? users[0].id : 1;
+
+    // Get the last transfer id to base new sequential ids
+    const [maxIdRows] = await connection.query(`
       SELECT transfer_id FROM cutlery_transfers 
       ORDER BY id DESC LIMIT 1
     `);
-
-    let nextId = 'T001';
-    if (maxId.length > 0) {
-      const lastId = maxId[0].transfer_id;
-      const lastNumber = parseInt(lastId.substring(1));
-      nextId = 'T' + String(lastNumber + 1).padStart(3, '0');
+    let lastNumber = 0;
+    if (maxIdRows.length > 0 && maxIdRows[0].transfer_id) {
+      const lastId = maxIdRows[0].transfer_id;
+      lastNumber = parseInt(lastId.substring(1)) || 0;
     }
 
-    // Get user ID from token or session - FIXED: Use a valid user ID
-    // First, let's get a valid user ID from the users table
-    const [users] = await connection.query('SELECT id FROM users LIMIT 1');
-    const userId = users.length > 0 ? users[0].id : 1; // Use first user or default to 1
+    const createdIds = [];
 
-    // Insert new transfer
-    const [result] = await connection.query(
-      `INSERT INTO cutlery_transfers 
-       (transfer_id, transfer_date, location_from_id, location_to_id, asset_id, quantity, notes, transferred_by, created_by) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [nextId, transfer_date, location_from_id, location_to_id, asset_id, quantity, notes, transferred_by, userId]
-    );
+    if (Array.isArray(items) && items.length > 0) {
+      // Insert one transfer row per item
+      for (const it of items) {
+        const aid = it.asset_id;
+        const qty = parseInt(it.quantity, 10) || 0;
+        if (!aid || qty <= 0) {
+          await connection.rollback();
+          return res.status(400).json({ error: 'Each item must have asset_id and quantity > 0' });
+        }
+        lastNumber += 1;
+        const nextId = 'T' + String(lastNumber).padStart(3, '0');
+
+        const [r] = await connection.query(
+          `INSERT INTO cutlery_transfers 
+           (transfer_id, transfer_date, location_from_id, location_to_id, asset_id, quantity, notes, transferred_by, created_by) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [nextId, transfer_date, location_from_id, location_to_id, aid, qty, notes, transferred_by, userId]
+        );
+        createdIds.push(r.insertId);
+      }
+    } else {
+      // legacy single asset payload
+      const [result] = await connection.query(
+        `INSERT INTO cutlery_transfers 
+         (transfer_id, transfer_date, location_from_id, location_to_id, asset_id, quantity, notes, transferred_by, created_by) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ['T' + String(lastNumber + 1).padStart(3, '0'), transfer_date, location_from_id, location_to_id, asset_id, quantity, notes, transferred_by, userId]
+      );
+      createdIds.push(result.insertId);
+    }
 
     await connection.commit();
 
-    // Get the created transfer with joined data
-    const [newTransfer] = await connection.query(`
+    // Fetch created transfers
+    const [newTransfers] = await connection.query(`
       SELECT 
         ct.*,
         cl_from.location_name as from_location_name,
@@ -127,12 +150,12 @@ const createTransfer = async (req, res) => {
       LEFT JOIN cutlery_locations cl_to ON ct.location_to_id = cl_to.id
       LEFT JOIN cutlery_assets ca ON ct.asset_id = ca.id
       LEFT JOIN users u ON ct.created_by = u.id
-      WHERE ct.id = ?
-    `, [result.insertId]);
+      WHERE ct.id IN (?);
+    `, [createdIds]);
 
     res.status(201).json({ 
-      message: 'Transfer created successfully',
-      transfer: newTransfer[0]
+      message: 'Transfer(s) created successfully',
+      transfers: newTransfers
     });
 
   } catch (err) {
