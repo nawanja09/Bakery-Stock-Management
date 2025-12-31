@@ -8,12 +8,12 @@ const EditTransfer = ({ transfer, onSubmit, onCancel }) => {
     transfer_date: '',
     location_from_id: '',
     location_to_id: '',
-    // support multiple assets
-    items: [{ asset_id: '', quantity: 1 }],
-    notes: '',
     transferred_by: '',
-    status: 'Pending'
+    status: 'Pending',
+    notes: '',
+    items: []
   });
+
   const [formOptions, setFormOptions] = useState({
     locations: [],
     assets: []
@@ -24,23 +24,32 @@ const EditTransfer = ({ transfer, onSubmit, onCancel }) => {
 
   useEffect(() => {
     fetchFormData();
+  }, []);
 
-    // Format transfer_date to YYYY-MM-DD for input[type="date"]
-    const formattedDate = transfer.transfer_date
-      ? new Date(transfer.transfer_date).toISOString().split('T')[0]
-      : '';
+  useEffect(() => {
+    if (transfer && formOptions.assets.length > 0) {
+      // Format transfer_date to YYYY-MM-DD
+      const formattedDate = transfer.transfer_date
+        ? new Date(transfer.transfer_date).toISOString().split('T')[0]
+        : '';
 
-    // Initialize form with transfer data
-    setFormData({
-      transfer_date: formattedDate,
-      location_from_id: transfer.location_from_id,
-      location_to_id: transfer.location_to_id,
-      items: [{ asset_id: transfer.asset_id || '', quantity: transfer.quantity || 1 }],
-      notes: transfer.notes || '',
-      transferred_by: transfer.transferred_by,
-      status: transfer.status
-    });
-  }, [transfer]);
+      // Initialize form with transfer data including items
+      setFormData({
+        transfer_date: formattedDate,
+        location_from_id: transfer.location_from_id,
+        location_to_id: transfer.location_to_id,
+        transferred_by: transfer.transferred_by,
+        status: transfer.status || 'Pending',
+        notes: transfer.notes || '',
+        items: transfer.items && transfer.items.length > 0 
+          ? transfer.items.map(item => ({
+              asset_id: item.asset_id.toString(),
+              quantity: item.quantity
+            }))
+          : [{ asset_id: '', quantity: 1 }]
+      });
+    }
+  }, [transfer, formOptions]);
 
   const fetchFormData = async () => {
     try {
@@ -65,17 +74,27 @@ const EditTransfer = ({ transfer, onSubmit, onCancel }) => {
 
   const handleItemChange = (index, field, value) => {
     const newItems = [...formData.items];
-    newItems[index] = { ...newItems[index], [field]: value };
-    if (field === 'quantity') newItems[index].quantity = parseInt(value || 0, 10);
+    newItems[index] = { 
+      ...newItems[index], 
+      [field]: field === 'quantity' ? parseInt(value) || 0 : value 
+    };
     setFormData(prev => ({ ...prev, items: newItems }));
   };
 
-  const addItem = () => setFormData(prev => ({ ...prev, items: [...prev.items, { asset_id: '', quantity: 1 }] }));
+  const addItem = () => {
+    setFormData(prev => ({
+      ...prev,
+      items: [...prev.items, { asset_id: '', quantity: 1 }]
+    }));
+  };
+
   const removeItem = (index) => {
     if (formData.items.length > 1) {
       const newItems = [...formData.items];
       newItems.splice(index, 1);
       setFormData(prev => ({ ...prev, items: newItems }));
+    } else {
+      showPopup('error', 'At least one asset is required');
     }
   };
 
@@ -83,7 +102,8 @@ const EditTransfer = ({ transfer, onSubmit, onCancel }) => {
     e.preventDefault();
     
     // Validation
-    if (!formData.transfer_date || !formData.location_from_id || !formData.location_to_id || !formData.transferred_by) {
+    if (!formData.transfer_date || !formData.location_from_id || !formData.location_to_id || 
+        !formData.transferred_by) {
       showPopup('error', 'Please fill all required fields');
       return;
     }
@@ -93,35 +113,34 @@ const EditTransfer = ({ transfer, onSubmit, onCancel }) => {
       return;
     }
 
-    const validItems = formData.items.filter(i => i.asset_id && i.quantity > 0);
+    // Validate items
+    const validItems = formData.items.filter(item => item.asset_id && item.quantity > 0);
     if (validItems.length === 0) {
-      showPopup('error', 'Please add at least one asset with quantity > 0');
+      showPopup('error', 'Please add at least one asset with quantity');
       return;
     }
 
+    // Check for duplicate assets
+    const assetIds = validItems.map(item => item.asset_id);
+    if (new Set(assetIds).size !== assetIds.length) {
+      showPopup('error', 'Duplicate assets are not allowed');
+      return;
+    }
+
+    const submitData = {
+      ...formData,
+      items: validItems.map(item => ({
+        asset_id: parseInt(item.asset_id),
+        quantity: parseInt(item.quantity)
+      }))
+    };
+
     setSubmitting(true);
     try {
-      const validItems = formData.items.filter(i => i.asset_id && i.quantity > 0);
-      if (validItems.length === 1) {
-        // Convert to legacy single-asset payload expected by server update
-        const payload = {
-          transfer_date: formData.transfer_date,
-          location_from_id: formData.location_from_id,
-          location_to_id: formData.location_to_id,
-          asset_id: validItems[0].asset_id,
-          quantity: validItems[0].quantity,
-          notes: formData.notes,
-          transferred_by: formData.transferred_by,
-          status: formData.status
-        };
-        await onSubmit(payload);
-      } else if (validItems.length > 1) {
-        showPopup('error', 'Editing multiple assets in a single transfer is not supported. Please edit individual transfers or create a new transfer.');
-      } else {
-        showPopup('error', 'Please add at least one asset with quantity > 0');
-      }
+      await onSubmit(submitData);
     } catch (error) {
       console.error('Error submitting form:', error);
+      showPopup('error', 'Failed to update transfer');
     } finally {
       setSubmitting(false);
     }
@@ -141,7 +160,7 @@ const EditTransfer = ({ transfer, onSubmit, onCancel }) => {
     <div className="edit-transfer-overlay">
       <div className="edit-transfer-container">
         <div className="edit-transfer-header">
-          <h3>Edit Transfer - {transfer.transfer_id}</h3>
+          <h3>Edit Transfer - {transfer?.transfer_id}</h3>
           <button 
             type="button" 
             className="btn-close"
@@ -247,17 +266,29 @@ const EditTransfer = ({ transfer, onSubmit, onCancel }) => {
           </div>
 
           <div className="form-section">
-            <h4>Asset Details</h4>
-            <div className="items-header">
-              <span>Assets ({formData.items.length})</span>
-              <button type="button" className="btn-add-item" onClick={addItem} disabled={submitting}>+ Add Asset</button>
+            <div className="assets-header">
+              <h4>Asset Details</h4>
+              <button
+                type="button"
+                className="btn-add-asset"
+                onClick={addItem}
+                disabled={submitting}
+              >
+                + Add Asset
+              </button>
             </div>
-            <div className="items-list">
-              {formData.items.map((item, i) => (
-                <div key={i} className="item-row">
+            
+            {formData.items.map((item, index) => (
+              <div key={index} className="asset-item-row">
+                <div className="form-row">
                   <div className="form-group">
                     <label>Asset *</label>
-                    <select value={item.asset_id} onChange={e => handleItemChange(i, 'asset_id', e.target.value)} required disabled={submitting}>
+                    <select
+                      value={item.asset_id}
+                      onChange={(e) => handleItemChange(index, 'asset_id', e.target.value)}
+                      required
+                      disabled={submitting}
+                    >
                       <option value="">Select Asset</option>
                       {formOptions.assets.map(asset => (
                         <option key={asset.id} value={asset.id}>
@@ -269,13 +300,29 @@ const EditTransfer = ({ transfer, onSubmit, onCancel }) => {
 
                   <div className="form-group">
                     <label>Quantity *</label>
-                    <input type="number" value={item.quantity} onChange={e => handleItemChange(i, 'quantity', e.target.value)} min="1" required disabled={submitting} />
+                    <input
+                      type="number"
+                      value={item.quantity}
+                      onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
+                      min="1"
+                      step="1"
+                      required
+                      disabled={submitting}
+                    />
                   </div>
-
-                  {formData.items.length > 1 && <button type="button" className="btn-remove-item" onClick={() => removeItem(i)} disabled={submitting} title="Remove Asset">×</button>}
                 </div>
-              ))}
-            </div>
+                {formData.items.length > 1 && (
+                  <button
+                    type="button"
+                    className="btn-remove-item"
+                    onClick={() => removeItem(index)}
+                    disabled={submitting}
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+            ))}
           </div>
 
           <div className="form-section">

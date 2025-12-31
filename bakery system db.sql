@@ -1396,3 +1396,44 @@ CALL GetStockReportByDate('2025-12-16');
 -- Affogato Cup: Stores=7, Café M=3, others=0
 
 COMMIT;
+
+-- Drop dependent tables first (in correct order)
+DROP TABLE IF EXISTS cutlery_transfer_items;
+DROP TABLE IF EXISTS cutlery_transfers;
+
+-- Recreate cutlery_transfers without asset_id and quantity
+CREATE TABLE IF NOT EXISTS `cutlery_transfers` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `transfer_id` varchar(20) NOT NULL,
+  `transfer_date` date NOT NULL,
+  `location_from_id` int NOT NULL,
+  `location_to_id` int NOT NULL,
+  `notes` text,
+  `transferred_by` varchar(255) NOT NULL,
+  `status` enum('Pending','Completed','Cancelled') DEFAULT 'Pending',
+  `created_by` int NOT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `transfer_id` (`transfer_id`),
+  KEY `location_from_id` (`location_from_id`),
+  KEY `location_to_id` (`location_to_id`),
+  KEY `created_by` (`created_by`),
+  CONSTRAINT `cutlery_transfers_ibfk_1` FOREIGN KEY (`location_from_id`) REFERENCES `cutlery_locations` (`id`),
+  CONSTRAINT `cutlery_transfers_ibfk_2` FOREIGN KEY (`location_to_id`) REFERENCES `cutlery_locations` (`id`),
+  CONSTRAINT `cutlery_transfers_ibfk_4` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Recreate cutlery_transfer_items
+CREATE TABLE IF NOT EXISTS `cutlery_transfer_items` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `transfer_id` int NOT NULL,
+  `asset_id` int NOT NULL,
+  `quantity` int NOT NULL DEFAULT '1',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `transfer_id` (`transfer_id`),
+  KEY `asset_id` (`asset_id`),
+  CONSTRAINT `cutlery_transfer_items_ibfk_1` FOREIGN KEY (`transfer_id`) REFERENCES `cutlery_transfers` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `cutlery_transfer_items_ibfk_2` FOREIGN KEY (`asset_id`) REFERENCES `cutlery_assets` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

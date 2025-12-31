@@ -132,3 +132,80 @@
   .form-actions { flex-direction: column; }
   .btn-submit, .btn-cancel { width: 100%; }
 }
+
+/* Add to AddTransferForm.css and EditTransfer.css */
+
+.assets-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.btn-add-asset {
+  background: #4f46e5;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.btn-add-asset:hover:not(:disabled) {
+  background: #4338ca;
+}
+
+.btn-add-asset:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.asset-item-row {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+  position: relative;
+}
+
+.btn-remove-item {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: #dc2626;
+  color: white;
+  border: none;
+  padding: 4px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.btn-remove-item:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.btn-remove-item:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+/* Update table styles in Transfers.css to handle multiple assets */
+.transfers-table td[data-label="Asset"] {
+  max-width: 200px;
+}
+
+.asset-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.asset-badge {
+  background: #f3f4f6;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  white-space: nowrap;
+}
