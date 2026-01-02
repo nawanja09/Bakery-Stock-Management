@@ -2,6 +2,7 @@ const pool = require('../config/db');
 
 const getTransfers = async (req, res) => {
   try {
+    // First get all transfers
     const [rows] = await pool.query(`
       SELECT 
         ct.*,
@@ -14,6 +15,8 @@ const getTransfers = async (req, res) => {
       LEFT JOIN users u ON ct.created_by = u.id
       ORDER BY ct.transfer_date DESC, ct.created_at DESC
     `);
+    
+    console.log('Found transfers:', rows.length);
     
     // Now fetch items for each transfer
     const transfersWithItems = await Promise.all(rows.map(async (transfer) => {
@@ -33,16 +36,24 @@ const getTransfers = async (req, res) => {
       };
     }));
     
-    res.json(transfersWithItems);
+    res.json({
+      success: true,
+      data: transfersWithItems
+    });
   } catch (err) {
     console.error('Error fetching transfers:', err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ 
+      success: false,
+      error: 'Server error',
+      message: err.message 
+    });
   }
 };
 
 const getTransferById = async (req, res) => {
   try {
     const { id } = req.params;
+    console.log('Fetching transfer by ID:', id);
 
     // Get transfer header
     const [transfer] = await pool.query(`
@@ -59,7 +70,10 @@ const getTransferById = async (req, res) => {
     `, [id]);
 
     if (transfer.length === 0) {
-      return res.status(404).json({ error: 'Transfer not found' });
+      return res.status(404).json({ 
+        success: false,
+        error: 'Transfer not found' 
+      });
     }
 
     // Get transfer items
@@ -74,12 +88,19 @@ const getTransferById = async (req, res) => {
     `, [id]);
 
     res.json({
-      ...transfer[0],
-      items: items
+      success: true,
+      data: {
+        ...transfer[0],
+        items: items
+      }
     });
   } catch (err) {
     console.error('Error fetching transfer:', err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ 
+      success: false,
+      error: 'Server error',
+      message: err.message 
+    });
   }
 };
 
@@ -99,23 +120,37 @@ const createTransfer = async (req, res) => {
       status = 'Pending'
     } = req.body;
 
+    console.log('Creating transfer with data:', req.body);
+
     // Validation
     if (!transfer_date || !location_from_id || !location_to_id || !transferred_by) {
-      return res.status(400).json({ error: 'All required fields must be filled' });
+      return res.status(400).json({ 
+        success: false,
+        error: 'All required fields must be filled' 
+      });
     }
 
     if (!items || !Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ error: 'At least one asset must be added' });
+      return res.status(400).json({ 
+        success: false,
+        error: 'At least one asset must be added' 
+      });
     }
 
     if (location_from_id === location_to_id) {
-      return res.status(400).json({ error: 'Source and destination locations cannot be the same' });
+      return res.status(400).json({ 
+        success: false,
+        error: 'Source and destination locations cannot be the same' 
+      });
     }
 
     // Validate each item
     for (const item of items) {
       if (!item.asset_id || item.quantity <= 0) {
-        return res.status(400).json({ error: 'Invalid item quantity or missing asset' });
+        return res.status(400).json({ 
+          success: false,
+          error: 'Invalid item quantity or missing asset' 
+        });
       }
     }
 
@@ -132,6 +167,8 @@ const createTransfer = async (req, res) => {
       nextId = 'T' + String(lastNumber + 1).padStart(3, '0');
     }
 
+    console.log('Generated transfer ID:', nextId);
+
     // Get user ID
     const [users] = await connection.query('SELECT id FROM users LIMIT 1');
     const userId = users.length > 0 ? users[0].id : 1;
@@ -147,6 +184,7 @@ const createTransfer = async (req, res) => {
     );
 
     const transferId = transferResult.insertId;
+    console.log('Created transfer with ID:', transferId);
 
     // Insert transfer items
     for (const item of items) {
@@ -157,6 +195,8 @@ const createTransfer = async (req, res) => {
         [transferId, item.asset_id, item.quantity]
       );
     }
+
+    console.log('Inserted transfer items:', items.length);
 
     // Get created transfer with items
     const [newTransfer] = await connection.query(`
@@ -186,8 +226,9 @@ const createTransfer = async (req, res) => {
     await connection.commit();
 
     res.status(201).json({ 
+      success: true,
       message: 'Transfer created successfully',
-      transfer: {
+      data: {
         ...newTransfer[0],
         items: transferItems
       }
@@ -198,10 +239,17 @@ const createTransfer = async (req, res) => {
     console.error('Error creating transfer:', err);
     
     if (err.code === 'ER_NO_REFERENCED_ROW_2') {
-      return res.status(400).json({ error: 'Invalid location, asset, or user selected' });
+      return res.status(400).json({ 
+        success: false,
+        error: 'Invalid location, asset, or user selected' 
+      });
     }
     
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ 
+      success: false,
+      error: 'Server error',
+      message: err.message 
+    });
   } finally {
     connection.release();
   }
@@ -224,6 +272,8 @@ const updateTransfer = async (req, res) => {
       status
     } = req.body;
 
+    console.log('Updating transfer ID:', id, 'with data:', req.body);
+
     // Check if transfer exists
     const [existingTransfer] = await connection.query(
       'SELECT * FROM cutlery_transfers WHERE id = ?',
@@ -231,12 +281,18 @@ const updateTransfer = async (req, res) => {
     );
 
     if (existingTransfer.length === 0) {
-      return res.status(404).json({ error: 'Transfer not found' });
+      return res.status(404).json({ 
+        success: false,
+        error: 'Transfer not found' 
+      });
     }
 
     // Validate items
     if (!items || !Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ error: 'At least one asset must be added' });
+      return res.status(400).json({ 
+        success: false,
+        error: 'At least one asset must be added' 
+      });
     }
 
     // Update transfer header
@@ -289,8 +345,9 @@ const updateTransfer = async (req, res) => {
     await connection.commit();
 
     res.json({ 
+      success: true,
       message: 'Transfer updated successfully',
-      transfer: {
+      data: {
         ...updatedTransfer[0],
         items: updatedItems
       }
@@ -299,7 +356,11 @@ const updateTransfer = async (req, res) => {
   } catch (err) {
     await connection.rollback();
     console.error('Error updating transfer:', err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ 
+      success: false,
+      error: 'Server error',
+      message: err.message 
+    });
   } finally {
     connection.release();
   }
@@ -308,6 +369,7 @@ const updateTransfer = async (req, res) => {
 const deleteTransfer = async (req, res) => {
   try {
     const { id } = req.params;
+    console.log('Deleting transfer ID:', id);
 
     const [result] = await pool.query(
       'DELETE FROM cutlery_transfers WHERE id = ?',
@@ -315,29 +377,59 @@ const deleteTransfer = async (req, res) => {
     );
 
     if (result.affectedRows === 0) {
-      return res.status(404).json({ error: 'Transfer not found' });
+      return res.status(404).json({ 
+        success: false,
+        error: 'Transfer not found' 
+      });
     }
 
-    res.json({ message: 'Transfer deleted successfully' });
+    res.json({ 
+      success: true,
+      message: 'Transfer deleted successfully' 
+    });
   } catch (err) {
     console.error('Error deleting transfer:', err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ 
+      success: false,
+      error: 'Server error',
+      message: err.message 
+    });
   }
 };
 
 // Helper function to get locations and assets for dropdowns
 const getTransferFormData = async (req, res) => {
   try {
-    const [locations] = await pool.query('SELECT id, location_id, location_name FROM cutlery_locations ORDER BY location_name');
-    const [assets] = await pool.query('SELECT id, asset_id, asset_name FROM cutlery_assets ORDER BY asset_name');
+    console.log('Fetching transfer form data');
+    
+    const [locations] = await pool.query(`
+      SELECT id, location_id, location_name 
+      FROM cutlery_locations 
+      ORDER BY location_name
+    `);
+    
+    const [assets] = await pool.query(`
+      SELECT id, asset_id, asset_name 
+      FROM cutlery_assets 
+      ORDER BY asset_name
+    `);
+    
+    console.log('Found locations:', locations.length, 'assets:', assets.length);
     
     res.json({
-      locations,
-      assets
+      success: true,
+      data: {
+        locations,
+        assets
+      }
     });
   } catch (err) {
     console.error('Error fetching form data:', err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ 
+      success: false,
+      error: 'Server error',
+      message: err.message 
+    });
   }
 };
 

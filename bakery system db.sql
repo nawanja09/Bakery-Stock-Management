@@ -1437,3 +1437,140 @@ CREATE TABLE IF NOT EXISTS `cutlery_transfer_items` (
   CONSTRAINT `cutlery_transfer_items_ibfk_1` FOREIGN KEY (`transfer_id`) REFERENCES `cutlery_transfers` (`id`) ON DELETE CASCADE,
   CONSTRAINT `cutlery_transfer_items_ibfk_2` FOREIGN KEY (`asset_id`) REFERENCES `cutlery_assets` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Drop existing triggers
+DROP TRIGGER IF EXISTS after_purchase_insert;
+DROP TRIGGER IF EXISTS after_transfer_insert;
+DROP TRIGGER IF EXISTS after_damage_insert;
+
+DELIMITER $$
+
+-- Trigger for purchases
+CREATE TRIGGER after_purchase_insert
+AFTER INSERT ON cutlery_purchase_items
+FOR EACH ROW
+BEGIN
+    DECLARE purchase_date_val DATE;
+    DECLARE purchase_id_val VARCHAR(20);
+    
+    SELECT purchase_date, purchase_id INTO purchase_date_val, purchase_id_val 
+    FROM cutlery_purchases 
+    WHERE id = NEW.purchase_id;
+    
+    -- Add stock to Stores (assuming Stores has id = 1)
+    INSERT INTO cutlery_stock_history 
+    (location_id, asset_id, quantity, transaction_type, transaction_id, reference, recorded_at)
+    VALUES (
+        1, -- Stores location_id
+        NEW.asset_id,
+        NEW.quantity,
+        'PURCHASE',
+        NEW.purchase_id,
+        purchase_id_val,
+        purchase_date_val
+    );
+    
+    -- Update current stock
+    INSERT INTO cutlery_stock (location_id, asset_id, quantity)
+    VALUES (1, NEW.asset_id, NEW.quantity)
+    ON DUPLICATE KEY UPDATE 
+    quantity = quantity + NEW.quantity,
+    updated_at = CURRENT_TIMESTAMP;
+END$$
+
+-- Trigger for transfers
+CREATE TRIGGER after_transfer_insert
+AFTER INSERT ON cutlery_transfer_items
+FOR EACH ROW
+BEGIN
+    DECLARE transfer_status VARCHAR(20);
+    DECLARE location_from_id_val INT;
+    DECLARE location_to_id_val INT;
+    DECLARE transfer_date_val DATE;
+    DECLARE transfer_id_val VARCHAR(20);
+    
+    -- Get transfer details
+    SELECT ct.status, ct.location_from_id, ct.location_to_id, ct.transfer_date, ct.transfer_id 
+    INTO transfer_status, location_from_id_val, location_to_id_val, transfer_date_val, transfer_id_val
+    FROM cutlery_transfers ct
+    WHERE ct.id = NEW.transfer_id;
+    
+    IF transfer_status = 'Completed' THEN
+        -- Deduct from source location
+        INSERT INTO cutlery_stock_history 
+        (location_id, asset_id, quantity, transaction_type, transaction_id, reference, recorded_at)
+        VALUES (
+            location_from_id_val,
+            NEW.asset_id,
+            -NEW.quantity,
+            'TRANSFER',
+            NEW.transfer_id,
+            transfer_id_val,
+            transfer_date_val
+        );
+        
+        -- Add to destination location
+        INSERT INTO cutlery_stock_history 
+        (location_id, asset_id, quantity, transaction_type, transaction_id, reference, recorded_at)
+        VALUES (
+            location_to_id_val,
+            NEW.asset_id,
+            NEW.quantity,
+            'TRANSFER',
+            NEW.transfer_id,
+            transfer_id_val,
+            transfer_date_val
+        );
+        
+        -- Update source stock
+        INSERT INTO cutlery_stock (location_id, asset_id, quantity)
+        VALUES (location_from_id_val, NEW.asset_id, -NEW.quantity)
+        ON DUPLICATE KEY UPDATE 
+        quantity = quantity - NEW.quantity,
+        updated_at = CURRENT_TIMESTAMP;
+        
+        -- Update destination stock
+        INSERT INTO cutlery_stock (location_id, asset_id, quantity)
+        VALUES (location_to_id_val, NEW.asset_id, NEW.quantity)
+        ON DUPLICATE KEY UPDATE 
+        quantity = quantity + NEW.quantity,
+        updated_at = CURRENT_TIMESTAMP;
+    END IF;
+END$$
+
+-- Trigger for damages
+CREATE TRIGGER after_damage_insert
+AFTER INSERT ON cutlery_damage_items
+FOR EACH ROW
+BEGIN
+    DECLARE damage_location_id INT;
+    DECLARE damage_date_val DATE;
+    DECLARE damage_id_val VARCHAR(20);
+    
+    SELECT location_id, damage_date, damage_id 
+    INTO damage_location_id, damage_date_val, damage_id_val
+    FROM cutlery_damages 
+    WHERE id = NEW.damage_id;
+    
+    -- Deduct from location
+    INSERT INTO cutlery_stock_history 
+    (location_id, asset_id, quantity, transaction_type, transaction_id, reference, recorded_at)
+    VALUES (
+        damage_location_id,
+        NEW.asset_id,
+        -NEW.quantity,
+        'DAMAGE',
+        NEW.damage_id,
+        damage_id_val,
+        damage_date_val
+    );
+    
+    -- Update current stock
+    INSERT INTO cutlery_stock (location_id, asset_id, quantity)
+    VALUES (damage_location_id, NEW.asset_id, -NEW.quantity)
+    ON DUPLICATE KEY UPDATE 
+    quantity = quantity - NEW.quantity,
+    updated_at = CURRENT_TIMESTAMP;
+END$$
+
+DELIMITER ;
