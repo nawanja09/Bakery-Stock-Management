@@ -30,10 +30,15 @@ const AddTransferForm = ({ onSubmit, onCancel }) => {
     try {
       setLoading(true);
       const response = await api.get('/cutlery-transfers/form-data');
-      setFormOptions(response.data);
+      setFormOptions({
+        locations: response.data?.data?.locations || [],
+        assets: response.data?.data?.assets || []
+      });
     } catch (err) {
       console.error(err);
       showPopup('error', 'Failed to load form data');
+      // Set empty arrays to prevent undefined error
+      setFormOptions({ locations: [], assets: [] });
     } finally {
       setLoading(false);
     }
@@ -202,7 +207,7 @@ const AddTransferForm = ({ onSubmit, onCancel }) => {
                   required
                 >
                   <option value="">Select Source</option>
-                  {formOptions.locations.map(loc => (
+                  {formOptions.locations && formOptions.locations.map(loc => (
                     <option key={loc.id} value={loc.id}>
                       {loc.location_name} ({loc.location_id})
                     </option>
@@ -220,7 +225,7 @@ const AddTransferForm = ({ onSubmit, onCancel }) => {
                   required
                 >
                   <option value="">Select Destination</option>
-                  {formOptions.locations.map(loc => (
+                  {formOptions.locations && formOptions.locations.map(loc => (
                     <option key={loc.id} value={loc.id}>
                       {loc.location_name} ({loc.location_id})
                     </option>
@@ -255,7 +260,7 @@ const AddTransferForm = ({ onSubmit, onCancel }) => {
                       required
                     >
                       <option value="">Select Asset</option>
-                      {formOptions.assets.map(asset => (
+                      {formOptions.assets && formOptions.assets.map(asset => (
                         <option key={asset.id} value={asset.id}>
                           {asset.asset_name} ({asset.asset_id})
                         </option>

@@ -1,152 +1,148 @@
-/* Overlay */
-.edit-purchase-overlay {
+:root {
+  --bg: #f4f6fb;
+  --card: #ffffff;
+  --border: #e5e7eb;
+  --primary: #5b3df5;
+  --text: #111827;
+  --muted: #6b7280;
+  --radius: 12px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.ep-overlay {
   position: fixed;
   inset: 0;
   background: rgba(0,0,0,0.4);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 10px;
+  display: grid;
+  place-items: center;
+  padding: 16px;
   z-index: 1000;
-  overflow-y: auto;
 }
 
-/* Container */
-.edit-purchase-container {
-  background: #fff;
-  border-radius: 10px;
+.ep-card {
+  background: var(--card);
   width: 100%;
-  max-width: 900px;
-  padding: 20px;
-  box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+  max-width: 1100px;
+  border-radius: var(--radius);
+  padding: 24px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 24px;
 }
 
-/* Header */
-.header {
+.ep-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
-.header h3 {
+
+.ep-header h2 {
   margin: 0;
-  font-size: 1.5rem;
 }
-.btn-close {
-  background: none;
-  border: none;
+
+.ep-close {
   font-size: 24px;
+  border: none;
+  background: none;
   cursor: pointer;
-  color: #555;
 }
 
-/* Form */
-.form section {
-  margin-bottom: 20px;
-}
-.form h4 {
-  margin-bottom: 10px;
-  font-weight: 600;
-  color: #333;
+.ep-section h4 {
+  margin-bottom: 12px;
 }
 
-/* Rows & Fields */
-.row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 15px;
+.ep-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
 }
-.field {
-  flex: 1 1 200px;
-  display: flex;
-  flex-direction: column;
-}
-.field label {
-  font-weight: 500;
-  margin-bottom: 5px;
-}
-.field input, .field select, .field textarea {
-  padding: 10px;
-  border: 1px solid #ccc;
-  border-radius: 6px;
+
+.ep-form input,
+.ep-form select {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
   font-size: 14px;
 }
-.field input:focus, .field select:focus, .field textarea:focus {
-  outline: none;
-  border-color: #6722e6;
-}
 
-/* Item Row */
-.item-row {
-  background: #f9f9f9;
-  border-radius: 6px;
-  padding: 10px;
-  position: relative;
-  margin-bottom: 10px;
-}
-.btn-remove-item {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  background: #dc3545;
-  color: #fff;
-  border: none;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  cursor: pointer;
-}
-.readonly {
-  background: #e9ecef;
-}
-
-/* Total */
-.total {
+.ep-items-header {
   display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  font-size: 1.2rem;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ep-items-header button {
+  background: none;
+  border: none;
+  color: var(--primary);
+  cursor: pointer;
   font-weight: 600;
 }
-.amount {
-  color: #28a745;
+
+.ep-item-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px dashed var(--border);
 }
 
-/* Actions */
-.actions {
+.ep-item-total {
+  font-weight: 600;
+}
+
+.ep-remove {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: #dc2626;
+}
+
+.ep-footer {
   display: flex;
-  justify-content: flex-end;
-  gap: 10px;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
   flex-wrap: wrap;
 }
-.btn-cancel {
-  background: #6c757d;
+
+.ep-footer button {
+  background: var(--primary);
   color: #fff;
   border: none;
-  padding: 10px 20px;
-  border-radius: 6px;
-  cursor: pointer;
-}
-.btn-submit {
-  background: #6722e6;
-  color: #fff;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 6px;
+  padding: 12px 20px;
+  border-radius: 10px;
+  font-weight: 600;
   cursor: pointer;
 }
 
-/* Responsive */
+.ep-total {
+  font-size: 1.2rem;
+}
+
+/* Mobile */
 @media (max-width: 768px) {
-  .row {
-    flex-direction: column;
+  .ep-item-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
   }
-  .actions {
-    flex-direction: column;
+
+  .ep-item-total {
+    grid-column: span 2;
   }
-  .btn-submit, .btn-cancel {
-    width: 100%;
+
+  .ep-remove {
+    grid-column: span 2;
+    justify-self: end;
+  }
+
+  .ep-footer {
+    flex-direction: column;
+    align-items: stretch;
   }
 }
