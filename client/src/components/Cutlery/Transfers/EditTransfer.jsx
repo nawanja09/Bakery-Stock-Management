@@ -55,10 +55,15 @@ const EditTransfer = ({ transfer, onSubmit, onCancel }) => {
     try {
       setLoading(true);
       const response = await api.get('/cutlery-transfers/form-data');
-      setFormOptions(response.data);
+      setFormOptions({
+        locations: response.data?.data?.locations || [],
+        assets: response.data?.data?.assets || []
+      });
     } catch (err) {
       console.error('Error fetching form data:', err);
       showPopup('error', 'Failed to load form data');
+      // Set empty arrays to prevent undefined error
+      setFormOptions({ locations: [], assets: [] });
     } finally {
       setLoading(false);
     }
@@ -236,7 +241,7 @@ const EditTransfer = ({ transfer, onSubmit, onCancel }) => {
                   disabled={submitting}
                 >
                   <option value="">Select Source Location</option>
-                  {formOptions.locations.map(location => (
+                  {formOptions.locations && formOptions.locations.map(location => (
                     <option key={location.id} value={location.id}>
                       {location.location_name} ({location.location_id})
                     </option>
@@ -255,7 +260,7 @@ const EditTransfer = ({ transfer, onSubmit, onCancel }) => {
                   disabled={submitting}
                 >
                   <option value="">Select Destination Location</option>
-                  {formOptions.locations.map(location => (
+                  {formOptions.locations && formOptions.locations.map(location => (
                     <option key={location.id} value={location.id}>
                       {location.location_name} ({location.location_id})
                     </option>
@@ -290,7 +295,7 @@ const EditTransfer = ({ transfer, onSubmit, onCancel }) => {
                       disabled={submitting}
                     >
                       <option value="">Select Asset</option>
-                      {formOptions.assets.map(asset => (
+                      {formOptions.assets && formOptions.assets.map(asset => (
                         <option key={asset.id} value={asset.id}>
                           {asset.asset_name} ({asset.asset_id})
                         </option>

@@ -69,7 +69,7 @@ const Transfers = () => {
     return () => {
       isMounted.current = false;
     };
-  }, []); // Empty dependency array - fetch only once on mount
+  }, [fetchTransfers]);
 
   const handleAddTransfer = async (data) => {
     try {
