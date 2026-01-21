@@ -142,6 +142,7 @@ const PurchaseHistory = () => {
           <option value="">All Companies</option>
           <option value="1">JH</option>
           <option value="2">RR</option>
+          <option value="3">Delights</option>
         </select>
 
         <div className="date-range">
