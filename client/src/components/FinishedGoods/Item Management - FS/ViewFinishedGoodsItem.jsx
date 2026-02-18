@@ -7,7 +7,9 @@ import './FinishedGoodsManagement.css';
 import api from '../../../api';
 
 const ViewFinishedGoodsItem = () => {
-  const { id } = useParams();
+  const { id: rawId } = useParams();
+  // Extract only the numeric part of the ID (in case it contains extra characters like "20:1")
+  const id = rawId?.split(':')[0] || '';
   const navigate = useNavigate();
   const { showPopup } = usePopup();
   
