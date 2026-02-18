@@ -8,7 +8,10 @@ import api from '../../../api';
 import './FinishedGoodsManagement.css';
 
 const EditFinishedGoodsItem = () => {
-  const { id } = useParams();
+  const { id: rawId } = useParams();
+  // Extract only the numeric part of the ID (in case it contains extra characters like "20:1")
+  const id = rawId?.split(':')[0] || '';
+  
   const [formData, setFormData] = useState({
     item_code: '',
     name: '',
@@ -328,6 +331,13 @@ const EditFinishedGoodsItem = () => {
       }
     } catch (error) {
       console.error('Error updating product:', error);
+      console.error('Request ID:', id);
+      console.error('Error details:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message
+      });
       if (error.response?.data?.error) {
         showPopup('error', error.response.data.error);
       } else {
