@@ -809,11 +809,6 @@ body {
   box-shadow: 0 1px 2px rgba(0,0,0,0.03);
 }
 
-.items-table tbody tr:nth-child(odd) td {
-  /* keep alternating rows subtle */
-  /* can remove if using row cards */
-}
-
 /* hover effect for rows */
 .items-table tbody tr:hover td {
   background-color: var(--gray-50);
