@@ -18,18 +18,19 @@ router.post('/', async (req, res) => {
   const { 
     name, 
     address, 
+    vat_number,
     city, 
     contact_name, 
     contact_phone, 
-    contact_email 
+    contact_email
   } = req.body;
 
   try {
     const [result] = await pool.query(
       `INSERT INTO supplier
-      (name, address, city, contact_name, contact_phone, contact_email) 
-      VALUES (?, ?, ?, ?, ?, ?)`,
-      [name, address, city, contact_name, contact_phone, contact_email]
+      (name, address, vat_number, city, contact_name, contact_phone, contact_email) 
+      VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [name, address, vat_number, city, contact_name, contact_phone, contact_email]
     );
     
     res.status(201).json({
@@ -45,14 +46,14 @@ router.post('/', async (req, res) => {
 // PUT update supplier
 router.put('/:id', async (req, res) => {
   const { id } = req.params;
-  const { name, address, city, contact_name, contact_phone, contact_email } = req.body;
+  const { name, address, vat_number, city, contact_name, contact_phone, contact_email } = req.body;
 
   try {
     await pool.query(
       `UPDATE supplier 
-       SET name=?, address=?, city=?, contact_name=?, contact_phone=?, contact_email=? 
+       SET name=?, address=?, vat_number=?, city=?, contact_name=?, contact_phone=?, contact_email=? 
        WHERE id=?`,
-      [name, address, city, contact_name, contact_phone, contact_email, id]
+      [name, address, vat_number, city, contact_name, contact_phone, contact_email, id]
     );
 
     res.json({ message: 'Supplier updated successfully' });

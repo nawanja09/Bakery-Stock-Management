@@ -128,6 +128,11 @@ const Suppliers = () => {
             </div>
 
             <div className="form-group">
+              <label>VAT Number</label>
+              <input type="text" name="vat_number" value={newSupplier.vat_number || ''} onChange={handleInputChange} />
+            </div>
+
+            <div className="form-group">
               <label>City</label>
               <input type="text" name="city" value={newSupplier.city} onChange={handleInputChange} required />
             </div>
@@ -167,6 +172,7 @@ const Suppliers = () => {
                 <tr>
                   <th>Name</th>
                   <th>Address</th>
+                  <th>VAT Number</th>
                   <th>City</th>
                   <th>Contact Name</th>
                   <th>Phone</th>
@@ -179,6 +185,7 @@ const Suppliers = () => {
                   <tr key={supplier.id} className="supplier-row">
                     <td>{supplier.name}</td>
                     <td>{supplier.address}</td>
+                    <td>{supplier.vat_number}</td>
                     <td>{supplier.city}</td>
                     <td>{supplier.contact_name}</td>
                     <td>{supplier.contact_phone}</td>

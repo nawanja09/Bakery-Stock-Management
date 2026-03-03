@@ -1575,3 +1575,25 @@ END$$
 
 DELIMITER ;
 
+----------------------------------------------
+---- 2026.03.03 ------------- Update sql querries for VAT value in the purchasing -------------------------------
+
+-- Add VAT column to suppliers table in raw material table
+ALTER TABLE `suppliers` 
+ADD COLUMN `vat_number` 
+VARCHAR(50) DEFAULT NULL AFTER `address`;
+
+-- Add VAT column to purchases table
+ALTER TABLE `purchases`
+ADD COLUMN `vat_amount`
+DECIMAL(10,2) NOT NULL DEFAULT '0.00' AFTER `total_amount`;
+
+-- Add VAT columns to purchases table
+ALTER TABLE purchases 
+ADD COLUMN subtotal DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER bill_amount,
+ADD COLUMN vat_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER subtotal,
+ADD COLUMN total_with_vat DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER vat_amount,
+ADD COLUMN vat_rate DECIMAL(5,2) NOT NULL DEFAULT 18.00 AFTER total_with_vat;
+
+-- Note: bill_amount will now store the total_with_vat value
+-- We'll keep it for backward compatibility
