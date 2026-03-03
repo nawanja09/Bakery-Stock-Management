@@ -318,7 +318,8 @@ const EditPurchase = () => {
                 ))}
               </select>
             </div>
-
+          </div>
+          <div className="form-row">
             <div className="form-group">
               <label>Supplier VAT Number</label>
               <input
@@ -329,9 +330,6 @@ const EditPurchase = () => {
                 placeholder="Auto-filled from supplier"
               />
             </div>
-          </div>
-
-          <div className="form-row">
             <div className="form-group">
               <label>Payment Method <span className="required">*</span></label>
               <select
@@ -343,7 +341,9 @@ const EditPurchase = () => {
                 <option value="BANK_TRANSFER">Bank Transfer</option>
               </select>
             </div>
+          </div>
 
+          <div className="form-row">
             <div className="form-group">
               <label>Company <span className="required">*</span></label>
               <select

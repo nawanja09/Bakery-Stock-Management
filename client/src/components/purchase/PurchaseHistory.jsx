@@ -217,27 +217,6 @@ const PurchaseHistory = () => {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="stats-cards">
-        <div className="stat-card">
-          <div className="stat-value">{stats.total}</div>
-          <div className="stat-label">Total Purchases</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-value">{stats.withVat}</div>
-          <div className="stat-label">With VAT</div>
-          <div className="stat-sub">Rs. {formatCurrency(stats.totalVat)} VAT</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-value">{stats.withoutVat}</div>
-          <div className="stat-label">Without VAT</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-value">Rs. {formatCurrency(stats.totalAmount)}</div>
-          <div className="stat-label">Total Amount</div>
-        </div>
-      </div>
-
       {/* Filter Toggle */}
       <button 
         className="filter-toggle"
