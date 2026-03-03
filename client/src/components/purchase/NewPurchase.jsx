@@ -15,19 +15,18 @@ const AddPurchase = () => {
   const { showPopup } = usePopup();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lastSubmitTime, setLastSubmitTime] = useState(0);
-  const [selectedSupplier, setSelectedSupplier] = useState(null);
+  const [selectedSupplierVat, setSelectedSupplierVat] = useState('');
   
-  // VAT rate (can be made configurable)
-  const VAT_RATE = 18.00;
+  // VAT rate constant
+  const VAT_RATE = 18;
 
   const [formData, setFormData] = useState({
     purchase_date: new Date().toLocaleDateString('en-CA'),
     supplier_id: '',
-    supplier_vat_number: '',
     subtotal: 0,
     vat_amount: 0,
-    total_with_vat: 0,
     vat_rate: VAT_RATE,
+    total_with_vat: 0,
     paid_amount: 0,
     payment_method: 'CASH',
     check_number: '',
@@ -81,7 +80,6 @@ const AddPurchase = () => {
     fetchCompanies();
   }, []);
 
-  // Fetch previous purchase prices
   useEffect(() => {
     const fetchPreviousPurchasePrices = async () => {
       try {
@@ -95,34 +93,51 @@ const AddPurchase = () => {
     fetchPreviousPurchasePrices();
   }, []);
 
-  // Calculate subtotal, VAT, and total with VAT
-  useEffect(() => {
-    const subtotal = formData.items.reduce((total, item) => {
+  // Handle supplier change to get VAT number
+  const handleSupplierChange = async (e) => {
+    const supplierId = e.target.value;
+    setFormData({ ...formData, supplier_id: supplierId });
+    
+    if (supplierId) {
+      try {
+        const response = await api.get(`/suppliers/${supplierId}`);
+        setSelectedSupplierVat(response.data.vat_number || 'N/A');
+      } catch (error) {
+        console.error('Error fetching supplier details:', error);
+        setSelectedSupplierVat('');
+      }
+    } else {
+      setSelectedSupplierVat('');
+    }
+  };
+
+  const calculateSubtotal = () => {
+    return formData.items.reduce((total, item) => {
       return total + (item.quantity * item.unit_price);
     }, 0);
-    
-    const vatAmount = subtotal * (VAT_RATE / 100);
-    const totalWithVat = subtotal + vatAmount;
+  };
 
+  const calculateVAT = (subtotal) => {
+    return subtotal * (VAT_RATE / 100);
+  };
+
+  const calculateTotalWithVAT = (subtotal, vatAmount) => {
+    return subtotal + vatAmount;
+  };
+
+  // Update calculations whenever items change
+  useEffect(() => {
+    const subtotal = calculateSubtotal();
+    const vatAmount = calculateVAT(subtotal);
+    const totalWithVAT = calculateTotalWithVAT(subtotal, vatAmount);
+    
     setFormData(prev => ({
       ...prev,
-      subtotal: subtotal,
+      subtotal,
       vat_amount: vatAmount,
-      total_with_vat: totalWithVat
+      total_with_vat: totalWithVAT
     }));
-  }, [formData.items, VAT_RATE]);
-
-  const handleSupplierChange = (e) => {
-    const supplierId = e.target.value;
-    const supplier = suppliers.find(s => s.id.toString() === supplierId);
-    
-    setSelectedSupplier(supplier);
-    setFormData({
-      ...formData,
-      supplier_id: supplierId,
-      supplier_vat_number: supplier?.vat_number || ''
-    });
-  };
+  }, [formData.items]);
 
   const handleItemChange = (index, field, value) => {
     const newItems = [...formData.items];
@@ -138,7 +153,6 @@ const AddPurchase = () => {
       items: newItems
     });
 
-    // Auto-add new row when editing unit_price of last row
     if (field === 'unit_price' && index === formData.items.length - 1 && !autoAddedRow) {
       addItemRow();
       setAutoAddedRow(true);
@@ -181,12 +195,6 @@ const AddPurchase = () => {
     setFormData({ ...formData, items: newItems });
   };
 
-  const calculateItemsTotal = () => {
-    return formData.items.reduce((total, item) => {
-      return total + (item.quantity * item.unit_price);
-    }, 0);
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -206,7 +214,6 @@ const AddPurchase = () => {
     setIsSubmitting(true);
     setLastSubmitTime(now);
 
-    // Validate items
     if (formData.items.some(item => !item.id)) {
       showPopup('error', 'Please select valid items for all rows');
       setIsSubmitting(false);
@@ -277,12 +284,13 @@ const AddPurchase = () => {
             </select>
           </div>
         </div>
+
         <div className="form-row">
           <div className="form-group">
-            <label>Supplier VAT Number</label>
+            <label>VAT Number</label>
             <input
               type="text"
-              value={formData.supplier_vat_number}
+              value={selectedSupplierVat}
               readOnly
               className="vat-display"
               placeholder="Auto-filled from supplier"
@@ -301,6 +309,7 @@ const AddPurchase = () => {
           </div>
         </div>
 
+        {/* Company */}
         <div className="form-row">
           <div className="form-group">
             <label>Company</label>
@@ -315,7 +324,6 @@ const AddPurchase = () => {
               ))}
             </select>
           </div>
-
           <div className="form-group">
             <label>Invoice Number</label>
             <input
@@ -325,9 +333,6 @@ const AddPurchase = () => {
               placeholder="Enter invoice number"
             />
           </div>
-        </div>
-
-        <div className="form-row">
           <div className="form-group">
             <label>Remarks</label>
             <textarea 
@@ -343,17 +348,16 @@ const AddPurchase = () => {
           <thead>
             <tr>
               <th>Item</th>
-              <th>Previous Price (Rs.)</th>
+              <th>Previous Price</th>
               <th>Quantity</th>
               <th>Unit</th>
-              <th>Unit Price (Rs.)</th>
-              <th>Total (Rs.)</th>
+              <th>Unit Price</th>
+              <th>Total</th>
               <th>Action</th>
             </tr>
           </thead>
           <tbody>
             {formData.items.map((item, index) => {
-              const selectedItem = itemsList.find(itm => itm.id === item.id);
               const previousPrice = previousPurchasePrices[item.id] || 0;
               
               return (
@@ -399,13 +403,12 @@ const AddPurchase = () => {
                       required
                     />
                   </td>
-                  <td>{(item.quantity * item.unit_price).toFixed(2)}</td>
+                  <td>Rs. {(item.quantity * item.unit_price).toFixed(2)}</td>
                   <td>
                     <button 
                       type="button" 
                       className="btn-remove"
                       onClick={() => removeItemRow(index)}
-                      disabled={formData.items.length <= 1}
                     >
                       Remove
                     </button>
@@ -421,20 +424,18 @@ const AddPurchase = () => {
         </button>
 
         {/* VAT Calculation Section */}
-        <div className="vat-calculation-section">
-          <div className="calculation-row">
-            <span className="label">1. Subtotal (Without VAT):</span>
-            <span className="value">Rs. {formData.subtotal.toFixed(2)}</span>
+        <div className="vat-summary">
+          <div className="vat-row">
+            <span>Subtotal:</span>
+            <span>Rs. {formData.subtotal.toFixed(2)}</span>
           </div>
-          
-          <div className="calculation-row">
-            <span className="label">2. VAT ({VAT_RATE}%):</span>
-            <span className="value">Rs. {formData.vat_amount.toFixed(2)}</span>
+          <div className="vat-row">
+            <span>VAT ({VAT_RATE}%):</span>
+            <span>Rs. {formData.vat_amount.toFixed(2)}</span>
           </div>
-          
-          <div className="calculation-row total-row">
-            <span className="label">3. Total Amount (With VAT):</span>
-            <span className="value">Rs. {formData.total_with_vat.toFixed(2)}</span>
+          <div className="vat-row total">
+            <span>Total (with VAT):</span>
+            <span>Rs. {formData.total_with_vat.toFixed(2)}</span>
           </div>
         </div>
 
@@ -459,18 +460,12 @@ const AddPurchase = () => {
         {/* Summary */}
         <div className="summary">
           <div className="total">
-            <strong>Total Bill Amount (With VAT):</strong>
+            <strong>Total Bill Amount:</strong>
             <span>Rs. {formData.total_with_vat.toFixed(2)}</span>
-          </div>
-          <div className="paid">
-            <strong>Paid Amount:</strong>
-            <span>Rs. {formData.paid_amount.toFixed(2)}</span>
           </div>
           <div className="balance">
             <strong>Balance/Due:</strong>
-            <span className={formData.total_with_vat - formData.paid_amount > 0 ? 'due-amount' : ''}>
-              Rs. {(formData.total_with_vat - formData.paid_amount).toFixed(2)}
-            </span>
+            <span>Rs. {(formData.total_with_vat - formData.paid_amount).toFixed(2)}</span>
           </div>
         </div>
 
