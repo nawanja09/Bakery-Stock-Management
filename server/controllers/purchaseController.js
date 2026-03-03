@@ -1,13 +1,16 @@
 const pool = require('../config/db');
 const { v4: uuidv4 } = require('uuid');
 
-// Create new purchase
+// Create new purchase with VAT
 const createPurchase = async (req, res) => {
   const { 
     purchase_date, 
     supplier_id, 
     items, 
-    bill_amount, 
+    subtotal,
+    vat_amount,
+    total_with_vat,
+    vat_rate,
     paid_amount, 
     payment_method, 
     check_number,
@@ -22,14 +25,16 @@ const createPurchase = async (req, res) => {
   try {
     await connection.beginTransaction();
 
-    // Insert purchase with company_id
+    // Insert purchase with VAT fields
     const [purchaseResult] = await connection.query(
       `INSERT INTO purchases 
-      (invoice_no, purchase_date, supplier_id, bill_amount, paid_amount, 
-       payment_method, check_number, remarks, prepared_by, company_id) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [invoice_no, purchase_date, supplier_id, bill_amount, paid_amount, 
-       payment_method, check_number, remarks, prepared_by, company_id]
+      (invoice_no, purchase_date, supplier_id, bill_amount, subtotal, vat_amount, 
+       total_with_vat, vat_rate, paid_amount, payment_method, check_number, remarks, 
+       prepared_by, company_id) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [invoice_no, purchase_date, supplier_id, total_with_vat, subtotal, vat_amount, 
+       total_with_vat, vat_rate, paid_amount, payment_method, check_number, remarks, 
+       prepared_by, company_id]
     );
     
     const purchaseId = purchaseResult.insertId;
@@ -48,7 +53,12 @@ const createPurchase = async (req, res) => {
     res.status(201).json({ 
       message: 'Purchase created successfully!', 
       invoice_no,
-      purchase_id: purchaseId 
+      purchase_id: purchaseId,
+      summary: {
+        subtotal,
+        vat_amount,
+        total_with_vat
+      }
     });
     
   } catch (error) {
@@ -60,13 +70,14 @@ const createPurchase = async (req, res) => {
   }
 };
 
-// Get all purchases
+// Get all purchases (updated to include VAT fields)
 const getAllPurchases = async (req, res) => {
   try {
     const [purchases] = await pool.query(`
       SELECT 
         p.*, 
-        s.name AS supplier_name, 
+        s.name AS supplier_name,
+        s.vat_number AS supplier_vat_number,
         c.name AS company_name
       FROM purchases p
       JOIN supplier s ON p.supplier_id = s.id
@@ -74,7 +85,7 @@ const getAllPurchases = async (req, res) => {
       ORDER BY p.purchase_date DESC
     `);
 
-    // එක් එක් purchase සඳහා items ලබා ගන්න
+    // Get items for each purchase
     const purchasesWithItems = await Promise.all(
       purchases.map(async (purchase) => {
         const [items] = await pool.query(
@@ -96,7 +107,7 @@ const getAllPurchases = async (req, res) => {
   }
 };
 
-// Get purchase by ID
+// Get purchase by ID (updated to include VAT fields)
 const getPurchaseById = async (req, res) => {
   const { id } = req.params;
   
@@ -105,6 +116,7 @@ const getPurchaseById = async (req, res) => {
       SELECT 
         p.*, 
         s.name AS supplier_name,
+        s.vat_number AS supplier_vat_number,
         s.contact_name,
         s.contact_phone,
         c.name AS company_name
@@ -138,14 +150,17 @@ const getPurchaseById = async (req, res) => {
   }
 };
 
-// Update purchase
+// Update purchase with VAT
 const updatePurchase = async (req, res) => {
   const { id } = req.params;
   const { 
     purchase_date, 
     supplier_id, 
     items, 
-    bill_amount, 
+    subtotal,
+    vat_amount,
+    total_with_vat,
+    vat_rate,
     paid_amount, 
     payment_method, 
     check_number,
@@ -159,14 +174,17 @@ const updatePurchase = async (req, res) => {
   try {
     await connection.beginTransaction();
 
-    // Update purchase
+    // Update purchase with VAT fields
     await connection.query(
       `UPDATE purchases 
-       SET purchase_date = ?, supplier_id = ?, bill_amount = ?, paid_amount = ?, 
-           payment_method = ?, check_number = ?, remarks = ?, prepared_by = ?, company_id = ?
+       SET purchase_date = ?, supplier_id = ?, bill_amount = ?, subtotal = ?, 
+           vat_amount = ?, total_with_vat = ?, vat_rate = ?, paid_amount = ?, 
+           payment_method = ?, check_number = ?, remarks = ?, prepared_by = ?, 
+           company_id = ?
        WHERE id = ?`,
-      [purchase_date, supplier_id, bill_amount, paid_amount, 
-       payment_method, check_number, remarks, prepared_by, company_id, id]
+      [purchase_date, supplier_id, total_with_vat, subtotal, vat_amount, 
+       total_with_vat, vat_rate, paid_amount, payment_method, check_number, 
+       remarks, prepared_by, company_id, id]
     );
 
     // Delete existing items
@@ -186,7 +204,14 @@ const updatePurchase = async (req, res) => {
     }
 
     await connection.commit();
-    res.json({ message: 'Purchase updated successfully!' });
+    res.json({ 
+      message: 'Purchase updated successfully!',
+      summary: {
+        subtotal,
+        vat_amount,
+        total_with_vat
+      }
+    });
     
   } catch (error) {
     await connection.rollback();
