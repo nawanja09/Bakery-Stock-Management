@@ -14,7 +14,7 @@
     "axios": "^1.11.0",
     "chart.js": "^4.5.0",
     "date-fns": "^4.1.0",
-    "dayjs": "^1.11.18",
+    "dayjs": "^1.11.19",
     "font-awesome": "^4.7.0",
     "jspdf": "^3.0.1",
     "jspdf-autotable": "^5.0.2",

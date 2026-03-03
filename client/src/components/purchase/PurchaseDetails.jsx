@@ -6,110 +6,69 @@ import {
   faArrowLeft, 
   faEdit, 
   faPrint, 
-  faDownload,
+  faFilePdf,
   faBuilding,
   faUser,
   faCalendar,
   faFileInvoice,
-  faMoneyBill,
-  faPercent
+  faCreditCard,
+  faTag,
+  faPhone,
+  faEnvelope,
+  faHistory
 } from '@fortawesome/free-solid-svg-icons';
-import dayjs from 'dayjs';
 import './Purchase.css';
 import api from '../../api';
+import dayjs from 'dayjs';
 
 const PurchaseDetails = () => {
   const { id } = useParams();
   const [purchase, setPurchase] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [previousPrices, setPreviousPrices] = useState({});
   const navigate = useNavigate();
 
   useEffect(() => {
-    const fetchPurchase = async () => {
+    const fetchData = async () => {
       try {
-        setLoading(true);
-        const response = await api.get(`/purchases/${id}`);
-        const data = response.data;
+        const [purchaseRes, previousPricesRes] = await Promise.all([
+          api.get(`/purchases/${id}`),
+          api.get('/purchases/previous-prices')
+        ]);
         
-        // Process and normalize data
-        const processedData = {
-          ...data,
-          bill_amount: Number(data.bill_amount),
-          paid_amount: Number(data.paid_amount),
-          subtotal: Number(data.subtotal || data.bill_amount / (1 + (data.vat_rate || 18)/100) || 0),
-          vat_amount: Number(data.vat_amount || 0),
-          vat_rate: Number(data.vat_rate || 18),
-          total_with_vat: Number(data.total_with_vat || data.bill_amount || 0),
-          items: data.items.map(item => ({
-            ...item,
-            quantity: Number(item.quantity),
-            unit_price: Number(item.unit_price),
-            total: Number(item.quantity) * Number(item.unit_price)
-          }))
-        };
-
-        setPurchase(processedData);
-        setError('');
+        setPurchase(purchaseRes.data);
+        setPreviousPrices(previousPricesRes.data);
       } catch (err) {
-        console.error('Error fetching purchase:', err);
-        setError(err.response?.data?.error || 'Failed to fetch purchase details');
+        setError(err.message || 'Failed to fetch purchase details');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchPurchase();
+    fetchData();
   }, [id]);
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-LK', {
+      style: 'currency',
+      currency: 'LKR',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(amount).replace('LKR', 'Rs.');
+  };
+
+  const formatDate = (date) => {
+    return dayjs(date).format('DD MMMM YYYY');
+  };
 
   const handlePrint = () => {
     window.print();
   };
 
-  const handleDownload = () => {
-    // Create a text version of the purchase details
-    const content = `
-PURCHASE DETAILS
-================
-Invoice No: ${purchase.invoice_no}
-Date: ${dayjs(purchase.purchase_date).format('YYYY-MM-DD')}
-Supplier: ${purchase.supplier_name}
-Supplier VAT: ${purchase.supplier_vat_number || 'N/A'}
-Company: ${purchase.company_name}
-
-ITEMS
------
-${purchase.items.map(item => 
-  `${item.item_name} - ${item.quantity} ${item.unit || ''} x Rs. ${item.unit_price.toFixed(2)} = Rs. ${(item.quantity * item.unit_price).toFixed(2)}`
-).join('\n')}
-
-FINANCIAL SUMMARY
------------------
-Subtotal: Rs. ${purchase.subtotal.toFixed(2)}
-VAT (${purchase.vat_rate}%): Rs. ${purchase.vat_amount.toFixed(2)}
-Total with VAT: Rs. ${purchase.total_with_vat.toFixed(2)}
-Paid Amount: Rs. ${purchase.paid_amount.toFixed(2)}
-Balance: Rs. ${(purchase.total_with_vat - purchase.paid_amount).toFixed(2)}
-
-Payment Method: ${purchase.payment_method}
-Invoice/Check No: ${purchase.check_number || 'N/A'}
-Remarks: ${purchase.remarks || 'N/A'}
-
-Generated on: ${dayjs().format('YYYY-MM-DD HH:mm:ss')}
-    `;
-
-    const blob = new Blob([content], { type: 'text/plain' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `purchase_${purchase.invoice_no}.txt`;
-    a.click();
-    window.URL.revokeObjectURL(url);
-  };
-
   if (loading) {
     return (
-      <div className="details-loading">
+      <div className="loading-container">
         <div className="loading-spinner"></div>
         <p>Loading purchase details...</p>
       </div>
@@ -118,8 +77,9 @@ Generated on: ${dayjs().format('YYYY-MM-DD HH:mm:ss')}
 
   if (error) {
     return (
-      <div className="details-error">
-        <h3>Error</h3>
+      <div className="error-container">
+        <div className="error-icon">⚠️</div>
+        <h3>Error Loading Purchase</h3>
         <p>{error}</p>
         <button onClick={() => navigate('/purchase/history')} className="btn-primary">
           Back to History
@@ -130,9 +90,10 @@ Generated on: ${dayjs().format('YYYY-MM-DD HH:mm:ss')}
 
   if (!purchase) {
     return (
-      <div className="details-not-found">
+      <div className="not-found-container">
+        <div className="not-found-icon">🔍</div>
         <h3>Purchase Not Found</h3>
-        <p>The requested purchase could not be found.</p>
+        <p>The purchase you're looking for doesn't exist or has been deleted.</p>
         <button onClick={() => navigate('/purchase/history')} className="btn-primary">
           Back to History
         </button>
@@ -140,166 +101,199 @@ Generated on: ${dayjs().format('YYYY-MM-DD HH:mm:ss')}
     );
   }
 
-  const dueAmount = purchase.total_with_vat - purchase.paid_amount;
+  const dueAmount = (purchase.total_with_vat || purchase.bill_amount) - purchase.paid_amount;
 
   return (
     <div className="purchase-details-container">
-      {/* Header with Actions */}
-      <div className="details-header">
-        <div className="header-left">
-          <button onClick={() => navigate('/purchase/history')} className="btn-icon" title="Back to History">
+      <div className="page-header">
+        <div className="header-title">
+          <button onClick={() => navigate('/purchase/history')} className="back-button">
             <FontAwesomeIcon icon={faArrowLeft} />
           </button>
-          <h1>Purchase Details</h1>
+          <div>
+            <h1>Purchase Details</h1>
+            <p className="subtitle">Invoice #{purchase.invoice_no}</p>
+          </div>
         </div>
         <div className="header-actions">
-          <button onClick={handlePrint} className="btn-outline" title="Print">
-            <FontAwesomeIcon icon={faPrint} /> Print
+          <button onClick={handlePrint} className="btn-outline">
+            <FontAwesomeIcon icon={faPrint} />
+            Print
           </button>
-          <button onClick={handleDownload} className="btn-outline" title="Download">
-            <FontAwesomeIcon icon={faDownload} /> Download
+          <button className="btn-outline">
+            <FontAwesomeIcon icon={faFilePdf} />
+            PDF
           </button>
           <button 
-            onClick={() => navigate(`/purchase/edit/${id}`)} 
+            onClick={() => navigate(`/purchase/edit/${purchase.id}`)} 
             className="btn-primary"
-            title="Edit Purchase"
           >
-            <FontAwesomeIcon icon={faEdit} /> Edit
+            <FontAwesomeIcon icon={faEdit} />
+            Edit
           </button>
         </div>
       </div>
 
-      {/* Invoice Header */}
-      <div className="invoice-header">
-        <div className="invoice-title">
-          <h2>INVOICE</h2>
-          <p className="invoice-no">{purchase.invoice_no}</p>
-        </div>
-        <div className="invoice-status">
-          <span className={`status-badge ${dueAmount > 0 ? 'pending' : 'paid'}`}>
-            {dueAmount > 0 ? 'Payment Pending' : 'Paid'}
-          </span>
-        </div>
-      </div>
-
-      {/* Info Cards */}
-      <div className="info-cards">
-        <div className="info-card">
-          <div className="card-icon">
+      <div className="details-grid">
+        <div className="detail-card">
+          <div className="card-header">
             <FontAwesomeIcon icon={faBuilding} />
+            <h3>Company Information</h3>
           </div>
           <div className="card-content">
-            <h4>Supplier Information</h4>
-            <p className="supplier-name">{purchase.supplier_name}</p>
-            {purchase.supplier_vat_number && (
-              <p className="supplier-vat">VAT: {purchase.supplier_vat_number}</p>
-            )}
-            <p className="contact-info">
-              {purchase.contact_name} | {purchase.contact_phone}
-            </p>
-          </div>
-        </div>
-
-        <div className="info-card">
-          <div className="card-icon">
-            <FontAwesomeIcon icon={faCalendar} />
-          </div>
-          <div className="card-content">
-            <h4>Date & Company</h4>
-            <p><strong>Date:</strong> {dayjs(purchase.purchase_date).format('YYYY-MM-DD')}</p>
-            <p><strong>Company:</strong> {purchase.company_name}</p>
-          </div>
-        </div>
-
-        <div className="info-card">
-          <div className="card-icon">
-            <FontAwesomeIcon icon={faFileInvoice} />
-          </div>
-          <div className="card-content">
-            <h4>Payment Details</h4>
-            <p><strong>Method:</strong> {purchase.payment_method}</p>
-            <p><strong>Invoice/Check No:</strong> {purchase.check_number || 'N/A'}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Items Table */}
-      <div className="items-section">
-        <h3>Purchased Items</h3>
-        <div className="items-table-wrapper">
-          <table className="items-details-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Item Name</th>
-                <th>Quantity</th>
-                <th>Unit</th>
-                <th>Unit Price (Rs.)</th>
-                <th>Total (Rs.)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {purchase.items.map((item, index) => (
-                <tr key={index}>
-                  <td>{index + 1}</td>
-                  <td className="item-name">{item.item_name}</td>
-                  <td className="item-quantity">{Number(item.quantity).toFixed(3)}</td>
-                  <td className="item-unit">{item.unit || '-'}</td>
-                  <td className="item-price">Rs. {Number(item.unit_price).toFixed(2)}</td>
-                  <td className="item-total">Rs. {(item.quantity * item.unit_price).toFixed(2)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Financial Summary */}
-      <div className="financial-summary">
-        <div className="summary-left">
-          {purchase.remarks && (
-            <div className="remarks-box">
-              <h4>Remarks:</h4>
-              <p>{purchase.remarks}</p>
+            <div className="info-row">
+              <span className="label">Company:</span>
+              <span className="value highlight">{purchase.company_name}</span>
             </div>
-          )}
+            <div className="info-row">
+              <span className="label">Supplier:</span>
+              <span className="value">{purchase.supplier_name}</span>
+            </div>
+            {purchase.vat_number && (
+              <div className="info-row">
+                <span className="label">VAT Number:</span>
+                <span className="value vat-badge">{purchase.vat_number}</span>
+              </div>
+            )}
+          </div>
         </div>
-        <div className="summary-right">
-          <div className="summary-card detailed">
+
+        <div className="detail-card">
+          <div className="card-header">
+            <FontAwesomeIcon icon={faUser} />
+            <h3>Contact Information</h3>
+          </div>
+          <div className="card-content">
+            <div className="info-row">
+              <span className="label">Contact Person:</span>
+              <span className="value">{purchase.contact_name || 'N/A'}</span>
+            </div>
+            {purchase.contact_phone && (
+              <div className="info-row">
+                <span className="label">
+                  <FontAwesomeIcon icon={faPhone} className="icon-small" />
+                </span>
+                <span className="value">{purchase.contact_phone}</span>
+              </div>
+            )}
+            {purchase.contact_email && (
+              <div className="info-row">
+                <span className="label">
+                  <FontAwesomeIcon icon={faEnvelope} className="icon-small" />
+                </span>
+                <span className="value">{purchase.contact_email}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="detail-card">
+          <div className="card-header">
+            <FontAwesomeIcon icon={faCalendar} />
+            <h3>Purchase Details</h3>
+          </div>
+          <div className="card-content">
+            <div className="info-row">
+              <span className="label">Date:</span>
+              <span className="value">{formatDate(purchase.purchase_date)}</span>
+            </div>
+            <div className="info-row">
+              <span className="label">Invoice No:</span>
+              <span className="value invoice-number">{purchase.check_number || 'N/A'}</span>
+            </div>
+            <div className="info-row">
+              <span className="label">Payment Method:</span>
+              <span className={`payment-badge ${purchase.payment_method?.toLowerCase()}`}>
+                {purchase.payment_method?.replace('_', ' ') || 'N/A'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="detail-card financial">
+          <div className="card-header">
+            <FontAwesomeIcon icon={faCreditCard} />
+            <h3>Financial Summary</h3>
+          </div>
+          <div className="financial-summary">
             <div className="summary-row">
               <span>Subtotal:</span>
-              <span>Rs. {purchase.subtotal.toFixed(2)}</span>
+              <span>{formatCurrency(purchase.subtotal || purchase.bill_amount)}</span>
             </div>
-            <div className="summary-row vat-row">
-              <span>
-                <FontAwesomeIcon icon={faPercent} className="vat-icon" />
-                VAT ({purchase.vat_rate}%):
-              </span>
-              <span>Rs. {purchase.vat_amount.toFixed(2)}</span>
+            <div className="summary-row vat">
+              <span>VAT (18%):</span>
+              <span>{formatCurrency(purchase.vat_amount || 0)}</span>
             </div>
             <div className="summary-row total">
-              <span>Total with VAT:</span>
-              <span>Rs. {purchase.total_with_vat.toFixed(2)}</span>
+              <span>Total (with VAT):</span>
+              <span>{formatCurrency(purchase.total_with_vat || purchase.bill_amount)}</span>
             </div>
             <div className="summary-divider"></div>
-            <div className="summary-row paid">
+            <div className="summary-row">
               <span>Paid Amount:</span>
-              <span>Rs. {purchase.paid_amount.toFixed(2)}</span>
+              <span className="paid">{formatCurrency(purchase.paid_amount)}</span>
             </div>
-            <div className={`summary-row balance ${dueAmount > 0 ? 'due' : 'zero'}`}>
-              <span>Balance / Due:</span>
-              <span>Rs. {dueAmount.toFixed(2)}</span>
+            <div className={`summary-row due ${dueAmount > 0 ? 'negative' : 'positive'}`}>
+              <span>Balance Due:</span>
+              <span>{formatCurrency(dueAmount)}</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Footer */}
-      <div className="details-footer">
-        <p className="prepared-by">
-          Prepared by: {purchase.prepared_by_name || 'System'} on {dayjs(purchase.created_at).format('YYYY-MM-DD HH:mm')}
-        </p>
-        <p className="footer-note">This is a system generated document</p>
+      <div className="items-card">
+        <h2>Purchased Items</h2>
+
+        <div className="items-list">
+          {purchase.items.map((item, index) => {
+            const previousPrice = previousPrices[item.item_id] || 0;
+            const isPriceDifferent = previousPrice > 0 && item.unit_price !== previousPrice;
+
+            return (
+              <div key={index} className="item-card" style={{ marginBottom: "20px", padding: "15px", border: "1px solid #e2e8f0", borderRadius: "12px", backgroundColor: "#f8fafc" }}>
+                
+                {/* Item Name */}
+                <div style={{ fontWeight: "600", fontSize: "16px", marginBottom: "8px" }}>
+                  {item.item_name} {item.item_code && <span style={{ fontWeight: "400", color: "#64748b" }}>({item.item_code})</span>}
+                </div>
+
+                {/* Bullet points for details */}
+                <ul style={{ paddingLeft: "20px", margin: 0, listStyleType: "disc" }}>
+                  <li>
+                    Previous Price: {previousPrice > 0 ? (
+                      <span style={{ color: isPriceDifferent ? "red" : "black" }}>
+                        {formatCurrency(previousPrice)}
+                      </span>
+                    ) : "No history"}
+                  </li>
+                  <li>
+                    Quantity: {Number(item.quantity).toFixed(3)} {item.unit || "-"}
+                  </li>
+                  <li>
+                    Unit Price: <span style={{ color: isPriceDifferent ? "green" : "black" }}>
+                      {formatCurrency(item.unit_price)}
+                    </span>
+                    {isPriceDifferent && (
+                      <span style={{ marginLeft: "6px", color: "#16a34a", fontSize: "12px" }}>Changed</span>
+                    )}
+                  </li>
+                  <li>
+                    Total: <strong>{formatCurrency(item.quantity * item.unit_price)}</strong>
+                  </li>
+                </ul>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Totals Section */}
+        <div style={{ marginTop: "20px", paddingTop: "10px", borderTop: "1px solid #e2e8f0" }}>
+          <p><strong>Subtotal:</strong> {formatCurrency(purchase.subtotal || purchase.bill_amount)}</p>
+          <p><strong>VAT (18%):</strong> {formatCurrency(purchase.vat_amount || 0)}</p>
+          <p style={{ fontWeight: "700", fontSize: "16px" }}>
+            Total: {formatCurrency(purchase.total_with_vat || purchase.bill_amount)}
+          </p>
+        </div>
       </div>
     </div>
   );
