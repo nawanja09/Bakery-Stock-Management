@@ -16,8 +16,7 @@ const PurchaseHistory = () => {
   const [endDate, setEndDate] = useState('');
   const [companies, setCompanies] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
-  // NEW: VAT filter state
-  const [vatFilter, setVatFilter] = useState('all'); // 'all', 'yes', 'no'
+  const [vatFilter, setVatFilter] = useState('all');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -38,22 +37,8 @@ const PurchaseHistory = () => {
     fetchData();
   }, []);
 
-  // Format currency
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-LK', {
-      style: 'currency',
-      currency: 'LKR',
-      minimumFractionDigits: 2
-    }).format(amount);
-  };
-
-  // Format date
-  const formatDate = (date) => {
-    return dayjs(date).format('DD MMM YYYY');
-  };
-
-  // Apply filters (including VAT filter)
-  const applyFilters = () => {
+  // Apply filters whenever any filter state changes
+  useEffect(() => {
     let filtered = purchases;
 
     if (searchQuery) {
@@ -84,7 +69,7 @@ const PurchaseHistory = () => {
       );
     }
 
-    // NEW: VAT filter
+    // VAT filter
     if (vatFilter !== 'all') {
       filtered = filtered.filter(purchase => {
         const hasVat = purchase.supplier_vat_number && purchase.supplier_vat_number.trim() !== '';
@@ -93,35 +78,44 @@ const PurchaseHistory = () => {
     }
 
     setFilteredPurchases(filtered);
+  }, [purchases, searchQuery, companyFilter, startDate, endDate, vatFilter]);
+
+  // Format currency
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-LK', {
+      style: 'currency',
+      currency: 'LKR',
+      minimumFractionDigits: 2
+    }).format(amount);
+  };
+
+  // Format date
+  const formatDate = (date) => {
+    return dayjs(date).format('DD MMM YYYY');
   };
 
   // Handle search
   const handleSearch = (e) => {
     setSearchQuery(e.target.value);
-    setTimeout(() => applyFilters(), 300);
   };
 
   // Handle company filter
   const handleCompanyFilter = (e) => {
     setCompanyFilter(e.target.value);
-    setTimeout(() => applyFilters(), 100);
   };
 
   // Handle date changes
   const handleStartDateChange = (e) => {
     setStartDate(e.target.value);
-    setTimeout(() => applyFilters(), 100);
   };
 
   const handleEndDateChange = (e) => {
     setEndDate(e.target.value);
-    setTimeout(() => applyFilters(), 100);
   };
 
-  // NEW: Handle VAT filter change
+  // Handle VAT filter change
   const handleVatFilterChange = (e) => {
     setVatFilter(e.target.value);
-    setTimeout(() => applyFilters(), 100);
   };
 
   // Clear all filters
@@ -131,7 +125,6 @@ const PurchaseHistory = () => {
     setStartDate('');
     setEndDate('');
     setVatFilter('all');
-    setFilteredPurchases(purchases);
   };
 
   if (loading) {
@@ -228,7 +221,7 @@ const PurchaseHistory = () => {
                 </div>
               </div>
 
-              {/* NEW: VAT filter dropdown */}
+              {/* VAT filter dropdown */}
               <div className="filter-group">
                 <label>VAT Status</label>
                 <select
@@ -273,7 +266,7 @@ const PurchaseHistory = () => {
                 <th>Invoice #</th>
                 <th>Date</th>
                 <th>Supplier</th>
-                <th>VAT Number</th>  {/* NEW column */}
+                <th>VAT Number</th>
                 <th>Company</th>
                 <th className="amount-col">Subtotal</th>
                 <th className="amount-col">VAT</th>
@@ -301,7 +294,7 @@ const PurchaseHistory = () => {
                         )}
                       </div>
                     </td>
-                    <td>  {/* VAT Number cell */}
+                    <td>
                       {purchase.supplier_vat_number ? (
                         <span className="vat-badge">{purchase.supplier_vat_number}</span>
                       ) : (
