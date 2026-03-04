@@ -12,7 +12,9 @@ const PurchasingReport = () => {
   const [reportData, setReportData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [companyFilter, setCompanyFilter] = useState('');
-  const [searchTerm, setSearchTerm] = useState(''); // <-- Added
+  const [searchTerm, setSearchTerm] = useState('');
+  // NEW: VAT filter state
+  const [vatFilter, setVatFilter] = useState('all'); // 'all', 'yes', 'no'
 
   const fetchPurchasingReport = async () => {
     setLoading(true);
@@ -23,17 +25,13 @@ const PurchasingReport = () => {
       const purchasesWithItems = await Promise.all(
         purchases.map(async (purchase) => {
           try {
-            const purchaseDetailResponse = await api.get(`/purchases/${purchase.id}`);
-            return {
-              ...purchase,
-              items: purchaseDetailResponse.data.items || []
-            };
+            // Fetch full details – this should include supplier_vat_number and items
+            const detailResponse = await api.get(`/purchases/${purchase.id}`);
+            return detailResponse.data; // use the detailed object (contains VAT number)
           } catch (error) {
             console.error(`Error fetching details for purchase ${purchase.id}:`, error);
-            return {
-              ...purchase,
-              items: []
-            };
+            // fallback: keep original data but with empty items
+            return { ...purchase, items: [] };
           }
         })
       );
@@ -75,6 +73,7 @@ const PurchasingReport = () => {
             purchase.invoice_no,
             format(new Date(purchase.purchase_date), 'MMM dd, yyyy'),
             purchase.supplier_name,
+            purchase.supplier_vat_number || '—',  // NEW: VAT number
             purchase.company_name || 'N/A',
             purchase.check_number || 'N/A',
             item.item_name || 'N/A',
@@ -92,8 +91,10 @@ const PurchasingReport = () => {
           purchase.invoice_no,
           format(new Date(purchase.purchase_date), 'MMM dd, yyyy'),
           purchase.supplier_name,
+          purchase.supplier_vat_number || '—',
           purchase.company_name || 'N/A',
           purchase.check_number || 'N/A',
+          'N/A',
           'N/A',
           'N/A',
           'N/A',
@@ -109,6 +110,7 @@ const PurchasingReport = () => {
       'Invoice #',
       'Date',
       'Supplier',
+      'VAT Number',  // NEW header
       'Company',
       'Check Number',
       'Item Name',
@@ -139,6 +141,7 @@ const PurchasingReport = () => {
       'Invoice #',
       'Date',
       'Supplier',
+      'VAT Number',  // NEW column
       'Company',
       'Check Number',
       'Item Name',
@@ -158,6 +161,7 @@ const PurchasingReport = () => {
             purchase.invoice_no,
             format(new Date(purchase.purchase_date), 'MMM dd, yyyy'),
             purchase.supplier_name,
+            purchase.supplier_vat_number || '—',
             purchase.company_name || 'N/A',
             purchase.check_number || 'N/A',
             item.item_name || 'N/A',
@@ -175,6 +179,7 @@ const PurchasingReport = () => {
           purchase.invoice_no,
           format(new Date(purchase.purchase_date), 'MMM dd, yyyy'),
           purchase.supplier_name,
+          purchase.supplier_vat_number || '—',
           purchase.company_name || 'N/A',
           purchase.check_number || 'N/A',
           'N/A',
@@ -195,7 +200,7 @@ const PurchasingReport = () => {
 
     worksheetData.push([]);
     worksheetData.push([
-      'TOTAL', '', '', '', '', '', '', '',
+      'TOTAL', '', '', '', '', '', '', '', '',
       totalPurchases,
       totalPaid,
       totalDue
@@ -205,11 +210,12 @@ const PurchasingReport = () => {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Purchasing Report');
 
+    // Adjust column widths
     worksheet['!cols'] = [
-      { wch: 15 }, { wch: 12 }, { wch: 20 }, { wch: 15 },
-      { wch: 15 }, { wch: 20 }, { wch: 10 }, { wch: 12 },
-      { wch: 12 }, { wch: 15 }, { wch: 15 }, { wch: 15 },
-      { wch: 15 }
+      { wch: 15 }, { wch: 12 }, { wch: 20 }, { wch: 15 }, // VAT column
+      { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 10 },
+      { wch: 12 }, { wch: 12 }, { wch: 15 }, { wch: 15 },
+      { wch: 15 }, { wch: 15 }
     ];
 
     XLSX.writeFile(workbook, `purchasing-report-${startDate}-to-${endDate}.xlsx`);
@@ -222,6 +228,7 @@ const PurchasingReport = () => {
         purchase.items.forEach(item => {
           allItems.push({
             ...item,
+            supplier_vat_number: purchase.supplier_vat_number, // include VAT number
             invoice_no: purchase.invoice_no,
             purchase_date: purchase.purchase_date,
             supplier_name: purchase.supplier_name,
@@ -234,6 +241,7 @@ const PurchasingReport = () => {
         });
       } else {
         allItems.push({
+          supplier_vat_number: purchase.supplier_vat_number,
           invoice_no: purchase.invoice_no,
           purchase_date: purchase.purchase_date,
           supplier_name: purchase.supplier_name,
@@ -253,10 +261,13 @@ const PurchasingReport = () => {
 
   const allItems = getAllItemsFromPurchases();
 
-  // 🔍 Apply search filter here
-  const filteredItems = allItems.filter(item =>
-    item.item_name?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Apply VAT filter and search filter
+  const filteredItems = allItems.filter(item => {
+    const matchesSearch = item.item_name?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesVat = vatFilter === 'all' ||
+      (vatFilter === 'yes' ? item.supplier_vat_number : !item.supplier_vat_number);
+    return matchesSearch && matchesVat;
+  });
 
   return (
     <div className="purchasing-report-container">
@@ -312,6 +323,20 @@ const PurchasingReport = () => {
           </select>
         </div>
 
+        {/* NEW: VAT filter dropdown */}
+        <div className="control-group">
+          <label>VAT Status</label>
+          <select
+            value={vatFilter}
+            onChange={(e) => setVatFilter(e.target.value)}
+            className="control-input"
+          >
+            <option value="all">All</option>
+            <option value="yes">Yes (has VAT)</option>
+            <option value="no">No (no VAT)</option>
+          </select>
+        </div>
+
         <div className="control-group">
           <label>Search Item</label>
           <input
@@ -351,6 +376,7 @@ const PurchasingReport = () => {
               <tr>
                 <th>Date</th>
                 <th>Supplier</th>
+                <th>VAT Number</th>  {/* NEW column */}
                 <th>Company</th>
                 <th>Check #</th>
                 <th>Item Name</th>
@@ -368,6 +394,7 @@ const PurchasingReport = () => {
                 <tr key={`${item.invoice_no}-${index}`}>
                   <td>{format(new Date(item.purchase_date), 'MMM dd, yyyy')}</td>
                   <td>{item.supplier_name}</td>
+                  <td>{item.supplier_vat_number || '—'}</td>
                   <td>{item.company_name || 'N/A'}</td>
                   <td>{item.check_number || 'N/A'}</td>
                   <td>{item.item_name || 'N/A'}</td>

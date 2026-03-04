@@ -1,4 +1,3 @@
-// src/components/purchase/PurchaseHistory.jsx
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -17,6 +16,8 @@ const PurchaseHistory = () => {
   const [endDate, setEndDate] = useState('');
   const [companies, setCompanies] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
+  // NEW: VAT filter state
+  const [vatFilter, setVatFilter] = useState('all'); // 'all', 'yes', 'no'
 
   useEffect(() => {
     const fetchData = async () => {
@@ -51,7 +52,7 @@ const PurchaseHistory = () => {
     return dayjs(date).format('DD MMM YYYY');
   };
 
-  // Apply filters
+  // Apply filters (including VAT filter)
   const applyFilters = () => {
     let filtered = purchases;
 
@@ -83,6 +84,14 @@ const PurchaseHistory = () => {
       );
     }
 
+    // NEW: VAT filter
+    if (vatFilter !== 'all') {
+      filtered = filtered.filter(purchase => {
+        const hasVat = purchase.supplier_vat_number && purchase.supplier_vat_number.trim() !== '';
+        return vatFilter === 'yes' ? hasVat : !hasVat;
+      });
+    }
+
     setFilteredPurchases(filtered);
   };
 
@@ -109,12 +118,19 @@ const PurchaseHistory = () => {
     setTimeout(() => applyFilters(), 100);
   };
 
+  // NEW: Handle VAT filter change
+  const handleVatFilterChange = (e) => {
+    setVatFilter(e.target.value);
+    setTimeout(() => applyFilters(), 100);
+  };
+
   // Clear all filters
   const clearFilters = () => {
     setSearchQuery('');
     setCompanyFilter('');
     setStartDate('');
     setEndDate('');
+    setVatFilter('all');
     setFilteredPurchases(purchases);
   };
 
@@ -211,6 +227,20 @@ const PurchaseHistory = () => {
                   />
                 </div>
               </div>
+
+              {/* NEW: VAT filter dropdown */}
+              <div className="filter-group">
+                <label>VAT Status</label>
+                <select
+                  value={vatFilter}
+                  onChange={handleVatFilterChange}
+                  className="filter-select"
+                >
+                  <option value="all">All</option>
+                  <option value="yes">Yes (has VAT)</option>
+                  <option value="no">No (no VAT)</option>
+                </select>
+              </div>
             </div>
 
             <div className="filter-actions">
@@ -243,6 +273,7 @@ const PurchaseHistory = () => {
                 <th>Invoice #</th>
                 <th>Date</th>
                 <th>Supplier</th>
+                <th>VAT Number</th>  {/* NEW column */}
                 <th>Company</th>
                 <th className="amount-col">Subtotal</th>
                 <th className="amount-col">VAT</th>
@@ -269,6 +300,13 @@ const PurchaseHistory = () => {
                           <span className="invoice-ref">Ref: {purchase.check_number}</span>
                         )}
                       </div>
+                    </td>
+                    <td>  {/* VAT Number cell */}
+                      {purchase.supplier_vat_number ? (
+                        <span className="vat-badge">{purchase.supplier_vat_number}</span>
+                      ) : (
+                        <span className="no-vat">—</span>
+                      )}
                     </td>
                     <td>
                       <span className="company-badge">{purchase.company_name}</span>
