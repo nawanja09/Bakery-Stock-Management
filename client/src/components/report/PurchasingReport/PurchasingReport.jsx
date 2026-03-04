@@ -137,18 +137,21 @@ const PurchasingReport = () => {
   const downloadExcel = () => {
     const worksheetData = [];
 
+    // Headers (16 columns — order matters!)
     worksheetData.push([
       'Invoice #',
       'Date',
       'Supplier',
-      'VAT Number',  // NEW column
+      'VAT Number',
       'Company',
       'Check Number',
       'Item Name',
       'Quantity',
       'Unit Price (Rs.)',
-      'Total Price (Rs.)',
       'Payment Method',
+      'Subtotal (Rs.)',
+      'VAT Amount (Rs.)',
+      'Total Price (Rs.)',
       'Bill Amount (Rs.)',
       'Paid Amount (Rs.)',
       'Due Amount (Rs.)'
@@ -157,6 +160,18 @@ const PurchasingReport = () => {
     reportData.forEach(purchase => {
       if (purchase.items && purchase.items.length > 0) {
         purchase.items.forEach(item => {
+
+          const quantity = Number(item.quantity || 0);
+          const unitPrice = Number(item.unit_price || 0);
+          const subtotal = quantity * unitPrice;
+          const vatRate = Number(purchase.vat_rate || 0);
+          const vatAmount = subtotal * (vatRate / 100);
+          const totalPrice = subtotal + vatAmount;
+
+          const billAmount = Number(purchase.bill_amount || 0);
+          const paidAmount = Number(purchase.paid_amount || 0);
+          const dueAmount = billAmount - paidAmount;
+
           worksheetData.push([
             purchase.invoice_no,
             format(new Date(purchase.purchase_date), 'MMM dd, yyyy'),
@@ -165,16 +180,25 @@ const PurchasingReport = () => {
             purchase.company_name || 'N/A',
             purchase.check_number || 'N/A',
             item.item_name || 'N/A',
-            Number(item.quantity),
-            Number(item.unit_price),
-            Number(item.quantity) * Number(item.unit_price),
+            quantity,
+            unitPrice,
             purchase.payment_method,
-            parseFloat(purchase.bill_amount),
-            parseFloat(purchase.paid_amount),
-            (parseFloat(purchase.bill_amount) - parseFloat(purchase.paid_amount))
+            subtotal,
+            vatAmount,
+            totalPrice,
+            billAmount,
+            paidAmount,
+            dueAmount
           ]);
         });
+
       } else {
+        const billAmount = Number(purchase.bill_amount || 0);
+        const paidAmount = Number(purchase.paid_amount || 0);
+        const vatAmount = Number(purchase.vat_amount || 0);
+        const subtotal = billAmount - vatAmount;
+        const dueAmount = billAmount - paidAmount;
+
         worksheetData.push([
           purchase.invoice_no,
           format(new Date(purchase.purchase_date), 'MMM dd, yyyy'),
@@ -182,26 +206,34 @@ const PurchasingReport = () => {
           purchase.supplier_vat_number || '—',
           purchase.company_name || 'N/A',
           purchase.check_number || 'N/A',
-          'N/A',
-          null,
+          'No item details',
           null,
           null,
           purchase.payment_method,
-          parseFloat(purchase.bill_amount),
-          parseFloat(purchase.paid_amount),
-          (parseFloat(purchase.bill_amount) - parseFloat(purchase.paid_amount))
+          subtotal,
+          vatAmount,
+          billAmount,
+          billAmount,
+          paidAmount,
+          dueAmount
         ]);
       }
     });
 
-    const totalPurchases = reportData.reduce((sum, purchase) => sum + parseFloat(purchase.bill_amount), 0);
-    const totalPaid = reportData.reduce((sum, purchase) => sum + parseFloat(purchase.paid_amount), 0);
-    const totalDue = totalPurchases - totalPaid;
+    // Totals row
+    const totalBill = reportData.reduce((sum, p) => sum + Number(p.bill_amount || 0), 0);
+    const totalPaid = reportData.reduce((sum, p) => sum + Number(p.paid_amount || 0), 0);
+    const totalVat = reportData.reduce((sum, p) => sum + Number(p.vat_amount || 0), 0);
+    const totalSubtotal = totalBill - totalVat;
+    const totalDue = totalBill - totalPaid;
 
     worksheetData.push([]);
     worksheetData.push([
-      'TOTAL', '', '', '', '', '', '', '', '',
-      totalPurchases,
+      'TOTAL', '', '', '', '', '', '', '', '', '',
+      totalSubtotal,
+      totalVat,
+      totalBill,
+      totalBill,
       totalPaid,
       totalDue
     ]);
@@ -210,12 +242,24 @@ const PurchasingReport = () => {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Purchasing Report');
 
-    // Adjust column widths
+    // 16 column widths (IMPORTANT FIX)
     worksheet['!cols'] = [
-      { wch: 15 }, { wch: 12 }, { wch: 20 }, { wch: 15 }, // VAT column
-      { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 10 },
-      { wch: 12 }, { wch: 12 }, { wch: 15 }, { wch: 15 },
-      { wch: 15 }, { wch: 15 }
+      { wch: 15 }, // Invoice
+      { wch: 12 }, // Date
+      { wch: 20 }, // Supplier
+      { wch: 15 }, // VAT Number
+      { wch: 15 }, // Company
+      { wch: 15 }, // Check
+      { wch: 25 }, // Item
+      { wch: 10 }, // Quantity
+      { wch: 15 }, // Unit Price
+      { wch: 15 }, // Payment
+      { wch: 15 }, // Subtotal
+      { wch: 15 }, // VAT
+      { wch: 15 }, // Total Price
+      { wch: 15 }, // Bill
+      { wch: 15 }, // Paid
+      { wch: 15 }  // Due
     ];
 
     XLSX.writeFile(workbook, `purchasing-report-${startDate}-to-${endDate}.xlsx`);
