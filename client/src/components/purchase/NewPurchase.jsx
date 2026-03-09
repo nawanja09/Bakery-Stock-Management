@@ -22,6 +22,7 @@ const AddPurchase = () => {
 
   const [formData, setFormData] = useState({
     purchase_date: new Date().toLocaleDateString('en-CA'),
+    invoice_no: '', // Add this line
     supplier_id: '',
     subtotal: 0,
     vat_amount: 0,
@@ -384,6 +385,18 @@ const AddPurchase = () => {
 
         <div className="form-row">
           <div className="form-group">
+            <label>Invoice Number <span className="required">*</span></label>
+            <input
+              type="text"
+              value={formData.invoice_no || ''}
+              onChange={(e) => setFormData({...formData, invoice_no: e.target.value})}
+              placeholder="Enter invoice number (e.g., INV-2025-001)"
+              required
+              className="invoice-input"
+            />
+            <small className="field-note">Must be unique - system will validate duplicates</small>
+          </div>
+          <div className="form-group">
             <label>VAT Number</label>
             <input
               type="text"
@@ -393,6 +406,10 @@ const AddPurchase = () => {
               placeholder={supplierVatRegistered ? "Auto-filled from supplier" : "Supplier not VAT registered"}
             />
           </div>
+        </div>
+
+        {/* Company */}
+        <div className="form-row">
           <div className="form-group">
             <label>Payment Method</label>
             <select
@@ -404,10 +421,6 @@ const AddPurchase = () => {
               <option value="BANK_TRANSFER">Bank Transfer</option>
             </select>
           </div>
-        </div>
-
-        {/* Company */}
-        <div className="form-row">
           <div className="form-group">
             <label>Company</label>
             <select
@@ -548,18 +561,6 @@ const AddPurchase = () => {
 
         {/* Payment */}
         <div className="form-row">
-          <div className="form-group">
-            <label>Payment Method</label>
-            <select
-              value={formData.payment_method}
-              onChange={(e) => setFormData({...formData, payment_method: e.target.value})}
-              required
-            >
-              <option value="CASH">Cash</option>
-              <option value="BANK_TRANSFER">Bank Transfer</option>
-            </select>
-          </div>
-          
           <div className="form-group">
             <label>Paid Amount (Rs.)</label>
             <input 

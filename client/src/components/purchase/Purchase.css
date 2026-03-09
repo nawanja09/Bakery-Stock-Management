@@ -2214,3 +2214,20 @@ body {
 .bold {
   font-weight: 700;
 }
+
+.invoice-input {
+  font-family: monospace;
+  text-transform: uppercase;
+}
+
+.required {
+  color: #dc3545;
+  margin-left: 2px;
+}
+
+.field-note {
+  display: block;
+  font-size: 0.8rem;
+  color: #6c757d;
+  margin-top: 4px;
+}
