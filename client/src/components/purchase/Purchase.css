@@ -2156,3 +2156,61 @@ body {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* Summary section - Updated to match image */
+.summary-section {
+  background-color: #ffffff;
+  border-radius: 8px;
+  padding: 20px;
+  margin: 20px 0;
+  border: 1px solid #e0e0e0;
+  max-width: 400px;
+  margin-left: auto;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  font-size: 15px;
+  color: #333;
+  border-bottom: 1px dashed #e0e0e0;
+}
+
+.summary-row:last-child {
+  border-bottom: none;
+}
+
+.summary-row.grand-total {
+  font-weight: 600;
+  font-size: 18px;
+  color: #000;
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 2px solid #333;
+}
+
+.summary-row span:last-child {
+  font-family: 'Courier New', monospace;
+  font-weight: 500;
+}
+
+.summary-row.grand-total span:last-child {
+  font-weight: 700;
+  color: #000;
+}
+
+/* Optional: Add a subtle background to the total row */
+.summary-row.grand-total {
+  background-color: #f9f9f9;
+  margin: 8px -20px -20px -20px;
+  padding: 16px 20px;
+  border-bottom-left-radius: 8px;
+  border-bottom-right-radius: 8px;
+}
+
+.bold {
+  font-weight: 700;
+}
