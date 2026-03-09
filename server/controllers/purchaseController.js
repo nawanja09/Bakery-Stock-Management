@@ -107,22 +107,29 @@ const getAllPurchases = async (req, res) => {
   }
 };
 
-// Get purchase by ID (updated to include VAT fields)
+// Get purchase by ID with full details
 const getPurchaseById = async (req, res) => {
   const { id } = req.params;
   
   try {
+    // Get purchase details with supplier and company info
     const [purchase] = await pool.query(`
       SELECT 
-        p.*, 
+        p.*,
         s.name AS supplier_name,
         s.vat_number AS supplier_vat_number,
+        s.vat_registered AS supplier_vat_registered,
         s.contact_name,
         s.contact_phone,
-        c.name AS company_name
+        s.contact_email,
+        s.address AS supplier_address,
+        s.city AS supplier_city,
+        c.name AS company_name,
+        u.name AS prepared_by_name
       FROM purchases p
-      JOIN supplier s ON p.supplier_id = s.id
-      JOIN company c ON p.company_id = c.id
+      LEFT JOIN supplier s ON p.supplier_id = s.id
+      LEFT JOIN company c ON p.company_id = c.id
+      LEFT JOIN users u ON p.prepared_by = u.id
       WHERE p.id = ?
     `, [id]);
     
@@ -130,19 +137,25 @@ const getPurchaseById = async (req, res) => {
       return res.status(404).json({ error: 'Purchase not found' });
     }
     
-    const [items] = await pool.query(
-      `SELECT * FROM purchase_items WHERE purchase_id = ?`,
-      [id]
-    );
+    // Get purchase items with item details
+    const [items] = await pool.query(`
+      SELECT 
+        pi.*,
+        i.item_code,
+        i.unit,
+        i.vat_applicable
+      FROM purchase_items pi
+      LEFT JOIN items i ON pi.item_id = i.id
+      WHERE pi.purchase_id = ?
+    `, [id]);
     
-    res.json({
+    // Combine data
+    const purchaseData = {
       ...purchase[0],
-      items,
-      contact_info: [
-        purchase[0].contact_name, 
-        purchase[0].contact_phone
-      ].filter(Boolean).join(' | ')
-    });
+      items: items
+    };
+    
+    res.json(purchaseData);
     
   } catch (error) {
     console.error('Error fetching purchase:', error);
