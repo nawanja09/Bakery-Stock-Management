@@ -1592,3 +1592,111 @@ ADD COLUMN vat_rate DECIMAL(5,2) NOT NULL DEFAULT 18.00 AFTER total_with_vat;
 
 -- Note: bill_amount will now store the total_with_vat value
 -- We'll keep it for backward compatibility
+
+-- Check and add vat_number to suppliers table if not exists
+SET @dbname = DATABASE();
+SET @tablename = "supplier";
+SET @columnname = "vat_number";
+SET @preparedStatement = (SELECT IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = @tablename AND COLUMN_NAME = @columnname) > 0,
+  "SELECT 'Column already exists'",
+  CONCAT("ALTER TABLE ", @tablename, " ADD COLUMN ", @columnname, " VARCHAR(50) DEFAULT NULL AFTER address")
+));
+PREPARE stmt FROM @preparedStatement;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Check and add vat_registered flag to suppliers if not exists
+SET @columnname = "vat_registered";
+SET @preparedStatement = (SELECT IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = @tablename AND COLUMN_NAME = @columnname) > 0,
+  "SELECT 'Column already exists'",
+  CONCAT("ALTER TABLE ", @tablename, " ADD COLUMN ", @columnname, " BOOLEAN DEFAULT FALSE AFTER vat_number")
+));
+PREPARE stmt FROM @preparedStatement;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Check and add vat_applicable flag to items table
+SET @tablename = "items";
+SET @columnname = "vat_applicable";
+SET @preparedStatement = (SELECT IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = @tablename AND COLUMN_NAME = @columnname) > 0,
+  "SELECT 'Column already exists'",
+  CONCAT("ALTER TABLE ", @tablename, " ADD COLUMN ", @columnname, " BOOLEAN DEFAULT FALSE AFTER unit")
+));
+PREPARE stmt FROM @preparedStatement;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Update purchases table columns with IF NOT EXISTS equivalent
+-- Since MySQL doesn't support IF NOT EXISTS for columns, we'll check each column
+SET @tablename = "purchases";
+
+-- Check and add subtotal column
+SET @columnname = "subtotal";
+SET @preparedStatement = (SELECT IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = @tablename AND COLUMN_NAME = @columnname) > 0,
+  "SELECT 'Column already exists'",
+  CONCAT("ALTER TABLE ", @tablename, " ADD COLUMN ", @columnname, " DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER bill_amount")
+));
+PREPARE stmt FROM @preparedStatement;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Check and add vat_amount column
+SET @columnname = "vat_amount";
+SET @preparedStatement = (SELECT IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = @tablename AND COLUMN_NAME = @columnname) > 0,
+  "SELECT 'Column already exists'",
+  CONCAT("ALTER TABLE ", @tablename, " ADD COLUMN ", @columnname, " DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER subtotal")
+));
+PREPARE stmt FROM @preparedStatement;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Check and add total_with_vat column
+SET @columnname = "total_with_vat";
+SET @preparedStatement = (SELECT IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = @tablename AND COLUMN_NAME = @columnname) > 0,
+  "SELECT 'Column already exists'",
+  CONCAT("ALTER TABLE ", @tablename, " ADD COLUMN ", @columnname, " DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER vat_amount")
+));
+PREPARE stmt FROM @preparedStatement;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Check and add vat_rate column
+SET @columnname = "vat_rate";
+SET @preparedStatement = (SELECT IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = @tablename AND COLUMN_NAME = @columnname) > 0,
+  "SELECT 'Column already exists'",
+  CONCAT("ALTER TABLE ", @tablename, " ADD COLUMN ", @columnname, " DECIMAL(5,2) NOT NULL DEFAULT 18.00 AFTER total_with_vat")
+));
+PREPARE stmt FROM @preparedStatement;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Update existing suppliers to set vat_registered based on vat_number
+UPDATE supplier 
+SET vat_registered = CASE 
+    WHEN vat_number IS NOT NULL AND vat_number != '' THEN TRUE 
+    ELSE FALSE 
+END;
+
+-- Update existing items to set vat_applicable to FALSE by default
+UPDATE items 
+SET vat_applicable = FALSE 
+WHERE vat_applicable IS NULL;
+
+-- Display the updated structure
+SELECT 
+    TABLE_NAME,
+    COLUMN_NAME,
+    DATA_TYPE,
+    IS_NULLABLE,
+    COLUMN_DEFAULT
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_NAME IN ('supplier', 'items', 'purchases')
+AND COLUMN_NAME IN ('vat_number', 'vat_registered', 'vat_applicable', 'subtotal', 'vat_amount', 'total_with_vat', 'vat_rate')
+ORDER BY TABLE_NAME, ORDINAL_POSITION;

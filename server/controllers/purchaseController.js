@@ -2,9 +2,11 @@ const pool = require('../config/db');
 const { v4: uuidv4 } = require('uuid');
 
 // Create new purchase with VAT
+// Create new purchase with user-provided invoice number
 const createPurchase = async (req, res) => {
   const { 
     purchase_date, 
+    invoice_no,  // Add this - user provided invoice number
     supplier_id, 
     items, 
     subtotal,
@@ -19,13 +21,30 @@ const createPurchase = async (req, res) => {
     company_id
   } = req.body;
 
-  const invoice_no = `PUR-${uuidv4().substr(0, 8).toUpperCase()}`;
+  // Validate invoice number is provided
+  if (!invoice_no || invoice_no.trim() === '') {
+    return res.status(400).json({ error: 'Invoice number is required' });
+  }
+
   const connection = await pool.getConnection();
   
   try {
     await connection.beginTransaction();
 
-    // Insert purchase with VAT fields
+    // Check if invoice number already exists
+    const [existing] = await connection.query(
+      'SELECT id FROM purchases WHERE invoice_no = ?',
+      [invoice_no]
+    );
+
+    if (existing.length > 0) {
+      await connection.rollback();
+      return res.status(400).json({ 
+        error: 'Invoice number already exists. Please use a unique invoice number.' 
+      });
+    }
+
+    // Insert purchase with user-provided invoice number
     const [purchaseResult] = await connection.query(
       `INSERT INTO purchases 
       (invoice_no, purchase_date, supplier_id, bill_amount, subtotal, vat_amount, 
@@ -64,6 +83,14 @@ const createPurchase = async (req, res) => {
   } catch (error) {
     await connection.rollback();
     console.error('Error creating purchase:', error);
+    
+    // Handle duplicate entry error specifically
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({ 
+        error: 'Invoice number already exists. Please use a unique invoice number.' 
+      });
+    }
+    
     res.status(500).json({ error: 'Server error' });
   } finally {
     connection.release();
@@ -164,10 +191,12 @@ const getPurchaseById = async (req, res) => {
 };
 
 // Update purchase with VAT
+// Update purchase with VAT (including invoice number)
 const updatePurchase = async (req, res) => {
   const { id } = req.params;
   const { 
     purchase_date, 
+    invoice_no,  // Add this
     supplier_id, 
     items, 
     subtotal,
@@ -182,20 +211,38 @@ const updatePurchase = async (req, res) => {
     company_id
   } = req.body;
 
+  // Validate invoice number is provided
+  if (!invoice_no || invoice_no.trim() === '') {
+    return res.status(400).json({ error: 'Invoice number is required' });
+  }
+
   const connection = await pool.getConnection();
   
   try {
     await connection.beginTransaction();
 
+    // Check if invoice number already exists for a different purchase
+    const [existing] = await connection.query(
+      'SELECT id FROM purchases WHERE invoice_no = ? AND id != ?',
+      [invoice_no, id]
+    );
+
+    if (existing.length > 0) {
+      await connection.rollback();
+      return res.status(400).json({ 
+        error: 'Invoice number already exists. Please use a unique invoice number.' 
+      });
+    }
+
     // Update purchase with VAT fields
     await connection.query(
       `UPDATE purchases 
-       SET purchase_date = ?, supplier_id = ?, bill_amount = ?, subtotal = ?, 
+       SET invoice_no = ?, purchase_date = ?, supplier_id = ?, bill_amount = ?, subtotal = ?, 
            vat_amount = ?, total_with_vat = ?, vat_rate = ?, paid_amount = ?, 
            payment_method = ?, check_number = ?, remarks = ?, prepared_by = ?, 
            company_id = ?
        WHERE id = ?`,
-      [purchase_date, supplier_id, total_with_vat, subtotal, vat_amount, 
+      [invoice_no, purchase_date, supplier_id, total_with_vat, subtotal, vat_amount, 
        total_with_vat, vat_rate, paid_amount, payment_method, check_number, 
        remarks, prepared_by, company_id, id]
     );
@@ -229,6 +276,14 @@ const updatePurchase = async (req, res) => {
   } catch (error) {
     await connection.rollback();
     console.error('Error updating purchase:', error);
+    
+    // Handle duplicate entry error specifically
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({ 
+        error: 'Invoice number already exists. Please use a unique invoice number.' 
+      });
+    }
+    
     res.status(500).json({ error: 'Server error' });
   } finally {
     connection.release();

@@ -273,6 +273,14 @@ const NavigationBar = () => {
                     <li><NavLink to="/reports/stock/items" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faBox} /></span><span>Item Wise Stock Report</span></NavLink></li>
                   </ul>
                 </li>
+
+                {/* VAT Report*/}
+                <li>
+                  <NavLink to="/reports/vat" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                    <span className="icon-container"><FontAwesomeIcon icon={faCalculator} /></span>
+                    <span>VAT Report</span>
+                  </NavLink>
+                </li>
               </>
             )}
           </div>
