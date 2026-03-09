@@ -1,7 +1,6 @@
 const pool = require('../config/db');
 const { v4: uuidv4 } = require('uuid');
 
-// Create new purchase with VAT
 // Create new purchase with user-provided invoice number
 const createPurchase = async (req, res) => {
   const { 
@@ -190,7 +189,6 @@ const getPurchaseById = async (req, res) => {
   }
 };
 
-// Update purchase with VAT
 // Update purchase with VAT (including invoice number)
 const updatePurchase = async (req, res) => {
   const { id } = req.params;

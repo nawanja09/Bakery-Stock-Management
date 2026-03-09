@@ -1700,3 +1700,33 @@ FROM INFORMATION_SCHEMA.COLUMNS
 WHERE TABLE_NAME IN ('supplier', 'items', 'purchases')
 AND COLUMN_NAME IN ('vat_number', 'vat_registered', 'vat_applicable', 'subtotal', 'vat_amount', 'total_with_vat', 'vat_rate')
 ORDER BY TABLE_NAME, ORDINAL_POSITION;
+
+--------------------------------------------
+-- Now modify the column
+ALTER TABLE supplier 
+MODIFY COLUMN vat_number VARCHAR(9) DEFAULT NULL;
+
+-- Update invalid VAT numbers to NULL
+UPDATE supplier 
+SET vat_number = NULL 
+WHERE vat_number IS NOT NULL 
+    AND (vat_number NOT REGEXP '^[0-9]{9}$' 
+    OR LENGTH(vat_number) != 9);
+
+-- If you want to keep the data but truncate it to 9 digits
+-- (Only if the first 9 characters are valid)
+UPDATE supplier 
+SET vat_number = LEFT(vat_number, 9)
+WHERE vat_number IS NOT NULL 
+    AND LENGTH(vat_number) > 9;
+
+-- Remove any non-digit characters from VAT numbers
+UPDATE supplier 
+SET vat_number = REGEXP_REPLACE(vat_number, '[^0-9]', '')
+WHERE vat_number IS NOT NULL;
+
+-- After removing non-digits, set to NULL if not exactly 9 digits
+UPDATE supplier 
+SET vat_number = NULL 
+WHERE vat_number IS NOT NULL 
+    AND LENGTH(vat_number) != 9;
