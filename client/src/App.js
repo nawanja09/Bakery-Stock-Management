@@ -67,6 +67,8 @@ import Purchases from './components/Cutlery/Purchases/Purchases';
 import Damages from './components/Cutlery/Damages/Damages';
 import CutleryStockReport from './components/Cutlery/Reports/CutleryStockReport';
 
+import VATReport from './components/report/VATReport';
+
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
@@ -163,7 +165,9 @@ function App() {
             <Route path="cutlery/damage" element={<Damages />} />
             <Route path="cutlery/reports/inventory" element={<CutleryStockReport />} />
             <Route path="cutlery/reports/stock" element={<CutleryStockReport />} />
-            
+
+            <Route path="reports/vat" element={<VATReport />} />
+
           </Route>
 
           <Route path="*" element={<Navigate to="/login" replace />} />
