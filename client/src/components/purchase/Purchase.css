@@ -1475,3 +1475,684 @@ body {
   padding: 10px 14px;
   border-radius: 10px;
 }
+
+/* VAT related styles */
+.vat-column {
+  background-color: #fff3cd !important;
+}
+
+.vat-display {
+  background-color: #f8f9fa;
+  color: #495057;
+  font-weight: 500;
+}
+
+.vat-display[readonly] {
+  cursor: default;
+}
+
+/* Summary section */
+.summary-section {
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  padding: 15px;
+  margin: 20px 0;
+  border: 1px solid #dee2e6;
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px dashed #dee2e6;
+}
+
+.summary-row:last-child {
+  border-bottom: none;
+}
+
+.summary-row.grand-total {
+  font-weight: bold;
+  font-size: 1.1em;
+  color: #28a745;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 2px solid #dee2e6;
+}
+
+.bold {
+  font-weight: 700;
+}
+
+/* Due amount highlighting */
+.due-amount {
+  background-color: #f8d7da !important;
+  color: #721c24 !important;
+  font-weight: 600;
+  border-color: #f5c6cb !important;
+}
+
+/* Item table */
+.item-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 20px 0;
+}
+
+.item-table th {
+  background-color: #f8f9fa;
+  padding: 12px;
+  text-align: left;
+  border-bottom: 2px solid #dee2e6;
+}
+
+.item-table td {
+  padding: 10px;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.item-table input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+}
+
+.item-table input:focus {
+  outline: none;
+  border-color: #80bdff;
+  box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+}
+
+.unit-display {
+  background-color: #e9ecef !important;
+  cursor: default;
+}
+
+.btn-remove {
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-remove:hover {
+  background-color: #c82333;
+}
+
+.btn-add {
+  background-color: #28a745;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin: 10px 0;
+  transition: background-color 0.2s;
+}
+
+.btn-add:hover {
+  background-color: #218838;
+}
+
+.btn-submit {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background-color 0.2s;
+}
+
+.btn-submit:hover:not(:disabled) {
+  background-color: #0056b3;
+}
+
+.btn-submit:disabled {
+  background-color: #6c757d;
+  cursor: not-allowed;
+}
+
+/* Form layout */
+.form-row {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.form-group {
+  flex: 1;
+  min-width: 200px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 500;
+  color: #495057;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.form-group textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.new-purchase-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.new-purchase-container h2 {
+  margin-bottom: 30px;
+  color: #343a40;
+}
+
+.new-purchase-container h3 {
+  margin: 30px 0 15px;
+  color: #495057;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .form-row {
+    flex-direction: column;
+    gap: 15px;
+  }
+  
+  .form-group {
+    min-width: 100%;
+  }
+  
+  .item-table {
+    font-size: 14px;
+  }
+  
+  .item-table th,
+  .item-table td {
+    padding: 8px 5px;
+  }
+  
+  .item-table input {
+    padding: 5px;
+  }
+}
+
+/* React Select customization */
+.react-select__control {
+  border-color: #ced4da !important;
+  min-height: 38px !important;
+}
+
+.react-select__control:hover {
+  border-color: #80bdff !important;
+}
+
+.react-select__control--is-focused {
+  border-color: #80bdff !important;
+  box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25) !important;
+}
+
+.react-select__menu {
+  z-index: 1050 !important;
+}
+
+.react-select__option--is-selected {
+  background-color: #007bff !important;
+}
+
+.react-select__option--is-focused {
+  background-color: #f8f9fa !important;
+}
+
+/* Purchase Details Specific Styles */
+.purchase-details-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.detail-card {
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  overflow: hidden;
+}
+
+.detail-card .card-header {
+  background: #f8f9fa;
+  padding: 15px 20px;
+  border-bottom: 1px solid #dee2e6;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.detail-card .card-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #495057;
+}
+
+.detail-card .card-header svg {
+  color: #007bff;
+}
+
+.detail-card .card-content {
+  padding: 20px;
+}
+
+.info-row {
+  display: flex;
+  padding: 10px 0;
+  border-bottom: 1px solid #f1f1f1;
+}
+
+.info-row:last-child {
+  border-bottom: none;
+}
+
+.info-row .label {
+  width: 120px;
+  color: #6c757d;
+  font-size: 14px;
+}
+
+.info-row .value {
+  flex: 1;
+  color: #212529;
+  font-weight: 500;
+}
+
+.info-row .value.highlight {
+  color: #007bff;
+  font-weight: 600;
+}
+
+.vat-status .value {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.vat-badge.yes {
+  background: #d4edda;
+  color: #155724;
+}
+
+.vat-badge.no {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.vat-number {
+  font-family: monospace;
+  background: #e9ecef;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.icon-small {
+  font-size: 12px;
+  color: #6c757d;
+}
+
+.financial-summary {
+  padding: 0;
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-bottom: 1px dashed #dee2e6;
+}
+
+.summary-row:last-child {
+  border-bottom: none;
+}
+
+.summary-row.vat {
+  color: #007bff;
+}
+
+.summary-row.total {
+  font-weight: 700;
+  font-size: 16px;
+  background: #f8f9fa;
+}
+
+.summary-divider {
+  height: 2px;
+  background: #dee2e6;
+  margin: 15px 0;
+}
+
+.summary-row.due {
+  font-weight: 600;
+}
+
+.summary-row.due.negative .value {
+  color: #dc3545;
+}
+
+.summary-row.due.positive .value {
+  color: #28a745;
+}
+
+.paid {
+  color: #28a745;
+  font-weight: 600;
+}
+
+.due-amount {
+  color: #dc3545 !important;
+  font-weight: 700;
+}
+
+.payment-status {
+  padding: 15px 20px;
+  text-align: center;
+  font-weight: 600;
+  border-radius: 0 0 10px 10px;
+}
+
+.payment-status.paid-fully {
+  background: #d4edda;
+  color: #155724;
+}
+
+.payment-status.partially-paid {
+  background: #fff3cd;
+  color: #856404;
+}
+
+/* Items Card */
+.items-card {
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  padding: 20px;
+  margin-bottom: 30px;
+}
+
+.items-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.items-card .card-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #495057;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.vat-note .badge {
+  background: #007bff;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.table-responsive {
+  overflow-x: auto;
+}
+
+.items-details-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 900px;
+}
+
+.items-details-table th {
+  background: #f8f9fa;
+  padding: 12px;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 600;
+  color: #495057;
+  border-bottom: 2px solid #dee2e6;
+}
+
+.items-details-table td {
+  padding: 12px;
+  border-bottom: 1px solid #e9ecef;
+  vertical-align: middle;
+}
+
+.items-details-table tbody tr:hover {
+  background: #f8f9fa;
+}
+
+.items-details-table tbody tr.vat-applicable-row {
+  background: #fff3cd;
+}
+
+.items-details-table tbody tr.vat-applicable-row:hover {
+  background: #ffe69c;
+}
+
+.vat-column {
+  background-color: #fff3cd !important;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.item-name {
+  font-weight: 500;
+  color: #212529;
+}
+
+.vat-applicable-badge {
+  display: inline-block;
+  background: #28a745;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 10px;
+  margin-top: 4px;
+}
+
+.price-different {
+  color: #dc3545;
+  font-weight: 600;
+}
+
+.price-history {
+  display: block;
+  color: #6c757d;
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.total-column {
+  background: #f8f9fa;
+  font-weight: 600;
+}
+
+.items-details-table tfoot {
+  background: #f8f9fa;
+  font-weight: 600;
+}
+
+.items-details-table tfoot td {
+  padding: 15px 12px;
+  border-top: 2px solid #dee2e6;
+}
+
+/* Items Summary */
+.items-summary {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 2px solid #dee2e6;
+}
+
+.summary-stats {
+  display: flex;
+  gap: 30px;
+  justify-content: flex-end;
+}
+
+.stat {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.stat-label {
+  color: #6c757d;
+  font-size: 14px;
+}
+
+.stat-value {
+  font-weight: 600;
+  color: #212529;
+  font-size: 16px;
+}
+
+/* Remarks Card */
+.remarks-card {
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  padding: 20px;
+  margin-bottom: 30px;
+}
+
+.remarks-card .card-header h3 {
+  margin: 0 0 15px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #495057;
+}
+
+.remarks-content {
+  background: #f8f9fa;
+  padding: 15px;
+  border-radius: 8px;
+  color: #212529;
+  line-height: 1.6;
+}
+
+/* Details Actions */
+.details-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+/* Print Styles */
+@media print {
+  .page-header,
+  .header-actions,
+  .back-button,
+  .details-actions,
+  .btn-outline,
+  .btn-primary,
+  .btn-secondary {
+    display: none !important;
+  }
+
+  .purchase-details-container {
+    padding: 0;
+  }
+
+  .detail-card,
+  .items-card,
+  .remarks-card {
+    box-shadow: none;
+    border: 1px solid #dee2e6;
+    break-inside: avoid;
+  }
+
+  .items-details-table {
+    border: 1px solid #dee2e6;
+  }
+
+  .items-details-table th,
+  .items-details-table td {
+    border: 1px solid #dee2e6;
+  }
+
+  .vat-column {
+    background-color: #fff3cd !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .details-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .info-row {
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .info-row .label {
+    width: 100%;
+  }
+
+  .summary-stats {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .stat {
+    justify-content: space-between;
+  }
+
+  .items-details-table {
+    font-size: 12px;
+  }
+
+  .items-details-table th,
+  .items-details-table td {
+    padding: 8px 5px;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  .details-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

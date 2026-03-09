@@ -5,8 +5,35 @@ const pool = require('../config/db');
 // GET all suppliers
 router.get('/', async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT * FROM supplier');
+    const [rows] = await pool.query(`
+      SELECT id, name, address, vat_number, vat_registered, city, 
+             contact_name, contact_phone, contact_email 
+      FROM supplier
+    `);
     res.json(rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET single supplier
+router.get('/:id', async (req, res) => {
+  const { id } = req.params;
+  
+  try {
+    const [rows] = await pool.query(`
+      SELECT id, name, address, vat_number, vat_registered, city,
+             contact_name, contact_phone, contact_email
+      FROM supplier 
+      WHERE id = ?
+    `, [id]);
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Supplier not found' });
+    }
+    
+    res.json(rows[0]);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Server error' });
@@ -19,18 +46,24 @@ router.post('/', async (req, res) => {
     name, 
     address, 
     vat_number,
+    vat_registered,
     city, 
     contact_name, 
     contact_phone, 
     contact_email
   } = req.body;
 
+  // Validate VAT number if registered
+  if (vat_registered && !vat_number) {
+    return res.status(400).json({ error: 'VAT Number is required for registered suppliers' });
+  }
+
   try {
     const [result] = await pool.query(
       `INSERT INTO supplier
-      (name, address, vat_number, city, contact_name, contact_phone, contact_email) 
-      VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [name, address, vat_number, city, contact_name, contact_phone, contact_email]
+      (name, address, vat_number, vat_registered, city, contact_name, contact_phone, contact_email) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [name, address, vat_number || null, vat_registered || false, city, contact_name, contact_phone, contact_email]
     );
     
     res.status(201).json({
@@ -46,14 +79,19 @@ router.post('/', async (req, res) => {
 // PUT update supplier
 router.put('/:id', async (req, res) => {
   const { id } = req.params;
-  const { name, address, vat_number, city, contact_name, contact_phone, contact_email } = req.body;
+  const { name, address, vat_number, vat_registered, city, contact_name, contact_phone, contact_email } = req.body;
+
+  // Validate VAT number if registered
+  if (vat_registered && !vat_number) {
+    return res.status(400).json({ error: 'VAT Number is required for registered suppliers' });
+  }
 
   try {
     await pool.query(
       `UPDATE supplier 
-       SET name=?, address=?, vat_number=?, city=?, contact_name=?, contact_phone=?, contact_email=? 
+       SET name=?, address=?, vat_number=?, vat_registered=?, city=?, contact_name=?, contact_phone=?, contact_email=? 
        WHERE id=?`,
-      [name, address, vat_number, city, contact_name, contact_phone, contact_email, id]
+      [name, address, vat_number || null, vat_registered || false, city, contact_name, contact_phone, contact_email, id]
     );
 
     res.json({ message: 'Supplier updated successfully' });
@@ -75,6 +113,5 @@ router.delete('/:id', async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
-
 
 module.exports = router;

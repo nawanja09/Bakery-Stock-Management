@@ -1,35 +1,74 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faEdit, faTrash, faPlus } from '@fortawesome/free-solid-svg-icons';
-import { usePopup } from '../context/PopupContext';
+import { faPlus, faEdit, faTrash, faSearch, faTimes } from '@fortawesome/free-solid-svg-icons';
 import './ItemManagement.css';
+import { usePopup } from '../context/PopupContext';
 import api from '../../api';
 
-const ViewItems = () => {
+const ItemsList = () => {
   const [items, setItems] = useState([]);
+  const [filteredItems, setFilteredItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const navigate = useNavigate();
+  const [filterVat, setFilterVat] = useState('all');
   const { showPopup } = usePopup();
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchItems();
   }, []);
 
+  useEffect(() => {
+    filterItems();
+  }, [searchTerm, filterVat, items]);
+
   const fetchItems = async () => {
     try {
+      setLoading(true);
       const response = await api.get('/items');
-      const data = response.data;
-      if (response.status === 200) {
-        setItems(data);
-      } else {
-        showPopup('error', data.error || 'Failed to fetch items');
-      }
-    } catch (err) {
-      showPopup('error', 'Network error. Please try again.');
+      setItems(response.data);
+      setFilteredItems(response.data);
+    } catch (error) {
+      console.error('Error fetching items:', error);
+      showPopup('error', 'Failed to load items');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const filterItems = () => {
+    let filtered = [...items];
+
+    // Apply search filter
+    if (searchTerm) {
+      filtered = filtered.filter(item =>
+        item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.item_code.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    // Apply VAT filter
+    if (filterVat !== 'all') {
+      const vatValue = filterVat === 'yes';
+      filtered = filtered.filter(item => item.vat_applicable === vatValue);
+    }
+
+    setFilteredItems(filtered);
+  };
+
+  const handleDelete = async (id, itemName) => {
+    if (!window.confirm(`Are you sure you want to delete "${itemName}"?`)) {
+      return;
+    }
+
+    try {
+      await api.delete(`/items/${id}`);
+      showPopup('success', 'Item deleted successfully!');
+      fetchItems(); // Refresh the list
+    } catch (error) {
+      console.error('Error deleting item:', error);
+      showPopup('error', 'Failed to delete item');
     }
   };
 
@@ -37,105 +76,184 @@ const ViewItems = () => {
     navigate(`/items/edit/${id}`);
   };
 
-  const handleDelete = async (id) => {
-    const itemToDelete = items.find(item => item.id === id);
-    
-    if (!itemToDelete) return;
-
-    if (window.confirm(`Are you sure you want to delete item "${itemToDelete.name}" (${itemToDelete.item_code})?`)) {
-      try {
-        const response = await api.delete(`/items/${id}`);
-
-        if (response.status === 200) {
-          setItems(items.filter(item => item.id !== id));
-          showPopup('success', 'Item deleted successfully!');
-        } else {
-          const data = response.data;
-          showPopup('error', data.error || 'Failed to delete item');
-        }
-      } catch (error) {
-        if (error.response && error.response.data && error.response.data.error) {
-          showPopup('error', error.response.data.error);
-        } else {
-          showPopup('error', 'Network error. Please try again.');
-        }
-      }
-    }
+  const clearSearch = () => {
+    setSearchTerm('');
+    setFilterVat('all');
   };
 
-  const handleAddNew = () => {
-    navigate('/items/add');
-  };
-
-  const filteredItems = items.filter(item =>
-    item.item_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  if (loading) {
+    return (
+      <div className="minimal-container">
+        <div className="minimal-card loading-card">
+          <div className="minimal-spinner"></div>
+          <p className="loading-text">Loading items...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="item-container">
-      <div className="item-header">
-        <h2>Item List</h2>
-        <div className="item-header-actions">
-          <div className="search-bar">
-            <input
-              type="text"
-              placeholder="Search by item code or name"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <button onClick={handleAddNew} className="btn-add">
-            <FontAwesomeIcon icon={faPlus} /> Add New Item
+    <div className="items-table-container">
+      <div className="items-table-header">
+        <h2 className="items-table-title">Items Management</h2>
+        <div className="items-table-actions">
+          <button 
+            onClick={() => navigate('/items/add')} 
+            className="minimal-button minimal-button-primary"
+          >
+            <FontAwesomeIcon icon={faPlus} className="button-icon" />
+            Add New Item
           </button>
         </div>
       </div>
 
-      {loading ? (
-        <p>Loading items...</p>
-      ) : filteredItems.length === 0 ? (
-        <p>No items found. {searchTerm && 'Try a different search term.'}</p>
+      <div className="filters-section">
+        <div className="items-search">
+          <FontAwesomeIcon icon={faSearch} className="search-icon" />
+          <input
+            type="text"
+            placeholder="Search by name or code..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          {searchTerm && (
+            <button 
+              className="clear-search"
+              onClick={() => setSearchTerm('')}
+              aria-label="Clear search"
+            >
+              <FontAwesomeIcon icon={faTimes} />
+            </button>
+          )}
+        </div>
+
+        <div className="filter-dropdown">
+          <select 
+            value={filterVat} 
+            onChange={(e) => setFilterVat(e.target.value)}
+            className="minimal-select filter-select"
+          >
+            <option value="all">All Items</option>
+            <option value="yes">VAT Applicable</option>
+            <option value="no">VAT Not Applicable</option>
+          </select>
+        </div>
+
+        {(searchTerm || filterVat !== 'all') && (
+          <button 
+            onClick={clearSearch}
+            className="minimal-button minimal-button-secondary clear-filters"
+          >
+            Clear Filters
+          </button>
+        )}
+      </div>
+
+      {filteredItems.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-state-icon">📦</div>
+          <h3>No Items Found</h3>
+          <p>
+            {searchTerm || filterVat !== 'all' 
+              ? "No items match your search criteria. Try adjusting your filters." 
+              : "Get started by adding your first item."}
+          </p>
+          {(searchTerm || filterVat !== 'all') && (
+            <button onClick={clearSearch} className="minimal-button minimal-button-secondary">
+              Clear All Filters
+            </button>
+          )}
+          {!searchTerm && filterVat === 'all' && (
+            <button 
+              onClick={() => navigate('/items/add')} 
+              className="minimal-button minimal-button-primary"
+            >
+              <FontAwesomeIcon icon={faPlus} className="button-icon" />
+              Add Your First Item
+            </button>
+          )}
+        </div>
       ) : (
-        <table className="items-table">
-          <thead>
-            <tr>
-              <th>Item Code</th>
-              <th>Item Name</th>
-              <th>Unit</th>
-              <th>Reorder Level</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredItems.map(item => (
-              <tr key={item.id}>
-                <td>{item.item_code}</td>
-                <td>{item.name}</td>
-                <td>{item.unit}</td>
-                <td>{item.reorder_level}</td>
-                <td className="actions">
-                  <button 
-                    onClick={() => handleEdit(item.id)} 
-                    className="btn-edit"
-                    title="Edit Item"
-                  >
-                    <FontAwesomeIcon icon={faEdit} />
-                  </button>
-                  <button 
-                    onClick={() => handleDelete(item.id)} 
-                    className="btn-delete"
-                    title="Delete Item"
-                  >
-                    <FontAwesomeIcon icon={faTrash} />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <>
+          <div className="minimal-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Item Code</th>
+                  <th>Item Name</th>
+                  <th>Unit</th>
+                  <th>VAT Status</th>
+                  <th>Reorder Level</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredItems.map(item => (
+                  <tr key={item.id}>
+                    <td>
+                      <span className="item-code-badge">{item.item_code}</span>
+                    </td>
+                    <td className="item-name-cell">
+                      <span className="item-name">{item.name}</span>
+                    </td>
+                    <td>
+                      <span className="unit-badge">{item.unit}</span>
+                    </td>
+                    <td>
+                      <span className={`vat-status-badge ${item.vat_applicable ? 'applicable' : 'not-applicable'}`}>
+                        {item.vat_applicable ? 'VAT Applicable' : 'VAT Not Applicable'}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="reorder-level">{item.reorder_level}</span>
+                    </td>
+                    <td>
+                      <div className="table-actions">
+                        <button 
+                          onClick={() => handleEdit(item.id)} 
+                          className="btn-icon edit"
+                          title="Edit item"
+                          aria-label={`Edit ${item.name}`}
+                        >
+                          <FontAwesomeIcon icon={faEdit} />
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(item.id, item.name)} 
+                          className="btn-icon delete"
+                          title="Delete item"
+                          aria-label={`Delete ${item.name}`}
+                        >
+                          <FontAwesomeIcon icon={faTrash} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="table-footer">
+            <div className="table-stats">
+              <span className="stat-item">
+                <strong>{filteredItems.length}</strong> items displayed
+              </span>
+              {filteredItems.length !== items.length && (
+                <span className="stat-item text-muted">
+                  (filtered from {items.length} total)
+                </span>
+              )}
+            </div>
+            <div className="table-export">
+              <button className="minimal-button minimal-button-secondary" disabled>
+                Export List
+              </button>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );
 };
 
-export default ViewItems;
+export default ItemsList;

@@ -11,10 +11,13 @@ const Suppliers = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showVatNumber, setShowVatNumber] = useState(false);
   const [newSupplier, setNewSupplier] = useState({
     name: '',
     address: '',
     city: '',
+    vat_registered: false,
+    vat_number: '',
     contact_name: '',
     contact_phone: '',
     contact_email: ''
@@ -39,12 +42,29 @@ const Suppliers = () => {
   };
 
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setNewSupplier(prev => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    
+    if (type === 'checkbox') {
+      setNewSupplier(prev => ({ 
+        ...prev, 
+        [name]: checked,
+        vat_number: checked ? prev.vat_number : '' // Clear VAT number if not registered
+      }));
+      setShowVatNumber(checked);
+    } else {
+      setNewSupplier(prev => ({ ...prev, [name]: value }));
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validate VAT number if registered
+    if (newSupplier.vat_registered && !newSupplier.vat_number.trim()) {
+      showPopup('error', 'VAT Number is required for registered suppliers');
+      return;
+    }
+
     try {
       if (editingSupplier) {
         await api.put(`/suppliers/${editingSupplier.id}`, newSupplier);
@@ -61,10 +81,13 @@ const Suppliers = () => {
         name: '',
         address: '',
         city: '',
+        vat_registered: false,
+        vat_number: '',
         contact_name: '',
         contact_phone: '',
         contact_email: ''
       });
+      setShowVatNumber(false);
 
       navigate("/suppliers");
     } catch (error) {
@@ -75,6 +98,7 @@ const Suppliers = () => {
   const handleEdit = (supplier) => {
     setEditingSupplier(supplier);
     setNewSupplier(supplier);
+    setShowVatNumber(supplier.vat_registered);
     setShowForm(true);
   };
 
@@ -99,18 +123,32 @@ const Suppliers = () => {
   return (
     <div className="suppliers-container">
       <div className="header-buttons">
-        <button onClick={() => { setShowForm(true); setEditingSupplier(null); }} className="btn-add">
+        <button onClick={() => { 
+          setShowForm(true); 
+          setEditingSupplier(null); 
+          setNewSupplier({
+            name: '',
+            address: '',
+            city: '',
+            vat_registered: false,
+            vat_number: '',
+            contact_name: '',
+            contact_phone: '',
+            contact_email: ''
+          });
+          setShowVatNumber(false);
+        }} className="btn-add">
           <FontAwesomeIcon icon={faPlus} /> Add New Supplier
         </button>
 
-         <div className="search-bar">
-            <input
-              type="text"
-              placeholder="Search by supplier name..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
+        <div className="search-bar">
+          <input
+            type="text"
+            placeholder="Search by supplier name..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
       </div>
 
       {showForm ? (
@@ -118,32 +156,55 @@ const Suppliers = () => {
           <h2>{editingSupplier ? 'Edit Supplier' : 'Add Supplier'}</h2>
           <form onSubmit={handleSubmit} className="form-layout">
             <div className="form-group">
-              <label>Supplier Name</label>
+              <label>Supplier Name *</label>
               <input type="text" name="name" value={newSupplier.name} onChange={handleInputChange} required />
             </div>
 
             <div className="form-group">
-              <label>Address</label>
+              <label>Address *</label>
               <input type="text" name="address" value={newSupplier.address} onChange={handleInputChange} required />
             </div>
 
             <div className="form-group">
-              <label>VAT Number</label>
-              <input type="text" name="vat_number" value={newSupplier.vat_number || ''} onChange={handleInputChange} />
-            </div>
-
-            <div className="form-group">
-              <label>City</label>
+              <label>City *</label>
               <input type="text" name="city" value={newSupplier.city} onChange={handleInputChange} required />
             </div>
 
+            <div className="form-group toggle-group">
+              <label className="toggle-label">
+                <span>VAT Registered</span>
+                <div className="toggle-switch">
+                  <input
+                    type="checkbox"
+                    name="vat_registered"
+                    checked={newSupplier.vat_registered}
+                    onChange={handleInputChange}
+                  />
+                  <span className="toggle-slider"></span>
+                </div>
+              </label>
+            </div>
+
+            {showVatNumber && (
+              <div className="form-group">
+                <label>VAT Number *</label>
+                <input 
+                  type="text" 
+                  name="vat_number" 
+                  value={newSupplier.vat_number} 
+                  onChange={handleInputChange} 
+                  required={newSupplier.vat_registered}
+                />
+              </div>
+            )}
+
             <div className="form-group">
-              <label>Contact Name</label>
+              <label>Contact Name *</label>
               <input type="text" name="contact_name" value={newSupplier.contact_name} onChange={handleInputChange} required />
             </div>
 
             <div className="form-group">
-              <label>Contact Phone</label>
+              <label>Contact Phone *</label>
               <input type="text" name="contact_phone" value={newSupplier.contact_phone} onChange={handleInputChange} required />
             </div>
 
@@ -153,7 +214,11 @@ const Suppliers = () => {
             </div>
 
             <div className="form-actions">
-              <button type="button" className="btn-cancel" onClick={() => { setShowForm(false); setEditingSupplier(null); }}>
+              <button type="button" className="btn-cancel" onClick={() => { 
+                setShowForm(false); 
+                setEditingSupplier(null);
+                setShowVatNumber(false);
+              }}>
                 Cancel
               </button>
               <button type="submit" className="btn-save">
@@ -170,13 +235,14 @@ const Suppliers = () => {
             <table className="supplier-table">
               <thead>
                 <tr>
-                  <th>Name</th>
+                  <th>Supplier Name</th>
                   <th>Address</th>
-                  <th>VAT Number</th>
                   <th>City</th>
+                  <th>VAT Registered</th>
+                  <th>VAT Number</th>
                   <th>Contact Name</th>
-                  <th>Phone</th>
-                  <th>Email</th>
+                  <th>Contact Phone</th>
+                  <th>Contact Email</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -185,8 +251,13 @@ const Suppliers = () => {
                   <tr key={supplier.id} className="supplier-row">
                     <td>{supplier.name}</td>
                     <td>{supplier.address}</td>
-                    <td>{supplier.vat_number}</td>
                     <td>{supplier.city}</td>
+                    <td>
+                      <span className={`vat-badge ${supplier.vat_registered ? 'yes' : 'no'}`}>
+                        {supplier.vat_registered ? 'Yes' : 'No'}
+                      </span>
+                    </td>
+                    <td>{supplier.vat_number || '-'}</td>
                     <td>{supplier.contact_name}</td>
                     <td>{supplier.contact_phone}</td>
                     <td>{supplier.contact_email}</td>
