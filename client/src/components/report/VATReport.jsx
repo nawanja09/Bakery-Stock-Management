@@ -11,12 +11,12 @@ const VATReport = () => {
   const [loading, setLoading] = useState(false);
   const [companyFilter, setCompanyFilter] = useState('');
 
-  // Format date to MM/DD/YY
-  const formatDateMMDDYY = (dateString) => {
+  // Format date to MM/DD/YYYY (with 4-digit year)
+  const formatDateMMDDYYYY = (dateString) => {
     const date = new Date(dateString);
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
-    const year = String(date.getFullYear()).slice(-2);
+    const year = date.getFullYear(); // 4-digit year
     return `${month}/${day}/${year}`;
   };
 
@@ -101,18 +101,18 @@ const VATReport = () => {
 
     // Add headers
     worksheetData.push([
-      'Invoice Date',
+      'Invoice Date (MM/DD/YYYY)',
       'Invoice No',
       'Supplier TIN Number',
       'Name of Supplier',
-      'Value of Purchasing',
-      'VAT Amount'
+      'Net Amount (Rs.)',
+      'VAT Amount (18%) (Rs.)'
     ]);
 
     // Add data rows
     vatData.forEach(item => {
       worksheetData.push([
-        formatDateMMDDYY(item.invoiceDate),
+        formatDateMMDDYYYY(item.invoiceDate), // Now returns MM/DD/YYYY
         item.invoiceNo,
         item.supplierTIN,
         item.supplierName,
@@ -142,7 +142,7 @@ const VATReport = () => {
 
     // Set column widths
     worksheet['!cols'] = [
-      { wch: 15 }, // Invoice Date
+      { wch: 18 }, // Invoice Date (MM/DD/YYYY)
       { wch: 20 }, // Invoice No
       { wch: 20 }, // Supplier TIN
       { wch: 30 }, // Supplier Name
@@ -173,7 +173,7 @@ const VATReport = () => {
         <h2>VAT Purchasing Report</h2>
         {vatData.length > 0 && (
           <button onClick={downloadExcel} className="btn btn-success">
-            <span>📊</span> Excel
+            <span>📊</span> Export to Excel
           </button>
         )}
       </div>
@@ -243,7 +243,7 @@ const VATReport = () => {
             <table className="vat-report-table">
               <thead>
                 <tr>
-                  <th>Invoice Date (MM/DD/YY)</th>
+                  <th>Invoice Date</th>
                   <th>Invoice No</th>
                   <th>Supplier TIN Number</th>
                   <th>Name of Supplier</th>
@@ -254,7 +254,7 @@ const VATReport = () => {
               <tbody>
                 {vatData.map((item, index) => (
                   <tr key={`${item.invoiceNo}-${index}`}>
-                    <td>{formatDateMMDDYY(item.invoiceDate)}</td>
+                    <td>{formatDateMMDDYYYY(item.invoiceDate)}</td>
                     <td>{item.invoiceNo}</td>
                     <td>{item.supplierTIN}</td>
                     <td>{item.supplierName}</td>
