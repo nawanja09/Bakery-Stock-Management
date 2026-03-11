@@ -10,6 +10,7 @@ const VATReport = () => {
   const [reportData, setReportData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [companyFilter, setCompanyFilter] = useState('');
+  const [vatFilter, setVatFilter] = useState('all');
 
   // Format date to MM/DD/YYYY (with 4-digit year)
   const formatDateMMDDYYYY = (dateString) => {
@@ -49,6 +50,11 @@ const VATReport = () => {
     }
   };
 
+  // Handle VAT filter change
+  const handleVatFilterChange = (e) => {
+    setVatFilter(e.target.value);
+  };
+
   // Process data for VAT report
   const processVATData = () => {
     const vatData = [];
@@ -56,9 +62,8 @@ const VATReport = () => {
     reportData.forEach(purchase => {
       if (purchase.items && purchase.items.length > 0) {
         purchase.items.forEach(item => {
-          // Calculate Net Amount (amount excluding VAT)
           const amount = parseFloat(item.quantity) * parseFloat(item.unit_price);
-          const vatAmount = amount * 0.18; // 18% VAT
+          const vatAmount = amount * 0.18;
 
           vatData.push({
             invoiceDate: purchase.purchase_date,
@@ -70,7 +75,6 @@ const VATReport = () => {
           });
         });
       } else {
-        // Fallback for purchases without item details
         const netAmount = parseFloat(purchase.bill_amount || 0) - parseFloat(purchase.vat_amount || 0);
         const vatAmount = parseFloat(purchase.vat_amount || 0);
 
@@ -85,7 +89,18 @@ const VATReport = () => {
       }
     });
 
-    return vatData;
+    // VAT FILTER APPLY
+    let filteredData = vatData;
+
+    if (vatFilter === 'yes') {
+      filteredData = vatData.filter(item => item.vatAmount > 0);
+    }
+
+    if (vatFilter === 'no') {
+      filteredData = vatData.filter(item => item.vatAmount === 0);
+    }
+
+    return filteredData;
   };
 
   const downloadExcel = () => {
@@ -213,6 +228,19 @@ const VATReport = () => {
             <option value="1">JH</option>
             <option value="2">RR</option>
             <option value="3">Delights</option>
+          </select>
+        </div>
+
+        <div className="control-group">
+          <label>VAT Status</label>
+            <select
+              value={vatFilter}
+              onChange={handleVatFilterChange}
+              className="filter-select"
+            >
+            <option value="all">All</option>
+            <option value="yes">Yes (has VAT)</option>
+            <option value="no">No (no VAT)</option>
           </select>
         </div>
 
