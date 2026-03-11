@@ -1,36 +1,37 @@
 import React, { useState } from 'react';
 import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
-import { useNavigate } from 'react-router-dom'; // Add this import
 import api from '../../api';
+import PurchaseDetailsModal from '../purchase/PurchaseDetailsModal';
 import './VATReport.css';
 
 const VATReport = () => {
-  const navigate = useNavigate(); // Add this hook
   const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-01'));
   const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [reportData, setReportData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [companyFilter, setCompanyFilter] = useState('');
   const [vatFilter, setVatFilter] = useState('all');
+  
+  // State for modal
+  const [selectedPurchaseId, setSelectedPurchaseId] = useState(null);
+  const [showModal, setShowModal] = useState(false);
 
   // Format date to MM/DD/YYYY (with 4-digit year)
   const formatDateMMDDYYYY = (dateString) => {
     const date = new Date(dateString);
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
-    const year = date.getFullYear(); // 4-digit year
+    const year = date.getFullYear();
     return `${month}/${day}/${year}`;
   };
 
   const fetchVATReport = async () => {
     setLoading(true);
     try {
-      // Fetch purchasing data (same source as regular purchasing report)
       const response = await api.get(`/reports/purchasing?startDate=${startDate}&endDate=${endDate}&companyId=${companyFilter}`);
       const purchases = response.data;
 
-      // Fetch detailed purchase data for each purchase to get VAT numbers
       const detailedPurchases = await Promise.all(
         purchases.map(async (purchase) => {
           try {
@@ -52,14 +53,20 @@ const VATReport = () => {
     }
   };
 
-  // Handle VAT filter change
   const handleVatFilterChange = (e) => {
     setVatFilter(e.target.value);
   };
 
-  // Handle row click to navigate to purchase details
+  // Handle row click to open modal
   const handleRowClick = (purchaseId) => {
-    navigate(`/purchase/${purchaseId}`);
+    setSelectedPurchaseId(purchaseId);
+    setShowModal(true);
+  };
+
+  // Close modal
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setSelectedPurchaseId(null);
   };
 
   // Process data for VAT report
@@ -120,10 +127,8 @@ const VATReport = () => {
       return;
     }
 
-    // Prepare data for Excel
     const worksheetData = [];
 
-    // Add headers
     worksheetData.push([
       'Invoice Date (MM/DD/YYYY)',
       'Invoice No',
@@ -133,10 +138,9 @@ const VATReport = () => {
       'VAT Amount (18%) (Rs.)'
     ]);
 
-    // Add data rows
     vatData.forEach(item => {
       worksheetData.push([
-        formatDateMMDDYYYY(item.invoiceDate), // Now returns MM/DD/YYYY
+        formatDateMMDDYYYY(item.invoiceDate),
         item.invoiceNo,
         item.supplierTIN,
         item.supplierName,
@@ -145,10 +149,8 @@ const VATReport = () => {
       ]);
     });
 
-    // Add empty row for spacing
     worksheetData.push([]);
 
-    // Add summary row
     const totalNetAmount = vatData.reduce((sum, item) => sum + item.netAmount, 0);
     const totalVATAmount = vatData.reduce((sum, item) => sum + item.vatAmount, 0);
     
@@ -161,33 +163,25 @@ const VATReport = () => {
       totalVATAmount.toFixed(2)
     ]);
 
-    // Create worksheet
     const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
 
-    // Set column widths
     worksheet['!cols'] = [
-      { wch: 18 }, // Invoice Date (MM/DD/YYYY)
-      { wch: 20 }, // Invoice No
-      { wch: 20 }, // Supplier TIN
-      { wch: 30 }, // Supplier Name
-      { wch: 15 }, // Net Amount
-      { wch: 15 }  // VAT Amount
+      { wch: 18 },
+      { wch: 20 },
+      { wch: 20 },
+      { wch: 30 },
+      { wch: 15 },
+      { wch: 15 }
     ];
 
-    // Create workbook
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'VAT Report');
-
-    // Generate filename with date range
     const fileName = `vat-report-${startDate}-to-${endDate}.xlsx`;
-
-    // Download file
     XLSX.writeFile(workbook, fileName);
   };
 
   const vatData = processVATData();
 
-  // Calculate totals
   const totalNetAmount = vatData.reduce((sum, item) => sum + item.netAmount, 0);
   const totalVATAmount = vatData.reduce((sum, item) => sum + item.vatAmount, 0);
 
@@ -294,7 +288,6 @@ const VATReport = () => {
                     key={`${item.invoiceNo}-${index}`}
                     onClick={() => handleRowClick(item.purchaseId)}
                     className="clickable-row"
-                    style={{ cursor: 'pointer' }}
                     title="Click to view full purchase details"
                   >
                     <td>{formatDateMMDDYYYY(item.invoiceDate)}</td>
@@ -338,6 +331,14 @@ const VATReport = () => {
         <div className="empty-state">
           <p>No data to display. Select a date range and generate the report.</p>
         </div>
+      )}
+
+      {/* Modal for Purchase Details */}
+      {showModal && selectedPurchaseId && (
+        <PurchaseDetailsModal 
+          purchaseId={selectedPurchaseId} 
+          onClose={handleCloseModal} 
+        />
       )}
     </div>
   );

@@ -17,20 +17,24 @@ import {
   faMapMarkerAlt,
   faCity,
   faCheckCircle,
-  faTimesCircle
+  faTimesCircle,
+  faTimes // Add this for close button
 } from '@fortawesome/free-solid-svg-icons';
 import './Purchase.css';
 import api from '../../api';
 import dayjs from 'dayjs';
 
-const PurchaseDetails = () => {
-  const { id } = useParams();
+const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
+  // Use either the prop or URL param
+  const params = useParams();
+  const navigate = useNavigate();
+  const id = purchaseId || params.id;
+  
   const [purchase, setPurchase] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [previousPrices, setPreviousPrices] = useState({});
   const [supplierDetails, setSupplierDetails] = useState(null);
-  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -65,7 +69,9 @@ const PurchaseDetails = () => {
       }
     };
 
-    fetchData();
+    if (id) {
+      fetchData();
+    }
   }, [id]);
 
   const formatCurrency = (amount) => {
@@ -90,8 +96,24 @@ const PurchaseDetails = () => {
   };
 
   const handlePDF = () => {
-    // You can implement PDF generation here
     alert('PDF generation feature coming soon!');
+  };
+
+  const handleBack = () => {
+    if (isModal && onClose) {
+      onClose();
+    } else {
+      navigate('/purchase/history');
+    }
+  };
+
+  const handleEdit = () => {
+    if (isModal && onClose) {
+      onClose();
+      navigate(`/purchase/edit/${id}`);
+    } else {
+      navigate(`/purchase/edit/${id}`);
+    }
   };
 
   if (loading) {
@@ -109,8 +131,8 @@ const PurchaseDetails = () => {
         <div className="error-icon">⚠️</div>
         <h3>Error Loading Purchase</h3>
         <p>{error}</p>
-        <button onClick={() => navigate('/purchase/history')} className="btn-primary">
-          Back to History
+        <button onClick={handleBack} className="btn-primary">
+          {isModal ? 'Close' : 'Back to History'}
         </button>
       </div>
     );
@@ -122,8 +144,8 @@ const PurchaseDetails = () => {
         <div className="not-found-icon">🔍</div>
         <h3>Purchase Not Found</h3>
         <p>The purchase you're looking for doesn't exist or has been deleted.</p>
-        <button onClick={() => navigate('/purchase/history')} className="btn-primary">
-          Back to History
+        <button onClick={handleBack} className="btn-primary">
+          {isModal ? 'Close' : 'Back to History'}
         </button>
       </div>
     );
@@ -137,11 +159,11 @@ const PurchaseDetails = () => {
   const vatRate = parseFloat(purchase.vat_rate || 18);
 
   return (
-    <div className="purchase-details-container">
+    <div className={`purchase-details-container ${isModal ? 'modal-view' : ''}`}>
       <div className="page-header">
         <div className="header-title">
-          <button onClick={() => navigate('/purchase/history')} className="back-button">
-            <FontAwesomeIcon icon={faArrowLeft} />
+          <button onClick={handleBack} className="back-button">
+            <FontAwesomeIcon icon={isModal ? faTimes : faArrowLeft} />
           </button>
           <div>
             <h1>Purchase Details</h1>
@@ -157,16 +179,14 @@ const PurchaseDetails = () => {
             <FontAwesomeIcon icon={faFilePdf} />
             PDF
           </button>
-          <button 
-            onClick={() => navigate(`/purchase/edit/${purchase.id}`)} 
-            className="btn-primary"
-          >
+          <button onClick={handleEdit} className="btn-primary">
             <FontAwesomeIcon icon={faEdit} />
             Edit
           </button>
         </div>
       </div>
 
+      {/* Rest of your component remains exactly the same */}
       {/* Supplier Information Card */}
       <div className="details-grid">
         <div className="detail-card">
@@ -442,13 +462,15 @@ const PurchaseDetails = () => {
         </div>
       )}
 
-      {/* Action Buttons */}
-      <div className="details-actions">
-        <button onClick={() => navigate('/purchase/history')} className="btn-secondary">
-          <FontAwesomeIcon icon={faArrowLeft} />
-          Back to History
-        </button>
-      </div>
+      {/* Action Buttons - Only show if not in modal */}
+      {!isModal && (
+        <div className="details-actions">
+          <button onClick={handleBack} className="btn-secondary">
+            <FontAwesomeIcon icon={faArrowLeft} />
+            Back to History
+          </button>
+        </div>
+      )}
     </div>
   );
 };

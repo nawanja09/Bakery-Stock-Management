@@ -293,3 +293,58 @@
 .clickable-row:hover td:first-child::before {
   opacity: 0.5;
 }
+
+/* Add to your existing VATReport.css */
+
+.clickable-row {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.clickable-row:hover {
+  background-color: #e8f0fe !important;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.clickable-row td {
+  transition: background-color 0.2s;
+}
+
+/* Add a visual indicator for clickable rows */
+.clickable-row td:first-child {
+  position: relative;
+  padding-left: 25px !important;
+}
+
+.clickable-row td:first-child::before {
+  content: '🔍';
+  font-size: 12px;
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.clickable-row:hover td:first-child::before {
+  opacity: 0.6;
+}
+
+/* Style for the view indicator */
+.clickable-row td:last-child::after {
+  content: 'View';
+  font-size: 11px;
+  background-color: #007bff;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 12px;
+  margin-left: 8px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.clickable-row:hover td:last-child::after {
+  opacity: 1;
+}
