@@ -261,3 +261,35 @@
 .btn-success span {
   font-size: 16px;
 }
+
+/* Add to your existing VATReport.css */
+
+.clickable-row {
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.clickable-row:hover {
+  background-color: #f0f7ff !important;
+}
+
+.clickable-row td {
+  transition: background-color 0.2s;
+}
+
+/* Optional: Add a subtle indicator that rows are clickable */
+.clickable-row td:first-child {
+  position: relative;
+}
+
+.clickable-row td:first-child::before {
+  content: '🔍';
+  font-size: 12px;
+  opacity: 0;
+  margin-right: 5px;
+  transition: opacity 0.2s;
+}
+
+.clickable-row:hover td:first-child::before {
+  opacity: 0.5;
+}
