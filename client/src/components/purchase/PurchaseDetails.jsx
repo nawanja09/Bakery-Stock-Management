@@ -9,7 +9,6 @@ import {
   faBuilding,
   faUser,
   faCalendar,
-  faFileInvoice,
   faCreditCard,
   faTag,
   faPhone,
