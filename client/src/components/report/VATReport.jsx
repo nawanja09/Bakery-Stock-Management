@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
+import { useNavigate } from 'react-router-dom'; // Add this import
 import api from '../../api';
 import './VATReport.css';
 
 const VATReport = () => {
+  const navigate = useNavigate(); // Add this hook
   const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-01'));
   const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [reportData, setReportData] = useState([]);
@@ -55,6 +57,11 @@ const VATReport = () => {
     setVatFilter(e.target.value);
   };
 
+  // Handle row click to navigate to purchase details
+  const handleRowClick = (purchaseId) => {
+    navigate(`/purchase/${purchaseId}`);
+  };
+
   // Process data for VAT report
   const processVATData = () => {
     const vatData = [];
@@ -66,6 +73,7 @@ const VATReport = () => {
           const vatAmount = amount * 0.18;
 
           vatData.push({
+            purchaseId: purchase.id, // Include purchase ID for navigation
             invoiceDate: purchase.purchase_date,
             invoiceNo: purchase.invoice_no,
             supplierTIN: purchase.supplier_vat_number || '—',
@@ -79,6 +87,7 @@ const VATReport = () => {
         const vatAmount = parseFloat(purchase.vat_amount || 0);
 
         vatData.push({
+          purchaseId: purchase.id, // Include purchase ID for navigation
           invoiceDate: purchase.purchase_date,
           invoiceNo: purchase.invoice_no,
           supplierTIN: purchase.supplier_vat_number || '—',
@@ -281,7 +290,13 @@ const VATReport = () => {
               </thead>
               <tbody>
                 {vatData.map((item, index) => (
-                  <tr key={`${item.invoiceNo}-${index}`}>
+                  <tr 
+                    key={`${item.invoiceNo}-${index}`}
+                    onClick={() => handleRowClick(item.purchaseId)}
+                    className="clickable-row"
+                    style={{ cursor: 'pointer' }}
+                    title="Click to view full purchase details"
+                  >
                     <td>{formatDateMMDDYYYY(item.invoiceDate)}</td>
                     <td>{item.invoiceNo}</td>
                     <td>{item.supplierTIN}</td>

@@ -1,16 +1,104 @@
 // server/routes/purchaseRoutes.js
-
 const express = require('express');
 const router = express.Router();
 const purchaseController = require('../controllers/purchaseController');
+const pool = require('../config/db'); // Add this line to import the database pool
 
+// Existing routes
 router.post('/', purchaseController.createPurchase);
 router.get('/', purchaseController.getAllPurchases);
 router.get('/suppliers', purchaseController.getAllSuppliers);
 router.get('/companies', purchaseController.getAllCompanies);
-router.get('/previous-prices', purchaseController.getPreviousPurchasePrices); // Add this line
+router.get('/previous-prices', purchaseController.getPreviousPurchasePrices);
 router.get('/:id', purchaseController.getPurchaseById);
-router.put('/:id', purchaseController.updatePurchase);// server/routes/purchaseRoutes.js - Add this route
+router.put('/:id', purchaseController.updatePurchase);
+
+// Add this route for getting purchase details by ID
+router.get('/details/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Get purchase details with supplier info
+    const [purchases] = await pool.query(`
+      SELECT 
+        p.id,
+        p.invoice_no,
+        p.purchase_date,
+        p.subtotal,
+        p.vat_amount,
+        p.total_with_vat,
+        p.vat_rate,
+        p.paid_amount,
+        p.payment_method,
+        p.check_number,
+        p.remarks,
+        p.company_id,
+        s.id AS supplier_id,
+        s.name AS supplier_name,
+        s.vat_number AS supplier_vat_number,
+        s.vat_registered,
+        s.contact_name,
+        s.contact_phone,
+        s.contact_email,
+        s.address AS supplier_address,
+        c.name AS company_name
+      FROM purchases p
+      JOIN supplier s ON p.supplier_id = s.id
+      LEFT JOIN company c ON p.company_id = c.id
+      WHERE p.id = ?
+    `, [id]);
+
+    if (purchases.length === 0) {
+      return res.status(404).json({ error: 'Purchase not found' });
+    }
+
+    // Get purchase items with item details
+    const [items] = await pool.query(`
+      SELECT 
+        pi.id,
+        pi.item_name,
+        pi.quantity,
+        pi.unit_price,
+        i.item_code,
+        i.unit,
+        i.vat_applicable,
+        (pi.quantity * pi.unit_price) AS amount
+      FROM purchase_items pi
+      LEFT JOIN items i ON pi.item_id = i.id
+      WHERE pi.purchase_id = ?
+    `, [id]);
+
+    // Calculate line totals with VAT if applicable
+    const itemsWithVAT = items.map(item => {
+      const amount = parseFloat(item.amount) || 0;
+      const vatAmount = item.vat_applicable ? amount * 0.18 : 0;
+      return {
+        ...item,
+        amount,
+        vatAmount,
+        lineTotal: amount + vatAmount
+      };
+    });
+
+    const response = {
+      ...purchases[0],
+      items: itemsWithVAT,
+      summary: {
+        subtotal: parseFloat(purchases[0].subtotal || 0),
+        vatAmount: parseFloat(purchases[0].vat_amount || 0),
+        totalWithVat: parseFloat(purchases[0].total_with_vat || 0),
+        paidAmount: parseFloat(purchases[0].paid_amount || 0),
+        dueAmount: parseFloat(purchases[0].total_with_vat || 0) - parseFloat(purchases[0].paid_amount || 0)
+      }
+    };
+
+    res.json(response);
+    
+  } catch (error) {
+    console.error('Error fetching purchase details:', error);
+    res.status(500).json({ error: 'Server error: ' + error.message });
+  }
+});
 
 // Get latest purchase prices for all items
 router.get('/latest-prices', async (req, res) => {
@@ -55,6 +143,5 @@ router.get('/latest-prices', async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
-
 
 module.exports = router;
