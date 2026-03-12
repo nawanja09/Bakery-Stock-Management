@@ -1794,3 +1794,10 @@ CREATE TABLE IF NOT EXISTS `stock_movements` (
   KEY `movement_date` (`movement_date`),
   CONSTRAINT `stock_movements_ibfk_1` FOREIGN KEY (`item_id`) REFERENCES `items` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- First, drop the UNIQUE constraint if exists
+ALTER TABLE purchase_returns DROP INDEX return_number;
+
+-- Modify return_number column to remove any default/auto generation
+ALTER TABLE purchase_returns 
+MODIFY COLUMN return_number varchar(50) NOT NULL;
