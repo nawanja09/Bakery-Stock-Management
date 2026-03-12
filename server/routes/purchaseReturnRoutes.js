@@ -294,4 +294,103 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// GET Purchase Returns for VAT Report
+router.get('/reports/vat-returns', async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    let query = `
+      SELECT 
+        pr.return_number as return_bill_no,
+        pr.return_date as return_date,
+        pr.total_amount as total_amount,
+        pr.vat_amount as vat_amount,
+        pr.subtotal as subtotal,
+        s.vat_number as supplier_vat_number,
+        s.name as supplier_name,
+        s.vat_registered,
+        p.invoice_no as original_invoice_no,
+        p.purchase_date as original_purchase_date,
+        GROUP_CONCAT(
+          CONCAT(pri.item_name, ' (', pri.quantity, ' ', i.unit, ')') 
+          SEPARATOR ', '
+        ) as items_returned
+      FROM purchase_returns pr
+      JOIN supplier s ON pr.supplier_id = s.id
+      JOIN purchases p ON pr.purchase_id = p.id
+      JOIN purchase_return_items pri ON pr.id = pri.return_id
+      JOIN items i ON pri.item_id = i.id
+      WHERE s.vat_registered = 1 
+        AND pr.vat_amount > 0
+    `;
+
+    const queryParams = [];
+
+    if (startDate && endDate) {
+      query += ` AND DATE(pr.return_date) BETWEEN ? AND ?`;
+      queryParams.push(startDate, endDate);
+    }
+
+    query += ` GROUP BY pr.id ORDER BY pr.return_date DESC`;
+
+    const [returns] = await pool.query(query, queryParams);
+
+    // Format the data for the report
+    const formattedReturns = returns.map((ret, index) => ({
+      serial_no: index + 1,
+      tin_no: ret.supplier_vat_number || '',
+      invoice_date: ret.original_purchase_date,
+      invoice_no: ret.original_invoice_no,
+      return_bill_no: ret.return_bill_no,
+      return_date: ret.return_date,
+      tax_credit_no: `R${ret.return_bill_no}`, // Generate credit note number
+      value_of_return: parseFloat(ret.subtotal).toFixed(2),
+      vat_amount: parseFloat(ret.vat_amount).toFixed(2),
+      supplier_name: ret.supplier_name,
+      items: ret.items_returned
+    }));
+
+    res.json(formattedReturns);
+  } catch (error) {
+    console.error('Error generating VAT returns report:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET Summary for VAT Report
+router.get('/reports/vat-summary', async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    let query = `
+      SELECT 
+        COALESCE(SUM(pr.subtotal), 0) as total_return_value,
+        COALESCE(SUM(pr.vat_amount), 0) as total_vat_credit,
+        COUNT(DISTINCT pr.id) as total_returns
+      FROM purchase_returns pr
+      JOIN supplier s ON pr.supplier_id = s.id
+      WHERE s.vat_registered = 1 
+        AND pr.vat_amount > 0
+    `;
+
+    const queryParams = [];
+
+    if (startDate && endDate) {
+      query += ` AND DATE(pr.return_date) BETWEEN ? AND ?`;
+      queryParams.push(startDate, endDate);
+    }
+
+    const [summary] = await pool.query(query, queryParams);
+
+    res.json({
+      total_return_value: parseFloat(summary[0].total_return_value).toFixed(2),
+      total_vat_credit: parseFloat(summary[0].total_vat_credit).toFixed(2),
+      total_returns: summary[0].total_returns
+    });
+  } catch (error) {
+    console.error('Error generating VAT summary:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 module.exports = router;

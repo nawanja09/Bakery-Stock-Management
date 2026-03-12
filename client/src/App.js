@@ -71,6 +71,7 @@ import VATReport from './components/report/VATReport';
 
 import AddPurchaseReturn from './components/purchasereturn/AddPurchaseReturn';
 import PurchaseReturnHistory from './components/purchasereturn/PurchaseReturnHistory';
+import PurchaseVATReport from './components/report/PurchaseVATReport';
 
 import './App.css';
 
@@ -172,6 +173,7 @@ function App() {
             <Route path="reports/vat" element={<VATReport />} />
             <Route path="purchase-returns/add" element={<AddPurchaseReturn />} />
             <Route path="purchase-returns/history" element={<PurchaseReturnHistory />} />
+            <Route path="reports/purchase-vat" element={<PurchaseVATReport />} />
 
           </Route>
 
