@@ -101,6 +101,7 @@ router.post('/', async (req, res) => {
     await connection.beginTransaction();
 
     const {
+      return_number,  // Now coming from user
       purchase_id,
       supplier_id,
       return_date,
@@ -108,6 +109,25 @@ router.post('/', async (req, res) => {
       remarks,
       returned_by
     } = req.body;
+
+    // Validate return number
+    if (!return_number || return_number.trim() === '') {
+      await connection.rollback();
+      return res.status(400).json({ error: 'Return number is required' });
+    }
+
+    // Check if return number already exists
+    const [existingReturn] = await connection.query(
+      'SELECT id FROM purchase_returns WHERE return_number = ?',
+      [return_number]
+    );
+
+    if (existingReturn.length > 0) {
+      await connection.rollback();
+      return res.status(400).json({ 
+        error: 'Return number already exists. Please use a unique return number.' 
+      });
+    }
 
     // Validate items
     if (!items || items.length === 0) {
@@ -167,20 +187,17 @@ router.post('/', async (req, res) => {
 
     const totalAmount = subtotal + totalVat;
 
-    // Generate return number
-    const returnNumber = generateReturnNumber();
-
-    // Insert purchase return
+    // Insert purchase return with user-provided return number
     const [returnResult] = await connection.query(
       `INSERT INTO purchase_returns 
        (return_number, return_date, purchase_id, supplier_id, subtotal, vat_amount, total_amount, remarks, returned_by) 
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [returnNumber, return_date, purchase_id, supplier_id, subtotal, totalVat, totalAmount, remarks, returned_by]
+      [return_number, return_date, purchase_id, supplier_id, subtotal, totalVat, totalAmount, remarks, returned_by]
     );
 
     const returnId = returnResult.insertId;
 
-    // Insert return items and update stock
+    // Insert return items
     for (const item of items) {
       if (item.return_quantity <= 0) continue;
 
@@ -189,7 +206,6 @@ router.post('/', async (req, res) => {
         amount * (VAT_RATE / 100) : 0;
       const itemTotal = amount + vatAmount;
 
-      // Insert return item
       await connection.query(
         `INSERT INTO purchase_return_items 
          (return_id, purchase_item_id, item_id, item_name, quantity, unit_price, vat_applicable, vat_amount, total_amount) 
@@ -197,22 +213,13 @@ router.post('/', async (req, res) => {
         [returnId, item.purchase_item_id, item.item_id, item.item_name, 
          item.return_quantity, item.unit_price, item.vat_applicable, vatAmount, itemTotal]
       );
-
-      // Update stock (decrease by return quantity)
-      // Since this is a return to supplier, we need to decrease stock
-      await connection.query(
-        `UPDATE items 
-         SET current_stock = current_stock - ? 
-         WHERE id = ?`,
-        [item.return_quantity, item.item_id]
-      );
     }
 
     await connection.commit();
 
     res.status(201).json({
       message: 'Purchase return created successfully',
-      return_number: returnNumber,
+      return_number: return_number,
       return_id: returnId,
       summary: { subtotal, vat_amount: totalVat, total_amount: totalAmount }
     });
@@ -220,6 +227,14 @@ router.post('/', async (req, res) => {
   } catch (error) {
     await connection.rollback();
     console.error('Error creating purchase return:', error);
+    
+    // Handle duplicate entry error specifically
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({ 
+        error: 'Return number already exists. Please use a unique return number.' 
+      });
+    }
+    
     res.status(500).json({ error: 'Server error: ' + error.message });
   } finally {
     connection.release();

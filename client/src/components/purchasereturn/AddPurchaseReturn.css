@@ -154,3 +154,39 @@ box-shadow:0 0 0 2px rgba(59,130,246,0.1);
 cursor:pointer;
 opacity:0.8;
 }
+
+.return-number-input {
+  width: 100%;
+  max-width: 400px;
+  padding: 10px;
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-family: monospace;
+  text-transform: uppercase;
+}
+
+.return-number-input:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 3px rgba(0,123,255,.25);
+}
+
+.field-note {
+  display: block;
+  font-size: 0.8rem;
+  color: #6c757d;
+  margin-top: 4px;
+}
+
+.form-row {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.form-row .form-group {
+  flex: 1;
+  min-width: 250px;
+}

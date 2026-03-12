@@ -28,6 +28,7 @@ const AddPurchaseReturn = () => {
   const [returnDate, setReturnDate] = useState(dayjs().format('YYYY-MM-DD'));
   const [remarks, setRemarks] = useState('');
   const [supplierVatRegistered, setSupplierVatRegistered] = useState(false);
+  const [returnNumber, setReturnNumber] = useState('');
   
   const VAT_RATE = 18;
 
@@ -80,6 +81,13 @@ const AddPurchaseReturn = () => {
     } finally {
       setFetchingItems(false);
     }
+  };
+
+  const validateReturnNumber = (number) => {
+    if (!number || number.trim() === '') {
+      return 'Return number is required';
+    }
+    return '';
   };
 
   const handleQuantityChange = (index, value) => {
@@ -138,6 +146,11 @@ const AddPurchaseReturn = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    if (!returnNumber || returnNumber.trim() === '') {
+      showPopup('error', 'Please enter a return number');
+      return;
+    }
+
     if (!selectedPurchase) {
       showPopup('error', 'Please select a purchase bill');
       return;
@@ -169,15 +182,13 @@ const AddPurchaseReturn = () => {
     const { subtotal, totalVat, grandTotal } = calculateTotals();
 
     const formData = {
+      return_number: returnNumber.trim().toUpperCase(),
       purchase_id: selectedPurchase.value,
       supplier_id: selectedPurchase.supplier_id,
       return_date: returnDate,
       items: itemsToReturn,
       remarks: remarks,
-      returned_by: currentUser.id,
-      subtotal,
-      vat_amount: totalVat,
-      total_amount: grandTotal
+      returned_by: currentUser.id
     };
 
     try {
@@ -186,7 +197,13 @@ const AddPurchaseReturn = () => {
       navigate('/purchase-returns/history');
     } catch (error) {
       console.error('Error creating return:', error);
-      showPopup('error', error.response?.data?.error || 'Failed to create return');
+      
+      // Show specific error message for duplicate return number
+      if (error.response?.data?.error?.includes('Return number already exists')) {
+        showPopup('error', 'This return number already exists. Please use a different number.');
+      } else {
+        showPopup('error', error.response?.data?.error || 'Failed to create return');
+      }
     }
   };
 
@@ -248,11 +265,26 @@ const AddPurchaseReturn = () => {
         )}
 
         {selectedPurchase && !fetchingItems && purchaseItems.length > 0 && (
-          <>
-            <div className="form-card return-date-card">
-              <h2>Return Date</h2>
+        <>
+          <div className="form-card">
+            <h2>Return Information</h2>
+            
+            <div className="form-row">
+              <div className="form-group">
+                <label>Return Number *</label>
+                <input
+                  type="text"
+                  value={returnNumber}
+                  onChange={(e) => setReturnNumber(e.target.value.toUpperCase())}
+                  placeholder="Enter return number (e.g., RTN-2025-001)"
+                  required
+                  className="return-number-input"
+                />
+                <small className="field-note">Must be unique - system will validate duplicates</small>
+              </div>
 
-              <div className="date-input-wrapper">
+              <div className="form-group">
+                <label>Return Date *</label>
                 <input
                   type="date"
                   value={returnDate}
@@ -262,6 +294,7 @@ const AddPurchaseReturn = () => {
                 />
               </div>
             </div>
+          </div>
 
             <div className="form-card">
               <h2>Items to Return</h2>
