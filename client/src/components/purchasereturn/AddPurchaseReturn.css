@@ -104,3 +104,53 @@ cursor:pointer;
 .btn-clear-item:hover{
 background:#dc2626;
 }
+
+/* RETURN DATE CARD */
+
+.return-date-card{
+padding:20px;
+background:#ffffff;
+border-radius:10px;
+box-shadow:0 2px 10px rgba(0,0,0,0.05);
+}
+
+
+/* DATE INPUT WRAPPER */
+
+.date-input-wrapper{
+margin-top:10px;
+position:relative;
+max-width:300px;
+}
+
+
+/* DATE INPUT */
+
+.date-input{
+width:100%;
+padding:10px 14px;
+font-size:14px;
+border:1px solid #d1d5db;
+border-radius:6px;
+background:#f9fafb;
+transition:all 0.2s;
+cursor:pointer;
+}
+
+
+/* FOCUS EFFECT */
+
+.date-input:focus{
+outline:none;
+border-color:#3b82f6;
+background:#ffffff;
+box-shadow:0 0 0 2px rgba(59,130,246,0.1);
+}
+
+
+/* CALENDAR ICON SPACE */
+
+.date-input::-webkit-calendar-picker-indicator{
+cursor:pointer;
+opacity:0.8;
+}
