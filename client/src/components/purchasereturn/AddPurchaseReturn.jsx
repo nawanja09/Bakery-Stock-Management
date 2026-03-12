@@ -249,9 +249,10 @@ const AddPurchaseReturn = () => {
 
         {selectedPurchase && !fetchingItems && purchaseItems.length > 0 && (
           <>
-            <div className="form-card">
+            <div className="form-card return-date-card">
               <h2>Return Date</h2>
-              <div className="form-group">
+
+              <div className="date-input-wrapper">
                 <input
                   type="date"
                   value={returnDate}

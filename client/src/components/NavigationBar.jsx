@@ -212,6 +212,14 @@ const NavigationBar = () => {
                       </NavLink>
                     </li>
                   </ul>
+                  <ul className="dropdown-menu">
+                    <li>
+                      <NavLink to="/purchase-returns/history" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                        <span className="icon-container"><FontAwesomeIcon icon={faHistory} /></span>
+                        <span>View History</span>
+                      </NavLink>
+                    </li>
+                  </ul>
                 </li>
 
                 {/* Suppliers */}
