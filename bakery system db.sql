@@ -1729,4 +1729,68 @@ WHERE vat_number IS NOT NULL;
 UPDATE supplier 
 SET vat_number = NULL 
 WHERE vat_number IS NOT NULL 
-    AND LENGTH(vat_number) != 9;
+    AND LENGTH(vat_number) != 9;''
+
+
+-- Table structure for table `purchase_returns`
+CREATE TABLE IF NOT EXISTS `purchase_returns` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `return_number` varchar(50) NOT NULL,
+  `return_date` datetime NOT NULL,
+  `purchase_id` int NOT NULL,
+  `supplier_id` int NOT NULL,
+  `subtotal` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `vat_amount` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `total_amount` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `remarks` text,
+  `returned_by` int NOT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `return_number` (`return_number`),
+  KEY `purchase_id` (`purchase_id`),
+  KEY `supplier_id` (`supplier_id`),
+  KEY `returned_by` (`returned_by`),
+  CONSTRAINT `purchase_returns_ibfk_1` FOREIGN KEY (`purchase_id`) REFERENCES `purchases` (`id`),
+  CONSTRAINT `purchase_returns_ibfk_2` FOREIGN KEY (`supplier_id`) REFERENCES `supplier` (`id`),
+  CONSTRAINT `purchase_returns_ibfk_3` FOREIGN KEY (`returned_by`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Table structure for table `purchase_return_items`
+CREATE TABLE IF NOT EXISTS `purchase_return_items` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `return_id` int NOT NULL,
+  `purchase_item_id` int NOT NULL,
+  `item_id` int NOT NULL,
+  `item_name` varchar(255) NOT NULL,
+  `quantity` decimal(10,3) NOT NULL,
+  `unit_price` decimal(10,2) NOT NULL,
+  `vat_applicable` boolean DEFAULT FALSE,
+  `vat_amount` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `total_amount` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `return_id` (`return_id`),
+  KEY `item_id` (`item_id`),
+  KEY `purchase_item_id` (`purchase_item_id`),
+  CONSTRAINT `purchase_return_items_ibfk_1` FOREIGN KEY (`return_id`) REFERENCES `purchase_returns` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `purchase_return_items_ibfk_2` FOREIGN KEY (`item_id`) REFERENCES `items` (`id`),
+  CONSTRAINT `purchase_return_items_ibfk_3` FOREIGN KEY (`purchase_item_id`) REFERENCES `purchase_items` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Create stock_movements table for comprehensive tracking
+CREATE TABLE IF NOT EXISTS `stock_movements` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `item_id` int NOT NULL,
+  `quantity` decimal(10,3) NOT NULL,
+  `movement_type` enum('PURCHASE', 'ISSUANCE', 'RETURN_FROM_DEPT', 'RETURN_TO_SUPPLIER', 'WASTAGE', 'ADJUSTMENT') NOT NULL,
+  `reference_id` int NOT NULL,
+  `reference_type` varchar(50) NOT NULL,
+  `reference_number` varchar(50),
+  `movement_date` datetime NOT NULL,
+  `notes` text,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `item_id` (`item_id`),
+  KEY `movement_date` (`movement_date`),
+  CONSTRAINT `stock_movements_ibfk_1` FOREIGN KEY (`item_id`) REFERENCES `items` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

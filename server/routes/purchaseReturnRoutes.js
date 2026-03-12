@@ -1,0 +1,297 @@
+const express = require('express');
+const router = express.Router();
+const pool = require('../config/db');
+
+// Generate unique return number
+const generateReturnNumber = () => {
+  const date = new Date();
+  const year = date.getFullYear().toString().slice(-2);
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const day = date.getDate().toString().padStart(2, '0');
+  const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+  return `PR${year}${month}${day}-${random}`;
+};
+
+// GET purchases for dropdown (with items)
+router.get('/purchases', async (req, res) => {
+  try {
+    const [purchases] = await pool.query(`
+      SELECT 
+        p.id,
+        p.invoice_no,
+        p.purchase_date,
+        s.id as supplier_id,
+        s.name as supplier_name,
+        s.vat_registered,
+        p.total_with_vat as total_amount
+      FROM purchases p
+      JOIN supplier s ON p.supplier_id = s.id
+      ORDER BY p.purchase_date DESC
+    `);
+    res.json(purchases);
+  } catch (error) {
+    console.error('Error fetching purchases:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET purchase items by purchase ID (for return form)
+router.get('/purchases/:purchaseId/items', async (req, res) => {
+  const { purchaseId } = req.params;
+  
+  try {
+    // Get purchase details with supplier VAT info
+    const [purchase] = await pool.query(`
+      SELECT 
+        p.id,
+        p.invoice_no,
+        s.vat_registered as supplier_vat_registered,
+        s.vat_number as supplier_vat_number
+      FROM purchases p
+      JOIN supplier s ON p.supplier_id = s.id
+      WHERE p.id = ?
+    `, [purchaseId]);
+
+    if (purchase.length === 0) {
+      return res.status(404).json({ error: 'Purchase not found' });
+    }
+
+    // Get purchase items with their details
+    const [items] = await pool.query(`
+      SELECT 
+        pi.id as purchase_item_id,
+        pi.item_id,
+        pi.item_name,
+        pi.quantity as purchased_quantity,
+        pi.unit_price,
+        i.vat_applicable,
+        i.unit,
+        (SELECT COALESCE(SUM(quantity), 0) 
+         FROM purchase_return_items 
+         WHERE purchase_item_id = pi.id) as returned_quantity
+      FROM purchase_items pi
+      JOIN items i ON pi.item_id = i.id
+      WHERE pi.purchase_id = ?
+    `, [purchaseId]);
+
+    // Calculate available quantity for return
+    const itemsWithAvailable = items.map(item => ({
+      ...item,
+      purchased_quantity: parseFloat(item.purchased_quantity),
+      returned_quantity: parseFloat(item.returned_quantity),
+      available_quantity: parseFloat(item.purchased_quantity) - parseFloat(item.returned_quantity),
+      return_quantity: 0
+    }));
+
+    res.json({
+      purchase: purchase[0],
+      items: itemsWithAvailable
+    });
+  } catch (error) {
+    console.error('Error fetching purchase items:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST create new purchase return
+router.post('/', async (req, res) => {
+  const connection = await pool.getConnection();
+  
+  try {
+    await connection.beginTransaction();
+
+    const {
+      purchase_id,
+      supplier_id,
+      return_date,
+      items,
+      remarks,
+      returned_by
+    } = req.body;
+
+    // Validate items
+    if (!items || items.length === 0) {
+      await connection.rollback();
+      return res.status(400).json({ error: 'At least one item is required' });
+    }
+
+    // Check if any item has invalid return quantity
+    for (const item of items) {
+      if (item.return_quantity <= 0) {
+        await connection.rollback();
+        return res.status(400).json({ error: 'Return quantity must be greater than 0' });
+      }
+
+      // Get available quantity
+      const [purchaseItem] = await connection.query(`
+        SELECT quantity, 
+          (SELECT COALESCE(SUM(quantity), 0) 
+           FROM purchase_return_items 
+           WHERE purchase_item_id = ?) as returned_qty
+        FROM purchase_items 
+        WHERE id = ?
+      `, [item.purchase_item_id, item.purchase_item_id]);
+
+      const purchasedQty = parseFloat(purchaseItem[0].quantity);
+      const returnedQty = parseFloat(purchaseItem[0].returned_qty);
+      const availableQty = purchasedQty - returnedQty;
+
+      if (item.return_quantity > availableQty) {
+        await connection.rollback();
+        return res.status(400).json({ 
+          error: `Return quantity for ${item.item_name} cannot exceed ${availableQty} (Available for return)` 
+        });
+      }
+    }
+
+    // Get supplier VAT status
+    const [supplier] = await connection.query(
+      'SELECT vat_registered FROM supplier WHERE id = ?',
+      [supplier_id]
+    );
+    const supplierVatRegistered = supplier[0]?.vat_registered || false;
+    const VAT_RATE = 18; // 18%
+
+    // Calculate totals
+    let subtotal = 0;
+    let totalVat = 0;
+
+    items.forEach(item => {
+      const amount = item.return_quantity * item.unit_price;
+      subtotal += amount;
+      
+      if (supplierVatRegistered && item.vat_applicable) {
+        totalVat += amount * (VAT_RATE / 100);
+      }
+    });
+
+    const totalAmount = subtotal + totalVat;
+
+    // Generate return number
+    const returnNumber = generateReturnNumber();
+
+    // Insert purchase return
+    const [returnResult] = await connection.query(
+      `INSERT INTO purchase_returns 
+       (return_number, return_date, purchase_id, supplier_id, subtotal, vat_amount, total_amount, remarks, returned_by) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [returnNumber, return_date, purchase_id, supplier_id, subtotal, totalVat, totalAmount, remarks, returned_by]
+    );
+
+    const returnId = returnResult.insertId;
+
+    // Insert return items and update stock
+    for (const item of items) {
+      if (item.return_quantity <= 0) continue;
+
+      const amount = item.return_quantity * item.unit_price;
+      const vatAmount = (supplierVatRegistered && item.vat_applicable) ? 
+        amount * (VAT_RATE / 100) : 0;
+      const itemTotal = amount + vatAmount;
+
+      // Insert return item
+      await connection.query(
+        `INSERT INTO purchase_return_items 
+         (return_id, purchase_item_id, item_id, item_name, quantity, unit_price, vat_applicable, vat_amount, total_amount) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [returnId, item.purchase_item_id, item.item_id, item.item_name, 
+         item.return_quantity, item.unit_price, item.vat_applicable, vatAmount, itemTotal]
+      );
+
+      // Update stock (decrease by return quantity)
+      // Since this is a return to supplier, we need to decrease stock
+      await connection.query(
+        `UPDATE items 
+         SET current_stock = current_stock - ? 
+         WHERE id = ?`,
+        [item.return_quantity, item.item_id]
+      );
+    }
+
+    await connection.commit();
+
+    res.status(201).json({
+      message: 'Purchase return created successfully',
+      return_number: returnNumber,
+      return_id: returnId,
+      summary: { subtotal, vat_amount: totalVat, total_amount: totalAmount }
+    });
+
+  } catch (error) {
+    await connection.rollback();
+    console.error('Error creating purchase return:', error);
+    res.status(500).json({ error: 'Server error: ' + error.message });
+  } finally {
+    connection.release();
+  }
+});
+
+// GET all purchase returns (for history page)
+router.get('/', async (req, res) => {
+  try {
+    const [returns] = await pool.query(`
+      SELECT 
+        pr.*,
+        p.invoice_no as purchase_invoice,
+        s.name as supplier_name
+      FROM purchase_returns pr
+      JOIN purchases p ON pr.purchase_id = p.id
+      JOIN supplier s ON pr.supplier_id = s.id
+      ORDER BY pr.return_date DESC
+    `);
+    res.json(returns);
+  } catch (error) {
+    console.error('Error fetching returns:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET single purchase return by ID
+router.get('/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    // Get return header
+    const [returnHeader] = await pool.query(`
+      SELECT 
+        pr.*,
+        p.invoice_no as purchase_invoice,
+        p.purchase_date as original_purchase_date,
+        s.name as supplier_name,
+        s.vat_registered as supplier_vat_registered,
+        s.vat_number as supplier_vat_number,
+        u.name as returned_by_name
+      FROM purchase_returns pr
+      JOIN purchases p ON pr.purchase_id = p.id
+      JOIN supplier s ON pr.supplier_id = s.id
+      JOIN users u ON pr.returned_by = u.id
+      WHERE pr.id = ?
+    `, [id]);
+
+    if (returnHeader.length === 0) {
+      return res.status(404).json({ error: 'Return not found' });
+    }
+
+    // Get return items
+    const [items] = await pool.query(`
+      SELECT 
+        pri.*,
+        i.unit,
+        i.item_code
+      FROM purchase_return_items pri
+      JOIN items i ON pri.item_id = i.id
+      WHERE pri.return_id = ?
+    `, [id]);
+
+    res.json({
+      ...returnHeader[0],
+      items
+    });
+
+  } catch (error) {
+    console.error('Error fetching return:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+module.exports = router;

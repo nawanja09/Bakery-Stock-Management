@@ -1,0 +1,106 @@
+/* TABLE CONTAINER */
+.items-table-container{
+width:100%;
+overflow-x:auto;
+margin-top:20px;
+border-radius:8px;
+background:#fff;
+border:1px solid #e5e7eb;
+}
+
+/* TABLE */
+.items-table{
+width:100%;
+border-collapse:collapse;
+font-family:Segoe UI, sans-serif;
+font-size:14px;
+table-layout:auto;
+display: block;
+}
+
+/* HEADER */
+.items-table thead{
+background:#f9fafb;
+}
+
+.items-table th{
+padding:14px 16px;
+font-weight:600;
+color:#374151;
+text-align:left;
+border-bottom:2px solid #e5e7eb;
+white-space:nowrap;
+}
+
+
+/* BODY */
+.items-table td{
+padding:12px 16px;
+border-bottom:1px solid #f1f1f1;
+}
+
+/* ZEBRA */
+.items-table tbody tr:nth-child(even){
+background:#fafafa;
+}
+
+
+/* HOVER */
+
+.items-table tbody tr:hover{
+background:#f1f5f9;
+}
+
+
+/* ALIGN */
+
+.text-center{
+text-align:center;
+}
+
+.text-right{
+text-align:right;
+}
+
+
+/* INPUT */
+
+.quantity-input{
+width:70px;
+padding:6px;
+border:1px solid #d1d5db;
+border-radius:4px;
+}
+
+
+/* MAX BUTTON */
+
+.max-btn{
+background:#2563eb;
+color:#fff;
+border:none;
+padding:4px 8px;
+border-radius:4px;
+font-size:12px;
+cursor:pointer;
+}
+
+.max-btn:hover{
+background:#1d4ed8;
+}
+
+
+/* CLEAR */
+
+.btn-clear-item{
+background:#ef4444;
+border:none;
+color:white;
+padding:5px 8px;
+border-radius:4px;
+cursor:pointer;
+}
+
+.btn-clear-item:hover{
+background:#dc2626;
+}

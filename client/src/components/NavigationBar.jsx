@@ -28,7 +28,8 @@ import {
   faUndo,
   faCutlery,
   faMapMarkerAlt,
-  faExchangeAlt
+  faExchangeAlt,
+  faReply,
 } from '@fortawesome/free-solid-svg-icons';
 import bakeryLogo from '../images/icon.jpeg';
 import './NavigationBar.css';
@@ -200,6 +201,14 @@ const NavigationBar = () => {
                       <NavLink to="/purchase/new" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
                         <span className="icon-container"><FontAwesomeIcon icon={faPlusCircle} /></span>
                         <span>Add New</span>
+                      </NavLink>
+                    </li>
+                  </ul>
+                  <ul className="dropdown-menu">
+                    <li>
+                      <NavLink to="/purchase-returns/add" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                        <span className="icon-container"><FontAwesomeIcon icon={faReply} /></span>
+                        <span>Add New Return</span>
                       </NavLink>
                     </li>
                   </ul>
