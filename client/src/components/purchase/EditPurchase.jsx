@@ -28,12 +28,15 @@ const EditPurchase = () => {
 
   const [formData, setFormData] = useState({
     purchase_date: '',
+    invoice_no: '',
     supplier_id: '',
     subtotal: 0,
     vat_amount: 0,
     vat_rate: VAT_RATE,
     total_with_vat: 0,
     paid_amount: 0,
+    balance_amount: 0,
+    balance_status: 0,
     payment_method: 'CASH',
     check_number: '',
     remarks: '',
@@ -49,7 +52,6 @@ const EditPurchase = () => {
       try {
         setLoading(true);
         
-        // Fetch all required data in parallel
         const [purchaseRes, suppliersRes, itemsRes, companiesRes, previousPricesRes] = await Promise.all([
           api.get(`/purchases/${id}`),
           api.get('/suppliers'),
@@ -59,57 +61,78 @@ const EditPurchase = () => {
         ]);
 
         const purchaseData = purchaseRes.data;
+        console.log('Purchase Data:', purchaseData);
         
         setSuppliers(suppliersRes.data);
         setItemsList(itemsRes.data);
         setCompanies(companiesRes.data);
         setPreviousPurchasePrices(previousPricesRes.data);
 
-        // Find the supplier
         const supplier = suppliersRes.data.find(s => s.id === purchaseData.supplier_id);
         setSelectedSupplier(supplier);
         setSupplierVatRegistered(supplier?.vat_registered || false);
         setSupplierVatNumber(supplier?.vat_number || '');
 
-        // Process items with VAT calculations
-        const processedItems = purchaseData.items.map(item => {
-          const itemDetails = itemsRes.data.find(i => i.id === item.item_id) || {};
-          const amount = parseFloat(item.quantity) * parseFloat(item.unit_price);
-          const vat = (supplier?.vat_registered && itemDetails.vat_applicable) ? 
-            amount * (VAT_RATE / 100) : 0;
-          
-          return {
-            id: item.item_id,
-            item_name: item.item_name,
-            quantity: parseFloat(item.quantity),
-            unit_price: parseFloat(item.unit_price),
-            unit: item.unit || itemDetails.unit || '',
-            vat_applicable: itemDetails.vat_applicable || false,
-            amount: amount,
-            vat: vat,
-            lineTotal: amount + vat
-          };
-        });
+        let processedItems = [];
+        
+        if (purchaseData.items && purchaseData.items.length > 0) {
+          processedItems = purchaseData.items.map(item => {
+            const itemDetails = itemsRes.data.find(i => i.id === item.item_id) || {};
+            const quantity = parseFloat(item.quantity) || 0;
+            const unitPrice = parseFloat(item.unit_price) || 0;
+            const amount = quantity * unitPrice;
+            const vat = (supplier?.vat_registered && (item.vat_applicable || itemDetails.vat_applicable)) ? 
+              amount * (VAT_RATE / 100) : 0;
+            
+            return {
+              id: item.item_id,
+              item_name: item.item_name || itemDetails.name || '',
+              quantity: quantity,
+              unit_price: unitPrice,
+              unit: item.unit || itemDetails.unit || '',
+              vat_applicable: item.vat_applicable || itemDetails.vat_applicable || false,
+              amount: amount,
+              vat: vat,
+              lineTotal: amount + vat
+            };
+          });
+        } else {
+          processedItems = [{
+            id: '',
+            item_name: '',
+            quantity: 1,
+            unit_price: 0,
+            unit: '',
+            vat_applicable: false,
+            amount: 0,
+            vat: 0,
+            lineTotal: 0
+          }];
+        }
 
-        // Calculate totals
         const subtotal = processedItems.reduce((sum, item) => sum + item.amount, 0);
         const totalVat = processedItems.reduce((sum, item) => sum + item.vat, 0);
         const grandTotal = subtotal + totalVat;
+        const paidAmount = parseFloat(purchaseData.paid_amount) || 0;
+        const balanceAmount = Math.max(0, grandTotal - paidAmount);
+        const balanceStatus = balanceAmount > 0 ? 1 : 0;
 
         setFormData({
           purchase_date: dayjs(purchaseData.purchase_date).format('YYYY-MM-DD'),
+          invoice_no: purchaseData.invoice_no || '',
           supplier_id: purchaseData.supplier_id,
           subtotal: subtotal,
           vat_amount: totalVat,
           vat_rate: parseFloat(purchaseData.vat_rate) || VAT_RATE,
           total_with_vat: grandTotal,
-          paid_amount: parseFloat(purchaseData.paid_amount) || 0,
+          paid_amount: paidAmount,
+          balance_amount: balanceAmount,
+          balance_status: balanceStatus,
           payment_method: purchaseData.payment_method,
           check_number: purchaseData.check_number || '',
           remarks: purchaseData.remarks || '',
           company_id: purchaseData.company_id || '',
-          items: processedItems,
-          due_amount: Math.max(0, grandTotal - (parseFloat(purchaseData.paid_amount) || 0))
+          items: processedItems
         });
 
         setLoading(false);
@@ -123,7 +146,6 @@ const EditPurchase = () => {
     fetchData();
   }, [id, navigate, showPopup]);
 
-  // Calculate item values
   const calculateItemValues = (item, supplierVatRegistered) => {
     const amount = item.quantity * item.unit_price;
     let vat = 0;
@@ -137,8 +159,7 @@ const EditPurchase = () => {
     return { amount, vat, lineTotal };
   };
 
-  // Calculate totals
-  const calculateTotals = (items, supplierVatRegistered) => {
+  const calculateTotals = (items, supplierVatRegistered, paidAmount) => {
     let subtotal = 0;
     let totalVat = 0;
     
@@ -152,13 +173,13 @@ const EditPurchase = () => {
     });
     
     const grandTotal = subtotal + totalVat;
-    const paidAmount = formData.paid_amount || 0;
-    const dueAmount = Math.max(0, grandTotal - paidAmount);
+    const balanceAmount = Math.max(0, grandTotal - paidAmount);
+    const balanceStatus = balanceAmount > 0 ? 1 : 0;
     
-    return { subtotal, totalVat, grandTotal, dueAmount };
+    return { subtotal, totalVat, grandTotal, balanceAmount, balanceStatus };
   };
 
-  const handleSupplierChange = async (e) => {
+  const handleSupplierChange = (e) => {
     const supplierId = parseInt(e.target.value);
     const supplier = suppliers.find(s => s.id === supplierId);
     
@@ -171,15 +192,15 @@ const EditPurchase = () => {
       supplier_id: supplierId
     }));
 
-    // Recalculate all items with new supplier VAT status
     const newItems = formData.items.map(item => {
       const { amount, vat, lineTotal } = calculateItemValues(item, supplier?.vat_registered || false);
       return { ...item, amount, vat, lineTotal };
     });
 
-    const { subtotal, totalVat, grandTotal, dueAmount } = calculateTotals(
+    const { subtotal, totalVat, grandTotal, balanceAmount, balanceStatus } = calculateTotals(
       newItems, 
-      supplier?.vat_registered || false
+      supplier?.vat_registered || false,
+      formData.paid_amount
     );
 
     setFormData(prev => ({
@@ -188,7 +209,8 @@ const EditPurchase = () => {
       subtotal,
       vat_amount: totalVat,
       total_with_vat: grandTotal,
-      due_amount: dueAmount
+      balance_amount: balanceAmount,
+      balance_status: balanceStatus
     }));
   };
 
@@ -201,7 +223,6 @@ const EditPurchase = () => {
 
     newItems[index][field] = value;
 
-    // Recalculate item values
     const { amount, vat, lineTotal } = calculateItemValues(
       newItems[index], 
       supplierVatRegistered
@@ -211,10 +232,10 @@ const EditPurchase = () => {
     newItems[index].vat = vat;
     newItems[index].lineTotal = lineTotal;
 
-    // Recalculate totals
-    const { subtotal, totalVat, grandTotal, dueAmount } = calculateTotals(
+    const { subtotal, totalVat, grandTotal, balanceAmount, balanceStatus } = calculateTotals(
       newItems, 
-      supplierVatRegistered
+      supplierVatRegistered,
+      formData.paid_amount
     );
 
     setFormData({
@@ -223,7 +244,8 @@ const EditPurchase = () => {
       subtotal,
       vat_amount: totalVat,
       total_with_vat: grandTotal,
-      due_amount: dueAmount
+      balance_amount: balanceAmount,
+      balance_status: balanceStatus
     });
   };
 
@@ -245,7 +267,6 @@ const EditPurchase = () => {
       vat_applicable: selectedItem.vat_applicable || false
     };
 
-    // Recalculate item values
     const { amount, vat, lineTotal } = calculateItemValues(
       newItems[index], 
       supplierVatRegistered
@@ -255,10 +276,10 @@ const EditPurchase = () => {
     newItems[index].vat = vat;
     newItems[index].lineTotal = lineTotal;
 
-    // Recalculate totals
-    const { subtotal, totalVat, grandTotal, dueAmount } = calculateTotals(
+    const { subtotal, totalVat, grandTotal, balanceAmount, balanceStatus } = calculateTotals(
       newItems, 
-      supplierVatRegistered
+      supplierVatRegistered,
+      formData.paid_amount
     );
 
     setFormData({ 
@@ -267,7 +288,8 @@ const EditPurchase = () => {
       subtotal,
       vat_amount: totalVat,
       total_with_vat: grandTotal,
-      due_amount: dueAmount
+      balance_amount: balanceAmount,
+      balance_status: balanceStatus
     });
   };
 
@@ -296,10 +318,10 @@ const EditPurchase = () => {
     
     const newItems = formData.items.filter((_, i) => i !== index);
     
-    // Recalculate totals
-    const { subtotal, totalVat, grandTotal, dueAmount } = calculateTotals(
+    const { subtotal, totalVat, grandTotal, balanceAmount, balanceStatus } = calculateTotals(
       newItems, 
-      supplierVatRegistered
+      supplierVatRegistered,
+      formData.paid_amount
     );
     
     setFormData({ 
@@ -308,18 +330,21 @@ const EditPurchase = () => {
       subtotal,
       vat_amount: totalVat,
       total_with_vat: grandTotal,
-      due_amount: dueAmount
+      balance_amount: balanceAmount,
+      balance_status: balanceStatus
     });
   };
 
   const handlePaidAmountChange = (e) => {
     const paidAmount = parseFloat(e.target.value) || 0;
-    const dueAmount = Math.max(0, formData.total_with_vat - paidAmount);
+    const balanceAmount = Math.max(0, formData.total_with_vat - paidAmount);
+    const balanceStatus = balanceAmount > 0 ? 1 : 0;
     
     setFormData({
       ...formData,
       paid_amount: paidAmount,
-      due_amount: dueAmount
+      balance_amount: balanceAmount,
+      balance_status: balanceStatus
     });
   };
 
@@ -328,7 +353,6 @@ const EditPurchase = () => {
 
     if (isSubmitting) return;
 
-    // Validate items
     if (formData.items.some(item => !item.id)) {
       showPopup('error', 'Please select valid items for all rows');
       return;
@@ -342,9 +366,9 @@ const EditPurchase = () => {
 
     setIsSubmitting(true);
 
-    // Prepare data for submission
     const submitData = {
       purchase_date: formData.purchase_date,
+      invoice_no: formData.invoice_no,
       supplier_id: formData.supplier_id,
       items: formData.items.map(item => ({
         item_id: item.id,
@@ -358,6 +382,8 @@ const EditPurchase = () => {
       vat_rate: VAT_RATE,
       total_with_vat: formData.total_with_vat,
       paid_amount: formData.paid_amount,
+      balance_amount: formData.balance_amount,
+      balance_status: formData.balance_status,
       payment_method: formData.payment_method,
       check_number: formData.check_number,
       remarks: formData.remarks,
@@ -367,11 +393,11 @@ const EditPurchase = () => {
 
     try {
       const response = await api.put(`/purchases/${id}`, submitData);
-      showPopup('success', `Purchase updated successfully! Invoice: ${response.data.invoice_no || response.data.message}`);
+      showPopup('success', `Purchase updated successfully! Invoice: ${response.data.invoice_no}`);
       navigate('/purchase/history');
     } catch (error) {
       console.error('Error updating purchase:', error);
-      showPopup('error', `Error: ${error.response?.data?.error || 'Server error'}`);
+      showPopup('error', error.response?.data?.error || 'Server error');
     } finally {
       setIsSubmitting(false);
     }
@@ -380,8 +406,7 @@ const EditPurchase = () => {
   const itemOptions = itemsList.map(itm => ({
     value: itm.id,
     label: `${itm.name} (${itm.item_code || ''}) - ${itm.vat_applicable ? 'VAT Applicable' : 'No VAT'}`,
-    previousPrice: previousPurchasePrices[itm.id] || 0,
-    vat_applicable: itm.vat_applicable
+    previousPrice: previousPurchasePrices[itm.id] || 0
   }));
 
   if (loading) {
@@ -402,11 +427,8 @@ const EditPurchase = () => {
           </button>
           <div>
             <h1>Edit Purchase</h1>
-            <p className="subtitle">Purchase ID: {id}</p>
+            <p className="subtitle">Invoice: {formData.invoice_no}</p>
           </div>
-        </div>
-        <div className="header-badge">
-          Edit Mode
         </div>
       </div>
 
@@ -441,13 +463,22 @@ const EditPurchase = () => {
             </div>
 
             <div className="form-group">
+              <label>Invoice Number *</label>
+              <input
+                type="text"
+                value={formData.invoice_no}
+                onChange={(e) => setFormData({ ...formData, invoice_no: e.target.value })}
+                required
+              />
+            </div>
+
+            <div className="form-group">
               <label>VAT Number</label>
               <input
                 type="text"
                 value={supplierVatNumber}
                 readOnly
                 className="vat-display"
-                placeholder={supplierVatRegistered ? "Auto-filled from supplier" : "Supplier not VAT registered"}
               />
             </div>
 
@@ -478,12 +509,11 @@ const EditPurchase = () => {
             </div>
 
             <div className="form-group">
-              <label>Invoice Number</label>
+              <label>Reference Number</label>
               <input
                 type="text"
                 value={formData.check_number}
                 onChange={(e) => setFormData({ ...formData, check_number: e.target.value })}
-                placeholder="Enter invoice number"
               />
             </div>
 
@@ -493,7 +523,6 @@ const EditPurchase = () => {
                 value={formData.remarks}
                 onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
                 rows="3"
-                placeholder="Add any notes or remarks..."
               />
             </div>
           </div>
@@ -521,24 +550,21 @@ const EditPurchase = () => {
               <tbody>
                 {formData.items.map((item, index) => {
                   const previousPrice = previousPurchasePrices[item.id] || 0;
-                  const isPriceDifferent = previousPrice > 0 && item.unit_price !== previousPrice;
                   
                   return (
                     <tr key={index}>
-                      <td style={{ minWidth: '250px' }}>
+                      <td>
                         <Select
                           options={itemOptions}
                           value={itemOptions.find(opt => opt.value === item.id) || null}
                           onChange={(selected) => handleItemSelect(index, selected)}
                           isSearchable
-                          placeholder="Select or search item..."
+                          placeholder="Select item..."
                           className="react-select-container"
                           classNamePrefix="react-select"
                         />
                         {item.vat_applicable && (
-                          <small style={{ color: '#28a745', display: 'block', marginTop: '4px' }}>
-                            ⚡ VAT Applicable
-                          </small>
+                          <small style={{ color: '#28a745' }}>VAT Applicable</small>
                         )}
                       </td>
                       <td>
@@ -547,15 +573,14 @@ const EditPurchase = () => {
                           min="0"
                           step="0.001"
                           value={item.quantity}
-                          onChange={(e) => handleItemChange(index, 'quantity', parseFloat(e.target.value))}
+                          onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
                           required
-                          className="quantity-input"
                         />
                       </td>
                       <td>
                         <input
                           type="text"
-                          value={item.unit || ''}
+                          value={item.unit}
                           readOnly
                           className="unit-display"
                         />
@@ -566,21 +591,19 @@ const EditPurchase = () => {
                           min="0.01"
                           step="0.01"
                           value={item.unit_price}
-                          onChange={(e) => handleItemChange(index, 'unit_price', parseFloat(e.target.value))}
+                          onChange={(e) => handleItemChange(index, 'unit_price', e.target.value)}
                           required
-                          className={`price-input ${isPriceDifferent ? 'price-different' : ''}`}
+                          className={previousPrice && item.unit_price !== previousPrice ? 'price-different' : ''}
                         />
-                        {isPriceDifferent && (
-                          <small style={{ color: '#dc3545', display: 'block' }}>
-                            Prev: Rs. {previousPrice.toFixed(2)}
-                          </small>
+                        {previousPrice > 0 && (
+                          <small>Prev: Rs.{previousPrice}</small>
                         )}
                       </td>
-                      <td className="text-right">Rs. {item.amount.toFixed(2)}</td>
+                      <td>Rs. {item.amount.toFixed(2)}</td>
                       {supplierVatRegistered && (
-                        <td className="vat-column text-right">Rs. {item.vat.toFixed(2)}</td>
+                        <td className="vat-column">Rs. {item.vat.toFixed(2)}</td>
                       )}
-                      <td className="text-right"><strong>Rs. {item.lineTotal.toFixed(2)}</strong></td>
+                      <td><strong>Rs. {item.lineTotal.toFixed(2)}</strong></td>
                       <td>
                         <button 
                           type="button" 
@@ -605,18 +628,16 @@ const EditPurchase = () => {
 
           <div className="vat-summary">
             <div className="vat-row">
-              <span>Subtotal (Net Amount):</span>
+              <span>Subtotal:</span>
               <span>Rs. {formData.subtotal.toFixed(2)}</span>
             </div>
             <div className="vat-row">
-              <span>Total VAT ({VAT_RATE}%):</span>
+              <span>VAT ({VAT_RATE}%):</span>
               <span>Rs. {formData.vat_amount.toFixed(2)}</span>
             </div>
             <div className="vat-row total">
               <span>Grand Total:</span>
-              <span className={formData.total_with_vat > 0 ? 'bold' : ''}>
-                Rs. {formData.total_with_vat.toFixed(2)}
-              </span>
+              <span>Rs. {formData.total_with_vat.toFixed(2)}</span>
             </div>
           </div>
         </div>
@@ -633,7 +654,26 @@ const EditPurchase = () => {
                 value={formData.paid_amount}
                 onChange={handlePaidAmountChange}
                 required
-                className="paid-input"
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Balance Amount</label>
+              <input
+                type="number"
+                value={formData.balance_amount.toFixed(2)}
+                readOnly
+                className={formData.balance_amount > 0 ? 'due-amount' : ''}
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Balance Status</label>
+              <input
+                type="text"
+                value={`${formData.balance_status} (${formData.balance_status === 0 ? 'No Balance' : 'Balance Available'})`}
+                readOnly
+                className={formData.balance_status === 1 ? 'status-due-bg' : 'status-paid-bg'}
               />
             </div>
 
@@ -646,10 +686,10 @@ const EditPurchase = () => {
                 <span className="label">Paid:</span>
                 <span className="value">Rs. {formData.paid_amount.toFixed(2)}</span>
               </div>
-              <div className={`info-item due ${formData.due_amount > 0 ? 'negative' : ''}`}>
-                <span className="label">Balance Due:</span>
-                <span className="value due-amount">
-                  Rs. {formData.due_amount.toFixed(2)}
+              <div className="info-item">
+                <span className="label">Balance:</span>
+                <span className={`value ${formData.balance_amount > 0 ? 'due-amount' : ''}`}>
+                  Rs. {formData.balance_amount.toFixed(2)}
                 </span>
               </div>
             </div>
