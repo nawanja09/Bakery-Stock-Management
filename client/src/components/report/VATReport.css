@@ -167,6 +167,7 @@
 
 .report-summary {
   margin-top: 30px;
+  overflow-x:auto;
 }
 
 .summary-card {
@@ -592,4 +593,60 @@
     gap: 5px;
     text-align: center;
   }
+}
+
+.report-summary {
+  margin-top: 30px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+/* Summary Card */
+.summary-card {
+  background-color: #ffffff;
+  border-radius: 10px;
+  padding: 22px;
+  box-shadow: 0 3px 12px rgba(0,0,0,0.08);
+  width: 100%;
+  max-width: 550px;
+  border: 1px solid #e9ecef;
+}
+
+/* Title */
+.summary-card h3 {
+  margin: 0 0 15px 0;
+  font-size: 18px;
+  color: #343a40;
+  border-bottom: 1px solid #e9ecef;
+  padding-bottom: 8px;
+}
+
+/* Rows */
+.summary-column {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 0;
+  font-size: 14px;
+  color: #495057;
+}
+
+.summary-column span:last-child {
+  font-weight: 600;
+}
+
+/* VAT highlight */
+.summary-column.vat {
+  color: #dc3545;
+}
+
+/* Total row */
+.summary-column.total {
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 2px dashed #dee2e6;
+  font-size: 16px;
+  font-weight: 700;
 }
