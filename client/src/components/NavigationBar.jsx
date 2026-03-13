@@ -30,6 +30,8 @@ import {
   faMapMarkerAlt,
   faExchangeAlt,
   faReply,
+  faDollarSign,
+  faFileInvoiceDollar
 } from '@fortawesome/free-solid-svg-icons';
 import bakeryLogo from '../images/icon.jpeg';
 import './NavigationBar.css';
@@ -557,6 +559,27 @@ const NavigationBar = () => {
                 </li>
               </>
             )}
+          </div>
+
+          {/* Expenses Section */}
+          <div className="nav-section">
+            <div className="section-separator"></div>
+
+            <li className={`dropdown ${activeDropdown === 'expenses' ? 'active' : ''}`}>
+              <div className="dropdown-header" onClick={() => toggleDropdown('expenses')}>
+                <span className="icon-container"><FontAwesomeIcon icon={faDollarSign} /></span>
+                <span> Expenses </span>
+                <FontAwesomeIcon icon={faChevronDown} className="chevron" />
+              </div>
+              <ul className="dropdown-menu">
+                <li>
+                  <NavLink to="/reports/expenses" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                    <span className="icon-container"><FontAwesomeIcon icon={faFileInvoiceDollar} /></span>
+                    <span>Expenses Report</span>
+                  </NavLink>
+                </li>
+              </ul>
+            </li>
           </div>
 
           {/* Department Section */}
