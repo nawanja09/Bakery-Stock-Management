@@ -1801,3 +1801,37 @@ ALTER TABLE purchase_returns DROP INDEX return_number;
 -- Modify return_number column to remove any default/auto generation
 ALTER TABLE purchase_returns 
 MODIFY COLUMN return_number varchar(50) NOT NULL;
+
+-- Add balance_amount column first
+ALTER TABLE purchases 
+ADD COLUMN balance_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER paid_amount;
+
+-- Disable safe update mode
+SET SQL_SAFE_UPDATES = 0;
+
+-- Update both balance_amount and balance_status
+UPDATE purchases 
+SET 
+    balance_amount = total_with_vat - paid_amount,
+    balance_status = CASE 
+        WHEN (total_with_vat - paid_amount) > 0 THEN 1 
+        ELSE 0 
+    END;
+
+-- Re-enable safe update mode
+SET SQL_SAFE_UPDATES = 1;
+
+-- Verify the updates
+SELECT 
+    id, 
+    invoice_no, 
+    total_with_vat, 
+    paid_amount, 
+    balance_amount, 
+    balance_status,
+    CASE 
+        WHEN balance_status = 0 THEN 'No Balance'
+        ELSE 'Balance Available'
+    END as balance_status_text
+FROM purchases 
+ORDER BY id;

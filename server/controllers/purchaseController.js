@@ -1,11 +1,10 @@
 const pool = require('../config/db');
-const { v4: uuidv4 } = require('uuid');
 
-// Create new purchase with user-provided invoice number
+// Create new purchase
 const createPurchase = async (req, res) => {
   const { 
     purchase_date, 
-    invoice_no,  // Add this - user provided invoice number
+    invoice_no,
     supplier_id, 
     items, 
     subtotal,
@@ -13,6 +12,8 @@ const createPurchase = async (req, res) => {
     total_with_vat,
     vat_rate,
     paid_amount, 
+    balance_amount,
+    balance_status,
     payment_method, 
     check_number,
     remarks, 
@@ -20,9 +21,13 @@ const createPurchase = async (req, res) => {
     company_id
   } = req.body;
 
-  // Validate invoice number is provided
+  // Validate required fields
   if (!invoice_no || invoice_no.trim() === '') {
     return res.status(400).json({ error: 'Invoice number is required' });
+  }
+
+  if (!items || items.length === 0) {
+    return res.status(400).json({ error: 'At least one item is required' });
   }
 
   const connection = await pool.getConnection();
@@ -43,16 +48,16 @@ const createPurchase = async (req, res) => {
       });
     }
 
-    // Insert purchase with user-provided invoice number
+    // Insert purchase
     const [purchaseResult] = await connection.query(
       `INSERT INTO purchases 
       (invoice_no, purchase_date, supplier_id, bill_amount, subtotal, vat_amount, 
-       total_with_vat, vat_rate, paid_amount, payment_method, check_number, remarks, 
-       prepared_by, company_id) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       total_with_vat, vat_rate, paid_amount, balance_amount, balance_status, 
+       payment_method, check_number, remarks, prepared_by, company_id) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [invoice_no, purchase_date, supplier_id, total_with_vat, subtotal, vat_amount, 
-       total_with_vat, vat_rate, paid_amount, payment_method, check_number, remarks, 
-       prepared_by, company_id]
+       total_with_vat, vat_rate, paid_amount, balance_amount, balance_status, 
+       payment_method, check_number, remarks, prepared_by, company_id]
     );
     
     const purchaseId = purchaseResult.insertId;
@@ -63,7 +68,7 @@ const createPurchase = async (req, res) => {
         `INSERT INTO purchase_items 
         (purchase_id, item_name, quantity, unit_price, item_id) 
         VALUES (?, ?, ?, ?, ?)`,
-        [purchaseId, item.item_name, item.quantity, item.unit_price, item.id]
+        [purchaseId, item.item_name, item.quantity, item.unit_price, item.item_id]
       );
     }
 
@@ -71,19 +76,13 @@ const createPurchase = async (req, res) => {
     res.status(201).json({ 
       message: 'Purchase created successfully!', 
       invoice_no,
-      purchase_id: purchaseId,
-      summary: {
-        subtotal,
-        vat_amount,
-        total_with_vat
-      }
+      purchase_id: purchaseId
     });
     
   } catch (error) {
     await connection.rollback();
     console.error('Error creating purchase:', error);
     
-    // Handle duplicate entry error specifically
     if (error.code === 'ER_DUP_ENTRY') {
       return res.status(400).json({ 
         error: 'Invoice number already exists. Please use a unique invoice number.' 
@@ -96,7 +95,7 @@ const createPurchase = async (req, res) => {
   }
 };
 
-// Get all purchases (updated to include VAT fields)
+// Get all purchases
 const getAllPurchases = async (req, res) => {
   try {
     const [purchases] = await pool.query(`
@@ -111,7 +110,6 @@ const getAllPurchases = async (req, res) => {
       ORDER BY p.purchase_date DESC
     `);
 
-    // Get items for each purchase
     const purchasesWithItems = await Promise.all(
       purchases.map(async (purchase) => {
         const [items] = await pool.query(
@@ -133,12 +131,11 @@ const getAllPurchases = async (req, res) => {
   }
 };
 
-// Get purchase by ID with full details
+// Get purchase by ID
 const getPurchaseById = async (req, res) => {
   const { id } = req.params;
   
   try {
-    // Get purchase details with supplier and company info
     const [purchase] = await pool.query(`
       SELECT 
         p.*,
@@ -163,22 +160,21 @@ const getPurchaseById = async (req, res) => {
       return res.status(404).json({ error: 'Purchase not found' });
     }
     
-    // Get purchase items with item details
     const [items] = await pool.query(`
       SELECT 
         pi.*,
         i.item_code,
         i.unit,
-        i.vat_applicable
+        i.vat_applicable,
+        i.name as item_master_name
       FROM purchase_items pi
       LEFT JOIN items i ON pi.item_id = i.id
       WHERE pi.purchase_id = ?
     `, [id]);
     
-    // Combine data
     const purchaseData = {
       ...purchase[0],
-      items: items
+      items: items || []
     };
     
     res.json(purchaseData);
@@ -189,12 +185,12 @@ const getPurchaseById = async (req, res) => {
   }
 };
 
-// Update purchase with VAT (including invoice number)
+// Update purchase
 const updatePurchase = async (req, res) => {
   const { id } = req.params;
   const { 
     purchase_date, 
-    invoice_no,  // Add this
+    invoice_no,
     supplier_id, 
     items, 
     subtotal,
@@ -202,6 +198,8 @@ const updatePurchase = async (req, res) => {
     total_with_vat,
     vat_rate,
     paid_amount, 
+    balance_amount,
+    balance_status,
     payment_method, 
     check_number,
     remarks, 
@@ -209,9 +207,12 @@ const updatePurchase = async (req, res) => {
     company_id
   } = req.body;
 
-  // Validate invoice number is provided
   if (!invoice_no || invoice_no.trim() === '') {
     return res.status(400).json({ error: 'Invoice number is required' });
+  }
+
+  if (!items || items.length === 0) {
+    return res.status(400).json({ error: 'At least one item is required' });
   }
 
   const connection = await pool.getConnection();
@@ -219,7 +220,6 @@ const updatePurchase = async (req, res) => {
   try {
     await connection.beginTransaction();
 
-    // Check if invoice number already exists for a different purchase
     const [existing] = await connection.query(
       'SELECT id FROM purchases WHERE invoice_no = ? AND id != ?',
       [invoice_no, id]
@@ -232,50 +232,42 @@ const updatePurchase = async (req, res) => {
       });
     }
 
-    // Update purchase with VAT fields
     await connection.query(
       `UPDATE purchases 
        SET invoice_no = ?, purchase_date = ?, supplier_id = ?, bill_amount = ?, subtotal = ?, 
            vat_amount = ?, total_with_vat = ?, vat_rate = ?, paid_amount = ?, 
-           payment_method = ?, check_number = ?, remarks = ?, prepared_by = ?, 
-           company_id = ?
+           balance_amount = ?, balance_status = ?, payment_method = ?, check_number = ?, 
+           remarks = ?, prepared_by = ?, company_id = ?
        WHERE id = ?`,
       [invoice_no, purchase_date, supplier_id, total_with_vat, subtotal, vat_amount, 
-       total_with_vat, vat_rate, paid_amount, payment_method, check_number, 
-       remarks, prepared_by, company_id, id]
+       total_with_vat, vat_rate, paid_amount, balance_amount, balance_status, 
+       payment_method, check_number, remarks, prepared_by, company_id, id]
     );
 
-    // Delete existing items
     await connection.query(
       `DELETE FROM purchase_items WHERE purchase_id = ?`,
       [id]
     );
 
-    // Insert updated items
     for (const item of items) {
       await connection.query(
         `INSERT INTO purchase_items 
         (purchase_id, item_name, quantity, unit_price, item_id) 
         VALUES (?, ?, ?, ?, ?)`,
-        [id, item.item_name, item.quantity, item.unit_price, item.id]
+        [id, item.item_name, item.quantity, item.unit_price, item.item_id]
       );
     }
 
     await connection.commit();
     res.json({ 
       message: 'Purchase updated successfully!',
-      summary: {
-        subtotal,
-        vat_amount,
-        total_with_vat
-      }
+      invoice_no
     });
     
   } catch (error) {
     await connection.rollback();
     console.error('Error updating purchase:', error);
     
-    // Handle duplicate entry error specifically
     if (error.code === 'ER_DUP_ENTRY') {
       return res.status(400).json({ 
         error: 'Invoice number already exists. Please use a unique invoice number.' 
@@ -302,7 +294,7 @@ const getAllCompanies = async (req, res) => {
 // Get all suppliers
 const getAllSuppliers = async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT id, name FROM supplier');
+    const [rows] = await pool.query('SELECT id, name, vat_registered, vat_number FROM supplier');
     res.json(rows);
   } catch (error) {
     console.error('Error fetching suppliers:', error);
@@ -310,16 +302,12 @@ const getAllSuppliers = async (req, res) => {
   }
 };
 
-// Get previous purchase prices for all items
-
-/*
+// Get previous purchase prices
 const getPreviousPurchasePrices = async (req, res) => {
   try {
     const [rows] = await pool.query(`
       SELECT 
         i.id AS item_id,
-        i.name AS item_name,
-        i.item_code,
         (
           SELECT pi.unit_price 
           FROM purchase_items pi
@@ -329,54 +317,11 @@ const getPreviousPurchasePrices = async (req, res) => {
           LIMIT 1
         ) AS previous_unit_price
       FROM items i
-      WHERE EXISTS (
-        SELECT 1 FROM purchase_items pi WHERE pi.item_id = i.id
-      )
     `);
 
-    // Convert to object format for easy lookup
     const priceMap = {};
     rows.forEach(row => {
-      if (row.previous_unit_price) {
-        priceMap[row.item_id] = parseFloat(row.previous_unit_price);
-      }
-    });
-
-    res.json(priceMap);
-  } catch (error) {
-    console.error('Error fetching previous purchase prices:', error);
-    res.status(500).json({ error: 'Server error' });
-  }
-};
-*/
-
-const getPreviousPurchasePrices = async (req, res) => {
-  try {
-    const [rows] = await pool.query(`
-      SELECT 
-        i.id AS item_id,
-        i.name AS item_name,
-        i.item_code,
-        (
-          SELECT pi.unit_price 
-          FROM purchase_items pi
-          JOIN purchases p ON pi.purchase_id = p.id
-          WHERE pi.item_id = i.id
-          AND p.purchase_date >= DATE_SUB(CURDATE(), INTERVAL 1 MONTH)
-          ORDER BY p.purchase_date DESC, pi.id DESC 
-          LIMIT 1
-        ) AS previous_unit_price
-      FROM items i
-    `);
-
-    // Convert to object format for easy lookup
-    const priceMap = {};
-    rows.forEach(row => {
-      if (row.previous_unit_price) {
-        priceMap[row.item_id] = parseFloat(row.previous_unit_price);
-      } else {
-        priceMap[row.item_id] = 0; // Default value if no previous price
-      }
+      priceMap[row.item_id] = row.previous_unit_price ? parseFloat(row.previous_unit_price) : 0;
     });
 
     res.json(priceMap);
