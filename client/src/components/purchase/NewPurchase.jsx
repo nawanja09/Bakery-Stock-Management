@@ -434,6 +434,10 @@ const AddPurchase = () => {
               ))}
             </select>
           </div>
+        </div>
+
+        {/* Additional Info */}
+        <div className="form-row">
           <div className="form-group">
             <label>Invoice Number</label>
             <input

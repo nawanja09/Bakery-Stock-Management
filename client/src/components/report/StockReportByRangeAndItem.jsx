@@ -17,18 +17,20 @@ const TransactionDetailsModal = ({ date, itemId, itemName, onClose }) => {
     purchases: [],
     issuances: [],
     wastages: [],
-    returns: []
+    returns: [],
+    purchaseReturns: [] // Add purchase returns
   });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchTransactionDetails = async () => {
       try {
-        const [purchasesRes, issuancesRes, wastagesRes, returnsRes] = await Promise.all([
+        const [purchasesRes, issuancesRes, wastagesRes, returnsRes, purchaseReturnsRes] = await Promise.all([
           api.get(`/reports/daily-transactions/purchases`, { params: { date, itemId }}),
           api.get(`/reports/daily-transactions/issuances`, { params: { date, itemId }}),
           api.get(`/reports/daily-transactions/wastages`, { params: { date, itemId }}),
           api.get(`/reports/daily-transactions/returns`, { params: { date, itemId }}),
+          api.get(`/reports/daily-transactions/purchase-returns`, { params: { date, itemId }}), // Add purchase returns
         ]);
 
         setTransactions({
@@ -36,6 +38,7 @@ const TransactionDetailsModal = ({ date, itemId, itemName, onClose }) => {
           issuances: issuancesRes.data,
           wastages: wastagesRes.data,
           returns: returnsRes.data,
+          purchaseReturns: purchaseReturnsRes.data,
         });
       } catch (err) {
         console.error(err);
@@ -169,10 +172,10 @@ const TransactionDetailsModal = ({ date, itemId, itemName, onClose }) => {
             ) : <p className="no-data">No wastages recorded</p>}
           </div>
 
-          {/* SECTION: RETURNS */}
+          {/* SECTION: RETURNS (Department Returns) */}
           <div className="modal-section">
             <div className="modal-section-title returns-bg">
-              🔄 Returns ({transactions.returns.length})
+              🔄 Department Returns ({transactions.returns.length})
             </div>
 
             {transactions.returns.length > 0 ? (
@@ -200,7 +203,43 @@ const TransactionDetailsModal = ({ date, itemId, itemName, onClose }) => {
                   </tbody>
                 </table>
               </div>
-            ) : <p className="no-data">No returns recorded</p>}
+            ) : <p className="no-data">No department returns recorded</p>}
+          </div>
+
+          {/* SECTION: PURCHASE RETURNS (To Supplier) - NEW */}
+          <div className="modal-section">
+            <div className="modal-section-title" style={{ background: '#fd7e14' }}>
+              ↩️ Purchase Returns (to Supplier) ({transactions.purchaseReturns.length})
+            </div>
+
+            {transactions.purchaseReturns.length > 0 ? (
+              <div className="modern-table-wrapper">
+                <table className="modern-table">
+                  <thead>
+                    <tr>
+                      <th>Return #</th>
+                      <th>Supplier</th>
+                      <th>Qty</th>
+                      <th>Unit Price</th>
+                      <th>VAT</th>
+                      <th>Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {transactions.purchaseReturns.map((pr, idx) => (
+                      <tr key={idx}>
+                        <td>{pr.return_number}</td>
+                        <td>{pr.supplier_name}</td>
+                        <td>{Number(pr.quantity).toFixed(3)}</td>
+                        <td>{Number(pr.unit_price).toFixed(2)}</td>
+                        <td>{Number(pr.vat_amount).toFixed(2)}</td>
+                        <td>{Number(pr.total_amount).toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : <p className="no-data">No purchase returns recorded</p>}
           </div>
 
         </div>
@@ -298,13 +337,14 @@ const StockReportByRangeAndItem = () => {
     doc.setFontSize(10);
     doc.text(`Generated on: ${format(new Date(), 'MMM dd, yyyy HH:mm')}`, 105, 34, { align: 'center' });
 
-    // Table
+    // Table with Purchase Return column
     autoTable(doc, {
       head: [
-        ['Date', 'Opening', 'Purchased', 'Issued', 'Wasted', 'Returned', 'Closing', 'Net Change']
+        ['Date', 'Opening', 'Purchased', 'Issued', 'Wasted', 'Dept Return', 'Purchase Return', 'Closing', 'Net Change']
       ],
       body: stockData.map(r => {
-        const netChange = Number(r.purchased) - Number(r.issued) - Number(r.wasted) + Number(r.returned);
+        const netChange = Number(r.purchased) - Number(r.issued) - Number(r.wasted) + 
+                          Number(r.returned) - Number(r.purchaseReturned || 0);
         return [
           format(new Date(r.date), 'MMM dd, yyyy'),
           Number(r.opening).toFixed(3),
@@ -312,6 +352,7 @@ const StockReportByRangeAndItem = () => {
           Number(r.issued).toFixed(3),
           Number(r.wasted).toFixed(3),
           Number(r.returned).toFixed(3),
+          Number(r.purchaseReturned || 0).toFixed(3),
           Number(r.closing).toFixed(3),
           netChange.toFixed(3)
         ];
@@ -331,13 +372,14 @@ const StockReportByRangeAndItem = () => {
       },
       columnStyles: {
         0: { cellWidth: 25 },
-        1: { cellWidth: 18 },
-        2: { cellWidth: 18 },
-        3: { cellWidth: 18 },
-        4: { cellWidth: 18 },
-        5: { cellWidth: 18 },
-        6: { cellWidth: 18 },
-        7: { cellWidth: 18 }
+        1: { cellWidth: 15 },
+        2: { cellWidth: 15 },
+        3: { cellWidth: 15 },
+        4: { cellWidth: 15 },
+        5: { cellWidth: 15 },
+        6: { cellWidth: 15 },
+        7: { cellWidth: 15 },
+        8: { cellWidth: 15 }
       }
     });
 
@@ -355,8 +397,9 @@ const StockReportByRangeAndItem = () => {
       doc.text(`Total Purchased: ${summary.totalPurchased.toFixed(3)}`, 14, finalY + 8);
       doc.text(`Total Issued: ${summary.totalIssued.toFixed(3)}`, 14, finalY + 16);
       doc.text(`Total Wasted: ${summary.totalWasted.toFixed(3)}`, 14, finalY + 24);
-      doc.text(`Total Returned: ${summary.totalReturned.toFixed(3)}`, 14, finalY + 32);
-      doc.text(`Average Closing Balance: ${summary.avgClosing.toFixed(3)}`, 14, finalY + 40);
+      doc.text(`Total Dept Return: ${summary.totalReturned.toFixed(3)}`, 14, finalY + 32);
+      doc.text(`Total Purchase Return: ${summary.totalPurchaseReturned.toFixed(3)}`, 14, finalY + 40);
+      doc.text(`Average Closing Balance: ${summary.avgClosing.toFixed(3)}`, 14, finalY + 48);
     }
 
     // Page numbers
@@ -385,12 +428,13 @@ const StockReportByRangeAndItem = () => {
       [`Period: ${format(new Date(startDate), 'MMM dd, yyyy')} to ${format(new Date(endDate), 'MMM dd, yyyy')}`],
       [`Generated on: ${format(new Date(), 'MMM dd, yyyy HH:mm')}`],
       [''], // Empty row for spacing
-      ['Date', 'Opening Balance', 'Purchased', 'Issued', 'Wasted', 'Returned', 'Closing Balance', 'Net Change']
+      ['Date', 'Opening Balance', 'Purchased', 'Issued', 'Wasted', 'Dept Return', 'Purchase Return', 'Closing Balance', 'Net Change']
     ];
 
     // Add data rows
     stockData.forEach(r => {
-      const netChange = Number(r.purchased) - Number(r.issued) - Number(r.wasted) + Number(r.returned);
+      const netChange = Number(r.purchased) - Number(r.issued) - Number(r.wasted) + 
+                        Number(r.returned) - Number(r.purchaseReturned || 0);
       worksheetData.push([
         format(new Date(r.date), 'MMM dd, yyyy'),
         Number(r.opening),
@@ -398,6 +442,7 @@ const StockReportByRangeAndItem = () => {
         Number(r.issued),
         Number(r.wasted),
         Number(r.returned),
+        Number(r.purchaseReturned || 0),
         Number(r.closing),
         netChange
       ]);
@@ -410,7 +455,8 @@ const StockReportByRangeAndItem = () => {
     worksheetData.push(['Total Purchased:', summary.totalPurchased]);
     worksheetData.push(['Total Issued:', summary.totalIssued]);
     worksheetData.push(['Total Wasted:', summary.totalWasted]);
-    worksheetData.push(['Total Returned:', summary.totalReturned]);
+    worksheetData.push(['Total Dept Return:', summary.totalReturned]);
+    worksheetData.push(['Total Purchase Return:', summary.totalPurchaseReturned]);
     worksheetData.push(['Average Closing Balance:', summary.avgClosing]);
 
     // Create workbook and worksheet
@@ -443,7 +489,7 @@ const StockReportByRangeAndItem = () => {
     }
 
     // Summary styling
-    for (let i = worksheetData.length - 6; i < worksheetData.length; i++) {
+    for (let i = worksheetData.length - 7; i < worksheetData.length; i++) {
       const cellRef = XLSX.utils.encode_cell({ r: i, c: 0 });
       if (worksheet[cellRef]) {
         worksheet[cellRef].s = {
@@ -460,7 +506,8 @@ const StockReportByRangeAndItem = () => {
       { wch: 12 }, // Purchased
       { wch: 12 }, // Issued
       { wch: 12 }, // Wasted
-      { wch: 12 }, // Returned
+      { wch: 12 }, // Dept Return
+      { wch: 15 }, // Purchase Return
       { wch: 15 }, // Closing
       { wch: 12 }  // Net Change
     ];
@@ -481,6 +528,7 @@ const StockReportByRangeAndItem = () => {
         totalIssued: 0,
         totalWasted: 0,
         totalReturned: 0,
+        totalPurchaseReturned: 0,
         avgClosing: 0
       };
     }
@@ -490,6 +538,7 @@ const StockReportByRangeAndItem = () => {
       totalIssued: stockData.reduce((sum, day) => sum + Number(day.issued), 0),
       totalWasted: stockData.reduce((sum, day) => sum + Number(day.wasted), 0),
       totalReturned: stockData.reduce((sum, day) => sum + Number(day.returned), 0),
+      totalPurchaseReturned: stockData.reduce((sum, day) => sum + Number(day.purchaseReturned || 0), 0),
       avgClosing: stockData.reduce((sum, day) => sum + Number(day.closing), 0) / stockData.length
     };
   };
@@ -595,7 +644,7 @@ const StockReportByRangeAndItem = () => {
         </div>
       </div>
 
-      {/* Summary Cards */}
+      {/* Summary Cards - Updated with Purchase Return */}
       {summary && stockData.length > 0 && (
         <div className="summary-cards">
           <div className="summary-card">
@@ -614,18 +663,23 @@ const StockReportByRangeAndItem = () => {
           </div>
 
           <div className="summary-card positive">
-            <div className="summary-label">TOTAL RETURNED</div>
+            <div className="summary-label">DEPT RETURN</div>
             <div className="summary-value positive">{summary.totalReturned.toFixed(3)}</div>
+          </div>
+
+          <div className="summary-card" style={{ background: '#fff3cd' }}>
+            <div className="summary-label">PURCHASE RETURN</div>
+            <div className="summary-value" style={{ color: '#fd7e14' }}>{summary.totalPurchaseReturned.toFixed(3)}</div>
           </div>
           
           <div className="summary-card info">
-            <div className="summary-label">AVG CLOSING BALANCE</div>
+            <div className="summary-label">AVG CLOSING</div>
             <div className="summary-value">{summary.avgClosing.toFixed(3)}</div>
           </div>
         </div>
       )}
 
-      {/* Data Table */}
+      {/* Data Table with Purchase Return Column */}
       {loading ? (
         <div className="loading">Loading stock trend data...</div>
       ) : stockData.length > 0 ? (
@@ -634,20 +688,24 @@ const StockReportByRangeAndItem = () => {
             <thead>
               <tr>
                 <th>DATE</th>
-                <th>OPENING BALANCE</th>
+                <th>OPENING</th>
                 <th>PURCHASED</th>
                 <th>ISSUED</th>
                 <th>WASTED</th>
-                <th>RETURNED</th>
-                <th>CLOSING BALANCE</th>
+                <th>DEPT RETURN</th>
+                <th>PURCHASE RETURN</th>
+                <th>CLOSING</th>
                 <th>NET CHANGE</th>
                 <th>ACTIONS</th>
               </tr>
             </thead>
             <tbody>
               {stockData.map((r, index) => {
-                const netChange = Number(r.purchased) - Number(r.issued) - Number(r.wasted) + Number(r.returned);
-                const hasTransactions = Number(r.purchased) > 0 || Number(r.issued) > 0 || Number(r.wasted) > 0 || Number(r.returned) > 0;
+                const netChange = Number(r.purchased) - Number(r.issued) - Number(r.wasted) + 
+                                  Number(r.returned) - Number(r.purchaseReturned || 0);
+                const hasTransactions = Number(r.purchased) > 0 || Number(r.issued) > 0 || 
+                                        Number(r.wasted) > 0 || Number(r.returned) > 0 || 
+                                        Number(r.purchaseReturned || 0) > 0;
                 
                 return (
                   <tr 
@@ -664,6 +722,7 @@ const StockReportByRangeAndItem = () => {
                     <td className="negative">-{Number(r.issued).toFixed(3)}</td>
                     <td className="negative">-{Number(r.wasted).toFixed(3)}</td>
                     <td className="positive">+{Number(r.returned).toFixed(3)}</td>
+                    <td className="negative">-{Number(r.purchaseReturned || 0).toFixed(3)}</td>
                     <td style={{ fontWeight: '600' }}>{Number(r.closing).toFixed(3)}</td>
                     <td style={{ 
                       color: netChange >= 0 ? '#28a745' : '#dc3545',

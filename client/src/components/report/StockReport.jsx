@@ -13,7 +13,7 @@ const StockReport = () => {
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [stockData, setStockData] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [itemPrices, setItemPrices] = useState({}); // Store latest unit prices
+  const [itemPrices, setItemPrices] = useState({});
 
   const fetchStockReport = async () => {
     setLoading(true);
@@ -32,7 +32,6 @@ const StockReport = () => {
     }
   };
 
-  // Fetch latest unit prices before selected date
   const fetchLatestUnitPrices = async (stockData) => {
     try {
       const pricePromises = stockData.map(async (item) => {
@@ -62,15 +61,13 @@ const StockReport = () => {
     }
   };
 
-  // Calculate value for an item
   const calculateValue = (item) => {
     if (!item) return '0.00';
     const closingBalance = Number(item.closing_balance) || 0;
-    const unitPrice = itemPrices[item.id] || 0;
+    const unitPrice = itemPrices[item.id] || item.unit_price || 0;
     return (closingBalance * unitPrice).toFixed(2);
   };
 
-  // Calculate total value for all items (used in table footer)
   const calculateTotal = () => {
     const total = stockData.reduce((acc, item) => {
       return acc + Number(calculateValue(item));
@@ -98,6 +95,7 @@ const StockReport = () => {
       Number(item.total_issued).toFixed(2),
       Number(item.total_wasted).toFixed(2),
       Number(item.total_returned).toFixed(2),
+      Number(item.total_purchase_returned || 0).toFixed(2),
       Number(item.closing_balance).toFixed(2),
       `Rs. ${calculateValue(item)}`
     ]);
@@ -107,10 +105,11 @@ const StockReport = () => {
       'Item Name',
       'Unit',
       'Opening',
-      'Purchased',
-      'Issued',
-      'Wasted',
-      'Return',
+      'Purchase',
+      'Issue',
+      'Wastage',
+      'Dept Return',
+      'Purchase Return',
       'Closing',
       'Value (Rs.)'
     ];
@@ -132,10 +131,11 @@ const StockReport = () => {
       'Item Name': item.item_name,
       'Unit': item.unit,
       'Opening Balance': Number(item.opening_balance),
-      'Purchased': Number(item.total_purchased),
-      'Issued': Number(item.total_issued),
-      'Wasted': Number(item.total_wasted),
-      'Return': Number(item.total_returned),
+      'Purchase': Number(item.total_purchased),
+      'Issue': Number(item.total_issued),
+      'Wastage': Number(item.total_wasted),
+      'Dept Return': Number(item.total_returned),
+      'Purchase Return': Number(item.total_purchase_returned || 0),
       'Closing Balance': Number(item.closing_balance),
       'Value (Rs.)': Number(calculateValue(item))
     }));
@@ -199,10 +199,11 @@ const StockReport = () => {
                 <th>Item Name</th>
                 <th>Unit</th>
                 <th>Opening</th>
-                <th>Purchased</th>
-                <th>Issued</th>
-                <th>Wasted</th>
-                <th>Return</th>
+                <th>Purchase</th>
+                <th>Issue</th>
+                <th>Wastage</th>
+                <th>Dept Return</th>
+                <th>Purchase Return</th>
                 <th>Closing</th>
                 <th>Value (Rs.)</th>
               </tr>
@@ -218,6 +219,7 @@ const StockReport = () => {
                   <td>{Number(item.total_issued).toFixed(2)}</td>
                   <td>{Number(item.total_wasted).toFixed(2)}</td>
                   <td>{Number(item.total_returned).toFixed(2)}</td>
+                  <td>{Number(item.total_purchase_returned || 0).toFixed(2)}</td>
                   <td>{Number(item.closing_balance).toFixed(2)}</td>
                   <td style={{ fontWeight: 'bold', color: '#2e7d32' }}>
                     Rs. {calculateValue(item)}
@@ -227,8 +229,8 @@ const StockReport = () => {
             </tbody>
             <tfoot>
               <tr>
-                <td colSpan="8" style={{ fontWeight: 'bold' }}>Total Value (Rs.)</td>
-                <td style={{ fontWeight: 'bold', color: '#2e7d32' }}>
+                <td colSpan="9" style={{ fontWeight: 'bold' }}>Total Value (Rs.)</td>
+                <td colSpan="2" style={{ fontWeight: 'bold', color: '#2e7d32' }}>
                   Rs. {calculateTotal()}
                 </td>
               </tr>

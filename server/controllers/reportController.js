@@ -30,13 +30,15 @@ const getStockReport = async (req, res) => {
         COALESCE(issues.total_issued, 0) AS total_issued,
         COALESCE(wastage.total_wasted, 0) AS total_wasted,
         COALESCE(returns.total_returned, 0) AS total_returned,
+        COALESCE(purchase_returns.total_purchase_returned, 0) AS total_purchase_returned,
         (
           COALESCE(prev.closing_balance, 0) +
           COALESCE(ob_today.opening_balance_today, 0) +
           COALESCE(purchases.total_purchased, 0) -
           COALESCE(issues.total_issued, 0) -
           COALESCE(wastage.total_wasted, 0) +
-          COALESCE(returns.total_returned, 0)
+          COALESCE(returns.total_returned, 0) -
+          COALESCE(purchase_returns.total_purchase_returned, 0)
         ) AS closing_balance,
         -- Get latest unit price
         (
@@ -58,7 +60,8 @@ const getStockReport = async (req, res) => {
             COALESCE(purchases.total_purchased, 0) -
             COALESCE(issues.total_issued, 0) -
             COALESCE(wastage.total_wasted, 0) +
-            COALESCE(returns.total_returned, 0)
+            COALESCE(returns.total_returned, 0) -
+            COALESCE(purchase_returns.total_purchase_returned, 0)
           ) AS closing_balance
         FROM items i2
         LEFT JOIN (
@@ -96,6 +99,13 @@ const getStockReport = async (req, res) => {
           WHERE r.return_date <= ?
           GROUP BY ri.item_id
         ) returns ON i2.id = returns.item_id
+        LEFT JOIN (
+          SELECT pri.item_id, SUM(pri.quantity) AS total_purchase_returned
+          FROM purchase_return_items pri
+          JOIN purchase_returns pr ON pri.return_id = pr.id
+          WHERE pr.return_date <= ?
+          GROUP BY pri.item_id
+        ) purchase_returns ON i2.id = purchase_returns.item_id
       ) prev ON i.id = prev.item_id
       LEFT JOIN (
         -- today's manual opening balance
@@ -130,21 +140,29 @@ const getStockReport = async (req, res) => {
         GROUP BY wi.item_id
       ) wastage ON i.id = wastage.item_id
       LEFT JOIN (
-        -- today's returns
+        -- today's returns (internal)
         SELECT ri.item_id, SUM(ri.quantity) AS total_returned
         FROM return_items ri
         JOIN returns r ON ri.return_id = r.id
         WHERE DATE(r.return_date) = ?
         GROUP BY ri.item_id
       ) returns ON i.id = returns.item_id
+      LEFT JOIN (
+        -- today's purchase returns (to supplier)
+        SELECT pri.item_id, SUM(pri.quantity) AS total_purchase_returned
+        FROM purchase_return_items pri
+        JOIN purchase_returns pr ON pri.return_id = pr.id
+        WHERE DATE(pr.return_date) = ?
+        GROUP BY pri.item_id
+      ) purchase_returns ON i.id = purchase_returns.item_id
       ORDER BY i.item_code
     `;
 
     const params = [
       date, // For unit price subquery
-      prevDateStr, prevDateStr, prevDateStr, prevDateStr, prevDateStr, // yesterday x5
+      prevDateStr, prevDateStr, prevDateStr, prevDateStr, prevDateStr, prevDateStr, // yesterday x6
       date,                                              // today opening
-      date, date, date, date                            // today purchases/issues/wastage/returns
+      date, date, date, date, date                       // today purchases/issues/wastage/returns/purchase_returns
     ];
 
     const [rows] = await pool.query(query, params);
@@ -183,6 +201,7 @@ const getDateRange = (start, end) => {
   return dates;
 };
 
+// Update the getStockReportByRangeAndItem function
 const getStockReportByRangeAndItem = async (req, res) => {
   try {
     const { startDate, endDate, itemId } = req.query;
@@ -240,10 +259,21 @@ const getStockReportByRangeAndItem = async (req, res) => {
       [itemId, startDate]
     );
 
+    const [[{ purchaseReturned: prePurchaseReturned = 0 }]] = await pool.query(
+      `SELECT SUM(pri.quantity) AS purchaseReturned
+       FROM purchase_return_items pri
+       JOIN purchase_returns pr ON pri.return_id = pr.id
+       WHERE pri.item_id = ? AND DATE(pr.return_date) < ?`,
+      [itemId, startDate]
+    );
+
     // Calculate initial opening balance
-    let runningBalance = openingBalance + parseFloat(prePurchased || 0) - 
-                         parseFloat(preIssued || 0) - parseFloat(preWasted || 0) +
-                         parseFloat(preReturned || 0);
+    let runningBalance = openingBalance + 
+                        parseFloat(prePurchased || 0) - 
+                        parseFloat(preIssued || 0) - 
+                        parseFloat(preWasted || 0) +
+                        parseFloat(preReturned || 0) -
+                        parseFloat(prePurchaseReturned || 0);
 
     for (const date of dateRange) {
       let opening = runningBalance;
@@ -251,6 +281,7 @@ const getStockReportByRangeAndItem = async (req, res) => {
       let issued = 0;
       let wasted = 0;
       let returned = 0;
+      let purchaseReturned = 0;
 
       // Check if there's an opening balance specifically for this date
       const [[specificOpening]] = await pool.query(
@@ -296,13 +327,22 @@ const getStockReportByRangeAndItem = async (req, res) => {
         [itemId, date]
       );
 
+      const [[{ purchaseReturned: dbPurchaseReturned = 0 }]] = await pool.query(
+        `SELECT SUM(pri.quantity) AS purchaseReturned
+         FROM purchase_return_items pri
+         JOIN purchase_returns pr ON pri.return_id = pr.id
+         WHERE pri.item_id = ? AND DATE(pr.return_date) = ?`,
+        [itemId, date]
+      );
+
       // Add database values
       purchased = parseFloat(dbPurchased || 0);
       issued = parseFloat(dbIssued || 0);
       wasted = parseFloat(dbWasted || 0);
       returned = parseFloat(dbReturned || 0);
+      purchaseReturned = parseFloat(dbPurchaseReturned || 0);
 
-      const closing = opening + purchased - issued - wasted + returned;
+      const closing = opening + purchased - issued - wasted + returned - purchaseReturned;
       runningBalance = closing;
 
       report.push({
@@ -312,6 +352,7 @@ const getStockReportByRangeAndItem = async (req, res) => {
         issued,
         wasted,
         returned,
+        purchaseReturned,
         closing
       });
     }
@@ -750,6 +791,40 @@ const getLatestUnitPrice = async (req, res) => {
   }
 };
 
+// Add a new function to get purchase return transactions
+const getDailyPurchaseReturnTransactions = async (req, res) => {
+  try {
+    const { date, itemId } = req.query;
+
+    if (!date || !itemId) {
+      return res.status(400).json({ error: 'Date and itemId are required' });
+    }
+
+    const [rows] = await pool.query(`
+      SELECT 
+        pr.id AS return_id,
+        pr.return_number,
+        s.name AS supplier_name,
+        pri.quantity,
+        pri.unit_price,
+        pri.vat_applicable,
+        pri.vat_amount,
+        pri.total_amount
+      FROM purchase_returns pr
+      JOIN purchase_return_items pri ON pr.id = pri.return_id
+      JOIN supplier s ON pr.supplier_id = s.id
+      WHERE DATE(pr.return_date) = ? 
+        AND pri.item_id = ?
+      ORDER BY pr.return_number
+    `, [date, itemId]);
+
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching daily purchase return transactions:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
 
 module.exports = {
   getStockReport,
@@ -763,5 +838,6 @@ module.exports = {
   getDailyPurchaseTransactions,
   getDailyWastageTransactions,
   getDailyReturnTransactions,
-  getPurchasingItemWiseReport
+  getPurchasingItemWiseReport,
+  getDailyPurchaseReturnTransactions
 };
