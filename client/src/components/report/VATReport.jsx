@@ -312,15 +312,15 @@ const VATReport = () => {
           <div className="report-summary">
             <div className="summary-card">
               <h3>Summary</h3>
-              <div className="summary-row">
+              <div className="summary-column">
                 <span>Total Net Amount:</span>
                 <span>Rs. {totalNetAmount.toFixed(2)}</span>
               </div>
-              <div className="summary-row vat">
+              <div className="summary-column vat">
                 <span>Total VAT (18%):</span>
                 <span>Rs. {totalVATAmount.toFixed(2)}</span>
               </div>
-              <div className="summary-row total">
+              <div className="summary-column total">
                 <span>Total with VAT:</span>
                 <span>Rs. {(totalNetAmount + totalVATAmount).toFixed(2)}</span>
               </div>
