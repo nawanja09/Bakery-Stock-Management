@@ -1,0 +1,388 @@
+/* SettlementModal.css */
+.settlement-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1100;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.settlement-modal {
+  background: white;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 800px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.settlement-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e9ecef;
+  background: linear-gradient(to right, #f8f9fa, #ffffff);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.settlement-modal-header h3 {
+  margin: 0;
+  color: #2c3e50;
+  font-size: 1.3rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.settlement-modal-header h3 svg {
+  color: #fd7e14;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: #6c757d;
+  padding: 8px;
+  border-radius: 8px;
+  transition: all 0.2s;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-btn:hover {
+  color: #343a40;
+  background-color: #e9ecef;
+}
+
+.settlement-modal-body {
+  padding: 24px;
+}
+
+.return-summary {
+  background: #f8f9fa;
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 24px;
+  border: 1px solid #e9ecef;
+}
+
+.summary-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px dashed #dee2e6;
+}
+
+.summary-item:last-child {
+  border-bottom: none;
+}
+
+.summary-item .label {
+  color: #6c757d;
+  font-weight: 500;
+}
+
+.summary-item .value {
+  font-weight: 600;
+}
+
+.summary-item .value.highlight {
+  color: #fd7e14;
+  font-size: 1.1em;
+}
+
+.summary-item .value.success {
+  color: #28a745;
+}
+
+.summary-item .value.warning {
+  color: #fd7e14;
+}
+
+.bills-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+  max-height: 400px;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+.bills-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.bills-list::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.bills-list::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.bills-list::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+.bill-item {
+  background: white;
+  border: 1px solid #e9ecef;
+  border-radius: 10px;
+  padding: 16px;
+  transition: all 0.2s;
+}
+
+.bill-item:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  border-color: #fd7e14;
+}
+
+.bill-info {
+  margin-bottom: 12px;
+}
+
+.bill-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.invoice {
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.date {
+  color: #6c757d;
+  font-size: 0.9em;
+}
+
+.bill-details {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  font-size: 0.9em;
+  color: #495057;
+}
+
+.bill-details .balance {
+  color: #fd7e14;
+  font-weight: 600;
+}
+
+.bill-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.amount-input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.amount-input:focus {
+  outline: none;
+  border-color: #fd7e14;
+  box-shadow: 0 0 0 3px rgba(253, 126, 20, 0.1);
+}
+
+.amount-input:disabled {
+  background-color: #e9ecef;
+  cursor: not-allowed;
+}
+
+.allocate-btn {
+  background: #fd7e14;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.allocate-btn:hover:not(:disabled) {
+  background: #e06b00;
+  transform: translateY(-1px);
+}
+
+.allocate-btn:disabled {
+  background: #e9ecef;
+  color: #adb5bd;
+  cursor: not-allowed;
+}
+
+.allocated-badge {
+  color: #28a745;
+  font-size: 18px;
+}
+
+.settlement-notes {
+  margin-top: 24px;
+}
+
+.settlement-notes label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: #495057;
+}
+
+.settlement-notes textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+  font-size: 14px;
+  resize: vertical;
+  transition: all 0.2s;
+}
+
+.settlement-notes textarea:focus {
+  outline: none;
+  border-color: #fd7e14;
+  box-shadow: 0 0 0 3px rgba(253, 126, 20, 0.1);
+}
+
+.settlement-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 20px 24px;
+  border-top: 1px solid #e9ecef;
+  background: #f8f9fa;
+  position: sticky;
+  bottom: 0;
+}
+
+.btn-primary {
+  background: #fd7e14;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #e06b00;
+  transform: translateY(-1px);
+}
+
+.btn-primary:disabled {
+  background: #e9ecef;
+  color: #adb5bd;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: white;
+  color: #6c757d;
+  border: 1px solid #ced4da;
+  padding: 12px 24px;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+  background: #f8f9fa;
+  border-color: #adb5bd;
+  color: #495057;
+}
+
+.no-bills {
+  text-align: center;
+  padding: 32px;
+  background: #f8f9fa;
+  border-radius: 10px;
+  color: #6c757d;
+}
+
+.no-bills p {
+  margin: 8px 0;
+}
+
+.loading {
+  text-align: center;
+  padding: 40px;
+  color: #6c757d;
+}
+
+.error {
+  text-align: center;
+  padding: 40px;
+  color: #dc3545;
+  background: #f8d7da;
+  border-radius: 10px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .settlement-modal {
+    width: 100%;
+    height: 100%;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+
+  .bill-details {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .bill-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .allocate-btn {
+    width: 100%;
+  }
+}

@@ -1835,3 +1835,15 @@ SELECT
     END as balance_status_text
 FROM purchases 
 ORDER BY id;
+
+-- Add balance tracking fields to purchase_returns table
+ALTER TABLE purchase_returns 
+ADD COLUMN settled_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER total_amount,
+ADD COLUMN balance_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER settled_amount,
+ADD COLUMN settlement_details JSON DEFAULT NULL AFTER balance_amount;
+
+-- Explanation of new columns:
+-- settled_amount: Amount that was settled against existing purchase bills
+-- balance_amount: Remaining amount that couldn't be settled (carried forward)
+-- settlement_details: JSON array storing which bills were used for settlement
+-- Example: [{"purchase_id": 1, "invoice_no": "INV-001", "amount": 5000.00}, ...]
