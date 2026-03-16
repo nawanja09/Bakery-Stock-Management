@@ -1112,3 +1112,174 @@
     break-inside: avoid;
   }
 }
+
+/* Add to PurchaseReturnHistory.css */
+
+/* Settlement Breakdown Section */
+.settlement-breakdown {
+  padding: 20px;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.settlement-breakdown-header {
+  margin-bottom: 16px;
+}
+
+.breakdown-description {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #495057;
+  font-size: 14px;
+  padding: 10px 16px;
+  background: #e9ecef;
+  border-radius: 6px;
+  margin: 0;
+}
+
+.breakdown-description svg {
+  color: #fd7e14;
+}
+
+/* Settlement Breakdown Table */
+.settlement-breakdown-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.settlement-breakdown-table th {
+  background: #f1f3f5;
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  color: #495057;
+  border-bottom: 2px solid #dee2e6;
+}
+
+.settlement-breakdown-table td {
+  padding: 10px 16px;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.settlement-breakdown-table tbody tr:hover {
+  background: #f8f9fa;
+}
+
+.settlement-breakdown-table tfoot {
+  background: #f1f3f5;
+  font-weight: 600;
+}
+
+.settlement-breakdown-table tfoot td {
+  padding: 12px 16px;
+  border-top: 2px solid #dee2e6;
+}
+
+/* Percentage Badge */
+.percentage-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  background: #e7f5ff;
+  color: #1976d2;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Progress Bar */
+.settlement-progress {
+  margin-top: 20px;
+  padding: 16px;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.progress-label {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  color: #495057;
+  font-size: 14px;
+}
+
+.progress-bar {
+  height: 8px;
+  background: #e9ecef;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #28a745, #20c997);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.progress-percentage {
+  text-align: right;
+  font-size: 13px;
+  font-weight: 600;
+  color: #28a745;
+}
+
+/* Settlement Notes */
+.settlement-notes {
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: #fff3cd;
+  border: 1px solid #ffeeba;
+  border-radius: 6px;
+  color: #856404;
+}
+
+.settlement-notes p {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settlement-notes svg {
+  color: #fd7e14;
+}
+
+/* Invoice Badge */
+.invoice-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  background: #e3f2fd;
+  color: #1976d2;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: monospace;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .settlement-breakdown {
+    padding: 12px;
+  }
+
+  .settlement-breakdown-table {
+    font-size: 13px;
+  }
+
+  .settlement-breakdown-table th,
+  .settlement-breakdown-table td {
+    padding: 8px 10px;
+  }
+
+  .percentage-badge {
+    font-size: 11px;
+    padding: 2px 6px;
+  }
+}
