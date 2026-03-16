@@ -277,59 +277,6 @@ const getAllPurchaseReturns = async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 };
-
-// Get purchase return by ID with full details
-const getPurchaseReturnById = async (req, res) => {
-  const { id } = req.params;
-
-  try {
-    const [returns] = await pool.query(`
-      SELECT 
-        pr.*,
-        s.name AS supplier_name,
-        s.vat_registered AS supplier_vat_registered,
-        s.vat_number AS supplier_vat_number,
-        p.invoice_no AS purchase_invoice,
-        p.purchase_date AS original_purchase_date,
-        u.name AS returned_by_name
-      FROM purchase_returns pr
-      JOIN supplier s ON pr.supplier_id = s.id
-      JOIN purchases p ON pr.purchase_id = p.id
-      JOIN users u ON pr.returned_by = u.id
-      WHERE pr.id = ?
-    `, [id]);
-
-    if (returns.length === 0) {
-      return res.status(404).json({ error: 'Purchase return not found' });
-    }
-
-    const purchaseReturn = returns[0];
-
-    // Parse settlement details if exists
-    if (purchaseReturn.settlement_details) {
-      purchaseReturn.settlement_details = JSON.parse(purchaseReturn.settlement_details);
-    }
-
-    // Get return items
-    const [items] = await pool.query(`
-      SELECT 
-        pri.*,
-        i.item_code,
-        i.unit
-      FROM purchase_return_items pri
-      JOIN items i ON pri.item_id = i.id
-      WHERE pri.return_id = ?
-    `, [id]);
-
-    purchaseReturn.items = items;
-
-    res.json(purchaseReturn);
-  } catch (error) {
-    console.error('Error fetching purchase return:', error);
-    res.status(500).json({ error: 'Server error' });
-  }
-};
-
 // Get VAT returns data for reporting
 const getVATReturns = async (req, res) => {
   try {
@@ -417,6 +364,76 @@ const getVATSummary = async (req, res) => {
   }
 };
 
+// Get purchase return by ID with full details
+const getPurchaseReturnById = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    // First, get the purchase return details
+    const [returns] = await pool.query(`
+      SELECT 
+        pr.*,
+        s.name AS supplier_name,
+        s.vat_registered AS supplier_vat_registered,
+        s.vat_number AS supplier_vat_number,
+        p.invoice_no AS purchase_invoice,
+        p.purchase_date AS original_purchase_date,
+        u.name AS returned_by_name
+      FROM purchase_returns pr
+      LEFT JOIN supplier s ON pr.supplier_id = s.id
+      LEFT JOIN purchases p ON pr.purchase_id = p.id
+      LEFT JOIN users u ON pr.returned_by = u.id
+      WHERE pr.id = ?
+    `, [id]);
+
+    if (returns.length === 0) {
+      return res.status(404).json({ error: 'Purchase return not found' });
+    }
+
+    const purchaseReturn = returns[0];
+
+    // Handle settlement_details - check if it's already an object or needs parsing
+    if (purchaseReturn.settlement_details) {
+      // Check if it's already an object (from mysql2's JSON type)
+      if (typeof purchaseReturn.settlement_details === 'object') {
+        // It's already parsed, use as is
+        purchaseReturn.settlement_details = purchaseReturn.settlement_details;
+      } else {
+        // Try to parse it if it's a string
+        try {
+          purchaseReturn.settlement_details = JSON.parse(purchaseReturn.settlement_details);
+        } catch (e) {
+          console.error('Error parsing settlement_details:', e);
+          purchaseReturn.settlement_details = [];
+        }
+      }
+    } else {
+      purchaseReturn.settlement_details = [];
+    }
+
+    // Get return items
+    const [items] = await pool.query(`
+      SELECT 
+        pri.*,
+        i.item_code,
+        i.unit
+      FROM purchase_return_items pri
+      LEFT JOIN items i ON pri.item_id = i.id
+      WHERE pri.return_id = ?
+    `, [id]);
+
+    purchaseReturn.items = items || [];
+
+    res.json(purchaseReturn);
+  } catch (error) {
+    console.error('Error fetching purchase return:', error);
+    res.status(500).json({ 
+      error: 'Server error', 
+      details: error.message,
+      sqlMessage: error.sqlMessage 
+    });
+  }
+};
 
 module.exports = {
   getPurchasesForReturn,
