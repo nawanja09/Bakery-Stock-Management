@@ -271,12 +271,23 @@ const getAllPurchaseReturns = async (req, res) => {
       ORDER BY pr.return_date DESC, pr.id DESC
     `);
 
-    res.json(returns);
+    // Ensure numeric fields are proper numbers
+    const formattedReturns = returns.map(ret => ({
+      ...ret,
+      total_amount: parseFloat(ret.total_amount) || 0,
+      settled_amount: parseFloat(ret.settled_amount) || 0,
+      balance_amount: parseFloat(ret.balance_amount) || 0,
+      subtotal: parseFloat(ret.subtotal) || 0,
+      vat_amount: parseFloat(ret.vat_amount) || 0
+    }));
+
+    res.json(formattedReturns);
   } catch (error) {
     console.error('Error fetching purchase returns:', error);
     res.status(500).json({ error: 'Server error' });
   }
 };
+
 // Get VAT returns data for reporting
 const getVATReturns = async (req, res) => {
   try {
