@@ -1,3 +1,4 @@
+// AddPurchaseReturn.jsx (fixed)
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -7,12 +8,14 @@ import {
   faPlus, 
   faTrash,
   faSearch,
-  faExclamationTriangle
+  faExclamationTriangle,
+  faBalanceScale
 } from '@fortawesome/free-solid-svg-icons';
 import Select from 'react-select';
 import dayjs from 'dayjs';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
+import SettlementModal from './SettlementModal';
 import './AddPurchaseReturn.css';
 
 const AddPurchaseReturn = () => {
@@ -30,13 +33,25 @@ const AddPurchaseReturn = () => {
   const [supplierVatRegistered, setSupplierVatRegistered] = useState(false);
   const [returnNumber, setReturnNumber] = useState('');
   
+  // Settlement related states
+  const [showSettlementModal, setShowSettlementModal] = useState(false);
+  const [settlementData, setSettlementData] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
   const VAT_RATE = 18;
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('user'));
     setCurrentUser(user);
     fetchPurchases();
-  }, []);
+  }, []); // Empty dependency array - runs only once
+
+  // Separate useEffect for auto-submit
+  useEffect(() => {
+    if (settlementData && !showSettlementModal && !isSubmitting) {
+      finalSubmit();
+    }
+  }, [settlementData, showSettlementModal]); // Runs when settlementData or showSettlementModal changes
 
   const fetchPurchases = async () => {
     try {
@@ -81,13 +96,6 @@ const AddPurchaseReturn = () => {
     } finally {
       setFetchingItems(false);
     }
-  };
-
-  const validateReturnNumber = (number) => {
-    if (!number || number.trim() === '') {
-      return 'Return number is required';
-    }
-    return '';
   };
 
   const handleQuantityChange = (index, value) => {
@@ -143,6 +151,21 @@ const AddPurchaseReturn = () => {
     return purchaseItems.some(item => item.return_quantity > 0);
   };
 
+  const handleSettlementConfirm = (settlementResult) => {
+    setSettlementData(settlementResult);
+    setShowSettlementModal(false);
+    
+    // Show summary before final submission
+    const { subtotal, totalVat, grandTotal } = calculateTotals();
+    
+    showPopup('info', 
+      `Settlement Summary:\n` +
+      `Total Return: Rs. ${grandTotal.toFixed(2)}\n` +
+      `Settled: Rs. ${settlementResult.settlements.reduce((sum, s) => sum + s.amount, 0).toFixed(2)}\n` +
+      `Balance: Rs. ${settlementResult.remainingAmount.toFixed(2)}`
+    );
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -167,6 +190,18 @@ const AddPurchaseReturn = () => {
       return;
     }
 
+    // Show settlement modal first
+    setShowSettlementModal(true);
+  };
+
+  const finalSubmit = async () => {
+    if (!settlementData) {
+      showPopup('error', 'Settlement data is required');
+      return;
+    }
+
+    setIsSubmitting(true);
+
     // Prepare items for submission (only those with quantity > 0)
     const itemsToReturn = purchaseItems
       .filter(item => item.return_quantity > 0)
@@ -187,23 +222,34 @@ const AddPurchaseReturn = () => {
       supplier_id: selectedPurchase.supplier_id,
       return_date: returnDate,
       items: itemsToReturn,
-      remarks: remarks,
-      returned_by: currentUser.id
+      remarks: remarks + (settlementData.note ? ` | Settlement: ${settlementData.note}` : ''),
+      returned_by: currentUser.id,
+      settlements: settlementData.settlements.map(s => ({
+        purchase_id: s.purchase_id,
+        invoice_no: s.invoice_no,
+        amount: s.amount
+      }))
     };
 
     try {
       const response = await api.post('/purchase-returns', formData);
-      showPopup('success', `Return created successfully! Return #: ${response.data.return_number}`);
+      showPopup('success', 
+        `Return created successfully!\n` +
+        `Return #: ${response.data.return_number}\n` +
+        `Settled: Rs. ${response.data.summary.settled_amount.toFixed(2)}\n` +
+        `Balance: Rs. ${response.data.summary.balance_amount.toFixed(2)}`
+      );
       navigate('/purchase-returns/history');
     } catch (error) {
       console.error('Error creating return:', error);
       
-      // Show specific error message for duplicate return number
       if (error.response?.data?.error?.includes('Return number already exists')) {
         showPopup('error', 'This return number already exists. Please use a different number.');
       } else {
         showPopup('error', error.response?.data?.error || 'Failed to create return');
       }
+      setIsSubmitting(false);
+      setSettlementData(null);
     }
   };
 
@@ -296,157 +342,195 @@ const AddPurchaseReturn = () => {
             </div>
           </div>
 
-            <div className="form-card">
-              <h2>Items to Return</h2>
-              
-              <div className="items-table-container">
-                <table className="items-table">
-                  <thead>
-                    <tr>
-                      <th>Item</th>
-                      <th>Purchased Qty</th>
-                      <th>Already Returned</th>
-                      <th>Available for Return</th>
-                      <th>Unit</th>
-                      <th>Unit Price</th>
-                      <th>Return Qty</th>
-                      <th>Amount</th>
-                      {supplierVatRegistered && <th>VAT</th>}
-                      <th>Total</th>
-                      <th>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {purchaseItems.map((item, index) => {
-                      const { amount, vat, total } = calculateItemValues(item);
-                      const hasAvailable = item.available_quantity > 0;
-                      
-                      return (
-                        <tr key={index} className={!hasAvailable ? 'no-stock' : ''}>
-                          <td>
-                            <div className="item-name">{item.item_name}</div>
-                            {item.vat_applicable && (
-                              <small className="vat-applicable">VAT Applicable</small>
-                            )}
-                          </td>
-                          <td className="text-center">{item.purchased_quantity}</td>
-                          <td className="text-center">{item.returned_quantity}</td>
-                          <td className="text-center">
-                            <strong>{item.available_quantity}</strong>
-                          </td>
-                          <td>{item.unit}</td>
-                          <td className="text-right">Rs. {item.unit_price}</td>
-                          <td>
-                            <div className="quantity-control">
-                              <input
-                                type="number"
-                                min="0"
-                                max={item.available_quantity}
-                                step="0.001"
-                                value={item.return_quantity}
-                                onChange={(e) => handleQuantityChange(index, e.target.value)}
-                                disabled={!hasAvailable}
-                                className="quantity-input"
-                              />
-                              {hasAvailable && item.available_quantity > 0 && (
-                                <button
-                                  type="button"
-                                  onClick={() => setMaxQuantity(index)}
-                                  className="max-btn"
-                                  title="Return all available"
-                                >
-                                  Max
-                                </button>
+          <div className="form-card">
+            <h2>Items to Return</h2>
+            
+            <div className="items-table-container">
+              <table className="items-table">
+                <thead>
+                  <tr>
+                    <th>Item Details</th>
+                    <th>Purchased</th>
+                    <th>Returned</th>
+                    <th>Available</th>
+                    <th>Unit</th>
+                    <th>Unit Price</th>
+                    <th>Return Quantity</th>
+                    <th>Amount</th>
+                    {supplierVatRegistered && <th>VAT (18%)</th>}
+                    <th>Total</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {purchaseItems.map((item, index) => {
+                    const { amount, vat, total } = calculateItemValues(item);
+                    const hasAvailable = item.available_quantity > 0;
+                    const stockLevel = item.available_quantity <= item.purchased_quantity * 0.1 ? 'low' : 'good';
+                    
+                    return (
+                      <tr key={index} className={!hasAvailable ? 'no-stock' : ''}>
+                        <td>
+                          <div className="item-name-container">
+                            <div className="item-name">
+                              {item.item_name}
+                              {item.vat_applicable && (
+                                <span className="vat-badge-table">VAT</span>
                               )}
                             </div>
-                          </td>
-                          <td className="text-right">Rs. {amount.toFixed(2)}</td>
-                          {supplierVatRegistered && (
-                            <td className="text-right vat-column">
-                              {item.vat_applicable ? `Rs. ${vat.toFixed(2)}` : '-'}
-                            </td>
+                            <span className="item-category">
+                              {item.category || 'General'}
+                            </span>
+                          </div>
+                        </td>
+                        <td>
+                          <span className="quantity-badge quantity-purchased">
+                            {item.purchased_quantity?.toLocaleString()}
+                          </span>
+                        </td>
+                        <td>
+                          <span className="quantity-badge quantity-returned">
+                            {item.returned_quantity?.toLocaleString()}
+                          </span>
+                        </td>
+                        <td>
+                          <span className="quantity-badge quantity-available">
+                            {item.available_quantity?.toLocaleString()}
+                          </span>
+                          {stockLevel === 'low' && (
+                            <span className="stock-status low-stock">● Low</span>
                           )}
-                          <td className="text-right total-column">
-                            <strong>Rs. {total.toFixed(2)}</strong>
-                          </td>
-                          <td>
-                            {item.return_quantity > 0 && (
+                        </td>
+                        <td>
+                          <span className="unit-display">{item.unit}</span>
+                        </td>
+                        <td className="numeric-value">
+                          <span className="price-highlight">Rs.</span> {item.unit_price?.toFixed(2)}
+                        </td>
+                        <td>
+                          <div className="quantity-control-enhanced">
+                            <input
+                              type="number"
+                              min="0"
+                              max={item.available_quantity}
+                              step="0.001"
+                              value={item.return_quantity}
+                              onChange={(e) => handleQuantityChange(index, e.target.value)}
+                              disabled={!hasAvailable}
+                              className="quantity-input-enhanced"
+                              placeholder="0"
+                            />
+                            {hasAvailable && item.available_quantity > 0 && (
                               <button
                                 type="button"
-                                onClick={() => handleQuantityChange(index, 0)}
-                                className="btn-clear-item"
-                                title="Clear"
+                                onClick={() => setMaxQuantity(index)}
+                                className="max-btn-enhanced"
+                                title="Return all available"
                               >
-                                <FontAwesomeIcon icon={faTrash} />
+                                Max
                               </button>
                             )}
+                          </div>
+                        </td>
+                        <td className="amount-column">Rs. {amount?.toFixed(2)}</td>
+                        {supplierVatRegistered && (
+                          <td className="vat-amount">
+                            {item.vat_applicable ? `Rs. ${vat?.toFixed(2)}` : '-'}
                           </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                        )}
+                        <td className="amount-column">
+                          <strong>Rs. {total?.toFixed(2)}</strong>
+                        </td>
+                        <td>
+                          {item.return_quantity > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => handleQuantityChange(index, 0)}
+                              className="btn-clear-enhanced"
+                              title="Clear quantity"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {!hasItemsToReturn() && selectedPurchase && (
+              <div className="warning-message">
+                <FontAwesomeIcon icon={faExclamationTriangle} />
+                Please enter return quantity for at least one item
               </div>
+            )}
+          </div>
 
-              {!hasItemsToReturn() && selectedPurchase && (
-                <div className="warning-message">
-                  <FontAwesomeIcon icon={faExclamationTriangle} />
-                  Please enter return quantity for at least one item
-                </div>
-              )}
-            </div>
-
-            <div className="form-card">
-              <h2>Summary</h2>
-              
-              <div className="summary-section">
-                <div className="summary-row">
-                  <span>Subtotal (Net Amount):</span>
-                  <span>Rs. {totals.subtotal.toFixed(2)}</span>
-                </div>
-                <div className="summary-row vat">
-                  <span>VAT ({VAT_RATE}%):</span>
-                  <span>Rs. {totals.totalVat.toFixed(2)}</span>
-                </div>
-                <div className="summary-row grand-total">
-                  <span>Total Return Amount:</span>
-                  <span className="bold">Rs. {totals.grandTotal.toFixed(2)}</span>
-                </div>
+          <div className="form-card">
+            <h2>Summary</h2>
+            
+            <div className="summary-section">
+              <div className="summary-row">
+                <span>Subtotal (Net Amount):</span>
+                <span>Rs. {totals.subtotal.toFixed(2)}</span>
+              </div>
+              <div className="summary-row vat">
+                <span>VAT ({VAT_RATE}%):</span>
+                <span>Rs. {totals.totalVat.toFixed(2)}</span>
+              </div>
+              <div className="summary-row grand-total">
+                <span>Total Return Amount:</span>
+                <span className="bold">Rs. {totals.grandTotal.toFixed(2)}</span>
               </div>
             </div>
+          </div>
 
-            <div className="form-card">
-              <h2>Remarks</h2>
-              <div className="form-group">
-                <textarea
-                  value={remarks}
-                  onChange={(e) => setRemarks(e.target.value)}
-                  rows="3"
-                  placeholder="Enter any remarks or notes..."
-                />
-              </div>
+          <div className="form-card">
+            <h2>Remarks</h2>
+            <div className="form-group">
+              <textarea
+                value={remarks}
+                onChange={(e) => setRemarks(e.target.value)}
+                rows="3"
+                placeholder="Enter any remarks or notes..."
+              />
             </div>
+          </div>
 
-            <div className="form-actions">
-              <button
-                type="button"
-                onClick={() => navigate('/purchase-returns/history')}
-                className="btn-secondary"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="btn-primary"
-                disabled={!hasItemsToReturn()}
-              >
-                <FontAwesomeIcon icon={faSave} />
-                Create Return
-              </button>
-            </div>
-          </>
+          <div className="form-actions">
+            <button
+              type="button"
+              onClick={() => navigate('/purchase-returns/history')}
+              className="btn-secondary"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn-primary"
+              disabled={!hasItemsToReturn() || isSubmitting}
+            >
+              <FontAwesomeIcon icon={faBalanceScale} />
+              {isSubmitting ? 'Processing...' : 'Create Return with Settlement'}
+            </button>
+          </div>
+        </>
         )}
       </form>
+
+      {/* Settlement Modal */}
+      {showSettlementModal && selectedPurchase && (
+        <SettlementModal
+          isOpen={showSettlementModal}
+          onClose={() => setShowSettlementModal(false)}
+          supplierId={selectedPurchase.supplier_id}
+          supplierName={selectedPurchase.supplier_name}
+          returnAmount={totals.grandTotal}
+          onConfirm={handleSettlementConfirm}
+        />
+      )}
     </div>
   );
 };
