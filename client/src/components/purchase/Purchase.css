@@ -1,47 +1,5 @@
 /* src/components/purchase/Purchase.css */
 
-/* ========== CSS Variables ========== */
-:root {
-  --primary-color: #3b82f6;
-  --primary-hover: #2563eb;
-  --primary-light: #eff6ff;
-  --danger-color: #ef4444;
-  --danger-hover: #dc2626;
-  --danger-light: #fee2e2;
-  --success-color: #10b981;
-  --success-light: #d1fae5;
-  --warning-color: #f59e0b;
-  --warning-light: #fef3c7;
-  --gray-50: #f9fafb;
-  --gray-100: #f3f4f6;
-  --gray-200: #e5e7eb;
-  --gray-300: #d1d5db;
-  --gray-400: #9ca3af;
-  --gray-500: #6b7280;
-  --gray-600: #4b5563;
-  --gray-700: #374151;
-  --gray-800: #1f2937;
-  --gray-900: #111827;
-  --border-radius: 12px;
-  --border-radius-sm: 8px;
-  --box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  --box-shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
-  --transition: all 0.2s ease;
-}
-
-/* ========== Base Styles ========== */
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background-color: var(--gray-50);
-  color: var(--gray-900);
-}
-
 /* ========== Loading Container ========== */
 .loading-container {
   display: flex;
@@ -2603,7 +2561,7 @@ body {
 }
 
 .react-select__option--is-selected {
-  background-color: #007bff !important;
+  background-color: #1a1b1b !important;
 }
 
 /* Responsive adjustments */
