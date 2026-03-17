@@ -1847,3 +1847,7 @@ ADD COLUMN settlement_details JSON DEFAULT NULL AFTER balance_amount;
 -- balance_amount: Remaining amount that couldn't be settled (carried forward)
 -- settlement_details: JSON array storing which bills were used for settlement
 -- Example: [{"purchase_id": 1, "invoice_no": "INV-001", "amount": 5000.00}, ...]
+
+-- Add auto_add_to_stock column to items table
+ALTER TABLE items 
+ADD COLUMN auto_add_to_stock BOOLEAN NOT NULL DEFAULT TRUE AFTER vat_applicable;

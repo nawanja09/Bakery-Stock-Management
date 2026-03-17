@@ -1,7 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus, faEdit, faTrash, faSearch, faTimes } from '@fortawesome/free-solid-svg-icons';
+import { 
+  faPlus, 
+  faEdit, 
+  faTrash, 
+  faSearch, 
+  faTimes,
+  faCheck,
+  faBan 
+} from '@fortawesome/free-solid-svg-icons';
 import './ItemManagement.css';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
@@ -12,6 +20,7 @@ const ItemsList = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterVat, setFilterVat] = useState('all');
+  const [filterAutoAdd, setFilterAutoAdd] = useState('all');
   const { showPopup } = usePopup();
   const navigate = useNavigate();
 
@@ -21,7 +30,7 @@ const ItemsList = () => {
 
   useEffect(() => {
     filterItems();
-  }, [searchTerm, filterVat, items]);
+  }, [searchTerm, filterVat, filterAutoAdd, items]);
 
   const fetchItems = async () => {
     try {
@@ -54,6 +63,12 @@ const ItemsList = () => {
       filtered = filtered.filter(item => item.vat_applicable === vatValue);
     }
 
+    // Apply Auto-Add filter
+    if (filterAutoAdd !== 'all') {
+      const autoAddValue = filterAutoAdd === 'yes';
+      filtered = filtered.filter(item => item.auto_add_to_stock === autoAddValue);
+    }
+
     setFilteredItems(filtered);
   };
 
@@ -65,7 +80,7 @@ const ItemsList = () => {
     try {
       await api.delete(`/items/${id}`);
       showPopup('success', 'Item deleted successfully!');
-      fetchItems(); // Refresh the list
+      fetchItems();
     } catch (error) {
       console.error('Error deleting item:', error);
       showPopup('error', 'Failed to delete item');
@@ -79,6 +94,7 @@ const ItemsList = () => {
   const clearSearch = () => {
     setSearchTerm('');
     setFilterVat('all');
+    setFilterAutoAdd('all');
   };
 
   if (loading) {
@@ -107,7 +123,9 @@ const ItemsList = () => {
         </div>
       </div>
 
+      {/* Enhanced Filters Section */}
       <div className="filters-section">
+        {/* Search Box */}
         <div className="items-search">
           <FontAwesomeIcon icon={faSearch} className="search-icon" />
           <input
@@ -127,26 +145,47 @@ const ItemsList = () => {
           )}
         </div>
 
-        <div className="filter-dropdown">
-          <select 
-            value={filterVat} 
-            onChange={(e) => setFilterVat(e.target.value)}
-            className="minimal-select filter-select"
-          >
-            <option value="all">All Items</option>
-            <option value="yes">VAT Applicable</option>
-            <option value="no">VAT Not Applicable</option>
-          </select>
-        </div>
+        {/* Filter Dropdowns Container */}
+        <div className="filter-dropdowns">
+          {/* VAT Status Filter */}
+          <div className={`filter-item ${filterVat !== 'all' ? 'has-value' : ''}`}>
+            <span className="filter-label">VAT Status</span>
+            <select 
+              value={filterVat} 
+              onChange={(e) => setFilterVat(e.target.value)}
+              className="filter-select"
+            >
+              <option value="all">All VAT Status</option>
+              <option value="yes">VAT Applicable</option>
+              <option value="no">VAT Not Applicable</option>
+            </select>
+          </div>
 
-        {(searchTerm || filterVat !== 'all') && (
-          <button 
-            onClick={clearSearch}
-            className="minimal-button minimal-button-secondary clear-filters"
-          >
-            Clear Filters
-          </button>
-        )}
+          {/* Auto-Add Status Filter */}
+          <div className={`filter-item ${filterAutoAdd !== 'all' ? 'has-value' : ''}`}>
+            <span className="filter-label">Auto-Add Status</span>
+            <select 
+              value={filterAutoAdd} 
+              onChange={(e) => setFilterAutoAdd(e.target.value)}
+              className="filter-select"
+            >
+              <option value="all">All Auto-Add Status</option>
+              <option value="yes">Auto-Add Enabled</option>
+              <option value="no">Auto-Add Disabled</option>
+            </select>
+          </div>
+
+          {/* Clear Filters Button */}
+          {(searchTerm || filterVat !== 'all' || filterAutoAdd !== 'all') && (
+            <button 
+              onClick={clearSearch}
+              className="clear-filters"
+            >
+              <FontAwesomeIcon icon={faTimes} />
+              Clear Filters
+            </button>
+          )}
+        </div>
       </div>
 
       {filteredItems.length === 0 ? (
@@ -154,16 +193,16 @@ const ItemsList = () => {
           <div className="empty-state-icon">📦</div>
           <h3>No Items Found</h3>
           <p>
-            {searchTerm || filterVat !== 'all' 
+            {searchTerm || filterVat !== 'all' || filterAutoAdd !== 'all'
               ? "No items match your search criteria. Try adjusting your filters." 
               : "Get started by adding your first item."}
           </p>
-          {(searchTerm || filterVat !== 'all') && (
+          {(searchTerm || filterVat !== 'all' || filterAutoAdd !== 'all') && (
             <button onClick={clearSearch} className="minimal-button minimal-button-secondary">
               Clear All Filters
             </button>
           )}
-          {!searchTerm && filterVat === 'all' && (
+          {!searchTerm && filterVat === 'all' && filterAutoAdd === 'all' && (
             <button 
               onClick={() => navigate('/items/add')} 
               className="minimal-button minimal-button-primary"
@@ -183,6 +222,7 @@ const ItemsList = () => {
                   <th>Item Name</th>
                   <th>Unit</th>
                   <th>VAT Status</th>
+                  <th>Auto-Add to Stock</th>
                   <th>Reorder Level</th>
                   <th>Actions</th>
                 </tr>
@@ -202,6 +242,15 @@ const ItemsList = () => {
                     <td>
                       <span className={`vat-status-badge ${item.vat_applicable ? 'applicable' : 'not-applicable'}`}>
                         {item.vat_applicable ? 'VAT Applicable' : 'VAT Not Applicable'}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={`auto-add-badge ${item.auto_add_to_stock ? 'enabled' : 'disabled'}`}>
+                        <FontAwesomeIcon 
+                          icon={item.auto_add_to_stock ? faCheck : faBan} 
+                          style={{ fontSize: '0.7rem' }} 
+                        />
+                        {item.auto_add_to_stock ? 'Enabled' : 'Disabled'}
                       </span>
                     </td>
                     <td>

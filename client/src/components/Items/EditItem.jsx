@@ -18,6 +18,7 @@ const EditItem = () => {
     item_name: '',
     unit: 'kg',
     vat_applicable: false,
+    auto_add_to_stock: true,
     reorder_level: ''
   });
 
@@ -36,6 +37,7 @@ const EditItem = () => {
         item_name: item.name || '',
         unit: item.unit || 'kg',
         vat_applicable: item.vat_applicable || false,
+        auto_add_to_stock: item.auto_add_to_stock !== undefined ? item.auto_add_to_stock : true,
         reorder_level: item.reorder_level || ''
       });
     } catch (error) {
@@ -83,6 +85,7 @@ const EditItem = () => {
         name: formData.item_name,
         unit: formData.unit,
         vat_applicable: formData.vat_applicable,
+        auto_add_to_stock: formData.auto_add_to_stock,
         reorder_level: formData.reorder_level
       };
 
@@ -196,23 +199,53 @@ const EditItem = () => {
             </div>
           </div>
 
-          <div className="minimal-toggle-group">
-            <label className="minimal-toggle-label">
-              <span>VAT Applicable</span>
-              <div className="minimal-toggle">
-                <input
-                  type="checkbox"
-                  name="vat_applicable"
-                  checked={formData.vat_applicable}
-                  onChange={handleChange}
-                  className="minimal-toggle-checkbox"
-                />
-                <div className="minimal-toggle-slider"></div>
-              </div>
-            </label>
-            <span className="minimal-helper-text">
-              If enabled, VAT will be calculated for this item in purchases
-            </span>
+          {/* Two-column toggle section */}
+          <div className="toggle-row">
+            {/* VAT Applicable Toggle */}
+            <div className="toggle-column">
+              <label className="minimal-toggle-label">
+                <span>VAT Applicable</span>
+                <div className="minimal-toggle-switch vat-toggle">
+                  <input
+                    type="checkbox"
+                    name="vat_applicable"
+                    checked={formData.vat_applicable}
+                    onChange={handleChange}
+                  />
+                  <div className="toggle-animate">
+                    <span className="toggle-off">OFF</span>
+                    <span className="toggle-on">ON</span>
+                  </div>
+                </div>
+              </label>
+              <span className="minimal-helper-text">
+                If enabled, VAT will be calculated for this item in purchases
+              </span>
+            </div>
+
+            {/* Auto-Add to Stock Toggle */}
+            <div className="toggle-column">
+              <label className="minimal-toggle-label">
+                <span>Auto-Add to Stock</span>
+                <div className="minimal-toggle-switch stock-toggle">
+                  <input
+                    type="checkbox"
+                    name="auto_add_to_stock"
+                    checked={formData.auto_add_to_stock}
+                    onChange={handleChange}
+                  />
+                  <div className="toggle-animate">
+                    <span className="toggle-off">OFF</span>
+                    <span className="toggle-on">ON</span>
+                  </div>
+                </div>
+              </label>
+              <span className="minimal-helper-text">
+                {formData.auto_add_to_stock 
+                  ? "Item will be automatically added to stock" 
+                  : "Item will NOT be automatically added to stock"}
+              </span>
+            </div>
           </div>
 
           <div className="minimal-info-box">
@@ -226,6 +259,12 @@ const EditItem = () => {
                 <span className="info-label">VAT Status:</span>
                 <span className={`info-value ${formData.vat_applicable ? 'vat-active' : 'vat-inactive'}`}>
                   {formData.vat_applicable ? 'VAT Applicable' : 'VAT Not Applicable'}
+                </span>
+              </div>
+              <div className="info-item">
+                <span className="info-label">Auto-Add to Stock:</span>
+                <span className={`info-value ${formData.auto_add_to_stock ? 'vat-active' : 'vat-inactive'}`}>
+                  {formData.auto_add_to_stock ? 'Enabled' : 'Disabled'}
                 </span>
               </div>
             </div>
