@@ -62,7 +62,11 @@ const createPurchase = async (req, res) => {
     
     const purchaseId = purchaseResult.insertId;
 
-    // Insert purchase items
+    // Arrays to track stock updates
+    const autoAddItems = [];
+    const manualItems = [];
+
+    // Insert purchase items and update stock for auto-add items
     for (const item of items) {
       await connection.query(
         `INSERT INTO purchase_items 
@@ -70,13 +74,74 @@ const createPurchase = async (req, res) => {
         VALUES (?, ?, ?, ?, ?)`,
         [purchaseId, item.item_name, item.quantity, item.unit_price, item.item_id]
       );
+
+      // Check if item has auto_add_to_stock enabled
+      const [itemData] = await connection.query(
+        'SELECT auto_add_to_stock FROM items WHERE id = ?',
+        [item.item_id]
+      );
+
+      if (itemData[0]?.auto_add_to_stock) {
+        autoAddItems.push({
+          item_id: item.item_id,
+          quantity: item.quantity,
+          item_name: item.item_name
+        });
+
+        // Update opening_balances
+        await connection.query(
+          `INSERT INTO opening_balances (date, item_id, quantity, created_at)
+           VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+           ON DUPLICATE KEY UPDATE 
+           quantity = quantity + VALUES(quantity)`,
+          [purchase_date, item.item_id, item.quantity]
+        );
+
+        // Log stock movement
+        await connection.query(
+          `INSERT INTO stock_movements 
+           (item_id, quantity, movement_type, reference_id, reference_type, reference_number, movement_date, notes)
+           VALUES (?, ?, 'PURCHASE', ?, 'purchases', ?, ?, ?)`,
+          [item.item_id, item.quantity, purchaseId, invoice_no, purchase_date, 
+           `Purchase added to stock (Auto-add: Yes)`]
+        );
+      } else {
+        manualItems.push({
+          item_id: item.item_id,
+          quantity: item.quantity,
+          item_name: item.item_name
+        });
+
+        // Log that stock wasn't updated
+        await connection.query(
+          `INSERT INTO stock_movements 
+           (item_id, quantity, movement_type, reference_id, reference_type, reference_number, movement_date, notes)
+           VALUES (?, 0, 'PURCHASE', ?, 'purchases', ?, ?, ?)`,
+          [item.item_id, purchaseId, invoice_no, purchase_date, 
+           `Purchase recorded - Stock NOT updated (Auto-add: No)`]
+        );
+      }
     }
 
     await connection.commit();
+
+    // Prepare response message
+    let stockMessage = '';
+    if (autoAddItems.length > 0) {
+      stockMessage = `Stock updated for ${autoAddItems.length} auto-add item(s)`;
+    }
+    if (manualItems.length > 0) {
+      stockMessage += stockMessage ? `. ${manualItems.length} manual item(s) require manual stock update` : 
+        `${manualItems.length} manual item(s) require manual stock update`;
+    }
+
     res.status(201).json({ 
-      message: 'Purchase created successfully!', 
+      message: 'Purchase created successfully!',
       invoice_no,
-      purchase_id: purchaseId
+      purchase_id: purchaseId,
+      stock_update: stockMessage,
+      auto_add_items: autoAddItems.length,
+      manual_items: manualItems.length
     });
     
   } catch (error) {
@@ -89,7 +154,7 @@ const createPurchase = async (req, res) => {
       });
     }
     
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: 'Server error: ' + error.message });
   } finally {
     connection.release();
   }
@@ -166,6 +231,7 @@ const getPurchaseById = async (req, res) => {
         i.item_code,
         i.unit,
         i.vat_applicable,
+        i.auto_add_to_stock,  -- Include auto-add status
         i.name as item_master_name
       FROM purchase_items pi
       LEFT JOIN items i ON pi.item_id = i.id
