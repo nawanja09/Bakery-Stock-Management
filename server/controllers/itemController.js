@@ -1,12 +1,12 @@
 const pool = require('../config/db');
 
 const createItem = async (req, res) => {
-  const { item_code, name, unit, vat_applicable, reorder_level } = req.body;
+  const { item_code, name, unit, vat_applicable, auto_add_to_stock, reorder_level } = req.body;
 
   try {
     const [result] = await pool.query(
-      'INSERT INTO items (item_code, name, unit, vat_applicable, reorder_level) VALUES (?, ?, ?, ?, ?)',
-      [item_code, name, unit, vat_applicable || false, reorder_level]
+      'INSERT INTO items (item_code, name, unit, vat_applicable, auto_add_to_stock, reorder_level) VALUES (?, ?, ?, ?, ?, ?)',
+      [item_code, name, unit, vat_applicable || false, auto_add_to_stock !== undefined ? auto_add_to_stock : true, reorder_level]
     );
     
     res.status(201).json({
@@ -27,7 +27,7 @@ const createItem = async (req, res) => {
 const getAllItems = async (req, res) => {
   try {
     const [rows] = await pool.query(
-      'SELECT id, item_code, name, unit, vat_applicable, reorder_level FROM items WHERE deleted = FALSE ORDER BY item_code'
+      'SELECT id, item_code, name, unit, vat_applicable, auto_add_to_stock, reorder_level FROM items WHERE deleted = FALSE ORDER BY item_code'
     );
     res.json(rows);
   } catch (error) {
@@ -41,7 +41,7 @@ const getItemById = async (req, res) => {
 
   try {
     const [rows] = await pool.query(
-      'SELECT id, item_code, name, unit, vat_applicable, reorder_level FROM items WHERE id = ? AND deleted = FALSE', 
+      'SELECT id, item_code, name, unit, vat_applicable, auto_add_to_stock, reorder_level FROM items WHERE id = ? AND deleted = FALSE', 
       [id]
     );
     
@@ -58,12 +58,12 @@ const getItemById = async (req, res) => {
 
 const updateItem = async (req, res) => {
   const { id } = req.params;
-  const { item_code, name, unit, vat_applicable, reorder_level } = req.body;
+  const { item_code, name, unit, vat_applicable, auto_add_to_stock, reorder_level } = req.body;
 
   try {
     const [result] = await pool.query(
-      'UPDATE items SET item_code = ?, name = ?, unit = ?, vat_applicable = ?, reorder_level = ? WHERE id = ? AND deleted = FALSE',
-      [item_code, name, unit, vat_applicable || false, reorder_level, id]
+      'UPDATE items SET item_code = ?, name = ?, unit = ?, vat_applicable = ?, auto_add_to_stock = ?, reorder_level = ? WHERE id = ? AND deleted = FALSE',
+      [item_code, name, unit, vat_applicable || false, auto_add_to_stock !== undefined ? auto_add_to_stock : true, reorder_level, id]
     );
     
     if (result.affectedRows === 0) {

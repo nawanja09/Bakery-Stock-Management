@@ -12,6 +12,7 @@ const AddItem = () => {
     item_name: '',
     unit: 'kg',
     vat_applicable: false,
+    auto_add_to_stock: true,
     reorder_level: ''
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -38,6 +39,7 @@ const AddItem = () => {
         name: formData.item_name,
         unit: formData.unit,
         vat_applicable: formData.vat_applicable,
+        auto_add_to_stock: formData.auto_add_to_stock,
         reorder_level: formData.reorder_level
       };
 
@@ -52,6 +54,7 @@ const AddItem = () => {
           item_name: '',
           unit: 'kg',
           vat_applicable: false,
+          auto_add_to_stock: true,
           reorder_level: ''
         });
       } else {
@@ -139,21 +142,53 @@ const AddItem = () => {
             </div>
           </div>
 
-          <div className="minimal-toggle-group">
-            <label className="minimal-toggle-label">
-              <span>VAT Applicable</span>
-              <div className="minimal-toggle">
-                <input
-                  type="checkbox"
-                  name="vat_applicable"
-                  checked={formData.vat_applicable}
-                  onChange={handleChange}
-                  className="minimal-toggle-checkbox"
-                />
-                <div className="minimal-toggle-slider"></div>
-              </div>
-            </label>
-            <span className="minimal-helper-text">Enable if item is subject to VAT</span>
+          {/* Two-column toggle section */}
+          <div className="toggle-row">
+            {/* VAT Applicable Toggle */}
+            <div className="toggle-column">
+              <label className="minimal-toggle-label">
+                <span>VAT Applicable</span>
+                <div className="minimal-toggle-switch vat-toggle">
+                  <input
+                    type="checkbox"
+                    name="vat_applicable"
+                    checked={formData.vat_applicable}
+                    onChange={handleChange}
+                  />
+                  <div className="toggle-animate">
+                    <span className="toggle-off">OFF</span>
+                    <span className="toggle-on">ON</span>
+                  </div>
+                </div>
+              </label>
+              <span className="minimal-helper-text">
+                Enable if item is subject to VAT
+              </span>
+            </div>
+
+            {/* Auto-Add to Stock Toggle */}
+            <div className="toggle-column">
+              <label className="minimal-toggle-label">
+                <span>Auto-Add to Stock</span>
+                <div className="minimal-toggle-switch stock-toggle">
+                  <input
+                    type="checkbox"
+                    name="auto_add_to_stock"
+                    checked={formData.auto_add_to_stock}
+                    onChange={handleChange}
+                  />
+                  <div className="toggle-animate">
+                    <span className="toggle-off">OFF</span>
+                    <span className="toggle-on">ON</span>
+                  </div>
+                </div>
+              </label>
+              <span className="minimal-helper-text">
+                {formData.auto_add_to_stock 
+                  ? "Item will be automatically added to stock when created" 
+                  : "Item will NOT be automatically added to stock"}
+              </span>
+            </div>
           </div>
 
           <div className="minimal-form-actions">
