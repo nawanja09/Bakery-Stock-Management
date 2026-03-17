@@ -4,7 +4,7 @@ const itemController = require('../controllers/itemController');
 
 // Corrected route order - fixed routes before parameterized routes
 router.get('/', itemController.getAllItems);
-router.get('/without-opening', itemController.getItemsWithoutOpeningBalance); // Moved up
+router.get('/without-opening', itemController.getItemsWithoutOpeningBalance);
 router.post('/', itemController.createItem);
 router.get('/:id', itemController.getItemById);
 router.put('/:id', itemController.updateItem);

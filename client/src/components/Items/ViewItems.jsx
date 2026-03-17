@@ -8,7 +8,8 @@ import {
   faSearch, 
   faTimes,
   faCheck,
-  faBan 
+  faBan,
+  faInfoCircle
 } from '@fortawesome/free-solid-svg-icons';
 import './ItemManagement.css';
 import { usePopup } from '../context/PopupContext';
@@ -123,9 +124,8 @@ const ItemsList = () => {
         </div>
       </div>
 
-      {/* Enhanced Filters Section */}
+      {/* Filters Section */}
       <div className="filters-section">
-        {/* Search Box */}
         <div className="items-search">
           <FontAwesomeIcon icon={faSearch} className="search-icon" />
           <input
@@ -145,47 +145,39 @@ const ItemsList = () => {
           )}
         </div>
 
-        {/* Filter Dropdowns Container */}
-        <div className="filter-dropdowns">
-          {/* VAT Status Filter */}
-          <div className={`filter-item ${filterVat !== 'all' ? 'has-value' : ''}`}>
-            <span className="filter-label">VAT Status</span>
-            <select 
-              value={filterVat} 
-              onChange={(e) => setFilterVat(e.target.value)}
-              className="filter-select"
-            >
-              <option value="all">All VAT Status</option>
-              <option value="yes">VAT Applicable</option>
-              <option value="no">VAT Not Applicable</option>
-            </select>
-          </div>
-
-          {/* Auto-Add Status Filter */}
-          <div className={`filter-item ${filterAutoAdd !== 'all' ? 'has-value' : ''}`}>
-            <span className="filter-label">Auto-Add Status</span>
-            <select 
-              value={filterAutoAdd} 
-              onChange={(e) => setFilterAutoAdd(e.target.value)}
-              className="filter-select"
-            >
-              <option value="all">All Auto-Add Status</option>
-              <option value="yes">Auto-Add Enabled</option>
-              <option value="no">Auto-Add Disabled</option>
-            </select>
-          </div>
-
-          {/* Clear Filters Button */}
-          {(searchTerm || filterVat !== 'all' || filterAutoAdd !== 'all') && (
-            <button 
-              onClick={clearSearch}
-              className="clear-filters"
-            >
-              <FontAwesomeIcon icon={faTimes} />
-              Clear Filters
-            </button>
-          )}
+        <div className="filter-dropdown">
+          <select 
+            value={filterVat} 
+            onChange={(e) => setFilterVat(e.target.value)}
+            className="minimal-select filter-select"
+          >
+            <option value="all">All VAT Status</option>
+            <option value="yes">VAT Applicable</option>
+            <option value="no">VAT Not Applicable</option>
+          </select>
         </div>
+
+        {/* Auto-Add Filter Dropdown */}
+        <div className="filter-dropdown">
+          <select 
+            value={filterAutoAdd} 
+            onChange={(e) => setFilterAutoAdd(e.target.value)}
+            className="minimal-select filter-select"
+          >
+            <option value="all">All Auto-Add Status</option>
+            <option value="yes">Auto-Add Enabled</option>
+            <option value="no">Auto-Add Disabled</option>
+          </select>
+        </div>
+
+        {(searchTerm || filterVat !== 'all' || filterAutoAdd !== 'all') && (
+          <button 
+            onClick={clearSearch}
+            className="minimal-button minimal-button-secondary clear-filters"
+          >
+            Clear Filters
+          </button>
+        )}
       </div>
 
       {filteredItems.length === 0 ? (
@@ -223,6 +215,7 @@ const ItemsList = () => {
                   <th>Unit</th>
                   <th>VAT Status</th>
                   <th>Auto-Add to Stock</th>
+                  <th>Current Stock</th>
                   <th>Reorder Level</th>
                   <th>Actions</th>
                 </tr>
@@ -248,10 +241,18 @@ const ItemsList = () => {
                       <span className={`auto-add-badge ${item.auto_add_to_stock ? 'enabled' : 'disabled'}`}>
                         <FontAwesomeIcon 
                           icon={item.auto_add_to_stock ? faCheck : faBan} 
-                          style={{ fontSize: '0.7rem' }} 
+                          style={{ fontSize: '0.7rem', marginRight: '4px' }} 
                         />
                         {item.auto_add_to_stock ? 'Enabled' : 'Disabled'}
                       </span>
+                      {item.auto_add_to_stock && (
+                        <small style={{ display: 'block', color: '#28a745', fontSize: '10px', marginTop: '2px' }}>
+                          Auto-managed
+                        </small>
+                      )}
+                    </td>
+                    <td>
+                      <span className="current-stock">{item.current_stock || 0}</span>
                     </td>
                     <td>
                       <span className="reorder-level">{item.reorder_level}</span>
@@ -292,6 +293,9 @@ const ItemsList = () => {
                   (filtered from {items.length} total)
                 </span>
               )}
+              <span className="stat-item">
+                <strong>{items.filter(i => i.auto_add_to_stock).length}</strong> Auto-Add
+              </span>
             </div>
             <div className="table-export">
               <button className="minimal-button minimal-button-secondary" disabled>

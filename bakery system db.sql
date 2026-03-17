@@ -1848,6 +1848,72 @@ ADD COLUMN settlement_details JSON DEFAULT NULL AFTER balance_amount;
 -- settlement_details: JSON array storing which bills were used for settlement
 -- Example: [{"purchase_id": 1, "invoice_no": "INV-001", "amount": 5000.00}, ...]
 
--- Add auto_add_to_stock column to items table
+-- =============================================
+-- 1. Add auto_add_to_stock column to items table
+-- =============================================
 ALTER TABLE items 
 ADD COLUMN auto_add_to_stock BOOLEAN NOT NULL DEFAULT TRUE AFTER vat_applicable;
+
+-- =============================================
+-- 2. Create stock_movements table for tracking
+-- =============================================
+CREATE TABLE IF NOT EXISTS `stock_movements` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `item_id` int NOT NULL,
+  `quantity` decimal(10,3) NOT NULL,
+  `movement_type` enum('PURCHASE', 'ISSUANCE', 'RETURN_FROM_DEPT', 'RETURN_TO_SUPPLIER', 'WASTAGE', 'ADJUSTMENT') NOT NULL,
+  `reference_id` int NOT NULL,
+  `reference_type` varchar(50) NOT NULL,
+  `reference_number` varchar(50),
+  `movement_date` datetime NOT NULL,
+  `notes` text,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `item_id` (`item_id`),
+  KEY `movement_date` (`movement_date`),
+  CONSTRAINT `stock_movements_ibfk_1` FOREIGN KEY (`item_id`) REFERENCES `items` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- =============================================
+-- 3. Create Triggers for Auto-Add functionality
+-- =============================================
+DELIMITER $$
+
+-- Trigger for INSERT
+CREATE TRIGGER after_item_insert_auto_add_stock
+AFTER INSERT ON items
+FOR EACH ROW
+BEGIN
+    IF NEW.auto_add_to_stock = TRUE THEN
+        INSERT INTO opening_balances (date, item_id, quantity, created_at)
+        VALUES (CURDATE(), NEW.id, 0, CURRENT_TIMESTAMP);
+    END IF;
+END$$
+
+-- Trigger for UPDATE
+CREATE TRIGGER after_item_update_auto_add_stock
+AFTER UPDATE ON items
+FOR EACH ROW
+BEGIN
+    IF NEW.auto_add_to_stock = TRUE AND OLD.auto_add_to_stock = FALSE THEN
+        IF NOT EXISTS (SELECT 1 FROM opening_balances WHERE item_id = NEW.id) THEN
+            INSERT INTO opening_balances (date, item_id, quantity, created_at)
+            VALUES (CURDATE(), NEW.id, 0, CURRENT_TIMESTAMP);
+        END IF;
+    END IF;
+END$$
+
+DELIMITER ;
+
+-- =============================================
+-- 4. Migration Script for existing data
+-- =============================================
+-- Set all existing items to auto_add_to_stock = TRUE (backward compatibility)
+UPDATE items SET auto_add_to_stock = TRUE WHERE auto_add_to_stock IS NULL;
+
+-- Make sure all auto-add items have opening_balances entries
+INSERT INTO opening_balances (date, item_id, quantity, created_at)
+SELECT CURDATE(), i.id, 0, CURRENT_TIMESTAMP
+FROM items i
+LEFT JOIN opening_balances ob ON i.id = ob.item_id
+WHERE i.auto_add_to_stock = TRUE AND ob.item_id IS NULL AND i.deleted = FALSE;

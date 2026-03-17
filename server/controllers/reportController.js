@@ -1,5 +1,6 @@
 const pool = require('../config/db');
 
+// Get stock report for a specific date (auto-add items only)
 const getStockReport = async (req, res) => {
   try {
     const { date } = req.query;
@@ -24,7 +25,7 @@ const getStockReport = async (req, res) => {
         i.item_code,
         i.name AS item_name,
         i.unit,
-        -- opening balance for today = yesterday closing + today's manual opening
+        i.auto_add_to_stock,
         COALESCE(prev.closing_balance, 0) + COALESCE(ob_today.opening_balance_today, 0) AS opening_balance,
         COALESCE(purchases.total_purchased, 0) AS total_purchased,
         COALESCE(issues.total_issued, 0) AS total_issued,
@@ -40,7 +41,6 @@ const getStockReport = async (req, res) => {
           COALESCE(returns.total_returned, 0) -
           COALESCE(purchase_returns.total_purchase_returned, 0)
         ) AS closing_balance,
-        -- Get latest unit price
         (
           SELECT pi.unit_price 
           FROM purchase_items pi
@@ -52,7 +52,6 @@ const getStockReport = async (req, res) => {
         ) AS unit_price
       FROM items i
       LEFT JOIN (
-        -- previous day's closing balance
         SELECT 
           i2.id AS item_id,
           (
@@ -74,7 +73,7 @@ const getStockReport = async (req, res) => {
           SELECT i.id AS item_id, SUM(pi.quantity) AS total_purchased
           FROM purchase_items pi
           JOIN purchases p ON pi.purchase_id = p.id
-          JOIN items i ON pi.item_name = i.name
+          JOIN items i ON pi.item_id = i.id
           WHERE p.purchase_date <= ?
           GROUP BY i.id
         ) purchases ON i2.id = purchases.item_id
@@ -108,23 +107,20 @@ const getStockReport = async (req, res) => {
         ) purchase_returns ON i2.id = purchase_returns.item_id
       ) prev ON i.id = prev.item_id
       LEFT JOIN (
-        -- today's manual opening balance
         SELECT item_id, SUM(quantity) AS opening_balance_today
         FROM opening_balances
         WHERE date = ?
         GROUP BY item_id
       ) ob_today ON i.id = ob_today.item_id
       LEFT JOIN (
-        -- today's purchases
         SELECT i.id AS item_id, SUM(pi.quantity) AS total_purchased
         FROM purchase_items pi
         JOIN purchases p ON pi.purchase_id = p.id
-        JOIN items i ON pi.item_name = i.name
+        JOIN items i ON pi.item_id = i.id
         WHERE DATE(p.purchase_date) = ?
         GROUP BY i.id
       ) purchases ON i.id = purchases.item_id
       LEFT JOIN (
-        -- today's issues
         SELECT ii.item_id, SUM(ii.quantity) AS total_issued
         FROM issuance_items ii
         JOIN issuances iss ON ii.issuance_id = iss.id
@@ -132,7 +128,6 @@ const getStockReport = async (req, res) => {
         GROUP BY ii.item_id
       ) issues ON i.id = issues.item_id
       LEFT JOIN (
-        -- today's wastage
         SELECT wi.item_id, SUM(wi.quantity) AS total_wasted
         FROM wastage_items wi
         JOIN wastages w ON wi.wastage_id = w.id
@@ -140,7 +135,6 @@ const getStockReport = async (req, res) => {
         GROUP BY wi.item_id
       ) wastage ON i.id = wastage.item_id
       LEFT JOIN (
-        -- today's returns (internal)
         SELECT ri.item_id, SUM(ri.quantity) AS total_returned
         FROM return_items ri
         JOIN returns r ON ri.return_id = r.id
@@ -148,13 +142,14 @@ const getStockReport = async (req, res) => {
         GROUP BY ri.item_id
       ) returns ON i.id = returns.item_id
       LEFT JOIN (
-        -- today's purchase returns (to supplier)
         SELECT pri.item_id, SUM(pri.quantity) AS total_purchase_returned
         FROM purchase_return_items pri
         JOIN purchase_returns pr ON pri.return_id = pr.id
         WHERE DATE(pr.return_date) = ?
         GROUP BY pri.item_id
       ) purchase_returns ON i.id = purchase_returns.item_id
+      WHERE i.auto_add_to_stock = 1  -- 🔥 AUTO-ADD ITEMS ONLY
+        AND i.deleted = FALSE
       ORDER BY i.item_code
     `;
 
@@ -167,7 +162,7 @@ const getStockReport = async (req, res) => {
 
     const [rows] = await pool.query(query, params);
 
-    // Calculate value for each item - CLOSING BALANCE * UNIT PRICE
+    // Calculate value for each item
     const stockDataWithValue = rows.map(item => {
       const closingBalance = Number(item.closing_balance) || 0;
       const unitPrice = Number(item.unit_price) || 0;
@@ -176,7 +171,8 @@ const getStockReport = async (req, res) => {
       return {
         ...item,
         value: value,
-        unit_price: unitPrice
+        unit_price: unitPrice,
+        stock_type: 'Auto-Managed'
       };
     });
 
@@ -201,13 +197,28 @@ const getDateRange = (start, end) => {
   return dates;
 };
 
-// Update the getStockReportByRangeAndItem function
 const getStockReportByRangeAndItem = async (req, res) => {
   try {
     const { startDate, endDate, itemId } = req.query;
 
     if (!startDate || !endDate || !itemId) {
       return res.status(400).json({ error: 'startDate, endDate, and itemId are required (format: YYYY-MM-DD)' });
+    }
+
+    // 🔥 Check if the requested item is auto-add enabled
+    const [itemCheck] = await pool.query(
+      'SELECT auto_add_to_stock FROM items WHERE id = ? AND deleted = FALSE',
+      [itemId]
+    );
+
+    if (itemCheck.length === 0) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+
+    if (itemCheck[0].auto_add_to_stock === 0) {
+      return res.status(400).json({ 
+        error: 'This report only shows Auto-Add enabled items. Selected item is manual.' 
+      });
     }
 
     const dateRange = getDateRange(startDate, endDate);
@@ -226,7 +237,7 @@ const getStockReportByRangeAndItem = async (req, res) => {
       openingBalance = parseFloat(openingRow.quantity);
     }
 
-    // Get all transactions before the start date to calculate the initial opening
+    // Get all transactions before the start date
     const [[{ purchased: prePurchased = 0 }]] = await pool.query(
       `SELECT SUM(pi.quantity) AS purchased
        FROM purchase_items pi
@@ -292,7 +303,7 @@ const getStockReportByRangeAndItem = async (req, res) => {
 
       if (specificOpening) {
         opening = parseFloat(specificOpening.quantity);
-        runningBalance = opening; // Reset running balance to the opening balance
+        runningBalance = opening;
       }
 
       const [[{ purchased: dbPurchased = 0 }]] = await pool.query(
@@ -335,7 +346,6 @@ const getStockReportByRangeAndItem = async (req, res) => {
         [itemId, date]
       );
 
-      // Add database values
       purchased = parseFloat(dbPurchased || 0);
       issued = parseFloat(dbIssued || 0);
       wasted = parseFloat(dbWasted || 0);
