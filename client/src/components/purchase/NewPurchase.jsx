@@ -1,9 +1,31 @@
+// src/components/purchase/NewPurchase.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import './Purchase.css'; 
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { 
+  faSave, 
+  faPlus, 
+  faTrash,
+  faMoneyBillWave,
+  faCreditCard,
+  faUniversity,
+  faCheckCircle,
+  faExclamationTriangle,
+  faFileInvoice,
+  faBuilding,
+  faUser,
+  faCalendar,
+  faPercent,
+  faReceipt,
+  faWallet,
+  faBoxes,
+  faShoppingCart
+} from '@fortawesome/free-solid-svg-icons';
+import Select from 'react-select';
+import dayjs from 'dayjs';
+import './Purchase.css';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
-import Select from 'react-select';
 
 const AddPurchase = () => {
   const navigate = useNavigate();
@@ -32,6 +54,7 @@ const AddPurchase = () => {
     paid_amount: 0,
     balance_amount: 0,
     balance_status: 0,
+    payment_status: 'Non-Paid',
     payment_method: 'CASH',
     check_number: '',
     remarks: '',
@@ -76,6 +99,35 @@ const AddPurchase = () => {
 
     fetchData();
   }, [showPopup]);
+
+  useEffect(() => {
+    const total = formData.total_with_vat;
+    const paid = formData.paid_amount;
+    
+    let paymentStatus = 'Non-Paid';
+    let balanceStatus = 0;
+    
+    if (paid >= total && total > 0) {
+      paymentStatus = 'Paid';
+      balanceStatus = 0;
+    } else if (paid > 0 && paid < total) {
+      paymentStatus = 'Partially Paid';
+      balanceStatus = 1;
+    } else {
+      paymentStatus = 'Non-Paid';
+      balanceStatus = total > 0 ? 1 : 0;
+    }
+    
+    const balance = Math.max(0, total - paid);
+    
+    setFormData(prev => ({
+      ...prev,
+      balance_amount: balance,
+      balance_status: balanceStatus,
+      payment_status: paymentStatus
+    }));
+    
+  }, [formData.paid_amount, formData.total_with_vat]);
 
   const calculateItemValues = (item, supplierVatRegistered) => {
     const amount = item.quantity * item.unit_price;
@@ -274,15 +326,30 @@ const AddPurchase = () => {
 
   const handlePaidAmountChange = (e) => {
     const paidAmount = parseFloat(e.target.value) || 0;
-    const balanceAmount = Math.max(0, formData.total_with_vat - paidAmount);
-    const balanceStatus = balanceAmount > 0 ? 1 : 0;
     
-    setFormData({
-      ...formData,
-      paid_amount: paidAmount,
-      balance_amount: balanceAmount,
-      balance_status: balanceStatus
-    });
+    if (paidAmount > formData.total_with_vat) {
+      showPopup('warning', `Paid amount cannot exceed total bill amount (${formatCurrency(formData.total_with_vat)})`);
+      return;
+    }
+    
+    setFormData(prev => ({
+      ...prev,
+      paid_amount: paidAmount
+    }));
+  };
+
+  const setFullPayment = () => {
+    setFormData(prev => ({
+      ...prev,
+      paid_amount: prev.total_with_vat
+    }));
+  };
+
+  const setNoPayment = () => {
+    setFormData(prev => ({
+      ...prev,
+      paid_amount: 0
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -295,6 +362,21 @@ const AddPurchase = () => {
     }
 
     if (isSubmitting) return;
+
+    if (!formData.invoice_no.trim()) {
+      showPopup('error', 'Invoice number is required');
+      return;
+    }
+
+    if (!formData.supplier_id) {
+      showPopup('error', 'Please select a supplier');
+      return;
+    }
+
+    if (!formData.company_id) {
+      showPopup('error', 'Please select a company');
+      return;
+    }
 
     if (formData.items.some(item => !item.id)) {
       showPopup('error', 'Please select valid items for all rows');
@@ -325,291 +407,586 @@ const AddPurchase = () => {
 
     try {
       const response = await api.post('/purchases', submitData);
-      showPopup('success', `Purchase created successfully! Invoice: ${response.data.invoice_no}`);
+      
+      let successMessage = `Purchase created successfully! Invoice: ${response.data.invoice_no}`;
+      
+      if (response.data.payment_status === 'Paid') {
+        successMessage += ' (Fully Paid)';
+      } else if (response.data.payment_status === 'Partially Paid') {
+        successMessage += ` (Partially Paid - Balance: ${formatCurrency(formData.balance_amount)})`;
+      } else {
+        successMessage += ` (Non-Paid - Amount Due: ${formatCurrency(formData.total_with_vat)})`;
+      }
+      
+      showPopup('success', successMessage);
       navigate('/purchase/history');
     } catch (error) {
       console.error('Error creating purchase:', error);
-      showPopup('error', error.response?.data?.error || 'Server error');
+      
+      if (error.response?.data?.error?.includes('Invoice number already exists')) {
+        showPopup('error', 'This invoice number already exists. Please use a different number.');
+      } else {
+        showPopup('error', error.response?.data?.error || 'Server error');
+      }
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-LK', {
+      style: 'currency',
+      currency: 'LKR',
+      minimumFractionDigits: 2
+    }).format(amount).replace('LKR', 'Rs.');
+  };
+
   const itemOptions = itemsList.map(itm => ({
     value: itm.id,
-    label: `${itm.name} (${itm.item_code || ''}) - ${itm.vat_applicable ? 'VAT Applicable' : 'No VAT'}`,
+    label: `${itm.name} (${itm.item_code || ''})`,
     previousPrice: previousPurchasePrices[itm.id] || 0
   }));
 
+  const getPaymentStatusInfo = () => {
+    switch(formData.payment_status) {
+      case 'Paid':
+        return { 
+          color: '#10b981', 
+          icon: faCheckCircle,
+          text: 'Fully Paid',
+          bg: '#d1fae5'
+        };
+      case 'Partially Paid':
+        return { 
+          color: '#f59e0b', 
+          icon: faExclamationTriangle,
+          text: 'Partially Paid',
+          bg: '#fef3c7'
+        };
+      default:
+        return { 
+          color: '#ef4444', 
+          icon: faMoneyBillWave,
+          text: 'Non-Paid',
+          bg: '#fee2e2'
+        };
+    }
+  };
+
+  const paymentInfo = getPaymentStatusInfo();
+
   return (
-    <div className="new-purchase-container">
-      <h2>Add New Purchase</h2>
-      <form onSubmit={handleSubmit}>
-        <div className="form-row">
-          <div className="form-group">
-            <label>Purchase Date *</label>
-            <input 
-              type="date" 
-              value={formData.purchase_date}
-              onChange={(e) => setFormData({...formData, purchase_date: e.target.value})}
-              required
-            />
+    <div className="purchase-container">
+      {/* Header */}
+      <div className="page-header">
+        <div className="header-left">
+          <h1 className="page-title">
+            <FontAwesomeIcon icon={faShoppingCart} className="page-icon" />
+            New Purchase
+          </h1>
+          <p className="page-subtitle">Create a new purchase invoice</p>
+        </div>
+        <div className="header-badge">
+          <FontAwesomeIcon icon={faBoxes} />
+          <span>{formData.items.length} Items</span>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} className="purchase-form">
+        {/* Basic Information Section */}
+        <div className="form-section">
+          <div className="section-header">
+            <h2>
+              <FontAwesomeIcon icon={faFileInvoice} className="section-icon" />
+              Basic Information
+            </h2>
           </div>
 
-          <div className="form-group">
-            <label>Supplier *</label>
-            <select
-              value={formData.supplier_id}
-              onChange={handleSupplierChange}
-              required
+          <div className="form-grid">
+            <div className="form-group">
+              <label>
+                <FontAwesomeIcon icon={faCalendar} />
+                Purchase Date
+              </label>
+              <input 
+                type="date" 
+                value={formData.purchase_date}
+                onChange={(e) => setFormData({...formData, purchase_date: e.target.value})}
+                className="form-control"
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label>
+                <FontAwesomeIcon icon={faFileInvoice} />
+                Invoice Number
+              </label>
+              <input
+                type="text"
+                value={formData.invoice_no}
+                onChange={(e) => setFormData({...formData, invoice_no: e.target.value})}
+                placeholder="INV-2024-001"
+                className="form-control"
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label>
+                <FontAwesomeIcon icon={faUser} />
+                Supplier
+              </label>
+              <select
+                value={formData.supplier_id}
+                onChange={handleSupplierChange}
+                className="form-control"
+                required
+              >
+                <option value="">Select supplier</option>
+                {suppliers.map(supplier => (
+                  <option key={supplier.id} value={supplier.id}>
+                    {supplier.name} {supplier.vat_registered ? '• VAT Reg' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label>
+                <FontAwesomeIcon icon={faPercent} />
+                VAT Number
+              </label>
+              <input
+                type="text"
+                value={supplierVatNumber}
+                readOnly
+                className={`form-control ${supplierVatRegistered ? 'vat-active' : 'vat-inactive'}`}
+                placeholder={supplierVatRegistered ? "VAT registered" : "Not VAT registered"}
+              />
+            </div>
+
+            <div className="form-group">
+              <label>
+                <FontAwesomeIcon icon={faCreditCard} />
+                Payment Method
+              </label>
+              <select
+                value={formData.payment_method}
+                onChange={(e) => setFormData({...formData, payment_method: e.target.value})}
+                className="form-control"
+                required
+              >
+                <option value="CASH">Cash</option>
+                <option value="BANK_TRANSFER">Bank Transfer</option>
+                <option value="CHEQUE">Cheque</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label>
+                <FontAwesomeIcon icon={faBuilding} />
+                Company
+              </label>
+              <select
+                value={formData.company_id}
+                onChange={(e) => setFormData({...formData, company_id: e.target.value})}
+                className="form-control"
+                required
+              >
+                <option value="">Select company</option>
+                {companies.map(company => (
+                  <option key={company.id} value={company.id}>{company.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label>
+                <FontAwesomeIcon icon={faUniversity} />
+                Reference/Check No.
+              </label>
+              <input
+                type="text"
+                value={formData.check_number}
+                onChange={(e) => setFormData({...formData, check_number: e.target.value})}
+                placeholder="Optional"
+                className="form-control"
+              />
+            </div>
+
+            <div className="form-group full-width">
+              <label>Remarks</label>
+              <textarea 
+                value={formData.remarks}
+                onChange={(e) => setFormData({...formData, remarks: e.target.value})}
+                rows="2"
+                className="form-control"
+                placeholder="Add any notes or remarks..."
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Items Table Section */}
+        <div className="form-section">
+          <div className="section-header">
+            <h2>
+              <FontAwesomeIcon icon={faBoxes} className="section-icon" />
+              Purchase Items
+            </h2>
+            <button 
+              type="button" 
+              className="btn-add-item"
+              onClick={addItemRow}
             >
-              <option value="">Select Supplier</option>
-              {suppliers.map(supplier => (
-                <option key={supplier.id} value={supplier.id}>
-                  {supplier.name} {supplier.vat_registered ? '(VAT Registered)' : ''}
-                </option>
-              ))}
-            </select>
+              <FontAwesomeIcon icon={faPlus} />
+              Add New Item
+            </button>
           </div>
-        </div>
 
-        <div className="form-row">
-          <div className="form-group">
-            <label>Invoice Number *</label>
-            <input
-              type="text"
-              value={formData.invoice_no}
-              onChange={(e) => setFormData({...formData, invoice_no: e.target.value})}
-              placeholder="Enter invoice number"
-              required
-              className="invoice-input"
-            />
+          {/* Table for Desktop */}
+          <div className="table-responsive">
+            <table className="items-table">
+              <thead>
+                <tr>
+                  <th width="25%">Item</th>
+                  <th width="8%">Qty</th>
+                  <th width="8%">Unit</th>
+                  <th width="12%">Unit Price (Rs.)</th>
+                  <th width="12%">Amount (Rs.)</th>
+                  {supplierVatRegistered && <th width="10%">VAT (Rs.)</th>}
+                  <th width="12%">Line Total (Rs.)</th>
+                  <th width="5%"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {formData.items.map((item, index) => {
+                  const previousPrice = previousPurchasePrices[item.id] || 0;
+                  
+                  return (
+                    <tr key={index} className={item.id ? 'item-selected' : ''}>
+                      <td>
+                        <div className="item-select-wrapper">
+                          <Select
+                            options={itemOptions}
+                            value={itemOptions.find(opt => opt.value === item.id) || null}
+                            onChange={(selected) => handleItemSelect(index, selected)}
+                            isSearchable
+                            placeholder="Search item..."
+                            className="react-select-container"
+                            classNamePrefix="react-select"
+                            styles={{
+                              control: (base) => ({
+                                ...base,
+                                minHeight: '36px',
+                                borderColor: '#e5e7eb',
+                                boxShadow: 'none',
+                                '&:hover': {
+                                  borderColor: '#3b82f6'
+                                }
+                              })
+                            }}
+                          />
+                          {item.vat_applicable && (
+                            <span className="vat-badge">VAT</span>
+                          )}
+                        </div>
+                      </td>
+                      <td>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.001"
+                          value={item.quantity}
+                          onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
+                          className="table-input"
+                          required
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="text"
+                          value={item.unit}
+                          readOnly
+                          className="table-input unit-display"
+                        />
+                      </td>
+                      <td>
+                        <div className="price-cell">
+                          <input
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                            value={item.unit_price}
+                            onChange={(e) => handleItemChange(index, 'unit_price', e.target.value)}
+                            className={`table-input ${previousPrice && item.unit_price !== previousPrice ? 'price-different' : ''}`}
+                            required
+                          />
+                          {previousPrice > 0 && (
+                            <small className="price-hint">Prev: {previousPrice}</small>
+                          )}
+                        </div>
+                      </td>
+                      <td className="text-right amount-cell">
+                        {item.amount.toFixed(2)}
+                      </td>
+                      {supplierVatRegistered && (
+                        <td className="text-right vat-cell">
+                          {item.vat.toFixed(2)}
+                        </td>
+                      )}
+                      <td className="text-right total-cell">
+                        <strong>{item.lineTotal.toFixed(2)}</strong>
+                      </td>
+                      <td className="action-cell">
+                        <button 
+                          type="button" 
+                          className="btn-remove"
+                          onClick={() => removeItemRow(index)}
+                          disabled={formData.items.length <= 1}
+                          title="Remove item"
+                        >
+                          <FontAwesomeIcon icon={faTrash} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-          <div className="form-group">
-            <label>VAT Number</label>
-            <input
-              type="text"
-              value={supplierVatNumber}
-              readOnly
-              className="vat-display"
-              placeholder={supplierVatRegistered ? "Auto-filled" : "Not VAT registered"}
-            />
-          </div>
-        </div>
 
-        <div className="form-row">
-          <div className="form-group">
-            <label>Payment Method *</label>
-            <select
-              value={formData.payment_method}
-              onChange={(e) => setFormData({...formData, payment_method: e.target.value})}
-              required
-            >
-              <option value="CASH">Cash</option>
-              <option value="BANK_TRANSFER">Bank Transfer</option>
-            </select>
-          </div>
-          <div className="form-group">
-            <label>Company *</label>
-            <select
-              value={formData.company_id}
-              onChange={(e) => setFormData({...formData, company_id: e.target.value})}
-              required
-            >
-              <option value="">Select Company</option>
-              {companies.map(company => (
-                <option key={company.id} value={company.id}>{company.name}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="form-row">
-          <div className="form-group">
-            <label>Reference/Check Number</label>
-            <input
-              type="text"
-              value={formData.check_number}
-              onChange={(e) => setFormData({...formData, check_number: e.target.value})}
-              placeholder="Enter reference number"
-            />
-          </div>
-          <div className="form-group">
-            <label>Remarks</label>
-            <textarea 
-              value={formData.remarks}
-              onChange={(e) => setFormData({...formData, remarks: e.target.value})}
-              rows="2"
-            />
-          </div>
-        </div>
-
-        <h3>Purchased Items</h3>
-        <table className="item-table">
-          <thead>
-            <tr>
-              <th>Item Name</th>
-              <th>Quantity</th>
-              <th>Unit</th>
-              <th>Unit Price (Net)</th>
-              <th>Amount</th>
-              {supplierVatRegistered && (
-                <th className="vat-column">VAT 18%</th>
-              )}
-              <th>Line Total</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
+          {/* Mobile Items View (Cards) */}
+          <div className="mobile-items-view">
             {formData.items.map((item, index) => {
               const previousPrice = previousPurchasePrices[item.id] || 0;
-              const amount = item.quantity * item.unit_price;
-              const vat = (supplierVatRegistered && item.vat_applicable) ? 
-                amount * (VAT_RATE / 100) : 0;
-              const lineTotal = amount + vat;
               
               return (
-                <tr key={index}>
-                  <td>
-                    <Select
-                      options={itemOptions}
-                      value={itemOptions.find(opt => opt.value === item.id) || null}
-                      onChange={(selected) => handleItemSelect(index, selected)}
-                      isSearchable
-                      placeholder="Select item..."
-                    />
-                  </td>
-                  <td>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.001"
-                      value={item.quantity}
-                      onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
-                      required
-                    />
-                  </td>
-                  <td>
-                    <input
-                      type="text"
-                      value={item.unit}
-                      readOnly
-                      className="unit-display"
-                    />
-                  </td>
-                  <td>
-                    <input
-                      type="number"
-                      min="0.01"
-                      step="0.01"
-                      value={item.unit_price}
-                      onChange={(e) => handleItemChange(index, 'unit_price', e.target.value)}
-                      required
-                      className={previousPrice && item.unit_price !== previousPrice ? 'price-different' : ''}
-                    />
-                    {previousPrice > 0 && (
-                      <small>Prev: Rs.{previousPrice}</small>
+                <div key={index} className="mobile-item-card">
+                  <div className="mobile-item-header">
+                    <span className="item-number">Item {index + 1}</span>
+                    {formData.items.length > 1 && (
+                      <button 
+                        type="button" 
+                        className="btn-remove-mobile"
+                        onClick={() => removeItemRow(index)}
+                      >
+                        <FontAwesomeIcon icon={faTrash} />
+                      </button>
                     )}
-                  </td>
-                  <td>Rs. {amount.toFixed(2)}</td>
-                  {supplierVatRegistered && (
-                    <td className="vat-column">Rs. {vat.toFixed(2)}</td>
-                  )}
-                  <td><strong>Rs. {lineTotal.toFixed(2)}</strong></td>
-                  <td>
-                    <button 
-                      type="button" 
-                      className="btn-remove"
-                      onClick={() => removeItemRow(index)}
-                      disabled={formData.items.length <= 1}
-                    >
-                      Remove
-                    </button>
-                  </td>
-                </tr>
+                  </div>
+                  
+                  <div className="mobile-item-body">
+                    <div className="mobile-item-field full">
+                      <label>Item</label>
+                      <Select
+                        options={itemOptions}
+                        value={itemOptions.find(opt => opt.value === item.id) || null}
+                        onChange={(selected) => handleItemSelect(index, selected)}
+                        isSearchable
+                        placeholder="Select item..."
+                        className="react-select-container"
+                        classNamePrefix="react-select"
+                      />
+                    </div>
+
+                    <div className="mobile-item-row">
+                      <div className="mobile-item-field">
+                        <label>Qty</label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.001"
+                          value={item.quantity}
+                          onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
+                          className="mobile-input"
+                        />
+                      </div>
+
+                      <div className="mobile-item-field">
+                        <label>Unit</label>
+                        <input
+                          type="text"
+                          value={item.unit}
+                          readOnly
+                          className="mobile-input unit-display"
+                        />
+                      </div>
+
+                      <div className="mobile-item-field">
+                        <label>Unit Price</label>
+                        <input
+                          type="number"
+                          min="0.01"
+                          step="0.01"
+                          value={item.unit_price}
+                          onChange={(e) => handleItemChange(index, 'unit_price', e.target.value)}
+                          className={`mobile-input ${previousPrice && item.unit_price !== previousPrice ? 'price-different' : ''}`}
+                        />
+                      </div>
+                    </div>
+
+                    {previousPrice > 0 && (
+                      <div className="price-hint-mobile">
+                        Previous price: Rs. {previousPrice.toFixed(2)}
+                      </div>
+                    )}
+
+                    {item.vat_applicable && (
+                      <div className="vat-badge-mobile">VAT Applicable</div>
+                    )}
+
+                    <div className="mobile-item-totals">
+                      <div className="total-row">
+                        <span>Amount:</span>
+                        <span>Rs. {item.amount.toFixed(2)}</span>
+                      </div>
+                      {supplierVatRegistered && (
+                        <div className="total-row vat">
+                          <span>VAT:</span>
+                          <span>Rs. {item.vat.toFixed(2)}</span>
+                        </div>
+                      )}
+                      <div className="total-row grand">
+                        <span>Line Total:</span>
+                        <span>Rs. {item.lineTotal.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               );
             })}
-          </tbody>
-        </table>
+            
+            <button 
+              type="button" 
+              className="btn-add-item-mobile"
+              onClick={addItemRow}
+            >
+              <FontAwesomeIcon icon={faPlus} />
+              Add Item
+            </button>
+          </div>
+        </div>
 
-        <button type="button" className="btn-add" onClick={addItemRow}>
-          + Add Item
-        </button>
+        {/* Payment Section */}
+        <div className="form-section">
+          <div className="section-header">
+            <h2>
+              <FontAwesomeIcon icon={faWallet} className="section-icon" />
+              Payment Information
+            </h2>
+          </div>
 
-        <div className="summary-section">
-          <div className="summary-row">
-            <span>Subtotal:</span>
-            <span>Rs. {formData.subtotal.toFixed(2)}</span>
+          {/* Summary Cards */}
+          <div className="summary-cards">
+            <div className="summary-card">
+              <div className="summary-icon" style={{ background: '#e0f2fe' }}>
+                <FontAwesomeIcon icon={faReceipt} style={{ color: '#0284c7' }} />
+              </div>
+              <div className="summary-details">
+                <span className="summary-label">Subtotal</span>
+                <span className="summary-value">Rs. {formData.subtotal.toFixed(2)}</span>
+              </div>
+            </div>
+
+            <div className="summary-card">
+              <div className="summary-icon" style={{ background: '#fef3c7' }}>
+                <FontAwesomeIcon icon={faPercent} style={{ color: '#d97706' }} />
+              </div>
+              <div className="summary-details">
+                <span className="summary-label">VAT</span>
+                <span className="summary-value">Rs. {formData.vat_amount.toFixed(2)}</span>
+              </div>
+            </div>
+
+            <div className="summary-card highlight">
+              <div className="summary-icon" style={{ background: '#d1fae5' }}>
+                <FontAwesomeIcon icon={faWallet} style={{ color: '#059669' }} />
+              </div>
+              <div className="summary-details">
+                <span className="summary-label">Grand Total</span>
+                <span className="summary-value grand">Rs. {formData.total_with_vat.toFixed(2)}</span>
+              </div>
+            </div>
           </div>
-          <div className="summary-row">
-            <span>VAT ({VAT_RATE}%):</span>
-            <span>Rs. {formData.vat_amount.toFixed(2)}</span>
-          </div>
-          <div className="summary-row grand-total">
-            <span>Grand Total:</span>
-            <span>Rs. {formData.total_with_vat.toFixed(2)}</span>
-          </div>
-          <div className="summary-row">
-            <span>Paid Amount:</span>
-            <span>Rs. {formData.paid_amount.toFixed(2)}</span>
-          </div>
-          <div className="summary-row">
-            <span>Balance Amount:</span>
-            <span className={formData.balance_amount > 0 ? 'due-amount' : ''}>
-              Rs. {formData.balance_amount.toFixed(2)}
-            </span>
-          </div>
-          <div className="summary-row">
-            <span>Balance Status:</span>
-            <span>
-              <span className={`status-badge ${formData.balance_status === 0 ? 'status-paid' : 'status-due'}`}>
-                {formData.balance_status} ({formData.balance_status === 0 ? 'No Balance' : 'Balance Available'})
+
+          {/* Payment Status */}
+          <div className="payment-status-card" style={{ background: paymentInfo.bg }}>
+            <div className="payment-status-icon">
+              <FontAwesomeIcon icon={paymentInfo.icon} style={{ color: paymentInfo.color }} />
+            </div>
+            <div className="payment-status-info">
+              <span className="payment-status-label">Payment Status</span>
+              <span className="payment-status-value" style={{ color: paymentInfo.color }}>
+                {paymentInfo.text}
               </span>
-            </span>
+            </div>
+            <div className="payment-status-badge" style={{ background: paymentInfo.color }}>
+              {formData.payment_status}
+            </div>
+          </div>
+
+          {/* Payment Input */}
+          <div className="payment-grid">
+            <div className="payment-field">
+              <label>Paid Amount (Rs.)</label>
+              <div className="amount-input-group">
+                <input 
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.paid_amount}
+                  onChange={handlePaidAmountChange}
+                  className="amount-input"
+                  required
+                />
+                <div className="amount-actions">
+                  <button 
+                    type="button" 
+                    className="action-btn full"
+                    onClick={setFullPayment}
+                  >
+                    Full
+                  </button>
+                  <button 
+                    type="button" 
+                    className="action-btn none"
+                    onClick={setNoPayment}
+                  >
+                    None
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="payment-field">
+              <label>Balance Amount (Rs.)</label>
+              <div className={`balance-display ${formData.balance_amount > 0 ? 'due' : 'paid'}`}>
+                Rs. {formData.balance_amount.toFixed(2)}
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="form-row">
-          <div className="form-group">
-            <label>Paid Amount (Rs.) *</label>
-            <input 
-              type="number"
-              min="0"
-              step="0.01"
-              value={formData.paid_amount}
-              onChange={handlePaidAmountChange}
-              required
-            />
-          </div>
-          
-          <div className="form-group">
-            <label>Balance Amount</label>
-            <input
-              type="number"
-              value={formData.balance_amount.toFixed(2)}
-              readOnly
-              className={formData.balance_amount > 0 ? 'due-amount' : ''}
-            />
-          </div>
-
-          <div className="form-group">
-            <label>Balance Status</label>
-            <input
-              type="text"
-              value={`${formData.balance_status} (${formData.balance_status === 0 ? 'No Balance' : 'Balance Available'})`}
-              readOnly
-              className={formData.balance_status === 1 ? 'status-due-bg' : 'status-paid-bg'}
-            />
-          </div>
+        {/* Form Actions */}
+        <div className="form-actions">
+          <button 
+            type="button" 
+            onClick={() => navigate('/purchase/history')}
+            className="btn-cancel"
+          >
+            Cancel
+          </button>
+          <button 
+            type="submit" 
+            className="btn-submit"
+            disabled={isSubmitting}
+          >
+            <FontAwesomeIcon icon={faSave} />
+            {isSubmitting ? 'Creating...' : 'Create Purchase'}
+          </button>
         </div>
-
-        <button 
-          type="submit" 
-          className="btn-submit"
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? 'Saving...' : 'Save Purchase'}
-        </button>
       </form>
     </div>
   );

@@ -2,6 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const purchaseController = require('../controllers/purchaseController');
+const paymentHistoryController = require('../controllers/paymentHistoryController');
 const pool = require('../config/db'); // Add this line to import the database pool
 
 // Existing routes
@@ -10,8 +11,9 @@ router.get('/', purchaseController.getAllPurchases);
 router.get('/suppliers', purchaseController.getAllSuppliers);
 router.get('/companies', purchaseController.getAllCompanies);
 router.get('/previous-prices', purchaseController.getPreviousPurchasePrices);
-router.get('/:id', purchaseController.getPurchaseById);
-router.put('/:id', purchaseController.updatePurchase);
+
+// Specific routes must come BEFORE parameterized routes
+router.get('/non-paid', purchaseController.getNonPaidPurchases);
 
 // Add this route for getting purchase details by ID
 router.get('/details/:id', async (req, res) => {
@@ -143,5 +145,15 @@ router.get('/latest-prices', async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
+
+router.post('/:id/pay', purchaseController.makePayment);
+router.get('/:id/payments', purchaseController.getPaymentHistory);
+router.get('/summary', paymentHistoryController.getPaymentSummary);
+router.get('/recent', paymentHistoryController.getRecentPayments);
+router.post('/update-statuses', purchaseController.updatePaymentStatuses);
+
+// Parameterized routes must come LAST
+router.get('/:id', purchaseController.getPurchaseById);
+router.put('/:id', purchaseController.updatePurchase);
 
 module.exports = router;

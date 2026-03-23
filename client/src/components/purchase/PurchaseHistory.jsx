@@ -274,6 +274,7 @@ const PurchaseHistory = () => {
                 <th className="amount-col">Paid</th>
                 <th className="amount-col">Due</th>
                 <th>Payment</th>
+                <th>Payment Status</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -314,6 +315,11 @@ const PurchaseHistory = () => {
                     <td>
                       <span className={`payment-badge ${purchase.payment_method.toLowerCase()}`}>
                         {purchase.payment_method.replace('_', ' ')}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={`payment-badge ${purchase.payment_status?.toLowerCase().replace(' ', '-') || 'non-paid'}`}>
+                        {purchase.payment_status || 'Non-Paid'}
                       </span>
                     </td>
                     <td className="actions-cell">
