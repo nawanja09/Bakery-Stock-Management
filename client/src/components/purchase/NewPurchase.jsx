@@ -635,126 +635,120 @@ const AddPurchase = () => {
               <FontAwesomeIcon icon={faBoxes} className="section-icon" />
               Purchase Items
             </h2>
-            <button 
-              type="button" 
-              className="btn-add-item"
-              onClick={addItemRow}
-            >
-              <FontAwesomeIcon icon={faPlus} />
-              Add New Item
-            </button>
           </div>
 
           {/* Table for Desktop */}
-          <div className="table-responsive">
-            <table className="items-table">
-              <thead>
-                <tr>
-                  <th width="25%">Item</th>
-                  <th width="8%">Qty</th>
-                  <th width="8%">Unit</th>
-                  <th width="12%">Unit Price (Rs.)</th>
-                  <th width="12%">Amount (Rs.)</th>
-                  {supplierVatRegistered && <th width="10%">VAT (Rs.)</th>}
-                  <th width="12%">Line Total (Rs.)</th>
-                  <th width="5%"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {formData.items.map((item, index) => {
-                  const previousPrice = previousPurchasePrices[item.id] || 0;
-                  
-                  return (
-                    <tr key={index} className={item.id ? 'item-selected' : ''}>
-                      <td>
-                        <div className="item-select-wrapper">
+          <div className="form-card">
+          <h3>Purchase Items</h3>
+          
+            <div className="items-table-container">
+              <table className="items-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: '35%' }}>Item Name</th>
+                    <th style={{ width: '10%' }}>Quantity</th>
+                    <th style={{ width: '8%' }}>Unit</th>
+                    <th style={{ width: '15%' }}>Unit Price (Net)</th>
+                    <th style={{ width: '12%' }}>Amount</th>
+                    {supplierVatRegistered && <th style={{ width: '10%' }}>VAT 18%</th>}
+                    <th style={{ width: '12%' }}>Line Total</th>
+                    <th style={{ width: '8%' }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {formData.items.map((item, index) => {
+                    const selectedOption = item.id ? itemOptions.find(opt => opt.value === item.id) : null;
+                    const previousPrice = previousPurchasePrices[item.id] || 0;
+                    
+                    return (
+                      <tr key={index}>
+                        <td>
                           <Select
                             options={itemOptions}
-                            value={itemOptions.find(opt => opt.value === item.id) || null}
+                            value={selectedOption}
                             onChange={(selected) => handleItemSelect(index, selected)}
                             isSearchable
-                            placeholder="Search item..."
+                            isClearable
+                            placeholder="Search or select item..."
                             className="react-select-container"
                             classNamePrefix="react-select"
                             styles={{
                               control: (base) => ({
                                 ...base,
-                                minHeight: '36px',
-                                borderColor: '#e5e7eb',
-                                boxShadow: 'none',
-                                '&:hover': {
-                                  borderColor: '#3b82f6'
-                                }
-                              })
+                                minHeight: '38px',
+                                borderColor: '#ced4da'
+                              }),
+                              menuPortal: (base) => ({ ...base, zIndex: 9999 })
                             }}
+                            menuPortalTarget={document.body}
                           />
                           {item.vat_applicable && (
-                            <span className="vat-badge">VAT</span>
+                            <small style={{ color: '#28a745', display: 'block', marginTop: '4px' }}>
+                              ✓ VAT Applicable
+                            </small>
                           )}
-                        </div>
-                      </td>
-                      <td>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.001"
-                          value={item.quantity}
-                          onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
-                          className="table-input"
-                          required
-                        />
-                      </td>
-                      <td>
-                        <input
-                          type="text"
-                          value={item.unit}
-                          readOnly
-                          className="table-input unit-display"
-                        />
-                      </td>
-                      <td>
-                        <div className="price-cell">
+                        </td>
+                        <td>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.001"
+                            value={item.quantity}
+                            onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
+                            required
+                            className="quantity-input"
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="text"
+                            value={item.unit}
+                            readOnly
+                            className="unit-display"
+                          />
+                        </td>
+                        <td>
                           <input
                             type="number"
                             min="0.01"
                             step="0.01"
                             value={item.unit_price}
                             onChange={(e) => handleItemChange(index, 'unit_price', e.target.value)}
-                            className={`table-input ${previousPrice && item.unit_price !== previousPrice ? 'price-different' : ''}`}
                             required
+                            className={previousPrice && item.unit_price !== previousPrice ? 'price-different' : ''}
                           />
                           {previousPrice > 0 && (
-                            <small className="price-hint">Prev: {previousPrice}</small>
+                            <small style={{ display: 'block', fontSize: '11px', color: '#6c757d' }}>
+                              Prev: Rs.{previousPrice}
+                            </small>
                           )}
-                        </div>
-                      </td>
-                      <td className="text-right amount-cell">
-                        {item.amount.toFixed(2)}
-                      </td>
-                      {supplierVatRegistered && (
-                        <td className="text-right vat-cell">
-                          {item.vat.toFixed(2)}
                         </td>
-                      )}
-                      <td className="text-right total-cell">
-                        <strong>{item.lineTotal.toFixed(2)}</strong>
-                      </td>
-                      <td className="action-cell">
-                        <button 
-                          type="button" 
-                          className="btn-remove"
-                          onClick={() => removeItemRow(index)}
-                          disabled={formData.items.length <= 1}
-                          title="Remove item"
-                        >
-                          <FontAwesomeIcon icon={faTrash} />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        <td className="text-right">Rs. {item.amount.toFixed(2)}</td>
+                        {supplierVatRegistered && (
+                          <td className="text-right vat-column">
+                            {item.vat_applicable ? `Rs. ${item.vat.toFixed(2)}` : '-'}
+                          </td>
+                        )}
+                        <td className="text-right">
+                          <strong>Rs. {item.lineTotal.toFixed(2)}</strong>
+                        </td>
+                        <td className="text-center">
+                          <button 
+                            type="button" 
+                            className="btn-remove-item"
+                            onClick={() => removeItemRow(index)}
+                            disabled={formData.items.length <= 1}
+                            title="Remove item"
+                          >
+                            <FontAwesomeIcon icon={faTrash} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           {/* Mobile Items View (Cards) */}
@@ -867,6 +861,15 @@ const AddPurchase = () => {
               Add Item
             </button>
           </div>
+
+          <button 
+            type="button" 
+            className="btn-add-item"
+            onClick={addItemRow}
+          >
+          <FontAwesomeIcon icon={faPlus} />
+            Add New Item
+          </button>
         </div>
 
         {/* Payment Section */}
