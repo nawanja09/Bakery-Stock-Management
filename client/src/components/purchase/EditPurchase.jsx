@@ -1,10 +1,11 @@
+// src/components/purchase/EditPurchase.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
 import Select from 'react-select';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faArrowLeft, faSave, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { faArrowLeft, faSave, faPlus, faTrash, faMoneyBillWave, faCreditCard, faCheckCircle, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
 import dayjs from 'dayjs';
 import './Purchase.css';
 
@@ -37,6 +38,7 @@ const EditPurchase = () => {
     paid_amount: 0,
     balance_amount: 0,
     balance_status: 0,
+    payment_status: 'Non-Paid',
     payment_method: 'CASH',
     check_number: '',
     remarks: '',
@@ -61,7 +63,6 @@ const EditPurchase = () => {
         ]);
 
         const purchaseData = purchaseRes.data;
-        console.log('Purchase Data:', purchaseData);
         
         setSuppliers(suppliersRes.data);
         setItemsList(itemsRes.data);
@@ -128,7 +129,8 @@ const EditPurchase = () => {
           paid_amount: paidAmount,
           balance_amount: balanceAmount,
           balance_status: balanceStatus,
-          payment_method: purchaseData.payment_method,
+          payment_status: purchaseData.payment_status || 'Non-Paid',
+          payment_method: purchaseData.payment_method || 'CASH',
           check_number: purchaseData.check_number || '',
           remarks: purchaseData.remarks || '',
           company_id: purchaseData.company_id || '',
@@ -145,6 +147,36 @@ const EditPurchase = () => {
 
     fetchData();
   }, [id, navigate, showPopup]);
+
+  // Calculate payment status whenever paid_amount or total changes
+  useEffect(() => {
+    const total = formData.total_with_vat;
+    const paid = formData.paid_amount;
+    
+    let paymentStatus = 'Non-Paid';
+    let balanceStatus = 0;
+    
+    if (paid >= total && total > 0) {
+      paymentStatus = 'Paid';
+      balanceStatus = 0;
+    } else if (paid > 0 && paid < total) {
+      paymentStatus = 'Partially Paid';
+      balanceStatus = 1;
+    } else {
+      paymentStatus = 'Non-Paid';
+      balanceStatus = total > 0 ? 1 : 0;
+    }
+    
+    const balance = Math.max(0, total - paid);
+    
+    setFormData(prev => ({
+      ...prev,
+      balance_amount: balance,
+      balance_status: balanceStatus,
+      payment_status: paymentStatus
+    }));
+    
+  }, [formData.paid_amount, formData.total_with_vat]);
 
   const calculateItemValues = (item, supplierVatRegistered) => {
     const amount = item.quantity * item.unit_price;
@@ -250,7 +282,38 @@ const EditPurchase = () => {
   };
 
   const handleItemSelect = (index, selectedOption) => {
-    if (!selectedOption) return;
+    if (!selectedOption) {
+      // Clear the item selection
+      const newItems = [...formData.items];
+      newItems[index] = {
+        ...newItems[index],
+        id: '',
+        item_name: '',
+        unit: '',
+        vat_applicable: false,
+        unit_price: 0,
+        amount: 0,
+        vat: 0,
+        lineTotal: 0
+      };
+      
+      const { subtotal, totalVat, grandTotal, balanceAmount, balanceStatus } = calculateTotals(
+        newItems, 
+        supplierVatRegistered,
+        formData.paid_amount
+      );
+      
+      setFormData({ 
+        ...formData, 
+        items: newItems,
+        subtotal,
+        vat_amount: totalVat,
+        total_with_vat: grandTotal,
+        balance_amount: balanceAmount,
+        balance_status: balanceStatus
+      });
+      return;
+    }
     
     const selectedItem = itemsList.find(item => item.id === selectedOption.value);
     if (!selectedItem) return;
@@ -262,7 +325,7 @@ const EditPurchase = () => {
       ...newItems[index],
       id: selectedItem.id,
       item_name: selectedItem.name,
-      unit_price: previousPrice || newItems[index].unit_price || 0,
+      unit_price: previousPrice > 0 ? previousPrice : newItems[index].unit_price,
       unit: selectedItem.unit,
       vat_applicable: selectedItem.vat_applicable || false
     };
@@ -337,21 +400,51 @@ const EditPurchase = () => {
 
   const handlePaidAmountChange = (e) => {
     const paidAmount = parseFloat(e.target.value) || 0;
-    const balanceAmount = Math.max(0, formData.total_with_vat - paidAmount);
-    const balanceStatus = balanceAmount > 0 ? 1 : 0;
     
-    setFormData({
-      ...formData,
-      paid_amount: paidAmount,
-      balance_amount: balanceAmount,
-      balance_status: balanceStatus
-    });
+    if (paidAmount > formData.total_with_vat) {
+      showPopup('warning', `Paid amount cannot exceed total bill amount (${formatCurrency(formData.total_with_vat)})`);
+      return;
+    }
+    
+    setFormData(prev => ({
+      ...prev,
+      paid_amount: paidAmount
+    }));
+  };
+
+  const setFullPayment = () => {
+    setFormData(prev => ({
+      ...prev,
+      paid_amount: prev.total_with_vat
+    }));
+  };
+
+  const setNoPayment = () => {
+    setFormData(prev => ({
+      ...prev,
+      paid_amount: 0
+    }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (isSubmitting) return;
+
+    if (!formData.invoice_no.trim()) {
+      showPopup('error', 'Invoice number is required');
+      return;
+    }
+
+    if (!formData.supplier_id) {
+      showPopup('error', 'Please select a supplier');
+      return;
+    }
+
+    if (!formData.company_id) {
+      showPopup('error', 'Please select a company');
+      return;
+    }
 
     if (formData.items.some(item => !item.id)) {
       showPopup('error', 'Please select valid items for all rows');
@@ -367,47 +460,88 @@ const EditPurchase = () => {
     setIsSubmitting(true);
 
     const submitData = {
-      purchase_date: formData.purchase_date,
-      invoice_no: formData.invoice_no,
-      supplier_id: formData.supplier_id,
+      ...formData,
+      prepared_by: currentUser.id,
+      company_id: formData.company_id || null,
       items: formData.items.map(item => ({
         item_id: item.id,
         item_name: item.item_name,
         quantity: item.quantity,
         unit_price: item.unit_price,
         unit: item.unit
-      })),
-      subtotal: formData.subtotal,
-      vat_amount: formData.vat_amount,
-      vat_rate: VAT_RATE,
-      total_with_vat: formData.total_with_vat,
-      paid_amount: formData.paid_amount,
-      balance_amount: formData.balance_amount,
-      balance_status: formData.balance_status,
-      payment_method: formData.payment_method,
-      check_number: formData.check_number,
-      remarks: formData.remarks,
-      prepared_by: currentUser.id,
-      company_id: formData.company_id || null
+      }))
     };
 
     try {
       const response = await api.put(`/purchases/${id}`, submitData);
-      showPopup('success', `Purchase updated successfully! Invoice: ${response.data.invoice_no}`);
+      
+      let successMessage = `Purchase updated successfully! Invoice: ${response.data.invoice_no}`;
+      
+      if (formData.payment_status === 'Paid') {
+        successMessage += ' (Fully Paid)';
+      } else if (formData.payment_status === 'Partially Paid') {
+        successMessage += ` (Partially Paid - Balance: ${formatCurrency(formData.balance_amount)})`;
+      }
+      
+      showPopup('success', successMessage);
       navigate('/purchase/history');
     } catch (error) {
       console.error('Error updating purchase:', error);
-      showPopup('error', error.response?.data?.error || 'Server error');
+      
+      if (error.response?.data?.error?.includes('Invoice number already exists')) {
+        showPopup('error', 'This invoice number already exists. Please use a different number.');
+      } else {
+        showPopup('error', error.response?.data?.error || 'Server error');
+      }
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const itemOptions = itemsList.map(itm => ({
-    value: itm.id,
-    label: `${itm.name} (${itm.item_code || ''}) - ${itm.vat_applicable ? 'VAT Applicable' : 'No VAT'}`,
-    previousPrice: previousPurchasePrices[itm.id] || 0
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-LK', {
+      style: 'currency',
+      currency: 'LKR',
+      minimumFractionDigits: 2
+    }).format(amount).replace('LKR', 'Rs.');
+  };
+
+  // Create item options for react-select with proper formatting
+  const itemOptions = itemsList.map(item => ({
+    value: item.id,
+    label: `${item.item_code} - ${item.name} ${item.vat_applicable ? '(VAT)' : ''}`,
+    unit: item.unit,
+    vat_applicable: item.vat_applicable,
+    previousPrice: previousPurchasePrices[item.id] || 0
   }));
+
+  const getPaymentStatusInfo = () => {
+    switch(formData.payment_status) {
+      case 'Paid':
+        return { 
+          color: '#28a745', 
+          icon: faCheckCircle,
+          text: 'Fully Paid',
+          bg: '#d4edda'
+        };
+      case 'Partially Paid':
+        return { 
+          color: '#fd7e14', 
+          icon: faExclamationTriangle,
+          text: 'Partially Paid',
+          bg: '#fff3cd'
+        };
+      default:
+        return { 
+          color: '#dc3545', 
+          icon: faMoneyBillWave,
+          text: 'Non-Paid',
+          bg: '#f8d7da'
+        };
+    }
+  };
+
+  const paymentInfo = getPaymentStatusInfo();
 
   if (loading) {
     return (
@@ -433,8 +567,9 @@ const EditPurchase = () => {
       </div>
 
       <form onSubmit={handleSubmit} className="purchase-form">
+        {/* Basic Information Section */}
         <div className="form-card">
-          <h2>Basic Information</h2>
+          <h3>Basic Information</h3>
           <div className="form-grid">
             <div className="form-group">
               <label>Purchase Date *</label>
@@ -491,6 +626,7 @@ const EditPurchase = () => {
               >
                 <option value="CASH">Cash</option>
                 <option value="BANK_TRANSFER">Bank Transfer</option>
+                <option value="CHEQUE">Cheque</option>
               </select>
             </div>
 
@@ -509,7 +645,7 @@ const EditPurchase = () => {
             </div>
 
             <div className="form-group">
-              <label>Reference Number</label>
+              <label>Reference/Check Number</label>
               <input
                 type="text"
                 value={formData.check_number}
@@ -528,27 +664,27 @@ const EditPurchase = () => {
           </div>
         </div>
 
+        {/* Purchase Items Section */}
         <div className="form-card">
-          <h2>Purchased Items</h2>
+          <h3>Purchase Items</h3>
 
           <div className="items-table-container">
             <table className="items-table">
               <thead>
                 <tr>
-                  <th>Item Name</th>
-                  <th>Quantity</th>
-                  <th>Unit</th>
-                  <th>Unit Price (Net)</th>
-                  <th>Amount</th>
-                  {supplierVatRegistered && (
-                    <th className="vat-column">VAT 18%</th>
-                  )}
-                  <th>Line Total</th>
-                  <th>Action</th>
+                  <th style={{ width: '35%' }}>Item Name</th>
+                  <th style={{ width: '10%' }}>Quantity</th>
+                  <th style={{ width: '8%' }}>Unit</th>
+                  <th style={{ width: '15%' }}>Unit Price (Net)</th>
+                  <th style={{ width: '12%' }}>Amount</th>
+                  {supplierVatRegistered && <th style={{ width: '10%' }}>VAT 18%</th>}
+                  <th style={{ width: '12%' }}>Line Total</th>
+                  <th style={{ width: '8%' , textAlign: 'center'}}>Action</th>
                 </tr>
               </thead>
               <tbody>
                 {formData.items.map((item, index) => {
+                  const selectedOption = item.id ? itemOptions.find(opt => opt.value === item.id) : null;
                   const previousPrice = previousPurchasePrices[item.id] || 0;
                   
                   return (
@@ -556,15 +692,27 @@ const EditPurchase = () => {
                       <td>
                         <Select
                           options={itemOptions}
-                          value={itemOptions.find(opt => opt.value === item.id) || null}
+                          value={selectedOption}
                           onChange={(selected) => handleItemSelect(index, selected)}
                           isSearchable
-                          placeholder="Select item..."
+                          isClearable
+                          placeholder="Search or select item..."
                           className="react-select-container"
                           classNamePrefix="react-select"
+                          styles={{
+                            control: (base) => ({
+                              ...base,
+                              minHeight: '38px',
+                              borderColor: '#ced4da'
+                            }),
+                            menuPortal: (base) => ({ ...base, zIndex: 9999 })
+                          }}
+                          menuPortalTarget={document.body}
                         />
                         {item.vat_applicable && (
-                          <small style={{ color: '#28a745' }}>VAT Applicable</small>
+                          <small style={{ color: '#28a745', display: 'block', marginTop: '4px' }}>
+                            ✓ VAT Applicable
+                          </small>
                         )}
                       </td>
                       <td>
@@ -575,6 +723,7 @@ const EditPurchase = () => {
                           value={item.quantity}
                           onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
                           required
+                          className="quantity-input"
                         />
                       </td>
                       <td>
@@ -596,20 +745,27 @@ const EditPurchase = () => {
                           className={previousPrice && item.unit_price !== previousPrice ? 'price-different' : ''}
                         />
                         {previousPrice > 0 && (
-                          <small>Prev: Rs.{previousPrice}</small>
+                          <small style={{ display: 'block', fontSize: '11px', color: '#6c757d' }}>
+                            Prev: Rs.{previousPrice}
+                          </small>
                         )}
                       </td>
-                      <td>Rs. {item.amount.toFixed(2)}</td>
+                      <td className="text-right">Rs. {item.amount.toFixed(2)}</td>
                       {supplierVatRegistered && (
-                        <td className="vat-column">Rs. {item.vat.toFixed(2)}</td>
+                        <td className="text-right vat-column">
+                          {item.vat_applicable ? `Rs. ${item.vat.toFixed(2)}` : '-'}
+                        </td>
                       )}
-                      <td><strong>Rs. {item.lineTotal.toFixed(2)}</strong></td>
-                      <td>
+                      <td className="text-right">
+                        <strong>Rs. {item.lineTotal.toFixed(2)}</strong>
+                      </td>
+                      <td className="action-cell">
                         <button 
                           type="button" 
                           className="btn-remove-item"
                           onClick={() => removeItemRow(index)}
                           disabled={formData.items.length <= 1}
+                          title="Remove this item"
                         >
                           <FontAwesomeIcon icon={faTrash} />
                         </button>
@@ -621,10 +777,12 @@ const EditPurchase = () => {
             </table>
           </div>
 
-          <button type="button" onClick={addItemRow} className="btn-add-item">
-            <FontAwesomeIcon icon={faPlus} />
-            Add Item
-          </button>
+          {/* Add Item Button - Positioned below table on the left */}
+          <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-start' }}>
+            <button type="button" className="btn-add-item" onClick={addItemRow}>
+              <FontAwesomeIcon icon={faPlus} /> Add Item
+            </button>
+          </div>
 
           <div className="vat-summary">
             <div className="vat-row">
@@ -642,19 +800,84 @@ const EditPurchase = () => {
           </div>
         </div>
 
+        {/* Payment Information Section */}
         <div className="form-card">
-          <h2>Payment Information</h2>
+          <h3>Payment Information</h3>
+          
+          <div className="payment-status-banner" style={{
+            background: paymentInfo.bg,
+            border: `1px solid ${paymentInfo.color}`,
+            borderRadius: '8px',
+            padding: '16px',
+            marginBottom: '20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <FontAwesomeIcon icon={paymentInfo.icon} style={{ color: paymentInfo.color, fontSize: '24px' }} />
+              <div>
+                <div style={{ fontWeight: '600', color: paymentInfo.color, fontSize: '16px' }}>
+                  {paymentInfo.text}
+                </div>
+                <div style={{ color: '#6c757d', fontSize: '14px' }}>
+                  Total: {formatCurrency(formData.total_with_vat)} | 
+                  Paid: {formatCurrency(formData.paid_amount)} | 
+                  Balance: {formatCurrency(formData.balance_amount)}
+                </div>
+              </div>
+            </div>
+            <div>
+              <span className={`payment-badge ${formData.payment_status?.toLowerCase().replace(' ', '-')}`}>
+                {formData.payment_status}
+              </span>
+            </div>
+          </div>
+
           <div className="payment-section">
             <div className="form-group">
               <label>Paid Amount (Rs.) *</label>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={formData.paid_amount}
-                onChange={handlePaidAmountChange}
-                required
-              />
+              <div className="amount-input-group" style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.paid_amount}
+                  onChange={handlePaidAmountChange}
+                  required
+                  style={{ flex: 1 }}
+                />
+                <button 
+                  type="button" 
+                  className="btn-small"
+                  onClick={setFullPayment}
+                  style={{ 
+                    background: '#28a745', 
+                    color: 'white',
+                    border: 'none',
+                    padding: '0 12px',
+                    borderRadius: '4px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Full
+                </button>
+                <button 
+                  type="button" 
+                  className="btn-small"
+                  onClick={setNoPayment}
+                  style={{ 
+                    background: '#6c757d', 
+                    color: 'white',
+                    border: 'none',
+                    padding: '0 12px',
+                    borderRadius: '4px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  None
+                </button>
+              </div>
             </div>
 
             <div className="form-group">
@@ -664,16 +887,6 @@ const EditPurchase = () => {
                 value={formData.balance_amount.toFixed(2)}
                 readOnly
                 className={formData.balance_amount > 0 ? 'due-amount' : ''}
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Balance Status</label>
-              <input
-                type="text"
-                value={`${formData.balance_status} (${formData.balance_status === 0 ? 'No Balance' : 'Balance Available'})`}
-                readOnly
-                className={formData.balance_status === 1 ? 'status-due-bg' : 'status-paid-bg'}
               />
             </div>
 

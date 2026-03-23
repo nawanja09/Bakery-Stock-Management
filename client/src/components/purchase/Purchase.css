@@ -177,30 +177,6 @@
   color: white;
 }
 
-.btn-remove-item {
-  background-color: var(--danger-light);
-  color: var(--danger-color);
-  border: none;
-  width: 32px;
-  height: 32px;
-  border-radius: var(--border-radius-sm);
-  cursor: pointer;
-  transition: var(--transition);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.btn-remove-item:hover:not(:disabled) {
-  background-color: var(--danger-color);
-  color: white;
-}
-
-.btn-remove-item:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
-
 .btn-clear {
   background-color: var(--gray-100);
   color: var(--gray-700);
@@ -4063,4 +4039,79 @@ textarea.form-control {
   .returns-history-table td {
     padding: 8px;
   }
+}
+
+/* Add Item Button Styling - Left aligned below table */
+.btn-add-item {
+  background-color: var(--primary-light);
+  color: var(--primary-color);
+  border: 1px solid var(--primary-color);
+  padding: 0.5rem 1rem;
+  border-radius: var(--border-radius-sm);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+
+.btn-add-item:hover {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+.btn-remove-item:hover:not(:disabled) {
+  background-color: #dc2626;
+  color: white;
+  border-color: #dc2626;
+  transform: translateY(-1px);
+}
+
+.btn-remove-item:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Table cell alignment */
+.items-table td.text-center {
+  text-align: center;
+  vertical-align: middle;
+}
+
+.items-table td.text-right {
+  text-align: right;
+}
+
+/* Action column styling */
+.items-table th:last-child,
+.items-table td:last-child {
+  text-align: center;
+  width: 60px;
+}
+
+.action-cell {
+  text-align: center;
+  vertical-align: middle;
+  width: 60px;
+}
+
+.btn-remove-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background-color: #dc3545;
+  color: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-remove-item:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
 }
