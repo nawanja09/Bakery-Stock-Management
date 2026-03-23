@@ -1917,3 +1917,180 @@ SELECT CURDATE(), i.id, 0, CURRENT_TIMESTAMP
 FROM items i
 LEFT JOIN opening_balances ob ON i.id = ob.item_id
 WHERE i.auto_add_to_stock = TRUE AND ob.item_id IS NULL AND i.deleted = FALSE;
+
+-- =============================================
+-- Add payment_status column to purchases table
+-- =============================================
+ALTER TABLE purchases 
+ADD COLUMN payment_status ENUM('Paid', 'Partially Paid', 'Non-Paid') NOT NULL DEFAULT 'Non-Paid' AFTER balance_status;
+
+-- =============================================
+-- Create payment_history table
+-- =============================================
+CREATE TABLE IF NOT EXISTS `payment_history` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `purchase_id` int NOT NULL,
+  `payment_date` date NOT NULL,
+  `amount` decimal(10,2) NOT NULL,
+  `payment_method` enum('CASH','BANK_TRANSFER','CHEQUE','CREDIT_CARD') NOT NULL,
+  `check_number` varchar(50) DEFAULT NULL,
+  `notes` text,
+  `created_by` int NOT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `purchase_id` (`purchase_id`),
+  KEY `created_by` (`created_by`),
+  CONSTRAINT `payment_history_ibfk_1` FOREIGN KEY (`purchase_id`) REFERENCES `purchases` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `payment_history_ibfk_2` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- =============================================
+-- Update existing purchases with payment status
+-- =============================================
+UPDATE purchases 
+SET payment_status = CASE 
+  WHEN paid_amount >= total_with_vat THEN 'Paid'
+  WHEN paid_amount > 0 THEN 'Partially Paid'
+  ELSE 'Non-Paid'
+END;
+
+----Add new purchase bill එකක් create කරනකොට payment එක කරලා තියෙනවා නම් ඒ bill එක “Paid” ලෙසත්, payment එක කරලා නැත්නම් “Non-Paid” ලෙසත් system එක automatically update වෙන්න ඕන. එවගේම navigation bar එකේ “Non-Paid” bills සඳහා වෙනම route එකක් තිබිය යුතු අතර, ඒකෙන් access වෙන්න පුළුවන් වෙනම page එකක සියලු non-paid bills display වෙන්න ඕන. එම page එකේ එක් එක් non-paid bill එකක් සඳහා “Make Payment” button එකක් තිබිය යුතු අතර, ඒ button එක click කළාම popup message එකක් open වෙලා payment details view කරන්නත්, එමඟින් payment එක complete කරන්නත් හැකි විය යුතුය. Payment කිරීමේදී, payment වූ දිනය (payment date) database එකට save විය යුතු අතර, payment එක system එකට ඇතුළත් කළ දිනය (created date) automatically save විය යුතුය. එම මොහොතේ bill එක “Paid” බවට පත් වුවහොත්, purchasing process එක existing workflow එකට අනුව ඉදිරියට proceed විය යුතුය.
+---Item එකක් create කරන වෙලාවේ ඒ item එක **stock එකට automatically add වෙනවාද නැද්ද** කියලා control කරන්න option එකක් තියෙන්න ඕන. Item Management page එකේ ඒ option එක **1/0 (Yes/No)** විදිහට display වෙන්න ඕන. Default ලෙස item එක create කරනකොට **stock එකට add වෙන විදිහට (1)** set වෙලා තියෙන්න ඕන. නමුත් අවශ්‍ය නම් userට ඒක **off කරලා (0) stock එකට add නොවන විදිහට** change කරන්නත් පුළුවන් වෙන්න ඕන.
+
+-- =============================================
+-- 1. Add payment_status column to purchases table
+-- =============================================
+ALTER TABLE purchases 
+ADD COLUMN payment_status ENUM('Paid', 'Partially Paid', 'Non-Paid') 
+NOT NULL DEFAULT 'Non-Paid' 
+AFTER balance_status;
+
+-- =============================================
+-- 2. Create payment_history table
+-- =============================================
+CREATE TABLE IF NOT EXISTS `payment_history` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `purchase_id` int NOT NULL,
+  `payment_date` date NOT NULL,
+  `amount` decimal(10,2) NOT NULL,
+  `payment_method` enum('CASH','BANK_TRANSFER','CHEQUE','CREDIT_CARD') NOT NULL,
+  `check_number` varchar(50) DEFAULT NULL,
+  `notes` text,
+  `created_by` int NOT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `purchase_id` (`purchase_id`),
+  KEY `created_by` (`created_by`),
+  CONSTRAINT `payment_history_ibfk_1` 
+    FOREIGN KEY (`purchase_id`) REFERENCES `purchases` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `payment_history_ibfk_2` 
+    FOREIGN KEY (`created_by`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+-- =============================================
+-- 3. Update existing purchases (SAFE MODE FIX)
+-- =============================================
+SET SQL_SAFE_UPDATES = 0;
+
+UPDATE purchases 
+SET payment_status = CASE 
+  WHEN paid_amount >= total_with_vat THEN 'Paid'
+  WHEN paid_amount > 0 THEN 'Partially Paid'
+  ELSE 'Non-Paid'
+END;
+
+SET SQL_SAFE_UPDATES = 1;
+
+
+-- =============================================
+-- 4. Trigger: AFTER INSERT on payment_history
+-- =============================================
+DELIMITER $$
+
+CREATE TRIGGER trg_payment_insert
+AFTER INSERT ON payment_history
+FOR EACH ROW
+BEGIN
+  -- Update paid_amount
+  UPDATE purchases
+  SET paid_amount = (
+    SELECT IFNULL(SUM(amount), 0)
+    FROM payment_history
+    WHERE purchase_id = NEW.purchase_id
+  )
+  WHERE id = NEW.purchase_id;
+
+  -- Update payment_status
+  UPDATE purchases
+  SET payment_status = CASE 
+      WHEN paid_amount >= total_with_vat THEN 'Paid'
+      WHEN paid_amount > 0 THEN 'Partially Paid'
+      ELSE 'Non-Paid'
+    END
+  WHERE id = NEW.purchase_id;
+END$$
+
+DELIMITER ;
+
+
+-- =============================================
+-- 5. Trigger: AFTER DELETE on payment_history
+-- =============================================
+DELIMITER $$
+
+CREATE TRIGGER trg_payment_delete
+AFTER DELETE ON payment_history
+FOR EACH ROW
+BEGIN
+  -- Recalculate paid_amount
+  UPDATE purchases
+  SET paid_amount = (
+    SELECT IFNULL(SUM(amount), 0)
+    FROM payment_history
+    WHERE purchase_id = OLD.purchase_id
+  )
+  WHERE id = OLD.purchase_id;
+
+  -- Update payment_status
+  UPDATE purchases
+  SET payment_status = CASE 
+      WHEN paid_amount >= total_with_vat THEN 'Paid'
+      WHEN paid_amount > 0 THEN 'Partially Paid'
+      ELSE 'Non-Paid'
+    END
+  WHERE id = OLD.purchase_id;
+END$$
+
+DELIMITER ;
+
+
+-- =============================================
+-- 6. Trigger: AFTER UPDATE on payment_history
+-- =============================================
+DELIMITER $$
+
+CREATE TRIGGER trg_payment_update
+AFTER UPDATE ON payment_history
+FOR EACH ROW
+BEGIN
+  -- Recalculate paid_amount
+  UPDATE purchases
+  SET paid_amount = (
+    SELECT IFNULL(SUM(amount), 0)
+    FROM payment_history
+    WHERE purchase_id = NEW.purchase_id
+  )
+  WHERE id = NEW.purchase_id;
+
+  -- Update payment_status
+  UPDATE purchases
+  SET payment_status = CASE 
+      WHEN paid_amount >= total_with_vat THEN 'Paid'
+      WHEN paid_amount > 0 THEN 'Partially Paid'
+      ELSE 'Non-Paid'
+    END
+  WHERE id = NEW.purchase_id;
+END$$
+
+DELIMITER ;

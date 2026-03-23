@@ -31,7 +31,8 @@ import {
   faExchangeAlt,
   faReply,
   faDollarSign,
-  faFileInvoiceDollar
+  faFileInvoiceDollar,
+  faMoneyBill1Wave
 } from '@fortawesome/free-solid-svg-icons';
 import bakeryLogo from '../images/icon.jpeg';
 import './NavigationBar.css';
@@ -306,6 +307,14 @@ const NavigationBar = () => {
                   <NavLink to="/reports/purchase-vat" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
                     <span className="icon-container"><FontAwesomeIcon icon={faCalculator} /></span>
                     <span>Purchase VAT Report</span>
+                  </NavLink>
+                </li>
+
+                {/* Non-paid payment - Outstanding Bill*/}
+                <li>
+                  <NavLink to="/purchase/non-paid" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                    <span className="icon-container"><FontAwesomeIcon icon={faMoneyBill1Wave} /></span>
+                    <span>Non-Paid Payments</span>
                   </NavLink>
                 </li>
 

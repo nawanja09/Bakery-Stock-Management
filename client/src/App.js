@@ -73,6 +73,8 @@ import AddPurchaseReturn from './components/purchasereturn/AddPurchaseReturn';
 import PurchaseReturnHistory from './components/purchasereturn/PurchaseReturnHistory';
 import PurchaseVATReport from './components/report/PurchaseVATReport';
 
+import NonPaidPurchases from './components/purchase/NonPaidPurchases';
+
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
@@ -174,6 +176,8 @@ function App() {
             <Route path="purchase-returns/add" element={<AddPurchaseReturn />} />
             <Route path="purchase-returns/history" element={<PurchaseReturnHistory />} />
             <Route path="reports/purchase-vat" element={<PurchaseVATReport />} />
+
+            <Route path="purchase/non-paid" element={<NonPaidPurchases />} />
 
           </Route>
 
