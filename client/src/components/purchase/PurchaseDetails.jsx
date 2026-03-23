@@ -1,3 +1,4 @@
+// src/components/purchase/PurchaseDetails.jsx
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -17,14 +18,17 @@ import {
   faCity,
   faCheckCircle,
   faTimesCircle,
-  faTimes // Add this for close button
+  faMoneyBillWave,
+  faHistory,
+  faUndo,
+  faReceipt
 } from '@fortawesome/free-solid-svg-icons';
-import './Purchase.css';
-import api from '../../api';
 import dayjs from 'dayjs';
+import { usePopup } from '../context/PopupContext';
+import api from '../../api';
+import './Purchase.css';
 
 const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
-  // Use either the prop or URL param
   const params = useParams();
   const navigate = useNavigate();
   const id = purchaseId || params.id;
@@ -34,13 +38,15 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
   const [error, setError] = useState('');
   const [previousPrices, setPreviousPrices] = useState({});
   const [supplierDetails, setSupplierDetails] = useState(null);
+  const [activeTab, setActiveTab] = useState('items'); // 'items', 'payments', 'returns'
+  const { showPopup } = usePopup();
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
         
-        // Fetch purchase details, previous prices, and supplier details
+        // Fetch purchase details with payments and returns
         const [purchaseRes, previousPricesRes] = await Promise.all([
           api.get(`/purchases/${id}`),
           api.get('/purchases/previous-prices')
@@ -115,6 +121,19 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
     }
   };
 
+  const getPaymentStatusInfo = () => {
+    if (!purchase) return { text: 'Unknown', class: 'unknown', icon: faTimesCircle };
+    
+    switch(purchase.payment_status) {
+      case 'Paid':
+        return { text: 'Fully Paid', class: 'paid', icon: faCheckCircle, color: '#28a745' };
+      case 'Partially Paid':
+        return { text: 'Partially Paid', class: 'partially-paid', icon: faMoneyBillWave, color: '#fd7e14' };
+      default:
+        return { text: 'Non-Paid', class: 'non-paid', icon: faTimesCircle, color: '#dc3545' };
+    }
+  };
+
   if (loading) {
     return (
       <div className="loading-container">
@@ -150,19 +169,25 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
     );
   }
 
-  const subtotal = parseFloat(purchase.subtotal || purchase.bill_amount || 0);
+  const subtotal = parseFloat(purchase.subtotal || 0);
   const vatAmount = parseFloat(purchase.vat_amount || 0);
-  const totalWithVat = parseFloat(purchase.total_with_vat || purchase.bill_amount || 0);
+  const totalWithVat = parseFloat(purchase.total_with_vat || 0);
   const paidAmount = parseFloat(purchase.paid_amount || 0);
   const dueAmount = Math.max(0, totalWithVat - paidAmount);
   const vatRate = parseFloat(purchase.vat_rate || 18);
+  const statusInfo = getPaymentStatusInfo();
+
+  // Calculate total returns
+  const totalReturns = (purchase.returns || []).reduce((sum, r) => sum + parseFloat(r.return_total || r.total_amount || 0), 0);
+  const netPaidAfterReturns = paidAmount;
+  const netBalanceAfterReturns = dueAmount;
 
   return (
     <div className={`purchase-details-container ${isModal ? 'modal-view' : ''}`}>
       <div className="page-header">
         <div className="header-title">
           <button onClick={handleBack} className="back-button">
-            <FontAwesomeIcon icon={isModal ? faTimes : faArrowLeft} />
+            <FontAwesomeIcon icon={isModal ? faTimesCircle : faArrowLeft} />
           </button>
           <div>
             <h1>Purchase Details</h1>
@@ -185,7 +210,15 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
         </div>
       </div>
 
-      {/* Rest of your component remains exactly the same */}
+      {/* Payment Status Banner */}
+      <div className={`payment-status-banner ${statusInfo.class}`}>
+        <FontAwesomeIcon icon={statusInfo.icon} />
+        <span className="status-text">{statusInfo.text}</span>
+        <span className="status-amount">
+          {dueAmount === 0 ? '✓ Fully Settled' : `Balance: ${formatCurrency(dueAmount)}`}
+        </span>
+      </div>
+
       {/* Supplier Information Card */}
       <div className="details-grid">
         <div className="detail-card">
@@ -273,7 +306,7 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
             </div>
             <div className="info-row">
               <span className="label">Invoice No:</span>
-              <span className="value invoice-number">{purchase.check_number || 'N/A'}</span>
+              <span className="value invoice-number">{purchase.invoice_no}</span>
             </div>
             <div className="info-row">
               <span className="label">Company:</span>
@@ -281,9 +314,13 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
             </div>
             <div className="info-row">
               <span className="label">Payment Method:</span>
-              <span className={`payment-badge ${purchase.payment_method?.toLowerCase()}`}>
+              <span className={`payment-method-badge ${purchase.payment_method?.toLowerCase()}`}>
                 {purchase.payment_method?.replace('_', ' ') || 'N/A'}
               </span>
+            </div>
+            <div className="info-row">
+              <span className="label">Reference No:</span>
+              <span className="value">{purchase.check_number || 'N/A'}</span>
             </div>
             <div className="info-row">
               <span className="label">Prepared By:</span>
@@ -314,17 +351,42 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
               <span>Grand Total (with VAT):</span>
               <span className="bold">{formatCurrency(totalWithVat)}</span>
             </div>
+            
+            {/* Returns Section */}
+            {totalReturns > 0 && (
+              <>
+                <div className="summary-row returns">
+                  <span>Total Returns:</span>
+                  <span className="returns-amount">-{formatCurrency(totalReturns)}</span>
+                </div>
+                <div className="summary-row net-after-returns">
+                  <span>Net After Returns:</span>
+                  <span>{formatCurrency(totalWithVat - totalReturns)}</span>
+                </div>
+              </>
+            )}
+            
             <div className="summary-divider"></div>
+            
             <div className="summary-row">
-              <span>Paid Amount:</span>
+              <span>Total Paid:</span>
               <span className="paid">{formatCurrency(paidAmount)}</span>
             </div>
+            
+            {totalReturns > 0 && (
+              <div className="summary-row">
+                <span>Returns Adjusted:</span>
+                <span className="returns-amount">-{formatCurrency(totalReturns)}</span>
+              </div>
+            )}
+            
             <div className={`summary-row due ${dueAmount > 0 ? 'negative' : 'positive'}`}>
               <span>Balance Due:</span>
               <span className={dueAmount > 0 ? 'due-amount' : ''}>
-                {formatCurrency(dueAmount)}
+                {formatCurrency(netBalanceAfterReturns)}
               </span>
             </div>
+            
             {dueAmount === 0 && (
               <div className="payment-status paid-fully">
                 <FontAwesomeIcon icon={faCheckCircle} /> Fully Paid
@@ -332,122 +394,274 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
             )}
             {dueAmount > 0 && (
               <div className="payment-status partially-paid">
-                <FontAwesomeIcon icon={faTimesCircle} /> Partially Paid
+                <FontAwesomeIcon icon={faMoneyBillWave} /> Balance Remaining: {formatCurrency(dueAmount)}
               </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* Items Card */}
-      <div className="items-card">
-        <div className="card-header">
-          <h3>
-            <FontAwesomeIcon icon={faTag} />
-            Purchased Items
-          </h3>
-          {supplierDetails?.vat_registered && (
-            <div className="vat-note">
-              <span className="badge">VAT Registered Supplier</span>
-            </div>
-          )}
-        </div>
+      {/* Tabs for Items, Payments, Returns */}
+      <div className="tabs-container">
+        <button 
+          className={`tab-button ${activeTab === 'items' ? 'active' : ''}`}
+          onClick={() => setActiveTab('items')}
+        >
+          <FontAwesomeIcon icon={faTag} />
+          Items ({purchase.items?.length || 0})
+        </button>
+        <button 
+          className={`tab-button ${activeTab === 'payments' ? 'active' : ''}`}
+          onClick={() => setActiveTab('payments')}
+        >
+          <FontAwesomeIcon icon={faHistory} />
+          Payment History ({purchase.payments?.length || 0})
+        </button>
+        <button 
+          className={`tab-button ${activeTab === 'returns' ? 'active' : ''}`}
+          onClick={() => setActiveTab('returns')}
+        >
+          <FontAwesomeIcon icon={faUndo} />
+          Returns ({purchase.returns?.length || 0})
+        </button>
+      </div>
 
-        <div className="table-responsive">
-          <table className="items-details-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Item Name</th>
-                <th>Item Code</th>
-                <th>Quantity</th>
-                <th>Unit</th>
-                <th>Unit Price (Net)</th>
-                <th>Amount</th>
-                {supplierDetails?.vat_registered && (
-                  <th className="vat-column">VAT 18%</th>
-                )}
-                <th className="total-column">Line Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {purchase.items && purchase.items.map((item, index) => {
-                const previousPrice = previousPrices[item.item_id] || 0;
-                const amount = parseFloat(item.quantity) * parseFloat(item.unit_price);
-                const vat = (supplierDetails?.vat_registered && item.vat_applicable) ? 
-                  amount * (vatRate / 100) : 0;
-                const lineTotal = amount + vat;
-                const isPriceDifferent = previousPrice > 0 && 
-                  parseFloat(item.unit_price) !== previousPrice;
+      {/* Items Tab */}
+      {activeTab === 'items' && (
+        <div className="items-card">
+          <div className="card-header">
+            <h3>
+              <FontAwesomeIcon icon={faTag} />
+              Purchased Items
+            </h3>
+            {supplierDetails?.vat_registered && (
+              <div className="vat-note">
+                <span className="badge">VAT Registered Supplier</span>
+              </div>
+            )}
+          </div>
 
-                return (
-                  <tr key={index} className={item.vat_applicable ? 'vat-applicable-row' : ''}>
-                    <td>{index + 1}</td>
-                    <td>
-                      <div className="item-name">{item.item_name}</div>
-                      {item.vat_applicable && (
-                        <small className="vat-applicable-badge">VAT Applicable</small>
-                      )}
-                    </td>
-                    <td>{item.item_code || '-'}</td>
-                    <td className="text-right">{Number(item.quantity).toFixed(3)}</td>
-                    <td>{item.unit || '-'}</td>
-                    <td className="text-right">
-                      <span className={isPriceDifferent ? 'price-different' : ''}>
-                        {formatCurrency(item.unit_price)}
-                      </span>
-                      {isPriceDifferent && (
-                        <small className="price-history">
-                          (Prev: {formatCurrency(previousPrice)})
-                        </small>
-                      )}
-                    </td>
-                    <td className="text-right">{formatCurrency(amount)}</td>
-                    {supplierDetails?.vat_registered && (
-                      <td className="vat-column text-right">
-                        {item.vat_applicable ? formatCurrency(vat) : '-'}
+          <div className="table-responsive">
+            <table className="items-details-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Item Name</th>
+                  <th>Item Code</th>
+                  <th className="text-right">Quantity</th>
+                  <th>Unit</th>
+                  <th className="text-right">Unit Price</th>
+                  <th className="text-right">Amount</th>
+                  {supplierDetails?.vat_registered && (
+                    <th className="text-right vat-column">VAT 18%</th>
+                  )}
+                  <th className="text-right total-column">Line Total</th>
+                 </tr>
+              </thead>
+              <tbody>
+                {purchase.items && purchase.items.map((item, index) => {
+                  const previousPrice = previousPrices[item.item_id] || 0;
+                  const amount = parseFloat(item.quantity) * parseFloat(item.unit_price);
+                  const vat = (supplierDetails?.vat_registered && item.vat_applicable) ? 
+                    amount * (vatRate / 100) : 0;
+                  const lineTotal = amount + vat;
+                  const isPriceDifferent = previousPrice > 0 && 
+                    parseFloat(item.unit_price) !== previousPrice;
+
+                  return (
+                    <tr key={index} className={item.vat_applicable ? 'vat-applicable-row' : ''}>
+                      <td>{index + 1}</td>
+                      <td>
+                        <div className="item-name">{item.item_name}</div>
+                        {item.vat_applicable && (
+                          <small className="vat-applicable-badge">VAT Applicable</small>
+                        )}
                       </td>
-                    )}
-                    <td className="text-right total-column">
-                      <strong>{formatCurrency(lineTotal)}</strong>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-            <tfoot>
-              <tr>
-                <td colSpan="6" className="text-right"><strong>Subtotal:</strong></td>
-                <td className="text-right"><strong>{formatCurrency(subtotal)}</strong></td>
-                {supplierDetails?.vat_registered && (
-                  <td className="vat-column text-right">
-                    <strong>{formatCurrency(vatAmount)}</strong>
+                      <td>{item.item_code || '-'}</td>
+                      <td className="text-right">{Number(item.quantity).toFixed(3)}</td>
+                      <td>{item.unit || '-'}</td>
+                      <td className="text-right">
+                        <span className={isPriceDifferent ? 'price-different' : ''}>
+                          {formatCurrency(item.unit_price)}
+                        </span>
+                        {isPriceDifferent && (
+                          <small className="price-history">
+                            (Prev: {formatCurrency(previousPrice)})
+                          </small>
+                        )}
+                      </td>
+                      <td className="text-right">{formatCurrency(amount)}</td>
+                      {supplierDetails?.vat_registered && (
+                        <td className="text-right vat-column">
+                          {item.vat_applicable ? formatCurrency(vat) : '-'}
+                        </td>
+                      )}
+                      <td className="text-right total-column">
+                        <strong>{formatCurrency(lineTotal)}</strong>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colSpan={supplierDetails?.vat_registered ? "6" : "5"} className="text-right">
+                    <strong>Subtotal:</strong>
                   </td>
-                )}
-                <td className="text-right total-column">
-                  <strong>{formatCurrency(totalWithVat)}</strong>
-                </td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
+                  <td className="text-right"><strong>{formatCurrency(subtotal)}</strong></td>
+                  {supplierDetails?.vat_registered && (
+                    <td className="text-right vat-column">
+                      <strong>{formatCurrency(vatAmount)}</strong>
+                    </td>
+                  )}
+                  <td className="text-right total-column">
+                    <strong>{formatCurrency(totalWithVat)}</strong>
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
 
-        {/* Items Summary */}
-        <div className="items-summary">
-          <div className="summary-stats">
-            <div className="stat">
-              <span className="stat-label">Total Items:</span>
-              <span className="stat-value">{purchase.items?.length || 0}</span>
-            </div>
-            <div className="stat">
-              <span className="stat-label">Total Quantity:</span>
-              <span className="stat-value">
-                {purchase.items?.reduce((sum, item) => sum + parseFloat(item.quantity), 0).toFixed(3)}
-              </span>
+          <div className="items-summary">
+            <div className="summary-stats">
+              <div className="stat">
+                <span className="stat-label">Total Items:</span>
+                <span className="stat-value">{purchase.items?.length || 0}</span>
+              </div>
+              <div className="stat">
+                <span className="stat-label">Total Quantity:</span>
+                <span className="stat-value">
+                  {purchase.items?.reduce((sum, item) => sum + parseFloat(item.quantity), 0).toFixed(3)}
+                </span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* Payment History Tab */}
+      {activeTab === 'payments' && (
+        <div className="items-card">
+          <div className="card-header">
+            <h3>
+              <FontAwesomeIcon icon={faHistory} />
+              Payment History
+            </h3>
+            <div className="total-payments">
+              Total Paid: <strong>{formatCurrency(paidAmount)}</strong>
+            </div>
+          </div>
+
+          {purchase.payments && purchase.payments.length > 0 ? (
+            <div className="table-responsive">
+              <table className="payment-history-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Payment Date</th>
+                    <th>Amount</th>
+                    <th>Method</th>
+                    <th>Reference</th>
+                    <th>Recorded By</th>
+                    <th>Recorded At</th>
+                    <th>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {purchase.payments.map((payment, index) => (
+                    <tr key={payment.id}>
+                      <td>{index + 1}</td>
+                      <td>{formatDate(payment.payment_date)}</td>
+                      <td className="text-right paid-amount">{formatCurrency(payment.amount)}</td>
+                      <td>
+                        <span className={`payment-method-badge ${payment.payment_method?.toLowerCase()}`}>
+                          {payment.payment_method?.replace('_', ' ')}
+                        </span>
+                      </td>
+                      <td>{payment.check_number || '-'}</td>
+                      <td>{payment.created_by_name || '-'}</td>
+                      <td>{formatDateTime(payment.created_at)}</td>
+                      <td>{payment.notes || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td colSpan="2" className="text-right"><strong>Total:</strong></td>
+                    <td className="text-right paid-amount"><strong>{formatCurrency(paidAmount)}</strong></td>
+                    <td colSpan="5"></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          ) : (
+            <div className="empty-state-small">
+              <p>No payments recorded yet.</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Returns Tab */}
+      {activeTab === 'returns' && (
+        <div className="items-card">
+          <div className="card-header">
+            <h3>
+              <FontAwesomeIcon icon={faUndo} />
+              Purchase Returns
+            </h3>
+            <div className="total-returns">
+              Total Returns: <strong className="returns-amount">-{formatCurrency(totalReturns)}</strong>
+            </div>
+          </div>
+
+          {purchase.returns && purchase.returns.length > 0 ? (
+            <div className="table-responsive">
+              <table className="returns-history-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Return #</th>
+                    <th>Return Date</th>
+                    <th className="text-right">Subtotal</th>
+                    <th className="text-right">VAT</th>
+                    <th className="text-right">Total</th>
+                    <th className="text-right">Settled</th>
+                    <th className="text-right">Balance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {purchase.returns.map((returnItem, index) => (
+                    <tr key={returnItem.id}>
+                      <td>{index + 1}</td>
+                      <td>
+                        <span className="return-badge">{returnItem.return_number}</span>
+                      </td>
+                      <td>{formatDate(returnItem.return_date)}</td>
+                      <td className="text-right">{formatCurrency(returnItem.subtotal || 0)}</td>
+                      <td className="text-right">{formatCurrency(returnItem.vat_amount || 0)}</td>
+                      <td className="text-right returns-amount">{formatCurrency(returnItem.return_total || returnItem.total_amount || 0)}</td>
+                      <td className="text-right">{formatCurrency(returnItem.settled_amount || 0)}</td>
+                      <td className="text-right due-amount">{formatCurrency(returnItem.balance_amount || 0)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td colSpan="5" className="text-right"><strong>Total Returns:</strong></td>
+                    <td className="text-right returns-amount"><strong>-{formatCurrency(totalReturns)}</strong></td>
+                    <td colSpan="2"></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          ) : (
+            <div className="empty-state-small">
+              <p>No returns recorded for this purchase.</p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Remarks Card */}
       {purchase.remarks && (
@@ -461,7 +675,7 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
         </div>
       )}
 
-      {/* Action Buttons - Only show if not in modal */}
+      {/* Action Buttons */}
       {!isModal && (
         <div className="details-actions">
           <button onClick={handleBack} className="btn-secondary">

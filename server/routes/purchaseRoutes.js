@@ -152,6 +152,8 @@ router.get('/summary', paymentHistoryController.getPaymentSummary);
 router.get('/recent', paymentHistoryController.getRecentPayments);
 router.post('/update-statuses', purchaseController.updatePaymentStatuses);
 
+router.get('/:id/return', purchaseController.getPurchaseReturnsForBill);
+
 // Parameterized routes must come LAST
 router.get('/:id', purchaseController.getPurchaseById);
 router.put('/:id', purchaseController.updatePurchase);

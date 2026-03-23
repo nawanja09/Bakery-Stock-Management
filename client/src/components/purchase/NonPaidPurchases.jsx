@@ -7,13 +7,15 @@ import {
   faEye, 
   faCalendarAlt,
   faBuilding,
-  faUser,
   faCreditCard,
   faCheckCircle,
   faExclamationTriangle,
   faClock,
   faHistory,
-  faFileInvoice
+  faFileInvoice,
+  faFilter,
+  faTimes,
+  faSearch
 } from '@fortawesome/free-solid-svg-icons';
 import dayjs from 'dayjs';
 import { usePopup } from '../context/PopupContext';
@@ -30,10 +32,12 @@ const NonPaidPurchases = () => {
   const [suppliers, setSuppliers] = useState([]);
   const [selectedPurchase, setSelectedPurchase] = useState(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
   const [summary, setSummary] = useState({
     total_outstanding: 0,
     non_paid_count: 0,
-    partially_paid_count: 0
+    partially_paid_count: 0,
+    total_bills: 0
   });
   
   const { showPopup } = usePopup();
@@ -50,7 +54,7 @@ const NonPaidPurchases = () => {
     try {
       setLoading(true);
       
-      // Fetch non-paid purchases
+      // Fetch non-paid purchases (balance > 0)
       const purchasesRes = await api.get('/purchases/non-paid');
       setPurchases(purchasesRes.data);
       setFilteredPurchases(purchasesRes.data);
@@ -67,7 +71,8 @@ const NonPaidPurchases = () => {
       setSummary({
         total_outstanding: totalOutstanding,
         non_paid_count: nonPaidCount,
-        partially_paid_count: partiallyPaidCount
+        partially_paid_count: partiallyPaidCount,
+        total_bills: purchasesRes.data.length
       });
 
     } catch (error) {
@@ -104,7 +109,7 @@ const NonPaidPurchases = () => {
 
   const handlePaymentComplete = (result) => {
     setShowPaymentModal(false);
-    showPopup('success', `Payment of Rs. ${result.amount} recorded successfully!`);
+    showPopup('success', `Payment of ${formatCurrency(result.amount)} recorded successfully!`);
     fetchData(); // Refresh the list
   };
 
@@ -120,10 +125,24 @@ const NonPaidPurchases = () => {
     return dayjs(date).format('DD MMM YYYY');
   };
 
-  const getDaysOverdue = (purchaseDate, balanceAmount) => {
-    if (balanceAmount <= 0) return 0;
-    const days = dayjs().diff(dayjs(purchaseDate), 'day');
-    return days;
+  const getStatusBadge = (status) => {
+    switch(status) {
+      case 'Partially Paid':
+        return { class: 'partially-paid', icon: faExclamationTriangle, text: 'Partially Paid' };
+      default:
+        return { class: 'non-paid', icon: faClock, text: 'Non-Paid' };
+    }
+  };
+
+  const getOverdueClass = (days) => {
+    if (days > 30) return 'critical';
+    if (days > 15) return 'warning';
+    return 'normal';
+  };
+
+  const clearFilters = () => {
+    setSearchQuery('');
+    setSupplierFilter('');
   };
 
   if (loading) {
@@ -143,7 +162,7 @@ const NonPaidPurchases = () => {
             <FontAwesomeIcon icon={faMoneyBillWave} className="header-icon" />
             Outstanding Bills
           </h1>
-          <p className="subtitle">Manage non-paid and partially paid purchases</p>
+          <p className="subtitle">Bills with pending payments (Balance &gt; 0)</p>
         </div>
         <Link to="/purchase/new" className="btn-primary">
           <FontAwesomeIcon icon={faFileInvoice} />
@@ -160,77 +179,95 @@ const NonPaidPurchases = () => {
           <div className="summary-details">
             <span className="summary-label">Total Outstanding</span>
             <span className="summary-value">{formatCurrency(summary.total_outstanding)}</span>
+            <span className="summary-sub">{summary.total_bills} bills</span>
           </div>
         </div>
 
         <div className="summary-card non-paid">
           <div className="summary-icon">
-            <FontAwesomeIcon icon={faExclamationTriangle} />
+            <FontAwesomeIcon icon={faClock} />
           </div>
           <div className="summary-details">
             <span className="summary-label">Non-Paid Bills</span>
             <span className="summary-value">{summary.non_paid_count}</span>
+            <span className="summary-sub">No payment made</span>
           </div>
         </div>
 
         <div className="summary-card partially-paid">
           <div className="summary-icon">
-            <FontAwesomeIcon icon={faClock} />
+            <FontAwesomeIcon icon={faExclamationTriangle} />
           </div>
           <div className="summary-details">
             <span className="summary-label">Partially Paid</span>
             <span className="summary-value">{summary.partially_paid_count}</span>
+            <span className="summary-sub">Partial payments made</span>
           </div>
         </div>
       </div>
 
-      {/* Filters */}
+      {/* Filters Section */}
       <div className="filters-card">
-        <div className="filters-grid">
-          <div className="filter-group">
-            <label>
-              <FontAwesomeIcon icon={faEye} />
-              Search
-            </label>
-            <input
-              type="text"
-              placeholder="Invoice #, Supplier..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="filter-input"
-            />
+        <div className="filters-header" onClick={() => setShowFilters(!showFilters)}>
+          <div className="filters-title">
+            <FontAwesomeIcon icon={faFilter} />
+            <h3>Filters</h3>
+            {(searchQuery || supplierFilter) && (
+              <span className="active-filters-badge">
+                {[searchQuery, supplierFilter].filter(Boolean).length}
+              </span>
+            )}
           </div>
-
-          <div className="filter-group">
-            <label>
-              <FontAwesomeIcon icon={faBuilding} />
-              Supplier
-            </label>
-            <select
-              value={supplierFilter}
-              onChange={(e) => setSupplierFilter(e.target.value)}
-              className="filter-select"
-            >
-              <option value="">All Suppliers</option>
-              {suppliers.map(supplier => (
-                <option key={supplier} value={supplier}>{supplier}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="filter-group">
-            <label>&nbsp;</label>
-            <button 
-              onClick={() => {
-                setSearchQuery('');
-                setSupplierFilter('');
-              }}
-              className="btn-clear"
-            >
-              Clear Filters
-            </button>
-          </div>
+          <button className="toggle-filters">
+            {showFilters ? '−' : '+'}
+          </button>
         </div>
+
+        {showFilters && (
+          <div className="filters-content">
+            <div className="filters-grid">
+              <div className="filter-group">
+                <label>
+                  <FontAwesomeIcon icon={faSearch} />
+                  Search
+                </label>
+                <input
+                  type="text"
+                  placeholder="Invoice #, Supplier..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="filter-input"
+                />
+              </div>
+
+              <div className="filter-group">
+                <label>
+                  <FontAwesomeIcon icon={faBuilding} />
+                  Supplier
+                </label>
+                <select
+                  value={supplierFilter}
+                  onChange={(e) => setSupplierFilter(e.target.value)}
+                  className="filter-select"
+                >
+                  <option value="">All Suppliers</option>
+                  {suppliers.map(supplier => (
+                    <option key={supplier} value={supplier}>{supplier}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="filter-actions">
+              <button onClick={clearFilters} className="btn-clear">
+                Clear Filters
+              </button>
+              <span className="result-count">
+                {filteredPurchases.length} {filteredPurchases.length === 1 ? 'bill' : 'bills'} found
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Table */}
@@ -239,7 +276,11 @@ const NonPaidPurchases = () => {
           <div className="empty-state">
             <div className="empty-icon">✅</div>
             <h3>No Outstanding Bills</h3>
-            <p>All purchases are paid or no purchases found matching your criteria.</p>
+            <p>All purchases are paid or no bills match your criteria.</p>
+            <Link to="/purchase/new" className="btn-primary">
+              <FontAwesomeIcon icon={faFileInvoice} />
+              Create New Purchase
+            </Link>
           </div>
         ) : (
           <table className="purchase-table">
@@ -249,17 +290,18 @@ const NonPaidPurchases = () => {
                 <th>Date</th>
                 <th>Supplier</th>
                 <th>Company</th>
-                <th className="text-right">Total</th>
-                <th className="text-right">Paid</th>
-                <th className="text-right">Balance</th>
+                <th className="amount-col">Total</th>
+                <th className="amount-col">Paid</th>
+                <th className="amount-col">Balance</th>
                 <th>Status</th>
                 <th>Days Overdue</th>
                 <th>Actions</th>
-              </tr>
+               </tr>
             </thead>
             <tbody>
               {filteredPurchases.map(purchase => {
-                const daysOverdue = getDaysOverdue(purchase.purchase_date, purchase.balance_amount);
+                const statusInfo = getStatusBadge(purchase.payment_status);
+                const daysOverdue = purchase.days_overdue || 0;
                 
                 return (
                   <tr key={purchase.id}>
@@ -278,23 +320,18 @@ const NonPaidPurchases = () => {
                     <td>
                       <span className="company-badge">{purchase.company_name}</span>
                     </td>
-                    <td className="text-right total-col">
-                      {formatCurrency(purchase.total_with_vat)}
-                    </td>
-                    <td className="text-right">
-                      {formatCurrency(purchase.paid_amount)}
-                    </td>
-                    <td className="text-right due-amount">
-                      {formatCurrency(purchase.balance_amount)}
-                    </td>
+                    <td className="amount-col total-col">{formatCurrency(purchase.total_with_vat)}</td>
+                    <td className="amount-col">{formatCurrency(purchase.paid_amount)}</td>
+                    <td className="amount-col due-amount">{formatCurrency(purchase.balance_amount)}</td>
                     <td>
-                      <span className={`payment-badge ${purchase.payment_status === 'Non-Paid' ? 'non-paid' : 'partially-paid'}`}>
-                        {purchase.payment_status}
+                      <span className={`payment-badge ${statusInfo.class}`}>
+                        <FontAwesomeIcon icon={statusInfo.icon} />
+                        {statusInfo.text}
                       </span>
                     </td>
                     <td>
                       {daysOverdue > 0 ? (
-                        <span className={`days-badge ${daysOverdue > 30 ? 'critical' : daysOverdue > 15 ? 'warning' : 'normal'}`}>
+                        <span className={`days-badge ${getOverdueClass(daysOverdue)}`}>
                           {daysOverdue} days
                         </span>
                       ) : (

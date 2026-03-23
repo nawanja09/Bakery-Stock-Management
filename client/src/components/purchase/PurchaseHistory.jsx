@@ -1,7 +1,21 @@
+// src/components/purchase/PurchaseHistory.jsx
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSearch, faEdit, faEye, faPlus, faFileInvoice, faCalendar, faBuilding, faFilter } from '@fortawesome/free-solid-svg-icons';
+import { 
+  faSearch, 
+  faEdit, 
+  faEye, 
+  faPlus, 
+  faFileInvoice, 
+  faCalendar, 
+  faBuilding,
+  faCheckCircle,
+  faExclamationTriangle,
+  faClock,
+  faMoneyBillWave,
+  faFilter
+} from '@fortawesome/free-solid-svg-icons';
 import './Purchase.css';
 import api from '../../api';
 import dayjs from 'dayjs';
@@ -16,7 +30,7 @@ const PurchaseHistory = () => {
   const [endDate, setEndDate] = useState('');
   const [companies, setCompanies] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
-  const [vatFilter, setVatFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all'); // 🔥 New status filter
 
   useEffect(() => {
     const fetchData = async () => {
@@ -41,6 +55,7 @@ const PurchaseHistory = () => {
   useEffect(() => {
     let filtered = purchases;
 
+    // Search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(purchase =>
@@ -51,12 +66,14 @@ const PurchaseHistory = () => {
       );
     }
 
+    // Company filter
     if (companyFilter) {
       filtered = filtered.filter(purchase =>
-        purchase.company_id.toString() === companyFilter
+        purchase.company_id?.toString() === companyFilter
       );
     }
 
+    // Date range filter
     if (startDate) {
       filtered = filtered.filter(purchase =>
         dayjs(purchase.purchase_date).isAfter(dayjs(startDate).subtract(1, 'day'))
@@ -69,18 +86,14 @@ const PurchaseHistory = () => {
       );
     }
 
-    // VAT filter
-    if (vatFilter !== 'all') {
-      filtered = filtered.filter(purchase => {
-        const hasVat = purchase.supplier_vat_number && purchase.supplier_vat_number.trim() !== '';
-        return vatFilter === 'yes' ? hasVat : !hasVat;
-      });
+    // 🔥 Status filter (New)
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(purchase => purchase.payment_status === statusFilter);
     }
 
     setFilteredPurchases(filtered);
-  }, [purchases, searchQuery, companyFilter, startDate, endDate, vatFilter]);
+  }, [purchases, searchQuery, companyFilter, startDate, endDate, statusFilter]);
 
-  // Format currency
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-LK', {
       style: 'currency',
@@ -89,42 +102,38 @@ const PurchaseHistory = () => {
     }).format(amount);
   };
 
-  // Format date
   const formatDate = (date) => {
     return dayjs(date).format('DD MMM YYYY');
   };
 
-  // Handle search
-  const handleSearch = (e) => {
-    setSearchQuery(e.target.value);
+  const getStatusBadge = (status) => {
+    switch(status) {
+      case 'Paid':
+        return { class: 'paid', icon: faCheckCircle, text: 'Paid' };
+      case 'Partially Paid':
+        return { class: 'partially-paid', icon: faExclamationTriangle, text: 'Partially Paid' };
+      default:
+        return { class: 'non-paid', icon: faClock, text: 'Non-Paid' };
+    }
   };
 
-  // Handle company filter
-  const handleCompanyFilter = (e) => {
-    setCompanyFilter(e.target.value);
-  };
-
-  // Handle date changes
-  const handleStartDateChange = (e) => {
-    setStartDate(e.target.value);
-  };
-
-  const handleEndDateChange = (e) => {
-    setEndDate(e.target.value);
-  };
-
-  // Handle VAT filter change
-  const handleVatFilterChange = (e) => {
-    setVatFilter(e.target.value);
-  };
-
-  // Clear all filters
   const clearFilters = () => {
     setSearchQuery('');
     setCompanyFilter('');
     setStartDate('');
     setEndDate('');
-    setVatFilter('all');
+    setStatusFilter('all');
+  };
+
+  // Calculate summary statistics
+  const summary = {
+    total_purchases: filteredPurchases.length,
+    total_amount: filteredPurchases.reduce((sum, p) => sum + parseFloat(p.total_with_vat), 0),
+    total_paid: filteredPurchases.reduce((sum, p) => sum + parseFloat(p.paid_amount), 0),
+    total_balance: filteredPurchases.reduce((sum, p) => sum + parseFloat(p.balance_amount), 0),
+    paid_count: filteredPurchases.filter(p => p.payment_status === 'Paid').length,
+    non_paid_count: filteredPurchases.filter(p => p.payment_status === 'Non-Paid').length,
+    partially_paid_count: filteredPurchases.filter(p => p.payment_status === 'Partially Paid').length
   };
 
   if (loading) {
@@ -144,7 +153,7 @@ const PurchaseHistory = () => {
             <FontAwesomeIcon icon={faFileInvoice} className="header-icon" />
             Purchase History
           </h1>
-          <p className="subtitle">Manage and track all your purchases</p>
+          <p className="subtitle">Manage and track all your purchases with payment status</p>
         </div>
         <Link to="/purchase/new" className="btn-primary">
           <FontAwesomeIcon icon={faPlus} />
@@ -152,6 +161,43 @@ const PurchaseHistory = () => {
         </Link>
       </div>
 
+      {/* Summary Cards */}
+      <div className="summary-cards">
+        <div className="summary-card total">
+          <div className="summary-icon">💰</div>
+          <div className="summary-details">
+            <span className="summary-label">Total Purchases</span>
+            <span className="summary-value">{summary.total_purchases}</span>
+            <span className="summary-sub">{formatCurrency(summary.total_amount)}</span>
+          </div>
+        </div>
+        <div className="summary-card paid">
+          <div className="summary-icon">✅</div>
+          <div className="summary-details">
+            <span className="summary-label">Paid</span>
+            <span className="summary-value">{summary.paid_count}</span>
+            <span className="summary-sub">{formatCurrency(summary.total_paid)}</span>
+          </div>
+        </div>
+        <div className="summary-card partially">
+          <div className="summary-icon">⚠️</div>
+          <div className="summary-details">
+            <span className="summary-label">Partially Paid</span>
+            <span className="summary-value">{summary.partially_paid_count}</span>
+            <span className="summary-sub">{formatCurrency(summary.total_balance)}</span>
+          </div>
+        </div>
+        <div className="summary-card non-paid">
+          <div className="summary-icon">⏰</div>
+          <div className="summary-details">
+            <span className="summary-label">Non-Paid</span>
+            <span className="summary-value">{summary.non_paid_count}</span>
+            <span className="summary-sub">{formatCurrency(summary.total_balance)}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Filters Card */}
       <div className="filters-card">
         <div className="filters-header" onClick={() => setShowFilters(!showFilters)}>
           <div className="filters-title">
@@ -175,7 +221,7 @@ const PurchaseHistory = () => {
                   type="text"
                   placeholder="Invoice, supplier, company..."
                   value={searchQuery}
-                  onChange={handleSearch}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                   className="filter-input"
                 />
               </div>
@@ -187,7 +233,7 @@ const PurchaseHistory = () => {
                 </label>
                 <select
                   value={companyFilter}
-                  onChange={handleCompanyFilter}
+                  onChange={(e) => setCompanyFilter(e.target.value)}
                   className="filter-select"
                 >
                   <option value="">All Companies</option>
@@ -208,30 +254,34 @@ const PurchaseHistory = () => {
                   <input
                     type="date"
                     value={startDate}
-                    onChange={handleStartDateChange}
+                    onChange={(e) => setStartDate(e.target.value)}
                     placeholder="Start date"
                   />
                   <span>to</span>
                   <input
                     type="date"
                     value={endDate}
-                    onChange={handleEndDateChange}
+                    onChange={(e) => setEndDate(e.target.value)}
                     placeholder="End date"
                   />
                 </div>
               </div>
 
-              {/* VAT filter dropdown */}
+              {/* 🔥 Status Filter */}
               <div className="filter-group">
-                <label>VAT Status</label>
+                <label>
+                  <FontAwesomeIcon icon={faCheckCircle} />
+                  Payment Status
+                </label>
                 <select
-                  value={vatFilter}
-                  onChange={handleVatFilterChange}
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
                   className="filter-select"
                 >
-                  <option value="all">All</option>
-                  <option value="yes">Yes (has VAT)</option>
-                  <option value="no">No (no VAT)</option>
+                  <option value="all">All Status</option>
+                  <option value="Paid">Paid</option>
+                  <option value="Partially Paid">Partially Paid</option>
+                  <option value="Non-Paid">Non-Paid</option>
                 </select>
               </div>
             </div>
@@ -248,6 +298,7 @@ const PurchaseHistory = () => {
         )}
       </div>
 
+      {/* Table */}
       <div className="table-container">
         {filteredPurchases.length === 0 ? (
           <div className="empty-state">
@@ -266,26 +317,23 @@ const PurchaseHistory = () => {
                 <th>Invoice #</th>
                 <th>Date</th>
                 <th>Supplier</th>
-                <th>VAT Number</th>
                 <th>Company</th>
-                <th className="amount-col">Subtotal</th>
-                <th className="amount-col">VAT</th>
                 <th className="amount-col">Total</th>
                 <th className="amount-col">Paid</th>
-                <th className="amount-col">Due</th>
-                <th>Payment</th>
-                <th>Payment Status</th>
+                <th className="amount-col">Balance</th>
+                <th>Status</th>
+                <th>Payment Method</th>
                 <th>Actions</th>
-              </tr>
+               </tr>
             </thead>
             <tbody>
               {filteredPurchases.map(purchase => {
-                const dueAmount = purchase.total_with_vat - purchase.paid_amount;
+                const statusInfo = getStatusBadge(purchase.payment_status);
                 return (
                   <tr key={purchase.id}>
                     <td className="invoice-cell">
                       <span className="invoice-badge">{purchase.invoice_no}</span>
-                    </td>
+                     </td>
                     <td>{formatDate(purchase.purchase_date)}</td>
                     <td>
                       <div className="supplier-info">
@@ -296,30 +344,22 @@ const PurchaseHistory = () => {
                       </div>
                     </td>
                     <td>
-                      {purchase.supplier_vat_number ? (
-                        <span className="vat-badge">{purchase.supplier_vat_number}</span>
-                      ) : (
-                        <span className="no-vat">—</span>
-                      )}
-                    </td>
-                    <td>
                       <span className="company-badge">{purchase.company_name}</span>
                     </td>
-                    <td className="amount-col">{formatCurrency(purchase.subtotal || purchase.bill_amount)}</td>
-                    <td className="amount-col vat-col">{formatCurrency(purchase.vat_amount || 0)}</td>
-                    <td className="amount-col total-col">{formatCurrency(purchase.total_with_vat || purchase.bill_amount)}</td>
+                    <td className="amount-col total-col">{formatCurrency(purchase.total_with_vat)}</td>
                     <td className="amount-col">{formatCurrency(purchase.paid_amount)}</td>
-                    <td className={`amount-col ${dueAmount > 0 ? 'due-amount' : 'paid-amount'}`}>
-                      {formatCurrency(dueAmount)}
+                    <td className={`amount-col ${purchase.balance_amount > 0 ? 'due-amount' : 'paid-amount'}`}>
+                      {formatCurrency(purchase.balance_amount)}
                     </td>
                     <td>
-                      <span className={`payment-badge ${purchase.payment_method.toLowerCase()}`}>
-                        {purchase.payment_method.replace('_', ' ')}
+                      <span className={`payment-badge ${statusInfo.class}`}>
+                        <FontAwesomeIcon icon={statusInfo.icon} />
+                        {statusInfo.text}
                       </span>
                     </td>
                     <td>
-                      <span className={`payment-badge ${purchase.payment_status?.toLowerCase().replace(' ', '-') || 'non-paid'}`}>
-                        {purchase.payment_status || 'Non-Paid'}
+                      <span className="payment-method-badge">
+                        {purchase.payment_method?.replace('_', ' ')}
                       </span>
                     </td>
                     <td className="actions-cell">
