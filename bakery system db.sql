@@ -2094,3 +2094,7 @@ BEGIN
 END$$
 
 DELIMITER ;
+
+-- Add deleted column to purchases table for soft delete
+ALTER TABLE purchases 
+ADD COLUMN deleted BOOLEAN NOT NULL DEFAULT FALSE AFTER remarks;
