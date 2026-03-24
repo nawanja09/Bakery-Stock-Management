@@ -22,7 +22,6 @@ import {
   faShoppingCart
 } from '@fortawesome/free-solid-svg-icons';
 import Select from 'react-select';
-import dayjs from 'dayjs';
 import './Purchase.css';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
@@ -40,6 +39,9 @@ const AddPurchase = () => {
   const [supplierVatRegistered, setSupplierVatRegistered] = useState(false);
   const [supplierVatNumber, setSupplierVatNumber] = useState('');
   const [previousPurchasePrices, setPreviousPurchasePrices] = useState({});
+  const [selectedSupplierOption, setSelectedSupplierOption] = useState(null);
+  const [selectedPaymentOption, setSelectedPaymentOption] = useState(null);
+  const [selectedCompanyOption, setSelectedCompanyOption] = useState(null);
   
   const VAT_RATE = 18;
 
@@ -239,6 +241,132 @@ const AddPurchase = () => {
     if (index !== formData.items.length - 1) {
       setAutoAddedRow(false);
     }
+  };
+
+  // Payment method options
+  const paymentMethodOptions = [
+    { value: 'CASH', label: '💰 Cash', icon: '💰' },
+    { value: 'BANK_TRANSFER', label: '🏦 Bank Transfer', icon: '🏦' },
+    { value: 'CHEQUE', label: '📝 Cheque', icon: '📝' }
+  ];
+
+  // Supplier options for react-select
+  const supplierOptions = suppliers.map(supplier => ({
+    value: supplier.id,
+    label: `${supplier.name} ${supplier.vat_registered ? '✓ VAT Reg' : ''}`,
+    vat_registered: supplier.vat_registered,
+    vat_number: supplier.vat_number,
+    address: supplier.address
+  }));
+
+  // Company options for react-select
+  const companyOptions = companies.map(company => ({
+    value: company.id,
+    label: `🏢 ${company.name}`,
+    name: company.name
+  }));
+
+  // Handler for supplier select
+  const handleSupplierSelect = (selected) => {
+    setSelectedSupplierOption(selected);
+    const supplier = suppliers.find(s => s.id === selected?.value);
+    
+    setSelectedSupplier(supplier);
+    setSupplierVatRegistered(supplier?.vat_registered || false);
+    setSupplierVatNumber(supplier?.vat_number || '');
+    
+    setFormData(prev => ({
+      ...prev,
+      supplier_id: selected?.value || ''
+    }));
+
+    // Recalculate totals with new supplier VAT status
+    if (supplier) {
+      const newItems = formData.items.map(item => {
+        const { amount, vat, lineTotal } = calculateItemValues(item, supplier.vat_registered || false);
+        return { ...item, amount, vat, lineTotal };
+      });
+
+      const { subtotal, totalVat, grandTotal, balanceAmount, balanceStatus } = calculateTotals(
+        newItems, 
+        supplier.vat_registered || false,
+        formData.paid_amount
+      );
+
+      setFormData(prev => ({
+        ...prev,
+        items: newItems,
+        subtotal,
+        vat_amount: totalVat,
+        total_with_vat: grandTotal,
+        balance_amount: balanceAmount,
+        balance_status: balanceStatus
+      }));
+    }
+  };
+
+  // Handler for payment method select
+  const handlePaymentSelect = (selected) => {
+    setSelectedPaymentOption(selected);
+    setFormData(prev => ({
+      ...prev,
+      payment_method: selected?.value || 'CASH'
+    }));
+  };
+
+  // Handler for company select
+  const handleCompanySelect = (selected) => {
+    setSelectedCompanyOption(selected);
+    setFormData(prev => ({
+      ...prev,
+      company_id: selected?.value || ''
+    }));
+  };
+
+  // Custom styles for react-select to prevent text cutting
+  const selectStyles = {
+    control: (base, state) => ({
+      ...base,
+      height: '42px',          // ⬅️ match input height
+      minHeight: '42px',
+      borderRadius: '6px',
+      borderColor: state.isFocused ? '#3b82f6' : '#ced4da',
+      boxShadow: state.isFocused ? '0 0 0 2px rgba(59, 130, 246, 0.1)' : 'none',
+      '&:hover': {
+        borderColor: '#3b82f6'
+      }
+    }),
+
+    valueContainer: (base) => ({
+      ...base,
+      height: '42px',
+      padding: '0 10px',   // ⬅️ match input padding
+      display: 'flex',
+      alignItems: 'center'
+    }),
+
+    input: (base) => ({
+      ...base,
+      margin: 0,
+      padding: 0
+    }),
+
+    indicatorsContainer: (base) => ({
+      ...base,
+      height: '42px'
+    }),
+
+    placeholder: (base) => ({
+      ...base,
+      color: '#6c757d'
+    }),
+
+    singleValue: (base) => ({
+      ...base,
+      color: '#212529'
+    }),
+
+    menuPortal: (base) => ({ ...base, zIndex: 9999 })
   };
 
   const addItemRow = () => {
@@ -532,24 +660,30 @@ const AddPurchase = () => {
               />
             </div>
 
+            {/* Supplier with react-select */}
             <div className="form-group">
               <label>
                 <FontAwesomeIcon icon={faUser} />
-                Supplier
+                Supplier <span className="required-star">*</span>
               </label>
-              <select
-                value={formData.supplier_id}
-                onChange={handleSupplierChange}
-                className="form-control"
-                required
-              >
-                <option value="">Select supplier</option>
-                {suppliers.map(supplier => (
-                  <option key={supplier.id} value={supplier.id}>
-                    {supplier.name} {supplier.vat_registered ? '• VAT Reg' : ''}
-                  </option>
-                ))}
-              </select>
+              <Select
+                options={supplierOptions}
+                value={selectedSupplierOption}
+                onChange={handleSupplierSelect}
+                placeholder="Select supplier..."
+                isSearchable
+                styles={selectStyles}
+                className="react-select-container"
+                classNamePrefix="react-select"
+                menuPortalTarget={document.body}
+              />
+              {selectedSupplier && (
+                <div className="field-hint">
+                  <small>
+                    📍 {selectedSupplier.address || 'Address not available'}
+                  </small>
+                </div>
+              )}
             </div>
 
             <div className="form-group">
@@ -562,43 +696,43 @@ const AddPurchase = () => {
                 value={supplierVatNumber}
                 readOnly
                 className={`form-control ${supplierVatRegistered ? 'vat-active' : 'vat-inactive'}`}
-                placeholder={supplierVatRegistered ? "VAT registered" : "Not VAT registered"}
+                placeholder={supplierVatRegistered ? "VAT registered ✓" : "Not VAT registered"}
               />
             </div>
 
+            {/* Payment Method with react-select */}
             <div className="form-group">
               <label>
                 <FontAwesomeIcon icon={faCreditCard} />
-                Payment Method
+                Payment Method <span className="required-star">*</span>
               </label>
-              <select
-                value={formData.payment_method}
-                onChange={(e) => setFormData({...formData, payment_method: e.target.value})}
-                className="form-control"
-                required
-              >
-                <option value="CASH">Cash</option>
-                <option value="BANK_TRANSFER">Bank Transfer</option>
-                <option value="CHEQUE">Cheque</option>
-              </select>
+              <Select
+                options={paymentMethodOptions}
+                value={selectedPaymentOption}
+                onChange={handlePaymentSelect}
+                placeholder="Select payment method..."
+                styles={selectStyles}
+                className="react-select-container"
+                classNamePrefix="react-select"
+              />
             </div>
 
+            {/* Company with react-select */}
             <div className="form-group">
               <label>
                 <FontAwesomeIcon icon={faBuilding} />
-                Company
+                Company <span className="required-star">*</span>
               </label>
-              <select
-                value={formData.company_id}
-                onChange={(e) => setFormData({...formData, company_id: e.target.value})}
-                className="form-control"
-                required
-              >
-                <option value="">Select company</option>
-                {companies.map(company => (
-                  <option key={company.id} value={company.id}>{company.name}</option>
-                ))}
-              </select>
+              <Select
+                options={companyOptions}
+                value={selectedCompanyOption}
+                onChange={handleCompanySelect}
+                placeholder="Select company..."
+                isSearchable
+                styles={selectStyles}
+                className="react-select-container"
+                classNamePrefix="react-select"
+              />
             </div>
 
             <div className="form-group">
@@ -735,7 +869,7 @@ const AddPurchase = () => {
                         <td className="text-center">
                           <button 
                             type="button" 
-                            className="btn-remove-item"
+                            className="btn-delete-item"
                             onClick={() => removeItemRow(index)}
                             disabled={formData.items.length <= 1}
                             title="Remove item"
