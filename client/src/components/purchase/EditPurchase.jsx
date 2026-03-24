@@ -762,7 +762,7 @@ const EditPurchase = () => {
                       <td className="action-cell">
                         <button 
                           type="button" 
-                          className="btn-remove-item"
+                          className="btn-delete-item"
                           onClick={() => removeItemRow(index)}
                           disabled={formData.items.length <= 1}
                           title="Remove this item"
