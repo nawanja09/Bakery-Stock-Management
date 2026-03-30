@@ -578,60 +578,6 @@ const getPurchaseReturnByNumber = async (req, res) => {
   }
 };
 
-// Get VAT returns data for reporting
-const getVATReturns = async (req, res) => {
-  try {
-    const { startDate, endDate } = req.query;
-
-    if (!startDate || !endDate) {
-      return res.status(400).json({ error: 'Start date and end date are required' });
-    }
-
-    const [returns] = await pool.query(`
-      SELECT 
-        pr.id,
-        pr.return_number AS tax_credit_no,
-        DATE_FORMAT(pr.return_date, '%Y-%m-%d') AS return_date,
-        pr.subtotal AS value_of_return,
-        pr.vat_amount,
-        pr.total_amount,
-        s.name AS supplier_name,
-        s.vat_number AS tin_no,
-        p.invoice_no AS invoice_no,
-        DATE_FORMAT(p.purchase_date, '%Y-%m-%d') AS invoice_date,
-        ROW_NUMBER() OVER (ORDER BY pr.return_date, pr.id) AS serial_no
-      FROM purchase_returns pr
-      JOIN supplier s ON pr.supplier_id = s.id
-      LEFT JOIN purchases p ON pr.purchase_id = p.id
-      WHERE s.vat_registered = 1 
-        AND s.vat_number IS NOT NULL 
-        AND pr.vat_amount > 0
-        AND DATE(pr.return_date) BETWEEN ? AND ?
-      ORDER BY pr.return_date ASC, pr.id ASC
-    `, [startDate, endDate]);
-
-    // Format the data for VAT report
-    const formattedReturns = returns.map((ret, index) => ({
-      serial_no: index + 1,
-      tin_no: ret.tin_no,
-      invoice_date: ret.invoice_date,
-      invoice_no: ret.invoice_no,
-      tax_credit: 'Credit',
-      return_date: ret.return_date,
-      tax_credit_no: ret.tax_credit_no,
-      value_of_return: parseFloat(ret.value_of_return),
-      vat_amount: parseFloat(ret.vat_amount),
-      supplier_name: ret.supplier_name,
-      total_amount: parseFloat(ret.total_amount)
-    }));
-
-    res.json(formattedReturns);
-  } catch (error) {
-    console.error('Error fetching VAT returns:', error);
-    res.status(500).json({ error: 'Server error' });
-  }
-};
-
 // Get VAT summary
 const getVATSummary = async (req, res) => {
   try {
@@ -793,6 +739,71 @@ const getItemStock = async (req, res) => {
   }
 };
 
+// Get VAT returns summary
+const getVATReturnsSummary = async (req, res) => {
+  const { startDate, endDate } = req.query;
+
+  if (!startDate || !endDate) {
+    return res.status(400).json({ error: 'startDate and endDate are required' });
+  }
+
+  try {
+    const [[summary]] = await pool.query(`
+      SELECT
+        COUNT(DISTINCT pr.id)              AS total_returns,
+        COALESCE(SUM(pri.quantity * pri.unit_price), 0) AS total_return_value,
+        COALESCE(SUM(pri.vat_amount), 0)   AS total_vat_credit
+      FROM purchase_returns pr
+      JOIN supplier s               ON pr.supplier_id = s.id
+      JOIN purchase_return_items pri ON pr.id = pri.return_id
+      WHERE s.vat_registered = 1
+        AND DATE(pr.return_date) BETWEEN ? AND ?
+    `, [startDate, endDate]);
+
+    res.json(summary);
+  } catch (error) {
+    console.error('Error fetching VAT summary:', error);
+    res.status(500).json({ error: 'Server error: ' + error.message });
+  }
+};
+
+// Get VAT returns report
+const getVATReturns = async (req, res) => {
+  const { startDate, endDate } = req.query;
+
+  if (!startDate || !endDate) {
+    return res.status(400).json({ error: 'startDate and endDate are required' });
+  }
+
+  try {
+    const [rows] = await pool.query(`
+      SELECT 
+        ROW_NUMBER() OVER (ORDER BY pr.return_date, pr.id) AS serial_no,
+        s.vat_number                  AS tin_no,
+        p.purchase_date               AS invoice_date,
+        pr.return_number              AS invoice_no,  -- ← Changed: Use return_number instead of purchase invoice
+        pr.return_date,
+        pr.return_number              AS tax_credit_no,
+        SUM(pri.quantity * pri.unit_price) AS value_of_return,
+        SUM(COALESCE(pri.vat_amount, 0))   AS vat_amount
+      FROM purchase_returns pr
+      JOIN supplier s          ON pr.supplier_id = s.id
+      LEFT JOIN purchases p    ON pr.purchase_id = p.id
+      JOIN purchase_return_items pri ON pr.id = pri.return_id
+      WHERE s.vat_registered = 1
+        AND DATE(pr.return_date) BETWEEN ? AND ?
+      GROUP BY pr.id, s.vat_number, p.purchase_date, 
+               pr.return_date, pr.return_number
+      ORDER BY pr.return_date, pr.id
+    `, [startDate, endDate]);
+
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching VAT returns:', error);
+    res.status(500).json({ error: 'Server error: ' + error.message });
+  }
+};
+
 module.exports = {
   getPurchasesForReturn,
   getPurchaseItemsForReturn,
@@ -805,5 +816,6 @@ module.exports = {
   getPurchaseReturnById,
   getPurchaseReturnByNumber,
   getPurchaseReturnsForBill,
-  getItemStock
+  getItemStock,
+  getVATReturnsSummary
 };

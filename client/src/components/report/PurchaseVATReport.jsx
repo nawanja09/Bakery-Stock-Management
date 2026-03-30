@@ -235,7 +235,6 @@ const PurchaseVATReport = () => {
               <th>Tax Credit No</th>
               <th>Value of Tax Credit Note</th>
               <th>VAT Amount</th>
-              <th>Disallowable VAT Amount</th>
             </tr>
           </thead>
           <tbody>

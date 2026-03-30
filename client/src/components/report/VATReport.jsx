@@ -69,40 +69,59 @@ const VATReport = () => {
     setSelectedPurchaseId(null);
   };
 
-  // Process data for VAT report
+  // Process data for VAT report - Group by invoice
   const processVATData = () => {
     const vatData = [];
+    const invoiceMap = new Map();
 
     reportData.forEach(purchase => {
+      // Check if we already have this invoice
+      if (invoiceMap.has(purchase.id)) {
+        return;
+      }
+
+      let totalNetAmount = 0;
+      let totalVATAmount = 0;
+      let totalDisallowableVAT = 0;
+
       if (purchase.items && purchase.items.length > 0) {
         purchase.items.forEach(item => {
           const amount = parseFloat(item.quantity) * parseFloat(item.unit_price);
           const vatAmount = amount * 0.18;
-
-          vatData.push({
-            purchaseId: purchase.id, // Include purchase ID for navigation
-            invoiceDate: purchase.purchase_date,
-            invoiceNo: purchase.invoice_no,
-            supplierTIN: purchase.supplier_vat_number || '—',
-            supplierName: purchase.supplier_name,
-            netAmount: amount,
-            vatAmount: vatAmount
-          });
+          const vatApplicable = item.vat_applicable !== undefined ? item.vat_applicable : true;
+          
+          totalNetAmount += amount;
+          
+          // Check if VAT is applicable for this item
+          if (vatApplicable) {
+            totalVATAmount += vatAmount;
+          } else {
+            // If VAT is not applicable for this item, add to disallowable VAT
+            totalDisallowableVAT += vatAmount;
+          }
         });
       } else {
+        // Handle case where items might be in a different structure
         const netAmount = parseFloat(purchase.bill_amount || 0) - parseFloat(purchase.vat_amount || 0);
         const vatAmount = parseFloat(purchase.vat_amount || 0);
-
-        vatData.push({
-          purchaseId: purchase.id, // Include purchase ID for navigation
-          invoiceDate: purchase.purchase_date,
-          invoiceNo: purchase.invoice_no,
-          supplierTIN: purchase.supplier_vat_number || '—',
-          supplierName: purchase.supplier_name,
-          netAmount: netAmount,
-          vatAmount: vatAmount
-        });
+        totalNetAmount = netAmount;
+        totalVATAmount = vatAmount;
+        totalDisallowableVAT = 0;
       }
+
+      const invoiceData = {
+        purchaseId: purchase.id,
+        invoiceDate: purchase.purchase_date,
+        invoiceNo: purchase.invoice_no,
+        supplierTIN: purchase.supplier_vat_number || '—',
+        supplierName: purchase.supplier_name,
+        netAmount: totalNetAmount,
+        vatAmount: totalVATAmount,
+        disallowableVATAmount: totalDisallowableVAT
+      };
+
+      invoiceMap.set(purchase.id, invoiceData);
+      vatData.push(invoiceData);
     });
 
     // VAT FILTER APPLY
@@ -135,7 +154,8 @@ const VATReport = () => {
       'Supplier TIN Number',
       'Name of Supplier',
       'Net Amount (Rs.)',
-      'VAT Amount (18%) (Rs.)'
+      'VAT Amount (18%) (Rs.)',
+      'Disallowable VAT Amount (Rs.)'
     ]);
 
     vatData.forEach(item => {
@@ -145,7 +165,8 @@ const VATReport = () => {
         item.supplierTIN,
         item.supplierName,
         item.netAmount.toFixed(2),
-        item.vatAmount.toFixed(2)
+        item.vatAmount.toFixed(2),
+        item.disallowableVATAmount.toFixed(2)
       ]);
     });
 
@@ -153,6 +174,7 @@ const VATReport = () => {
 
     const totalNetAmount = vatData.reduce((sum, item) => sum + item.netAmount, 0);
     const totalVATAmount = vatData.reduce((sum, item) => sum + item.vatAmount, 0);
+    const totalDisallowableVAT = vatData.reduce((sum, item) => sum + item.disallowableVATAmount, 0);
     
     worksheetData.push([
       'TOTAL',
@@ -160,7 +182,8 @@ const VATReport = () => {
       '',
       '',
       totalNetAmount.toFixed(2),
-      totalVATAmount.toFixed(2)
+      totalVATAmount.toFixed(2),
+      totalDisallowableVAT.toFixed(2)
     ]);
 
     const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
@@ -171,7 +194,8 @@ const VATReport = () => {
       { wch: 20 },
       { wch: 30 },
       { wch: 15 },
-      { wch: 15 }
+      { wch: 15 },
+      { wch: 18 }
     ];
 
     const workbook = XLSX.utils.book_new();
@@ -184,6 +208,7 @@ const VATReport = () => {
 
   const totalNetAmount = vatData.reduce((sum, item) => sum + item.netAmount, 0);
   const totalVATAmount = vatData.reduce((sum, item) => sum + item.vatAmount, 0);
+  const totalDisallowableVAT = vatData.reduce((sum, item) => sum + item.disallowableVATAmount, 0);
 
   return (
     <div className="vat-report-container">
@@ -234,19 +259,6 @@ const VATReport = () => {
           </select>
         </div>
 
-        <div className="control-group">
-          <label>VAT Status</label>
-            <select
-              value={vatFilter}
-              onChange={handleVatFilterChange}
-              className="filter-select"
-            >
-            <option value="all">All</option>
-            <option value="yes">Yes (has VAT)</option>
-            <option value="no">No (no VAT)</option>
-          </select>
-        </div>
-
         <button 
           onClick={fetchVATReport}
           disabled={loading}
@@ -280,6 +292,7 @@ const VATReport = () => {
                   <th>Name of Supplier</th>
                   <th className="amount-col">Net Amount (Rs.)</th>
                   <th className="amount-col">VAT Amount (18%) (Rs.)</th>
+                  <th className="amount-col">Disallowable VAT Amount (Rs.)</th>
                 </tr>
               </thead>
               <tbody>
@@ -296,6 +309,7 @@ const VATReport = () => {
                     <td>{item.supplierName}</td>
                     <td className="amount-col">{item.netAmount.toFixed(2)}</td>
                     <td className="amount-col vat-amount">{item.vatAmount.toFixed(2)}</td>
+                    <td className="amount-col disallowable-vat-amount">{item.disallowableVATAmount.toFixed(2)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -304,6 +318,7 @@ const VATReport = () => {
                   <td colSpan="4" className="text-right"><strong>TOTAL</strong></td>
                   <td className="amount-col"><strong>{totalNetAmount.toFixed(2)}</strong></td>
                   <td className="amount-col vat-amount"><strong>{totalVATAmount.toFixed(2)}</strong></td>
+                  <td className="amount-col disallowable-vat-amount"><strong>{totalDisallowableVAT.toFixed(2)}</strong></td>
                 </tr>
               </tfoot>
             </table>
@@ -319,6 +334,10 @@ const VATReport = () => {
               <div className="summary-column vat">
                 <span>Total VAT (18%):</span>
                 <span>Rs. {totalVATAmount.toFixed(2)}</span>
+              </div>
+              <div className="summary-column disallowable-vat">
+                <span>Total Disallowable VAT:</span>
+                <span>Rs. {totalDisallowableVAT.toFixed(2)}</span>
               </div>
               <div className="summary-column total">
                 <span>Total with VAT:</span>
