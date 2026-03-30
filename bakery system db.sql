@@ -2098,3 +2098,18 @@ DELIMITER ;
 -- Add deleted column to purchases table for soft delete
 ALTER TABLE purchases 
 ADD COLUMN deleted BOOLEAN NOT NULL DEFAULT FALSE AFTER remarks;
+
+ALTER TABLE purchase_returns 
+MODIFY COLUMN purchase_id int NULL;
+
+-- First, check the current structure
+DESCRIBE purchase_returns;
+DESCRIBE purchase_return_items;
+
+-- Modify purchase_returns table to allow NULL purchase_id
+ALTER TABLE purchase_returns 
+MODIFY COLUMN purchase_id int NULL;
+
+-- Modify purchase_return_items table to allow NULL purchase_item_id
+ALTER TABLE purchase_return_items 
+MODIFY COLUMN purchase_item_id int NULL;

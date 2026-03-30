@@ -2,28 +2,44 @@
 const express = require('express');
 const router = express.Router();
 const purchaseReturnController = require('../controllers/purchaseReturnController');
-const auth = require('../middleware/authenticate');
 
-// VAT Report endpoints - Add these BEFORE the :id route
-router.get('/reports/vat-returns', auth, purchaseReturnController.getVATReturns);
-router.get('/reports/vat-summary', auth, purchaseReturnController.getVATSummary);
+// =============================================
+// STOCK ROUTES (MUST COME BEFORE PARAMETER ROUTES)
+// =============================================
+router.get('/stock/current', purchaseReturnController.getCurrentStock);
+router.get('/stock/item/:itemId', purchaseReturnController.getItemStock);
 
-// Get all purchases for return selection
-router.get('/purchases', auth, purchaseReturnController.getPurchasesForReturn);
+// =============================================
+// VAT ROUTES
+// =============================================
+router.get('/vat/returns', purchaseReturnController.getVATReturns);
+router.get('/vat/summary', purchaseReturnController.getVATSummary);
 
-// Get purchase items for a specific purchase
-router.get('/purchases/:purchaseId/items', auth, purchaseReturnController.getPurchaseItemsForReturn);
+// =============================================
+// PURCHASE RETURNS ROUTES
+// =============================================
+// Get all purchase returns
+router.get('/', purchaseReturnController.getAllPurchaseReturns);
 
-// Get supplier bills with balance for settlement
-router.get('/supplier/:supplierId/bills', auth, purchaseReturnController.getSupplierBillsWithBalance);
+// Get purchases for return selection
+router.get('/purchases', purchaseReturnController.getPurchasesForReturn);
+
+// Get purchase items for return by purchase ID
+router.get('/purchases/:purchaseId/items', purchaseReturnController.getPurchaseItemsForReturn);
+
+// Get supplier bills with balance
+router.get('/supplier/:supplierId/bills', purchaseReturnController.getSupplierBillsWithBalance);
+
+// Get purchase returns for a specific bill
+router.get('/bill/:id', purchaseReturnController.getPurchaseReturnsForBill);
+
+// Get purchase return by return number (MUST come before /:id)
+router.get('/number/:returnNumber', purchaseReturnController.getPurchaseReturnByNumber);
+
+// Get purchase return by ID (MUST come LAST)
+router.get('/:id', purchaseReturnController.getPurchaseReturnById);
 
 // Create new purchase return
-router.post('/', auth, purchaseReturnController.createPurchaseReturn);
-
-// Get all purchase returns
-router.get('/', auth, purchaseReturnController.getAllPurchaseReturns);
-
-// Get purchase return by ID - This must be last
-router.get('/:id', auth, purchaseReturnController.getPurchaseReturnById);
+router.post('/', purchaseReturnController.createPurchaseReturn);
 
 module.exports = router;
