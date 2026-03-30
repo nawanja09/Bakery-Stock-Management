@@ -5,7 +5,6 @@ import {
   faFilePdf, 
   faPrint,
   faCalendar,
-  faBuilding,
   faSearch,
   faUndo
 } from '@fortawesome/free-solid-svg-icons';
@@ -235,12 +234,13 @@ const PurchaseVATReport = () => {
               <th>Tax Credit No</th>
               <th>Value of Tax Credit Note</th>
               <th>VAT Amount</th>
+              <th>Disallowable VAT</th>
             </tr>
           </thead>
           <tbody>
             {filteredReturns.length === 0 ? (
               <tr>
-                <td colSpan="10" className="no-data">
+                <td colSpan="9" className="no-data">
                   No VAT returns found for the selected period
                 </td>
               </tr>
@@ -264,7 +264,6 @@ const PurchaseVATReport = () => {
                   </td>
                   <td className="text-right">{formatCurrency(ret.value_of_return)}</td>
                   <td className="text-right vat-amount">{formatCurrency(ret.vat_amount)}</td>
-
                 </tr>
               ))
             )}
