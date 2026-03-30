@@ -11,12 +11,16 @@ import {
   faPercent,
   faCreditCard,
   faBuilding,
-  faUniversity
+  faUniversity,
+  faPlus,
+  faTrash,
+  faBoxes,
+  faSearch
 } from '@fortawesome/free-solid-svg-icons';
+import Select from 'react-select';
 import dayjs from 'dayjs';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
-import SettlementModal from './SettlementModal';
 import './AddPurchaseReturn.css';
 
 const AddPurchaseReturn = () => {
@@ -24,20 +28,15 @@ const AddPurchaseReturn = () => {
   const location = useLocation();
   const { showPopup } = usePopup();
   
-  // Get purchase ID from URL query parameters
-  const queryParams = new URLSearchParams(location.search);
-  const purchaseIdFromUrl = queryParams.get('purchaseId');
-  
-  const [selectedPurchase, setSelectedPurchase] = useState(null);
-  const [purchaseItems, setPurchaseItems] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [fetchingItems, setFetchingItems] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [returnDate, setReturnDate] = useState(dayjs().format('YYYY-MM-DD'));
   const [remarks, setRemarks] = useState('');
   const [supplierVatRegistered, setSupplierVatRegistered] = useState(false);
   const [returnNumber, setReturnNumber] = useState('');
-  const [purchaseDetails, setPurchaseDetails] = useState(null);
+  const [itemsList, setItemsList] = useState([]);
+  const [previousPurchasePrices, setPreviousPurchasePrices] = useState({});
+  const [currentStock, setCurrentStock] = useState({});
+  const [loadingStock, setLoadingStock] = useState(false);
   
   // Form data state
   const [formData, setFormData] = useState({
@@ -52,39 +51,28 @@ const AddPurchaseReturn = () => {
   const [companies, setCompanies] = useState([]);
   const [supplierVatNumber, setSupplierVatNumber] = useState('');
   
-  // Settlement related states
-  const [showSettlementModal, setShowSettlementModal] = useState(false);
-  const [settlementData, setSettlementData] = useState(null);
+  // Items to return
+  const [returnItems, setReturnItems] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const VAT_RATE = 18;
 
+  // Generate return number on load
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('user'));
     setCurrentUser(user);
     
-    // Fetch suppliers for dropdowns
+    const today = dayjs().format('YYYYMMDD');
+    const randomNum = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    setReturnNumber(`RTN-${today}-${randomNum}`);
+    
+    // Fetch data
     fetchSuppliers();
-    
-    // FIXED: Use correct endpoint for companies
-    fetchCompanies().catch(err => {
-      console.warn('Companies feature not available:', err);
-    });
-    
-    // If purchase ID is provided in URL, fetch that purchase
-    if (purchaseIdFromUrl) {
-      fetchPurchaseDetails(purchaseIdFromUrl);
-    } else {
-      console.log('No purchase bill selected. User can select one from the purchase list.');
-    }
+    fetchCompanies().catch(err => console.warn('Companies feature not available:', err));
+    fetchItems();
+    fetchPreviousPrices();
+    fetchAllCurrentStock();
   }, []);
-
-  // Separate useEffect for auto-submit
-  useEffect(() => {
-    if (settlementData && !showSettlementModal && !isSubmitting) {
-      finalSubmit();
-    }
-  }, [settlementData, showSettlementModal]);
 
   const fetchSuppliers = async () => {
     try {
@@ -96,7 +84,6 @@ const AddPurchaseReturn = () => {
     }
   };
 
-  // FIXED: Correct endpoint for companies
   const fetchCompanies = async () => {
     try {
       const response = await api.get('/purchases/companies');
@@ -105,66 +92,56 @@ const AddPurchaseReturn = () => {
     } catch (error) {
       console.error('Error fetching companies:', error);
       setCompanies([]);
-      // Don't show error to user for optional feature
       return [];
     }
   };
 
-  const fetchPurchaseDetails = async (purchaseId) => {
+  const fetchItems = async () => {
     try {
-      setFetchingItems(true);
-      setLoading(true);
-      
-      // Fetch purchase details - FIXED: Use correct endpoint
-      const response = await api.get(`/purchase-returns/purchases/${purchaseId}/items`);
-      
-      // Store purchase details
-      setPurchaseDetails({
-        id: purchaseId,
-        invoice_no: response.data.purchase.invoice_no,
-        supplier_name: response.data.purchase.supplier_name,
-        supplier_id: response.data.purchase.supplier_id,
-        purchase_date: response.data.purchase.purchase_date,
-        total_amount: response.data.purchase.total_with_vat
-      });
-      
-      // Set selected purchase for settlement modal
-      setSelectedPurchase({
-        value: purchaseId,
-        supplier_id: response.data.purchase.supplier_id,
-        supplier_name: response.data.purchase.supplier_name
-      });
-      
-      // Set supplier VAT status
-      setSupplierVatRegistered(response.data.purchase.supplier_vat_registered || false);
-      
-      // Update form data with supplier info
-      setFormData(prev => ({
-        ...prev,
-        supplier_id: response.data.purchase.supplier_id
-      }));
-      
-      // Initialize items with return_quantity = 0
-      const itemsWithReturn = response.data.items.map(item => ({
-        ...item,
-        return_quantity: 0
-      }));
-      
-      setPurchaseItems(itemsWithReturn);
-      
-      // Generate return number suggestion
-      const today = dayjs().format('YYYYMMDD');
-      const randomNum = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-      setReturnNumber(`RTN-${today}-${randomNum}`);
-      
+      const response = await api.get('/items');
+      setItemsList(response.data);
     } catch (error) {
-      console.error('Error fetching purchase details:', error);
-      showPopup('error', 'Failed to load purchase details');
-      setPurchaseDetails(null);
-      setPurchaseItems([]);
+      console.error('Error fetching items:', error);
+      showPopup('error', 'Failed to load items');
+    }
+  };
+
+  const fetchPreviousPrices = async () => {
+    try {
+      const response = await api.get('/purchases/previous-prices');
+      setPreviousPurchasePrices(response.data);
+    } catch (error) {
+      console.error('Error fetching previous prices:', error);
+    }
+  };
+
+  // Fetch current stock for all items - FIXED: Use correct endpoint
+  const fetchAllCurrentStock = async () => {
+    try {
+      setLoadingStock(true);
+      // The stock endpoint is under purchase-returns route
+      const response = await api.get('/purchase-returns/stock/current');
+      const stockMap = {};
+      response.data.forEach(stock => {
+        stockMap[stock.item_id] = stock.quantity;
+      });
+      setCurrentStock(stockMap);
+    } catch (error) {
+      console.error('Error fetching stock:', error);
+      showPopup('warning', 'Could not load stock information. You can still create returns but stock validation may be limited.');
     } finally {
-      setFetchingItems(false);
-      setLoading(false);
+      setLoadingStock(false);
+    }
+  };
+
+  // Fetch current stock for a specific item - FIXED: Use correct endpoint
+  const fetchItemStock = async (itemId) => {
+    try {
+      const response = await api.get(`/purchase-returns/stock/item/${itemId}`);
+      return response.data.quantity || 0;
+    } catch (error) {
+      console.error('Error fetching item stock:', error);
+      return 0;
     }
   };
 
@@ -187,24 +164,84 @@ const AddPurchaseReturn = () => {
     }
   };
 
+  // Add new empty item row
+  const addNewItem = () => {
+    setReturnItems([
+      ...returnItems,
+      {
+        id: Date.now(), // temporary ID
+        item_id: null,
+        item_name: '',
+        return_quantity: 1,
+        unit_price: 0,
+        unit: '',
+        vat_applicable: false,
+        current_stock: 0,
+        purchased_quantity: 0,
+        returned_quantity: 0,
+        available_quantity: 0
+      }
+    ]);
+  };
+
+  // Handle item selection from dropdown
+  const handleItemSelect = async (index, selectedOption) => {
+    if (!selectedOption) return;
+    
+    const selectedItem = itemsList.find(item => item.id === selectedOption.value);
+    if (!selectedItem) return;
+
+    const previousPrice = previousPurchasePrices[selectedItem.id] || 0;
+    const currentStockQty = currentStock[selectedItem.id] || await fetchItemStock(selectedItem.id);
+
+    const newItems = [...returnItems];
+    newItems[index] = {
+      ...newItems[index],
+      item_id: selectedItem.id,
+      item_name: selectedItem.name,
+      unit_price: previousPrice,
+      unit: selectedItem.unit,
+      vat_applicable: selectedItem.vat_applicable || false,
+      current_stock: currentStockQty,
+      return_quantity: 1,
+      // These are not used for standalone return
+      purchased_quantity: 0,
+      returned_quantity: 0,
+      available_quantity: currentStockQty
+    };
+
+    setReturnItems(newItems);
+  };
+
   const handleQuantityChange = (index, value) => {
-    const newItems = [...purchaseItems];
+    const newItems = [...returnItems];
     const newQuantity = parseFloat(value) || 0;
     
-    // Validate not exceeding available quantity
-    if (newQuantity > newItems[index].available_quantity) {
-      showPopup('warning', `Cannot return more than ${newItems[index].available_quantity} ${newItems[index].unit}`);
+    // Validate not exceeding current stock
+    if (newQuantity > newItems[index].current_stock) {
+      showPopup('warning', `Cannot return more than current stock (${newItems[index].current_stock} ${newItems[index].unit})`);
       return;
     }
     
-    newItems[index].return_quantity = Math.max(0, newQuantity);
-    setPurchaseItems(newItems);
+    newItems[index].return_quantity = newQuantity;
+    setReturnItems(newItems);
   };
 
   const setMaxQuantity = (index) => {
-    const newItems = [...purchaseItems];
-    newItems[index].return_quantity = newItems[index].available_quantity;
-    setPurchaseItems(newItems);
+    const newItems = [...returnItems];
+    newItems[index].return_quantity = newItems[index].current_stock;
+    setReturnItems(newItems);
+  };
+
+  const handlePriceChange = (index, value) => {
+    const newItems = [...returnItems];
+    newItems[index].unit_price = parseFloat(value) || 0;
+    setReturnItems(newItems);
+  };
+
+  const removeItem = (index) => {
+    const newItems = returnItems.filter((_, i) => i !== index);
+    setReturnItems(newItems);
   };
 
   const calculateItemValues = (item) => {
@@ -220,8 +257,8 @@ const AddPurchaseReturn = () => {
     let subtotal = 0;
     let totalVat = 0;
     
-    purchaseItems.forEach(item => {
-      if (item.return_quantity > 0) {
+    returnItems.forEach(item => {
+      if (item.return_quantity > 0 && item.unit_price > 0 && item.item_id) {
         const amount = item.return_quantity * item.unit_price;
         subtotal += amount;
         
@@ -237,22 +274,9 @@ const AddPurchaseReturn = () => {
   };
 
   const hasItemsToReturn = () => {
-    return purchaseItems.some(item => item.return_quantity > 0);
-  };
-
-  const handleSettlementConfirm = (settlementResult) => {
-    setSettlementData(settlementResult);
-    setShowSettlementModal(false);
-    
-    // Show summary before final submission
-    const { subtotal, totalVat, grandTotal } = calculateTotals();
-    
-    showPopup('info', 
-      `Settlement Summary:\n` +
-      `Total Return: Rs. ${grandTotal.toFixed(2)}\n` +
-      `Settled: Rs. ${settlementResult.settlements.reduce((sum, s) => sum + s.amount, 0).toFixed(2)}\n` +
-      `Balance: Rs. ${settlementResult.remainingAmount.toFixed(2)}`
-    );
+    return returnItems.some(item => {
+      return item.return_quantity > 0 && item.unit_price > 0 && item.item_id;
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -263,10 +287,8 @@ const AddPurchaseReturn = () => {
       return;
     }
 
-    const activePurchase = getActivePurchase();
-
-    if (!activePurchase) {
-      showPopup('error', 'Please select a purchase bill to return');
+    if (!formData.supplier_id) {
+      showPopup('error', 'Please select a supplier');
       return;
     }
 
@@ -281,55 +303,34 @@ const AddPurchaseReturn = () => {
       return;
     }
 
-    // Show settlement modal first
-    setShowSettlementModal(true);
-  };
-
-  const finalSubmit = async () => {
-    if (!settlementData) {
-      showPopup('error', 'Settlement data is required');
-      return;
-    }
-
     setIsSubmitting(true);
 
-    // Prepare items for submission (only those with quantity > 0)
-    const itemsToReturn = purchaseItems
-      .filter(item => item.return_quantity > 0)
+    const { grandTotal } = calculateTotals();
+
+    // Prepare items for submission
+    const itemsToReturn = returnItems
+      .filter(item => item.return_quantity > 0 && item.unit_price > 0 && item.item_id)
       .map(item => ({
-        purchase_item_id: item.purchase_item_id,
         item_id: item.item_id,
         item_name: item.item_name,
         return_quantity: item.return_quantity,
         unit_price: item.unit_price,
-        vat_applicable: item.vat_applicable
+        vat_applicable: item.vat_applicable,
+        is_new: true // All items are standalone returns
       }));
-
-    const { grandTotal } = calculateTotals();
-
-    const activePurchase = getActivePurchase();
-    if (!activePurchase) {
-      showPopup('error', 'Cannot submit return without an active purchase bill');
-      setIsSubmitting(false);
-      return;
-    }
 
     const finalFormData = {
       return_number: returnNumber.trim().toUpperCase(),
-      purchase_id: activePurchase.value,
-      supplier_id: activePurchase.supplier_id,
+      purchase_id: null, // No purchase ID - standalone return
+      supplier_id: formData.supplier_id,
       return_date: returnDate,
       items: itemsToReturn,
-      remarks: remarks + (settlementData.note ? ` | Settlement: ${settlementData.note}` : ''),
+      remarks: remarks,
       returned_by: currentUser.id,
       payment_method: formData.payment_method,
       company_id: formData.company_id || null,
       check_number: formData.check_number || null,
-      settlements: settlementData.settlements.map(s => ({
-        purchase_id: s.purchase_id,
-        invoice_no: s.invoice_no,
-        amount: s.amount
-      }))
+      settlements: [] // No settlements
     };
 
     try {
@@ -337,8 +338,7 @@ const AddPurchaseReturn = () => {
       showPopup('success', 
         `Return created successfully!\n` +
         `Return #: ${response.data.return_number}\n` +
-        `Settled: Rs. ${response.data.summary.settled_amount.toFixed(2)}\n` +
-        `Balance: Rs. ${response.data.summary.balance_amount.toFixed(2)}`
+        `Total Amount: Rs. ${response.data.summary.total_amount.toFixed(2)}`
       );
       navigate('/purchase-returns/history');
     } catch (error) {
@@ -350,34 +350,19 @@ const AddPurchaseReturn = () => {
         showPopup('error', error.response?.data?.error || 'Failed to create return');
       }
       setIsSubmitting(false);
-      setSettlementData(null);
     }
   };
 
   const totals = calculateTotals();
 
-  const getActivePurchase = () => {
-    if (selectedPurchase) return selectedPurchase;
-    if (purchaseDetails) {
-      return {
-        value: purchaseDetails.id,
-        supplier_id: purchaseDetails.supplier_id,
-        supplier_name: purchaseDetails.supplier_name,
-      };
-    }
-    return null;
-  };
-
-  if (loading) {
-    return (
-      <div className="purchase-return-container">
-        <div className="loading-container">
-          <div className="loading-spinner"></div>
-          <p>Loading purchase details...</p>
-        </div>
-      </div>
-    );
-  }
+  // Item options for react-select
+  const itemOptions = itemsList.map(item => ({
+    value: item.id,
+    label: `${item.name} (${item.item_code || ''}) - ${item.unit}`,
+    previousPrice: previousPurchasePrices[item.id] || 0,
+    unit: item.unit,
+    vat_applicable: item.vat_applicable || false
+  }));
 
   return (
     <div className="purchase-return-container">
@@ -391,334 +376,340 @@ const AddPurchaseReturn = () => {
       </div>
 
       <form onSubmit={handleSubmit} className="return-form">
-        {fetchingItems && (
-          <div className="loading-container">
-            <div className="loading-spinner"></div>
-            <p>Loading purchase items...</p>
-          </div>
-        )}
-
-        {!fetchingItems && (
-          <>
-            <div className="form-card">
-              <h2>Return Information</h2>
-              
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Return Number *</label>
-                  <input
-                    type="text"
-                    value={returnNumber}
-                    onChange={(e) => setReturnNumber(e.target.value.toUpperCase())}
-                    placeholder="Enter return number (e.g., RTN-2025-001)"
-                    required
-                    className="return-number-input"
-                  />
-                  <small className="field-note">Must be unique - system will validate duplicates</small>
-                </div>
-
-                <div className="form-group">
-                  <label>Return Date *</label>
-                  <input
-                    type="date"
-                    value={returnDate}
-                    onChange={(e) => setReturnDate(e.target.value)}
-                    required
-                    className="date-input"
-                  />
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label>
-                    <FontAwesomeIcon icon={faUser} />
-                    Supplier
-                  </label>
-                  <select
-                    value={formData.supplier_id}
-                    onChange={handleSupplierChange}
-                    className="form-control"
-                    required
-                  >
-                    <option value="">Select supplier</option>
-                    {suppliers.map(supplier => (
-                      <option key={supplier.id} value={supplier.id}>
-                        {supplier.name} {supplier.vat_registered ? '• VAT Reg' : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label>
-                    <FontAwesomeIcon icon={faPercent} />
-                    VAT Number
-                  </label>
-                  <input
-                    type="text"
-                    value={supplierVatNumber}
-                    readOnly
-                    className={`form-control ${supplierVatRegistered ? 'vat-active' : 'vat-inactive'}`}
-                    placeholder={supplierVatRegistered ? "VAT registered" : "Not VAT registered"}
-                  />
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label>
-                    <FontAwesomeIcon icon={faCreditCard} />
-                    Payment Method *
-                  </label>
-                  <select
-                    value={formData.payment_method}
-                    onChange={(e) => setFormData({...formData, payment_method: e.target.value})}
-                    className="form-control"
-                    required
-                  >
-                    <option value="CASH">Cash</option>
-                    <option value="BANK_TRANSFER">Bank Transfer</option>
-                    <option value="CHEQUE">Cheque</option>
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label>
-                    <FontAwesomeIcon icon={faBuilding} />
-                    Company
-                  </label>
-                  <select
-                    value={formData.company_id}
-                    onChange={(e) => setFormData({...formData, company_id: e.target.value})}
-                    className="form-control"
-                  >
-                    <option value="">Select company (optional)</option>
-                    {companies.map(company => (
-                      <option key={company.id} value={company.id}>{company.name}</option>
-                    ))}
-                  </select>
-                  <small className="field-note">Optional - select company if applicable</small>
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label>
-                    <FontAwesomeIcon icon={faUniversity} />
-                    Reference/Check No.
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.check_number}
-                    onChange={(e) => setFormData({...formData, check_number: e.target.value})}
-                    placeholder="Optional"
-                    className="form-control"
-                  />
-                  <small className="field-note">Reference number for cheque or bank transfer</small>
-                </div>
-                <div className="form-group">
-                  <label>Remarks</label>
-                  <textarea 
-                    value={formData.remarks}
-                    onChange={(e) => setFormData({...formData, remarks: e.target.value})}
-                    rows="2"
-                    className="form-control"
-                    placeholder="Add any notes or remarks..."
-                  />
-                </div>
-              </div>
+        <div className="form-card">
+          <h2>Return Information</h2>
+          
+          <div className="form-row">
+            <div className="form-group">
+              <label>Return Number *</label>
+              <input
+                type="text"
+                value={returnNumber}
+                onChange={(e) => setReturnNumber(e.target.value.toUpperCase())}
+                placeholder="Enter return number (e.g., RTN-2025-001)"
+                required
+                className="return-number-input"
+              />
+              <small className="field-note">Must be unique - system will validate duplicates</small>
             </div>
 
-            <div className="form-card">
-              <h2>Items to Return</h2>
-              
-              <div className="items-table-container">
-                <table className="items-table">
-                  <thead>
-                    <tr>
-                      <th>Item Details</th>
-                      <th>Purchased</th>
-                      <th>Returned</th>
-                      <th>Available</th>
-                      <th>Unit</th>
-                      <th>Unit Price</th>
-                      <th>Return Quantity</th>
-                      <th>Amount</th>
-                      {supplierVatRegistered && <th>VAT (18%)</th>}
-                      <th>Total</th>
-                      <th>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {purchaseItems.map((item, index) => {
-                      const { amount, vat, total } = calculateItemValues(item);
-                      const hasAvailable = item.available_quantity > 0;
-                      const stockLevel = item.available_quantity <= item.purchased_quantity * 0.1 ? 'low' : 'good';
-                      
-                      return (
-                        <tr key={index} className={!hasAvailable ? 'no-stock' : ''}>
-                          <td>
-                            <div className="item-name-container">
-                              <div className="item-name">
-                                {item.item_name}
-                                {item.vat_applicable && (
-                                  <span className="vat-badge-table">VAT</span>
-                                )}
-                              </div>
-                              <span className="item-category">
-                                {item.category || 'General'}
-                              </span>
-                            </div>
-                          </td>
-                          <td>
-                            <span className="quantity-badge quantity-purchased">
-                              {item.purchased_quantity?.toLocaleString()}
-                            </span>
-                          </td>
-                          <td>
-                            <span className="quantity-badge quantity-returned">
-                              {item.returned_quantity?.toLocaleString()}
-                            </span>
-                          </td>
-                          <td>
-                            <span className="quantity-badge quantity-available">
-                              {item.available_quantity?.toLocaleString()}
-                            </span>
-                            {stockLevel === 'low' && (
-                              <span className="stock-status low-stock">● Low</span>
-                            )}
-                          </td>
-                          <td>
-                            <span className="unit-display">{item.unit}</span>
-                          </td>
-                          <td className="numeric-value">
-                            <span className="price-highlight">Rs.</span> {item.unit_price?.toFixed(2)}
-                          </td>
-                          <td>
-                            <div className="quantity-control-enhanced">
-                              <input
-                                type="number"
-                                min="0"
-                                max={item.available_quantity}
-                                step="0.001"
-                                value={item.return_quantity}
-                                onChange={(e) => handleQuantityChange(index, e.target.value)}
-                                disabled={!hasAvailable}
-                                className="quantity-input-enhanced"
-                                placeholder="0"
-                              />
-                              {hasAvailable && item.available_quantity > 0 && (
-                                <button
-                                  type="button"
-                                  onClick={() => setMaxQuantity(index)}
-                                  className="max-btn-enhanced"
-                                  title="Return all available"
-                                >
-                                  Max
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                          <td className="amount-column">Rs. {amount?.toFixed(2)}</td>
-                          {supplierVatRegistered && (
-                            <td className="vat-amount">
-                              {item.vat_applicable ? `Rs. ${vat?.toFixed(2)}` : '-'}
-                            </td>
+            <div className="form-group">
+              <label>Return Date *</label>
+              <input
+                type="date"
+                value={returnDate}
+                onChange={(e) => setReturnDate(e.target.value)}
+                required
+                className="date-input"
+              />
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label>
+                <FontAwesomeIcon icon={faUser} />
+                Supplier *
+              </label>
+              <select
+                value={formData.supplier_id}
+                onChange={handleSupplierChange}
+                className="form-control"
+                required
+              >
+                <option value="">Select supplier</option>
+                {suppliers.map(supplier => (
+                  <option key={supplier.id} value={supplier.id}>
+                    {supplier.name} {supplier.vat_registered ? '• VAT Reg' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label>
+                <FontAwesomeIcon icon={faPercent} />
+                VAT Number
+              </label>
+              <input
+                type="text"
+                value={supplierVatNumber}
+                readOnly
+                className={`form-control ${supplierVatRegistered ? 'vat-active' : 'vat-inactive'}`}
+                placeholder={supplierVatRegistered ? "VAT registered" : "Not VAT registered"}
+              />
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label>
+                <FontAwesomeIcon icon={faCreditCard} />
+                Payment Method *
+              </label>
+              <select
+                value={formData.payment_method}
+                onChange={(e) => setFormData({...formData, payment_method: e.target.value})}
+                className="form-control"
+                required
+              >
+                <option value="CASH">Cash</option>
+                <option value="BANK_TRANSFER">Bank Transfer</option>
+                <option value="CHEQUE">Cheque</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label>
+                <FontAwesomeIcon icon={faBuilding} />
+                Company
+              </label>
+              <select
+                value={formData.company_id}
+                onChange={(e) => setFormData({...formData, company_id: e.target.value})}
+                className="form-control"
+              >
+                <option value="">Select company (optional)</option>
+                {companies.map(company => (
+                  <option key={company.id} value={company.id}>{company.name}</option>
+                ))}
+              </select>
+              <small className="field-note">Optional - select company if applicable</small>
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label>
+                <FontAwesomeIcon icon={faUniversity} />
+                Reference/Check No.
+              </label>
+              <input
+                type="text"
+                value={formData.check_number}
+                onChange={(e) => setFormData({...formData, check_number: e.target.value})}
+                placeholder="Optional"
+                className="form-control"
+              />
+              <small className="field-note">Reference number for cheque or bank transfer</small>
+            </div>
+            <div className="form-group">
+              <label>Remarks</label>
+              <textarea 
+                value={formData.remarks}
+                onChange={(e) => setFormData({...formData, remarks: e.target.value})}
+                rows="2"
+                className="form-control"
+                placeholder="Add any notes or remarks..."
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="form-card">
+          <div className="section-header">
+            <h2>
+              <FontAwesomeIcon icon={faBoxes} />
+              Items to Return
+            </h2>
+            <button 
+              type="button" 
+              className="btn-add-item-header"
+              onClick={addNewItem}
+            >
+              <FontAwesomeIcon icon={faPlus} />
+              Add Item
+            </button>
+          </div>
+          
+          <div className="items-table-container">
+            <table className="items-table">
+              <thead>
+                <tr>
+                  <th style={{ width: '25%' }}>Item Details</th>
+                  <th style={{ width: '10%' }}>Current Stock</th>
+                  <th style={{ width: '8%' }}>Unit</th>
+                  <th style={{ width: '12%' }}>Unit Price</th>
+                  <th style={{ width: '12%' }}>Return Quantity</th>
+                  <th style={{ width: '10%' }}>Amount</th>
+                  {supplierVatRegistered && <th style={{ width: '10%' }}>VAT (18%)</th>}
+                  <th style={{ width: '10%' }}>Total</th>
+                  <th style={{ width: '8%' }}>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {returnItems.length === 0 ? (
+                  <tr>
+                    <td colSpan={supplierVatRegistered ? 9 : 8} className="empty-table-message">
+                      <div className="empty-state-small">
+                        <FontAwesomeIcon icon={faSearch} />
+                        <p>No items added. Click "Add Item" to add items for return.</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  returnItems.map((item, index) => {
+                    const { amount, vat, total } = calculateItemValues(item);
+                    const selectedOption = item.item_id ? itemOptions.find(opt => opt.value === item.item_id) : null;
+                    const previousPrice = previousPurchasePrices[item.item_id] || 0;
+                    const stockLevel = item.current_stock <= 10 ? 'low' : 'good';
+                    
+                    return (
+                      <tr key={item.id || index}>
+                        <td>
+                          <Select
+                            options={itemOptions}
+                            value={selectedOption}
+                            onChange={(selected) => handleItemSelect(index, selected)}
+                            isSearchable
+                            isClearable
+                            placeholder="Search or select item..."
+                            className="react-select-container"
+                            classNamePrefix="react-select"
+                            styles={{
+                              control: (base) => ({
+                                ...base,
+                                minHeight: '38px',
+                                borderColor: '#ced4da'
+                              }),
+                              menuPortal: (base) => ({ ...base, zIndex: 9999 })
+                            }}
+                            menuPortalTarget={document.body}
+                          />
+                          {item.vat_applicable && (
+                            <small style={{ color: '#28a745', display: 'block', marginTop: '4px' }}>
+                              ✓ VAT Applicable
+                            </small>
                           )}
-                          <td className="amount-column">
-                            <strong>Rs. {total?.toFixed(2)}</strong>
-                          </td>
-                          <td>
-                            {item.return_quantity > 0 && (
+                        </td>
+                        <td>
+                          <span className={`quantity-badge quantity-available ${stockLevel === 'low' ? 'low-stock-badge' : ''}`}>
+                            {item.current_stock?.toLocaleString() || 0}
+                          </span>
+                          {stockLevel === 'low' && item.current_stock > 0 && (
+                            <span className="stock-status low-stock">● Low Stock</span>
+                          )}
+                          {item.current_stock === 0 && (
+                            <span className="stock-status out-of-stock">● Out of Stock</span>
+                          )}
+                        </td>
+                        <td>
+                          <span className="unit-display">{item.unit || '-'}</span>
+                        </td>
+                        <td>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={item.unit_price}
+                            onChange={(e) => handlePriceChange(index, e.target.value)}
+                            className="quantity-input"
+                            placeholder="0.00"
+                            disabled={!item.item_id}
+                          />
+                          {previousPrice > 0 && item.unit_price !== previousPrice && item.item_id && (
+                            <small style={{ display: 'block', fontSize: '11px', color: '#6c757d' }}>
+                              Prev: Rs.{previousPrice}
+                            </small>
+                          )}
+                        </td>
+                        <td>
+                          <div className="quantity-control-enhanced">
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.001"
+                              max={item.current_stock}
+                              value={item.return_quantity}
+                              onChange={(e) => handleQuantityChange(index, e.target.value)}
+                              className="quantity-input-enhanced"
+                              placeholder="0"
+                              disabled={!item.item_id || item.current_stock === 0}
+                            />
+                            {item.item_id && item.current_stock > 0 && (
                               <button
                                 type="button"
-                                onClick={() => handleQuantityChange(index, 0)}
-                                className="btn-clear-enhanced"
-                                title="Clear quantity"
+                                onClick={() => setMaxQuantity(index)}
+                                className="max-btn-enhanced"
+                                title="Return all available stock"
                               >
-                                ✕
+                                Max
                               </button>
                             )}
+                          </div>
+                        </td>
+                        <td className="amount-column">Rs. {amount?.toFixed(2)}</td>
+                        {supplierVatRegistered && (
+                          <td className="vat-amount">
+                            {item.vat_applicable ? `Rs. ${vat?.toFixed(2)}` : '-'}
                           </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                        )}
+                        <td className="amount-column">
+                          <strong>Rs. {total?.toFixed(2)}</strong>
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            onClick={() => removeItem(index)}
+                            className="btn-clear-enhanced"
+                            title="Remove item"
+                          >
+                            <FontAwesomeIcon icon={faTrash} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
 
-              {!hasItemsToReturn() && (
-                <div className="warning-message">
-                  <FontAwesomeIcon icon={faExclamationTriangle} />
-                  Please enter return quantity for at least one item
-                </div>
-              )}
+          {!hasItemsToReturn() && returnItems.length > 0 && (
+            <div className="warning-message">
+              <FontAwesomeIcon icon={faExclamationTriangle} />
+              Please enter return quantity for at least one item
             </div>
+          )}
+        </div>
 
-            <div className="form-card">
-              <h2>Summary</h2>
-              
-              <div className="summary-section">
-                <div className="summary-row">
-                  <span>Subtotal (Net Amount):</span>
-                  <span>Rs. {totals.subtotal.toFixed(2)}</span>
-                </div>
-                <div className="summary-row vat">
-                  <span>VAT ({VAT_RATE}%):</span>
-                  <span>Rs. {totals.totalVat.toFixed(2)}</span>
-                </div>
-                <div className="summary-row grand-total">
-                  <span>Total Return Amount:</span>
-                  <span className="bold">Rs. {totals.grandTotal.toFixed(2)}</span>
-                </div>
-              </div>
+        <div className="form-card">
+          <h2>Summary</h2>
+          
+          <div className="summary-section">
+            <div className="summary-row">
+              <span>Subtotal (Net Amount):</span>
+              <span>Rs. {totals.subtotal.toFixed(2)}</span>
             </div>
+            <div className="summary-row vat">
+              <span>VAT ({VAT_RATE}%):</span>
+              <span>Rs. {totals.totalVat.toFixed(2)}</span>
+            </div>
+            <div className="summary-row grand-total">
+              <span>Total Return Amount:</span>
+              <span className="bold">Rs. {totals.grandTotal.toFixed(2)}</span>
+            </div>
+          </div>
+        </div>
 
-            <div className="form-card">
-              <h2>Remarks</h2>
-              <div className="form-group">
-                <textarea
-                  value={remarks}
-                  onChange={(e) => setRemarks(e.target.value)}
-                  rows="3"
-                  placeholder="Enter any remarks or notes..."
-                />
-              </div>
-            </div>
-
-            <div className="form-actions">
-              <button
-                type="button"
-                onClick={() => navigate('/purchase-returns/history')}
-                className="btn-secondary"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="btn-primary"
-                disabled={!hasItemsToReturn() || isSubmitting || !getActivePurchase()}
-              >
-                <FontAwesomeIcon icon={faBalanceScale} />
-                {isSubmitting ? 'Processing...' : 'Create Return with Settlement'}
-              </button>
-            </div>
-          </>
-        )}
+        <div className="form-actions">
+          <button
+            type="button"
+            onClick={() => navigate('/purchase-returns/history')}
+            className="btn-secondary"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="btn-primary"
+            disabled={!hasItemsToReturn() || isSubmitting || !formData.supplier_id}
+          >
+            <FontAwesomeIcon icon={faBalanceScale} />
+            {isSubmitting ? 'Processing...' : 'Create Return'}
+          </button>
+        </div>
       </form>
-
-      {/* Settlement Modal */}
-      {showSettlementModal && getActivePurchase() && (
-        <SettlementModal
-          isOpen={showSettlementModal}
-          onClose={() => setShowSettlementModal(false)}
-          supplierId={getActivePurchase().supplier_id}
-          supplierName={getActivePurchase().supplier_name}
-          returnAmount={totals.grandTotal}
-          onConfirm={handleSettlementConfirm}
-        />
-      )}
     </div>
   );
 };

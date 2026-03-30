@@ -15,7 +15,7 @@ const getPurchasesForReturn = async (req, res) => {
         s.vat_registered
       FROM purchases p
       JOIN supplier s ON p.supplier_id = s.id
-      WHERE p.deleted = FALSE OR p.deleted IS NULL
+      WHERE (p.deleted = FALSE OR p.deleted IS NULL)
       ORDER BY p.purchase_date DESC
     `);
 
@@ -70,6 +70,8 @@ const getPurchaseItemsForReturn = async (req, res) => {
     // Calculate available quantity for return
     const itemsWithAvailability = items.map(item => ({
       ...item,
+      purchased_quantity: parseFloat(item.purchased_quantity),
+      returned_quantity: parseFloat(item.returned_quantity || 0),
       available_quantity: parseFloat(item.purchased_quantity) - parseFloat(item.returned_quantity || 0),
       unit_price: parseFloat(item.unit_price)
     }));
@@ -128,79 +130,186 @@ const createPurchaseReturn = async (req, res) => {
       items,
       remarks,
       returned_by,
+      payment_method,
+      company_id,
+      check_number,
       settlements
     } = req.body;
+
+    console.log('=== CREATE PURCHASE RETURN DEBUG ===');
+    console.log('Request body:', JSON.stringify(req.body, null, 2));
+    console.log('Items:', items);
+    console.log('Items length:', items?.length);
+
+    // Validate required fields
+    if (!return_number) {
+      throw new Error('Return number is required');
+    }
+    if (!supplier_id) {
+      throw new Error('Supplier ID is required');
+    }
+    if (!return_date) {
+      throw new Error('Return date is required');
+    }
+    if (!items || items.length === 0) {
+      throw new Error('At least one item is required');
+    }
+    if (!returned_by) {
+      throw new Error('Returned by user ID is required');
+    }
 
     // Calculate totals
     let subtotal = 0;
     let totalVat = 0;
     let totalAmount = 0;
 
-    items.forEach(item => {
-      const amount = item.return_quantity * item.unit_price;
+    // Process each item
+    const processedItems = [];
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      console.log(`Processing item ${i}:`, item);
+      
+      const quantity = parseFloat(item.return_quantity) || 0;
+      const unitPrice = parseFloat(item.unit_price) || 0;
+      const amount = quantity * unitPrice;
       subtotal += amount;
       
-      if (item.vat_applicable) {
-        const vat = amount * 0.18; // 18% VAT
-        totalVat += vat;
-        totalAmount += amount + vat;
-      } else {
-        totalAmount += amount;
-      }
-    });
+      // Check if VAT should be applied
+      const isVatApplicable = item.vat_applicable === true || item.vat_applicable === 1;
+      const vatAmount = isVatApplicable ? (amount * 0.18) : 0;
+      totalVat += vatAmount;
+      totalAmount += amount + vatAmount;
+      
+      processedItems.push({
+        originalItem: item,
+        quantity: quantity,
+        unit_price: unitPrice,
+        amount: amount,
+        vat_amount: vatAmount,
+        total_amount: amount + vatAmount
+      });
+    }
+
+    console.log('Calculated totals:', { subtotal, totalVat, totalAmount });
 
     // Calculate settlement amounts
     let settledAmount = 0;
     if (settlements && settlements.length > 0) {
-      settledAmount = settlements.reduce((sum, s) => sum + s.amount, 0);
+      settledAmount = settlements.reduce((sum, s) => sum + (parseFloat(s.amount) || 0), 0);
     }
 
     const balanceAmount = totalAmount - settledAmount;
+    console.log('Settlement:', { settledAmount, balanceAmount });
 
     // Insert purchase return
-    const [returnResult] = await connection.query(
-      `INSERT INTO purchase_returns 
+    const insertReturnQuery = `
+      INSERT INTO purchase_returns 
       (return_number, return_date, purchase_id, supplier_id, subtotal, vat_amount, 
        total_amount, settled_amount, balance_amount, settlement_details, remarks, returned_by) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        return_number, return_date, purchase_id, supplier_id, 
-        subtotal, totalVat, totalAmount, 
-        settledAmount, balanceAmount,
-        JSON.stringify(settlements || []), remarks, returned_by
-      ]
-    );
-
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+    
+    const insertReturnParams = [
+      return_number, 
+      return_date, 
+      purchase_id || null, 
+      supplier_id, 
+      subtotal, 
+      totalVat, 
+      totalAmount, 
+      settledAmount, 
+      balanceAmount,
+      JSON.stringify(settlements || []), 
+      remarks || null, 
+      returned_by
+    ];
+    
+    console.log('Insert Return SQL:', insertReturnQuery);
+    console.log('Insert Return Params:', insertReturnParams);
+    
+    const [returnResult] = await connection.query(insertReturnQuery, insertReturnParams);
     const returnId = returnResult.insertId;
+    console.log('Created return with ID:', returnId);
 
     // Insert return items
-    for (const item of items) {
-      const itemAmount = item.return_quantity * item.unit_price;
-      const itemVat = item.vat_applicable ? (itemAmount * 0.18) : 0;
-      const itemTotal = itemAmount + itemVat;
+    for (let i = 0; i < processedItems.length; i++) {
+      const processed = processedItems[i];
+      const originalItem = processed.originalItem;
       
-      await connection.query(
-        `INSERT INTO purchase_return_items 
+      // Get item details
+      let itemId = originalItem.item_id;
+      let itemName = originalItem.item_name;
+      let vatApplicable = originalItem.vat_applicable === true || originalItem.vat_applicable === 1;
+      
+      console.log(`Processing item ${i} for insertion:`, { itemId, itemName, vatApplicable });
+      
+      // If item_id is not provided but item_name is, try to find it
+      if (!itemId && itemName) {
+        console.log(`Looking up item by name: ${itemName}`);
+        const [foundItem] = await connection.query(
+          'SELECT id, vat_applicable FROM items WHERE name = ? OR item_code = ? LIMIT 1',
+          [itemName, itemName]
+        );
+        if (foundItem.length > 0) {
+          itemId = foundItem[0].id;
+          vatApplicable = foundItem[0].vat_applicable === 1;
+          console.log(`Found item: ID=${itemId}, vat_applicable=${vatApplicable}`);
+        } else {
+          console.warn(`Item not found for name: ${itemName}`);
+        }
+      }
+      
+      // Determine purchase_item_id (NULL for standalone returns)
+      let purchaseItemId = null;
+      
+      // If there's a purchase_id and we have an item_id, try to find the purchase_item
+      if (purchase_id && itemId) {
+        console.log(`Looking up purchase_item for purchase_id=${purchase_id}, item_id=${itemId}`);
+        const [purchaseItem] = await connection.query(
+          `SELECT id FROM purchase_items 
+           WHERE purchase_id = ? AND item_id = ? 
+           LIMIT 1`,
+          [purchase_id, itemId]
+        );
+        if (purchaseItem.length > 0) {
+          purchaseItemId = purchaseItem[0].id;
+          console.log(`Found purchase_item_id: ${purchaseItemId}`);
+        }
+      }
+      
+      const insertItemQuery = `
+        INSERT INTO purchase_return_items 
         (return_id, purchase_item_id, item_id, item_name, quantity, unit_price, 
          vat_applicable, vat_amount, total_amount) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          returnId, 
-          item.purchase_item_id, 
-          item.item_id, 
-          item.item_name,
-          item.return_quantity, 
-          item.unit_price, 
-          item.vat_applicable || false,
-          itemVat,
-          itemTotal
-        ]
-      );
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+      
+      const insertItemParams = [
+        returnId, 
+        purchaseItemId, 
+        itemId, 
+        itemName || `Item ${i + 1}`,
+        processed.quantity, 
+        processed.unit_price, 
+        vatApplicable ? 1 : 0,
+        processed.vat_amount,
+        processed.total_amount
+      ];
+      
+      console.log(`Insert Item ${i} SQL:`, insertItemQuery);
+      console.log(`Insert Item ${i} Params:`, insertItemParams);
+      
+      await connection.query(insertItemQuery, insertItemParams);
+      console.log(`Inserted item ${i} successfully`);
     }
 
     // Update purchase balances if settlements were made
     if (settlements && settlements.length > 0) {
+      console.log('Processing settlements:', settlements);
       for (const settlement of settlements) {
+        const settlementAmount = parseFloat(settlement.amount) || 0;
+        console.log(`Processing settlement for purchase_id=${settlement.purchase_id}, amount=${settlementAmount}`);
+        
         const [purchase] = await connection.query(
           `SELECT balance_amount, paid_amount, total_with_vat 
            FROM purchases WHERE id = ?`,
@@ -208,11 +317,11 @@ const createPurchaseReturn = async (req, res) => {
         );
 
         if (purchase.length > 0) {
-          const currentBalance = parseFloat(purchase[0].balance_amount);
-          const currentPaid = parseFloat(purchase[0].paid_amount);
+          const currentBalance = parseFloat(purchase[0].balance_amount) || 0;
+          const currentPaid = parseFloat(purchase[0].paid_amount) || 0;
           
-          const newBalance = currentBalance - settlement.amount;
-          const newPaid = currentPaid + settlement.amount;
+          const newBalance = currentBalance - settlementAmount;
+          const newPaid = currentPaid + settlementAmount;
           const newBalanceStatus = newBalance > 0 ? 1 : 0;
 
           // Determine new payment status
@@ -223,20 +332,24 @@ const createPurchaseReturn = async (req, res) => {
             paymentStatus = 'Partially Paid';
           }
 
+          console.log(`Updating purchase ${settlement.purchase_id}:`, {
+            currentBalance, newBalance,
+            currentPaid, newPaid,
+            paymentStatus
+          });
+
           await connection.query(
             `UPDATE purchases 
              SET balance_amount = ?, 
                  paid_amount = ?,
                  balance_status = ?,
-                 payment_status = ?,
-                 remarks = CONCAT(IFNULL(remarks, ''), ' | Return settlement: ', ?)
+                 payment_status = ?
              WHERE id = ?`,
             [
               newBalance, 
               newPaid,
               newBalanceStatus,
               paymentStatus,
-              `Return #${return_number} settled Rs. ${settlement.amount}`,
               settlement.purchase_id
             ]
           );
@@ -249,17 +362,22 @@ const createPurchaseReturn = async (req, res) => {
             [
               settlement.purchase_id,
               return_date,
-              settlement.amount,
-              'CASH',
+              settlementAmount,
+              payment_method || 'CASH',
               `Return settlement from return #${return_number}`,
               returned_by
             ]
           );
+          
+          console.log(`Settlement processed for purchase ${settlement.purchase_id}`);
+        } else {
+          console.warn(`Purchase ${settlement.purchase_id} not found for settlement`);
         }
       }
     }
 
     await connection.commit();
+    console.log('=== RETURN CREATED SUCCESSFULLY ===');
     
     res.status(201).json({
       message: 'Purchase return created successfully!',
@@ -276,7 +394,12 @@ const createPurchaseReturn = async (req, res) => {
 
   } catch (error) {
     await connection.rollback();
-    console.error('Error creating purchase return:', error);
+    console.error('=== ERROR CREATING PURCHASE RETURN ===');
+    console.error('Error message:', error.message);
+    console.error('Error code:', error.code);
+    console.error('Error SQL:', error.sql);
+    console.error('Error SQL Message:', error.sqlMessage);
+    console.error('Full error:', error);
     
     // Handle duplicate return number
     if (error.code === 'ER_DUP_ENTRY') {
@@ -285,7 +408,10 @@ const createPurchaseReturn = async (req, res) => {
       });
     }
     
-    res.status(500).json({ error: 'Server error: ' + error.message });
+    res.status(500).json({ 
+      error: 'Server error: ' + error.message,
+      details: error.sqlMessage || error.message
+    });
   } finally {
     connection.release();
   }
@@ -301,7 +427,7 @@ const getAllPurchaseReturns = async (req, res) => {
         p.invoice_no AS purchase_invoice
       FROM purchase_returns pr
       JOIN supplier s ON pr.supplier_id = s.id
-      JOIN purchases p ON pr.purchase_id = p.id
+      LEFT JOIN purchases p ON pr.purchase_id = p.id
       ORDER BY pr.return_date DESC, pr.id DESC
     `);
 
@@ -352,12 +478,9 @@ const getPurchaseReturnById = async (req, res) => {
 
     // Handle settlement_details - check if it's already an object or needs parsing
     if (purchaseReturn.settlement_details) {
-      // Check if it's already an object (from mysql2's JSON type)
       if (typeof purchaseReturn.settlement_details === 'object') {
-        // It's already parsed, use as is
         purchaseReturn.settlement_details = purchaseReturn.settlement_details;
       } else {
-        // Try to parse it if it's a string
         try {
           purchaseReturn.settlement_details = JSON.parse(purchaseReturn.settlement_details);
         } catch (e) {
@@ -369,7 +492,7 @@ const getPurchaseReturnById = async (req, res) => {
       purchaseReturn.settlement_details = [];
     }
 
-    // Get return items
+    // Get return items with detailed information
     const [items] = await pool.query(`
       SELECT 
         pri.*,
@@ -390,6 +513,68 @@ const getPurchaseReturnById = async (req, res) => {
       details: error.message,
       sqlMessage: error.sqlMessage 
     });
+  }
+};
+
+// Get purchase return by return number
+const getPurchaseReturnByNumber = async (req, res) => {
+  const { returnNumber } = req.params;
+
+  try {
+    const [returns] = await pool.query(`
+      SELECT 
+        pr.*,
+        s.name AS supplier_name,
+        s.vat_registered AS supplier_vat_registered,
+        s.vat_number AS supplier_vat_number,
+        p.invoice_no AS purchase_invoice,
+        p.purchase_date AS original_purchase_date,
+        u.name AS returned_by_name
+      FROM purchase_returns pr
+      LEFT JOIN supplier s ON pr.supplier_id = s.id
+      LEFT JOIN purchases p ON pr.purchase_id = p.id
+      LEFT JOIN users u ON pr.returned_by = u.id
+      WHERE pr.return_number = ?
+    `, [returnNumber]);
+
+    if (returns.length === 0) {
+      return res.status(404).json({ error: 'Purchase return not found' });
+    }
+
+    const purchaseReturn = returns[0];
+
+    // Handle settlement_details
+    if (purchaseReturn.settlement_details) {
+      if (typeof purchaseReturn.settlement_details === 'object') {
+        purchaseReturn.settlement_details = purchaseReturn.settlement_details;
+      } else {
+        try {
+          purchaseReturn.settlement_details = JSON.parse(purchaseReturn.settlement_details);
+        } catch (e) {
+          purchaseReturn.settlement_details = [];
+        }
+      }
+    } else {
+      purchaseReturn.settlement_details = [];
+    }
+
+    // Get return items
+    const [items] = await pool.query(`
+      SELECT 
+        pri.*,
+        i.item_code,
+        i.unit
+      FROM purchase_return_items pri
+      LEFT JOIN items i ON pri.item_id = i.id
+      WHERE pri.return_id = ?
+    `, [purchaseReturn.id]);
+
+    purchaseReturn.items = items || [];
+
+    res.json(purchaseReturn);
+  } catch (error) {
+    console.error('Error fetching purchase return:', error);
+    res.status(500).json({ error: 'Server error: ' + error.message });
   }
 };
 
@@ -417,7 +602,7 @@ const getVATReturns = async (req, res) => {
         ROW_NUMBER() OVER (ORDER BY pr.return_date, pr.id) AS serial_no
       FROM purchase_returns pr
       JOIN supplier s ON pr.supplier_id = s.id
-      JOIN purchases p ON pr.purchase_id = p.id
+      LEFT JOIN purchases p ON pr.purchase_id = p.id
       WHERE s.vat_registered = 1 
         AND s.vat_number IS NOT NULL 
         AND pr.vat_amount > 0
@@ -480,13 +665,145 @@ const getVATSummary = async (req, res) => {
   }
 };
 
+// Get purchase returns for a specific purchase bill
+const getPurchaseReturnsForBill = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const [returns] = await pool.query(`
+      SELECT 
+        pr.id,
+        pr.return_number,
+        pr.return_date,
+        pr.total_amount,
+        pr.settled_amount,
+        pr.balance_amount,
+        pri.item_name,
+        pri.quantity,
+        pri.unit_price,
+        pri.total_amount as line_total
+      FROM purchase_returns pr
+      LEFT JOIN purchase_return_items pri ON pr.id = pri.return_id
+      WHERE pr.purchase_id = ?
+      ORDER BY pr.return_date DESC
+    `, [id]);
+
+    res.json(returns);
+  } catch (error) {
+    console.error('Error fetching purchase returns:', error);
+    res.status(500).json({ error: 'Server error: ' + error.message });
+  }
+};
+
+// Get current stock for all items
+const getCurrentStock = async (req, res) => {
+  try {
+    const [stock] = await pool.query(`
+      SELECT 
+        i.id AS item_id,
+        i.name AS item_name,
+        i.unit,
+        COALESCE(ob.quantity, 0) + 
+        COALESCE((
+          SELECT COALESCE(SUM(pi.quantity), 0)
+          FROM purchase_items pi 
+          JOIN purchases p ON pi.purchase_id = p.id 
+          WHERE pi.item_id = i.id
+            AND (p.deleted = FALSE OR p.deleted IS NULL)
+        ), 0) - 
+        COALESCE((
+          SELECT COALESCE(SUM(ii.quantity), 0)
+          FROM issuance_items ii 
+          WHERE ii.item_id = i.id
+        ), 0) - 
+        COALESCE((
+          SELECT COALESCE(SUM(pri.quantity), 0)
+          FROM purchase_return_items pri 
+          WHERE pri.item_id = i.id
+        ), 0) - 
+        COALESCE((
+          SELECT COALESCE(SUM(wi.quantity), 0)
+          FROM wastage_items wi 
+          WHERE wi.item_id = i.id
+        ), 0) AS quantity
+      FROM items i
+      LEFT JOIN opening_balances ob ON i.id = ob.item_id
+      WHERE (i.deleted = FALSE OR i.deleted IS NULL)
+    `);
+    
+    // Format the response
+    const formattedStock = stock.map(item => ({
+      item_id: item.item_id,
+      item_name: item.item_name,
+      unit: item.unit,
+      quantity: parseFloat(item.quantity) || 0
+    }));
+    
+    res.json(formattedStock);
+  } catch (error) {
+    console.error('Error fetching current stock:', error);
+    res.status(500).json({ error: 'Server error: ' + error.message });
+  }
+};
+
+// Get current stock for a single item
+const getItemStock = async (req, res) => {
+  const { itemId } = req.params;
+  
+  try {
+    const [stock] = await pool.query(`
+      SELECT 
+        COALESCE(ob.quantity, 0) + 
+        COALESCE((
+          SELECT COALESCE(SUM(pi.quantity), 0)
+          FROM purchase_items pi 
+          JOIN purchases p ON pi.purchase_id = p.id 
+          WHERE pi.item_id = ?
+            AND (p.deleted = FALSE OR p.deleted IS NULL)
+        ), 0) - 
+        COALESCE((
+          SELECT COALESCE(SUM(ii.quantity), 0)
+          FROM issuance_items ii 
+          WHERE ii.item_id = ?
+        ), 0) - 
+        COALESCE((
+          SELECT COALESCE(SUM(pri.quantity), 0)
+          FROM purchase_return_items pri 
+          WHERE pri.item_id = ?
+        ), 0) - 
+        COALESCE((
+          SELECT COALESCE(SUM(wi.quantity), 0)
+          FROM wastage_items wi 
+          WHERE wi.item_id = ?
+        ), 0) AS quantity
+      FROM items i
+      LEFT JOIN opening_balances ob ON i.id = ob.item_id
+      WHERE i.id = ?
+    `, [itemId, itemId, itemId, itemId, itemId]);
+    
+    const quantity = stock.length > 0 ? (parseFloat(stock[0].quantity) || 0) : 0;
+    
+    res.json({ 
+      item_id: parseInt(itemId),
+      quantity: quantity 
+    });
+  } catch (error) {
+    console.error('Error fetching item stock:', error);
+    res.status(500).json({ error: 'Server error: ' + error.message });
+  }
+};
+
 module.exports = {
   getPurchasesForReturn,
   getPurchaseItemsForReturn,
   getSupplierBillsWithBalance,
+  getCurrentStock,
   getVATReturns,
   getVATSummary,
   createPurchaseReturn,
   getAllPurchaseReturns,
-  getPurchaseReturnById
+  getPurchaseReturnById,
+  getPurchaseReturnByNumber,
+  getPurchaseReturnsForBill,
+  getItemStock
 };
