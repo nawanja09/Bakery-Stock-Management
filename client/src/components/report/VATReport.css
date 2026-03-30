@@ -650,3 +650,16 @@
   font-size: 16px;
   font-weight: 700;
 }
+
+.disallowable-vat-amount {
+  color: #ff6b6b;
+  font-weight: 500;
+}
+
+.summary-column.disallowable-vat {
+  color: #ff6b6b;
+}
+
+.summary-column.disallowable-vat span:last-child {
+  font-weight: 600;
+}

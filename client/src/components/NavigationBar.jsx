@@ -298,15 +298,15 @@ const NavigationBar = () => {
                 <li>
                   <NavLink to="/reports/vat" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
                     <span className="icon-container"><FontAwesomeIcon icon={faCalculator} /></span>
-                    <span>VAT Report</span>
+                    <span>Purchase VAT Report</span>
                   </NavLink>
                 </li>
 
-                {/* Purchase VAT Report */ }
+                {/* Bill Return VAT Report */ }
                 <li>
                   <NavLink to="/reports/purchase-vat" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
                     <span className="icon-container"><FontAwesomeIcon icon={faCalculator} /></span>
-                    <span>Purchase VAT Report</span>
+                    <span>Bill Return VAT Report</span>
                   </NavLink>
                 </li>
 

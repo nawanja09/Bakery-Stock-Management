@@ -12,8 +12,8 @@ router.get('/stock/item/:itemId', purchaseReturnController.getItemStock);
 // =============================================
 // VAT ROUTES
 // =============================================
-router.get('/vat/returns', purchaseReturnController.getVATReturns);
-router.get('/vat/summary', purchaseReturnController.getVATSummary);
+router.get('/reports/vat-returns', purchaseReturnController.getVATReturns);  // ← ADD THIS LINE
+router.get('/reports/vat-summary', purchaseReturnController.getVATReturnsSummary);
 
 // =============================================
 // PURCHASE RETURNS ROUTES

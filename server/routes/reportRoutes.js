@@ -1,3 +1,4 @@
+// routes/reportRoutes.js
 const express = require('express');
 const router = express.Router();
 const reportController = require('../controllers/reportController');
@@ -13,6 +14,7 @@ router.get('/daily-transactions/purchases', reportController.getDailyPurchaseTra
 router.get('/daily-transactions/issuances', reportController.getDailyIssuanceTransactions);
 router.get('/daily-transactions/wastages', reportController.getDailyWastageTransactions);
 router.get('/daily-transactions/returns', reportController.getDailyReturnTransactions);
+router.get('/daily-transactions/purchase-returns', reportController.getDailyPurchaseReturnTransactions);  // ← ADD THIS LINE
 router.get('/purchasing-item-wise', reportController.getPurchasingItemWiseReport);
 
 module.exports = router;
