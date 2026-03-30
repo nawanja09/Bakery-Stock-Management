@@ -38,7 +38,6 @@ const AddPurchaseReturn = () => {
   const [currentStock, setCurrentStock] = useState({});
   const [loadingStock, setLoadingStock] = useState(false);
   
-  // Form data state
   const [formData, setFormData] = useState({
     supplier_id: '',
     payment_method: 'CASH',
@@ -50,23 +49,17 @@ const AddPurchaseReturn = () => {
   const [suppliers, setSuppliers] = useState([]);
   const [companies, setCompanies] = useState([]);
   const [supplierVatNumber, setSupplierVatNumber] = useState('');
-  
-  // Items to return
   const [returnItems, setReturnItems] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const VAT_RATE = 18;
 
-  // Generate return number on load
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('user'));
     setCurrentUser(user);
-    
     const today = dayjs().format('YYYYMMDD');
     const randomNum = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
     setReturnNumber(`RTN-${today}-${randomNum}`);
-    
-    // Fetch data
     fetchSuppliers();
     fetchCompanies().catch(err => console.warn('Companies feature not available:', err));
     fetchItems();
@@ -90,7 +83,6 @@ const AddPurchaseReturn = () => {
       setCompanies(response.data);
       return response.data;
     } catch (error) {
-      console.error('Error fetching companies:', error);
       setCompanies([]);
       return [];
     }
@@ -101,7 +93,6 @@ const AddPurchaseReturn = () => {
       const response = await api.get('/items');
       setItemsList(response.data);
     } catch (error) {
-      console.error('Error fetching items:', error);
       showPopup('error', 'Failed to load items');
     }
   };
@@ -115,11 +106,9 @@ const AddPurchaseReturn = () => {
     }
   };
 
-  // Fetch current stock for all items - FIXED: Use correct endpoint
   const fetchAllCurrentStock = async () => {
     try {
       setLoadingStock(true);
-      // The stock endpoint is under purchase-returns route
       const response = await api.get('/purchase-returns/stock/current');
       const stockMap = {};
       response.data.forEach(stock => {
@@ -127,20 +116,17 @@ const AddPurchaseReturn = () => {
       });
       setCurrentStock(stockMap);
     } catch (error) {
-      console.error('Error fetching stock:', error);
       showPopup('warning', 'Could not load stock information. You can still create returns but stock validation may be limited.');
     } finally {
       setLoadingStock(false);
     }
   };
 
-  // Fetch current stock for a specific item - FIXED: Use correct endpoint
   const fetchItemStock = async (itemId) => {
     try {
       const response = await api.get(`/purchase-returns/stock/item/${itemId}`);
       return response.data.quantity || 0;
     } catch (error) {
-      console.error('Error fetching item stock:', error);
       return 0;
     }
   };
@@ -148,7 +134,6 @@ const AddPurchaseReturn = () => {
   const handleSupplierChange = async (e) => {
     const supplierId = e.target.value;
     setFormData(prev => ({ ...prev, supplier_id: supplierId }));
-    
     if (supplierId) {
       try {
         const response = await api.get(`/suppliers/${supplierId}`);
@@ -164,12 +149,11 @@ const AddPurchaseReturn = () => {
     }
   };
 
-  // Add new empty item row
   const addNewItem = () => {
     setReturnItems([
       ...returnItems,
       {
-        id: Date.now(), // temporary ID
+        id: Date.now(),
         item_id: null,
         item_name: '',
         return_quantity: 1,
@@ -184,15 +168,13 @@ const AddPurchaseReturn = () => {
     ]);
   };
 
-  // Handle item selection from dropdown
   const handleItemSelect = async (index, selectedOption) => {
     if (!selectedOption) return;
-    
     const selectedItem = itemsList.find(item => item.id === selectedOption.value);
     if (!selectedItem) return;
 
     const previousPrice = previousPurchasePrices[selectedItem.id] || 0;
-    const currentStockQty = currentStock[selectedItem.id] || await fetchItemStock(selectedItem.id);
+    const currentStockQty = currentStock[selectedItem.id] ?? await fetchItemStock(selectedItem.id);
 
     const newItems = [...returnItems];
     newItems[index] = {
@@ -204,25 +186,20 @@ const AddPurchaseReturn = () => {
       vat_applicable: selectedItem.vat_applicable || false,
       current_stock: currentStockQty,
       return_quantity: 1,
-      // These are not used for standalone return
       purchased_quantity: 0,
       returned_quantity: 0,
       available_quantity: currentStockQty
     };
-
     setReturnItems(newItems);
   };
 
   const handleQuantityChange = (index, value) => {
     const newItems = [...returnItems];
     const newQuantity = parseFloat(value) || 0;
-    
-    // Validate not exceeding current stock
     if (newQuantity > newItems[index].current_stock) {
       showPopup('warning', `Cannot return more than current stock (${newItems[index].current_stock} ${newItems[index].unit})`);
       return;
     }
-    
     newItems[index].return_quantity = newQuantity;
     setReturnItems(newItems);
   };
@@ -240,74 +217,43 @@ const AddPurchaseReturn = () => {
   };
 
   const removeItem = (index) => {
-    const newItems = returnItems.filter((_, i) => i !== index);
-    setReturnItems(newItems);
+    setReturnItems(returnItems.filter((_, i) => i !== index));
   };
 
   const calculateItemValues = (item) => {
     const amount = item.return_quantity * item.unit_price;
-    const vat = (supplierVatRegistered && item.vat_applicable) ? 
-      amount * (VAT_RATE / 100) : 0;
+    const vat = (supplierVatRegistered && item.vat_applicable) ? amount * (VAT_RATE / 100) : 0;
     const total = amount + vat;
-    
     return { amount, vat, total };
   };
 
   const calculateTotals = () => {
     let subtotal = 0;
     let totalVat = 0;
-    
     returnItems.forEach(item => {
       if (item.return_quantity > 0 && item.unit_price > 0 && item.item_id) {
         const amount = item.return_quantity * item.unit_price;
         subtotal += amount;
-        
         if (supplierVatRegistered && item.vat_applicable) {
           totalVat += amount * (VAT_RATE / 100);
         }
       }
     });
-    
-    const grandTotal = subtotal + totalVat;
-    
-    return { subtotal, totalVat, grandTotal };
+    return { subtotal, totalVat, grandTotal: subtotal + totalVat };
   };
 
-  const hasItemsToReturn = () => {
-    return returnItems.some(item => {
-      return item.return_quantity > 0 && item.unit_price > 0 && item.item_id;
-    });
-  };
+  const hasItemsToReturn = () =>
+    returnItems.some(item => item.return_quantity > 0 && item.unit_price > 0 && item.item_id);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    if (!returnNumber || returnNumber.trim() === '') {
-      showPopup('error', 'Please enter a return number');
-      return;
-    }
-
-    if (!formData.supplier_id) {
-      showPopup('error', 'Please select a supplier');
-      return;
-    }
-
-    if (!hasItemsToReturn()) {
-      showPopup('error', 'Please enter return quantity for at least one item');
-      return;
-    }
-
-    if (!currentUser || !currentUser.id) {
-      showPopup('error', 'User information is missing. Please login again.');
-      navigate('/login');
-      return;
-    }
+    if (!returnNumber?.trim()) { showPopup('error', 'Please enter a return number'); return; }
+    if (!formData.supplier_id)  { showPopup('error', 'Please select a supplier'); return; }
+    if (!hasItemsToReturn())    { showPopup('error', 'Please enter return quantity for at least one item'); return; }
+    if (!currentUser?.id)       { showPopup('error', 'User information is missing. Please login again.'); navigate('/login'); return; }
 
     setIsSubmitting(true);
-
     const { grandTotal } = calculateTotals();
-
-    // Prepare items for submission
     const itemsToReturn = returnItems
       .filter(item => item.return_quantity > 0 && item.unit_price > 0 && item.item_id)
       .map(item => ({
@@ -316,12 +262,12 @@ const AddPurchaseReturn = () => {
         return_quantity: item.return_quantity,
         unit_price: item.unit_price,
         vat_applicable: item.vat_applicable,
-        is_new: true // All items are standalone returns
+        is_new: true
       }));
 
     const finalFormData = {
       return_number: returnNumber.trim().toUpperCase(),
-      purchase_id: null, // No purchase ID - standalone return
+      purchase_id: null,
       supplier_id: formData.supplier_id,
       return_date: returnDate,
       items: itemsToReturn,
@@ -330,20 +276,16 @@ const AddPurchaseReturn = () => {
       payment_method: formData.payment_method,
       company_id: formData.company_id || null,
       check_number: formData.check_number || null,
-      settlements: [] // No settlements
+      settlements: []
     };
 
     try {
       const response = await api.post('/purchase-returns', finalFormData);
-      showPopup('success', 
-        `Return created successfully!\n` +
-        `Return #: ${response.data.return_number}\n` +
-        `Total Amount: Rs. ${response.data.summary.total_amount.toFixed(2)}`
+      showPopup('success',
+        `Return created successfully!\nReturn #: ${response.data.return_number}\nTotal Amount: Rs. ${response.data.summary.total_amount.toFixed(2)}`
       );
       navigate('/purchase-returns/history');
     } catch (error) {
-      console.error('Error creating return:', error);
-      
       if (error.response?.data?.error?.includes('Return number already exists')) {
         showPopup('error', 'This return number already exists. Please use a different number.');
       } else {
@@ -355,7 +297,6 @@ const AddPurchaseReturn = () => {
 
   const totals = calculateTotals();
 
-  // Item options for react-select
   const itemOptions = itemsList.map(item => ({
     value: item.id,
     label: `${item.name} (${item.item_code || ''}) - ${item.unit}`,
@@ -366,9 +307,10 @@ const AddPurchaseReturn = () => {
 
   return (
     <div className="purchase-return-container">
+      {/* PAGE HEADER */}
       <div className="page-header">
         <div className="header-title">
-          <button onClick={() => navigate('/purchase-returns/history')} className="back-button">
+          <button onClick={() => navigate('/purchase-returns/history')} className="back-button" type="button">
             <FontAwesomeIcon icon={faArrowLeft} />
           </button>
           <h1>Create Purchase Return</h1>
@@ -376,9 +318,11 @@ const AddPurchaseReturn = () => {
       </div>
 
       <form onSubmit={handleSubmit} className="return-form">
+
+        {/* ── RETURN INFORMATION ── */}
         <div className="form-card">
           <h2>Return Information</h2>
-          
+
           <div className="form-row">
             <div className="form-group">
               <label>Return Number *</label>
@@ -386,13 +330,12 @@ const AddPurchaseReturn = () => {
                 type="text"
                 value={returnNumber}
                 onChange={(e) => setReturnNumber(e.target.value.toUpperCase())}
-                placeholder="Enter return number (e.g., RTN-2025-001)"
+                placeholder="RTN-YYYYMMDD-000"
                 required
                 className="return-number-input"
               />
-              <small className="field-note">Must be unique - system will validate duplicates</small>
+              <span className="field-note">Must be unique — system validates duplicates</span>
             </div>
-
             <div className="form-group">
               <label>Return Date *</label>
               <input
@@ -408,8 +351,7 @@ const AddPurchaseReturn = () => {
           <div className="form-row">
             <div className="form-group">
               <label>
-                <FontAwesomeIcon icon={faUser} />
-                Supplier *
+                <FontAwesomeIcon icon={faUser} /> Supplier *
               </label>
               <select
                 value={formData.supplier_id}
@@ -418,25 +360,23 @@ const AddPurchaseReturn = () => {
                 required
               >
                 <option value="">Select supplier</option>
-                {suppliers.map(supplier => (
-                  <option key={supplier.id} value={supplier.id}>
-                    {supplier.name} {supplier.vat_registered ? '• VAT Reg' : ''}
+                {suppliers.map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}{s.vat_registered ? ' · VAT Reg' : ''}
                   </option>
                 ))}
               </select>
             </div>
-
             <div className="form-group">
               <label>
-                <FontAwesomeIcon icon={faPercent} />
-                VAT Number
+                <FontAwesomeIcon icon={faPercent} /> VAT Number
               </label>
               <input
                 type="text"
                 value={supplierVatNumber}
                 readOnly
                 className={`form-control ${supplierVatRegistered ? 'vat-active' : 'vat-inactive'}`}
-                placeholder={supplierVatRegistered ? "VAT registered" : "Not VAT registered"}
+                placeholder={supplierVatRegistered ? 'VAT registered' : 'Not VAT registered'}
               />
             </div>
           </div>
@@ -444,12 +384,11 @@ const AddPurchaseReturn = () => {
           <div className="form-row">
             <div className="form-group">
               <label>
-                <FontAwesomeIcon icon={faCreditCard} />
-                Payment Method *
+                <FontAwesomeIcon icon={faCreditCard} /> Payment Method *
               </label>
               <select
                 value={formData.payment_method}
-                onChange={(e) => setFormData({...formData, payment_method: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, payment_method: e.target.value })}
                 className="form-control"
                 required
               >
@@ -458,46 +397,43 @@ const AddPurchaseReturn = () => {
                 <option value="CHEQUE">Cheque</option>
               </select>
             </div>
-
             <div className="form-group">
               <label>
-                <FontAwesomeIcon icon={faBuilding} />
-                Company
+                <FontAwesomeIcon icon={faBuilding} /> Company
               </label>
               <select
                 value={formData.company_id}
-                onChange={(e) => setFormData({...formData, company_id: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, company_id: e.target.value })}
                 className="form-control"
               >
                 <option value="">Select company (optional)</option>
-                {companies.map(company => (
-                  <option key={company.id} value={company.id}>{company.name}</option>
+                {companies.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
-              <small className="field-note">Optional - select company if applicable</small>
+              <span className="field-note">Optional</span>
             </div>
           </div>
 
           <div className="form-row">
             <div className="form-group">
               <label>
-                <FontAwesomeIcon icon={faUniversity} />
-                Reference/Check No.
+                <FontAwesomeIcon icon={faUniversity} /> Reference / Check No.
               </label>
               <input
                 type="text"
                 value={formData.check_number}
-                onChange={(e) => setFormData({...formData, check_number: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, check_number: e.target.value })}
                 placeholder="Optional"
                 className="form-control"
               />
-              <small className="field-note">Reference number for cheque or bank transfer</small>
+              <span className="field-note">For cheque or bank transfer reference</span>
             </div>
             <div className="form-group">
               <label>Remarks</label>
-              <textarea 
+              <textarea
                 value={formData.remarks}
-                onChange={(e) => setFormData({...formData, remarks: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
                 rows="2"
                 className="form-control"
                 placeholder="Add any notes or remarks..."
@@ -506,35 +442,30 @@ const AddPurchaseReturn = () => {
           </div>
         </div>
 
+        {/* ── ITEMS TO RETURN ── */}
         <div className="form-card">
           <div className="section-header">
             <h2>
-              <FontAwesomeIcon icon={faBoxes} />
-              Items to Return
+              <FontAwesomeIcon icon={faBoxes} /> Items to Return
             </h2>
-            <button 
-              type="button" 
-              className="btn-add-item-header"
-              onClick={addNewItem}
-            >
-              <FontAwesomeIcon icon={faPlus} />
-              Add Item
+            <button type="button" className="btn-add-item-header" onClick={addNewItem}>
+              <FontAwesomeIcon icon={faPlus} /> Add Item
             </button>
           </div>
-          
+
           <div className="items-table-container">
             <table className="items-table">
               <thead>
                 <tr>
-                  <th style={{ width: '25%' }}>Item Details</th>
-                  <th style={{ width: '10%' }}>Current Stock</th>
-                  <th style={{ width: '8%' }}>Unit</th>
+                  <th style={{ width: '26%' }}>Item</th>
+                  <th style={{ width: '10%' }}>Stock</th>
+                  <th style={{ width: '7%' }}>Unit</th>
                   <th style={{ width: '12%' }}>Unit Price</th>
-                  <th style={{ width: '12%' }}>Return Quantity</th>
-                  <th style={{ width: '10%' }}>Amount</th>
-                  {supplierVatRegistered && <th style={{ width: '10%' }}>VAT (18%)</th>}
-                  <th style={{ width: '10%' }}>Total</th>
-                  <th style={{ width: '8%' }}>Action</th>
+                  <th style={{ width: '14%' }}>Qty to Return</th>
+                  <th style={{ width: '10%', textAlign: 'right' }}>Amount</th>
+                  {supplierVatRegistered && <th style={{ width: '10%', textAlign: 'right' }}>VAT (18%)</th>}
+                  <th style={{ width: '10%', textAlign: 'right' }}>Total</th>
+                  <th style={{ width: '7%' }}></th>
                 </tr>
               </thead>
               <tbody>
@@ -543,19 +474,22 @@ const AddPurchaseReturn = () => {
                     <td colSpan={supplierVatRegistered ? 9 : 8} className="empty-table-message">
                       <div className="empty-state-small">
                         <FontAwesomeIcon icon={faSearch} />
-                        <p>No items added. Click "Add Item" to add items for return.</p>
+                        <p>No items added. Click "Add Item" to begin.</p>
                       </div>
                     </td>
                   </tr>
                 ) : (
                   returnItems.map((item, index) => {
                     const { amount, vat, total } = calculateItemValues(item);
-                    const selectedOption = item.item_id ? itemOptions.find(opt => opt.value === item.item_id) : null;
+                    const selectedOption = item.item_id
+                      ? itemOptions.find(opt => opt.value === item.item_id)
+                      : null;
                     const previousPrice = previousPurchasePrices[item.item_id] || 0;
                     const stockLevel = item.current_stock <= 10 ? 'low' : 'good';
-                    
+
                     return (
                       <tr key={item.id || index}>
+                        {/* Item Selector */}
                         <td>
                           <Select
                             options={itemOptions}
@@ -563,39 +497,44 @@ const AddPurchaseReturn = () => {
                             onChange={(selected) => handleItemSelect(index, selected)}
                             isSearchable
                             isClearable
-                            placeholder="Search or select item..."
-                            className="react-select-container"
+                            placeholder="Search item..."
                             classNamePrefix="react-select"
                             styles={{
                               control: (base) => ({
                                 ...base,
-                                minHeight: '38px',
-                                borderColor: '#ced4da'
+                                minHeight: '36px',
+                                fontSize: '13px'
                               }),
                               menuPortal: (base) => ({ ...base, zIndex: 9999 })
                             }}
                             menuPortalTarget={document.body}
                           />
                           {item.vat_applicable && (
-                            <small style={{ color: '#28a745', display: 'block', marginTop: '4px' }}>
-                              ✓ VAT Applicable
+                            <small style={{ color: '#059669', fontSize: '11px', display: 'block', marginTop: '3px', fontWeight: 600 }}>
+                              ✓ VAT
                             </small>
                           )}
                         </td>
+
+                        {/* Stock */}
                         <td>
-                          <span className={`quantity-badge quantity-available ${stockLevel === 'low' ? 'low-stock-badge' : ''}`}>
+                          <span className={`quantity-badge ${stockLevel === 'low' ? 'low-stock-badge' : 'quantity-available'}`}>
                             {item.current_stock?.toLocaleString() || 0}
                           </span>
                           {stockLevel === 'low' && item.current_stock > 0 && (
-                            <span className="stock-status low-stock">● Low Stock</span>
+                            <span className="stock-status low-stock">● Low</span>
                           )}
-                          {item.current_stock === 0 && (
-                            <span className="stock-status out-of-stock">● Out of Stock</span>
+                          {item.current_stock === 0 && item.item_id && (
+                            <span className="stock-status out-of-stock">● Out</span>
                           )}
                         </td>
+
+                        {/* Unit */}
                         <td>
-                          <span className="unit-display">{item.unit || '-'}</span>
+                          <span className="unit-display">{item.unit || '—'}</span>
                         </td>
+
+                        {/* Unit Price */}
                         <td>
                           <input
                             type="number"
@@ -608,11 +547,13 @@ const AddPurchaseReturn = () => {
                             disabled={!item.item_id}
                           />
                           {previousPrice > 0 && item.unit_price !== previousPrice && item.item_id && (
-                            <small style={{ display: 'block', fontSize: '11px', color: '#6c757d' }}>
+                            <small style={{ display: 'block', fontSize: '10px', color: '#9ca3af', marginTop: '2px' }}>
                               Prev: Rs.{previousPrice}
                             </small>
                           )}
                         </td>
+
+                        {/* Quantity */}
                         <td>
                           <div className="quantity-control-enhanced">
                             <input
@@ -631,22 +572,30 @@ const AddPurchaseReturn = () => {
                                 type="button"
                                 onClick={() => setMaxQuantity(index)}
                                 className="max-btn-enhanced"
-                                title="Return all available stock"
+                                title="Set to max available stock"
                               >
                                 Max
                               </button>
                             )}
                           </div>
                         </td>
+
+                        {/* Amount */}
                         <td className="amount-column">Rs. {amount?.toFixed(2)}</td>
+
+                        {/* VAT */}
                         {supplierVatRegistered && (
                           <td className="vat-amount">
-                            {item.vat_applicable ? `Rs. ${vat?.toFixed(2)}` : '-'}
+                            {item.vat_applicable ? `Rs. ${vat?.toFixed(2)}` : '—'}
                           </td>
                         )}
+
+                        {/* Total */}
                         <td className="amount-column">
                           <strong>Rs. {total?.toFixed(2)}</strong>
                         </td>
+
+                        {/* Remove */}
                         <td>
                           <button
                             type="button"
@@ -668,30 +617,31 @@ const AddPurchaseReturn = () => {
           {!hasItemsToReturn() && returnItems.length > 0 && (
             <div className="warning-message">
               <FontAwesomeIcon icon={faExclamationTriangle} />
-              Please enter return quantity for at least one item
+              Please enter a return quantity for at least one item.
             </div>
           )}
         </div>
 
+        {/* ── SUMMARY ── */}
         <div className="form-card">
           <h2>Summary</h2>
-          
           <div className="summary-section">
             <div className="summary-row">
-              <span>Subtotal (Net Amount):</span>
+              <span>Subtotal (Net Amount)</span>
               <span>Rs. {totals.subtotal.toFixed(2)}</span>
             </div>
             <div className="summary-row vat">
-              <span>VAT ({VAT_RATE}%):</span>
+              <span>VAT ({VAT_RATE}%)</span>
               <span>Rs. {totals.totalVat.toFixed(2)}</span>
             </div>
             <div className="summary-row grand-total">
-              <span>Total Return Amount:</span>
+              <span>Total Return Amount</span>
               <span className="bold">Rs. {totals.grandTotal.toFixed(2)}</span>
             </div>
           </div>
         </div>
 
+        {/* ── ACTIONS ── */}
         <div className="form-actions">
           <button
             type="button"
@@ -706,7 +656,7 @@ const AddPurchaseReturn = () => {
             disabled={!hasItemsToReturn() || isSubmitting || !formData.supplier_id}
           >
             <FontAwesomeIcon icon={faBalanceScale} />
-            {isSubmitting ? 'Processing...' : 'Create Return'}
+            {isSubmitting ? 'Processing…' : 'Create Return'}
           </button>
         </div>
       </form>

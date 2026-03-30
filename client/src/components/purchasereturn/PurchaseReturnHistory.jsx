@@ -20,17 +20,15 @@ import {
   faPrint,
   faReceipt,
   faMoneyBillWave,
-  faClock
 } from '@fortawesome/free-solid-svg-icons';
 import dayjs from 'dayjs';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
-import '../purchase/Purchase.css';
 import './PurchaseReturnHistory.css';
 
 const PurchaseReturnHistory = () => {
   const { showPopup } = usePopup();
-  
+
   const [returns, setReturns] = useState([]);
   const [filteredReturns, setFilteredReturns] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -49,37 +47,20 @@ const PurchaseReturnHistory = () => {
     remarks: true
   });
 
-  useEffect(() => {
-    fetchReturns();
-  }, []);
+  useEffect(() => { fetchReturns(); }, []);
 
-  // Apply filters
   useEffect(() => {
     let filtered = returns;
-
-    // Search filter
     if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(ret => 
-        ret.return_number?.toLowerCase().includes(query) ||
-        ret.purchase_invoice?.toLowerCase().includes(query) ||
-        ret.supplier_name?.toLowerCase().includes(query)
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter(r =>
+        r.return_number?.toLowerCase().includes(q) ||
+        r.purchase_invoice?.toLowerCase().includes(q) ||
+        r.supplier_name?.toLowerCase().includes(q)
       );
     }
-
-    // Date range filter
-    if (startDate) {
-      filtered = filtered.filter(ret => 
-        dayjs(ret.return_date).isAfter(dayjs(startDate).subtract(1, 'day'))
-      );
-    }
-
-    if (endDate) {
-      filtered = filtered.filter(ret => 
-        dayjs(ret.return_date).isBefore(dayjs(endDate).add(1, 'day'))
-      );
-    }
-
+    if (startDate) filtered = filtered.filter(r => dayjs(r.return_date).isAfter(dayjs(startDate).subtract(1, 'day')));
+    if (endDate)   filtered = filtered.filter(r => dayjs(r.return_date).isBefore(dayjs(endDate).add(1, 'day')));
     setFilteredReturns(filtered);
   }, [returns, searchQuery, startDate, endDate]);
 
@@ -90,28 +71,18 @@ const PurchaseReturnHistory = () => {
       setReturns(response.data);
       setFilteredReturns(response.data);
     } catch (error) {
-      console.error('Error fetching returns:', error);
       showPopup('error', 'Failed to load purchase returns');
     } finally {
       setLoading(false);
     }
   };
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-LK', {
-      style: 'currency',
-      currency: 'LKR',
-      minimumFractionDigits: 2
-    }).format(amount).replace('LKR', 'Rs.');
-  };
+  const formatCurrency = (amount) =>
+    new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR', minimumFractionDigits: 2 })
+      .format(amount).replace('LKR', 'Rs.');
 
-  const formatDate = (date) => {
-    return dayjs(date).format('DD MMM YYYY');
-  };
-
-  const formatDateTime = (date) => {
-    return dayjs(date).format('DD MMM YYYY, h:mm A');
-  };
+  const formatDate     = (d) => dayjs(d).format('DD MMM YYYY');
+  const formatDateTime = (d) => dayjs(d).format('DD MMM YYYY, h:mm A');
 
   const viewReturnDetails = async (id) => {
     try {
@@ -120,7 +91,6 @@ const PurchaseReturnHistory = () => {
       const response = await api.get(`/purchase-returns/${id}`);
       setSelectedReturn(response.data);
     } catch (error) {
-      console.error('Error fetching return details:', error);
       showPopup('error', 'Failed to load return details');
       setShowDetailsModal(false);
     } finally {
@@ -131,78 +101,32 @@ const PurchaseReturnHistory = () => {
   const closeModal = () => {
     setShowDetailsModal(false);
     setSelectedReturn(null);
-    setExpandedSections({
-      summary: true,
-      settlement: true,
-      settlementBreakdown: true,
-      items: true,
-      remarks: true
-    });
+    setExpandedSections({ summary: true, settlement: true, settlementBreakdown: true, items: true, remarks: true });
   };
 
-  const clearFilters = () => {
-    setSearchQuery('');
-    setStartDate('');
-    setEndDate('');
-  };
+  const clearFilters = () => { setSearchQuery(''); setStartDate(''); setEndDate(''); };
 
   const getSettlementStatus = (ret) => {
-    if (ret.settled_amount === 0) {
-      return { 
-        text: 'Not Settled', 
-        class: 'status-pending', 
-        icon: faTimesCircle,
-        color: '#dc3545'
-      };
-    } else if (ret.balance_amount === 0) {
-      return { 
-        text: 'Fully Settled', 
-        class: 'status-fully-settled', 
-        icon: faCheckCircle,
-        color: '#28a745'
-      };
-    } else {
-      return { 
-        text: 'Partially Settled', 
-        class: 'status-partially-settled', 
-        icon: faBalanceScale,
-        color: '#fd7e14'
-      };
-    }
+    if (ret.settled_amount === 0)      return { text: 'Not Settled',        cls: 'status-pending',            icon: faTimesCircle  };
+    if (ret.balance_amount === 0)      return { text: 'Fully Settled',      cls: 'status-fully-settled',      icon: faCheckCircle  };
+    return                                    { text: 'Partially Settled',  cls: 'status-partially-settled',  icon: faBalanceScale };
   };
 
-  const toggleSection = (section) => {
-    setExpandedSections(prev => ({
-      ...prev,
-      [section]: !prev[section]
-    }));
-  };
+  const toggleSection = (section) =>
+    setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
 
-  const handlePrint = () => {
-    window.print();
-  };
+  const handlePrint = () => window.print();
 
   const handleExportCSV = () => {
-    // Create CSV content
     const headers = ['Return #', 'Date', 'Supplier', 'Purchase Invoice', 'Total', 'Settled', 'Balance', 'Status'];
     const csvContent = [
       headers.join(','),
       ...filteredReturns.map(ret => {
         const status = getSettlementStatus(ret).text;
-        return [
-          ret.return_number,
-          formatDate(ret.return_date),
-          `"${ret.supplier_name}"`,
-          ret.purchase_invoice,
-          ret.total_amount,
-          ret.settled_amount || 0,
-          ret.balance_amount || 0,
-          status
-        ].join(',');
+        return [ret.return_number, formatDate(ret.return_date), `"${ret.supplier_name}"`,
+          ret.purchase_invoice, ret.total_amount, ret.settled_amount || 0, ret.balance_amount || 0, status].join(',');
       })
     ].join('\n');
-
-    // Download CSV
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -215,51 +139,50 @@ const PurchaseReturnHistory = () => {
   if (loading) {
     return (
       <div className="loading-container">
-        <div className="loading-spinner"></div>
-        <p>Loading purchase returns...</p>
+        <div className="loading-spinner" />
+        <p>Loading purchase returns…</p>
       </div>
     );
   }
 
+  const activeFilterCount = [searchQuery, startDate, endDate].filter(Boolean).length;
+
   return (
     <div className="purchase-returns-history-container">
+
+      {/* ── PAGE HEADER ── */}
       <div className="page-header">
         <div className="header-title">
           <h1>
             <FontAwesomeIcon icon={faUndo} className="header-icon" />
-            Purchase Returns History
+            Purchase Returns
           </h1>
           <p className="subtitle">View and manage all purchase returns with settlement tracking</p>
         </div>
         <div className="header-actions">
-          <button onClick={handleExportCSV} className="btn-outline">
-            <FontAwesomeIcon icon={faDownload} />
-            Export CSV
+          <button onClick={handleExportCSV} className="btn-outline" type="button">
+            <FontAwesomeIcon icon={faDownload} /> Export CSV
           </button>
-          <button onClick={handlePrint} className="btn-outline">
-            <FontAwesomeIcon icon={faPrint} />
-            Print
+          <button onClick={handlePrint} className="btn-outline" type="button">
+            <FontAwesomeIcon icon={faPrint} /> Print
           </button>
           <Link to="/purchase-returns/add" className="btn-primary">
-            <FontAwesomeIcon icon={faPlus} />
-            <span>New Return</span>
+            <FontAwesomeIcon icon={faPlus} /> New Return
           </Link>
         </div>
       </div>
 
-      {/* Filters Section */}
+      {/* ── FILTERS ── */}
       <div className="filters-card">
         <div className="filters-header" onClick={() => setShowFilters(!showFilters)}>
           <div className="filters-title">
             <FontAwesomeIcon icon={faFilter} />
             <h3>Filters</h3>
-            {(searchQuery || startDate || endDate) && (
-              <span className="active-filters-badge">
-                {[searchQuery, startDate, endDate].filter(Boolean).length}
-              </span>
+            {activeFilterCount > 0 && (
+              <span className="active-filters-badge">{activeFilterCount}</span>
             )}
           </div>
-          <button className="toggle-filters">
+          <button className="toggle-filters" type="button">
             <FontAwesomeIcon icon={showFilters ? faChevronUp : faChevronDown} />
           </button>
         </div>
@@ -268,46 +191,26 @@ const PurchaseReturnHistory = () => {
           <div className="filters-content">
             <div className="filters-grid">
               <div className="filter-group">
-                <label>
-                  <FontAwesomeIcon icon={faSearch} />
-                  Search
-                </label>
+                <label><FontAwesomeIcon icon={faSearch} /> Search</label>
                 <input
                   type="text"
-                  placeholder="Return #, Invoice #, Supplier..."
+                  placeholder="Return #, Invoice #, Supplier…"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="filter-input"
                 />
               </div>
-
               <div className="filter-group">
-                <label>
-                  <FontAwesomeIcon icon={faCalendar} />
-                  Date Range
-                </label>
+                <label><FontAwesomeIcon icon={faCalendar} /> Date Range</label>
                 <div className="date-range-inputs">
-                  <input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    placeholder="Start date"
-                  />
+                  <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
                   <span>to</span>
-                  <input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    placeholder="End date"
-                  />
+                  <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
                 </div>
               </div>
             </div>
-
             <div className="filter-actions">
-              <button onClick={clearFilters} className="btn-clear">
-                Clear Filters
-              </button>
+              <button onClick={clearFilters} className="btn-clear" type="button">Clear</button>
               <span className="result-count">
                 {filteredReturns.length} {filteredReturns.length === 1 ? 'return' : 'returns'} found
               </span>
@@ -316,7 +219,7 @@ const PurchaseReturnHistory = () => {
         )}
       </div>
 
-      {/* Summary Cards */}
+      {/* ── SUMMARY CARDS ── */}
       {filteredReturns.length > 0 && (
         <div className="summary-cards">
           <div className="summary-card">
@@ -325,26 +228,20 @@ const PurchaseReturnHistory = () => {
           </div>
           <div className="summary-card">
             <div className="summary-label">Total Amount</div>
-            <div className="summary-value">
-              {formatCurrency(filteredReturns.reduce((sum, r) => sum + r.total_amount, 0))}
-            </div>
+            <div className="summary-value">{formatCurrency(filteredReturns.reduce((s, r) => s + r.total_amount, 0))}</div>
           </div>
           <div className="summary-card">
             <div className="summary-label">Total Settled</div>
-            <div className="summary-value success-text">
-              {formatCurrency(filteredReturns.reduce((sum, r) => sum + (r.settled_amount || 0), 0))}
-            </div>
+            <div className="summary-value success-text">{formatCurrency(filteredReturns.reduce((s, r) => s + (r.settled_amount || 0), 0))}</div>
           </div>
           <div className="summary-card">
-            <div className="summary-label">Total Balance</div>
-            <div className="summary-value warning-text">
-              {formatCurrency(filteredReturns.reduce((sum, r) => sum + (r.balance_amount || 0), 0))}
-            </div>
+            <div className="summary-label">Outstanding Balance</div>
+            <div className="summary-value warning-text">{formatCurrency(filteredReturns.reduce((s, r) => s + (r.balance_amount || 0), 0))}</div>
           </div>
         </div>
       )}
 
-      {/* Returns Table */}
+      {/* ── TABLE ── */}
       <div className="table-container">
         {filteredReturns.length === 0 ? (
           <div className="empty-state">
@@ -352,8 +249,7 @@ const PurchaseReturnHistory = () => {
             <h3>No returns found</h3>
             <p>Try adjusting your filters or create a new return</p>
             <Link to="/purchase-returns/add" className="btn-primary">
-              <FontAwesomeIcon icon={faPlus} />
-              Create Return
+              <FontAwesomeIcon icon={faPlus} /> Create Return
             </Link>
           </div>
         ) : (
@@ -363,12 +259,12 @@ const PurchaseReturnHistory = () => {
                 <th>Return #</th>
                 <th>Date</th>
                 <th>Supplier</th>
-                <th>Purchase Invoice</th>
+                <th>Invoice</th>
                 <th className="text-right">Total</th>
                 <th className="text-right">Settled</th>
                 <th className="text-right">Balance</th>
-                <th>Settlement Status</th>
-                <th>Actions</th>
+                <th>Status</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -382,32 +278,34 @@ const PurchaseReturnHistory = () => {
                     <td>{formatDate(ret.return_date)}</td>
                     <td>
                       <div className="supplier-info">
-                        <span className="supplier-name">{ret.supplier_name}</span>
+                        <div className="supplier-name">{ret.supplier_name}</div>
+                        {ret.supplier_vat_registered && (
+                          <div className="supplier-vat">VAT Reg</div>
+                        )}
                       </div>
                     </td>
-                    <td>
-                      <span className="invoice-ref">{ret.purchase_invoice}</span>
+                    <td>{ret.purchase_invoice || '—'}</td>
+                    <td className="text-right">
+                      <span className="amount-value">{formatCurrency(ret.total_amount)}</span>
                     </td>
-                    <td className="text-right total-col">
-                      <strong>{formatCurrency(ret.total_amount)}</strong>
+                    <td className="text-right">
+                      <span className="amount-value success">{formatCurrency(ret.settled_amount || 0)}</span>
                     </td>
-                    <td className="text-right success-text">
-                      {formatCurrency(ret.settled_amount || 0)}
-                    </td>
-                    <td className={`text-right ${ret.balance_amount > 0 ? 'warning-text' : 'muted-text'}`}>
-                      {formatCurrency(ret.balance_amount || 0)}
+                    <td className="text-right">
+                      <span className="amount-value warning">{formatCurrency(ret.balance_amount || 0)}</span>
                     </td>
                     <td>
-                      <span className={`settlement-badge ${status.class}`}>
-                        <FontAwesomeIcon icon={status.icon} style={{ color: status.color }} />
+                      <span className={`status-badge ${status.cls}`}>
+                        <FontAwesomeIcon icon={status.icon} />
                         {status.text}
                       </span>
                     </td>
                     <td>
                       <button
+                        className="btn-view"
                         onClick={() => viewReturnDetails(ret.id)}
-                        className="action-btn view"
-                        title="View Details"
+                        title="View details"
+                        type="button"
                       >
                         <FontAwesomeIcon icon={faEye} />
                       </button>
@@ -420,114 +318,109 @@ const PurchaseReturnHistory = () => {
         )}
       </div>
 
-      {/* Details Modal */}
+      {/* ── DETAILS MODAL ── */}
       {showDetailsModal && (
         <div className="modal-overlay" onClick={closeModal}>
           <div className="modal-content large-modal" onClick={(e) => e.stopPropagation()}>
+
+            {/* Modal Header */}
             <div className="modal-header">
               <h3>
                 <FontAwesomeIcon icon={faFileInvoice} />
-                Return Details - {selectedReturn?.return_number}
+                {selectedReturn?.return_number || 'Return Details'}
               </h3>
               <div className="modal-header-actions">
-                <button className="btn-outline" onClick={handlePrint}>
+                <button className="btn-outline" onClick={handlePrint} type="button">
                   <FontAwesomeIcon icon={faPrint} />
                 </button>
-                <button className="close-button" onClick={closeModal}>×</button>
+                <button className="close-button" onClick={closeModal} type="button">×</button>
               </div>
             </div>
-            
+
+            {/* Modal Body */}
             <div className="modal-body">
               {modalLoading ? (
                 <div className="modal-loading">
-                  <div className="loading-spinner"></div>
-                  <p>Loading details...</p>
+                  <div className="loading-spinner" />
+                  <p>Loading details…</p>
                 </div>
               ) : selectedReturn && (
                 <>
-                  {/* Summary Section */}
+                  {/* ── Return Information ── */}
                   <div className="modal-section">
-                    <div 
-                      className="section-header" 
-                      onClick={() => toggleSection('summary')}
-                    >
-                      <h4>
-                        <FontAwesomeIcon icon={faInfoCircle} />
-                        Return Information
-                      </h4>
-                      <FontAwesomeIcon 
-                        icon={expandedSections.summary ? faChevronUp : faChevronDown} 
-                      />
+                    <div className="section-header" onClick={() => toggleSection('summary')}>
+                      <h4><FontAwesomeIcon icon={faInfoCircle} /> Return Information</h4>
+                      <FontAwesomeIcon icon={expandedSections.summary ? faChevronUp : faChevronDown} />
                     </div>
-                    
+
                     {expandedSections.summary && (
                       <div className="details-grid">
-                        {/* Return Info Card */}
+                        {/* Return Info */}
                         <div className="detail-card">
                           <div className="card-content">
                             <div className="info-row">
-                              <span className="label">Return Number:</span>
+                              <span className="label">Return Number</span>
                               <span className="value highlight">{selectedReturn.return_number}</span>
                             </div>
                             <div className="info-row">
-                              <span className="label">Return Date:</span>
+                              <span className="label">Return Date</span>
                               <span className="value">{formatDateTime(selectedReturn.return_date)}</span>
                             </div>
                             <div className="info-row">
-                              <span className="label">Created At:</span>
+                              <span className="label">Created At</span>
                               <span className="value">{formatDateTime(selectedReturn.created_at)}</span>
                             </div>
                             <div className="info-row">
-                              <span className="label">Returned By:</span>
+                              <span className="label">Returned By</span>
                               <span className="value">{selectedReturn.returned_by_name}</span>
                             </div>
                           </div>
                         </div>
 
-                        {/* Supplier Info Card */}
+                        {/* Supplier Info */}
                         <div className="detail-card">
                           <div className="card-content">
                             <div className="info-row">
-                              <span className="label">Supplier:</span>
+                              <span className="label">Supplier</span>
                               <span className="value highlight">{selectedReturn.supplier_name}</span>
                             </div>
                             <div className="info-row">
-                              <span className="label">VAT Status:</span>
+                              <span className="label">VAT Status</span>
                               <span className={`value vat-badge ${selectedReturn.supplier_vat_registered ? 'yes' : 'no'}`}>
                                 {selectedReturn.supplier_vat_registered ? 'Registered' : 'Not Registered'}
                               </span>
                             </div>
                             {selectedReturn.supplier_vat_registered && (
                               <div className="info-row">
-                                <span className="label">VAT Number:</span>
+                                <span className="label">VAT Number</span>
                                 <span className="value vat-number">{selectedReturn.supplier_vat_number}</span>
                               </div>
                             )}
                             <div className="info-row">
-                              <span className="label">Original Invoice:</span>
-                              <span className="value">{selectedReturn.purchase_invoice}</span>
+                              <span className="label">Original Invoice</span>
+                              <span className="value">{selectedReturn.purchase_invoice || '—'}</span>
                             </div>
                             <div className="info-row">
-                              <span className="label">Purchase Date:</span>
+                              <span className="label">Purchase Date</span>
                               <span className="value">{formatDate(selectedReturn.original_purchase_date)}</span>
                             </div>
                           </div>
                         </div>
 
-                        {/* Financial Summary Card */}
+                        {/* Financial Summary */}
                         <div className="detail-card financial">
                           <div className="card-content">
                             <div className="financial-summary">
                               <div className="summary-row">
-                                <span>Subtotal:</span>
+                                <span>Subtotal</span>
                                 <span>{formatCurrency(selectedReturn.subtotal)}</span>
                               </div>
                               <div className="summary-row vat">
-                                <span>VAT Amount:</span>
+                                <span>VAT Amount</span>
                                 <span>{formatCurrency(selectedReturn.vat_amount)}</span>
                               </div>
                               <div className="summary-row total">
-                                <span>Total Return Amount:</span>
+                                <span>Total Return Amount</span>
                                 <span className="bold">{formatCurrency(selectedReturn.total_amount)}</span>
                               </div>
                             </div>
@@ -537,20 +430,12 @@ const PurchaseReturnHistory = () => {
                     )}
                   </div>
 
-                  {/* Settlement Section */}
+                  {/* ── Settlement Summary ── */}
                   {(selectedReturn.settled_amount > 0 || selectedReturn.balance_amount > 0) && (
                     <div className="modal-section">
-                      <div 
-                        className="section-header" 
-                        onClick={() => toggleSection('settlement')}
-                      >
-                        <h4>
-                          <FontAwesomeIcon icon={faBalanceScale} />
-                          Settlement Summary
-                        </h4>
-                        <FontAwesomeIcon 
-                          icon={expandedSections.settlement ? faChevronUp : faChevronDown} 
-                        />
+                      <div className="section-header" onClick={() => toggleSection('settlement')}>
+                        <h4><FontAwesomeIcon icon={faBalanceScale} /> Settlement Summary</h4>
+                        <FontAwesomeIcon icon={expandedSections.settlement ? faChevronUp : faChevronDown} />
                       </div>
 
                       {expandedSections.settlement && (
@@ -574,20 +459,12 @@ const PurchaseReturnHistory = () => {
                     </div>
                   )}
 
-                  {/* Settlement Breakdown Section - Detailed bill-wise settlement */}
-                  {selectedReturn.settlement_details && selectedReturn.settlement_details.length > 0 && (
+                  {/* ── Settlement Breakdown ── */}
+                  {selectedReturn.settlement_details?.length > 0 && (
                     <div className="modal-section">
-                      <div 
-                        className="section-header" 
-                        onClick={() => toggleSection('settlementBreakdown')}
-                      >
-                        <h4>
-                          <FontAwesomeIcon icon={faReceipt} />
-                          Settlement Breakdown by Bill
-                        </h4>
-                        <FontAwesomeIcon 
-                          icon={expandedSections.settlementBreakdown ? faChevronUp : faChevronDown} 
-                        />
+                      <div className="section-header" onClick={() => toggleSection('settlementBreakdown')}>
+                        <h4><FontAwesomeIcon icon={faReceipt} /> Settlement Breakdown by Bill</h4>
+                        <FontAwesomeIcon icon={expandedSections.settlementBreakdown ? faChevronUp : faChevronDown} />
                       </div>
 
                       {expandedSections.settlementBreakdown && (
@@ -598,31 +475,29 @@ const PurchaseReturnHistory = () => {
                               This return was settled against the following purchase bills:
                             </p>
                           </div>
-                          
+
                           <div className="settlement-table-wrapper">
                             <table className="settlement-breakdown-table">
                               <thead>
                                 <tr>
                                   <th>#</th>
                                   <th>Invoice Number</th>
-                                  <th>Amount Settled</th>
-                                  <th>Percentage of Return</th>
+                                  <th className="text-right">Amount Settled</th>
+                                  <th className="text-center">% of Return</th>
                                 </tr>
                               </thead>
                               <tbody>
                                 {selectedReturn.settlement_details.map((s, idx) => {
-                                  const percentage = ((s.amount / selectedReturn.total_amount) * 100).toFixed(2);
+                                  const pct = ((s.amount / selectedReturn.total_amount) * 100).toFixed(2);
                                   return (
                                     <tr key={idx}>
-                                      <td className="text-center">{idx + 1}</td>
-                                      <td>
-                                        <span className="invoice-badge">{s.invoice_no}</span>
-                                      </td>
+                                      <td>{idx + 1}</td>
+                                      <td><span className="invoice-badge">{s.invoice_no}</span></td>
                                       <td className="text-right success-text">
                                         <strong>{formatCurrency(s.amount)}</strong>
                                       </td>
                                       <td className="text-center">
-                                        <span className="percentage-badge">{percentage}%</span>
+                                        <span className="percentage-badge">{pct}%</span>
                                       </td>
                                     </tr>
                                   );
@@ -630,49 +505,39 @@ const PurchaseReturnHistory = () => {
                               </tbody>
                               <tfoot>
                                 <tr>
-                                  <td colSpan="2" className="text-right">
-                                    <strong>Total Settled:</strong>
-                                  </td>
+                                  <td colSpan="2" className="text-right"><strong>Total Settled:</strong></td>
                                   <td className="text-right success-text">
-                                    <strong>{formatCurrency(
-                                      selectedReturn.settlement_details.reduce((sum, s) => sum + s.amount, 0)
-                                    )}</strong>
+                                    <strong>{formatCurrency(selectedReturn.settlement_details.reduce((sum, s) => sum + s.amount, 0))}</strong>
                                   </td>
-                                  <td className="text-center">
-                                    <strong>100%</strong>
-                                  </td>
+                                  <td className="text-center"><strong>100%</strong></td>
                                 </tr>
                               </tfoot>
                             </table>
                           </div>
 
-                          {/* Visual progress bar for settlement */}
+                          {/* Progress bar */}
                           <div className="settlement-progress">
                             <div className="progress-label">
                               <span>Settlement Progress</span>
                               <span>{formatCurrency(selectedReturn.settled_amount)} of {formatCurrency(selectedReturn.total_amount)}</span>
                             </div>
                             <div className="progress-bar">
-                              <div 
-                                className="progress-fill" 
-                                style={{ 
-                                  width: `${(selectedReturn.settled_amount / selectedReturn.total_amount) * 100}%` 
-                                }}
-                              ></div>
+                              <div
+                                className="progress-fill"
+                                style={{ width: `${(selectedReturn.settled_amount / selectedReturn.total_amount) * 100}%` }}
+                              />
                             </div>
                             <div className="progress-percentage">
                               {((selectedReturn.settled_amount / selectedReturn.total_amount) * 100).toFixed(2)}% Settled
                             </div>
                           </div>
 
-                          {/* Settlement Notes if any */}
-                          {selectedReturn.remarks && selectedReturn.remarks.includes('Settlement:') && (
+                          {selectedReturn.remarks?.includes('Settlement:') && (
                             <div className="settlement-notes">
                               <p>
                                 <FontAwesomeIcon icon={faInfoCircle} />
-                                <strong>Settlement Note:</strong> {
-                                  selectedReturn.remarks.split('Settlement:')[1]?.split('|')[0] || 'No additional notes'
-                                }
+                                <strong>Settlement Note:</strong>&nbsp;
+                                {selectedReturn.remarks.split('Settlement:')[1]?.split('|')[0] || 'No additional notes'}
                               </p>
                             </div>
                           )}
@@ -681,19 +546,11 @@ const PurchaseReturnHistory = () => {
                     </div>
                   )}
 
-                  {/* Items Section */}
+                  {/* ── Returned Items ── */}
                   <div className="modal-section">
-                    <div 
-                      className="section-header" 
-                      onClick={() => toggleSection('items')}
-                    >
-                      <h4>
-                        <FontAwesomeIcon icon={faFileInvoice} />
-                        Returned Items
-                      </h4>
-                      <FontAwesomeIcon 
-                        icon={expandedSections.items ? faChevronUp : faChevronDown} 
-                      />
+                    <div className="section-header" onClick={() => toggleSection('items')}>
+                      <h4><FontAwesomeIcon icon={faFileInvoice} /> Returned Items</h4>
+                      <FontAwesomeIcon icon={expandedSections.items ? faChevronUp : faChevronDown} />
                     </div>
 
                     {expandedSections.items && (
@@ -704,7 +561,7 @@ const PurchaseReturnHistory = () => {
                               <tr>
                                 <th>#</th>
                                 <th>Item</th>
-                                <th className="text-center">Quantity</th>
+                                <th className="text-center">Qty</th>
                                 <th>Unit</th>
                                 <th className="text-right">Unit Price</th>
                                 <th className="text-right">Amount</th>
@@ -715,22 +572,22 @@ const PurchaseReturnHistory = () => {
                               </tr>
                             </thead>
                             <tbody>
-                              {selectedReturn.items.map((item, index) => {
+                              {selectedReturn.items.map((item, idx) => {
                                 const amount = item.quantity * item.unit_price;
                                 return (
-                                  <tr key={index}>
-                                    <td>{index + 1}</td>
+                                  <tr key={idx}>
+                                    <td>{idx + 1}</td>
                                     <td>
                                       <div className="item-name">{item.item_name}</div>
                                       <small className="item-code">{item.item_code}</small>
                                     </td>
                                     <td className="text-center">{item.quantity}</td>
-                                    <td>{item.unit || '-'}</td>
+                                    <td>{item.unit || '—'}</td>
                                     <td className="text-right">{formatCurrency(item.unit_price)}</td>
                                     <td className="text-right">{formatCurrency(amount)}</td>
                                     {selectedReturn.supplier_vat_registered && (
                                       <td className="text-right vat-column">
-                                        {item.vat_applicable ? formatCurrency(item.vat_amount) : '-'}
+                                        {item.vat_applicable ? formatCurrency(item.vat_amount) : '—'}
                                       </td>
                                     )}
                                     <td className="text-right total-column">
@@ -742,7 +599,7 @@ const PurchaseReturnHistory = () => {
                             </tbody>
                             <tfoot>
                               <tr>
-                                <td colSpan={selectedReturn.supplier_vat_registered ? "6" : "5"} className="text-right">
+                                <td colSpan={selectedReturn.supplier_vat_registered ? 6 : 5} className="text-right">
                                   <strong>Total:</strong>
                                 </td>
                                 <td className="text-right total-column">
@@ -756,27 +613,16 @@ const PurchaseReturnHistory = () => {
                     )}
                   </div>
 
-                  {/* Remarks Section */}
+                  {/* ── Remarks ── */}
                   {selectedReturn.remarks && (
                     <div className="modal-section">
-                      <div 
-                        className="section-header" 
-                        onClick={() => toggleSection('remarks')}
-                      >
-                        <h4>
-                          <FontAwesomeIcon icon={faInfoCircle} />
-                          Remarks
-                        </h4>
-                        <FontAwesomeIcon 
-                          icon={expandedSections.remarks ? faChevronUp : faChevronDown} 
-                        />
+                      <div className="section-header" onClick={() => toggleSection('remarks')}>
+                        <h4><FontAwesomeIcon icon={faInfoCircle} /> Remarks</h4>
+                        <FontAwesomeIcon icon={expandedSections.remarks ? faChevronUp : faChevronDown} />
                       </div>
-
                       {expandedSections.remarks && (
                         <div className="remarks-card">
-                          <div className="remarks-content">
-                            {selectedReturn.remarks}
-                          </div>
+                          <div className="remarks-content">{selectedReturn.remarks}</div>
                         </div>
                       )}
                     </div>
