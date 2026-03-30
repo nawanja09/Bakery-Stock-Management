@@ -1,17 +1,17 @@
-// SettlementModal.jsx
+// src/components/purchase/SettlementModal.jsx
 import React, { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheck, faTimes, faBalanceScale } from '@fortawesome/free-solid-svg-icons';
 import './SettlementModal.css';
 import api from '../../api';
 
-const SettlementModal = ({ 
-  isOpen, 
-  onClose, 
-  supplierId, 
+const SettlementModal = ({
+  isOpen,
+  onClose,
+  supplierId,
   supplierName,
   returnAmount,
-  onConfirm 
+  onConfirm
 }) => {
   const [bills, setBills] = useState([]);
   const [selectedBills, setSelectedBills] = useState([]);
@@ -21,14 +21,11 @@ const SettlementModal = ({
   const [settlementNote, setSettlementNote] = useState('');
 
   useEffect(() => {
-    if (isOpen && supplierId) {
-      fetchSupplierBills();
-    }
+    if (isOpen && supplierId) fetchSupplierBills();
   }, [isOpen, supplierId]);
 
   useEffect(() => {
-    // Calculate remaining amount based on selected bills
-    const totalSelected = selectedBills.reduce((sum, bill) => sum + bill.allocatedAmount, 0);
+    const totalSelected = selectedBills.reduce((sum, bill) => sum + bill.amount, 0);
     setRemainingAmount(returnAmount - totalSelected);
   }, [selectedBills, returnAmount]);
 
@@ -47,96 +44,89 @@ const SettlementModal = ({
 
   const handleBillSelection = (bill, allocatedAmount) => {
     if (allocatedAmount <= 0) {
-      // Remove bill if amount is 0 or negative
       setSelectedBills(prev => prev.filter(b => b.purchase_id !== bill.id));
       return;
     }
-
     const existingIndex = selectedBills.findIndex(b => b.purchase_id === bill.id);
-    
+    const entry = {
+      purchase_id: bill.id,
+      invoice_no: bill.invoice_no,
+      amount: Math.min(allocatedAmount, bill.balance_amount),
+      originalBalance: bill.balance_amount
+    };
     if (existingIndex >= 0) {
-      // Update existing bill
       const updated = [...selectedBills];
-      updated[existingIndex] = {
-        purchase_id: bill.id,
-        invoice_no: bill.invoice_no,
-        amount: Math.min(allocatedAmount, bill.balance_amount),
-        originalBalance: bill.balance_amount
-      };
+      updated[existingIndex] = entry;
       setSelectedBills(updated);
     } else {
-      // Add new bill
-      setSelectedBills(prev => [...prev, {
-        purchase_id: bill.id,
-        invoice_no: bill.invoice_no,
-        amount: Math.min(allocatedAmount, bill.balance_amount),
-        originalBalance: bill.balance_amount
-      }]);
+      setSelectedBills(prev => [...prev, entry]);
     }
   };
 
   const handleAllocateAll = (bill) => {
-    const maxAllocatable = Math.min(bill.balance_amount, remainingAmount + 
-      (selectedBills.find(b => b.purchase_id === bill.id)?.amount || 0));
-    
+    const currentAlloc = selectedBills.find(b => b.purchase_id === bill.id)?.amount || 0;
+    const maxAllocatable = Math.min(bill.balance_amount, remainingAmount + currentAlloc);
     handleBillSelection(bill, maxAllocatable);
   };
 
   const handleConfirm = () => {
     if (selectedBills.length === 0 && returnAmount > 0) {
-      if (!window.confirm('No bills selected for settlement. The full amount will be carried forward as balance. Continue?')) {
-        return;
-      }
+      if (!window.confirm('No bills selected. The full amount will be carried forward as balance. Continue?')) return;
     }
-    
     onConfirm({
       settlements: selectedBills,
-      remainingAmount: remainingAmount,
+      remainingAmount,
       note: settlementNote
     });
   };
 
-  const totalSelectedAmount = selectedBills.reduce((sum, bill) => sum + bill.amount, 0);
+  const totalSelectedAmount = selectedBills.reduce((sum, b) => sum + b.amount, 0);
 
   if (!isOpen) return null;
 
   return (
     <div className="settlement-modal-overlay">
       <div className="settlement-modal">
+
+        {/* HEADER */}
         <div className="settlement-modal-header">
           <h3>
             <FontAwesomeIcon icon={faBalanceScale} />
             Settle Return Amount
           </h3>
-          <button className="close-btn" onClick={onClose}>
+          <button className="close-btn" onClick={onClose} type="button">
             <FontAwesomeIcon icon={faTimes} />
           </button>
         </div>
 
+        {/* BODY */}
         <div className="settlement-modal-body">
+
+          {/* Summary Grid */}
           <div className="return-summary">
             <div className="summary-item">
-              <span className="label">Supplier:</span>
+              <span className="label">Supplier</span>
               <span className="value">{supplierName}</span>
             </div>
             <div className="summary-item">
-              <span className="label">Return Amount:</span>
+              <span className="label">Return Amount</span>
               <span className="value highlight">Rs. {returnAmount.toFixed(2)}</span>
             </div>
             <div className="summary-item">
-              <span className="label">Selected Settlement:</span>
+              <span className="label">Selected Settlement</span>
               <span className="value success">Rs. {totalSelectedAmount.toFixed(2)}</span>
             </div>
             <div className="summary-item">
-              <span className="label">Remaining Balance:</span>
+              <span className="label">Remaining Balance</span>
               <span className={`value ${remainingAmount > 0 ? 'warning' : 'success'}`}>
                 Rs. {remainingAmount.toFixed(2)}
               </span>
             </div>
           </div>
 
+          {/* Bills list */}
           {loading ? (
-            <div className="loading">Loading bills...</div>
+            <div className="loading">Loading bills…</div>
           ) : error ? (
             <div className="error">{error}</div>
           ) : bills.length === 0 ? (
@@ -151,10 +141,7 @@ const SettlementModal = ({
                 {bills.map(bill => {
                   const selectedBill = selectedBills.find(b => b.purchase_id === bill.id);
                   const allocatedAmount = selectedBill?.amount || 0;
-                  const maxAllocatable = Math.min(
-                    bill.balance_amount,
-                    remainingAmount + allocatedAmount
-                  );
+                  const maxAllocatable = Math.min(bill.balance_amount, remainingAmount + allocatedAmount);
 
                   return (
                     <div key={bill.id} className="bill-item">
@@ -171,7 +158,7 @@ const SettlementModal = ({
                           <span className="balance">Balance: Rs. {bill.balance_amount}</span>
                         </div>
                       </div>
-                      
+
                       <div className="bill-actions">
                         <input
                           type="number"
@@ -205,24 +192,27 @@ const SettlementModal = ({
             </>
           )}
 
+          {/* Notes */}
           <div className="settlement-notes">
-            <label>Notes (Optional):</label>
+            <label>Notes (Optional)</label>
             <textarea
               value={settlementNote}
               onChange={(e) => setSettlementNote(e.target.value)}
-              placeholder="Add any notes about this settlement..."
+              placeholder="Add any notes about this settlement…"
               rows="2"
             />
           </div>
         </div>
 
+        {/* FOOTER */}
         <div className="settlement-modal-footer">
-          <button className="btn-secondary" onClick={onClose}>
+          <button className="btn-secondary" onClick={onClose} type="button">
             Cancel
           </button>
-          <button 
-            className="btn-primary" 
+          <button
+            className="btn-primary"
             onClick={handleConfirm}
+            type="button"
             disabled={remainingAmount < 0}
           >
             Confirm Settlement
