@@ -4494,3 +4494,19 @@ select.form-control {
   flex-direction: column;
   gap: 6px;
 }
+
+.items-table-container {
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+}
+
+.items-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.items-table th,
+.items-table td {
+  border: 1px solid #dee2e6;
+}
