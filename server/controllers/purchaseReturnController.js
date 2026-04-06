@@ -133,12 +133,6 @@ const createPurchaseReturn = async (req, res) => {
       settlements
     } = req.body;
 
-    console.log('=== CREATE PURCHASE RETURN DEBUG ===');
-    console.log('Request body:', JSON.stringify(req.body, null, 2));
-    console.log('Items:', items);
-    console.log('Items length:', items?.length);
-    console.log('Settlements:', settlements);
-
     // Validate required fields
     if (!return_number) {
       throw new Error('Return number is required');
@@ -165,7 +159,6 @@ const createPurchaseReturn = async (req, res) => {
     const processedItems = [];
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
-      console.log(`Processing item ${i}:`, item);
       
       const quantity = parseFloat(item.return_quantity) || 0;
       const unitPrice = parseFloat(item.unit_price) || 0;
@@ -187,8 +180,6 @@ const createPurchaseReturn = async (req, res) => {
       });
     }
 
-    console.log('Calculated totals:', { subtotal, totalVat, totalAmount });
-
     // Calculate settlement amounts and enhance with purchase details
     let settledAmount = 0;
     let enhancedSettlements = [];
@@ -200,7 +191,7 @@ const createPurchaseReturn = async (req, res) => {
         
         // Get purchase details for this settlement
         const [purchaseDetails] = await connection.query(
-          `SELECT id, invoice_no, purchase_date FROM purchases WHERE id = ?`,
+          `SELECT id, invoice_no, DATE(purchase_date) as purchase_date FROM purchases WHERE id = ?`,
           [settlement.purchase_id]
         );
         
@@ -223,37 +214,29 @@ const createPurchaseReturn = async (req, res) => {
     }
 
     const balanceAmount = totalAmount - settledAmount;
-    console.log('Settlement:', { settledAmount, balanceAmount, enhancedSettlements });
 
     // Insert purchase return
-    const insertReturnQuery = `
-      INSERT INTO purchase_returns 
+    const [returnResult] = await connection.query(
+      `INSERT INTO purchase_returns 
       (return_number, return_date, purchase_id, supplier_id, subtotal, vat_amount, 
        total_amount, settled_amount, balance_amount, settlement_details, remarks, returned_by) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `;
-    
-    const insertReturnParams = [
-      return_number, 
-      return_date, 
-      purchase_id || null, 
-      supplier_id, 
-      subtotal, 
-      totalVat, 
-      totalAmount, 
-      settledAmount, 
-      balanceAmount,
-      JSON.stringify(enhancedSettlements), 
-      remarks || null, 
-      returned_by
-    ];
-    
-    console.log('Insert Return SQL:', insertReturnQuery);
-    console.log('Insert Return Params:', insertReturnParams);
-    
-    const [returnResult] = await connection.query(insertReturnQuery, insertReturnParams);
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        return_number, 
+        return_date, 
+        purchase_id || null, 
+        supplier_id, 
+        subtotal, 
+        totalVat, 
+        totalAmount, 
+        settledAmount, 
+        balanceAmount,
+        JSON.stringify(enhancedSettlements), 
+        remarks || null, 
+        returned_by
+      ]
+    );
     const returnId = returnResult.insertId;
-    console.log('Created return with ID:', returnId);
 
     // Insert return items
     for (let i = 0; i < processedItems.length; i++) {
@@ -264,10 +247,7 @@ const createPurchaseReturn = async (req, res) => {
       let itemName = originalItem.item_name;
       let vatApplicable = originalItem.vat_applicable === true || originalItem.vat_applicable === 1;
       
-      console.log(`Processing item ${i} for insertion:`, { itemId, itemName, vatApplicable });
-      
       if (!itemId && itemName) {
-        console.log(`Looking up item by name: ${itemName}`);
         const [foundItem] = await connection.query(
           'SELECT id, vat_applicable FROM items WHERE name = ? OR item_code = ? LIMIT 1',
           [itemName, itemName]
@@ -275,16 +255,12 @@ const createPurchaseReturn = async (req, res) => {
         if (foundItem.length > 0) {
           itemId = foundItem[0].id;
           vatApplicable = foundItem[0].vat_applicable === 1;
-          console.log(`Found item: ID=${itemId}, vat_applicable=${vatApplicable}`);
-        } else {
-          console.warn(`Item not found for name: ${itemName}`);
         }
       }
       
       let purchaseItemId = null;
       
       if (purchase_id && itemId) {
-        console.log(`Looking up purchase_item for purchase_id=${purchase_id}, item_id=${itemId}`);
         const [purchaseItem] = await connection.query(
           `SELECT id FROM purchase_items 
            WHERE purchase_id = ? AND item_id = ? 
@@ -293,42 +269,32 @@ const createPurchaseReturn = async (req, res) => {
         );
         if (purchaseItem.length > 0) {
           purchaseItemId = purchaseItem[0].id;
-          console.log(`Found purchase_item_id: ${purchaseItemId}`);
         }
       }
       
-      const insertItemQuery = `
-        INSERT INTO purchase_return_items 
+      await connection.query(
+        `INSERT INTO purchase_return_items 
         (return_id, purchase_item_id, item_id, item_name, quantity, unit_price, 
          vat_applicable, vat_amount, total_amount) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `;
-      
-      const insertItemParams = [
-        returnId, 
-        purchaseItemId, 
-        itemId, 
-        itemName || `Item ${i + 1}`,
-        processed.quantity, 
-        processed.unit_price, 
-        vatApplicable ? 1 : 0,
-        processed.vat_amount,
-        processed.total_amount
-      ];
-      
-      console.log(`Insert Item ${i} SQL:`, insertItemQuery);
-      console.log(`Insert Item ${i} Params:`, insertItemParams);
-      
-      await connection.query(insertItemQuery, insertItemParams);
-      console.log(`Inserted item ${i} successfully`);
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          returnId, 
+          purchaseItemId, 
+          itemId, 
+          itemName || `Item ${i + 1}`,
+          processed.quantity, 
+          processed.unit_price, 
+          vatApplicable ? 1 : 0,
+          processed.vat_amount,
+          processed.total_amount
+        ]
+      );
     }
 
     // Update purchase balances if settlements were made
     if (settlements && settlements.length > 0) {
-      console.log('Processing settlements:', settlements);
       for (const settlement of settlements) {
         const settlementAmount = parseFloat(settlement.amount) || 0;
-        console.log(`Processing settlement for purchase_id=${settlement.purchase_id}, amount=${settlementAmount}`);
         
         const [purchase] = await connection.query(
           `SELECT balance_amount, paid_amount, total_with_vat 
@@ -351,12 +317,6 @@ const createPurchaseReturn = async (req, res) => {
             paymentStatus = 'Partially Paid';
           }
 
-          console.log(`Updating purchase ${settlement.purchase_id}:`, {
-            currentBalance, newBalance,
-            currentPaid, newPaid,
-            paymentStatus
-          });
-
           await connection.query(
             `UPDATE purchases 
              SET balance_amount = ?, 
@@ -364,13 +324,7 @@ const createPurchaseReturn = async (req, res) => {
                  balance_status = ?,
                  payment_status = ?
              WHERE id = ?`,
-            [
-              newBalance, 
-              newPaid,
-              newBalanceStatus,
-              paymentStatus,
-              settlement.purchase_id
-            ]
+            [newBalance, newPaid, newBalanceStatus, paymentStatus, settlement.purchase_id]
           );
 
           await connection.query(
@@ -386,16 +340,11 @@ const createPurchaseReturn = async (req, res) => {
               returned_by
             ]
           );
-          
-          console.log(`Settlement processed for purchase ${settlement.purchase_id}`);
-        } else {
-          console.warn(`Purchase ${settlement.purchase_id} not found for settlement`);
         }
       }
     }
 
     await connection.commit();
-    console.log('=== RETURN CREATED SUCCESSFULLY ===');
     
     res.status(201).json({
       message: 'Purchase return created successfully!',
@@ -412,12 +361,7 @@ const createPurchaseReturn = async (req, res) => {
 
   } catch (error) {
     await connection.rollback();
-    console.error('=== ERROR CREATING PURCHASE RETURN ===');
-    console.error('Error message:', error.message);
-    console.error('Error code:', error.code);
-    console.error('Error SQL:', error.sql);
-    console.error('Error SQL Message:', error.sqlMessage);
-    console.error('Full error:', error);
+    console.error('Error creating purchase return:', error);
     
     if (error.code === 'ER_DUP_ENTRY') {
       return res.status(400).json({ 
@@ -426,67 +370,95 @@ const createPurchaseReturn = async (req, res) => {
     }
     
     res.status(500).json({ 
-      error: 'Server error: ' + error.message,
-      details: error.sqlMessage || error.message
+      error: 'Server error: ' + error.message 
     });
   } finally {
     connection.release();
   }
 };
 
-// Get all purchase returns - FIXED to include invoice info
+// Get all purchase returns - FIXED to show invoice info
 const getAllPurchaseReturns = async (req, res) => {
   try {
     const [returns] = await pool.query(`
       SELECT 
         pr.*,
-        s.name           AS supplier_name,
+        s.name AS supplier_name,
         s.vat_registered AS supplier_vat_registered,
-        s.vat_number     AS supplier_vat_number,
-        p.invoice_no     AS purchase_invoice,
-        p.purchase_date  AS original_purchase_date,
-        -- Pull invoice numbers by joining purchases on the IDs stored in settlement_details
-        COALESCE(
-          (
-            SELECT GROUP_CONCAT(DISTINCT p2.invoice_no ORDER BY p2.invoice_no SEPARATOR ', ')
-            FROM JSON_TABLE(
-              pr.settlement_details,
-              '$[*]' COLUMNS (pid INT PATH '$.purchase_id')
-            ) AS jt
-            JOIN purchases p2 ON p2.id = jt.pid
-            WHERE jt.pid IS NOT NULL
-          ),
-          p.invoice_no
-        ) AS invoice_display,
-        -- Pull earliest invoice date the same way
-        COALESCE(
-          (
-            SELECT DATE(MIN(p2.purchase_date))
-            FROM JSON_TABLE(
-              pr.settlement_details,
-              '$[*]' COLUMNS (pid INT PATH '$.purchase_id')
-            ) AS jt
-            JOIN purchases p2 ON p2.id = jt.pid
-            WHERE jt.pid IS NOT NULL
-          ),
-          DATE(p.purchase_date)
-        ) AS invoice_date_display
+        s.vat_number AS supplier_vat_number,
+        p.invoice_no AS purchase_invoice,
+        p.purchase_date AS original_purchase_date,
+        u.name AS returned_by_name
       FROM purchase_returns pr
-      JOIN  supplier s ON pr.supplier_id = s.id
+      JOIN supplier s ON pr.supplier_id = s.id
       LEFT JOIN purchases p ON pr.purchase_id = p.id
+      LEFT JOIN users u ON pr.returned_by = u.id
       ORDER BY pr.return_date DESC, pr.id DESC
     `);
 
-    const formattedReturns = returns.map(ret => ({
-      ...ret,
-      total_amount:         parseFloat(ret.total_amount)   || 0,
-      settled_amount:       parseFloat(ret.settled_amount) || 0,
-      balance_amount:       parseFloat(ret.balance_amount) || 0,
-      subtotal:             parseFloat(ret.subtotal)       || 0,
-      vat_amount:           parseFloat(ret.vat_amount)     || 0,
-      invoice_display:      ret.invoice_display      || '—',
-      invoice_date_display: ret.invoice_date_display || null
-    }));
+    const formattedReturns = [];
+    
+    for (const ret of returns) {
+      let invoice_display = '—';
+      let invoice_date_display = null;
+      
+      // Parse settlement_details to get invoice info
+      let settlements = [];
+      if (ret.settlement_details) {
+        try {
+          if (typeof ret.settlement_details === 'string') {
+            settlements = JSON.parse(ret.settlement_details);
+          } else if (typeof ret.settlement_details === 'object') {
+            settlements = ret.settlement_details;
+          }
+        } catch (e) {
+          console.warn('Error parsing settlement_details:', e.message);
+        }
+      }
+      
+      // Get invoice info from settlements
+      if (Array.isArray(settlements) && settlements.length > 0) {
+        const purchaseIds = settlements.map(s => s.purchase_id).filter(Boolean);
+        
+        if (purchaseIds.length > 0) {
+          const placeholders = purchaseIds.map(() => '?').join(',');
+          const [purchases] = await pool.query(
+            `SELECT id, invoice_no, DATE(purchase_date) as purchase_date 
+             FROM purchases 
+             WHERE id IN (${placeholders})`,
+            purchaseIds
+          );
+          
+          const invoices = purchases.map(p => p.invoice_no).filter(Boolean);
+          if (invoices.length > 0) {
+            invoice_display = invoices.join(', ');
+          }
+          
+          const dates = purchases.map(p => p.purchase_date).filter(Boolean);
+          if (dates.length > 0) {
+            const earliestDate = dates.reduce((a, b) => a < b ? a : b);
+            invoice_date_display = earliestDate;
+          }
+        }
+      }
+      
+      // If no settlements, use direct purchase invoice
+      if (invoice_display === '—' && ret.purchase_invoice) {
+        invoice_display = ret.purchase_invoice;
+        invoice_date_display = ret.original_purchase_date;
+      }
+      
+      formattedReturns.push({
+        ...ret,
+        total_amount: parseFloat(ret.total_amount) || 0,
+        settled_amount: parseFloat(ret.settled_amount) || 0,
+        balance_amount: parseFloat(ret.balance_amount) || 0,
+        subtotal: parseFloat(ret.subtotal) || 0,
+        vat_amount: parseFloat(ret.vat_amount) || 0,
+        invoice_display: invoice_display,
+        invoice_date_display: invoice_date_display
+      });
+    }
 
     res.json(formattedReturns);
   } catch (error) {
@@ -554,8 +526,7 @@ const getPurchaseReturnById = async (req, res) => {
     console.error('Error fetching purchase return:', error);
     res.status(500).json({ 
       error: 'Server error', 
-      details: error.message,
-      sqlMessage: error.sqlMessage 
+      details: error.message 
     });
   }
 };
@@ -616,6 +587,138 @@ const getPurchaseReturnByNumber = async (req, res) => {
     res.json(purchaseReturn);
   } catch (error) {
     console.error('Error fetching purchase return:', error);
+    res.status(500).json({ error: 'Server error: ' + error.message });
+  }
+};
+
+// Get VAT returns - COMPLETELY FIXED for invoice display
+const getVATReturns = async (req, res) => {
+  const { startDate, endDate } = req.query;
+
+  if (!startDate || !endDate) {
+    return res.status(400).json({ error: 'startDate and endDate are required' });
+  }
+
+  try {
+    // First, get all VAT registered returns with their settlement details
+    const [rows] = await pool.query(`
+      SELECT 
+        ROW_NUMBER() OVER (ORDER BY pr.return_date, pr.id) AS serial_no,
+        s.name AS supplier_name,
+        s.vat_number AS tin_no,
+        DATE(pr.return_date) AS return_date,
+        pr.return_number AS tax_credit_no,
+        pr.settlement_details,
+        pr.purchase_id,
+        pr.id AS return_id,
+        SUM(pri.quantity * pri.unit_price) AS value_of_return,
+        SUM(COALESCE(pri.vat_amount, 0)) AS vat_amount
+      FROM purchase_returns pr
+      JOIN supplier s ON pr.supplier_id = s.id
+      JOIN purchase_return_items pri ON pr.id = pri.return_id
+      WHERE s.vat_registered = 1
+        AND DATE(pr.return_date) BETWEEN ? AND ?
+      GROUP BY
+        pr.id, s.name, s.vat_number,
+        pr.return_date, pr.return_number, pr.settlement_details, pr.purchase_id
+      ORDER BY pr.return_date, pr.id
+    `, [startDate, endDate]);
+
+    const formattedRows = [];
+    
+    for (const row of rows) {
+      let invoice_no = null;
+      let invoice_date = null;
+      let allInvoiceNumbers = [];
+      let allInvoiceDates = [];
+      
+      // Parse settlement_details
+      let settlements = [];
+      if (row.settlement_details) {
+        try {
+          if (typeof row.settlement_details === 'string') {
+            settlements = JSON.parse(row.settlement_details);
+          } else if (typeof row.settlement_details === 'object') {
+            settlements = row.settlement_details;
+          }
+        } catch (e) {
+          console.warn('Error parsing settlement_details for return', row.return_id, e.message);
+        }
+      }
+      
+      // If we have settlements, get invoice info from each settled bill
+      if (Array.isArray(settlements) && settlements.length > 0) {
+        const purchaseIds = settlements.map(s => s.purchase_id).filter(Boolean);
+        
+        if (purchaseIds.length > 0) {
+          const placeholders = purchaseIds.map(() => '?').join(',');
+          const [purchases] = await pool.query(
+            `SELECT id, invoice_no, DATE(purchase_date) as purchase_date 
+             FROM purchases 
+             WHERE id IN (${placeholders})
+             ORDER BY purchase_date ASC`,
+            purchaseIds
+          );
+          
+          for (const purchase of purchases) {
+            if (purchase.invoice_no) {
+              allInvoiceNumbers.push(purchase.invoice_no);
+            }
+            if (purchase.purchase_date) {
+              allInvoiceDates.push(purchase.purchase_date);
+            }
+          }
+        }
+      }
+      
+      // If no settlements, try to get from direct purchase_id
+      if (allInvoiceNumbers.length === 0 && row.purchase_id) {
+        const [purchase] = await pool.query(
+          `SELECT invoice_no, DATE(purchase_date) as purchase_date 
+           FROM purchases WHERE id = ?`,
+          [row.purchase_id]
+        );
+        if (purchase.length > 0) {
+          if (purchase[0].invoice_no) {
+            allInvoiceNumbers.push(purchase[0].invoice_no);
+          }
+          if (purchase[0].purchase_date) {
+            allInvoiceDates.push(purchase[0].purchase_date);
+          }
+        }
+      }
+      
+      // Format the results
+      if (allInvoiceNumbers.length > 0) {
+        invoice_no = allInvoiceNumbers.join(', ');
+        if (allInvoiceDates.length > 0) {
+          const earliestDate = allInvoiceDates.reduce((a, b) => a < b ? a : b);
+          invoice_date = earliestDate;
+        }
+      }
+      
+      // If still no invoice info, use return date as fallback
+      if (!invoice_date) {
+        invoice_date = row.return_date;
+      }
+      
+      formattedRows.push({
+        serial_no: row.serial_no,
+        supplier_name: row.supplier_name,
+        tin_no: row.tin_no || '',
+        invoice_date: invoice_date,
+        invoice_no: invoice_no,
+        tax_credit: 'Credit',
+        date_of_tax_credit: row.return_date,
+        tax_credit_no: row.tax_credit_no,
+        value_of_return: parseFloat(row.value_of_return) || 0,
+        vat_amount: parseFloat(row.vat_amount) || 0
+      });
+    }
+
+    res.json(formattedRows);
+  } catch (error) {
+    console.error('Error fetching VAT returns:', error);
     res.status(500).json({ error: 'Server error: ' + error.message });
   }
 };
@@ -808,87 +911,6 @@ const getVATReturnsSummary = async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching VAT summary:', error);
-    res.status(500).json({ error: 'Server error: ' + error.message });
-  }
-};
-
-// Get VAT returns - FIXED to show invoice info
-const getVATReturns = async (req, res) => {
-  const { startDate, endDate } = req.query;
-
-  if (!startDate || !endDate) {
-    return res.status(400).json({ error: 'startDate and endDate are required' });
-  }
-
-  try {
-    const [rows] = await pool.query(`
-      SELECT 
-        ROW_NUMBER() OVER (ORDER BY pr.return_date, pr.id) AS serial_no,
-        s.name       AS supplier_name,
-        s.vat_number AS tin_no,
-        COALESCE(
-          (
-            SELECT DATE(MIN(p2.purchase_date))
-            FROM JSON_TABLE(
-              COALESCE(pr.settlement_details, '[]'),
-              '$[*]' COLUMNS (pid INT PATH '$.purchase_id')
-            ) AS jt
-            JOIN purchases p2 ON p2.id = jt.pid
-            WHERE jt.pid IS NOT NULL
-          ),
-          DATE(p.purchase_date),
-          DATE(pr.return_date)
-        ) AS invoice_date,
-        COALESCE(
-          (
-            SELECT GROUP_CONCAT(DISTINCT p2.invoice_no ORDER BY p2.invoice_no SEPARATOR ', ')
-            FROM JSON_TABLE(
-              COALESCE(pr.settlement_details, '[]'),
-              '$[*]' COLUMNS (pid INT PATH '$.purchase_id')
-            ) AS jt
-            JOIN purchases p2 ON p2.id = jt.pid
-            WHERE jt.pid IS NOT NULL
-          ),
-          p.invoice_no,
-          '—'
-        ) AS invoice_no,
-        'Credit'             AS tax_credit,
-        DATE(pr.return_date) AS date_of_tax_credit,
-        pr.return_number     AS tax_credit_no,
-        pr.return_number     AS return_bill_no,
-        SUM(pri.quantity * pri.unit_price) AS value_of_return,
-        SUM(COALESCE(pri.vat_amount, 0))   AS vat_amount
-      FROM purchase_returns pr
-      JOIN  supplier s ON pr.supplier_id = s.id
-      LEFT JOIN purchases p ON pr.purchase_id = p.id
-      JOIN  purchase_return_items pri ON pr.id = pri.return_id
-      WHERE s.vat_registered = 1
-        AND DATE(pr.return_date) BETWEEN ? AND ?
-      GROUP BY
-        pr.id, s.name, s.vat_number,
-        pr.purchase_id, p.purchase_date, p.invoice_no,
-        pr.return_date, pr.return_number, pr.settlement_details
-      ORDER BY pr.return_date, pr.id
-    `, [startDate, endDate]);
-
-    const formattedRows = rows.map(row => ({
-      serial_no:       row.serial_no,
-      supplier_name:   row.supplier_name,
-      tin_no:          row.tin_no,
-      // Normalise "null" string → null
-      invoice_date:    (row.invoice_date  && row.invoice_date  !== 'null') ? row.invoice_date  : null,
-      invoice_no:      (row.invoice_no    && row.invoice_no    !== 'null') ? row.invoice_no    : '—',
-      tax_credit:      row.tax_credit,
-      return_date:     row.date_of_tax_credit,
-      tax_credit_no:   row.tax_credit_no,
-      return_bill_no:  row.return_bill_no,
-      value_of_return: parseFloat(row.value_of_return) || 0,
-      vat_amount:      parseFloat(row.vat_amount)       || 0
-    }));
-
-    res.json(formattedRows);
-  } catch (error) {
-    console.error('Error fetching VAT returns:', error);
     res.status(500).json({ error: 'Server error: ' + error.message });
   }
 };
