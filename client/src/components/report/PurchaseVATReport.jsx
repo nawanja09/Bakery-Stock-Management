@@ -6,7 +6,11 @@ import {
   faPrint,
   faCalendar,
   faSearch,
-  faUndo
+  faUndo,
+  faFileInvoice,
+  faBuilding,
+  faFilter,
+  faExclamationTriangle
 } from '@fortawesome/free-solid-svg-icons';
 import dayjs from 'dayjs';
 import api from '../../api';
@@ -24,19 +28,26 @@ const PurchaseVATReport = () => {
   const [startDate, setStartDate] = useState(dayjs().startOf('month').format('YYYY-MM-DD'));
   const [endDate, setEndDate] = useState(dayjs().format('YYYY-MM-DD'));
   const [searchQuery, setSearchQuery] = useState('');
+  const [companies, setCompanies] = useState([]);
+  const [selectedCompany, setSelectedCompany] = useState('');
+  const [debugInfo, setDebugInfo] = useState(null);
+
+  useEffect(() => {
+    fetchCompanies();
+  }, []);
 
   useEffect(() => {
     fetchVATReturns();
-  }, [startDate, endDate]);
+  }, [startDate, endDate, selectedCompany]);
 
   useEffect(() => {
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       const filtered = purchaseReturns.filter(ret => 
         ret.supplier_name?.toLowerCase().includes(query) ||
-        ret.return_bill_no?.toLowerCase().includes(query) ||
+        ret.tin_no?.toLowerCase().includes(query) ||
         ret.invoice_no?.toLowerCase().includes(query) ||
-        ret.tin_no?.includes(query)
+        ret.tax_credit_no?.toLowerCase().includes(query)
       );
       setFilteredReturns(filtered);
     } else {
@@ -44,26 +55,57 @@ const PurchaseVATReport = () => {
     }
   }, [searchQuery, purchaseReturns]);
 
+  const fetchCompanies = async () => {
+    try {
+      const response = await api.get('/purchases/companies');
+      setCompanies(response.data);
+    } catch (error) {
+      console.error('Error fetching companies:', error);
+    }
+  };
+
+  const getInvoiceNo = (ret) => {
+    const val = ret.invoice_no;
+
+    if (!val || val.trim() === '' || val === '—') {
+      return '-';
+    }
+
+    return val;
+  };
+  
   const fetchVATReturns = async () => {
     try {
       setLoading(true);
       
-      // Fetch purchase returns for VAT report
-      const returnsResponse = await api.get('/purchase-returns/reports/vat-returns', {
+      const response = await api.get('/purchase-returns/reports/vat-returns', {
         params: { startDate, endDate }
       });
       
-      // Fetch summary
       const summaryResponse = await api.get('/purchase-returns/reports/vat-summary', {
         params: { startDate, endDate }
       });
 
-      setPurchaseReturns(returnsResponse.data);
-      setFilteredReturns(returnsResponse.data);
+      console.log('API Response - VAT Returns:', response.data);
+      
+      // Debug: Check if invoice_no exists in the data
+      if (response.data && response.data.length > 0) {
+        console.log('First record invoice_no:', response.data[0].invoice_no);
+        console.log('First record full data:', response.data[0]);
+        setDebugInfo({
+          hasInvoiceNo: response.data[0].hasOwnProperty('invoice_no'),
+          invoiceNoValue: response.data[0].invoice_no,
+          totalRecords: response.data.length
+        });
+      }
+
+      setPurchaseReturns(response.data);
+      setFilteredReturns(response.data);
       setSummary(summaryResponse.data);
       
     } catch (error) {
       console.error('Error fetching VAT returns:', error);
+      setDebugInfo({ error: error.message });
     } finally {
       setLoading(false);
     }
@@ -78,7 +120,7 @@ const PurchaseVATReport = () => {
   };
 
   const formatDate = (date) => {
-    return dayjs(date).format('MM/DD/YYYY');
+    return date ? dayjs(date).format('MM/DD/YYYY') : '-';
   };
 
   const handlePrint = () => {
@@ -86,20 +128,23 @@ const PurchaseVATReport = () => {
   };
 
   const handleExcel = () => {
-    // Create CSV content
-    let csvContent = "Serial No,TIN No,Invoice Date,Invoice No,Tax Credit,Date of Tax Credit,Tax Credit No,Value of Tax Credit Note,VAT Amount\n";
+    let csvContent = "Serial No,TIN No,Invoice Date,Invoice No,Tax Credit,Date of Tax Credit,Tax Credit No,Value of Tax Credit Note (Rs.),VAT Amount (Rs.)\n";
     
     filteredReturns.forEach(ret => {
-      csvContent += `${ret.serial_no},${ret.tin_no},${formatDate(ret.invoice_date)},${ret.invoice_no},Credit,${formatDate(ret.return_date)},${ret.tax_credit_no},${ret.value_of_return},${ret.vat_amount}\n`;
+      // Use the same data that would display in table
+      const invoiceNo = ret.invoice_no || ret.invoice_number || '-';
+      const invoiceDate = ret.invoice_date || ret.date_of_tax_credit || startDate;
+      
+      csvContent += `${ret.serial_no},${ret.tin_no || ''},${formatDate(invoiceDate)},"${invoiceNo}",${ret.tax_credit || 'Credit'},${formatDate(ret.date_of_tax_credit)},${ret.tax_credit_no},${ret.value_of_return.toFixed(2)},${ret.vat_amount.toFixed(2)}\n`;
     });
 
-    // Download CSV
-    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = `VAT_Returns_${startDate}_to_${endDate}.csv`;
     a.click();
+    window.URL.revokeObjectURL(url);
   };
 
   const handlePDF = () => {
@@ -122,7 +167,7 @@ const PurchaseVATReport = () => {
           <FontAwesomeIcon icon={faUndo} className="header-icon" />
           Purchase Returns - VAT Report
         </h1>
-        <p className="subtitle">Tax Credit Notes for Purchase Returns</p>
+        <p className="subtitle">Tax Credit Notes for Purchase Returns from VAT Registered Suppliers</p>
       </div>
 
       {/* Filter Section */}
@@ -171,7 +216,7 @@ const PurchaseVATReport = () => {
           <div className="filter-group">
             <label>&nbsp;</label>
             <button onClick={fetchVATReturns} className="btn-primary">
-              Generate Report
+              <FontAwesomeIcon icon={faFilter} /> Generate Report
             </button>
           </div>
         </div>
@@ -220,6 +265,14 @@ const PurchaseVATReport = () => {
         </button>
       </div>
 
+      {/* Warning if no invoice numbers */}
+      {filteredReturns.length > 0 && !filteredReturns[0]?.invoice_no && (
+        <div className="warning-banner">
+          <FontAwesomeIcon icon={faExclamationTriangle} />
+          <span>Warning: Invoice numbers are not available in the data. Please check the backend API response.</span>
+        </div>
+      )}
+
       {/* Report Table */}
       <div className="report-table-container">
         <table className="report-table">
@@ -234,36 +287,33 @@ const PurchaseVATReport = () => {
               <th>Tax Credit No</th>
               <th>Value of Tax Credit Note</th>
               <th>VAT Amount</th>
-              <th>Disallowable VAT</th>
             </tr>
           </thead>
           <tbody>
             {filteredReturns.length === 0 ? (
               <tr>
-                <td colSpan="10" className="no-data">
+                <td colSpan="9" className="no-data">
                   No VAT returns found for the selected period
                 </td>
               </tr>
             ) : (
-              filteredReturns.map((ret) => (
-                <tr key={ret.serial_no}>
+              filteredReturns.map((ret, index) => (
+                <tr key={index}>
                   <td className="text-center">{ret.serial_no}</td>
                   <td className="text-center">
-                    <span className="tin-badge">{ret.tin_no}</span>
+                    <span className="tin-badge">{ret.tin_no || '-'}</span>
                   </td>
                   <td className="text-center">
                     {ret.invoice_date ? formatDate(ret.invoice_date) : '-'}
                   </td>
                   <td className="text-center">
-                    <span className="invoice-badge">
-                      {ret.invoice_no || '-'}
-                    </span>
+                    {JSON.stringify(ret.invoice_no)}
+                  </td>  
+                  <td className="text-center">
+                    <span className="credit-badge">{ret.tax_credit || 'Credit'}</span>
                   </td>
                   <td className="text-center">
-                    <span className="credit-badge">Credit</span>
-                  </td>
-                  <td className="text-center">
-                    {ret.return_date ? formatDate(ret.return_date) : '-'}
+                    {ret.date_of_tax_credit ? formatDate(ret.date_of_tax_credit) : '-'}
                   </td>
                   <td className="text-center">
                     <span className="credit-no">{ret.tax_credit_no}</span>
@@ -274,7 +324,6 @@ const PurchaseVATReport = () => {
                   <td className="text-right vat-amount">
                     {formatCurrency(ret.vat_amount)}
                   </td>
-                  <td className="text-center">-</td>
                 </tr>
               ))
             )}
@@ -299,6 +348,7 @@ const PurchaseVATReport = () => {
         </p>
         <p>
           <strong>Note:</strong> This report includes only returns from VAT registered suppliers.
+          Invoice information is derived from the bills settled with this return.
         </p>
       </div>
     </div>
