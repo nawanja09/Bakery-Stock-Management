@@ -359,8 +359,14 @@ const AddPurchaseReturn = () => {
     return { subtotal, totalVat, grandTotal: subtotal + totalVat };
   };
 
+  // Custom components to hide dropdown indicator and separator
+  const customSelectComponents = {
+    DropdownIndicator: null,
+    IndicatorSeparator: null
+  };
+
   const hasItemsToReturn = () =>
-    returnItems.some(item => item.return_quantity > 0 && item.unit_price > 0 && item.item_id);
+    returnItems.some(item => item.return_quantity > 0 && item.unit_price > 0 && item.item_id)
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -626,9 +632,10 @@ const AddPurchaseReturn = () => {
                             value={selectedOption}
                             onChange={(selected) => handleItemSelect(index, selected)}
                             isSearchable
-                            isClearable
+                            isClearable = {false}
                             placeholder="Search item..."
                             classNamePrefix="react-select"
+                            components={customSelectComponents}
                             styles={{
                               control: (base) => ({
                                 ...base,
