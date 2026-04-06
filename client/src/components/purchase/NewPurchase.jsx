@@ -352,6 +352,12 @@ const AddPurchase = () => {
     }));
   };
 
+  // Custom components to hide dropdown indicator and separator
+  const customSelectComponents = {
+    DropdownIndicator: null,
+    IndicatorSeparator: null
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -636,10 +642,6 @@ const AddPurchase = () => {
               Purchase Items
             </h2>
           </div>
-
-          {/* Table for Desktop */}
-          <div className="form-card">
-          <h3>Purchase Items</h3>
           
             <div className="items-table-container">
               <table className="items-table">
@@ -665,13 +667,13 @@ const AddPurchase = () => {
                         <td>
                           <Select
                             options={itemOptions}
-                            value={selectedOption}
+                            value={itemOptions.find(opt => opt.value === item.id) || null}
                             onChange={(selected) => handleItemSelect(index, selected)}
                             isSearchable
-                            isClearable
-                            placeholder="Search or select item..."
+                            placeholder="Select item..."
                             className="react-select-container"
                             classNamePrefix="react-select"
+                            components={customSelectComponents}
                             styles={{
                               control: (base) => ({
                                 ...base,
@@ -749,7 +751,6 @@ const AddPurchase = () => {
                 </tbody>
               </table>
             </div>
-          </div>
 
           {/* Mobile Items View (Cards) */}
           <div className="mobile-items-view">
