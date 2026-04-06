@@ -631,6 +631,55 @@ const getPurchaseReturnsForBill = async (req, res) => {
   }
 };
 
+// Get supplier bills from last 3 months with balance > 0
+const getSupplierBills = async (req, res) => {
+  const { supplierId } = req.params;
+  const { fromDate } = req.query;
+
+  try {
+    let query = `
+      SELECT 
+        p.id,
+        p.invoice_no,
+        p.purchase_date,
+        p.total_with_vat,
+        p.paid_amount,
+        p.balance_amount,
+        p.balance_status,
+        p.payment_status
+      FROM purchases p
+      WHERE p.supplier_id = ? 
+        AND p.balance_status = 1 
+        AND p.balance_amount > 0
+        AND (p.deleted = FALSE OR p.deleted IS NULL)
+    `;
+    
+    const params = [supplierId];
+    
+    if (fromDate) {
+      query += ` AND p.purchase_date >= ?`;
+      params.push(fromDate);
+    }
+    
+    query += ` ORDER BY p.purchase_date ASC`;
+    
+    const [bills] = await pool.query(query, params);
+    
+    // Format amounts as numbers
+    const formattedBills = bills.map(bill => ({
+      ...bill,
+      total_with_vat: parseFloat(bill.total_with_vat) || 0,
+      paid_amount: parseFloat(bill.paid_amount) || 0,
+      balance_amount: parseFloat(bill.balance_amount) || 0
+    }));
+    
+    res.json(formattedBills);
+  } catch (error) {
+    console.error('Error fetching supplier bills:', error);
+    res.status(500).json({ error: 'Server error: ' + error.message });
+  }
+};
+
 module.exports = {
   createPurchase,
   getAllPurchases,
@@ -643,5 +692,6 @@ module.exports = {
   makePayment,
   getPaymentHistory,
   updatePaymentStatuses,
-  getPurchaseReturnsForBill
+  getPurchaseReturnsForBill,
+  getSupplierBills
 };

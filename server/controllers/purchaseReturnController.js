@@ -31,7 +31,6 @@ const getPurchaseItemsForReturn = async (req, res) => {
   const { purchaseId } = req.params;
 
   try {
-    // Get purchase details
     const [purchase] = await pool.query(`
       SELECT 
         p.*,
@@ -46,7 +45,6 @@ const getPurchaseItemsForReturn = async (req, res) => {
       return res.status(404).json({ error: 'Purchase not found' });
     }
 
-    // Get purchase items with already returned quantities
     const [items] = await pool.query(`
       SELECT 
         pi.id AS purchase_item_id,
@@ -67,7 +65,6 @@ const getPurchaseItemsForReturn = async (req, res) => {
       WHERE pi.purchase_id = ?
     `, [purchaseId]);
 
-    // Calculate available quantity for return
     const itemsWithAvailability = items.map(item => ({
       ...item,
       purchased_quantity: parseFloat(item.purchased_quantity),
@@ -140,6 +137,7 @@ const createPurchaseReturn = async (req, res) => {
     console.log('Request body:', JSON.stringify(req.body, null, 2));
     console.log('Items:', items);
     console.log('Items length:', items?.length);
+    console.log('Settlements:', settlements);
 
     // Validate required fields
     if (!return_number) {
@@ -174,7 +172,6 @@ const createPurchaseReturn = async (req, res) => {
       const amount = quantity * unitPrice;
       subtotal += amount;
       
-      // Check if VAT should be applied
       const isVatApplicable = item.vat_applicable === true || item.vat_applicable === 1;
       const vatAmount = isVatApplicable ? (amount * 0.18) : 0;
       totalVat += vatAmount;
@@ -192,14 +189,41 @@ const createPurchaseReturn = async (req, res) => {
 
     console.log('Calculated totals:', { subtotal, totalVat, totalAmount });
 
-    // Calculate settlement amounts
+    // Calculate settlement amounts and enhance with purchase details
     let settledAmount = 0;
+    let enhancedSettlements = [];
+    
     if (settlements && settlements.length > 0) {
-      settledAmount = settlements.reduce((sum, s) => sum + (parseFloat(s.amount) || 0), 0);
+      for (const settlement of settlements) {
+        const settlementAmount = parseFloat(settlement.amount) || 0;
+        settledAmount += settlementAmount;
+        
+        // Get purchase details for this settlement
+        const [purchaseDetails] = await connection.query(
+          `SELECT id, invoice_no, purchase_date FROM purchases WHERE id = ?`,
+          [settlement.purchase_id]
+        );
+        
+        if (purchaseDetails.length > 0) {
+          enhancedSettlements.push({
+            purchase_id: settlement.purchase_id,
+            invoice_no: purchaseDetails[0].invoice_no,
+            purchase_date: purchaseDetails[0].purchase_date,
+            amount: settlementAmount
+          });
+        } else {
+          enhancedSettlements.push({
+            purchase_id: settlement.purchase_id,
+            invoice_no: 'Unknown',
+            purchase_date: null,
+            amount: settlementAmount
+          });
+        }
+      }
     }
 
     const balanceAmount = totalAmount - settledAmount;
-    console.log('Settlement:', { settledAmount, balanceAmount });
+    console.log('Settlement:', { settledAmount, balanceAmount, enhancedSettlements });
 
     // Insert purchase return
     const insertReturnQuery = `
@@ -219,7 +243,7 @@ const createPurchaseReturn = async (req, res) => {
       totalAmount, 
       settledAmount, 
       balanceAmount,
-      JSON.stringify(settlements || []), 
+      JSON.stringify(enhancedSettlements), 
       remarks || null, 
       returned_by
     ];
@@ -236,14 +260,12 @@ const createPurchaseReturn = async (req, res) => {
       const processed = processedItems[i];
       const originalItem = processed.originalItem;
       
-      // Get item details
       let itemId = originalItem.item_id;
       let itemName = originalItem.item_name;
       let vatApplicable = originalItem.vat_applicable === true || originalItem.vat_applicable === 1;
       
       console.log(`Processing item ${i} for insertion:`, { itemId, itemName, vatApplicable });
       
-      // If item_id is not provided but item_name is, try to find it
       if (!itemId && itemName) {
         console.log(`Looking up item by name: ${itemName}`);
         const [foundItem] = await connection.query(
@@ -259,10 +281,8 @@ const createPurchaseReturn = async (req, res) => {
         }
       }
       
-      // Determine purchase_item_id (NULL for standalone returns)
       let purchaseItemId = null;
       
-      // If there's a purchase_id and we have an item_id, try to find the purchase_item
       if (purchase_id && itemId) {
         console.log(`Looking up purchase_item for purchase_id=${purchase_id}, item_id=${itemId}`);
         const [purchaseItem] = await connection.query(
@@ -324,7 +344,6 @@ const createPurchaseReturn = async (req, res) => {
           const newPaid = currentPaid + settlementAmount;
           const newBalanceStatus = newBalance > 0 ? 1 : 0;
 
-          // Determine new payment status
           let paymentStatus = 'Non-Paid';
           if (newPaid >= purchase[0].total_with_vat) {
             paymentStatus = 'Paid';
@@ -354,7 +373,6 @@ const createPurchaseReturn = async (req, res) => {
             ]
           );
 
-          // Add to payment history
           await connection.query(
             `INSERT INTO payment_history 
              (purchase_id, payment_date, amount, payment_method, notes, created_by)
@@ -401,7 +419,6 @@ const createPurchaseReturn = async (req, res) => {
     console.error('Error SQL Message:', error.sqlMessage);
     console.error('Full error:', error);
     
-    // Handle duplicate return number
     if (error.code === 'ER_DUP_ENTRY') {
       return res.status(400).json({ 
         error: 'Return number already exists. Please use a unique return number.' 
@@ -417,28 +434,58 @@ const createPurchaseReturn = async (req, res) => {
   }
 };
 
-// Get all purchase returns
+// Get all purchase returns - FIXED to include invoice info
 const getAllPurchaseReturns = async (req, res) => {
   try {
     const [returns] = await pool.query(`
       SELECT 
         pr.*,
-        s.name AS supplier_name,
-        p.invoice_no AS purchase_invoice
+        s.name           AS supplier_name,
+        s.vat_registered AS supplier_vat_registered,
+        s.vat_number     AS supplier_vat_number,
+        p.invoice_no     AS purchase_invoice,
+        p.purchase_date  AS original_purchase_date,
+        -- Pull invoice numbers by joining purchases on the IDs stored in settlement_details
+        COALESCE(
+          (
+            SELECT GROUP_CONCAT(DISTINCT p2.invoice_no ORDER BY p2.invoice_no SEPARATOR ', ')
+            FROM JSON_TABLE(
+              pr.settlement_details,
+              '$[*]' COLUMNS (pid INT PATH '$.purchase_id')
+            ) AS jt
+            JOIN purchases p2 ON p2.id = jt.pid
+            WHERE jt.pid IS NOT NULL
+          ),
+          p.invoice_no
+        ) AS invoice_display,
+        -- Pull earliest invoice date the same way
+        COALESCE(
+          (
+            SELECT DATE(MIN(p2.purchase_date))
+            FROM JSON_TABLE(
+              pr.settlement_details,
+              '$[*]' COLUMNS (pid INT PATH '$.purchase_id')
+            ) AS jt
+            JOIN purchases p2 ON p2.id = jt.pid
+            WHERE jt.pid IS NOT NULL
+          ),
+          DATE(p.purchase_date)
+        ) AS invoice_date_display
       FROM purchase_returns pr
-      JOIN supplier s ON pr.supplier_id = s.id
+      JOIN  supplier s ON pr.supplier_id = s.id
       LEFT JOIN purchases p ON pr.purchase_id = p.id
       ORDER BY pr.return_date DESC, pr.id DESC
     `);
 
-    // Ensure numeric fields are proper numbers
     const formattedReturns = returns.map(ret => ({
       ...ret,
-      total_amount: parseFloat(ret.total_amount) || 0,
-      settled_amount: parseFloat(ret.settled_amount) || 0,
-      balance_amount: parseFloat(ret.balance_amount) || 0,
-      subtotal: parseFloat(ret.subtotal) || 0,
-      vat_amount: parseFloat(ret.vat_amount) || 0
+      total_amount:         parseFloat(ret.total_amount)   || 0,
+      settled_amount:       parseFloat(ret.settled_amount) || 0,
+      balance_amount:       parseFloat(ret.balance_amount) || 0,
+      subtotal:             parseFloat(ret.subtotal)       || 0,
+      vat_amount:           parseFloat(ret.vat_amount)     || 0,
+      invoice_display:      ret.invoice_display      || '—',
+      invoice_date_display: ret.invoice_date_display || null
     }));
 
     res.json(formattedReturns);
@@ -453,7 +500,6 @@ const getPurchaseReturnById = async (req, res) => {
   const { id } = req.params;
 
   try {
-    // First, get the purchase return details
     const [returns] = await pool.query(`
       SELECT 
         pr.*,
@@ -476,7 +522,6 @@ const getPurchaseReturnById = async (req, res) => {
 
     const purchaseReturn = returns[0];
 
-    // Handle settlement_details - check if it's already an object or needs parsing
     if (purchaseReturn.settlement_details) {
       if (typeof purchaseReturn.settlement_details === 'object') {
         purchaseReturn.settlement_details = purchaseReturn.settlement_details;
@@ -492,7 +537,6 @@ const getPurchaseReturnById = async (req, res) => {
       purchaseReturn.settlement_details = [];
     }
 
-    // Get return items with detailed information
     const [items] = await pool.query(`
       SELECT 
         pri.*,
@@ -543,7 +587,6 @@ const getPurchaseReturnByNumber = async (req, res) => {
 
     const purchaseReturn = returns[0];
 
-    // Handle settlement_details
     if (purchaseReturn.settlement_details) {
       if (typeof purchaseReturn.settlement_details === 'object') {
         purchaseReturn.settlement_details = purchaseReturn.settlement_details;
@@ -558,7 +601,6 @@ const getPurchaseReturnByNumber = async (req, res) => {
       purchaseReturn.settlement_details = [];
     }
 
-    // Get return items
     const [items] = await pool.query(`
       SELECT 
         pri.*,
@@ -677,7 +719,6 @@ const getCurrentStock = async (req, res) => {
       WHERE (i.deleted = FALSE OR i.deleted IS NULL)
     `);
     
-    // Format the response
     const formattedStock = stock.map(item => ({
       item_id: item.item_id,
       item_name: item.item_name,
@@ -750,24 +791,28 @@ const getVATReturnsSummary = async (req, res) => {
   try {
     const [[summary]] = await pool.query(`
       SELECT
-        COUNT(DISTINCT pr.id)              AS total_returns,
+        COUNT(DISTINCT pr.id) AS total_returns,
         COALESCE(SUM(pri.quantity * pri.unit_price), 0) AS total_return_value,
-        COALESCE(SUM(pri.vat_amount), 0)   AS total_vat_credit
+        COALESCE(SUM(pri.vat_amount), 0) AS total_vat_credit
       FROM purchase_returns pr
-      JOIN supplier s               ON pr.supplier_id = s.id
+      JOIN supplier s ON pr.supplier_id = s.id
       JOIN purchase_return_items pri ON pr.id = pri.return_id
       WHERE s.vat_registered = 1
         AND DATE(pr.return_date) BETWEEN ? AND ?
     `, [startDate, endDate]);
 
-    res.json(summary);
+    res.json({
+      total_returns: summary.total_returns || 0,
+      total_return_value: parseFloat(summary.total_return_value || 0),
+      total_vat_credit: parseFloat(summary.total_vat_credit || 0)
+    });
   } catch (error) {
     console.error('Error fetching VAT summary:', error);
     res.status(500).json({ error: 'Server error: ' + error.message });
   }
 };
 
-// Get VAT returns report
+// Get VAT returns - FIXED to show invoice info
 const getVATReturns = async (req, res) => {
   const { startDate, endDate } = req.query;
 
@@ -779,25 +824,69 @@ const getVATReturns = async (req, res) => {
     const [rows] = await pool.query(`
       SELECT 
         ROW_NUMBER() OVER (ORDER BY pr.return_date, pr.id) AS serial_no,
-        s.vat_number                  AS tin_no,
-        p.purchase_date               AS invoice_date,
-        pr.return_number              AS invoice_no,  -- ← Changed: Use return_number instead of purchase invoice
-        pr.return_date,
-        pr.return_number              AS tax_credit_no,
+        s.name       AS supplier_name,
+        s.vat_number AS tin_no,
+        COALESCE(
+          (
+            SELECT DATE(MIN(p2.purchase_date))
+            FROM JSON_TABLE(
+              COALESCE(pr.settlement_details, '[]'),
+              '$[*]' COLUMNS (pid INT PATH '$.purchase_id')
+            ) AS jt
+            JOIN purchases p2 ON p2.id = jt.pid
+            WHERE jt.pid IS NOT NULL
+          ),
+          DATE(p.purchase_date),
+          DATE(pr.return_date)
+        ) AS invoice_date,
+        COALESCE(
+          (
+            SELECT GROUP_CONCAT(DISTINCT p2.invoice_no ORDER BY p2.invoice_no SEPARATOR ', ')
+            FROM JSON_TABLE(
+              COALESCE(pr.settlement_details, '[]'),
+              '$[*]' COLUMNS (pid INT PATH '$.purchase_id')
+            ) AS jt
+            JOIN purchases p2 ON p2.id = jt.pid
+            WHERE jt.pid IS NOT NULL
+          ),
+          p.invoice_no,
+          '—'
+        ) AS invoice_no,
+        'Credit'             AS tax_credit,
+        DATE(pr.return_date) AS date_of_tax_credit,
+        pr.return_number     AS tax_credit_no,
+        pr.return_number     AS return_bill_no,
         SUM(pri.quantity * pri.unit_price) AS value_of_return,
         SUM(COALESCE(pri.vat_amount, 0))   AS vat_amount
       FROM purchase_returns pr
-      JOIN supplier s          ON pr.supplier_id = s.id
-      LEFT JOIN purchases p    ON pr.purchase_id = p.id
-      JOIN purchase_return_items pri ON pr.id = pri.return_id
+      JOIN  supplier s ON pr.supplier_id = s.id
+      LEFT JOIN purchases p ON pr.purchase_id = p.id
+      JOIN  purchase_return_items pri ON pr.id = pri.return_id
       WHERE s.vat_registered = 1
         AND DATE(pr.return_date) BETWEEN ? AND ?
-      GROUP BY pr.id, s.vat_number, p.purchase_date, 
-               pr.return_date, pr.return_number
+      GROUP BY
+        pr.id, s.name, s.vat_number,
+        pr.purchase_id, p.purchase_date, p.invoice_no,
+        pr.return_date, pr.return_number, pr.settlement_details
       ORDER BY pr.return_date, pr.id
     `, [startDate, endDate]);
 
-    res.json(rows);
+    const formattedRows = rows.map(row => ({
+      serial_no:       row.serial_no,
+      supplier_name:   row.supplier_name,
+      tin_no:          row.tin_no,
+      // Normalise "null" string → null
+      invoice_date:    (row.invoice_date  && row.invoice_date  !== 'null') ? row.invoice_date  : null,
+      invoice_no:      (row.invoice_no    && row.invoice_no    !== 'null') ? row.invoice_no    : '—',
+      tax_credit:      row.tax_credit,
+      return_date:     row.date_of_tax_credit,
+      tax_credit_no:   row.tax_credit_no,
+      return_bill_no:  row.return_bill_no,
+      value_of_return: parseFloat(row.value_of_return) || 0,
+      vat_amount:      parseFloat(row.vat_amount)       || 0
+    }));
+
+    res.json(formattedRows);
   } catch (error) {
     console.error('Error fetching VAT returns:', error);
     res.status(500).json({ error: 'Server error: ' + error.message });
