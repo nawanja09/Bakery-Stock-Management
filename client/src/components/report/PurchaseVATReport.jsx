@@ -7,14 +7,16 @@ import {
   faCalendar,
   faSearch,
   faUndo,
-  faFileInvoice,
-  faBuilding,
   faFilter,
-  faExclamationTriangle
+  faExclamationTriangle,
+  faChevronLeft,
+  faChevronRight,
+  faDownload,
+  faBuilding
 } from '@fortawesome/free-solid-svg-icons';
 import dayjs from 'dayjs';
 import api from '../../api';
-import './VATReport.css';
+import './PurchaseVATReport.css';
 
 const PurchaseVATReport = () => {
   const [purchaseReturns, setPurchaseReturns] = useState([]);
@@ -31,6 +33,14 @@ const PurchaseVATReport = () => {
   const [companies, setCompanies] = useState([]);
   const [selectedCompany, setSelectedCompany] = useState('');
   const [debugInfo, setDebugInfo] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
+
+  // Pagination logic
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filteredReturns.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredReturns.length / itemsPerPage);
 
   useEffect(() => {
     fetchCompanies();
@@ -50,6 +60,7 @@ const PurchaseVATReport = () => {
         ret.tax_credit_no?.toLowerCase().includes(query)
       );
       setFilteredReturns(filtered);
+      setCurrentPage(1);
     } else {
       setFilteredReturns(purchaseReturns);
     }
@@ -66,11 +77,9 @@ const PurchaseVATReport = () => {
 
   const getInvoiceNo = (ret) => {
     const val = ret.invoice_no;
-
     if (!val || val.trim() === '' || val === '—') {
       return '-';
     }
-
     return val;
   };
   
@@ -88,7 +97,6 @@ const PurchaseVATReport = () => {
 
       console.log('API Response - VAT Returns:', response.data);
       
-      // Debug: Check if invoice_no exists in the data
       if (response.data && response.data.length > 0) {
         console.log('First record invoice_no:', response.data[0].invoice_no);
         console.log('First record full data:', response.data[0]);
@@ -119,8 +127,11 @@ const PurchaseVATReport = () => {
     }).format(amount).replace('LKR', 'Rs.');
   };
 
+  // Format date as MM/DD/YYYY with numbers only
   const formatDate = (date) => {
-    return date ? dayjs(date).format('MM/DD/YYYY') : '-';
+    if (!date) return '-';
+    const formatted = dayjs(date).format('MM/DD/YYYY');
+    return formatted;
   };
 
   const handlePrint = () => {
@@ -131,7 +142,6 @@ const PurchaseVATReport = () => {
     let csvContent = "Serial No,TIN No,Invoice Date,Invoice No,Tax Credit,Date of Tax Credit,Tax Credit No,Value of Tax Credit Note (Rs.),VAT Amount (Rs.)\n";
     
     filteredReturns.forEach(ret => {
-      // Use the same data that would display in table
       const invoiceNo = ret.invoice_no || ret.invoice_number || '-';
       const invoiceDate = ret.invoice_date || ret.date_of_tax_credit || startDate;
       
@@ -151,10 +161,22 @@ const PurchaseVATReport = () => {
     alert('PDF generation feature coming soon!');
   };
 
+  const resetFilters = () => {
+    setStartDate(dayjs().startOf('month').format('YYYY-MM-DD'));
+    setEndDate(dayjs().format('YYYY-MM-DD'));
+    setSearchQuery('');
+    setSelectedCompany('');
+  };
+
+  const paginate = (pageNumber) => {
+    setCurrentPage(pageNumber);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   if (loading) {
     return (
-      <div className="loading-container">
-        <div className="loading-spinner"></div>
+      <div className="vat-loading-container">
+        <div className="vat-loading-spinner"></div>
         <p>Loading VAT returns...</p>
       </div>
     );
@@ -162,18 +184,30 @@ const PurchaseVATReport = () => {
 
   return (
     <div className="vat-report-container">
-      <div className="page-header">
-        <h1>
-          <FontAwesomeIcon icon={faUndo} className="header-icon" />
-          Purchase Returns - VAT Report
-        </h1>
-        <p className="subtitle">Tax Credit Notes for Purchase Returns from VAT Registered Suppliers</p>
+      {/* Header Section */}
+      <div className="vat-header">
+        <div className="vat-header-content">
+          <div className="vat-title-section">
+            <div className="vat-icon-wrapper">
+              <FontAwesomeIcon icon={faUndo} className="vat-header-icon" />
+            </div>
+            <div>
+              <h1>Purchase Returns VAT Report</h1>
+              <p>Tax Credit Notes from VAT Registered Suppliers</p>
+            </div>
+          </div>
+          <div className="vat-header-actions">
+            <button onClick={resetFilters} className="vat-btn-outline">
+              <FontAwesomeIcon icon={faUndo} /> Reset
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Filter Section */}
-      <div className="filters-card">
-        <div className="filters-grid">
-          <div className="filter-group">
+      <div className="vat-filters-card">
+        <div className="vat-filters-grid">
+          <div className="vat-filter-group">
             <label>
               <FontAwesomeIcon icon={faCalendar} />
               From Date
@@ -182,11 +216,11 @@ const PurchaseVATReport = () => {
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="filter-input"
+              className="vat-filter-input"
             />
           </div>
 
-          <div className="filter-group">
+          <div className="vat-filter-group">
             <label>
               <FontAwesomeIcon icon={faCalendar} />
               To Date
@@ -195,160 +229,208 @@ const PurchaseVATReport = () => {
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="filter-input"
+              className="vat-filter-input"
             />
           </div>
 
-          <div className="filter-group">
+          <div className="vat-filter-group vat-search-group">
             <label>
               <FontAwesomeIcon icon={faSearch} />
               Search
             </label>
-            <input
-              type="text"
-              placeholder="Search by supplier, TIN, invoice..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="filter-input"
-            />
+            <div className="vat-search-wrapper">
+              <FontAwesomeIcon icon={faSearch} className="vat-search-icon" />
+              <input
+                type="text"
+                placeholder="Supplier, TIN, Invoice..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="vat-filter-input vat-search-input"
+              />
+            </div>
           </div>
 
-          <div className="filter-group">
+          <div className="vat-filter-group vat-filter-action">
             <label>&nbsp;</label>
-            <button onClick={fetchVATReturns} className="btn-primary">
-              <FontAwesomeIcon icon={faFilter} /> Generate Report
+            <button onClick={fetchVATReturns} className="vat-btn-primary">
+              <FontAwesomeIcon icon={faFilter} /> Generate
             </button>
           </div>
         </div>
       </div>
 
       {/* Summary Cards */}
-      <div className="summary-cards">
-        <div className="summary-card">
-          <div className="summary-icon return">📝</div>
-          <div className="summary-details">
-            <span className="summary-label">Total Returns</span>
-            <span className="summary-value">{summary.total_returns}</span>
+      <div className="vat-summary-grid">
+        <div className="vat-summary-card vat-card-returns">
+          <div className="vat-summary-icon">
+            <span>📋</span>
+          </div>
+          <div className="vat-summary-info">
+            <span className="vat-summary-label">Total Returns</span>
+            <span className="vat-summary-value">{summary.total_returns}</span>
           </div>
         </div>
 
-        <div className="summary-card">
-          <div className="summary-icon value">💰</div>
-          <div className="summary-details">
-            <span className="summary-label">Total Return Value</span>
-            <span className="summary-value">{formatCurrency(summary.total_return_value)}</span>
+        <div className="vat-summary-card vat-card-value">
+          <div className="vat-summary-icon">
+            <span>💰</span>
+          </div>
+          <div className="vat-summary-info">
+            <span className="vat-summary-label">Return Value</span>
+            <span className="vat-summary-value">{formatCurrency(summary.total_return_value)}</span>
           </div>
         </div>
 
-        <div className="summary-card">
-          <div className="summary-icon vat">🧾</div>
-          <div className="summary-details">
-            <span className="summary-label">Total VAT Credit</span>
-            <span className="summary-value vat-text">{formatCurrency(summary.total_vat_credit)}</span>
+        <div className="vat-summary-card vat-card-vat">
+          <div className="vat-summary-icon">
+            <span>🧾</span>
+          </div>
+          <div className="vat-summary-info">
+            <span className="vat-summary-label">VAT Credit</span>
+            <span className="vat-summary-value vat-highlight">{formatCurrency(summary.total_vat_credit)}</span>
           </div>
         </div>
       </div>
 
       {/* Action Buttons */}
-      <div className="action-buttons">
-        <button onClick={handleExcel} className="btn-excel">
+      <div className="vat-action-bar">
+        <button onClick={handleExcel} className="vat-btn-excel">
           <FontAwesomeIcon icon={faFileExcel} />
-          Export to Excel
+          <span>Excel</span>
         </button>
-        <button onClick={handlePDF} className="btn-pdf">
+        <button onClick={handlePDF} className="vat-btn-pdf">
           <FontAwesomeIcon icon={faFilePdf} />
-          Export to PDF
+          <span>PDF</span>
         </button>
-        <button onClick={handlePrint} className="btn-print">
+        <button onClick={handlePrint} className="vat-btn-print">
           <FontAwesomeIcon icon={faPrint} />
-          Print
+          <span>Print</span>
         </button>
       </div>
 
-      {/* Warning if no invoice numbers */}
+      {/* Warning Banner */}
       {filteredReturns.length > 0 && !filteredReturns[0]?.invoice_no && (
-        <div className="warning-banner">
+        <div className="vat-warning-banner">
           <FontAwesomeIcon icon={faExclamationTriangle} />
-          <span>Warning: Invoice numbers are not available in the data. Please check the backend API response.</span>
+          <span>Invoice numbers not available in data. Please verify backend API response.</span>
         </div>
       )}
 
-      {/* Report Table */}
-      <div className="report-table-container">
-        <table className="report-table">
-          <thead>
-            <tr>
-              <th>Serial No</th>
-              <th>TIN No</th>
-              <th>Invoice Date</th>
-              <th>Invoice No</th>
-              <th>Tax Credit</th>
-              <th>Date of Tax Credit</th>
-              <th>Tax Credit No</th>
-              <th>Value of Tax Credit Note</th>
-              <th>VAT Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredReturns.length === 0 ? (
+      {/* Table Section */}
+      <div className="vat-table-wrapper">
+        <div className="vat-table-container">
+          <table className="vat-data-table">
+            <thead>
               <tr>
-                <td colSpan="9" className="no-data">
-                  No VAT returns found for the selected period
-                </td>
+                <th>#</th>
+                <th>TIN No</th>
+                <th>Invoice Date</th>
+                <th>Invoice No</th>
+                <th>Tax Credit</th>
+                <th>Credit Date</th>
+                <th>Credit No</th>
+                <th>Credit Note Value</th>
+                <th>VAT Amount</th>
               </tr>
-            ) : (
-              filteredReturns.map((ret, index) => (
-                <tr key={index}>
-                  <td className="text-center">{ret.serial_no}</td>
-                  <td className="text-center">
-                    <span className="tin-badge">{ret.tin_no || '-'}</span>
-                  </td>
-                  <td className="text-center">
-                    {ret.invoice_date ? formatDate(ret.invoice_date) : '-'}
-                  </td>
-                  <td className="text-center">
-                    {JSON.stringify(ret.invoice_no)}
-                  </td>  
-                  <td className="text-center">
-                    <span className="credit-badge">{ret.tax_credit || 'Credit'}</span>
-                  </td>
-                  <td className="text-center">
-                    {ret.date_of_tax_credit ? formatDate(ret.date_of_tax_credit) : '-'}
-                  </td>
-                  <td className="text-center">
-                    <span className="credit-no">{ret.tax_credit_no}</span>
-                  </td>
-                  <td className="text-right">
-                    {formatCurrency(ret.value_of_return)}
-                  </td>
-                  <td className="text-right vat-amount">
-                    {formatCurrency(ret.vat_amount)}
-                  </td>
+            </thead>
+            <tbody>
+              {currentItems.length === 0 ? (
+                <tr>
+                  <td colSpan="9" className="vat-no-data">
+                    <div className="vat-empty-state">
+                      <span>📭</span>
+                      <p>No VAT returns found for selected period</p>
+                    </div>
+                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-          <tfoot>
-            <tr>
-              <td colSpan="7" className="text-right"><strong>Total:</strong></td>
-              <td className="text-right"><strong>{formatCurrency(summary.total_return_value)}</strong></td>
-              <td className="text-right vat-amount"><strong>{formatCurrency(summary.total_vat_credit)}</strong></td>
-            </tr>
-          </tfoot>
-        </table>
+              ) : (
+                currentItems.map((ret, idx) => (
+                  <tr key={idx}>
+                    <td data-label="#">{indexOfFirstItem + idx + 1}</td>
+                    <td data-label="TIN No">
+                      <span className="vat-tin-badge">{ret.tin_no || '-'}</span>
+                    </td>
+                    <td data-label="Invoice Date" className="vat-date-cell">
+                      {ret.invoice_date ? formatDate(ret.invoice_date) : '-'}
+                    </td>
+                    <td data-label="Invoice No" className="vat-invoice-cell">{getInvoiceNo(ret)}</td>
+                    <td data-label="Tax Credit">
+                      <span className="vat-credit-badge">{ret.tax_credit || 'Credit'}</span>
+                    </td>
+                    <td data-label="Credit Date" className="vat-date-cell">
+                      {ret.date_of_tax_credit ? formatDate(ret.date_of_tax_credit) : '-'}
+                    </td>
+                    <td data-label="Credit No">
+                      <span className="vat-credit-no">{ret.tax_credit_no || '-'}</span>
+                    </td>
+                    <td data-label="Credit Note Value" className="vat-amount-cell">{formatCurrency(ret.value_of_return)}</td>
+                    <td data-label="VAT Amount" className="vat-amount-cell vat-primary-amount">{formatCurrency(ret.vat_amount)}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colSpan="7" className="vat-footer-label"><strong>Total</strong></td>
+                <td className="vat-footer-amount"><strong>{formatCurrency(summary.total_return_value)}</strong></td>
+                <td className="vat-footer-amount vat-primary-amount"><strong>{formatCurrency(summary.total_vat_credit)}</strong></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="vat-pagination">
+            <button 
+              onClick={() => paginate(currentPage - 1)} 
+              disabled={currentPage === 1}
+              className="vat-page-btn"
+            >
+              <FontAwesomeIcon icon={faChevronLeft} />
+            </button>
+            <div className="vat-page-numbers">
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let pageNum;
+                if (totalPages <= 5) {
+                  pageNum = i + 1;
+                } else if (currentPage <= 3) {
+                  pageNum = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i;
+                } else {
+                  pageNum = currentPage - 2 + i;
+                }
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => paginate(pageNum)}
+                    className={`vat-page-number ${currentPage === pageNum ? 'active' : ''}`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+            </div>
+            <button 
+              onClick={() => paginate(currentPage + 1)} 
+              disabled={currentPage === totalPages}
+              className="vat-page-btn"
+            >
+              <FontAwesomeIcon icon={faChevronRight} />
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Report Info */}
-      <div className="report-info">
-        <p>
-          <strong>Report Period:</strong> {formatDate(startDate)} to {formatDate(endDate)}
-        </p>
-        <p>
-          <strong>Generated On:</strong> {dayjs().format('DD MMM YYYY, h:mm A')}
-        </p>
-        <p>
+      {/* Report Info Footer */}
+      <div className="vat-report-footer">
+        <div className="vat-footer-info">
+          <span>📅 {formatDate(startDate)} — {formatDate(endDate)}</span>
+          <span>⏱ Generated {dayjs().format('DD MMM YYYY, h:mm A')}</span>
+        </div>
+        <p className="vat-footer-note">
           <strong>Note:</strong> This report includes only returns from VAT registered suppliers.
-          Invoice information is derived from the bills settled with this return.
         </p>
       </div>
     </div>
