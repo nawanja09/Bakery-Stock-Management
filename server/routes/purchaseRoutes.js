@@ -158,4 +158,7 @@ router.get('/:id/return', purchaseController.getPurchaseReturnsForBill);
 router.get('/:id', purchaseController.getPurchaseById);
 router.put('/:id', purchaseController.updatePurchase);
 
+// Get supplier bills from last 3 months (MUST come before parameterized routes)
+router.get('/supplier/:supplierId/bills', purchaseController.getSupplierBills);
+
 module.exports = router;

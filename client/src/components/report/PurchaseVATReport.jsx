@@ -240,7 +240,7 @@ const PurchaseVATReport = () => {
           <tbody>
             {filteredReturns.length === 0 ? (
               <tr>
-                <td colSpan="9" className="no-data">
+                <td colSpan="10" className="no-data">
                   No VAT returns found for the selected period
                 </td>
               </tr>
@@ -251,19 +251,30 @@ const PurchaseVATReport = () => {
                   <td className="text-center">
                     <span className="tin-badge">{ret.tin_no}</span>
                   </td>
-                  <td className="text-center">{formatDate(ret.invoice_date)}</td>
                   <td className="text-center">
-                    <span className="invoice-badge">{ret.invoice_no}</span>
+                    {ret.invoice_date ? formatDate(ret.invoice_date) : '-'}
+                  </td>
+                  <td className="text-center">
+                    <span className="invoice-badge">
+                      {ret.invoice_no || '-'}
+                    </span>
                   </td>
                   <td className="text-center">
                     <span className="credit-badge">Credit</span>
                   </td>
-                  <td className="text-center">{formatDate(ret.return_date)}</td>
+                  <td className="text-center">
+                    {ret.return_date ? formatDate(ret.return_date) : '-'}
+                  </td>
                   <td className="text-center">
                     <span className="credit-no">{ret.tax_credit_no}</span>
                   </td>
-                  <td className="text-right">{formatCurrency(ret.value_of_return)}</td>
-                  <td className="text-right vat-amount">{formatCurrency(ret.vat_amount)}</td>
+                  <td className="text-right">
+                    {formatCurrency(ret.value_of_return)}
+                  </td>
+                  <td className="text-right vat-amount">
+                    {formatCurrency(ret.vat_amount)}
+                  </td>
+                  <td className="text-center">-</td>
                 </tr>
               ))
             )}

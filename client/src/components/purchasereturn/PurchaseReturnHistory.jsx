@@ -55,7 +55,7 @@ const PurchaseReturnHistory = () => {
       const q = searchQuery.toLowerCase();
       filtered = filtered.filter(r =>
         r.return_number?.toLowerCase().includes(q) ||
-        r.purchase_invoice?.toLowerCase().includes(q) ||
+        r.invoice_display?.toLowerCase().includes(q) ||
         r.supplier_name?.toLowerCase().includes(q)
       );
     }
@@ -68,9 +68,11 @@ const PurchaseReturnHistory = () => {
     try {
       setLoading(true);
       const response = await api.get('/purchase-returns');
+      console.log('Fetched returns:', response.data);
       setReturns(response.data);
       setFilteredReturns(response.data);
     } catch (error) {
+      console.error('Error fetching purchase returns:', error);
       showPopup('error', 'Failed to load purchase returns');
     } finally {
       setLoading(false);
@@ -81,8 +83,8 @@ const PurchaseReturnHistory = () => {
     new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR', minimumFractionDigits: 2 })
       .format(amount).replace('LKR', 'Rs.');
 
-  const formatDate     = (d) => dayjs(d).format('DD MMM YYYY');
-  const formatDateTime = (d) => dayjs(d).format('DD MMM YYYY, h:mm A');
+  const formatDate = (d) => d ? dayjs(d).format('DD MMM YYYY') : '-';
+  const formatDateTime = (d) => d ? dayjs(d).format('DD MMM YYYY, h:mm A') : '-';
 
   const viewReturnDetails = async (id) => {
     try {
@@ -91,6 +93,7 @@ const PurchaseReturnHistory = () => {
       const response = await api.get(`/purchase-returns/${id}`);
       setSelectedReturn(response.data);
     } catch (error) {
+      console.error('Error fetching return details:', error);
       showPopup('error', 'Failed to load return details');
       setShowDetailsModal(false);
     } finally {
@@ -118,13 +121,22 @@ const PurchaseReturnHistory = () => {
   const handlePrint = () => window.print();
 
   const handleExportCSV = () => {
-    const headers = ['Return #', 'Date', 'Supplier', 'Purchase Invoice', 'Total', 'Settled', 'Balance', 'Status'];
+    const headers = ['Return #', 'Date', 'Supplier', 'Invoice #', 'Invoice Date', 'Total', 'Settled', 'Balance', 'Status'];
     const csvContent = [
       headers.join(','),
       ...filteredReturns.map(ret => {
         const status = getSettlementStatus(ret).text;
-        return [ret.return_number, formatDate(ret.return_date), `"${ret.supplier_name}"`,
-          ret.purchase_invoice, ret.total_amount, ret.settled_amount || 0, ret.balance_amount || 0, status].join(',');
+        return [
+          ret.return_number,
+          formatDate(ret.return_date),
+          `"${ret.supplier_name}"`,
+          `"${ret.invoice_display || '-'}"`,
+          formatDate(ret.invoice_date_display),
+          ret.total_amount,
+          ret.settled_amount || 0,
+          ret.balance_amount || 0,
+          status
+        ].join(',');
       })
     ].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -150,7 +162,7 @@ const PurchaseReturnHistory = () => {
   return (
     <div className="purchase-returns-history-container">
 
-      {/* ── PAGE HEADER ── */}
+      {/* PAGE HEADER */}
       <div className="page-header">
         <div className="header-title">
           <h1>
@@ -172,7 +184,7 @@ const PurchaseReturnHistory = () => {
         </div>
       </div>
 
-      {/* ── FILTERS ── */}
+      {/* FILTERS */}
       <div className="filters-card">
         <div className="filters-header" onClick={() => setShowFilters(!showFilters)}>
           <div className="filters-title">
@@ -219,7 +231,7 @@ const PurchaseReturnHistory = () => {
         )}
       </div>
 
-      {/* ── SUMMARY CARDS ── */}
+      {/* SUMMARY CARDS */}
       {filteredReturns.length > 0 && (
         <div className="summary-cards">
           <div className="summary-card">
@@ -241,7 +253,7 @@ const PurchaseReturnHistory = () => {
         </div>
       )}
 
-      {/* ── TABLE ── */}
+      {/* TABLE */}
       <div className="table-container">
         {filteredReturns.length === 0 ? (
           <div className="empty-state">
@@ -270,6 +282,19 @@ const PurchaseReturnHistory = () => {
             <tbody>
               {filteredReturns.map(ret => {
                 const status = getSettlementStatus(ret);
+                const invoiceDisplay =
+                (ret.invoice_display && ret.invoice_display !== 'null' && ret.invoice_display !== '—')
+                  ? ret.invoice_display
+                  : (ret.purchase_invoice && ret.purchase_invoice !== 'null')
+                    ? ret.purchase_invoice
+                    : '—';
+
+              const invoiceDate =
+                (ret.invoice_date_display && ret.invoice_date_display !== 'null')
+                  ? ret.invoice_date_display
+                  : (ret.original_purchase_date && ret.original_purchase_date !== 'null')
+                    ? ret.original_purchase_date
+                    : null;             
                 return (
                   <tr key={ret.id}>
                     <td>
@@ -284,7 +309,18 @@ const PurchaseReturnHistory = () => {
                         )}
                       </div>
                     </td>
-                    <td>{ret.purchase_invoice || '—'}</td>
+                    <td className="invoice-cell">
+                      <div className="invoice-info">
+                        <span className="invoice-badge-small" title={invoiceDisplay}>
+                          {invoiceDisplay.length > 25 ? invoiceDisplay.substring(0, 25) + '...' : invoiceDisplay}
+                        </span>
+                        {invoiceDate && invoiceDate !== 'null' && (
+                          <div className="invoice-date-small">
+                            {formatDate(invoiceDate)}
+                          </div>
+                        )}
+                      </div>
+                    </td>
                     <td className="text-right">
                       <span className="amount-value">{formatCurrency(ret.total_amount)}</span>
                     </td>
@@ -318,12 +354,11 @@ const PurchaseReturnHistory = () => {
         )}
       </div>
 
-      {/* ── DETAILS MODAL ── */}
+      {/* DETAILS MODAL */}
       {showDetailsModal && (
         <div className="modal-overlay" onClick={closeModal}>
           <div className="modal-content large-modal" onClick={(e) => e.stopPropagation()}>
 
-            {/* Modal Header */}
             <div className="modal-header">
               <h3>
                 <FontAwesomeIcon icon={faFileInvoice} />
@@ -337,7 +372,6 @@ const PurchaseReturnHistory = () => {
               </div>
             </div>
 
-            {/* Modal Body */}
             <div className="modal-body">
               {modalLoading ? (
                 <div className="modal-loading">
@@ -346,7 +380,7 @@ const PurchaseReturnHistory = () => {
                 </div>
               ) : selectedReturn && (
                 <>
-                  {/* ── Return Information ── */}
+                  {/* Return Information */}
                   <div className="modal-section">
                     <div className="section-header" onClick={() => toggleSection('summary')}>
                       <h4><FontAwesomeIcon icon={faInfoCircle} /> Return Information</h4>
@@ -355,7 +389,6 @@ const PurchaseReturnHistory = () => {
 
                     {expandedSections.summary && (
                       <div className="details-grid">
-                        {/* Return Info */}
                         <div className="detail-card">
                           <div className="card-content">
                             <div className="info-row">
@@ -377,7 +410,6 @@ const PurchaseReturnHistory = () => {
                           </div>
                         </div>
 
-                        {/* Supplier Info */}
                         <div className="detail-card">
                           <div className="card-content">
                             <div className="info-row">
@@ -407,7 +439,6 @@ const PurchaseReturnHistory = () => {
                           </div>
                         </div>
 
-                        {/* Financial Summary */}
                         <div className="detail-card financial">
                           <div className="card-content">
                             <div className="financial-summary">
@@ -430,7 +461,7 @@ const PurchaseReturnHistory = () => {
                     )}
                   </div>
 
-                  {/* ── Settlement Summary ── */}
+                  {/* Settlement Summary */}
                   {(selectedReturn.settled_amount > 0 || selectedReturn.balance_amount > 0) && (
                     <div className="modal-section">
                       <div className="section-header" onClick={() => toggleSection('settlement')}>
@@ -459,7 +490,7 @@ const PurchaseReturnHistory = () => {
                     </div>
                   )}
 
-                  {/* ── Settlement Breakdown ── */}
+                  {/* Settlement Breakdown */}
                   {selectedReturn.settlement_details?.length > 0 && (
                     <div className="modal-section">
                       <div className="section-header" onClick={() => toggleSection('settlementBreakdown')}>
@@ -482,6 +513,7 @@ const PurchaseReturnHistory = () => {
                                 <tr>
                                   <th>#</th>
                                   <th>Invoice Number</th>
+                                  <th>Invoice Date</th>
                                   <th className="text-right">Amount Settled</th>
                                   <th className="text-center">% of Return</th>
                                 </tr>
@@ -493,6 +525,7 @@ const PurchaseReturnHistory = () => {
                                     <tr key={idx}>
                                       <td>{idx + 1}</td>
                                       <td><span className="invoice-badge">{s.invoice_no}</span></td>
+                                      <td>{formatDate(s.purchase_date)}</td>
                                       <td className="text-right success-text">
                                         <strong>{formatCurrency(s.amount)}</strong>
                                       </td>
@@ -505,7 +538,7 @@ const PurchaseReturnHistory = () => {
                               </tbody>
                               <tfoot>
                                 <tr>
-                                  <td colSpan="2" className="text-right"><strong>Total Settled:</strong></td>
+                                  <td colSpan="3" className="text-right"><strong>Total Settled:</strong></td>
                                   <td className="text-right success-text">
                                     <strong>{formatCurrency(selectedReturn.settlement_details.reduce((sum, s) => sum + s.amount, 0))}</strong>
                                   </td>
@@ -515,7 +548,6 @@ const PurchaseReturnHistory = () => {
                             </table>
                           </div>
 
-                          {/* Progress bar */}
                           <div className="settlement-progress">
                             <div className="progress-label">
                               <span>Settlement Progress</span>
@@ -531,22 +563,12 @@ const PurchaseReturnHistory = () => {
                               {((selectedReturn.settled_amount / selectedReturn.total_amount) * 100).toFixed(2)}% Settled
                             </div>
                           </div>
-
-                          {selectedReturn.remarks?.includes('Settlement:') && (
-                            <div className="settlement-notes">
-                              <p>
-                                <FontAwesomeIcon icon={faInfoCircle} />
-                                <strong>Settlement Note:</strong>&nbsp;
-                                {selectedReturn.remarks.split('Settlement:')[1]?.split('|')[0] || 'No additional notes'}
-                              </p>
-                            </div>
-                          )}
                         </div>
                       )}
                     </div>
                   )}
 
-                  {/* ── Returned Items ── */}
+                  {/* Returned Items */}
                   <div className="modal-section">
                     <div className="section-header" onClick={() => toggleSection('items')}>
                       <h4><FontAwesomeIcon icon={faFileInvoice} /> Returned Items</h4>
@@ -572,30 +594,27 @@ const PurchaseReturnHistory = () => {
                               </tr>
                             </thead>
                             <tbody>
-                              {selectedReturn.items.map((item, idx) => {
-                                const amount = item.quantity * item.unit_price;
-                                return (
-                                  <tr key={idx}>
-                                    <td>{idx + 1}</td>
-                                    <td>
-                                      <div className="item-name">{item.item_name}</div>
-                                      <small className="item-code">{item.item_code}</small>
+                              {selectedReturn.items?.map((item, idx) => (
+                                <tr key={idx}>
+                                  <td>{idx + 1}</td>
+                                  <td>
+                                    <div className="item-name">{item.item_name}</div>
+                                    {item.item_code && <div className="item-code">{item.item_code}</div>}
+                                  </td>
+                                  <td className="text-center">{parseFloat(item.quantity).toFixed(3)}</td>
+                                  <td>{item.unit || '-'}</td>
+                                  <td className="text-right">{formatCurrency(item.unit_price)}</td>
+                                  <td className="text-right">{formatCurrency(item.quantity * item.unit_price)}</td>
+                                  {selectedReturn.supplier_vat_registered && (
+                                    <td className="text-right vat-column">
+                                      {item.vat_applicable ? formatCurrency(item.vat_amount) : '-'}
                                     </td>
-                                    <td className="text-center">{item.quantity}</td>
-                                    <td>{item.unit || '—'}</td>
-                                    <td className="text-right">{formatCurrency(item.unit_price)}</td>
-                                    <td className="text-right">{formatCurrency(amount)}</td>
-                                    {selectedReturn.supplier_vat_registered && (
-                                      <td className="text-right vat-column">
-                                        {item.vat_applicable ? formatCurrency(item.vat_amount) : '—'}
-                                      </td>
-                                    )}
-                                    <td className="text-right total-column">
-                                      <strong>{formatCurrency(item.total_amount)}</strong>
-                                    </td>
-                                  </tr>
-                                );
-                              })}
+                                  )}
+                                  <td className="text-right total-column">
+                                    <strong>{formatCurrency(item.total_amount)}</strong>
+                                  </td>
+                                </tr>
+                              ))}
                             </tbody>
                             <tfoot>
                               <tr>
@@ -613,7 +632,7 @@ const PurchaseReturnHistory = () => {
                     )}
                   </div>
 
-                  {/* ── Remarks ── */}
+                  {/* Remarks */}
                   {selectedReturn.remarks && (
                     <div className="modal-section">
                       <div className="section-header" onClick={() => toggleSection('remarks')}>
