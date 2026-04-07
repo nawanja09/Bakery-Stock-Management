@@ -161,4 +161,9 @@ router.put('/:id', purchaseController.updatePurchase);
 // Get supplier bills from last 3 months (MUST come before parameterized routes)
 router.get('/supplier/:supplierId/bills', purchaseController.getSupplierBills);
 
+// =============================================
+// NEW: Add settlement to existing purchase return
+// =============================================
+router.post('/:id/settle', purchaseController.addSettlementToReturn);
+
 module.exports = router;

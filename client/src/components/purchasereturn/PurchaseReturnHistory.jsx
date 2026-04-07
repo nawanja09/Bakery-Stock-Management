@@ -20,10 +20,13 @@ import {
   faPrint,
   faReceipt,
   faMoneyBillWave,
+  faCreditCard,
+  faCheck
 } from '@fortawesome/free-solid-svg-icons';
 import dayjs from 'dayjs';
 import { usePopup } from '../context/PopupContext';
-import api from '../../api';
+import api from '../../api.js';
+import SettlementModalForReturn from './SettlementModalForReturn'; // New component we'll create
 import './PurchaseReturnHistory.css';
 
 const PurchaseReturnHistory = () => {
@@ -39,6 +42,15 @@ const PurchaseReturnHistory = () => {
   const [selectedReturn, setSelectedReturn] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [modalLoading, setModalLoading] = useState(false);
+  
+  // NEW: Settlement modal states
+  const [showSettlementModal, setShowSettlementModal] = useState(false);
+  const [settlingReturn, setSettlingReturn] = useState(null);
+  const [settlingSupplierId, setSettlingSupplierId] = useState(null);
+  const [settlingSupplierName, setSettlingSupplierName] = useState('');
+  const [settlingReturnAmount, setSettlingReturnAmount] = useState(0);
+  const [existingReturnSettlements, setExistingReturnSettlements] = useState([]);
+  
   const [expandedSections, setExpandedSections] = useState({
     summary: true,
     settlement: true,
@@ -107,12 +119,102 @@ const PurchaseReturnHistory = () => {
     setExpandedSections({ summary: true, settlement: true, settlementBreakdown: true, items: true, remarks: true });
   };
 
+  // NEW: Open settlement modal for existing return
+  const openSettlementModal = async (returnData) => {
+    try {
+      // Get fresh data for the return
+      const response = await api.get(`/purchase-returns/${returnData.id}`);
+      const freshReturnData = response.data;
+      
+      // Parse existing settlements
+      let existingSettlements = [];
+      if (freshReturnData.settlement_details) {
+        try {
+          existingSettlements = typeof freshReturnData.settlement_details === 'string'
+            ? JSON.parse(freshReturnData.settlement_details)
+            : freshReturnData.settlement_details;
+        } catch (e) {
+          existingSettlements = [];
+        }
+      }
+      
+      setSettlingReturn(freshReturnData);
+      setSettlingSupplierId(freshReturnData.supplier_id);
+      setSettlingSupplierName(freshReturnData.supplier_name);
+      setSettlingReturnAmount(parseFloat(freshReturnData.balance_amount)); // Only remaining balance
+      setExistingReturnSettlements(existingSettlements);
+      setShowSettlementModal(true);
+    } catch (error) {
+      console.error('Error loading return for settlement:', error);
+      showPopup('error', 'Failed to load return details for settlement');
+    }
+  };
+
+  // NEW: Handle settlement confirmation for existing return
+  const handleSettlementConfirm = async (settlementData) => {
+    if (!settlingReturn) return;
+    
+    try {
+      // Get current user
+      const user = JSON.parse(localStorage.getItem('user'));
+      
+      // Prepare settlement payload
+      const payload = {
+        settlements: settlementData.settlements,
+        payment_method: settlementData.payment_method || 'CASH',
+        settlement_date: settlementData.settlement_date || dayjs().format('YYYY-MM-DD'),
+        notes: settlementData.note,
+        settled_by: user?.id
+      };
+      
+      // Call API to add settlement
+      const response = await api.post(`/purchase-returns/${settlingReturn.id}/settle`, payload);
+      
+      if (response.data) {
+        showPopup('success', 
+          `Settlement added successfully!\n` +
+          `Amount: Rs. ${settlementData.settlements.reduce((s, b) => s + b.amount, 0).toFixed(2)}\n` +
+          `Remaining Balance: Rs. ${response.data.summary.balance_amount.toFixed(2)}`
+        );
+        
+        // Refresh the returns list
+        await fetchReturns();
+        
+        // If details modal is open, refresh that too
+        if (showDetailsModal && selectedReturn) {
+          const freshDetails = await api.get(`/purchase-returns/${settlingReturn.id}`);
+          setSelectedReturn(freshDetails.data);
+        }
+      }
+    } catch (error) {
+      console.error('Error adding settlement:', error);
+      showPopup('error', error.response?.data?.error || 'Failed to add settlement');
+    }
+  };
+
+  const closeSettlementModal = () => {
+    setShowSettlementModal(false);
+    setSettlingReturn(null);
+    setSettlingSupplierId(null);
+    setSettlingSupplierName('');
+    setSettlingReturnAmount(0);
+    setExistingReturnSettlements([]);
+  };
+
   const clearFilters = () => { setSearchQuery(''); setStartDate(''); setEndDate(''); };
 
   const getSettlementStatus = (ret) => {
-    if (ret.settled_amount === 0)      return { text: 'Not Settled',        cls: 'status-pending',            icon: faTimesCircle  };
-    if (ret.balance_amount === 0)      return { text: 'Fully Settled',      cls: 'status-fully-settled',      icon: faCheckCircle  };
-    return                                    { text: 'Partially Settled',  cls: 'status-partially-settled',  icon: faBalanceScale };
+    const balance = parseFloat(ret.balance_amount) || 0;
+    const total = parseFloat(ret.total_amount) || 0;
+    const settled = parseFloat(ret.settled_amount) || 0;
+    
+    if (settled === 0 && balance === total) {
+      return { text: 'Not Settled', cls: 'status-pending', icon: faTimesCircle, canSettle: true };
+    }
+    if (balance === 0) {
+      return { text: 'Fully Settled', cls: 'status-fully-settled', icon: faCheckCircle, canSettle: false };
+    }
+    return { text: 'Partially Settled', cls: 'status-partially-settled', icon: faBalanceScale, canSettle: true };
   };
 
   const toggleSection = (section) =>
@@ -276,25 +378,24 @@ const PurchaseReturnHistory = () => {
                 <th className="text-right">Settled</th>
                 <th className="text-right">Balance</th>
                 <th>Status</th>
-                <th></th>
+                <th colSpan="2">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredReturns.map(ret => {
                 const status = getSettlementStatus(ret);
-                const invoiceDisplay =
-                (ret.invoice_display && ret.invoice_display !== 'null' && ret.invoice_display !== '—')
+                const invoiceDisplay = (ret.invoice_display && ret.invoice_display !== 'null' && ret.invoice_display !== '—')
                   ? ret.invoice_display
                   : (ret.purchase_invoice && ret.purchase_invoice !== 'null')
                     ? ret.purchase_invoice
                     : '—';
 
-              const invoiceDate =
-                (ret.invoice_date_display && ret.invoice_date_display !== 'null')
+                const invoiceDate = (ret.invoice_date_display && ret.invoice_date_display !== 'null')
                   ? ret.invoice_date_display
                   : (ret.original_purchase_date && ret.original_purchase_date !== 'null')
                     ? ret.original_purchase_date
-                    : null;             
+                    : null;
+
                 return (
                   <tr key={ret.id}>
                     <td>
@@ -346,6 +447,32 @@ const PurchaseReturnHistory = () => {
                         <FontAwesomeIcon icon={faEye} />
                       </button>
                     </td>
+                    <td>
+                      {status.canSettle && (
+                        <button
+                          className="btn-settle"
+                          onClick={() => openSettlementModal(ret)}
+                          title="Settle this return"
+                          type="button"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '6px 12px',
+                            background: '#059669',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '0.75rem',
+                            fontWeight: 600
+                          }}
+                        >
+                          <FontAwesomeIcon icon={faCreditCard} />
+                          Settle
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 );
               })}
@@ -354,11 +481,10 @@ const PurchaseReturnHistory = () => {
         )}
       </div>
 
-      {/* DETAILS MODAL */}
+      {/* DETAILS MODAL (same as before) */}
       {showDetailsModal && (
         <div className="modal-overlay" onClick={closeModal}>
           <div className="modal-content large-modal" onClick={(e) => e.stopPropagation()}>
-
             <div className="modal-header">
               <h3>
                 <FontAwesomeIcon icon={faFileInvoice} />
@@ -485,6 +611,23 @@ const PurchaseReturnHistory = () => {
                               <div className="settlement-value">{formatCurrency(selectedReturn.balance_amount || 0)}</div>
                             </div>
                           </div>
+                          
+                          {/* Settle button in modal if not fully settled */}
+                          {selectedReturn.balance_amount > 0 && (
+                            <div style={{ marginTop: '16px', textAlign: 'right' }}>
+                              <button
+                                className="btn-primary"
+                                onClick={() => {
+                                  closeModal();
+                                  openSettlementModal(selectedReturn);
+                                }}
+                                type="button"
+                                style={{ background: '#059669' }}
+                              >
+                                <FontAwesomeIcon icon={faCreditCard} /> Settle Balance
+                              </button>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -500,13 +643,6 @@ const PurchaseReturnHistory = () => {
 
                       {expandedSections.settlementBreakdown && (
                         <div className="settlement-breakdown">
-                          <div className="settlement-breakdown-header">
-                            <p className="breakdown-description">
-                              <FontAwesomeIcon icon={faMoneyBillWave} />
-                              This return was settled against the following purchase bills:
-                            </p>
-                          </div>
-
                           <div className="settlement-table-wrapper">
                             <table className="settlement-breakdown-table">
                               <thead>
@@ -652,6 +788,18 @@ const PurchaseReturnHistory = () => {
           </div>
         </div>
       )}
+
+      {/* SETTLEMENT MODAL FOR EXISTING RETURN */}
+      <SettlementModalForReturn
+        isOpen={showSettlementModal}
+        onClose={closeSettlementModal}
+        supplierId={settlingSupplierId}
+        supplierName={settlingSupplierName}
+        returnAmount={settlingReturnAmount}
+        returnTotal={settlingReturn?.total_amount || 0}
+        existingSettlements={existingReturnSettlements}
+        onConfirm={handleSettlementConfirm}
+      />
     </div>
   );
 };

@@ -4510,3 +4510,33 @@ select.form-control {
 .items-table td {
   border: 1px solid #dee2e6;
 }
+
+/* Invoice number styling */
+.invoice-cell {
+  min-width: 120px;
+}
+
+.invoice-badge {
+  display: inline-flex;
+  align-items: center;
+  background-color: var(--primary-light, #e3f2fd);
+  color: var(--primary-color, #1976d2);
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+  font-family: 'Courier New', monospace;
+}
+
+.invoice-badge svg {
+  opacity: 0.7;
+}
+
+/* Make sure invoice number is visible on mobile */
+@media (max-width: 768px) {
+  .invoice-badge {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.5rem;
+  }
+}

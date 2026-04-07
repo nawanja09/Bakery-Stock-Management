@@ -14,7 +14,8 @@ import {
   faExclamationTriangle,
   faClock,
   faMoneyBillWave,
-  faFilter
+  faFilter,
+  faReceipt
 } from '@fortawesome/free-solid-svg-icons';
 import './Purchase.css';
 import api from '../../api';
@@ -30,7 +31,7 @@ const PurchaseHistory = () => {
   const [endDate, setEndDate] = useState('');
   const [companies, setCompanies] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
-  const [statusFilter, setStatusFilter] = useState('all'); // 🔥 New status filter
+  const [statusFilter, setStatusFilter] = useState('all');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -39,6 +40,9 @@ const PurchaseHistory = () => {
           api.get('/purchases'),
           api.get('/purchases/companies')
         ]);
+        
+        console.log('API Response - First purchase:', purchasesRes.data[0]); // Debug log
+        
         setPurchases(purchasesRes.data);
         setFilteredPurchases(purchasesRes.data);
         setCompanies(companiesRes.data);
@@ -55,15 +59,16 @@ const PurchaseHistory = () => {
   useEffect(() => {
     let filtered = purchases;
 
-    // Search filter
+    // Search filter - Check multiple possible invoice field names
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(purchase =>
-        purchase.invoice_no?.toLowerCase().includes(query) ||
-        purchase.supplier_name?.toLowerCase().includes(query) ||
-        purchase.company_name?.toLowerCase().includes(query) ||
-        purchase.check_number?.toLowerCase().includes(query)
-      );
+      filtered = filtered.filter(purchase => {
+        const invoiceNumber = purchase.invoice_no || purchase.invoice_number || '';
+        return invoiceNumber.toLowerCase().includes(query) ||
+          (purchase.supplier_name || '').toLowerCase().includes(query) ||
+          (purchase.company_name || '').toLowerCase().includes(query) ||
+          (purchase.check_number || '').toLowerCase().includes(query);
+      });
     }
 
     // Company filter
@@ -86,7 +91,7 @@ const PurchaseHistory = () => {
       );
     }
 
-    // 🔥 Status filter (New)
+    // Status filter
     if (statusFilter !== 'all') {
       filtered = filtered.filter(purchase => purchase.payment_status === statusFilter);
     }
@@ -95,11 +100,12 @@ const PurchaseHistory = () => {
   }, [purchases, searchQuery, companyFilter, startDate, endDate, statusFilter]);
 
   const formatCurrency = (amount) => {
+    const numAmount = parseFloat(amount) || 0;
     return new Intl.NumberFormat('en-LK', {
       style: 'currency',
       currency: 'LKR',
       minimumFractionDigits: 2
-    }).format(amount);
+    }).format(numAmount);
   };
 
   const formatDate = (date) => {
@@ -128,9 +134,9 @@ const PurchaseHistory = () => {
   // Calculate summary statistics
   const summary = {
     total_purchases: filteredPurchases.length,
-    total_amount: filteredPurchases.reduce((sum, p) => sum + parseFloat(p.total_with_vat), 0),
-    total_paid: filteredPurchases.reduce((sum, p) => sum + parseFloat(p.paid_amount), 0),
-    total_balance: filteredPurchases.reduce((sum, p) => sum + parseFloat(p.balance_amount), 0),
+    total_amount: filteredPurchases.reduce((sum, p) => sum + (parseFloat(p.total_with_vat) || 0), 0),
+    total_paid: filteredPurchases.reduce((sum, p) => sum + (parseFloat(p.paid_amount) || 0), 0),
+    total_balance: filteredPurchases.reduce((sum, p) => sum + (parseFloat(p.balance_amount) || 0), 0),
     paid_count: filteredPurchases.filter(p => p.payment_status === 'Paid').length,
     non_paid_count: filteredPurchases.filter(p => p.payment_status === 'Non-Paid').length,
     partially_paid_count: filteredPurchases.filter(p => p.payment_status === 'Partially Paid').length
@@ -267,7 +273,6 @@ const PurchaseHistory = () => {
                 </div>
               </div>
 
-              {/* 🔥 Status Filter */}
               <div className="filter-group">
                 <label>
                   <FontAwesomeIcon icon={faCheckCircle} />
@@ -324,16 +329,42 @@ const PurchaseHistory = () => {
                 <th>Status</th>
                 <th>Payment Method</th>
                 <th>Actions</th>
-               </tr>
+              </tr>
             </thead>
             <tbody>
               {filteredPurchases.map(purchase => {
+                console.log('Purchase object:', purchase);
                 const statusInfo = getStatusBadge(purchase.payment_status);
+                // Get invoice number with fallback
+                const invoiceNumber = purchase.invoice_no || purchase.invoice_number || 'N/A';
+                
                 return (
                   <tr key={purchase.id}>
                     <td className="invoice-cell">
-                      <span className="invoice-badge">{purchase.invoice_no}</span>
-                     </td>
+                      <div className="invoice-badge" style={{ 
+                        display: 'inline-flex', 
+                        alignItems: 'center', 
+                        gap: '6px',
+                        backgroundColor: '#e3f2fd',
+                        color: '#1976d2',
+                        padding: '4px 12px',
+                        borderRadius: '20px',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        fontFamily: 'monospace'
+                      }}>
+                        <FontAwesomeIcon icon={faReceipt} style={{ fontSize: '11px', opacity: 0.7 }} />
+                        <span>
+                          {purchase.invoice_no || purchase.invoice_number || purchase.inv_number || 
+                          (purchase.id ? `ID:${purchase.id}` : 'N/A')}
+                        </span>
+                      </div>
+                      {(!purchase.invoice_no && !purchase.invoice_number && !purchase.inv_number) && (
+                        <div style={{ fontSize: '10px', color: '#dc3545', marginTop: '4px', textAlign: 'center' }}>
+                          ⚠️ Missing
+                        </div>
+                      )}
+                    </td>
                     <td>{formatDate(purchase.purchase_date)}</td>
                     <td>
                       <div className="supplier-info">
@@ -359,7 +390,7 @@ const PurchaseHistory = () => {
                     </td>
                     <td>
                       <span className="payment-method-badge">
-                        {purchase.payment_method?.replace('_', ' ')}
+                        {purchase.payment_method?.replace('_', ' ') || 'N/A'}
                       </span>
                     </td>
                     <td className="actions-cell">
