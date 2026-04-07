@@ -53,6 +53,7 @@ const VATReport = () => {
     }
   };
 
+  /* Handle VAT filter change */
   const handleVatFilterChange = (e) => {
     setVatFilter(e.target.value);
   };

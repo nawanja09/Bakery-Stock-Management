@@ -108,7 +108,7 @@ const createPurchase = async (req, res) => {
   }
 };
 
-// Get all purchases
+// Update getAllPurchases function with better data formatting
 const getAllPurchases = async (req, res) => {
   try {
     const [purchases] = await pool.query(`
@@ -131,11 +131,15 @@ const getAllPurchases = async (req, res) => {
       FROM purchases p
       JOIN supplier s ON p.supplier_id = s.id
       JOIN company c ON p.company_id = c.id
+      WHERE p.deleted = FALSE OR p.deleted IS NULL
       ORDER BY p.purchase_date DESC, p.id DESC
     `);
 
     // Get payment counts and return counts for each purchase
     for (let purchase of purchases) {
+      // Ensure invoice_no is a string and not null
+      purchase.invoice_no = purchase.invoice_no ? String(purchase.invoice_no) : 'N/A';
+      
       // Get payment count and total payments
       const [payments] = await pool.query(
         `SELECT COUNT(*) as payment_count, COALESCE(SUM(amount), 0) as total_payments
@@ -146,7 +150,7 @@ const getAllPurchases = async (req, res) => {
       purchase.payment_count = payments[0]?.payment_count || 0;
       purchase.total_payments = payments[0]?.total_payments || 0;
 
-      // 🔥 FIXED: Get return total - specify table alias for total_amount
+      // Get return total
       const [returns] = await pool.query(
         `SELECT COALESCE(SUM(pri.total_amount), 0) as total_returns
          FROM purchase_returns pr
@@ -155,6 +159,13 @@ const getAllPurchases = async (req, res) => {
         [purchase.id]
       );
       purchase.total_returns = returns[0]?.total_returns || 0;
+      
+      // Format amounts to numbers
+      purchase.subtotal = parseFloat(purchase.subtotal) || 0;
+      purchase.vat_amount = parseFloat(purchase.vat_amount) || 0;
+      purchase.total_with_vat = parseFloat(purchase.total_with_vat) || 0;
+      purchase.paid_amount = parseFloat(purchase.paid_amount) || 0;
+      purchase.balance_amount = parseFloat(purchase.balance_amount) || 0;
     }
 
     res.json(purchases);
@@ -680,6 +691,182 @@ const getSupplierBills = async (req, res) => {
   }
 };
 
+// Add this new function before module.exports
+const addSettlementToReturn = async (req, res) => {
+  const connection = await pool.getConnection();
+  
+  try {
+    await connection.beginTransaction();
+
+    const { id } = req.params;
+    const { 
+      settlements, 
+      payment_method, 
+      settlement_date,
+      notes,
+      settled_by 
+    } = req.body;
+
+    if (!id || !settlements || settlements.length === 0) {
+      throw new Error('Return ID and settlements are required');
+    }
+
+    if (!settled_by) {
+      throw new Error('User ID is required');
+    }
+
+    // Get current return details
+    const [returns] = await connection.query(
+      `SELECT * FROM purchase_returns WHERE id = ?`,
+      [id]
+    );
+
+    if (returns.length === 0) {
+      throw new Error('Purchase return not found');
+    }
+
+    const purchaseReturn = returns[0];
+    const currentSettledAmount = parseFloat(purchaseReturn.settled_amount) || 0;
+    const totalAmount = parseFloat(purchaseReturn.total_amount) || 0;
+    
+    // Parse existing settlement details
+    let existingSettlements = [];
+    if (purchaseReturn.settlement_details) {
+      try {
+        existingSettlements = typeof purchaseReturn.settlement_details === 'string' 
+          ? JSON.parse(purchaseReturn.settlement_details) 
+          : purchaseReturn.settlement_details;
+      } catch (e) {
+        existingSettlements = [];
+      }
+    }
+
+    // Calculate new settlement amount
+    let newSettledAmount = 0;
+    const enhancedSettlements = [...existingSettlements];
+    
+    for (const settlement of settlements) {
+      const settlementAmount = parseFloat(settlement.amount) || 0;
+      if (settlementAmount <= 0) continue;
+      
+      newSettledAmount += settlementAmount;
+      
+      // Check if this purchase is already in settlements
+      const existingIndex = existingSettlements.findIndex(s => s.purchase_id === settlement.purchase_id);
+      
+      if (existingIndex >= 0) {
+        // Update existing settlement amount
+        enhancedSettlements[existingIndex].amount = 
+          (enhancedSettlements[existingIndex].amount || 0) + settlementAmount;
+      } else {
+        // Get purchase details for this settlement
+        const [purchaseDetails] = await connection.query(
+          `SELECT id, invoice_no, DATE(purchase_date) as purchase_date FROM purchases WHERE id = ?`,
+          [settlement.purchase_id]
+        );
+        
+        enhancedSettlements.push({
+          purchase_id: settlement.purchase_id,
+          invoice_no: purchaseDetails.length > 0 ? purchaseDetails[0].invoice_no : 'Unknown',
+          purchase_date: purchaseDetails.length > 0 ? purchaseDetails[0].purchase_date : null,
+          amount: settlementAmount
+        });
+      }
+    }
+
+    const totalSettledAmount = currentSettledAmount + newSettledAmount;
+    const newBalanceAmount = totalAmount - totalSettledAmount;
+
+    // Update purchase return
+    await connection.query(
+      `UPDATE purchase_returns 
+       SET settled_amount = ?, 
+           balance_amount = ?,
+           settlement_details = ?
+       WHERE id = ?`,
+      [totalSettledAmount, newBalanceAmount, JSON.stringify(enhancedSettlements), id]
+    );
+
+    // Update purchase bills and create payment history
+    const settlementDate = settlement_date || purchaseReturn.return_date;
+    
+    for (const settlement of settlements) {
+      const settlementAmount = parseFloat(settlement.amount) || 0;
+      if (settlementAmount <= 0) continue;
+      
+      // Get current purchase bill details
+      const [purchase] = await connection.query(
+        `SELECT balance_amount, paid_amount, total_with_vat FROM purchases WHERE id = ?`,
+        [settlement.purchase_id]
+      );
+
+      if (purchase.length > 0) {
+        const currentBalance = parseFloat(purchase[0].balance_amount) || 0;
+        const currentPaid = parseFloat(purchase[0].paid_amount) || 0;
+        
+        const newBalance = currentBalance - settlementAmount;
+        const newPaid = currentPaid + settlementAmount;
+        const newBalanceStatus = newBalance > 0 ? 1 : 0;
+
+        let paymentStatus = 'Non-Paid';
+        if (newPaid >= purchase[0].total_with_vat) {
+          paymentStatus = 'Paid';
+        } else if (newPaid > 0) {
+          paymentStatus = 'Partially Paid';
+        }
+
+        await connection.query(
+          `UPDATE purchases 
+           SET balance_amount = ?, 
+               paid_amount = ?,
+               balance_status = ?,
+               payment_status = ?
+           WHERE id = ?`,
+          [newBalance, newPaid, newBalanceStatus, paymentStatus, settlement.purchase_id]
+        );
+
+        // Add payment history entry
+        await connection.query(
+          `INSERT INTO payment_history 
+           (purchase_id, payment_date, amount, payment_method, notes, created_by)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [
+            settlement.purchase_id,
+            settlementDate,
+            settlementAmount,
+            payment_method || 'CASH',
+            notes || `Additional settlement for return #${purchaseReturn.return_number}`,
+            settled_by
+          ]
+        );
+      }
+    }
+
+    await connection.commit();
+    
+    res.json({
+      message: 'Settlement added successfully!',
+      return_id: parseInt(id),
+      summary: {
+        previous_settled: currentSettledAmount,
+        new_settlement: newSettledAmount,
+        total_settled: totalSettledAmount,
+        balance_amount: newBalanceAmount,
+        is_fully_settled: newBalanceAmount === 0
+      }
+    });
+
+  } catch (error) {
+    await connection.rollback();
+    console.error('Error adding settlement to return:', error);
+    res.status(500).json({ 
+      error: 'Server error: ' + error.message 
+    });
+  } finally {
+    connection.release();
+  }
+};
+
 module.exports = {
   createPurchase,
   getAllPurchases,
@@ -693,5 +880,6 @@ module.exports = {
   getPaymentHistory,
   updatePaymentStatuses,
   getPurchaseReturnsForBill,
-  getSupplierBills
+  getSupplierBills,
+  addSettlementToReturn
 };
