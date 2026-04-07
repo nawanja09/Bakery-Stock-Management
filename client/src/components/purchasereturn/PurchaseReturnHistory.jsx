@@ -487,13 +487,11 @@ const PurchaseReturnHistory = () => {
           <div className="modal-content large-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>
-                <FontAwesomeIcon icon={faFileInvoice} />
+
+                <FontAwesomeIcon icon={faFileInvoice} /> Details for Return #
                 {selectedReturn?.return_number || 'Return Details'}
               </h3>
               <div className="modal-header-actions">
-                <button className="btn-outline" onClick={handlePrint} type="button">
-                  <FontAwesomeIcon icon={faPrint} />
-                </button>
                 <button className="close-button" onClick={closeModal} type="button">×</button>
               </div>
             </div>
@@ -519,7 +517,7 @@ const PurchaseReturnHistory = () => {
                           <div className="card-content">
                             <div className="info-row">
                               <span className="label">Return Number</span>
-                              <span className="value highlight">{selectedReturn.return_number}</span>
+                              <span className="value">{selectedReturn.return_number}</span>
                             </div>
                             <div className="info-row">
                               <span className="label">Return Date</span>
@@ -540,11 +538,11 @@ const PurchaseReturnHistory = () => {
                           <div className="card-content">
                             <div className="info-row">
                               <span className="label">Supplier</span>
-                              <span className="value highlight">{selectedReturn.supplier_name}</span>
+                              <span className="value">{selectedReturn.supplier_name}</span>
                             </div>
                             <div className="info-row">
                               <span className="label">VAT Status</span>
-                              <span className={`value vat-badge ${selectedReturn.supplier_vat_registered ? 'yes' : 'no'}`}>
+                              <span className={`value ${selectedReturn.supplier_vat_registered ? 'yes' : 'no'}`}>
                                 {selectedReturn.supplier_vat_registered ? 'Registered' : 'Not Registered'}
                               </span>
                             </div>
@@ -660,15 +658,15 @@ const PurchaseReturnHistory = () => {
                                   return (
                                     <tr key={idx}>
                                       <td>{idx + 1}</td>
-                                      <td><span className="invoice-badge">{s.invoice_no}</span></td>
-                                      <td>{formatDate(s.purchase_date)}</td>
+                                      <td><span className="invoice-number">{s.invoice_no}</span></td>
+                                      <td>{formatDate(s.invoice_date)}</td>
                                       <td className="text-right success-text">
                                         <strong>{formatCurrency(s.amount)}</strong>
                                       </td>
                                       <td className="text-center">
                                         <span className="percentage-badge">{pct}%</span>
                                       </td>
-                                    </tr>
+                                    </tr> 
                                   );
                                 })}
                               </tbody>

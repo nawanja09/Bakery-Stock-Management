@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheck, faTimes, faBalanceScale, faMoneyBillWave } from '@fortawesome/free-solid-svg-icons';
 import dayjs from 'dayjs';
-import './SettlementModal.css';
+import './SettlementModalForReturn.css';
 import api from '../../api';
 
 const SettlementModalForReturn = ({
