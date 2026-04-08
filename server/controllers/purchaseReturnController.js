@@ -915,6 +915,173 @@ const getVATReturnsSummary = async (req, res) => {
   }
 };
 
+// Add settlement to existing purchase return
+const addSettlementToPurchaseReturn = async (req, res) => {
+  const { id } = req.params;
+  const connection = await pool.getConnection();
+  
+  try {
+    await connection.beginTransaction();
+
+    const { settlements, payment_method, settlement_date, notes, settled_by } = req.body;
+
+    // Validate required fields
+    if (!settlements || settlements.length === 0) {
+      return res.status(400).json({ error: 'At least one settlement is required' });
+    }
+
+    // Get current purchase return
+    const [returns] = await connection.query(
+      `SELECT * FROM purchase_returns WHERE id = ?`,
+      [id]
+    );
+
+    if (returns.length === 0) {
+      return res.status(404).json({ error: 'Purchase return not found' });
+    }
+
+    const currentReturn = returns[0];
+    const currentSettledAmount = parseFloat(currentReturn.settled_amount) || 0;
+    const totalReturnAmount = parseFloat(currentReturn.total_amount) || 0;
+
+    // Calculate new settlement amounts
+    let newSettlementAmount = 0;
+    let enhancedNewSettlements = [];
+
+    for (const settlement of settlements) {
+      const settlementAmount = parseFloat(settlement.amount) || 0;
+      newSettlementAmount += settlementAmount;
+
+      // Get purchase details for this settlement
+      const [purchaseDetails] = await connection.query(
+        `SELECT id, invoice_no, DATE(purchase_date) as purchase_date FROM purchases WHERE id = ?`,
+        [settlement.purchase_id]
+      );
+
+      if (purchaseDetails.length > 0) {
+        enhancedNewSettlements.push({
+          purchase_id: settlement.purchase_id,
+          invoice_no: purchaseDetails[0].invoice_no,
+          purchase_date: purchaseDetails[0].purchase_date,
+          amount: settlementAmount
+        });
+      }
+    }
+
+    // Calculate new totals
+    const newTotalSettled = currentSettledAmount + newSettlementAmount;
+    const newBalanceAmount = totalReturnAmount - newTotalSettled;
+
+    // Validate settlement doesn't exceed total
+    if (newTotalSettled > totalReturnAmount) {
+      return res.status(400).json({ 
+        error: `Settlement amount exceeds return total. Return total: Rs. ${totalReturnAmount.toFixed(2)}, Already settled: Rs. ${currentSettledAmount.toFixed(2)}, Remaining: Rs. ${(totalReturnAmount - currentSettledAmount).toFixed(2)}`
+      });
+    }
+
+    // Parse existing settlements
+    let existingSettlements = [];
+    if (currentReturn.settlement_details) {
+      try {
+        if (typeof currentReturn.settlement_details === 'string') {
+          existingSettlements = JSON.parse(currentReturn.settlement_details);
+        } else if (typeof currentReturn.settlement_details === 'object') {
+          existingSettlements = currentReturn.settlement_details;
+        }
+      } catch (e) {
+        console.warn('Error parsing existing settlement_details:', e.message);
+        existingSettlements = [];
+      }
+    }
+
+    // Merge settlements
+    const allSettlements = [...existingSettlements, ...enhancedNewSettlements];
+
+    // Update purchase return with new settlement totals
+    await connection.query(
+      `UPDATE purchase_returns 
+       SET settled_amount = ?, 
+           balance_amount = ?,
+           settlement_details = ?
+       WHERE id = ?`,
+      [newTotalSettled, newBalanceAmount, JSON.stringify(allSettlements), id]
+    );
+
+    // Update purchase balances if settlements were made
+    for (const settlement of settlements) {
+      const settlementAmount = parseFloat(settlement.amount) || 0;
+
+      const [purchase] = await connection.query(
+        `SELECT balance_amount, paid_amount, total_with_vat 
+         FROM purchases WHERE id = ?`,
+        [settlement.purchase_id]
+      );
+
+      if (purchase.length > 0) {
+        const currentBalance = parseFloat(purchase[0].balance_amount) || 0;
+        const currentPaid = parseFloat(purchase[0].paid_amount) || 0;
+
+        const newBalance = currentBalance - settlementAmount;
+        const newPaid = currentPaid + settlementAmount;
+        const newBalanceStatus = newBalance > 0 ? 1 : 0;
+
+        let paymentStatus = 'Non-Paid';
+        if (newPaid >= purchase[0].total_with_vat) {
+          paymentStatus = 'Paid';
+        } else if (newPaid > 0) {
+          paymentStatus = 'Partially Paid';
+        }
+
+        await connection.query(
+          `UPDATE purchases 
+           SET balance_amount = ?, 
+               paid_amount = ?,
+               balance_status = ?,
+               payment_status = ?
+           WHERE id = ?`,
+          [newBalance, newPaid, newBalanceStatus, paymentStatus, settlement.purchase_id]
+        );
+
+        // Record payment history
+        await connection.query(
+          `INSERT INTO payment_history 
+           (purchase_id, payment_date, amount, payment_method, notes, created_by)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [
+            settlement.purchase_id,
+            settlement_date || new Date().toISOString().split('T')[0],
+            settlementAmount,
+            payment_method || 'CASH',
+            notes || `Settlement added to return #${currentReturn.return_number}`,
+            settled_by
+          ]
+        );
+      }
+    }
+
+    await connection.commit();
+
+    res.json({
+      message: 'Settlement added successfully!',
+      settlement_id: id,
+      summary: {
+        total_amount: totalReturnAmount,
+        settled_amount: newTotalSettled,
+        balance_amount: newBalanceAmount
+      }
+    });
+
+  } catch (error) {
+    await connection.rollback();
+    console.error('Error adding settlement:', error);
+    res.status(500).json({ 
+      error: 'Server error: ' + error.message 
+    });
+  } finally {
+    connection.release();
+  }
+};
+
 module.exports = {
   getPurchasesForReturn,
   getPurchaseItemsForReturn,
@@ -923,6 +1090,7 @@ module.exports = {
   getVATReturns,
   getVATSummary,
   createPurchaseReturn,
+  addSettlementToPurchaseReturn,
   getAllPurchaseReturns,
   getPurchaseReturnById,
   getPurchaseReturnByNumber,

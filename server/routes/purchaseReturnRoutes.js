@@ -42,4 +42,7 @@ router.get('/:id', purchaseReturnController.getPurchaseReturnById);
 // Create new purchase return
 router.post('/', purchaseReturnController.createPurchaseReturn);
 
+// Add settlement to existing purchase return (MUST come before /:id)
+router.post('/:id/settle', purchaseReturnController.addSettlementToPurchaseReturn);
+
 module.exports = router;
