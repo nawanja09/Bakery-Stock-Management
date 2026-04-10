@@ -1706,6 +1706,10 @@ ORDER BY TABLE_NAME, ORDINAL_POSITION;
 ALTER TABLE supplier 
 MODIFY COLUMN vat_number VARCHAR(9) DEFAULT NULL;
 
+ALTER TABLE `supplier` 
+ADD COLUMN `vat_number` 
+VARCHAR(9) DEFAULT NULL AFTER `address`;
+
 -- Update invalid VAT numbers to NULL
 UPDATE supplier 
 SET vat_number = NULL 
