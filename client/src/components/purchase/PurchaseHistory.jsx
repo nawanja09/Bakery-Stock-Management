@@ -386,21 +386,6 @@ const PurchaseHistory = () => {
       
       <div className="filter-sheet-content">
         <div className="filter-section">
-          <label>Quick Filters</label>
-          <div className="quick-filters-grid">
-            {['all', 'today', 'yesterday', 'week', 'month'].map(filter => (
-              <button
-                key={filter}
-                className={`quick-filter-btn ${quickFilter === filter ? 'active' : ''}`}
-                onClick={() => setQuickFilter(filter)}
-              >
-                {filter.charAt(0).toUpperCase() + filter.slice(1)}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="filter-section">
           <label>Company</label>
           <select
             value={companyFilter}
@@ -496,57 +481,12 @@ const PurchaseHistory = () => {
           </div>
           
           <div className="header-actions-responsive">
-            {!responsive.isMobile && (
-              <>
-                <button className="action-btn-secondary" onClick={exportToCSV} title="Export">
-                  <FontAwesomeIcon icon={faDownload} />
-                  <span className="btn-text">Export</span>
-                </button>
-                <button className="action-btn-secondary" onClick={() => window.print()} title="Print">
-                  <FontAwesomeIcon icon={faPrint} />
-                  <span className="btn-text">Print</span>
-                </button>
-              </>
-            )}
-            
-            <div className="view-toggle-responsive">
-              <button 
-                className={`toggle-option ${viewMode === 'table' ? 'active' : ''}`}
-                onClick={() => setViewMode('table')}
-                disabled={responsive.isMobile}
-                title="Table View"
-              >
-                <FontAwesomeIcon icon={faList} />
-              </button>
-              <button 
-                className={`toggle-option ${viewMode === 'cards' ? 'active' : ''}`}
-                onClick={() => setViewMode('cards')}
-                title="Card View"
-              >
-                <FontAwesomeIcon icon={faThLarge} />
-              </button>
-            </div>
-
             <Link to="/purchase/new" className="btn-primary-responsive">
               <FontAwesomeIcon icon={faPlus} />
               <span className="btn-text">New Purchase</span>
             </Link>
           </div>
         </div>
-
-        {responsive.isMobile && showMobileMenu && (
-          <div className="mobile-menu-dropdown">
-            <button onClick={exportToCSV}>
-              <FontAwesomeIcon icon={faDownload} /> Export CSV
-            </button>
-            <button onClick={() => window.print()}>
-              <FontAwesomeIcon icon={faPrint} /> Print
-            </button>
-            <button onClick={() => { clearFilters(); setShowMobileMenu(false); }}>
-              <FontAwesomeIcon icon={faTimes} /> Clear Filters
-            </button>
-          </div>
-        )}
       </header>
 
       {/* Stats Cards - Single Row Layout */}
@@ -720,21 +660,6 @@ const PurchaseHistory = () => {
         <div className="filters-panel-responsive">
           <div className="filters-grid-responsive">
             <div className="filter-group-responsive">
-              <label>Quick Date</label>
-              <div className="quick-date-buttons">
-                {['all', 'today', 'week', 'month'].map(filter => (
-                  <button
-                    key={filter}
-                    className={`quick-date-btn ${quickFilter === filter ? 'active' : ''}`}
-                    onClick={() => setQuickFilter(filter)}
-                  >
-                    {filter.charAt(0).toUpperCase() + filter.slice(1)}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="filter-group-responsive">
               <label>Company</label>
               <select
                 value={companyFilter}
@@ -780,34 +705,6 @@ const PurchaseHistory = () => {
                 <option value="Non-Paid">Non-Paid</option>
               </select>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Batch Actions Bar */}
-      {showBatchActions && selectedPurchases.size > 0 && (
-        <div className="batch-bar-responsive">
-          <div className="batch-info">
-            <button className="batch-close" onClick={() => { setSelectedPurchases(new Set()); setShowBatchActions(false); }}>
-              <FontAwesomeIcon icon={faTimes} />
-            </button>
-            <span className="batch-count">{selectedPurchases.size} selected</span>
-          </div>
-          <div className="batch-actions-group">
-            <button className="batch-action-btn" onClick={exportToCSV}>
-              <FontAwesomeIcon icon={faDownload} />
-              {!responsive.isMobile && <span>Export</span>}
-            </button>
-            {!responsive.isMobile && (
-              <button className="batch-action-btn" onClick={() => window.print()}>
-                <FontAwesomeIcon icon={faPrint} />
-                <span>Print</span>
-              </button>
-            )}
-            <button className="batch-action-btn danger" onClick={handleBatchDelete}>
-              <FontAwesomeIcon icon={faTrash} />
-              {!responsive.isMobile && <span>Delete</span>}
-            </button>
           </div>
         </div>
       )}
