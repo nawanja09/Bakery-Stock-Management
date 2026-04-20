@@ -268,40 +268,105 @@ const PurchasingReport = () => {
   const getAllItemsFromPurchases = () => {
     const allItems = [];
     reportData.forEach(purchase => {
-      if (purchase.items && purchase.items.length > 0) {
-        purchase.items.forEach(item => {
-          allItems.push({
-            ...item,
-            supplier_vat_number: purchase.supplier_vat_number, // include VAT number
-            invoice_no: purchase.invoice_no,
-            purchase_date: purchase.purchase_date,
-            supplier_name: purchase.supplier_name,
-            payment_method: purchase.payment_method,
-            bill_amount: purchase.bill_amount,
-            paid_amount: purchase.paid_amount,
-            company_name: purchase.company_name,
-            check_number: purchase.check_number
-          });
-        });
-      } else {
-        allItems.push({
-          supplier_vat_number: purchase.supplier_vat_number,
-          invoice_no: purchase.invoice_no,
-          purchase_date: purchase.purchase_date,
-          supplier_name: purchase.supplier_name,
-          item_name: 'No item details',
-          quantity: null,
-          unit_price: null,
-          payment_method: purchase.payment_method,
-          bill_amount: purchase.bill_amount,
-          paid_amount: purchase.paid_amount,
-          company_name: purchase.company_name,
-          check_number: purchase.check_number
-        });
-      }
+        // 🔥 FIX: Get correct bill amount (handle old bills)
+        let totalBillAmount = 0;
+        let subtotal = 0;
+        let vatAmount = 0;
+        
+        // Check if this is a new bill with VAT columns
+        if (purchase.total_with_vat && purchase.total_with_vat > 0) {
+            totalBillAmount = parseFloat(purchase.total_with_vat);
+            subtotal = parseFloat(purchase.subtotal || 0);
+            vatAmount = parseFloat(purchase.vat_amount || 0);
+        } 
+        // Old bill - use bill_amount as total (no VAT)
+        else if (purchase.bill_amount && purchase.bill_amount > 0) {
+            totalBillAmount = parseFloat(purchase.bill_amount);
+            subtotal = parseFloat(purchase.bill_amount);
+            vatAmount = 0;
+        }
+        // Fallback
+        else {
+            totalBillAmount = 0;
+            subtotal = 0;
+            vatAmount = 0;
+        }
+        
+        const totalPaidAmount = parseFloat(purchase.paid_amount || 0);
+        const totalDueAmount = totalBillAmount - totalPaidAmount;
+        
+        if (purchase.items && purchase.items.length > 0) {
+            purchase.items.forEach(item => {
+                const quantity = Number(item.quantity || 0);
+                const unitPrice = Number(item.unit_price || 0);
+                const itemSubtotal = quantity * unitPrice;
+                
+                // Calculate VAT only for new bills
+                let itemVatAmount = 0;
+                let itemTotalPrice = itemSubtotal;
+                
+                if (totalBillAmount > 0 && vatAmount > 0) {
+                    // New bill with VAT - calculate proportional VAT
+                    const vatRatio = vatAmount / totalBillAmount;
+                    itemVatAmount = itemTotalPrice * vatRatio;
+                    itemTotalPrice = itemSubtotal + itemVatAmount;
+                } else if (totalBillAmount > 0) {
+                    // Old bill - no VAT, total price = subtotal
+                    itemTotalPrice = itemSubtotal;
+                    itemVatAmount = 0;
+                }
+                
+                // Calculate payment ratio for this item
+                const paymentRatio = totalBillAmount > 0 ? totalPaidAmount / totalBillAmount : 0;
+                const itemPaidAmount = itemTotalPrice * paymentRatio;
+                const itemDueAmount = itemTotalPrice - itemPaidAmount;
+                
+                allItems.push({
+                    ...item,
+                    supplier_vat_number: purchase.supplier_vat_number,
+                    invoice_no: purchase.invoice_no,
+                    purchase_date: purchase.purchase_date,
+                    supplier_name: purchase.supplier_name,
+                    payment_method: purchase.payment_method,
+                    bill_amount: totalBillAmount,
+                    paid_amount: totalPaidAmount,
+                    due_amount: totalDueAmount,
+                    item_bill_amount: itemTotalPrice,
+                    item_paid_amount: itemPaidAmount,
+                    item_due_amount: itemDueAmount,
+                    company_name: purchase.company_name,
+                    check_number: purchase.check_number,
+                    vat_rate: purchase.vat_rate || 0,
+                    vat_amount: itemVatAmount,
+                    is_old_bill: vatAmount === 0  // Flag to identify old bills
+                });
+            });
+        } else {
+            allItems.push({
+                supplier_vat_number: purchase.supplier_vat_number,
+                invoice_no: purchase.invoice_no,
+                purchase_date: purchase.purchase_date,
+                supplier_name: purchase.supplier_name,
+                item_name: 'No item details',
+                quantity: null,
+                unit_price: null,
+                payment_method: purchase.payment_method,
+                bill_amount: totalBillAmount,
+                paid_amount: totalPaidAmount,
+                due_amount: totalDueAmount,
+                item_bill_amount: totalBillAmount,
+                item_paid_amount: totalPaidAmount,
+                item_due_amount: totalDueAmount,
+                company_name: purchase.company_name,
+                check_number: purchase.check_number,
+                vat_rate: purchase.vat_rate || 0,
+                vat_amount: vatAmount,
+                is_old_bill: vatAmount === 0
+            });
+        }
     });
     return allItems;
-  };
+};
 
   const allItems = getAllItemsFromPurchases();
 
@@ -420,7 +485,7 @@ const PurchasingReport = () => {
               <tr>
                 <th>Date</th>
                 <th>Supplier</th>
-                <th>VAT Number</th>  {/* NEW column */}
+                <th>VAT Number</th>
                 <th>Company</th>
                 <th>Check #</th>
                 <th>Item Name</th>
@@ -434,27 +499,39 @@ const PurchasingReport = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredItems.map((item, index) => (
-                <tr key={`${item.invoice_no}-${index}`}>
-                  <td>{format(new Date(item.purchase_date), 'MMM dd, yyyy')}</td>
-                  <td>{item.supplier_name}</td>
-                  <td>{item.supplier_vat_number || '—'}</td>
-                  <td>{item.company_name || 'N/A'}</td>
-                  <td>{item.check_number || 'N/A'}</td>
-                  <td>{item.item_name || 'N/A'}</td>
-                  <td>{item.quantity ? Number(item.quantity).toFixed(3) : 'N/A'}</td>
-                  <td>{item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}</td>
-                  <td>
-                    {item.quantity && item.unit_price 
-                      ? (Number(item.quantity) * Number(item.unit_price)).toFixed(2)
-                      : 'N/A'}
-                  </td>
-                  <td>{item.payment_method}</td>
-                  <td>{parseFloat(item.bill_amount).toFixed(2)}</td>
-                  <td>{parseFloat(item.paid_amount).toFixed(2)}</td>
-                  <td>{(parseFloat(item.bill_amount) - parseFloat(item.paid_amount)).toFixed(2)}</td>
-                </tr>
-              ))}
+              {filteredItems.map((item, index) => {
+                // 🔥 Calculate display values safely
+                const displayBillAmount = item.item_bill_amount || item.bill_amount || 0;
+                const displayPaidAmount = item.item_paid_amount || item.paid_amount || 0;
+                const displayDueAmount = displayBillAmount - displayPaidAmount;
+                
+                return (
+                    <tr key={`${item.invoice_no}-${index}`}>
+                        <td>{format(new Date(item.purchase_date), 'MMM dd, yyyy')}</td>
+                        <td>{item.supplier_name}</td>
+                        <td>{item.supplier_vat_number || '—'}</td>
+                        <td>{item.company_name || 'N/A'}</td>
+                        <td>{item.check_number || 'N/A'}</td>
+                        <td>{item.item_name || 'N/A'}</td>
+                        <td>{item.quantity ? Number(item.quantity).toFixed(3) : 'N/A'}</td>
+                        <td>{item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}</td>
+                        <td>
+                            {item.quantity && item.unit_price 
+                                ? (Number(item.quantity) * Number(item.unit_price)).toFixed(2)
+                                : 'N/A'}
+                        </td>
+                        <td>{item.payment_method}</td>
+                        <td className={item.is_old_bill ? 'old-bill-warning' : ''}>
+                            {displayBillAmount.toFixed(2)}
+                            {item.is_old_bill && <small className="warning-text"> (No VAT)</small>}
+                        </td>
+                        <td>{displayPaidAmount.toFixed(2)}</td>
+                        <td className={displayDueAmount > 0 ? 'due-amount' : 'paid-amount'}>
+                            {displayDueAmount.toFixed(2)}
+                        </td>
+                    </tr>
+                );
+            })}
             </tbody>
           </table>
         </div>

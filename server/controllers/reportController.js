@@ -580,16 +580,28 @@ const getPurchasingReport = async (req, res) => {
         p.invoice_no,
         p.purchase_date,
         s.name AS supplier_name,
+        s.vat_number AS supplier_vat_number,
         p.payment_method,
-        p.bill_amount,
-        p.paid_amount,
+        -- 🔥 FIX: Handle old bills without VAT columns
+        CASE 
+          WHEN p.total_with_vat IS NOT NULL AND p.total_with_vat > 0 THEN p.total_with_vat
+          WHEN p.bill_amount IS NOT NULL AND p.bill_amount > 0 THEN p.bill_amount
+          ELSE 0
+        END AS bill_amount,
+        -- 🔥 FIX: Paid amount - ensure it's not NULL
+        COALESCE(p.paid_amount, 0) AS paid_amount,
         p.check_number,
         c.name AS company_name,
-        p.company_id
+        p.company_id,
+        -- 🔥 FIX: VAT columns for old bills
+        COALESCE(p.vat_rate, 0) AS vat_rate,
+        COALESCE(p.vat_amount, 0) AS vat_amount,
+        COALESCE(p.subtotal, p.bill_amount, 0) AS subtotal
       FROM purchases p
       JOIN supplier s ON p.supplier_id = s.id
       LEFT JOIN company c ON p.company_id = c.id
       WHERE p.purchase_date BETWEEN ? AND ?
+        AND (p.deleted = FALSE OR p.deleted IS NULL)
     `;
 
     const params = [startDate, endDate];
@@ -610,7 +622,7 @@ const getPurchasingReport = async (req, res) => {
           SELECT 
             pi.*,
             i.item_code,
-            i.name as item_name,
+            COALESCE(i.name, pi.item_name) as item_name,
             i.unit
           FROM purchase_items pi
           LEFT JOIN items i ON pi.item_id = i.id
