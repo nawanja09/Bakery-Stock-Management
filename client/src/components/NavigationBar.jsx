@@ -207,11 +207,20 @@ const NavigationBar = () => {
                       </NavLink>
                     </li>
                   </ul>
+                </li>
+
+                {/* Purchase Returns */}
+                <li className={`dropdown ${activeDropdown === 'purchase-returns' ? 'active' : ''}`}>
+                  <div className="dropdown-header" onClick={() => toggleDropdown('purchase-returns')}>
+                    <span className="icon-container"><FontAwesomeIcon icon={faReply} /></span>
+                    <span>Purchase Returns</span>
+                    <FontAwesomeIcon icon={faChevronDown} className="chevron" />
+                  </div>
                   <ul className="dropdown-menu">
                     <li>
                       <NavLink to="/purchase-returns/add" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
                         <span className="icon-container"><FontAwesomeIcon icon={faReply} /></span>
-                        <span>Add New Return</span>
+                        <span>Add New Purchase Return</span>
                       </NavLink>
                     </li>
                   </ul>
@@ -219,7 +228,7 @@ const NavigationBar = () => {
                     <li>
                       <NavLink to="/purchase-returns/history" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
                         <span className="icon-container"><FontAwesomeIcon icon={faHistory} /></span>
-                        <span>View History</span>
+                        <span>Purchase Return View History</span>
                       </NavLink>
                     </li>
                   </ul>

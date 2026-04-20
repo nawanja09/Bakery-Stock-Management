@@ -266,24 +266,34 @@ const PurchaseReturnHistory = () => {
 
       {/* PAGE HEADER */}
       <div className="page-header">
-        <div className="header-title">
-          <h1>
-            <FontAwesomeIcon icon={faUndo} className="header-icon" />
-            Purchase Returns
-          </h1>
-          <p className="subtitle">View and manage all purchase returns with settlement tracking</p>
+
+        {/* ROW 1 */}
+        <div className="header-row-1">
+          <div className="header-left">
+            <h1>
+              Purchase Returns History
+            </h1>
+            <p className="subtitle">
+              View and manage all purchase returns with settlement tracking
+            </p>
+          </div>
+
+          <div className="header-right">
+            <Link to="/purchase-returns/add" className="btn-primary">
+              <FontAwesomeIcon icon={faPlus} style={{ marginRight: '8px' }} /> New Return
+            </Link>
+          </div>
         </div>
-        <div className="header-actions">
+
+        
+        {/* ROW 2
+        <div className="header-row-2">
           <button onClick={handleExportCSV} className="btn-outline" type="button">
-            <FontAwesomeIcon icon={faDownload} /> Export CSV
+            <FontAwesomeIcon icon={faDownload} style={{ marginRight: '8px' }} /> Export CSV
           </button>
-          <button onClick={handlePrint} className="btn-outline" type="button">
-            <FontAwesomeIcon icon={faPrint} /> Print
-          </button>
-          <Link to="/purchase-returns/add" className="btn-primary">
-            <FontAwesomeIcon icon={faPlus} /> New Return
-          </Link>
         </div>
+         */}
+
       </div>
 
       {/* FILTERS */}
