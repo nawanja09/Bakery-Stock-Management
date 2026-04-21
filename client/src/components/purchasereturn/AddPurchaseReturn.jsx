@@ -757,7 +757,7 @@ const AddPurchaseReturn = () => {
             </div>
             <div className="summary-row grand-total">
               <span>Total Return Amount</span>
-              <span className="bold">Rs. {totals.grandTotal.toFixed(2)}</span>
+              <span>Rs. {totals.grandTotal.toFixed(2)}</span>
             </div>
           </div>
         </div>
