@@ -570,6 +570,7 @@ const getDepartmentIssuesReport = async (req, res) => {
     }
 };
 
+/*
 const getPurchasingReport = async (req, res) => {
   const { startDate, endDate, companyId } = req.query;
 
@@ -637,6 +638,93 @@ const getPurchasingReport = async (req, res) => {
     );
 
     res.json(purchasesWithItems);
+  } catch (error) {
+    console.error('Error fetching purchasing report:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+*/
+
+const getPurchasingReport = async (req, res) => {
+  const { startDate, endDate, companyId, itemId } = req.query;
+
+  try {
+    let query = `
+      SELECT 
+        p.id,
+        p.invoice_no,
+        p.purchase_date,
+        s.name AS supplier_name,
+        s.vat_number AS supplier_vat_number,
+        p.payment_method,
+        CASE 
+          WHEN p.total_with_vat IS NOT NULL AND p.total_with_vat > 0 THEN p.total_with_vat
+          WHEN p.bill_amount IS NOT NULL AND p.bill_amount > 0 THEN p.bill_amount
+          ELSE 0
+        END AS bill_amount,
+        COALESCE(p.paid_amount, 0) AS paid_amount,
+        p.check_number,
+        c.name AS company_name,
+        p.company_id,
+        COALESCE(p.vat_rate, 0) AS vat_rate,
+        COALESCE(p.vat_amount, 0) AS vat_amount,
+        COALESCE(p.subtotal, p.bill_amount, 0) AS subtotal
+      FROM purchases p
+      JOIN supplier s ON p.supplier_id = s.id
+      LEFT JOIN company c ON p.company_id = c.id
+      WHERE p.purchase_date BETWEEN ? AND ?
+        AND (p.deleted = FALSE OR p.deleted IS NULL)
+    `;
+
+    const params = [startDate, endDate];
+
+    if (companyId) {
+      query += ' AND p.company_id = ?';
+      params.push(companyId);
+    }
+
+    query += ' ORDER BY p.purchase_date DESC';
+
+    const [purchases] = await pool.query(query, params);
+
+    // Fetch items for each purchase
+    const purchasesWithItems = await Promise.all(
+      purchases.map(async (purchase) => {
+        let itemsQuery = `
+          SELECT 
+            pi.*,
+            i.item_code,
+            COALESCE(i.name, pi.item_name) as item_name,
+            i.unit
+          FROM purchase_items pi
+          LEFT JOIN items i ON pi.item_id = i.id
+          WHERE pi.purchase_id = ?
+        `;
+        
+        const itemsParams = [purchase.id];
+        
+        // If itemId is provided, filter items
+        if (itemId) {
+          itemsQuery += ' AND pi.item_id = ?';
+          itemsParams.push(itemId);
+        }
+        
+        const [items] = await pool.query(itemsQuery, itemsParams);
+        
+        return {
+          ...purchase,
+          items
+        };
+      })
+    );
+
+    // If itemId is provided, filter out purchases that have no matching items
+    const filteredPurchases = itemId 
+      ? purchasesWithItems.filter(purchase => purchase.items.length > 0)
+      : purchasesWithItems;
+
+    res.json(filteredPurchases);
   } catch (error) {
     console.error('Error fetching purchasing report:', error);
     res.status(500).json({ error: 'Server error' });

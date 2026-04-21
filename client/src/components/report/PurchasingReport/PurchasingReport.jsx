@@ -1,9 +1,10 @@
 // PurchasingReport.jsx
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { format } from 'date-fns';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import Select from 'react-select';
 import './PurchasingReport.css';
 import api from '../../../api';
 
@@ -13,13 +14,50 @@ const PurchasingReport = () => {
   const [reportData, setReportData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [companyFilter, setCompanyFilter] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedItem, setSelectedItem] = useState(null); // Changed from searchTerm to selectedItem object
   const [vatFilter, setVatFilter] = useState('all');
+  const [itemsList, setItemsList] = useState([]);
+  const [itemsLoading, setItemsLoading] = useState(false);
+
+  // Fetch items for dropdown (same as AddNewPurchase)
+  const fetchItems = useCallback(async () => {
+    setItemsLoading(true);
+    try {
+      const response = await api.get('/items');
+      // Format items for react-select
+      const formattedItems = response.data.map(item => ({
+        value: item.id,
+        label: `${item.name}${item.item_code ? ` (${item.item_code})` : ''}`,
+        name: item.name,
+        item_code: item.item_code,
+        unit: item.unit
+      }));
+      setItemsList(formattedItems);
+    } catch (error) {
+      console.error('Error fetching items:', error);
+    } finally {
+      setItemsLoading(false);
+    }
+  }, []);
+
+  // Load items on component mount
+  useEffect(() => {
+    fetchItems();
+  }, [fetchItems]);
 
   const fetchPurchasingReport = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await api.get(`/reports/purchasing?startDate=${startDate}&endDate=${endDate}&companyId=${companyFilter}`);
+      // Build URL with filters
+      let url = `/reports/purchasing?startDate=${startDate}&endDate=${endDate}`;
+      if (companyFilter) {
+        url += `&companyId=${companyFilter}`;
+      }
+      if (selectedItem && selectedItem.value) {
+        url += `&itemId=${selectedItem.value}`;
+      }
+      
+      const response = await api.get(url);
       const purchases = response.data;
 
       const purchasesWithItems = await Promise.all(
@@ -41,7 +79,7 @@ const PurchasingReport = () => {
     } finally {
       setLoading(false);
     }
-  }, [startDate, endDate, companyFilter]);
+  }, [startDate, endDate, companyFilter, selectedItem]);
 
   const getAllItemsFromPurchases = useCallback(() => {
     const allItems = [];
@@ -139,13 +177,19 @@ const PurchasingReport = () => {
   const allItems = useMemo(() => getAllItemsFromPurchases(), [getAllItemsFromPurchases]);
 
   const filteredItems = useMemo(() => {
+    // If an item is selected, filter by that item name
     return allItems.filter(item => {
-      const matchesSearch = item.item_name?.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesVat = vatFilter === 'all' ||
         (vatFilter === 'yes' ? item.supplier_vat_number : !item.supplier_vat_number);
-      return matchesSearch && matchesVat;
+      
+      // If an item is selected, only show that item
+      if (selectedItem && selectedItem.value) {
+        return item.item_name?.toLowerCase() === selectedItem.name?.toLowerCase() && matchesVat;
+      }
+      
+      return matchesVat;
     });
-  }, [allItems, searchTerm, vatFilter]);
+  }, [allItems, selectedItem, vatFilter]);
 
   const downloadPDF = useCallback(() => {
     const doc = new jsPDF();
@@ -159,6 +203,11 @@ const PurchasingReport = () => {
       const companyName = companyFilter === '1' ? 'JH' : companyFilter === '2' ? 'RR' : 'Delights';
       doc.setFontSize(12);
       doc.text(`Company: ${companyName}`, 15, yOffset);
+      yOffset += 7;
+    }
+
+    if (selectedItem && selectedItem.label) {
+      doc.text(`Item: ${selectedItem.label}`, 15, yOffset);
       yOffset += 7;
     }
 
@@ -206,7 +255,7 @@ const PurchasingReport = () => {
     });
 
     doc.save(`purchasing-report-${startDate}-to-${endDate}.pdf`);
-  }, [filteredItems, startDate, endDate, companyFilter]);
+  }, [filteredItems, startDate, endDate, companyFilter, selectedItem]);
 
   const downloadExcel = useCallback(() => {
     const worksheetData = [];
@@ -289,10 +338,12 @@ const PurchasingReport = () => {
     setStartDate(format(new Date(), 'yyyy-MM-01'));
     setEndDate(format(new Date(), 'yyyy-MM-dd'));
     setCompanyFilter('');
-    setSearchTerm('');
+    setSelectedItem(null);
     setVatFilter('all');
     setReportData([]);
   };
+
+  const isGenerateDisabled = loading || itemsLoading;
 
   return (
     <div className="purchasing-report-container">
@@ -366,19 +417,87 @@ const PurchasingReport = () => {
 
         <div className="control-group search-group">
           <label>🔍 Search Item</label>
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search by item name..."
-            className="control-input"
+          <Select
+            options={itemsList}
+            value={selectedItem}
+            onChange={(option) => setSelectedItem(option)}
+            isSearchable={true}
+            isClearable={true}
+            placeholder="Search and select an item..."
+            className="react-select-container"
+            classNamePrefix="react-select"
+            isLoading={itemsLoading}
+            noOptionsMessage={() => itemsLoading ? "Loading items..." : "No items found"}
+            // Add these props to prevent double icons
+            menuPosition="fixed"
+            blurInputOnSelect={true}
+            components={{
+              DropdownIndicator: null, // This removes the dropdown indicator
+              IndicatorSeparator: null  // This removes the separator
+            }}
+            styles={{
+              control: (base, state) => ({
+                ...base,
+                minHeight: '42px',
+                borderColor: state.isFocused ? '#007bff' : '#e9ecef',
+                borderRadius: '10px',
+                boxShadow: state.isFocused ? '0 0 0 3px rgba(0, 123, 255, 0.1)' : 'none',
+                '&:hover': {
+                  borderColor: '#adb5bd'
+                },
+                background: '#fff',
+                cursor: 'text'
+              }),
+              menuPortal: (base) => ({ 
+                ...base, 
+                zIndex: 9999 
+              }),
+              option: (base, { isFocused, isSelected }) => ({
+                ...base,
+                backgroundColor: isSelected ? '#007bff' : isFocused ? '#f8f9fa' : 'white',
+                color: isSelected ? 'white' : '#1a1d21',
+                cursor: 'pointer',
+                '&:active': {
+                  backgroundColor: '#007bff',
+                  color: 'white'
+                }
+              }),
+              placeholder: (base) => ({
+                ...base,
+                color: '#6c757d',
+                fontSize: '14px'
+              }),
+              singleValue: (base) => ({
+                ...base,
+                color: '#1a1d21',
+                fontSize: '14px'
+              }),
+              input: (base) => ({
+                ...base,
+                margin: 0,
+                padding: 0
+              }),
+              valueContainer: (base) => ({
+                ...base,
+                padding: '2px 8px'
+              }),
+              clearIndicator: (base) => ({
+                ...base,
+                cursor: 'pointer',
+                color: '#6c757d',
+                '&:hover': {
+                  color: '#dc3545'
+                }
+              })
+            }}
+            menuPortalTarget={document.body}
           />
         </div>
 
         <div className="control-group button-group">
           <button 
             onClick={fetchPurchasingReport}
-            disabled={loading}
+            disabled={isGenerateDisabled}
             className="btn btn-primary"
           >
             {loading ? (
