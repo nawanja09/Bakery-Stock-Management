@@ -48,8 +48,7 @@
 
 .back-button {
   display: flex;
-  align-items: center;
-  justify-content: center;
+  left: 20px; 
   width: 36px;
   height: 36px;
   border: 1px solid var(--border);
@@ -384,7 +383,7 @@ textarea.form-control {
 .summary-row:last-child { border-bottom: none; }
 .summary-row.vat { background: var(--bg); }
 .summary-row.grand-total {
-  background: var(--brand);
+  background: var(--bg-light);
   color: #fff;
   font-size: .9375rem;
 }
@@ -476,4 +475,28 @@ textarea.form-control {
 
 @media (min-width: 1400px) {
   .purchase-return-container { max-width: 1280px; }
+}
+
+.page-header {
+  position: relative; /* 🔥 important */
+}
+
+.back-button {
+  position: absolute;  /* 🔥 add this */
+  left: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all .15s;
 }
