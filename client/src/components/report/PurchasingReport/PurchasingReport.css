@@ -595,3 +595,75 @@ tfoot.total-row td {
 .mb-4 {
   margin-bottom: 16px;
 }
+
+/* PurchasingReport.css - Add these styles to fix double dropdown icon */
+
+/* Ensure react-select doesn't show native dropdown */
+.purchasing-report-container .react-select-container {
+  width: 100%;
+  position: relative;
+}
+
+.purchasing-report-container .react-select__control {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background: white;
+}
+
+/* Hide any native select that might be showing */
+.purchasing-report-container select.react-select__control {
+  display: none;
+}
+
+/* Ensure the control doesn't show native arrow */
+.purchasing-report-container .react-select__indicator {
+  padding: 8px;
+  color: #6c757d;
+}
+
+.purchasing-report-container .react-select__indicator-separator {
+  display: none; /* Hide the separator completely */
+}
+
+/* If you want to keep a custom dropdown indicator, use this instead of setting DropdownIndicator to null */
+.purchasing-report-container .react-select__dropdown-indicator {
+  color: #6c757d;
+}
+
+.purchasing-report-container .react-select__dropdown-indicator:hover {
+  color: #007bff;
+}
+
+/* Remove any default select styling from parent elements */
+.control-group.search-group select {
+  display: none;
+}
+
+/* Ensure the search group doesn't have any hidden selects */
+.search-group .control-input[type="text"] {
+  display: none;
+}
+
+/* Style the clear indicator */
+.purchasing-report-container .react-select__clear-indicator {
+  cursor: pointer;
+  padding: 8px;
+  color: #6c757d;
+}
+
+.purchasing-report-container .react-select__clear-indicator:hover {
+  color: #dc3545;
+}
+
+/* For mobile responsiveness */
+@media (max-width: 768px) {
+  .purchasing-report-container .react-select__menu {
+    position: fixed;
+    top: auto;
+    left: 16px;
+    right: 16px;
+    width: calc(100% - 32px);
+    margin: 0;
+  }
+}
