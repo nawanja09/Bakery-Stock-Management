@@ -667,3 +667,12 @@ tfoot.total-row td {
     margin: 0;
   }
 }
+
+.report-footer {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}
