@@ -647,7 +647,7 @@ const getPurchasingReport = async (req, res) => {
 */
 
 const getPurchasingReport = async (req, res) => {
-  const { startDate, endDate, companyId, itemId } = req.query;
+  const { startDate, endDate, companyId } = req.query;
 
   try {
     let query = `
@@ -657,6 +657,7 @@ const getPurchasingReport = async (req, res) => {
         p.purchase_date,
         s.name AS supplier_name,
         s.vat_number AS supplier_vat_number,
+        s.vat_registered AS supplier_vat_registered,  -- 🔥 ADD THIS
         p.payment_method,
         CASE 
           WHEN p.total_with_vat IS NOT NULL AND p.total_with_vat > 0 THEN p.total_with_vat
@@ -678,53 +679,33 @@ const getPurchasingReport = async (req, res) => {
     `;
 
     const params = [startDate, endDate];
-
     if (companyId) {
       query += ' AND p.company_id = ?';
       params.push(companyId);
     }
-
     query += ' ORDER BY p.purchase_date DESC';
 
     const [purchases] = await pool.query(query, params);
 
-    // Fetch items for each purchase
     const purchasesWithItems = await Promise.all(
       purchases.map(async (purchase) => {
-        let itemsQuery = `
+        const [items] = await pool.query(`
           SELECT 
             pi.*,
             i.item_code,
             COALESCE(i.name, pi.item_name) as item_name,
-            i.unit
+            i.unit,
+            i.vat_applicable  -- 🔥 ADD THIS - check if item has VAT
           FROM purchase_items pi
           LEFT JOIN items i ON pi.item_id = i.id
           WHERE pi.purchase_id = ?
-        `;
+        `, [purchase.id]);
         
-        const itemsParams = [purchase.id];
-        
-        // If itemId is provided, filter items
-        if (itemId) {
-          itemsQuery += ' AND pi.item_id = ?';
-          itemsParams.push(itemId);
-        }
-        
-        const [items] = await pool.query(itemsQuery, itemsParams);
-        
-        return {
-          ...purchase,
-          items
-        };
+        return { ...purchase, items };
       })
     );
 
-    // If itemId is provided, filter out purchases that have no matching items
-    const filteredPurchases = itemId 
-      ? purchasesWithItems.filter(purchase => purchase.items.length > 0)
-      : purchasesWithItems;
-
-    res.json(filteredPurchases);
+    res.json(purchasesWithItems);
   } catch (error) {
     console.error('Error fetching purchasing report:', error);
     res.status(500).json({ error: 'Server error' });
