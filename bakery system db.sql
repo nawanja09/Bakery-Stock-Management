@@ -2117,3 +2117,76 @@ MODIFY COLUMN purchase_id int NULL;
 -- Modify purchase_return_items table to allow NULL purchase_item_id
 ALTER TABLE purchase_return_items 
 MODIFY COLUMN purchase_item_id int NULL;
+
+-- Create petty_cash_balance table first
+CREATE TABLE IF NOT EXISTS `petty_cash_balance` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `balance_date` date NOT NULL,
+  `opening_balance` decimal(10,2) NOT NULL DEFAULT 0,
+  `total_vouchers` decimal(10,2) NOT NULL DEFAULT 0,
+  `total_reimbursements` decimal(10,2) NOT NULL DEFAULT 0,
+  `closing_balance` decimal(10,2) NOT NULL DEFAULT 0,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `balance_date` (`balance_date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Insert initial balance
+INSERT INTO `petty_cash_balance` (`balance_date`, `opening_balance`, `closing_balance`) 
+VALUES (CURDATE(), 112546.00, 112546.00)
+ON DUPLICATE KEY UPDATE closing_balance = closing_balance;
+
+-- Create petty_cash_vouchers table
+CREATE TABLE IF NOT EXISTS `petty_cash_vouchers` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `voucher_number` varchar(50) NOT NULL,
+  `voucher_date` date NOT NULL,
+  `employee_name` varchar(255) DEFAULT NULL,
+  `payee_name` varchar(255) NOT NULL,
+  `expense_type` varchar(100) NOT NULL,
+  `description` text,
+  `vehicle_number` varchar(50) DEFAULT NULL,
+  `amount` decimal(10,2) NOT NULL,
+  `status` enum('Pending','Approved','Rejected') DEFAULT 'Pending',
+  `created_by` int NOT NULL,
+  `approved_by` int DEFAULT NULL,
+  `approved_date` datetime DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `voucher_number` (`voucher_number`),
+  KEY `created_by` (`created_by`),
+  KEY `approved_by` (`approved_by`),
+  CONSTRAINT `petty_cash_vouchers_ibfk_1` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`),
+  CONSTRAINT `petty_cash_vouchers_ibfk_2` FOREIGN KEY (`approved_by`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Create petty_cash_reimbursements table
+CREATE TABLE IF NOT EXISTS `petty_cash_reimbursements` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `reference_number` varchar(50) NOT NULL,
+  `reimbursement_date` date NOT NULL,
+  `amount` decimal(10,2) NOT NULL,
+  `notes` text,
+  `status` enum('Pending','Completed') DEFAULT 'Completed',
+  `created_by` int NOT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `reference_number` (`reference_number`),
+  KEY `created_by` (`created_by`),
+  CONSTRAINT `petty_cash_reimbursements_ibfk_1` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Insert sample voucher (optional)
+INSERT INTO `petty_cash_vouchers` 
+(`voucher_number`, `voucher_date`, `payee_name`, `expense_type`, `amount`, `created_by`, `status`)
+VALUES 
+('PC-001', CURDATE(), 'Sample Payee', 'Stationery', 2500.00, 2, 'Approved'),
+('PC-002', CURDATE(), 'John Doe', 'Travel', 1500.00, 2, 'Approved');
+
+-- Insert sample reimbursement (optional)
+INSERT INTO `petty_cash_reimbursements` 
+(`reference_number`, `reimbursement_date`, `amount`, `created_by`, `status`)
+VALUES 
+('REF-001', CURDATE(), 5000.00, 2, 'Completed');

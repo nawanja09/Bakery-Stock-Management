@@ -32,7 +32,11 @@ import {
   faReply,
   faDollarSign,
   faFileInvoiceDollar,
-  faMoneyBill1Wave
+  faMoneyBill1Wave,
+  faCashRegister,
+  faMoneyCheck,
+  faUniversity,
+  faWifi
 } from '@fortawesome/free-solid-svg-icons';
 import bakeryLogo from '../images/icon.jpeg';
 import './NavigationBar.css';
@@ -586,14 +590,36 @@ const NavigationBar = () => {
             <li className={`dropdown ${activeDropdown === 'expenses' ? 'active' : ''}`}>
               <div className="dropdown-header" onClick={() => toggleDropdown('expenses')}>
                 <span className="icon-container"><FontAwesomeIcon icon={faDollarSign} /></span>
-                <span> Expenses </span>
+                <span>Expenses</span>
                 <FontAwesomeIcon icon={faChevronDown} className="chevron" />
               </div>
               <ul className="dropdown-menu">
+                {/* Petty Cash */}
                 <li>
-                  <NavLink to="/reports/expenses" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                    <span className="icon-container"><FontAwesomeIcon icon={faFileInvoiceDollar} /></span>
-                    <span>Expenses Report</span>
+                  <NavLink to="/expenses/petty-cash" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                    <span className="icon-container"><FontAwesomeIcon icon={faCashRegister} /></span>
+                    <span>Petty Cash</span>
+                  </NavLink>
+                </li>
+                {/* Cheque Expenses */}
+                <li>
+                  <NavLink to="/expenses/cheque" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                    <span className="icon-container"><FontAwesomeIcon icon={faMoneyCheck} /></span>
+                    <span>Cheque Expenses</span>
+                  </NavLink>
+                </li>
+                {/* Bank Charges */}
+                <li>
+                  <NavLink to="/expenses/bank-charges" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                    <span className="icon-container"><FontAwesomeIcon icon={faUniversity} /></span>
+                    <span>Bank Charges</span>
+                  </NavLink>
+                </li>
+                {/* Online Expenses */}
+                <li>
+                  <NavLink to="/expenses/online" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                    <span className="icon-container"><FontAwesomeIcon icon={faWifi} /></span>
+                    <span>Online Expenses</span>
                   </NavLink>
                 </li>
               </ul>

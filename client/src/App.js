@@ -75,6 +75,8 @@ import PurchaseVATReport from './components/report/PurchaseVATReport';
 
 import NonPaidPurchases from './components/purchase/NonPaidPurchases';
 
+import PettyCash from './components/Expenses/PettyCash';
+
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
@@ -179,6 +181,8 @@ function App() {
 
             <Route path="purchase/non-paid" element={<NonPaidPurchases />} />
 
+            <Route path="expenses/petty-cash" element={<PettyCash />} />z
+            <Route path="expenses/reimbursement" element={<Reimbursement />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/login" replace />} />
