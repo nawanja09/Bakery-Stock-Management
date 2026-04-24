@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { format } from 'date-fns';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import Select from 'react-select';  // 🔥 ADD THIS - Import react-select
 import './PurchasingReport.css';
 import api from '../../../api';
 
@@ -12,8 +13,9 @@ const PurchasingReport = () => {
   const [reportData, setReportData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [companyFilter, setCompanyFilter] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedItem, setSelectedItem] = useState(null);  // 🔥 CHANGE: from searchTerm to selectedItem
   const [vatFilter, setVatFilter] = useState('all');
+  const [itemsList, setItemsList] = useState([]);  // 🔥 ADD THIS - Store all items
 
   const fetchPurchasingReport = async () => {
     setLoading(true);
@@ -34,6 +36,11 @@ const PurchasingReport = () => {
       );
 
       setReportData(purchasesWithItems);
+      
+      // 🔥 ADD THIS - Fetch all items for dropdown
+      const itemsResponse = await api.get('/items');
+      setItemsList(itemsResponse.data);
+      
     } catch (error) {
       console.error('Error fetching purchasing report:', error);
       alert('Failed to fetch purchasing report');
@@ -45,37 +52,34 @@ const PurchasingReport = () => {
   const getAllItemsFromPurchases = () => {
     const allItems = [];
     reportData.forEach(purchase => {
-      // Get supplier VAT status
       const isSupplierVatRegistered = purchase.supplier_vat_registered === 1 || purchase.supplier_vat_registered === true;
-
-      // Get bill amount
+      
       let totalBillAmount = 0;
       let subtotal = 0;
       let vatAmount = 0;
-
+      
       if (purchase.total_with_vat && purchase.total_with_vat > 0) {
         totalBillAmount = parseFloat(purchase.total_with_vat);
         subtotal = parseFloat(purchase.subtotal || 0);
         vatAmount = parseFloat(purchase.vat_amount || 0);
-      }
+      } 
       else if (purchase.bill_amount && purchase.bill_amount > 0) {
         totalBillAmount = parseFloat(purchase.bill_amount);
         subtotal = parseFloat(purchase.bill_amount);
         vatAmount = 0;
       }
-
+      
       const totalPaidAmount = parseFloat(purchase.paid_amount || 0);
-
+      
       if (purchase.items && purchase.items.length > 0) {
         purchase.items.forEach(item => {
           const quantity = Number(item.quantity || 0);
           const unitPrice = Number(item.unit_price || 0);
           const itemSubtotal = quantity * unitPrice;
-
-          // Calculate VAT only if supplier IS VAT registered AND item is VAT applicable
+          
           let itemVatAmount = 0;
           let itemTotalPrice = itemSubtotal;
-
+          
           if (isSupplierVatRegistered && item.vat_applicable === 1) {
             const vatRate = Number(purchase.vat_rate || 18);
             itemVatAmount = itemSubtotal * (vatRate / 100);
@@ -84,12 +88,11 @@ const PurchasingReport = () => {
             itemVatAmount = 0;
             itemTotalPrice = itemSubtotal;
           }
-
-          // Calculate payment ratio
+          
           const paymentRatio = totalBillAmount > 0 ? totalPaidAmount / totalBillAmount : 0;
           const itemPaidAmount = itemTotalPrice * paymentRatio;
           const itemDueAmount = itemTotalPrice - itemPaidAmount;
-
+          
           allItems.push({
             ...item,
             supplier_vat_number: purchase.supplier_vat_number,
@@ -116,12 +119,12 @@ const PurchasingReport = () => {
       } else {
         let finalBillAmount = totalBillAmount;
         let finalVatAmount = 0;
-
+        
         if (!isSupplierVatRegistered) {
           finalVatAmount = 0;
           finalBillAmount = subtotal;
         }
-
+        
         allItems.push({
           supplier_vat_number: purchase.supplier_vat_number,
           supplier_vat_registered: isSupplierVatRegistered,
@@ -151,12 +154,28 @@ const PurchasingReport = () => {
 
   const allItems = getAllItemsFromPurchases();
 
-  // Apply filters
+  // 🔥 CREATE item options for react-select (same as Add Purchase page)
+  const itemOptions = useMemo(() => {
+    return itemsList.map(item => ({
+      value: item.id,
+      label: `${item.item_code || ''} - ${item.name} ${item.vat_applicable ? '(VAT)' : ''}`,
+      item_code: item.item_code,
+      name: item.name,
+      vat_applicable: item.vat_applicable
+    }));
+  }, [itemsList]);
+
+  // 🔥 MODIFY filter logic - filter by selected item
   const filteredItems = allItems.filter(item => {
-    const matchesSearch = item.item_name?.toLowerCase().includes(searchTerm.toLowerCase());
+    // Filter by selected item (item name matches selected item's name)
+    const matchesItem = !selectedItem || 
+      (item.item_name && item.item_name.toLowerCase().includes(selectedItem.name?.toLowerCase()));
+    
+    // Filter by VAT status
     const matchesVat = vatFilter === 'all' ||
       (vatFilter === 'yes' ? item.supplier_vat_registered : !item.supplier_vat_registered);
-    return matchesSearch && matchesVat;
+    
+    return matchesItem && matchesVat;
   });
 
   const downloadPDF = () => {
@@ -171,6 +190,12 @@ const PurchasingReport = () => {
       const companyName = companyFilter === '1' ? 'JH' : companyFilter === '2' ? 'RR' : 'Delights';
       doc.setFontSize(12);
       doc.text(`Company: ${companyName}`, 15, yOffset);
+      yOffset += 10;
+    }
+
+    if (selectedItem) {
+      doc.setFontSize(12);
+      doc.text(`Item: ${selectedItem.name}`, 15, yOffset);
       yOffset += 10;
     }
 
@@ -303,8 +328,8 @@ const PurchasingReport = () => {
       <div className="controls-section">
         <div className="control-group">
           <label>Start Date</label>
-          <input
-            type="date"
+          <input 
+            type="date" 
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
             max={endDate}
@@ -314,8 +339,8 @@ const PurchasingReport = () => {
 
         <div className="control-group">
           <label>End Date</label>
-          <input
-            type="date"
+          <input 
+            type="date" 
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
             min={startDate}
@@ -351,18 +376,36 @@ const PurchasingReport = () => {
           </select>
         </div>
 
-        <div className="control-group">
+        {/* 🔥 REPLACE search input with react-select dropdown */}
+        <div className="control-group search-group">
           <label>Search Item</label>
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+          <Select
+            options={itemOptions}
+            value={selectedItem}
+            onChange={setSelectedItem}
+            isSearchable
+            isClearable
             placeholder="Search by item name..."
-            className="control-input"
+            className="react-select-container"
+            classNamePrefix="react-select"
+            styles={{
+              control: (base) => ({
+                ...base,
+                minHeight: '42px',
+                borderColor: '#e9ecef',
+                borderRadius: '10px',
+                boxShadow: 'none',
+                '&:hover': {
+                  borderColor: '#adb5bd'
+                }
+              }),
+              menuPortal: (base) => ({ ...base, zIndex: 9999 })
+            }}
+            menuPortalTarget={document.body}
           />
         </div>
 
-        <button
+        <button 
           onClick={fetchPurchasingReport}
           disabled={loading}
           className="btn btn-primary"
@@ -411,7 +454,7 @@ const PurchasingReport = () => {
                 const displayBillAmount = item.item_bill_amount || item.bill_amount || 0;
                 const displayPaidAmount = item.item_paid_amount || item.paid_amount || 0;
                 const displayDueAmount = displayBillAmount - displayPaidAmount;
-
+                
                 return (
                   <tr key={`${item.invoice_no}-${index}`} className={!item.supplier_vat_registered ? 'non-vat-row' : ''}>
                     <td data-label="Date">{format(new Date(item.purchase_date), 'MMM dd, yyyy')}</td>
@@ -425,8 +468,8 @@ const PurchasingReport = () => {
                     <td data-label="Payment Method">{item.payment_method}</td>
                     <td data-label="Subtotal" className="text-right">{(item.item_subtotal || 0).toFixed(2)}</td>
                     <td data-label="VAT Amount" className={`text-right ${!item.supplier_vat_registered ? 'vat-zero' : ''}`}>
-                      {item.supplier_vat_registered && item.is_vat_applicable ?
-                        (item.item_vat_amount || 0).toFixed(2) :
+                      {item.supplier_vat_registered && item.is_vat_applicable ? 
+                        (item.item_vat_amount || 0).toFixed(2) : 
                         '0.00'}
                     </td>
                     <td data-label="Total Price" className="text-right">{(item.item_bill_amount || 0).toFixed(2)}</td>
@@ -439,15 +482,15 @@ const PurchasingReport = () => {
                 );
               })}
             </tbody>
-            <tfoot className="report-footer">
+            <tfoot>
               <tr>
-                <td colSpan="9" className="text-right"><strong>Total:</strong></td>
+                <td colSpan="9" className="text-right"><strong>Totals:</strong></td>
                 <td className="text-right"><strong>{filteredItems.reduce((sum, item) => sum + (item.item_subtotal || 0), 0).toFixed(2)}</strong></td>
-                <td className="text-right"><strong>{filteredItems.reduce((sum, item) => sum + (item.item_vat_amount || 0), 0).toFixed(2)}</strong></td>
+                <td className="text-right"><strong>{filteredItems.reduce((sum, item) => sum + (item.item_vat_amount || 0), 0).toFixed(2)}</strong></td>     
                 <td className="text-right"><strong>{filteredItems.reduce((sum, item) => sum + (item.item_bill_amount || 0), 0).toFixed(2)}</strong></td>
                 <td className="text-right"><strong>{filteredItems.reduce((sum, item) => sum + (item.bill_amount || 0), 0).toFixed(2)}</strong></td>
                 <td className="text-right"><strong>{filteredItems.reduce((sum, item) => sum + (item.item_paid_amount || 0), 0).toFixed(2)}</strong></td>
-                <td className="text-right"><strong>{filteredItems.reduce((sum, item) => sum + ((item.item_bill_amount || 0) - (item.item_paid_amount || 0)), 0).toFixed(2)}</strong></td>
+                <td className="text-right"><strong>{filteredItems.reduce((sum, item) => sum + (item.item_due_amount || 0), 0).toFixed(2)}</strong></td>
               </tr>
             </tfoot>
           </table>

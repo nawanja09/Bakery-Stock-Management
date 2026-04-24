@@ -668,6 +668,31 @@ tfoot.total-row td {
   }
 }
 
+/* For laptop screens */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .purchasing-report-container .react-select__menu {
+    position: fixed;
+    top: auto;
+    left: 16px;
+    right: 16px;
+    width: calc(100% - 32px);
+    margin: 0;
+  }
+}
+
+/* For desktop screens */
+@media (min-width: 1025px) {
+  .purchasing-report-container .react-select__menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    width: auto;
+    margin: 0;
+  }
+}
+
+/* Footer Styles */
 .report-footer {
   margin-top: 24px;
   padding-top: 16px;
