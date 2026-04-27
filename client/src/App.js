@@ -76,6 +76,7 @@ import PurchaseVATReport from './components/report/PurchaseVATReport';
 import NonPaidPurchases from './components/purchase/NonPaidPurchases';
 
 import PettyCash from './components/Expenses/PettyCash';
+import Reimbursement from './components/Expenses/Reimbursement';
 
 import './App.css';
 
