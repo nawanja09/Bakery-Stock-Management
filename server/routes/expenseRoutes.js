@@ -291,4 +291,96 @@ async function updatePettyCashBalance() {
   }
 }
 
+// GET all cheque vouchers
+router.get('/cheque/vouchers', async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT id, DATE_FORMAT(bill_date, '%Y-%m-%d') as date, 
+              voucher_number, cheque_number, payee_name, 
+              total_bill_amount as amount, is_realised
+       FROM cheque_expenses 
+       ORDER BY created_at DESC`
+    );
+    res.json(rows || []);
+  } catch (error) {
+    console.error('Error fetching cheque vouchers:', error);
+    res.json([]);
+  }
+});
+
+// GET unrealised cheques
+router.get('/cheque/unrealised', async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT id, DATE_FORMAT(bill_date, '%Y-%m-%d') as date, 
+              voucher_number, cheque_number, payee_name, 
+              total_bill_amount as amount, is_realised, realise_date
+       FROM cheque_expenses 
+       WHERE is_realised = 0
+       ORDER BY bill_date DESC`
+    );
+    res.json(rows || []);
+  } catch (error) {
+    console.error('Error fetching unrealised cheques:', error);
+    res.json([]);
+  }
+});
+
+// POST create cheque voucher
+router.post('/cheque/voucher', async (req, res) => {
+  const { 
+    bill_date, bill_number, payee_name, vat_reg_number, 
+    expense_type, without_vat_amount, vat_amount, 
+    total_bill_amount, description 
+  } = req.body;
+  const userId = req.user.id;
+
+  // Generate voucher number and cheque number
+  const voucher_number = `CHQ-${Date.now()}`;
+  const cheque_number = `CHQ-${Math.floor(Math.random() * 1000000)}`;
+
+  try {
+    const [result] = await pool.query(
+      `INSERT INTO cheque_expenses 
+       (bill_date, bill_number, payee_name, vat_reg_number, expense_type, 
+        without_vat_amount, vat_amount, total_bill_amount, description, 
+        voucher_number, cheque_number, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [bill_date, bill_number, payee_name, vat_reg_number, expense_type,
+       without_vat_amount, vat_amount, total_bill_amount, description,
+       voucher_number, cheque_number, userId]
+    );
+    
+    res.status(201).json({ 
+      id: result.insertId, 
+      message: 'Cheque expense voucher created successfully',
+      voucher_number,
+      cheque_number
+    });
+  } catch (error) {
+    console.error('Error creating cheque voucher:', error);
+    res.status(500).json({ error: 'Failed to create cheque voucher' });
+  }
+});
+
+// PUT realise cheque
+router.put('/cheque/realise/:id', async (req, res) => {
+  const { id } = req.params;
+  const { realise_date } = req.body;
+
+  try {
+    await pool.query(
+      `UPDATE cheque_expenses 
+       SET is_realised = 1, realise_date = ?
+       WHERE id = ?`,
+      [realise_date, id]
+    );
+    
+    res.json({ message: 'Cheque realised successfully' });
+  } catch (error) {
+    console.error('Error realising cheque:', error);
+    res.status(500).json({ error: 'Failed to realise cheque' });
+  }
+});
+
 module.exports = router;
