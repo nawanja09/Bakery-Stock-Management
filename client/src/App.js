@@ -77,6 +77,7 @@ import NonPaidPurchases from './components/purchase/NonPaidPurchases';
 
 import PettyCash from './components/Expenses/PettyCash';
 import Reimbursement from './components/Expenses/Reimbursement';
+import ChequeExpenses from './components/Expenses/ChequeExpenses';
 
 import './App.css';
 
@@ -184,6 +185,7 @@ function App() {
 
             <Route path="expenses/petty-cash" element={<PettyCash />} />z
             <Route path="expenses/reimbursement" element={<Reimbursement />} />
+            <Route path="expenses/cheque" element={<ChequeExpenses />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/login" replace />} />

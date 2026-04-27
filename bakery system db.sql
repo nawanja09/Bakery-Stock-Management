@@ -2190,3 +2190,41 @@ INSERT INTO `petty_cash_reimbursements`
 (`reference_number`, `reimbursement_date`, `amount`, `created_by`, `status`)
 VALUES 
 ('REF-001', CURDATE(), 5000.00, 2, 'Completed');
+
+-- =============================================
+-- Cheque Expenses Tables
+-- =============================================
+
+-- Create cheque expenses table
+CREATE TABLE IF NOT EXISTS `cheque_expenses` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `bill_date` date NOT NULL,
+  `bill_number` varchar(100) DEFAULT NULL,
+  `payee_name` varchar(255) NOT NULL,
+  `vat_reg_number` varchar(50) DEFAULT NULL,
+  `expense_type` varchar(100) NOT NULL,
+  `without_vat_amount` decimal(10,2) NOT NULL,
+  `vat_amount` decimal(10,2) DEFAULT 0.00,
+  `total_bill_amount` decimal(10,2) NOT NULL,
+  `description` text,
+  `cheque_number` varchar(50) DEFAULT NULL,
+  `voucher_number` varchar(50) DEFAULT NULL,
+  `is_realised` boolean DEFAULT FALSE,
+  `realise_date` date DEFAULT NULL,
+  `created_by` int NOT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `created_by` (`created_by`),
+  CONSTRAINT `cheque_expenses_ibfk_1` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Insert sample data
+INSERT INTO `cheque_expenses` 
+(`bill_date`, `bill_number`, `payee_name`, `expense_type`, `without_vat_amount`, `vat_amount`, `total_bill_amount`, `cheque_number`, `voucher_number`, `is_realised`, `created_by`)
+VALUES 
+('2026-03-15', 'INV-001', 'Jayawardena Agencies(Pvt) Ltd', 'Office Supplies', 216440.68, 38959.32, 255400.00, '750254', '9281', 0, 2),
+('2026-03-03', 'INV-002', 'Jayawardena Agencies(Pvt) Ltd', 'Utilities', 195000.00, 35040.00, 230040.00, '749600', '9260', 0, 2),
+('2026-03-03', 'INV-003', 'Jayawardena Agencies(Pvt) Ltd', 'Maintenance', 145762.71, 26237.29, 172000.00, '750251', '9261', 0, 2),
+('2026-02-25', 'INV-004', 'Jayawardena Agencies(Pvt) Ltd', 'Rent', 145762.71, 26237.29, 172000.00, '749598', '9258', 0, 2),
+('2026-02-23', 'INV-005', 'U.R.S.Hardware', 'Maintenance', 64343.22, 11581.78, 75925.00, '749597', '9249', 0, 2);
