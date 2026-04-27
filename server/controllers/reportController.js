@@ -575,6 +575,7 @@ const getPurchasingReport = async (req, res) => {
   const { startDate, endDate, companyId } = req.query;
 
   try {
+    // ✅ FIX: Query with payment aggregation from payment_history
     let query = `
       SELECT 
         p.id,
@@ -589,8 +590,8 @@ const getPurchasingReport = async (req, res) => {
           WHEN p.bill_amount IS NOT NULL AND p.bill_amount > 0 THEN p.bill_amount
           ELSE 0
         END AS bill_amount,
-        -- 🔥 FIX: Paid amount - ensure it's not NULL
-        COALESCE(p.paid_amount, 0) AS paid_amount,
+        -- ✅ AGGREGATED PAID AMOUNT from payment_history table
+        COALESCE(SUM(ph.amount), 0) AS paid_amount,
         p.check_number,
         c.name AS company_name,
         p.company_id,
@@ -601,8 +602,14 @@ const getPurchasingReport = async (req, res) => {
       FROM purchases p
       JOIN supplier s ON p.supplier_id = s.id
       LEFT JOIN company c ON p.company_id = c.id
+      -- ✅ LEFT JOIN to payment_history for actual payments
+      LEFT JOIN payment_history ph ON p.id = ph.purchase_id
       WHERE p.purchase_date BETWEEN ? AND ?
         AND (p.deleted = FALSE OR p.deleted IS NULL)
+      GROUP BY 
+        p.id, p.invoice_no, p.purchase_date, s.name, s.vat_number,
+        p.payment_method, p.total_with_vat, p.bill_amount, p.check_number,
+        c.name, p.company_id, p.vat_rate, p.vat_amount, p.subtotal
     `;
 
     const params = [startDate, endDate];
@@ -650,6 +657,7 @@ const getPurchasingReport = async (req, res) => {
   const { startDate, endDate, companyId } = req.query;
 
   try {
+    // ✅ FIX: Query with payment aggregation from payment_history
     let query = `
       SELECT 
         p.id,
@@ -657,14 +665,15 @@ const getPurchasingReport = async (req, res) => {
         p.purchase_date,
         s.name AS supplier_name,
         s.vat_number AS supplier_vat_number,
-        s.vat_registered AS supplier_vat_registered,  -- 🔥 ADD THIS
+        s.vat_registered AS supplier_vat_registered,
         p.payment_method,
         CASE 
           WHEN p.total_with_vat IS NOT NULL AND p.total_with_vat > 0 THEN p.total_with_vat
           WHEN p.bill_amount IS NOT NULL AND p.bill_amount > 0 THEN p.bill_amount
           ELSE 0
         END AS bill_amount,
-        COALESCE(p.paid_amount, 0) AS paid_amount,
+        -- ✅ AGGREGATED PAID AMOUNT from payment_history table
+        COALESCE(SUM(ph.amount), 0) AS paid_amount,
         p.check_number,
         c.name AS company_name,
         p.company_id,
@@ -674,8 +683,15 @@ const getPurchasingReport = async (req, res) => {
       FROM purchases p
       JOIN supplier s ON p.supplier_id = s.id
       LEFT JOIN company c ON p.company_id = c.id
+      -- ✅ LEFT JOIN to payment_history for actual payments
+      LEFT JOIN payment_history ph ON p.id = ph.purchase_id
       WHERE p.purchase_date BETWEEN ? AND ?
         AND (p.deleted = FALSE OR p.deleted IS NULL)
+      GROUP BY 
+        p.id, p.invoice_no, p.purchase_date, s.name, s.vat_number, 
+        s.vat_registered, p.payment_method, p.total_with_vat, p.bill_amount,
+        p.check_number, c.name, p.company_id, p.vat_rate, 
+        p.vat_amount, p.subtotal
     `;
 
     const params = [startDate, endDate];
@@ -695,7 +711,7 @@ const getPurchasingReport = async (req, res) => {
             i.item_code,
             COALESCE(i.name, pi.item_name) as item_name,
             i.unit,
-            i.vat_applicable  -- 🔥 ADD THIS - check if item has VAT
+            i.vat_applicable
           FROM purchase_items pi
           LEFT JOIN items i ON pi.item_id = i.id
           WHERE pi.purchase_id = ?
