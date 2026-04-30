@@ -2228,3 +2228,67 @@ VALUES
 ('2026-03-03', 'INV-003', 'Jayawardena Agencies(Pvt) Ltd', 'Maintenance', 145762.71, 26237.29, 172000.00, '750251', '9261', 0, 2),
 ('2026-02-25', 'INV-004', 'Jayawardena Agencies(Pvt) Ltd', 'Rent', 145762.71, 26237.29, 172000.00, '749598', '9258', 0, 2),
 ('2026-02-23', 'INV-005', 'U.R.S.Hardware', 'Maintenance', 64343.22, 11581.78, 75925.00, '749597', '9249', 0, 2);
+
+-- =============================================
+-- Bank Charges Table
+-- =============================================
+
+CREATE TABLE IF NOT EXISTS `bank_charges` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `charge_date` date NOT NULL,
+  `bank_name` varchar(255) NOT NULL,
+  `reference_number` varchar(100) DEFAULT NULL,
+  `charges_type` varchar(100) NOT NULL,
+  `description` text,
+  `amount` decimal(10,2) NOT NULL,
+  `created_by` int NOT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `created_by` (`created_by`),
+  CONSTRAINT `bank_charges_ibfk_1` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Insert sample data
+INSERT INTO `bank_charges` 
+(`charge_date`, `bank_name`, `reference_number`, `charges_type`, `description`, `amount`, `created_by`)
+VALUES 
+('2026-03-29', 'Sampath Bank - Current - 002110004837', 'CHQ-2026001', 'Cheque Books Charges', 'Cheque Book Charges - 50 leaves', 350.00, 2),
+('2026-03-25', 'Sampath Bank - Current - 002110004837', 'ONL-2026002', 'Online Payment Charges', 'Online bank payment charges for March', 25.00, 2),
+('2026-03-20', 'Commercial Bank - Current - 100123456789', 'ATM-2026003', 'ATM Withdrawal Charges', 'ATM withdrawal at other bank ATM', 100.00, 2),
+('2026-03-15', 'NDB Bank - Current - 200123456789', 'SVC-2026004', 'Service Charges', 'Monthly service charges', 150.00, 2),
+('2026-03-10', 'Peoples Bank - Current - 300123456789', 'ANN-2026005', 'Annual Fees', 'Credit card annual fee', 500.00, 2);
+
+-- =============================================
+-- Online Expenses Table
+-- =============================================
+
+CREATE TABLE IF NOT EXISTS `online_expenses` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `bill_date` date NOT NULL,
+  `bill_number` varchar(100) DEFAULT NULL,
+  `payee_name` varchar(255) NOT NULL,
+  `vat_reg_number` varchar(50) DEFAULT NULL,
+  `expense_type` varchar(100) NOT NULL,
+  `without_vat_amount` decimal(10,2) NOT NULL,
+  `vat_amount` decimal(10,2) DEFAULT 0.00,
+  `total_bill_amount` decimal(10,2) NOT NULL,
+  `balance` decimal(10,2) DEFAULT 0.00,
+  `description` text,
+  `created_by` int NOT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `created_by` (`created_by`),
+  CONSTRAINT `online_expenses_ibfk_1` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Insert sample data
+INSERT INTO `online_expenses` 
+(`bill_date`, `bill_number`, `payee_name`, `vat_reg_number`, `expense_type`, `without_vat_amount`, `vat_amount`, `total_bill_amount`, `balance`, `description`, `created_by`)
+VALUES 
+('2025-08-30', '4013258', 'Helans Motor Spares (PVT) LTD', NULL, 'Vehicle Maintenance', 19200.00, 0.00, 19200.00, 0.02, 'Vehicle Repair', 2),
+('2025-08-28', 'ONL-2025001', 'Google Cloud Services', '123456789', 'Cloud Services', 25000.00, 4500.00, 29500.00, 0.00, 'Cloud hosting services - August', 2),
+('2025-08-25', 'INV-89572', 'Meta Ads', '987654321', 'Online Marketing', 50000.00, 9000.00, 59000.00, 1500.00, 'Facebook & Instagram advertising', 2),
+('2025-08-20', 'SUB-202508', 'Microsoft 365', '456789123', 'Software Subscription', 15000.00, 2700.00, 17700.00, 0.00, 'Annual subscription', 2),
+('2025-08-15', 'AWS-895623', 'Amazon Web Services', '789123456', 'Cloud Services', 35000.00, 6300.00, 41300.00, 500.00, 'AWS cloud services', 2);
