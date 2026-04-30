@@ -208,9 +208,6 @@ const ChequeExpenses = () => {
           <FontAwesomeIcon icon={faMoneyCheck} className="title-icon" />
           Cheque Expenses Management
         </h1>
-        <div className="cheque-breadcrumb">
-          Dashboard / Expenses / Cheque Expenses
-        </div>
       </div>
 
       {/* Tab Navigation */}

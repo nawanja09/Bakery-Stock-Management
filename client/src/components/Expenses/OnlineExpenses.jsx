@@ -42,21 +42,12 @@ const OnlineExpenses = () => {
   });
 
   const expenseTypes = [
-    'Software Subscription',
-    'Cloud Services',
-    'Domain Hosting',
-    'Online Marketing',
-    'Social Media Ads',
-    'Email Services',
-    'Web Development',
-    'Online Training',
-    'Digital Tools',
-    'API Services',
-    'E-commerce Platform',
-    'Payment Gateway Fees',
-    'Online Storage',
-    'VPN Services',
-    'Other Online Services'
+    'Raw material',
+    'Electricity',
+    'Gas',
+    'Water',
+    'Insurance',
+    'Internet'
   ];
 
   // Calculate total amount when without_vat or vat changes

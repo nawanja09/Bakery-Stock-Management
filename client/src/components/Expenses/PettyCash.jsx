@@ -313,9 +313,6 @@ const PettyCash = () => {
           <FontAwesomeIcon icon={faMoneyBillWave} className="title-icon" />
           Petty Cash Management
         </h1>
-        <div className="expenses-breadcrumb">
-          Dashboard / Expenses / Petty Cash
-        </div>
       </div>
 
       {/* Tab Navigation */}
