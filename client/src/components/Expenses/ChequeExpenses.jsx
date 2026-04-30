@@ -83,13 +83,8 @@ const ChequeExpenses = () => {
       showPopup('error', 'Failed to load data from server');
       // Set demo data if API fails
       setChequeVouchers([
-        { id: 1, date: '2026-03-15', voucher_number: '9281', cheque_number: '750254', payee_name: 'Jayawardena Agencies(Pvt) Ltd', amount: 255400.00, is_realised: false },
-        { id: 2, date: '2026-03-03', voucher_number: '9260', cheque_number: '749600', payee_name: 'Jayawardena Agencies(Pvt) Ltd', amount: 230040.00, is_realised: false },
-        { id: 3, date: '2026-03-03', voucher_number: '9261', cheque_number: '750251', payee_name: 'Jayawardena Agencies(Pvt) Ltd', amount: 172000.00, is_realised: false },
       ]);
       setUnrealisedCheques([
-        { id: 1, date: '2026-03-15', voucher_number: '9281', cheque_number: '750254', payee_name: 'Jayawardena Agencies(Pvt) Ltd', amount: 255400.00, is_realised: false },
-        { id: 2, date: '2026-03-03', voucher_number: '9260', cheque_number: '749600', payee_name: 'Jayawardena Agencies(Pvt) Ltd', amount: 230040.00, is_realised: false },
       ]);
     } finally {
       setIsFetching(false);

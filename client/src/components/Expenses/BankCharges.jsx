@@ -1,0 +1,493 @@
+// src/components/Expenses/BankCharges.jsx
+import React, { useState, useEffect } from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { 
+  faSave, 
+  faTimes, 
+  faPlus, 
+  faEdit,
+  faTrash,
+  faSearch,
+  faPrint,
+  faFileExcel,
+  faSync,
+  faSpinner,
+  faBuildingColumns,
+  faUniversity
+} from '@fortawesome/free-solid-svg-icons';
+import './BankCharges.css';
+import { usePopup } from '../context/PopupContext';
+import api from '../../api';
+
+const BankCharges = () => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [isFetching, setIsFetching] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [bankCharges, setBankCharges] = useState([]);
+  const [editingId, setEditingId] = useState(null);
+  const { showPopup } = usePopup();
+
+  // Form State
+  const [formData, setFormData] = useState({
+    date: new Date().toISOString().split('T')[0],
+    bank_name: '',
+    reference_number: '',
+    charges_type: '',
+    description: '',
+    amount: ''
+  });
+
+  const bankOptions = [
+  ];
+
+  const chargesTypes = [
+    'Cheque Books Charges',
+    'Online Payment Charges',
+    'Bank Draft Charges',
+    'Service Charges',
+    'Annual Fees',
+    'Transaction Charges',
+    'SMS Alert Charges',
+    'ATM Withdrawal Charges',
+    'Overdraft Interest',
+    'Loan Processing Fee',
+    'Foreign Transaction Fee',
+    'Account Maintenance Fee',
+    'Statement Charges',
+    'Other Charges'
+  ];
+
+  // Fetch data on component mount
+  useEffect(() => {
+    fetchBankCharges();
+  }, []);
+
+  const fetchBankCharges = async () => {
+    setIsFetching(true);
+    try {
+      const response = await api.get('/expenses/bank-charges');
+      setBankCharges(response.data || []);
+    } catch (error) {
+      console.error('Error fetching bank charges:', error);
+      showPopup('error', 'Failed to load data from server');
+    } finally {
+      setIsFetching(false);
+    }
+  };
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    // Validation
+    if (!formData.date || !formData.bank_name || !formData.charges_type || !formData.amount) {
+      showPopup('error', 'Please fill all required fields');
+      return;
+    }
+    
+    if (parseFloat(formData.amount) <= 0) {
+      showPopup('error', 'Valid amount is required');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const payload = {
+        date: formData.date,
+        bank_name: formData.bank_name,
+        reference_number: formData.reference_number || null,
+        charges_type: formData.charges_type,
+        description: formData.description || null,
+        amount: parseFloat(formData.amount)
+      };
+
+      const response = await api.post('/expenses/bank-charges', payload);
+      
+      if (response.status === 201 || response.status === 200) {
+        showPopup('success', 'Bank charge recorded successfully!');
+        
+        // Reset form
+        setFormData({
+          date: new Date().toISOString().split('T')[0],
+          bank_name: '',
+          reference_number: '',
+          charges_type: '',
+          description: '',
+          amount: ''
+        });
+        
+        // Refresh data
+        await fetchBankCharges();
+      }
+    } catch (error) {
+      console.error('Error creating bank charge:', error);
+      showPopup('error', error.response?.data?.error || 'Failed to record bank charge');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleEdit = (charge) => {
+    setEditingId(charge.id);
+    setFormData({
+      date: charge.date,
+      bank_name: charge.bank_name,
+      reference_number: charge.reference_number || '',
+      charges_type: charge.charges_type,
+      description: charge.description || '',
+      amount: charge.amount.toString()
+    });
+    // Scroll to form
+    document.querySelector('.form-card')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleUpdate = async (e) => {
+    e.preventDefault();
+    
+    if (!formData.date || !formData.bank_name || !formData.charges_type || !formData.amount) {
+      showPopup('error', 'Please fill all required fields');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const payload = {
+        date: formData.date,
+        bank_name: formData.bank_name,
+        reference_number: formData.reference_number || null,
+        charges_type: formData.charges_type,
+        description: formData.description || null,
+        amount: parseFloat(formData.amount)
+      };
+
+      const response = await api.put(`/expenses/bank-charges/${editingId}`, payload);
+      
+      if (response.status === 200) {
+        showPopup('success', 'Bank charge updated successfully!');
+        
+        // Reset form and editing state
+        setFormData({
+          date: new Date().toISOString().split('T')[0],
+          bank_name: '',
+          reference_number: '',
+          charges_type: '',
+          description: '',
+          amount: ''
+        });
+        setEditingId(null);
+        
+        // Refresh data
+        await fetchBankCharges();
+      }
+    } catch (error) {
+      console.error('Error updating bank charge:', error);
+      showPopup('error', error.response?.data?.error || 'Failed to update bank charge');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (window.confirm('Are you sure you want to delete this bank charge?')) {
+      setIsLoading(true);
+      try {
+        const response = await api.delete(`/expenses/bank-charges/${id}`);
+        
+        if (response.status === 200) {
+          showPopup('success', 'Bank charge deleted successfully!');
+          await fetchBankCharges();
+        }
+      } catch (error) {
+        console.error('Error deleting bank charge:', error);
+        showPopup('error', error.response?.data?.error || 'Failed to delete bank charge');
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setFormData({
+      date: new Date().toISOString().split('T')[0],
+      bank_name: '',
+      reference_number: '',
+      charges_type: '',
+      description: '',
+      amount: ''
+    });
+  };
+
+  const formatCurrency = (amount) => {
+    if (!amount && amount !== 0) return 'LKR 0.00';
+    return new Intl.NumberFormat('en-LK', {
+      style: 'currency',
+      currency: 'LKR',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(amount);
+  };
+
+  const filteredCharges = bankCharges.filter(charge =>
+    charge.bank_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    charge.reference_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    charge.charges_type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    charge.description?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  return (
+    <div className="bank-charges-container">
+      <div className="bank-header">
+        <h1 className="bank-title">
+          <FontAwesomeIcon icon={faBuildingColumns} className="title-icon" />
+          Bank Charges Management
+        </h1>
+      </div>
+
+      {/* New Bank Charge Form */}
+      <div className="form-card">
+        <h3 className="form-title">
+          <FontAwesomeIcon icon={editingId ? faEdit : faPlus} />
+          {editingId ? 'Edit Bank Charge' : 'New Bank Charge'}
+        </h3>
+        
+        <form onSubmit={editingId ? handleUpdate : handleSubmit} className="bank-form">
+          <div className="form-row">
+            <div className="form-group">
+              <label>Date <span className="required">*</span></label>
+              <input
+                type="date"
+                name="date"
+                value={formData.date}
+                onChange={handleChange}
+                required
+                className="form-input"
+              />
+            </div>
+            
+            <div className="form-group">
+              <label>Bank <span className="required">*</span></label>
+              <select
+                name="bank_name"
+                value={formData.bank_name}
+                onChange={handleChange}
+                required
+                className="form-select"
+              >
+                <option value="">Select Bank</option>
+                {bankOptions.map(bank => (
+                  <option key={bank} value={bank}>{bank}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label>Reference Number</label>
+              <input
+                type="text"
+                name="reference_number"
+                value={formData.reference_number}
+                onChange={handleChange}
+                className="form-input"
+                placeholder="Enter reference number (optional)"
+              />
+            </div>
+            
+            <div className="form-group">
+              <label>Charges Type <span className="required">*</span></label>
+              <select
+                name="charges_type"
+                value={formData.charges_type}
+                onChange={handleChange}
+                required
+                className="form-select"
+              >
+                <option value="">Select Charges Type</option>
+                {chargesTypes.map(type => (
+                  <option key={type} value={type}>{type}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="form-group full-width">
+            <label>Description</label>
+            <textarea
+              name="description"
+              value={formData.description}
+              onChange={handleChange}
+              className="form-textarea"
+              rows="2"
+              placeholder="Enter description (optional)"
+            />
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label>Amount (LKR) <span className="required">*</span></label>
+              <input
+                type="number"
+                name="amount"
+                value={formData.amount}
+                onChange={handleChange}
+                required
+                min="0.01"
+                step="0.01"
+                className="form-input amount-input"
+                placeholder="0.00"
+              />
+            </div>
+          </div>
+
+          <div className="form-actions">
+            {editingId && (
+              <button 
+                type="button" 
+                onClick={handleCancelEdit}
+                className="btn-secondary"
+              >
+                <FontAwesomeIcon icon={faTimes} />
+                Cancel
+              </button>
+            )}
+            <button 
+              type="button" 
+              onClick={() => {
+                setFormData({
+                  date: new Date().toISOString().split('T')[0],
+                  bank_name: '',
+                  reference_number: '',
+                  charges_type: '',
+                  description: '',
+                  amount: ''
+                });
+                if (editingId) setEditingId(null);
+              }}
+              className="btn-secondary"
+              disabled={isLoading}
+            >
+              <FontAwesomeIcon icon={faTimes} />
+              Clear
+            </button>
+            <button 
+              type="submit" 
+              className="btn-primary"
+              disabled={isLoading}
+            >
+              <FontAwesomeIcon icon={isLoading ? faSpinner : faSave} spin={isLoading} />
+              {isLoading ? 'Processing...' : (editingId ? 'Update Charge' : 'Submit')}
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* Bank Charge Details Table */}
+      <div className="table-section">
+        <div className="table-header">
+          <h3 className="table-title">
+            <FontAwesomeIcon icon={faUniversity} />
+            Bank Charge Details
+          </h3>
+          <div className="table-actions">
+            <div className="search-box">
+              <FontAwesomeIcon icon={faSearch} className="search-icon" />
+              <input
+                type="text"
+                placeholder="Search by bank, reference, charges type..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="search-input"
+              />
+              {searchTerm && (
+                <button 
+                  className="clear-search"
+                  onClick={() => setSearchTerm('')}
+                >
+                  ×
+                </button>
+              )}
+            </div>
+            <button 
+              onClick={fetchBankCharges} 
+              className="refresh-btn"
+              disabled={isFetching}
+            >
+              <FontAwesomeIcon icon={isFetching ? faSpinner : faSync} spin={isFetching} />
+              Refresh
+            </button>
+            <button className="action-icon-btn" title="Print">
+              <FontAwesomeIcon icon={faPrint} />
+            </button>
+            <button className="action-icon-btn" title="Export to Excel">
+              <FontAwesomeIcon icon={faFileExcel} />
+            </button>
+          </div>
+        </div>
+
+        <div className="table-container">
+          <table className="bank-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Bank Name</th>
+                <th>Reference Number</th>
+                <th>Charges Type</th>
+                <th>Description</th>
+                <th>Amount (LKR)</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isFetching ? (
+                <tr>
+                  <td colSpan="7" className="loading-row">
+                    <FontAwesomeIcon icon={faSpinner} spin /> Loading bank charges...
+                  </td>
+                </tr>
+              ) : filteredCharges.length > 0 ? (
+                filteredCharges.map(charge => (
+                  <tr key={charge.id}>
+                    <td className="date-cell">{charge.date}</td>
+                    <td className="bank-cell">{charge.bank_name}</td>
+                    <td className="reference-cell">{charge.reference_number || '-'}</td>
+                    <td>{charge.charges_type}</td>
+                    <td className="description-cell">{charge.description || '-'}</td>
+                    <td className="amount-cell">{formatCurrency(charge.amount)}</td>
+                    <td className="action-cell">
+                      <button
+                        onClick={() => handleEdit(charge)}
+                        className="edit-btn"
+                        title="Edit"
+                      >
+                        <FontAwesomeIcon icon={faEdit} />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(charge.id)}
+                        className="delete-btn"
+                        title="Delete"
+                      >
+                        <FontAwesomeIcon icon={faTrash} />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="7" className="empty-row">No bank charges found</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default BankCharges;

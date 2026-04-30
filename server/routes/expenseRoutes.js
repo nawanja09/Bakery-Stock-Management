@@ -383,4 +383,201 @@ router.put('/cheque/realise/:id', async (req, res) => {
   }
 });
 
+// GET all bank charges
+router.get('/bank-charges', async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT id, DATE_FORMAT(charge_date, '%Y-%m-%d') as date, 
+              bank_name, reference_number, charges_type, description, amount
+       FROM bank_charges 
+       ORDER BY charge_date DESC, created_at DESC`
+    );
+    res.json(rows || []);
+  } catch (error) {
+    console.error('Error fetching bank charges:', error);
+    res.json([]);
+  }
+});
+
+// POST create bank charge
+router.post('/bank-charges', async (req, res) => {
+  const { date, bank_name, reference_number, charges_type, description, amount } = req.body;
+  const userId = req.user.id;
+
+  // Validation
+  if (!date || !bank_name || !charges_type || !amount) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  try {
+    const [result] = await pool.query(
+      `INSERT INTO bank_charges 
+       (charge_date, bank_name, reference_number, charges_type, description, amount, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [date, bank_name, reference_number || null, charges_type, description || null, amount, userId]
+    );
+    
+    res.status(201).json({ 
+      id: result.insertId, 
+      message: 'Bank charge recorded successfully' 
+    });
+  } catch (error) {
+    console.error('Error creating bank charge:', error);
+    res.status(500).json({ error: 'Failed to record bank charge' });
+  }
+});
+
+// PUT update bank charge
+router.put('/bank-charges/:id', async (req, res) => {
+  const { id } = req.params;
+  const { date, bank_name, reference_number, charges_type, description, amount } = req.body;
+
+  try {
+    const [result] = await pool.query(
+      `UPDATE bank_charges 
+       SET charge_date = ?, bank_name = ?, reference_number = ?, 
+           charges_type = ?, description = ?, amount = ?
+       WHERE id = ?`,
+      [date, bank_name, reference_number || null, charges_type, description || null, amount, id]
+    );
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Bank charge not found' });
+    }
+    
+    res.json({ message: 'Bank charge updated successfully' });
+  } catch (error) {
+    console.error('Error updating bank charge:', error);
+    res.status(500).json({ error: 'Failed to update bank charge' });
+  }
+});
+
+// DELETE bank charge
+router.delete('/bank-charges/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const [result] = await pool.query(
+      'DELETE FROM bank_charges WHERE id = ?',
+      [id]
+    );
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Bank charge not found' });
+    }
+    
+    res.json({ message: 'Bank charge deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting bank charge:', error);
+    res.status(500).json({ error: 'Failed to delete bank charge' });
+  }
+});
+
+// Add these to your existing expenseRoutes.js
+
+// GET all online expenses
+router.get('/online', async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT id, DATE_FORMAT(bill_date, '%Y-%m-%d') as bill_date, 
+              bill_number, payee_name, vat_reg_number, expense_type,
+              without_vat_amount, vat_amount, total_bill_amount, 
+              balance, description
+       FROM online_expenses 
+       ORDER BY bill_date DESC, created_at DESC`
+    );
+    res.json(rows || []);
+  } catch (error) {
+    console.error('Error fetching online expenses:', error);
+    res.json([]);
+  }
+});
+
+// POST create online expense
+router.post('/online', async (req, res) => {
+  const { 
+    bill_date, bill_number, payee_name, vat_reg_number, 
+    expense_type, without_vat_amount, vat_amount, 
+    total_bill_amount, description 
+  } = req.body;
+  const userId = req.user.id;
+
+  // Validation
+  if (!bill_date || !payee_name || !expense_type || !without_vat_amount) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  try {
+    const [result] = await pool.query(
+      `INSERT INTO online_expenses 
+       (bill_date, bill_number, payee_name, vat_reg_number, expense_type, 
+        without_vat_amount, vat_amount, total_bill_amount, balance, description, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+      [bill_date, bill_number || null, payee_name, vat_reg_number || null, expense_type,
+       without_vat_amount, vat_amount || 0, total_bill_amount, description || null, userId]
+    );
+    
+    res.status(201).json({ 
+      id: result.insertId, 
+      message: 'Online expense recorded successfully' 
+    });
+  } catch (error) {
+    console.error('Error creating online expense:', error);
+    res.status(500).json({ error: 'Failed to record online expense' });
+  }
+});
+
+// PUT update online expense
+router.put('/online/:id', async (req, res) => {
+  const { id } = req.params;
+  const { 
+    bill_date, bill_number, payee_name, vat_reg_number, 
+    expense_type, without_vat_amount, vat_amount, 
+    total_bill_amount, description 
+  } = req.body;
+
+  try {
+    const [result] = await pool.query(
+      `UPDATE online_expenses 
+       SET bill_date = ?, bill_number = ?, payee_name = ?, 
+           vat_reg_number = ?, expense_type = ?, without_vat_amount = ?,
+           vat_amount = ?, total_bill_amount = ?, description = ?
+       WHERE id = ?`,
+      [bill_date, bill_number || null, payee_name, vat_reg_number || null, 
+       expense_type, without_vat_amount, vat_amount || 0, total_bill_amount, 
+       description || null, id]
+    );
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Online expense not found' });
+    }
+    
+    res.json({ message: 'Online expense updated successfully' });
+  } catch (error) {
+    console.error('Error updating online expense:', error);
+    res.status(500).json({ error: 'Failed to update online expense' });
+  }
+});
+
+// DELETE online expense
+router.delete('/online/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const [result] = await pool.query(
+      'DELETE FROM online_expenses WHERE id = ?',
+      [id]
+    );
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Online expense not found' });
+    }
+    
+    res.json({ message: 'Online expense deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting online expense:', error);
+    res.status(500).json({ error: 'Failed to delete online expense' });
+  }
+});
+
 module.exports = router;
