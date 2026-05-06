@@ -92,6 +92,53 @@ exports.getDashboardStats = async (req, res) => {
 };
 
 // ==========================
+// General Stats Endpoint
+// ==========================
+exports.getGeneralStats = async (req, res) => {
+  try {
+    console.log("Fetching general stats...");
+
+    // Get counts from various tables
+    // Using try-catch for each to handle cases where tables might not exist or be empty
+    
+    let users = 0;
+    try {
+      const [rows] = await pool.query('SELECT COUNT(*) AS count FROM users');
+      users = rows[0].count;
+    } catch (e) { console.warn('Users query failed'); }
+
+    let orders = 0;
+    try {
+      const [rows] = await pool.query('SELECT COUNT(*) AS count FROM finished_goods_sales');
+      orders = rows[0].count;
+    } catch (e) { console.warn('Sales query failed'); }
+
+    let revenue = 0;
+    try {
+      const [rows] = await pool.query('SELECT SUM(total_value) AS total FROM finished_goods_sale_items');
+      revenue = rows[0].total || 0;
+    } catch (e) { console.warn('Revenue query failed'); }
+
+    let products = 0;
+    try {
+      const [rows] = await pool.query('SELECT COUNT(*) AS count FROM finished_goods_items');
+      products = rows[0].count;
+    } catch (e) { console.warn('Products query failed'); }
+
+    res.json({
+      users,
+      orders,
+      revenue,
+      products
+    });
+
+  } catch (error) {
+    console.error("Error in getGeneralStats:", error);
+    res.status(500).json({ error: 'Server error', details: error.message });
+  }
+};
+
+// ==========================
 // Chart Data Endpoint
 // ==========================
 exports.getChartData = async (req, res) => {

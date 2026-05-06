@@ -1,27 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import ChartStats from './ChartStats';
+import StatsDashboard from './StatsDashboard';
 import './Dashboard.css';
 import icon from '../images/icon.jpeg';
 import api from '../api';
 
 const Dashboard = () => {
-  const [stats, setStats] = useState({
-    openingBalance: 0,
-    purchasing: 0,
-    issues: 0,
-    wastage: 0
-  });
-  
   const [chartData, setChartData] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch stats
-        const statsResponse = await api.get('/dashboard/stats');
-        setStats(statsResponse.data);
-
         // Fetch chart data
         const chartsResponse = await api.get('/dashboard/charts');
         setChartData(chartsResponse.data);
@@ -59,43 +49,8 @@ const Dashboard = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="stats-container">
-        <div className="stat-card balance-card">
-          <div className="stat-header">
-            <div className="stat-icon">&#128176;</div>
-            <div className="stat-title">Opening Balance</div>
-          </div>
-          <div className="stat-value">Rs. {stats.openingBalance.toLocaleString()}</div>
-          <div className="stat-change positive"></div>
-        </div>
-
-        <div className="stat-card purchasing-card">
-          <div className="stat-header">
-            <div className="stat-icon">&#128722;</div>
-            <div className="stat-title">Purchasing</div>
-          </div>
-          <div className="stat-value">{stats.purchasing.toLocaleString()}</div>
-          <div className="stat-change positive"></div>
-        </div>
-
-        <div className="stat-card issues-card">
-          <div className="stat-header">
-            <div className="stat-icon">&#9888;</div>
-            <div className="stat-title">Issues</div>
-          </div>
-          <div className="stat-value">{stats.issues.toLocaleString()}</div>
-          <div className="stat-change neutral"></div>
-        </div>
-
-        <div className="stat-card wastage-card">
-          <div className="stat-header">
-            <div className="stat-icon">&#128200;</div>
-            <div className="stat-title">Wastage</div>
-          </div>
-          <div className="stat-value">{stats.wastage.toLocaleString()}</div>
-          <div className="stat-change positive"></div>
-        </div>
-      </div>
+      {/* Premium Stats Dashboard Component */}
+      <StatsDashboard />
 
       {/* Chart Stats Section */}       
       {chartData && <ChartStats chartData={chartData} />}
