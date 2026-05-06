@@ -14,6 +14,7 @@ const issuanceRoutes = require('./routes/issuanceRoutes');
 const wastageRoutes = require('./routes/wastageRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
+const dashboardController = require('./controllers/dashboardController');
 const userRoutes = require('./routes/userRoutes');
 
 const finishedGoodsItemsRouter = require('./routes/finishedGoodsItems');
@@ -84,6 +85,7 @@ app.use('/api/issuances', issuanceRoutes);
 app.use('/api/wastages', wastageRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.get('/api/stats', dashboardController.getGeneralStats);
 app.use('/api/users', userRoutes);
 
 app.use('/api/finished-goods-items', finishedGoodsItemsRouter);
