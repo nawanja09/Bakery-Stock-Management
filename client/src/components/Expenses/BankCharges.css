@@ -447,3 +447,89 @@
     justify-content: center;
   }
 }
+
+/* Custom Select Styles */
+.custom-select-container {
+  position: relative;
+  width: 100%;
+}
+
+.custom-select-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  background: white;
+  cursor: pointer;
+  position: relative;
+}
+
+.custom-select-input {
+  flex: 1;
+  padding: 10px 12px;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 14px;
+}
+
+.dropdown-icon {
+  padding: 0 12px;
+  color: #6c757d;
+  font-size: 12px;
+}
+
+.custom-select-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  max-height: 250px;
+  overflow-y: auto;
+  background: white;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  margin-top: 4px;
+}
+
+.dropdown-item {
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+  font-size: 14px;
+}
+
+.dropdown-item:hover {
+  background: #f8f9fa;
+}
+
+.dropdown-loading,
+.dropdown-empty {
+  padding: 20px;
+  text-align: center;
+  color: #6c757d;
+  font-size: 14px;
+}
+
+.add-bank-link {
+  background: none;
+  border: none;
+  color: #6d22e6;
+  cursor: pointer;
+  font-size: 14px;
+  text-decoration: underline;
+}
+
+.add-bank-link:hover {
+  color: #8b4df2;
+}
+
+.selected-bank-info {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: #28a745;
+}

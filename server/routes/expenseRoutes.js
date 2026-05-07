@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
+const authenticate = require('../middleware/authenticate');
 
 // =============================================
 // GET Petty Cash Balance
@@ -149,7 +150,7 @@ router.get('/petty-cash/reimbursements', async (req, res) => {
 // =============================================
 // POST Create Voucher
 // =============================================
-router.post('/petty-cash/voucher', async (req, res) => {
+router.post('/petty-cash/voucher', authenticate, async (req, res) => {
   const { 
     voucher_number, 
     voucher_date, 
@@ -162,7 +163,7 @@ router.post('/petty-cash/voucher', async (req, res) => {
     receipt_no
   } = req.body;
   
-  const userId = req.user.id;
+  const userId = req.user.userId;
 
   // Validation
   if (!voucher_number || !voucher_date || !payee_name || !expense_type || !amount) {
@@ -209,7 +210,7 @@ router.post('/petty-cash/voucher', async (req, res) => {
 // =============================================
 // PUT Update Voucher
 // =============================================
-router.put('/petty-cash/voucher/:id', async (req, res) => {
+router.put('/petty-cash/voucher/:id', authenticate, async (req, res) => {
   const { id } = req.params;
   const { 
     voucher_date, 
@@ -222,7 +223,7 @@ router.put('/petty-cash/voucher/:id', async (req, res) => {
     receipt_no
   } = req.body;
   
-  const userId = req.user.id;
+  const userId = req.user.userId;
 
   // Validation
   if (!voucher_date || !payee_name || !expense_type || !amount) {
@@ -267,9 +268,9 @@ router.put('/petty-cash/voucher/:id', async (req, res) => {
 // =============================================
 // POST Create Reimbursement
 // =============================================
-router.post('/petty-cash/reimbursement', async (req, res) => {
+router.post('/petty-cash/reimbursement', authenticate, async (req, res) => {
   const { reference_number, reimbursement_date, amount } = req.body;
-  const userId = req.user.id;
+  const userId = req.user.userId;
 
   // Validation
   if (!reference_number || !reimbursement_date || !amount) {
@@ -387,13 +388,13 @@ router.get('/cheque/unrealised', async (req, res) => {
 });
 
 // POST create cheque voucher
-router.post('/cheque/voucher', async (req, res) => {
+router.post('/cheque/voucher', authenticate, async (req, res) => {
   const { 
     bill_date, bill_number, payee_name, vat_reg_number, 
     expense_type, without_vat_amount, vat_amount, 
     total_bill_amount, description 
   } = req.body;
-  const userId = req.user.id;
+  const userId = req.user.userId;
 
   // Generate voucher number and cheque number
   const voucher_number = `CHQ-${Date.now()}`;
@@ -460,9 +461,9 @@ router.get('/bank-charges', async (req, res) => {
 });
 
 // POST create bank charge
-router.post('/bank-charges', async (req, res) => {
+router.post('/bank-charges', authenticate, async (req, res) => {
   const { date, bank_name, reference_number, charges_type, description, amount } = req.body;
-  const userId = req.user.id;
+  const userId = req.user.userId;
 
   // Validation
   if (!date || !bank_name || !charges_type || !amount) {
@@ -554,13 +555,13 @@ router.get('/online', async (req, res) => {
 });
 
 // POST create online expense
-router.post('/online', async (req, res) => {
+router.post('/online', authenticate, async (req, res) => {
   const { 
     bill_date, bill_number, payee_name, vat_reg_number, 
     expense_type, without_vat_amount, vat_amount, 
     total_bill_amount, description 
   } = req.body;
-  const userId = req.user.id;
+  const userId = req.user.userId;
 
   // Validation
   if (!bill_date || !payee_name || !expense_type || !without_vat_amount) {
@@ -637,6 +638,204 @@ router.delete('/online/:id', async (req, res) => {
   } catch (error) {
     console.error('Error deleting online expense:', error);
     res.status(500).json({ error: 'Failed to delete online expense' });
+  }
+});
+
+// =============================================
+// BANK DETAILS API ENDPOINTS
+// =============================================
+
+// GET all banks (for dropdown) - active only
+router.get('/banks', async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT id, bank_name 
+       FROM bank_details 
+       ORDER BY bank_name ASC`
+    );
+    res.json(rows || []);
+  } catch (error) {
+    console.error('Error fetching banks:', error);
+    res.status(500).json({ error: 'Failed to fetch banks' });
+  }
+});
+
+// GET all banks including inactive (for Bank Details management page)
+router.get('/banks/all', async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT id, bank_name, account_number, branch_name, account_type,
+              currency, opening_balance, current_balance,
+              contact_person, contact_phone, contact_email,
+              notes, status
+       FROM bank_details 
+       ORDER BY bank_name ASC`
+    );
+    res.json(rows || []);
+  } catch (error) {
+    console.error('Error fetching all banks:', error);
+    res.status(500).json({ error: 'Failed to fetch banks' });
+  }
+});
+
+// GET single bank by ID
+router.get('/banks/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [rows] = await pool.query(
+      'SELECT * FROM bank_details WHERE id = ?',
+      [id]
+    );
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Bank not found' });
+    }
+    
+    res.json(rows[0]);
+  } catch (error) {
+    console.error('Error fetching bank:', error);
+    res.status(500).json({ error: 'Failed to fetch bank' });
+  }
+});
+
+// POST create new bank
+router.post('/banks', authenticate, async (req, res) => {
+  const {
+    bank_name,
+    account_number,
+    branch_name,
+    account_type,
+    currency,
+    opening_balance,
+    current_balance,
+    contact_person,
+    contact_phone,
+    contact_email,
+    notes
+  } = req.body;
+  
+  const userId = req.user.userId;
+
+  // Validation
+  if (!bank_name) {
+    return res.status(400).json({ error: 'Bank name is required' });
+  }
+
+  try {
+    const [result] = await pool.query(
+      `INSERT INTO bank_details 
+       (bank_name, account_number, branch_name, account_type, currency, 
+        opening_balance, current_balance, contact_person, contact_phone, 
+        contact_email, notes, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        bank_name,
+        account_number || null,
+        branch_name || null,
+        account_type || 'Current',
+        currency || 'LKR',
+        opening_balance || 0,
+        current_balance || opening_balance || 0,
+        contact_person || null,
+        contact_phone || null,
+        contact_email || null,
+        notes || null,
+        userId
+      ]
+    );
+    
+    res.status(201).json({ 
+      id: result.insertId, 
+      message: 'Bank added successfully' 
+    });
+  } catch (error) {
+    console.error('Error creating bank:', error);
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({ error: 'Bank name already exists' });
+    }
+    res.status(500).json({ error: 'Failed to add bank' });
+  }
+});
+
+// PUT update bank
+router.put('/banks/:id', authenticate, async (req, res) => {
+  const { id } = req.params;
+  const {
+    bank_name,
+    account_number,
+    branch_name,
+    account_type,
+    currency,
+    opening_balance,
+    current_balance,
+    contact_person,
+    contact_phone,
+    contact_email,
+    notes,
+    status
+  } = req.body;
+
+  if (!bank_name) {
+    return res.status(400).json({ error: 'Bank name is required' });
+  }
+
+  try {
+    const [result] = await pool.query(
+      `UPDATE bank_details 
+       SET bank_name = ?, account_number = ?, branch_name = ?, 
+           account_type = ?, currency = ?, opening_balance = ?, 
+           current_balance = ?, contact_person = ?, contact_phone = ?, 
+           contact_email = ?, notes = ?, status = ?
+       WHERE id = ?`,
+      [
+        bank_name,
+        account_number || null,
+        branch_name || null,
+        account_type || 'Current',
+        currency || 'LKR',
+        opening_balance || 0,
+        current_balance || 0,
+        contact_person || null,
+        contact_phone || null,
+        contact_email || null,
+        notes || null,
+        status || 'Active',
+        id
+      ]
+    );
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Bank not found' });
+    }
+    
+    res.json({ message: 'Bank updated successfully' });
+  } catch (error) {
+    console.error('Error updating bank:', error);
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({ error: 'Bank name already exists' });
+    }
+    res.status(500).json({ error: 'Failed to update bank' });
+  }
+});
+
+// DELETE bank (soft delete by setting status to Inactive)
+router.delete('/banks/:id', authenticate, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const [result] = await pool.query(
+      'UPDATE bank_details SET status = "Inactive" WHERE id = ?',
+      [id]
+    );
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Bank not found' });
+    }
+    
+    res.json({ message: 'Bank deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting bank:', error);
+    res.status(500).json({ error: 'Failed to delete bank' });
   }
 });
 

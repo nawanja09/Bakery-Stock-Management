@@ -36,7 +36,8 @@ import {
   faCashRegister,
   faMoneyCheck,
   faUniversity,
-  faWifi
+  faWifi,
+  faBuildingColumns
 } from '@fortawesome/free-solid-svg-icons';
 import bakeryLogo from '../images/icon.jpeg';
 import './NavigationBar.css';
@@ -620,6 +621,13 @@ const NavigationBar = () => {
                   <NavLink to="/expenses/online" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
                     <span className="icon-container"><FontAwesomeIcon icon={faWifi} /></span>
                     <span>Online Expenses</span>
+                  </NavLink>
+                </li>
+                {/* Bank Details */}
+                <li>
+                  <NavLink to="/expenses/bank-details" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                    <span className="icon-container"><FontAwesomeIcon icon={faBuildingColumns} /></span>
+                    <span>Bank Details</span>
                   </NavLink>
                 </li>
               </ul>

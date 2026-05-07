@@ -1,5 +1,6 @@
 // src/components/Expenses/BankCharges.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faSave, 
@@ -13,7 +14,9 @@ import {
   faSync,
   faSpinner,
   faBuildingColumns,
-  faUniversity
+  faUniversity,
+  faChevronDown,
+  faChevronUp
 } from '@fortawesome/free-solid-svg-icons';
 import './BankCharges.css';
 import { usePopup } from '../context/PopupContext';
@@ -22,10 +25,16 @@ import api from '../../api';
 const BankCharges = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
+  const [isFetchingBanks, setIsFetchingBanks] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [bankSearchTerm, setBankSearchTerm] = useState('');
   const [bankCharges, setBankCharges] = useState([]);
+  const [banks, setBanks] = useState([]);
+  const [filteredBanks, setFilteredBanks] = useState([]);
   const [editingId, setEditingId] = useState(null);
+  const [isBankDropdownOpen, setIsBankDropdownOpen] = useState(false);
   const { showPopup } = usePopup();
+  const navigate = useNavigate();
 
   // Form State
   const [formData, setFormData] = useState({
@@ -36,9 +45,6 @@ const BankCharges = () => {
     description: '',
     amount: ''
   });
-
-  const bankOptions = [
-  ];
 
   const chargesTypes = [
     'Cheque Books Charges',
@@ -57,10 +63,42 @@ const BankCharges = () => {
     'Other Charges'
   ];
 
-  // Fetch data on component mount
+  // Fetch banks on component mount
+  useEffect(() => {
+    fetchBanks();
+  }, []);
+
+  // Fetch bank charges on component mount
   useEffect(() => {
     fetchBankCharges();
   }, []);
+
+  // Filter banks based on search term
+  useEffect(() => {
+    if (bankSearchTerm.trim() === '') {
+      setFilteredBanks(banks);
+    } else {
+      const filtered = banks.filter(bank =>
+        bank.bank_name.toLowerCase().includes(bankSearchTerm.toLowerCase())
+      );
+      setFilteredBanks(filtered);
+    }
+  }, [bankSearchTerm, banks]);
+
+  const fetchBanks = async () => {
+    setIsFetchingBanks(true);
+    try {
+      const response = await api.get('/expenses/banks');
+      const banksData = response.data || [];
+      setBanks(banksData);
+      setFilteredBanks(banksData);
+    } catch (error) {
+      console.error('Error fetching banks:', error);
+      showPopup('error', 'Failed to load banks from server');
+    } finally {
+      setIsFetchingBanks(false);
+    }
+  };
 
   const fetchBankCharges = async () => {
     setIsFetching(true);
@@ -78,6 +116,12 @@ const BankCharges = () => {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleBankSelect = (bankName) => {
+    setFormData(prev => ({ ...prev, bank_name: bankName }));
+    setBankSearchTerm('');
+    setIsBankDropdownOpen(false);
   };
 
   const handleSubmit = async (e) => {
@@ -119,6 +163,7 @@ const BankCharges = () => {
           description: '',
           amount: ''
         });
+        setBankSearchTerm('');
         
         // Refresh data
         await fetchBankCharges();
@@ -141,6 +186,7 @@ const BankCharges = () => {
       description: charge.description || '',
       amount: charge.amount.toString()
     });
+    setBankSearchTerm(charge.bank_name);
     // Scroll to form
     document.querySelector('.form-card')?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -178,6 +224,7 @@ const BankCharges = () => {
           description: '',
           amount: ''
         });
+        setBankSearchTerm('');
         setEditingId(null);
         
         // Refresh data
@@ -220,6 +267,7 @@ const BankCharges = () => {
       description: '',
       amount: ''
     });
+    setBankSearchTerm('');
   };
 
   const formatCurrency = (amount) => {
@@ -271,18 +319,71 @@ const BankCharges = () => {
             
             <div className="form-group">
               <label>Bank <span className="required">*</span></label>
-              <select
-                name="bank_name"
-                value={formData.bank_name}
-                onChange={handleChange}
-                required
-                className="form-select"
-              >
-                <option value="">Select Bank</option>
-                {bankOptions.map(bank => (
-                  <option key={bank} value={bank}>{bank}</option>
-                ))}
-              </select>
+              <div className="custom-select-container">
+                <div 
+                  className="custom-select-trigger"
+                  onClick={() => setIsBankDropdownOpen(!isBankDropdownOpen)}
+                >
+                  <input
+                    type="text"
+                    placeholder="Search or select bank..."
+                    value={bankSearchTerm}
+                    onChange={(e) => {
+                      setBankSearchTerm(e.target.value);
+                      setIsBankDropdownOpen(true);
+                    }}
+                    onFocus={() => setIsBankDropdownOpen(true)}
+                    className="custom-select-input"
+                    autoComplete="off"
+                  />
+                  <FontAwesomeIcon 
+                    icon={isBankDropdownOpen ? faChevronUp : faChevronDown} 
+                    className="dropdown-icon"
+                  />
+                </div>
+                
+                {isBankDropdownOpen && (
+                  <div className="custom-select-dropdown">
+                    {isFetchingBanks ? (
+                      <div className="dropdown-loading">
+                        <FontAwesomeIcon icon={faSpinner} spin /> Loading banks...
+                      </div>
+                    ) : filteredBanks.length > 0 ? (
+                      filteredBanks.map(bank => (
+                        <div
+                          key={bank.id}
+                          className="dropdown-item"
+                          onClick={() => handleBankSelect(bank.bank_name)}
+                        >
+                          {bank.bank_name}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="dropdown-empty">
+                        {banks.length === 0 ? (
+                          <>
+                            <span>No banks available. </span>
+                            <button 
+                              type="button"
+                              className="add-bank-link"
+                              onClick={() => navigate('/expenses/bank-details')}
+                            >
+                              Add bank details first?
+                            </button>
+                          </>
+                        ) : (
+                          'No matching banks found'
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+              {formData.bank_name && (
+                <small className="selected-bank-info">
+                  Selected: <strong>{formData.bank_name}</strong>
+                </small>
+              )}
             </div>
           </div>
 
@@ -367,6 +468,7 @@ const BankCharges = () => {
                   description: '',
                   amount: ''
                 });
+                setBankSearchTerm('');
                 if (editingId) setEditingId(null);
               }}
               className="btn-secondary"
@@ -420,6 +522,15 @@ const BankCharges = () => {
             >
               <FontAwesomeIcon icon={isFetching ? faSpinner : faSync} spin={isFetching} />
               Refresh
+            </button>
+            <button 
+              onClick={fetchBanks}
+              className="refresh-btn"
+              disabled={isFetchingBanks}
+              title="Refresh Bank List"
+            >
+              <FontAwesomeIcon icon={faBuildingColumns} />
+              Refresh Banks
             </button>
             <button className="action-icon-btn" title="Print">
               <FontAwesomeIcon icon={faPrint} />
@@ -486,6 +597,7 @@ const BankCharges = () => {
           </table>
         </div>
       </div>
+
     </div>
   );
 };
