@@ -185,7 +185,7 @@ function App() {
 
             <Route path="purchase/non-paid" element={<NonPaidPurchases />} />
 
-            <Route path="expenses/petty-cash" element={<PettyCash />} />z
+            <Route path="expenses/petty-cash" element={<PettyCash />} />
             <Route path="expenses/reimbursement" element={<Reimbursement />} />
             <Route path="expenses/cheque" element={<ChequeExpenses />} />
             <Route path="expenses/bank-charges" element={<BankCharges />} />

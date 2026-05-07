@@ -13,7 +13,8 @@ import {
   faFileExcel,
   faEye,
   faSync,
-  faSpinner
+  faSpinner,
+  faEdit
 } from '@fortawesome/free-solid-svg-icons';
 import './Expenses.css';
 import { usePopup } from '../context/PopupContext';
@@ -28,6 +29,8 @@ const PettyCash = () => {
   const [reimbursements, setReimbursements] = useState([]);
   const navigate = useNavigate();
   const { showPopup } = usePopup();
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingId, setEditingId] = useState(null);
 
   // Voucher Form State
   const [voucherForm, setVoucherForm] = useState({
@@ -38,7 +41,8 @@ const PettyCash = () => {
     expense_type: '',
     description: '',
     vehicle_number: '',
-    amount: ''
+    amount: '',
+    receipt_no: ''
   });
 
   // Reimbursement Form State
@@ -165,6 +169,40 @@ const PettyCash = () => {
     setReimbursementForm(prev => ({ ...prev, [name]: value }));
   };
 
+  const handleEdit = (voucher) => {
+    setIsEditing(true);
+    setEditingId(voucher.id);
+    setVoucherForm({
+      date: voucher.date || (voucher.voucher_date ? new Date(voucher.voucher_date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]),
+      voucher_number: voucher.voucher_number,
+      employee_name: voucher.employee_name || '',
+      payee_name: voucher.payee_name || voucher.payee || '',
+      expense_type: voucher.expense_type,
+      description: voucher.description || '',
+      vehicle_number: voucher.vehicle_number || '',
+      amount: voucher.amount,
+      receipt_no: voucher.receipt_no || ''
+    });
+    // Scroll to form
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditingId(null);
+    setVoucherForm({
+      date: new Date().toISOString().split('T')[0],
+      voucher_number: '',
+      employee_name: '',
+      payee_name: '',
+      expense_type: '',
+      description: '',
+      vehicle_number: '',
+      amount: ''
+    });
+    generateVoucherNumber();
+  };
+
   // Submit Voucher to Database
   const handleVoucherSubmit = async (e) => {
     e.preventDefault();
@@ -197,15 +235,23 @@ const PettyCash = () => {
         expense_type: voucherForm.expense_type,
         description: voucherForm.description || null,
         vehicle_number: voucherForm.vehicle_number || null,
-        amount: parseFloat(voucherForm.amount)
+        amount: parseFloat(voucherForm.amount),
+        receipt_no: voucherForm.receipt_no || null
       };
 
-      const response = await api.post('/expenses/petty-cash/voucher', payload);
+      let response;
+      if (isEditing) {
+        response = await api.put(`/expenses/petty-cash/voucher/${editingId}`, payload);
+      } else {
+        response = await api.post('/expenses/petty-cash/voucher', payload);
+      }
       
       if (response.status === 201 || response.status === 200) {
-        showPopup('success', 'Petty cash voucher created successfully!');
+        showPopup('success', isEditing ? 'Voucher updated successfully!' : 'Petty cash voucher created successfully!');
         
         // Reset form
+        setIsEditing(false);
+        setEditingId(null);
         setVoucherForm({
           date: new Date().toISOString().split('T')[0],
           voucher_number: '',
@@ -214,19 +260,22 @@ const PettyCash = () => {
           expense_type: '',
           description: '',
           vehicle_number: '',
-          amount: ''
+          amount: '',
+          receipt_no: ''
         });
         
         // Refresh all data
         await fetchPettyCashData();
         
-        // Generate new voucher number for next entry
-        await generateVoucherNumber();
+        // Generate new voucher number for next entry if not editing
+        if (!isEditing) {
+          await generateVoucherNumber();
+        }
       } else {
-        showPopup('error', response.data.error || 'Failed to create voucher');
+        showPopup('error', response.data.error || `Failed to ${isEditing ? 'update' : 'create'} voucher`);
       }
     } catch (error) {
-      console.error('Error creating voucher:', error);
+      console.error(`Error ${isEditing ? 'updating' : 'creating'} voucher:`, error);
       if (error.response?.data?.error) {
         showPopup('error', error.response.data.error);
       } else {
@@ -338,8 +387,8 @@ const PettyCash = () => {
         <div className="expenses-form-container">
           <div className="form-card">
             <h3 className="form-title">
-              <FontAwesomeIcon icon={faPlus} />
-              New Petty Cash Voucher
+              <FontAwesomeIcon icon={isEditing ? faEdit : faPlus} />
+              {isEditing ? 'Edit Petty Cash Voucher' : 'New Petty Cash Voucher'}
             </h3>
             
             <form onSubmit={handleVoucherSubmit} className="expenses-form">
@@ -455,10 +504,22 @@ const PettyCash = () => {
                 />
               </div>
 
+              <div className="form-group full-width">
+                <label>Receipt Number</label>
+                <input
+                  type="text"
+                  name="receipt_no"
+                  value={voucherForm.receipt_no}
+                  onChange={handleVoucherChange}
+                  className="form-input"
+                  placeholder="Enter receipt number (if any)"
+                />
+              </div>
+
               <div className="form-actions">
                 <button 
-                  type="button" 
-                  onClick={() => {
+                   type="button" 
+                   onClick={isEditing ? handleCancelEdit : () => {
                     setVoucherForm({
                       date: new Date().toISOString().split('T')[0],
                       voucher_number: '',
@@ -475,7 +536,7 @@ const PettyCash = () => {
                   disabled={isLoading}
                 >
                   <FontAwesomeIcon icon={faTimes} />
-                  Clear
+                  {isEditing ? 'Cancel' : 'Clear'}
                 </button>
                 <button 
                   type="submit" 
@@ -483,7 +544,7 @@ const PettyCash = () => {
                   disabled={isLoading}
                 >
                   <FontAwesomeIcon icon={isLoading ? faSpinner : faSave} spin={isLoading} />
-                  {isLoading ? 'Submitting...' : 'Submit Voucher'}
+                  {isLoading ? (isEditing ? 'Updating...' : 'Submitting...') : (isEditing ? 'Update Voucher' : 'Submit Voucher')}
                 </button>
               </div>
             </form>
@@ -518,6 +579,7 @@ const PettyCash = () => {
                     <th>Voucher No.</th>
                     <th>Payee</th>
                     <th>Expense Type</th>
+                    <th>Receipt No.</th>
                     <th>Amount (LKR)</th>
                     <th>Actions</th>
                    </tr>
@@ -536,11 +598,21 @@ const PettyCash = () => {
                         <td className="voucher-number">{voucher.voucher_number}</td>
                         <td>{voucher.payee_name || voucher.payee}</td>
                         <td>{voucher.expense_type}</td>
+                        <td className="receipt-no">{voucher.receipt_no || '-'}</td>
                         <td className="amount-cell">{formatCurrency(voucher.amount)}</td>
                         <td>
-                          <button className="action-btn view-btn" title="View Details">
-                            <FontAwesomeIcon icon={faEye} />
-                          </button>
+                          <div className="action-buttons">
+                            <button className="action-btn view-btn" title="View Details">
+                              <FontAwesomeIcon icon={faEye} />
+                            </button>
+                            <button 
+                              className="action-btn edit-btn" 
+                              title="Edit Voucher"
+                              onClick={() => handleEdit(voucher)}
+                            >
+                              <FontAwesomeIcon icon={faEdit} />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))
