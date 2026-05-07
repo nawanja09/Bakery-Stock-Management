@@ -158,7 +158,8 @@ router.post('/petty-cash/voucher', async (req, res) => {
     expense_type, 
     description, 
     vehicle_number, 
-    amount 
+    amount,
+    receipt_no
   } = req.body;
   
   const userId = req.user.id;
@@ -172,8 +173,8 @@ router.post('/petty-cash/voucher', async (req, res) => {
     const [result] = await pool.query(
       `INSERT INTO petty_cash_vouchers 
        (voucher_number, voucher_date, employee_name, payee_name, 
-        expense_type, description, vehicle_number, amount, created_by, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending')`,
+        expense_type, description, vehicle_number, amount, receipt_no, created_by, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending')`,
       [
         voucher_number, 
         voucher_date, 
@@ -182,7 +183,8 @@ router.post('/petty-cash/voucher', async (req, res) => {
         expense_type, 
         description || null, 
         vehicle_number || null, 
-        amount, 
+        amount,
+        receipt_no || null,
         userId
       ]
     );
@@ -201,6 +203,64 @@ router.post('/petty-cash/voucher', async (req, res) => {
     } else {
       res.status(500).json({ error: 'Failed to create voucher' });
     }
+  }
+});
+
+// =============================================
+// PUT Update Voucher
+// =============================================
+router.put('/petty-cash/voucher/:id', async (req, res) => {
+  const { id } = req.params;
+  const { 
+    voucher_date, 
+    employee_name, 
+    payee_name, 
+    expense_type, 
+    description, 
+    vehicle_number, 
+    amount,
+    receipt_no
+  } = req.body;
+  
+  const userId = req.user.id;
+
+  // Validation
+  if (!voucher_date || !payee_name || !expense_type || !amount) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  try {
+    const [result] = await pool.query(
+      `UPDATE petty_cash_vouchers 
+       SET voucher_date = ?, employee_name = ?, payee_name = ?, 
+           expense_type = ?, description = ?, vehicle_number = ?, 
+           amount = ?, receipt_no = ?, updated_by = ?
+       WHERE id = ?`,
+      [
+        voucher_date, 
+        employee_name || null, 
+        payee_name, 
+        expense_type, 
+        description || null, 
+        vehicle_number || null, 
+        amount, 
+        receipt_no || null,
+        userId,
+        id
+      ]
+    );
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Voucher not found' });
+    }
+    
+    // Update balance after voucher update
+    await updatePettyCashBalance();
+    
+    res.json({ message: 'Voucher updated successfully' });
+  } catch (error) {
+    console.error('Error updating voucher:', error);
+    res.status(500).json({ error: 'Failed to update voucher' });
   }
 });
 
