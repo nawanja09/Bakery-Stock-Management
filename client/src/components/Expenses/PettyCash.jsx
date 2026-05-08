@@ -32,6 +32,8 @@ const PettyCash = () => {
   const { showPopup } = usePopup();
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [suggestedVoucherNo, setSuggestedVoucherNo] = useState('');
+  const [suggestedReferenceNo, setSuggestedReferenceNo] = useState('');
 
   // Voucher Form State
   const [voucherForm, setVoucherForm] = useState({
@@ -68,53 +70,27 @@ const PettyCash = () => {
     'Entertainment'
   ];
 
-  // Generate voucher number automatically
-  const generateVoucherNumber = async () => {
+  // Fetch voucher number suggestion
+  const fetchVoucherSuggestion = async () => {
     try {
       const response = await api.get('/expenses/petty-cash/next-voucher-number');
       if (response.data.voucher_number) {
-        setVoucherForm(prev => ({ ...prev, voucher_number: response.data.voucher_number }));
-      } else {
-        // Fallback: generate client-side
-        const today = new Date();
-        const year = today.getFullYear();
-        const month = String(today.getMonth() + 1).padStart(2, '0');
-        const count = vouchers.length + 1;
-        const newVoucherNo = `PC-${year}${month}-${String(count).padStart(4, '0')}`;
-        setVoucherForm(prev => ({ ...prev, voucher_number: newVoucherNo }));
+        setSuggestedVoucherNo(response.data.voucher_number);
       }
     } catch (error) {
-      // Generate fallback voucher number
-      const today = new Date();
-      const year = today.getFullYear();
-      const month = String(today.getMonth() + 1).padStart(2, '0');
-      const count = vouchers.length + 1;
-      const newVoucherNo = `PC-${year}${month}-${String(count).padStart(4, '0')}`;
-      setVoucherForm(prev => ({ ...prev, voucher_number: newVoucherNo }));
+      console.error('Error fetching voucher suggestion:', error);
     }
   };
 
-  // Generate reference number for reimbursement
-  const generateReferenceNumber = async () => {
+  // Fetch reference number suggestion
+  const fetchReferenceSuggestion = async () => {
     try {
       const response = await api.get('/expenses/petty-cash/next-reference-number');
       if (response.data.reference_number) {
-        setReimbursementForm(prev => ({ ...prev, reference_number: response.data.reference_number }));
-      } else {
-        const today = new Date();
-        const year = today.getFullYear();
-        const month = String(today.getMonth() + 1).padStart(2, '0');
-        const count = reimbursements.length + 1;
-        const newRefNo = `REF-${year}${month}-${String(count).padStart(4, '0')}`;
-        setReimbursementForm(prev => ({ ...prev, reference_number: newRefNo }));
+        setSuggestedReferenceNo(response.data.reference_number);
       }
     } catch (error) {
-      const today = new Date();
-      const year = today.getFullYear();
-      const month = String(today.getMonth() + 1).padStart(2, '0');
-      const count = reimbursements.length + 1;
-      const newRefNo = `REF-${year}${month}-${String(count).padStart(4, '0')}`;
-      setReimbursementForm(prev => ({ ...prev, reference_number: newRefNo }));
+      console.error('Error fetching reference suggestion:', error);
     }
   };
 
@@ -147,17 +123,12 @@ const PettyCash = () => {
     fetchPettyCashData();
   }, []);
 
-  // Generate voucher number when voucher tab opens and no voucher number exists
+  // Fetch suggestions when tab changes
   useEffect(() => {
-    if (activeTab === 'voucher' && !voucherForm.voucher_number) {
-      generateVoucherNumber();
-    }
-  }, [activeTab]);
-
-  // Generate reference number when reimbursement tab opens
-  useEffect(() => {
-    if (activeTab === 'reimbursement' && !reimbursementForm.reference_number) {
-      generateReferenceNumber();
+    if (activeTab === 'voucher') {
+      fetchVoucherSuggestion();
+    } else if (activeTab === 'reimbursement') {
+      fetchReferenceSuggestion();
     }
   }, [activeTab]);
 
@@ -200,9 +171,10 @@ const PettyCash = () => {
       expense_type: '',
       description: '',
       vehicle_number: '',
-      amount: ''
+      amount: '',
+      receipt_no: ''
     });
-    generateVoucherNumber();
+    fetchVoucherSuggestion();
   };
 
   // Submit Voucher to Database
@@ -269,10 +241,8 @@ const PettyCash = () => {
         // Refresh all data
         await fetchPettyCashData();
         
-        // Generate new voucher number for next entry if not editing
-        if (!isEditing) {
-          await generateVoucherNumber();
-        }
+        // Refresh suggestion
+        await fetchVoucherSuggestion();
       } else {
         showPopup('error', response.data.error || `Failed to ${isEditing ? 'update' : 'create'} voucher`);
       }
@@ -325,8 +295,8 @@ const PettyCash = () => {
         // Refresh all data
         await fetchPettyCashData();
         
-        // Generate new reference number for next entry
-        await generateReferenceNumber();
+        // Refresh suggestion
+        await fetchReferenceSuggestion();
       } else {
         showPopup('error', response.data.error || 'Failed to record reimbursement');
       }
@@ -447,16 +417,25 @@ const PettyCash = () => {
                 
                 <div className="form-group">
                   <label>Voucher Number <span className="required">*</span></label>
-                  <input
-                    type="text"
-                    name="voucher_number"
-                    value={voucherForm.voucher_number}
-                    onChange={handleVoucherChange}
-                    required
-                    className="form-input"
-                    placeholder="Auto-generated"
-                    readOnly
-                  />
+                  <div className="input-with-button">
+                    <input
+                      type="text"
+                      name="voucher_number"
+                      value={voucherForm.voucher_number}
+                      onChange={handleVoucherChange}
+                      required
+                      className="form-input"
+                      placeholder="Enter voucher number"
+                    />
+                    <button 
+                      type="button" 
+                      className="btn-suggest"
+                      onClick={() => setVoucherForm(prev => ({ ...prev, voucher_number: suggestedVoucherNo }))}
+                      title={`Suggested: ${suggestedVoucherNo}`}
+                    >
+                      Use Suggested
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -568,9 +547,9 @@ const PettyCash = () => {
                       expense_type: '',
                       description: '',
                       vehicle_number: '',
-                      amount: ''
+                      amount: '',
+                      receipt_no: ''
                     });
-                    generateVoucherNumber();
                   }}
                   className="btn-secondary"
                   disabled={isLoading}
@@ -693,16 +672,25 @@ const PettyCash = () => {
                 
                 <div className="form-group">
                   <label>Reference Number <span className="required">*</span></label>
-                  <input
-                    type="text"
-                    name="reference_number"
-                    value={reimbursementForm.reference_number}
-                    onChange={handleReimbursementChange}
-                    required
-                    className="form-input"
-                    placeholder="Auto-generated"
-                    readOnly
-                  />
+                  <div className="input-with-button">
+                    <input
+                      type="text"
+                      name="reference_number"
+                      value={reimbursementForm.reference_number}
+                      onChange={handleReimbursementChange}
+                      required
+                      className="form-input"
+                      placeholder="Enter reference number"
+                    />
+                    <button 
+                      type="button" 
+                      className="btn-suggest"
+                      onClick={() => setReimbursementForm(prev => ({ ...prev, reference_number: suggestedReferenceNo }))}
+                      title={`Suggested: ${suggestedReferenceNo}`}
+                    >
+                      Use Suggested
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -730,7 +718,6 @@ const PettyCash = () => {
                       reference_number: '',
                       amount: ''
                     });
-                    generateReferenceNumber();
                   }}
                   className="btn-secondary"
                   disabled={isLoading}
