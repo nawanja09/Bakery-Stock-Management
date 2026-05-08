@@ -205,6 +205,35 @@
   box-shadow: 0 0 0 3px rgba(109, 34, 230, 0.1);
 }
 
+.input-with-button {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.input-with-button .form-input {
+  flex: 1;
+}
+
+.btn-suggest {
+  padding: 0 12px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #475569;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.btn-suggest:hover {
+  background: #e2e8f0;
+  color: #1e293b;
+  border-color: #cbd5e1;
+}
+
 .amount-input {
   font-size: 16px;
   font-weight: 500;

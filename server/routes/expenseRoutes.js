@@ -211,6 +211,7 @@ router.post('/petty-cash/voucher', authenticate, async (req, res) => {
 router.put('/petty-cash/voucher/:id', authenticate, async (req, res) => {
   const { id } = req.params;
   const { 
+    voucher_number,
     voucher_date, 
     employee_name, 
     payee_name, 
@@ -224,18 +225,19 @@ router.put('/petty-cash/voucher/:id', authenticate, async (req, res) => {
   const userId = req.user.userId;
 
   // Validation
-  if (!voucher_date || !payee_name || !expense_type || !amount) {
+  if (!voucher_number || !voucher_date || !payee_name || !expense_type || !amount) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
   try {
     const [result] = await pool.query(
       `UPDATE petty_cash_vouchers 
-       SET voucher_date = ?, employee_name = ?, payee_name = ?, 
+       SET voucher_number = ?, voucher_date = ?, employee_name = ?, payee_name = ?, 
            expense_type = ?, description = ?, vehicle_number = ?, 
            amount = ?, receipt_no = ?, updated_by = ?
        WHERE id = ?`,
       [
+        voucher_number,
         voucher_date, 
         employee_name || null, 
         payee_name, 
@@ -259,7 +261,11 @@ router.put('/petty-cash/voucher/:id', authenticate, async (req, res) => {
     res.json({ message: 'Voucher updated successfully' });
   } catch (error) {
     console.error('Error updating voucher:', error);
-    res.status(500).json({ error: 'Failed to update voucher' });
+    if (error.code === 'ER_DUP_ENTRY') {
+      res.status(400).json({ error: 'Voucher number already exists' });
+    } else {
+      res.status(500).json({ error: 'Failed to update voucher' });
+    }
   }
 });
 
