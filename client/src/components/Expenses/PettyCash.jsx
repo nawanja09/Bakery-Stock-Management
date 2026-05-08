@@ -23,6 +23,7 @@ import api from '../../api';
 const PettyCash = () => {
   const [activeTab, setActiveTab] = useState('voucher');
   const [balance, setBalance] = useState(0);
+  const [balanceData, setBalanceData] = useState({ totalReimbursements: 0, totalVouchers: 0 });
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
   const [vouchers, setVouchers] = useState([]);
@@ -124,6 +125,7 @@ const PettyCash = () => {
       // Fetch petty cash balance
       const balanceRes = await api.get('/expenses/petty-cash/balance');
       setBalance(balanceRes.data.balance || 0);
+      setBalanceData(balanceRes.data);
 
       // Fetch vouchers from database
       const vouchersRes = await api.get('/expenses/petty-cash/vouchers');
@@ -362,6 +364,44 @@ const PettyCash = () => {
           <FontAwesomeIcon icon={faMoneyBillWave} className="title-icon" />
           Petty Cash Management
         </h1>
+      </div>
+
+      {/* Petty Cash Balance Card */}
+      <div className="balance-card">
+        <div className="balance-icon">
+          <FontAwesomeIcon icon={faMoneyBillWave} />
+        </div>
+        <div className="balance-info">
+          <div className="balance-label">Current Petty Cash Balance</div>
+          <div className="balance-amount">{formatCurrency(balance)}</div>
+          <div className="balance-breakdown">
+            <span className="breakdown-item">
+              Total Reimbursement: <strong>{formatCurrency(balanceData.totalReimbursements || 0)}</strong>
+            </span>
+            <span className="breakdown-separator">|</span>
+            <span className="breakdown-item">
+              Total Vouchers: <strong>{formatCurrency(balanceData.totalVouchers || 0)}</strong>
+            </span>
+          </div>
+        </div>
+        <div className="balance-stats">
+          <button 
+            className="icon-btn refresh-btn" 
+            onClick={fetchPettyCashData}
+            disabled={isFetching}
+            title="Refresh Balance"
+            style={{ 
+              background: 'rgba(255,255,255,0.2)', 
+              color: 'white', 
+              border: 'none',
+              width: '40px',
+              height: '40px',
+              borderRadius: '50%'
+            }}
+          >
+            <FontAwesomeIcon icon={isFetching ? faSpinner : faSync} spin={isFetching} />
+          </button>
+        </div>
       </div>
 
       {/* Tab Navigation */}

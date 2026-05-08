@@ -8,31 +8,29 @@ const authenticate = require('../middleware/authenticate');
 // =============================================
 router.get('/petty-cash/balance', async (req, res) => {
   try {
-    const [rows] = await pool.query(
-      `SELECT closing_balance as balance 
-       FROM petty_cash_balance 
-       ORDER BY balance_date DESC 
-       LIMIT 1`
+    // Calculate total reimbursements
+    const [reimbursementRows] = await pool.query(
+      'SELECT SUM(amount) as total FROM petty_cash_reimbursements'
     );
+    const totalReimbursements = parseFloat(reimbursementRows[0].total) || 0;
+
+    // Calculate total vouchers
+    const [voucherRows] = await pool.query(
+      'SELECT SUM(amount) as total FROM petty_cash_vouchers'
+    );
+    const totalVouchers = parseFloat(voucherRows[0].total) || 0;
+
+    // Petty Cash balance = Total Reimbursement - Total Petty Cash Voucher
+    const balance = totalReimbursements - totalVouchers;
     
-    let balance = 112546.00; // Default balance
-    
-    if (rows.length > 0 && rows[0].balance !== null) {
-      balance = parseFloat(rows[0].balance);
-    } else {
-      // If no records exist, create initial balance
-      await pool.query(
-        `INSERT INTO petty_cash_balance (balance_date, opening_balance, closing_balance) 
-         VALUES (CURDATE(), ?, ?)`,
-        [balance, balance]
-      );
-    }
-    
-    res.json({ balance: balance });
+    res.json({ 
+      balance,
+      totalReimbursements,
+      totalVouchers
+    });
   } catch (error) {
     console.error('Error fetching petty cash balance:', error);
-    // Return default balance instead of error
-    res.json({ balance: 112546.00 });
+    res.status(500).json({ error: 'Failed to fetch petty cash balance' });
   }
 });
 
@@ -307,48 +305,53 @@ router.post('/petty-cash/reimbursement', authenticate, async (req, res) => {
 // =============================================
 async function updatePettyCashBalance() {
   try {
-    // Get total vouchers for today
+    // Get overall total vouchers
     const [voucherTotal] = await pool.query(
+      `SELECT COALESCE(SUM(amount), 0) as total FROM petty_cash_vouchers`
+    );
+    
+    // Get overall total reimbursements
+    const [reimbursementTotal] = await pool.query(
+      `SELECT COALESCE(SUM(amount), 0) as total FROM petty_cash_reimbursements`
+    );
+    
+    // Get today's vouchers
+    const [todayVoucherTotal] = await pool.query(
       `SELECT COALESCE(SUM(amount), 0) as total 
        FROM petty_cash_vouchers 
        WHERE DATE(voucher_date) = CURDATE()`
     );
-    
-    // Get total reimbursements for today
-    const [reimbursementTotal] = await pool.query(
+
+    // Get today's reimbursements
+    const [todayReimbursementTotal] = await pool.query(
       `SELECT COALESCE(SUM(amount), 0) as total 
        FROM petty_cash_reimbursements 
        WHERE DATE(reimbursement_date) = CURDATE()`
     );
-    
-    // Get previous closing balance
-    const [prevBalance] = await pool.query(
-      `SELECT closing_balance 
-       FROM petty_cash_balance 
-       WHERE balance_date < CURDATE() 
-       ORDER BY balance_date DESC 
-       LIMIT 1`
-    );
-    
-    const openingBalance = prevBalance.length > 0 ? parseFloat(prevBalance[0].closing_balance) : 112546.00;
+
     const totalVouchers = parseFloat(voucherTotal[0].total);
     const totalReimbursements = parseFloat(reimbursementTotal[0].total);
-    const closingBalance = openingBalance - totalVouchers + totalReimbursements;
+    const currentBalance = totalReimbursements - totalVouchers;
     
-    // Insert or update today's balance
+    const todayVouchers = parseFloat(todayVoucherTotal[0].total);
+    const todayReimbursements = parseFloat(todayReimbursementTotal[0].total);
+    const openingBalance = currentBalance - todayReimbursements + todayVouchers;
+
+    // Update today's record in petty_cash_balance table
     await pool.query(
       `INSERT INTO petty_cash_balance 
        (balance_date, opening_balance, total_vouchers, total_reimbursements, closing_balance)
        VALUES (CURDATE(), ?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE
+       opening_balance = VALUES(opening_balance),
        total_vouchers = VALUES(total_vouchers),
        total_reimbursements = VALUES(total_reimbursements),
        closing_balance = VALUES(closing_balance)`,
-      [openingBalance, totalVouchers, totalReimbursements, closingBalance]
+      [openingBalance, todayVouchers, todayReimbursements, currentBalance]
     );
     
   } catch (error) {
-    console.error('Error updating petty cash balance:', error);
+    console.error('Error updating petty cash balance table:', error);
   }
 }
 
