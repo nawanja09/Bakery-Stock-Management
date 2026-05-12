@@ -105,6 +105,7 @@ router.get('/petty-cash/vouchers', async (req, res) => {
         description, 
         vehicle_number, 
         amount,
+        receipt_no,
         status,
         DATE_FORMAT(created_at, '%Y-%m-%d') as created_date
        FROM petty_cash_vouchers 

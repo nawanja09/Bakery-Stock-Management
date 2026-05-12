@@ -14,8 +14,12 @@ const authenticate = (req, res, next) => {
     req.user = decoded;
     next();
   } catch (err) {
+    if (err.name === 'TokenExpiredError') {
+      console.warn('JWT Expired:', err.expiredAt);
+      return res.status(401).json({ error: 'Token expired', expired: true });
+    }
     console.error('JWT Error:', err);
-    return res.status(401).json({ error: 'Invalid or expired token' });
+    return res.status(401).json({ error: 'Invalid token' });
   }
 };
 
