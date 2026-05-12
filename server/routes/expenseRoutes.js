@@ -435,17 +435,25 @@ router.post('/cheque/voucher', authenticate, async (req, res) => {
 });
 
 // PUT realise cheque
-router.put('/cheque/realise/:id', async (req, res) => {
+router.put('/cheque/realise/:id', authenticate, async (req, res) => {
   const { id } = req.params;
   const { realise_date } = req.body;
 
+  if (!realise_date) {
+    return res.status(400).json({ error: 'Realise date is required' });
+  }
+
   try {
-    await pool.query(
+    const [result] = await pool.query(
       `UPDATE cheque_expenses 
        SET is_realised = 1, realise_date = ?
        WHERE id = ?`,
       [realise_date, id]
     );
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Cheque not found' });
+    }
     
     res.json({ message: 'Cheque realised successfully' });
   } catch (error) {

@@ -179,9 +179,17 @@ const ChequeExpenses = () => {
 
   const handleChequeRealiseChange = (id, field, value) => {
     setUnrealisedCheques(prev => 
-      prev.map(cheque => 
-        cheque.id === id ? { ...cheque, [field]: value } : cheque
-      )
+      prev.map(cheque => {
+        if (cheque.id === id) {
+          const updatedCheque = { ...cheque, [field]: value };
+          // If checking "is_realised" and no date, set today's date
+          if (field === 'is_realised' && value && !updatedCheque.realise_date) {
+            updatedCheque.realise_date = new Date().toISOString().split('T')[0];
+          }
+          return updatedCheque;
+        }
+        return cheque;
+      })
     );
   };
 
@@ -478,16 +486,15 @@ const ChequeExpenses = () => {
                           value={cheque.realise_date || ''}
                           onChange={(e) => handleChequeRealiseChange(cheque.id, 'realise_date', e.target.value)}
                           className="realise-date-input"
-                          disabled={cheque.is_realised}
                         />
                       </td>
                       <td>
                         <button
                           onClick={() => handleRealiseCheque(cheque.id, cheque.realise_date)}
                           className="save-btn"
-                          disabled={!cheque.realise_date || cheque.is_realised}
+                          disabled={!cheque.realise_date || isLoading}
                         >
-                          <FontAwesomeIcon icon={faSave} />
+                          <FontAwesomeIcon icon={isLoading ? faSpinner : faSave} spin={isLoading} />
                           Save
                         </button>
                       </td>
