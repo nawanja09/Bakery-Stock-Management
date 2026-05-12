@@ -1,6 +1,5 @@
 // src/components/Expenses/Reimbursement.jsx
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faSave,
@@ -8,9 +7,6 @@ import {
   faHistory,
   faMoneyBillWave,
   faReceipt,
-  faPrint,
-  faFileExcel,
-  faEye,
   faSync,
   faSpinner
 } from '@fortawesome/free-solid-svg-icons';
@@ -23,7 +19,6 @@ const Reimbursement = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
   const [reimbursements, setReimbursements] = useState([]);
-  const navigate = useNavigate();
   const { showPopup } = usePopup();
 
   // Reimbursement Form State
@@ -34,7 +29,7 @@ const Reimbursement = () => {
   });
 
   // Generate reference number for reimbursement
-  const generateReferenceNumber = async () => {
+  const generateReferenceNumber = useCallback(async () => {
     try {
       const response = await api.get('/expenses/petty-cash/next-reference-number');
       if (response.data.reference_number) {
@@ -55,10 +50,10 @@ const Reimbursement = () => {
       const newRefNo = `REF-${year}${month}-${String(count).padStart(4, '0')}`;
       setReimbursementForm(prev => ({ ...prev, reference_number: newRefNo }));
     }
-  };
+  }, [reimbursements.length]);
 
   // Fetch all data from database
-  const fetchReimbursementData = async () => {
+  const fetchReimbursementData = useCallback(async () => {
     setIsFetching(true);
     try {
       // Fetch petty cash balance
@@ -74,19 +69,19 @@ const Reimbursement = () => {
     } finally {
       setIsFetching(false);
     }
-  };
+  }, [showPopup]);
 
   // Load data on component mount
   useEffect(() => {
     fetchReimbursementData();
-  }, []);
+  }, [fetchReimbursementData]);
 
   // Generate reference number on component mount
   useEffect(() => {
     if (!reimbursementForm.reference_number) {
       generateReferenceNumber();
     }
-  }, []);
+  }, [generateReferenceNumber, reimbursementForm.reference_number]);
 
   const handleReimbursementChange = (e) => {
     const { name, value } = e.target;
