@@ -1,30 +1,28 @@
 // src/components/Expenses/ChequeExpenses.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faSave, 
   faTimes, 
   faPlus, 
   faSearch,
-  faPrint,
-  faFileExcel,
-  faEye,
   faSync,
   faSpinner,
   faMoneyCheck,
   faCalendarCheck,
+  faCheckCircle,
 } from '@fortawesome/free-solid-svg-icons';
 import './ChequeExpenses.css';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
 
 const ChequeExpenses = () => {
-  const [activeTab, setActiveTab] = useState('voucher'); // 'voucher' or 'unrealised'
+  const [activeTab, setActiveTab] = useState('voucher'); // 'voucher', 'unrealised', 'realised'
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [chequeVouchers, setChequeVouchers] = useState([]);
   const [unrealisedCheques, setUnrealisedCheques] = useState([]);
+  const [realisedCheques, setRealisedCheques] = useState([]);
   const { showPopup } = usePopup();
 
   // Form State
@@ -55,10 +53,31 @@ const ChequeExpenses = () => {
     'Other'
   ];
 
+  const fetchChequeData = useCallback(async () => {
+    setIsFetching(true);
+    try {
+      // Fetch unrealised cheques
+      const unrealisedRes = await api.get('/expenses/cheque/unrealised');
+      setUnrealisedCheques(unrealisedRes.data || []);
+
+      // Fetch realised cheques
+      const realisedRes = await api.get('/expenses/cheque/realised');
+      setRealisedCheques(realisedRes.data || []);
+    } catch (error) {
+      console.error('Error fetching cheque data:', error);
+      showPopup('error', 'Failed to load data from server');
+      // Set demo data if API fails
+      setUnrealisedCheques([]);
+      setRealisedCheques([]);
+    } finally {
+      setIsFetching(false);
+    }
+  }, [showPopup]);
+
   // Fetch data on component mount
   useEffect(() => {
     fetchChequeData();
-  }, []);
+  }, [fetchChequeData]);
 
   // Calculate total amount when without_vat or vat changes
   useEffect(() => {
@@ -67,29 +86,6 @@ const ChequeExpenses = () => {
     const total = withoutVat + vat;
     setFormData(prev => ({ ...prev, total_bill_amount: total.toFixed(2) }));
   }, [formData.without_vat_amount, formData.vat_amount]);
-
-  const fetchChequeData = async () => {
-    setIsFetching(true);
-    try {
-      // Fetch cheque vouchers
-      const vouchersRes = await api.get('/expenses/cheque/vouchers');
-      setChequeVouchers(vouchersRes.data || []);
-      
-      // Fetch unrealised cheques
-      const unrealisedRes = await api.get('/expenses/cheque/unrealised');
-      setUnrealisedCheques(unrealisedRes.data || []);
-    } catch (error) {
-      console.error('Error fetching cheque data:', error);
-      showPopup('error', 'Failed to load data from server');
-      // Set demo data if API fails
-      setChequeVouchers([
-      ]);
-      setUnrealisedCheques([
-      ]);
-    } finally {
-      setIsFetching(false);
-    }
-  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -203,7 +199,13 @@ const ChequeExpenses = () => {
     }).format(amount);
   };
 
-  const filteredCheques = unrealisedCheques.filter(cheque =>
+  const filteredUnrealised = unrealisedCheques.filter(cheque =>
+    cheque.cheque_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    cheque.payee_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    cheque.voucher_number?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const filteredRealised = realisedCheques.filter(cheque =>
     cheque.cheque_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     cheque.payee_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     cheque.voucher_number?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -232,7 +234,14 @@ const ChequeExpenses = () => {
           onClick={() => setActiveTab('unrealised')}
         >
           <FontAwesomeIcon icon={faCalendarCheck} />
-          Unrealise Expense Cheques
+          Unrealised Expense Cheques
+        </button>
+        <button 
+          className={`tab-button ${activeTab === 'realised' ? 'active' : ''}`}
+          onClick={() => setActiveTab('realised')}
+        >
+          <FontAwesomeIcon icon={faCheckCircle} />
+          Realised Expense Cheques
         </button>
       </div>
 
@@ -461,8 +470,8 @@ const ChequeExpenses = () => {
                       <FontAwesomeIcon icon={faSpinner} spin /> Loading cheques...
                     </td>
                   </tr>
-                ) : filteredCheques.length > 0 ? (
-                  filteredCheques.map(cheque => (
+                ) : filteredUnrealised.length > 0 ? (
+                  filteredUnrealised.map(cheque => (
                     <tr key={cheque.id}>
                       <td>{cheque.date}</td>
                       <td className="voucher-number">{cheque.voucher_number}</td>
@@ -503,6 +512,83 @@ const ChequeExpenses = () => {
                 ) : (
                   <tr>
                     <td colSpan="8" className="empty-row">No unrealised cheques found</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Realised Expense Cheques Table */}
+      {activeTab === 'realised' && (
+        <div className="unrealised-container">
+          <div className="search-section">
+            <div className="search-box">
+              <FontAwesomeIcon icon={faSearch} className="search-icon" />
+              <input
+                type="text"
+                placeholder="Search from Cheque Number, Payee Name, Voucher Number..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="search-input"
+              />
+              {searchTerm && (
+                <button 
+                  className="clear-search"
+                  onClick={() => setSearchTerm('')}
+                >
+                  ×
+                </button>
+              )}
+            </div>
+            <button 
+              onClick={fetchChequeData} 
+              className="refresh-btn"
+              disabled={isFetching}
+            >
+              <FontAwesomeIcon icon={isFetching ? faSpinner : faSync} spin={isFetching} />
+              Refresh
+            </button>
+          </div>
+
+          <div className="table-container">
+            <table className="cheque-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Voucher Number</th>
+                  <th>Cheque Number</th>
+                  <th>Payee Name</th>
+                  <th>Amount (LKR)</th>
+                  <th>Realise Date</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {isFetching ? (
+                  <tr>
+                    <td colSpan="7" className="loading-row">
+                      <FontAwesomeIcon icon={faSpinner} spin /> Loading cheques...
+                    </td>
+                  </tr>
+                ) : filteredRealised.length > 0 ? (
+                  filteredRealised.map(cheque => (
+                    <tr key={cheque.id}>
+                      <td>{cheque.date}</td>
+                      <td className="voucher-number">{cheque.voucher_number}</td>
+                      <td className="cheque-number">{cheque.cheque_number}</td>
+                      <td>{cheque.payee_name}</td>
+                      <td className="amount-cell">{formatCurrency(cheque.amount)}</td>
+                      <td>{cheque.realise_date}</td>
+                      <td>
+                        <span className="status-badge realised">Realised</span>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="7" className="empty-row">No realised cheques found</td>
                   </tr>
                 )}
               </tbody>

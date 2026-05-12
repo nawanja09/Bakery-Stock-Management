@@ -397,6 +397,25 @@ router.get('/cheque/unrealised', async (req, res) => {
   }
 });
 
+// GET realised cheques
+router.get('/cheque/realised', async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT id, DATE_FORMAT(bill_date, '%Y-%m-%d') as date, 
+              voucher_number, cheque_number, payee_name, 
+              total_bill_amount as amount, is_realised, 
+              DATE_FORMAT(realise_date, '%Y-%m-%d') as realise_date
+       FROM cheque_expenses 
+       WHERE is_realised = 1
+       ORDER BY realise_date DESC`
+    );
+    res.json(rows || []);
+  } catch (error) {
+    console.error('Error fetching realised cheques:', error);
+    res.json([]);
+  }
+});
+
 // POST create cheque voucher
 router.post('/cheque/voucher', authenticate, async (req, res) => {
   const { 

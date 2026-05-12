@@ -1,6 +1,5 @@
 // src/components/Expenses/PettyCash.jsx
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faSave, 
@@ -28,7 +27,6 @@ const PettyCash = () => {
   const [isFetching, setIsFetching] = useState(false);
   const [vouchers, setVouchers] = useState([]);
   const [reimbursements, setReimbursements] = useState([]);
-  const navigate = useNavigate();
   const { showPopup } = usePopup();
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -71,7 +69,7 @@ const PettyCash = () => {
   ];
 
   // Fetch voucher number suggestion
-  const fetchVoucherSuggestion = async () => {
+  const fetchVoucherSuggestion = useCallback(async () => {
     try {
       const response = await api.get('/expenses/petty-cash/next-voucher-number');
       if (response.data.voucher_number) {
@@ -80,10 +78,10 @@ const PettyCash = () => {
     } catch (error) {
       console.error('Error fetching voucher suggestion:', error);
     }
-  };
+  }, []);
 
   // Fetch reference number suggestion
-  const fetchReferenceSuggestion = async () => {
+  const fetchReferenceSuggestion = useCallback(async () => {
     try {
       const response = await api.get('/expenses/petty-cash/next-reference-number');
       if (response.data.reference_number) {
@@ -92,10 +90,10 @@ const PettyCash = () => {
     } catch (error) {
       console.error('Error fetching reference suggestion:', error);
     }
-  };
+  }, []);
 
   // Fetch all data from database
-  const fetchPettyCashData = async () => {
+  const fetchPettyCashData = useCallback(async () => {
     setIsFetching(true);
     try {
       // Fetch petty cash balance
@@ -116,12 +114,12 @@ const PettyCash = () => {
     } finally {
       setIsFetching(false);
     }
-  };
+  }, [showPopup]);
 
   // Load data on component mount
   useEffect(() => {
     fetchPettyCashData();
-  }, []);
+  }, [fetchPettyCashData]);
 
   // Fetch suggestions when tab changes
   useEffect(() => {
@@ -130,7 +128,7 @@ const PettyCash = () => {
     } else if (activeTab === 'reimbursement') {
       fetchReferenceSuggestion();
     }
-  }, [activeTab]);
+  }, [activeTab, fetchVoucherSuggestion, fetchReferenceSuggestion]);
 
   const handleVoucherChange = (e) => {
     const { name, value } = e.target;
