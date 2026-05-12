@@ -5,8 +5,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
 if (!process.env.JWT_SECRET) {
-  console.error('FATAL: JWT_SECRET is not defined');
-  return res.status(500).json({ error: 'Server configuration error' });
+  console.error('FATAL: JWT_SECRET is not defined. Authentication will fail.');
 }
 
 const loginUser = async (req, res) => {
@@ -29,7 +28,7 @@ const loginUser = async (req, res) => {
       const token = jwt.sign(
         { userId: user.id, email: user.email },
         process.env.JWT_SECRET,
-        { expiresIn: '8h' }
+        { expiresIn: '24h' }
       );
 
       res.json({ 

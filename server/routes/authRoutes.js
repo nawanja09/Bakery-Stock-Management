@@ -2,7 +2,7 @@
 
 const express = require('express');
 const router = express.Router();
-constjwt = require('jsonwebtoken')
+const jwt = require('jsonwebtoken')
 const { loginUser,changePassword, registerUser } = require('../controllers/authController');
 const authenticate = require('../middleware/authenticate');
 
@@ -19,7 +19,7 @@ router.post('/refresh-token', (req, res) => {
     const newToken = jwt.sign(
       { userId: decoded.userId, email: decoded.email },
       process.env.JWT_SECRET,
-      { expiresIn: '8h' }
+      { expiresIn: '24h' }
     );
     res.json({ token: newToken });
   } catch (error) {

@@ -194,6 +194,8 @@ const Reimbursement = () => {
                   readOnly
                 />
               </div>
+            </div>
+            <div className="form-row">
               <div className="form-group">
                 <label htmlFor="amount">Amount (Rs.) *</label>
                 <input

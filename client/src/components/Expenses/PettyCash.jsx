@@ -507,32 +507,34 @@ const PettyCash = () => {
                   placeholder="Enter description (optional)"
                 />
               </div>
+              
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Amount (LKR) <span className="required">*</span></label>
+                  <input
+                    type="number"
+                    name="amount"
+                    value={voucherForm.amount}
+                    onChange={handleVoucherChange}
+                    required
+                    min="0.01"
+                    step="0.01"
+                    className="form-input amount-input"
+                    placeholder="0.00"
+                  />
+                </div>
 
-              <div className="form-group full-width">
-                <label>Amount (LKR) <span className="required">*</span></label>
-                <input
-                  type="number"
-                  name="amount"
-                  value={voucherForm.amount}
-                  onChange={handleVoucherChange}
-                  required
-                  min="0.01"
-                  step="0.01"
-                  className="form-input amount-input"
-                  placeholder="0.00"
-                />
-              </div>
-
-              <div className="form-group full-width">
-                <label>Receipt Number</label>
-                <input
-                  type="text"
-                  name="receipt_no"
-                  value={voucherForm.receipt_no}
-                  onChange={handleVoucherChange}
-                  className="form-input"
-                  placeholder="Enter receipt number (if any)"
-                />
+                <div className="form-group">
+                  <label>Receipt Number</label>
+                  <input
+                    type="text"
+                    name="receipt_no"
+                    value={voucherForm.receipt_no}
+                    onChange={handleVoucherChange}
+                    className="form-input"
+                    placeholder="Enter receipt number (if any)"
+                  />
+                </div>
               </div>
 
               <div className="form-actions">
@@ -694,19 +696,21 @@ const PettyCash = () => {
                 </div>
               </div>
 
-              <div className="form-group full-width">
-                <label>Amount (LKR) <span className="required">*</span></label>
-                <input
-                  type="number"
-                  name="amount"
-                  value={reimbursementForm.amount}
-                  onChange={handleReimbursementChange}
-                  required
-                  min="0.01"
-                  step="0.01"
-                  className="form-input amount-input"
-                  placeholder="0.00"
-                />
+              <div className="form-row">
+                <div className="form-group left-align">
+                  <label>Amount (LKR) <span className="required">*</span></label>
+                  <input
+                    type="number"
+                    name="amount"
+                    value={reimbursementForm.amount}
+                    onChange={handleReimbursementChange}
+                    required
+                    min="0.01"
+                    step="0.01"
+                    className="form-input amount-input"
+                    placeholder="0.00"
+                  />
+                </div>
               </div>
 
               <div className="form-actions">
