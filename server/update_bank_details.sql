@@ -35,7 +35,7 @@ CREATE TABLE `bank_details` (
   `created_by` int DEFAULT NULL,  -- Removed UNSIGNED to match users.id
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
+  PRIMARY KEY (`id`), 
   KEY `created_by` (`created_by`),
   CONSTRAINT `fk_bank_details_created_by` 
     FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) 
