@@ -384,8 +384,10 @@ router.get('/cheque/unrealised', async (req, res) => {
   try {
     const [rows] = await pool.query(
       `SELECT id, DATE_FORMAT(bill_date, '%Y-%m-%d') as date, 
-              voucher_number, cheque_number, payee_name, 
-              total_bill_amount as amount, is_realised, realise_date
+              bill_number, payee_name, vat_reg_number, expense_type,
+              without_vat_amount, vat_amount, total_bill_amount as amount,
+              description, voucher_number, cheque_number, is_realised,
+              DATE_FORMAT(realise_date, '%Y-%m-%d') as realise_date
        FROM cheque_expenses 
        WHERE is_realised = 0
        ORDER BY bill_date DESC`
@@ -402,8 +404,9 @@ router.get('/cheque/realised', async (req, res) => {
   try {
     const [rows] = await pool.query(
       `SELECT id, DATE_FORMAT(bill_date, '%Y-%m-%d') as date, 
-              voucher_number, cheque_number, payee_name, 
-              total_bill_amount as amount, is_realised, 
+              bill_number, payee_name, vat_reg_number, expense_type,
+              without_vat_amount, vat_amount, total_bill_amount as amount,
+              description, voucher_number, cheque_number, is_realised, 
               DATE_FORMAT(realise_date, '%Y-%m-%d') as realise_date
        FROM cheque_expenses 
        WHERE is_realised = 1
@@ -413,6 +416,95 @@ router.get('/cheque/realised', async (req, res) => {
   } catch (error) {
     console.error('Error fetching realised cheques:', error);
     res.json([]);
+  }
+});
+
+// GET single cheque voucher by id
+router.get('/cheque/voucher/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [rows] = await pool.query(
+      `SELECT id, DATE_FORMAT(bill_date, '%Y-%m-%d') as bill_date, bill_number,
+              payee_name, vat_reg_number, expense_type, without_vat_amount,
+              vat_amount, total_bill_amount, description, voucher_number,
+              cheque_number, is_realised, DATE_FORMAT(realise_date, '%Y-%m-%d') as realise_date
+       FROM cheque_expenses
+       WHERE id = ?`,
+      [id]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Cheque voucher not found' });
+    }
+    res.json(rows[0]);
+  } catch (error) {
+    console.error('Error fetching cheque voucher:', error);
+    res.status(500).json({ error: 'Failed to fetch cheque voucher' });
+  }
+});
+
+// PUT update cheque voucher
+router.put('/cheque/voucher/:id', authenticate, async (req, res) => {
+  const { id } = req.params;
+  const {
+    bill_date, bill_number, payee_name, vat_reg_number,
+    expense_type, without_vat_amount, vat_amount,
+    total_bill_amount, description
+  } = req.body;
+
+  if (!bill_date || !payee_name || !expense_type || !without_vat_amount) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  try {
+    const [result] = await pool.query(
+      `UPDATE cheque_expenses
+       SET bill_date = ?, bill_number = ?, payee_name = ?, vat_reg_number = ?,
+           expense_type = ?, without_vat_amount = ?, vat_amount = ?,
+           total_bill_amount = ?, description = ?
+       WHERE id = ?`,
+      [
+        bill_date,
+        bill_number || null,
+        payee_name,
+        vat_reg_number || null,
+        expense_type,
+        without_vat_amount,
+        vat_amount || 0,
+        total_bill_amount,
+        description || null,
+        id
+      ]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Cheque voucher not found' });
+    }
+
+    res.json({ message: 'Cheque voucher updated successfully' });
+  } catch (error) {
+    console.error('Error updating cheque voucher:', error);
+    res.status(500).json({ error: 'Failed to update cheque voucher' });
+  }
+});
+
+// DELETE cheque voucher
+router.delete('/cheque/voucher/:id', authenticate, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const [result] = await pool.query(
+      'DELETE FROM cheque_expenses WHERE id = ?',
+      [id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Cheque voucher not found' });
+    }
+
+    res.json({ message: 'Cheque voucher deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting cheque voucher:', error);
+    res.status(500).json({ error: 'Failed to delete cheque voucher' });
   }
 });
 

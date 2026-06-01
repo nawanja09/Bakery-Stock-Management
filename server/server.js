@@ -44,6 +44,7 @@ const cutleryStockReportRoutes = require('./routes/cutleryStockReport');
 const purchaseReturnRoutes = require('./routes/purchaseReturnRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
 const expenseRoutes = require('./routes/expenseRoutes');
+const payeeRoutes = require('./routes/payeeRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -78,6 +79,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/api', authRoutes);
 app.use('/api/purchases', purchaseRoutes);
 app.use('/api/suppliers', supplierRoutes);
+app.use('/api/payees', payeeRoutes);
 app.use('/api/items', itemRoutes);
 app.use('/api', departmentRoutes);  
 app.use('/api/opening-balance', openingBalanceRoutes);

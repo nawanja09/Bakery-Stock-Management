@@ -64,7 +64,16 @@ const BankDetails = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => {
+      if (name === 'opening_balance') {
+        const openingBalance = value;
+        const currentBalance = prev.current_balance === '' || parseFloat(prev.current_balance) === parseFloat(prev.opening_balance)
+          ? openingBalance
+          : prev.current_balance;
+        return { ...prev, opening_balance: openingBalance, current_balance: currentBalance };
+      }
+      return { ...prev, [name]: value };
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -101,7 +110,7 @@ const BankDetails = () => {
       account_type: bank.account_type || 'Current',
       currency: bank.currency || 'LKR',
       opening_balance: bank.opening_balance ?? '',
-      current_balance: bank.current_balance ?? '',
+      current_balance: bank.current_balance ?? bank.opening_balance ?? '',
       contact_person: bank.contact_person || '',
       contact_phone: bank.contact_phone || '',
       contact_email: bank.contact_email || '',

@@ -120,7 +120,7 @@ const BankCharges = () => {
 
   const handleBankSelect = (bankName) => {
     setFormData(prev => ({ ...prev, bank_name: bankName }));
-    setBankSearchTerm('');
+    setBankSearchTerm(bankName);
     setIsBankDropdownOpen(false);
   };
 
@@ -187,6 +187,7 @@ const BankCharges = () => {
       amount: charge.amount.toString()
     });
     setBankSearchTerm(charge.bank_name);
+    setIsBankDropdownOpen(false);
     // Scroll to form
     document.querySelector('.form-card')?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -268,6 +269,7 @@ const BankCharges = () => {
       amount: ''
     });
     setBankSearchTerm('');
+    setIsBankDropdownOpen(false);
   };
 
   const formatCurrency = (amount) => {
@@ -469,6 +471,7 @@ const BankCharges = () => {
                   amount: ''
                 });
                 setBankSearchTerm('');
+                setIsBankDropdownOpen(false);
                 if (editingId) setEditingId(null);
               }}
               className="btn-secondary"

@@ -2192,6 +2192,19 @@ VALUES
 ('REF-001', CURDATE(), 5000.00, 2, 'Completed');
 
 -- =============================================
+-- Payee Master Table
+-- =============================================
+
+CREATE TABLE IF NOT EXISTS `payees` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `payee_name` varchar(255) NOT NULL,
+  `vat_reg_number` varchar(50) DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- =============================================
 -- Cheque Expenses Tables
 -- =============================================
 
@@ -2292,3 +2305,26 @@ VALUES
 ('2025-08-25', 'INV-89572', 'Meta Ads', '987654321', 'Online Marketing', 50000.00, 9000.00, 59000.00, 1500.00, 'Facebook & Instagram advertising', 2),
 ('2025-08-20', 'SUB-202508', 'Microsoft 365', '456789123', 'Software Subscription', 15000.00, 2700.00, 17700.00, 0.00, 'Annual subscription', 2),
 ('2025-08-15', 'AWS-895623', 'Amazon Web Services', '789123456', 'Cloud Services', 35000.00, 6300.00, 41300.00, 500.00, 'AWS cloud services', 2);
+
+
+----------------------
+
+
+CREATE TABLE IF NOT EXISTS `payees` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `payee_name` varchar(255) NOT NULL,
+  `vat_reg_number` varchar(50) DEFAULT NULL,
+  `address` text DEFAULT NULL,
+  `contact_person` varchar(255) DEFAULT NULL,
+  `phone` varchar(20) DEFAULT NULL,
+  `email` varchar(100) DEFAULT NULL,
+  `created_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `payee_name` (`payee_name`),
+  KEY `created_by` (`created_by`),
+  CONSTRAINT `fk_payees_created_by` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+
