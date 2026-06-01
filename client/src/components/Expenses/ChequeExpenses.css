@@ -111,6 +111,80 @@
   color: #495057;
 }
 
+.payee-dropdown-wrapper {
+  position: relative;
+}
+
+.payee-input-inner {
+  position: relative;
+}
+
+.clear-payee-btn {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #6c757d;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.payee-dropdown {
+  position: absolute;
+  z-index: 20;
+  left: 0;
+  right: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  margin-top: 6px;
+  border: 1px solid #dee2e6;
+  border-radius: 10px;
+  background: white;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08);
+}
+
+.dropdown-item {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font-size: 14px;
+  color: #212529;
+}
+
+.dropdown-item:hover,
+.dropdown-item.highlighted {
+  background: #f1f0ff;
+}
+
+.dropdown-annotation {
+  font-size: 12px;
+  color: #6c757d;
+}
+
+.dropdown-empty,
+.dropdown-loading {
+  padding: 12px;
+  color: #6c757d;
+  font-size: 13px;
+  background: #f8f9fa;
+}
+
+@media (max-width: 768px) {
+  .payee-dropdown {
+    max-height: 220px;
+  }
+}
+
 .required {
   color: #dc3545;
 }

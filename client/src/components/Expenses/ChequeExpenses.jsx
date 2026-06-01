@@ -1,5 +1,5 @@
 // src/components/Expenses/ChequeExpenses.jsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faSave, 
@@ -11,6 +11,8 @@ import {
   faMoneyCheck,
   faCalendarCheck,
   faCheckCircle,
+  faEdit,
+  faTrash
 } from '@fortawesome/free-solid-svg-icons';
 import './ChequeExpenses.css';
 import { usePopup } from '../context/PopupContext';
@@ -23,7 +25,17 @@ const ChequeExpenses = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [unrealisedCheques, setUnrealisedCheques] = useState([]);
   const [realisedCheques, setRealisedCheques] = useState([]);
+  const [payees, setPayees] = useState([]);
+  const [payeeSearch, setPayeeSearch] = useState('');
+  const [filteredPayees, setFilteredPayees] = useState([]);
+  const [selectedPayee, setSelectedPayee] = useState(null);
+  const [isPayeesLoading, setIsPayeesLoading] = useState(false);
+  const [payeesError, setPayeesError] = useState('');
+  const [isPayeeDropdownOpen, setIsPayeeDropdownOpen] = useState(false);
+  const [highlightedPayeeIndex, setHighlightedPayeeIndex] = useState(0);
+  const [editingId, setEditingId] = useState(null);
   const { showPopup } = usePopup();
+  const payeeInputRef = useRef(null);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -74,10 +86,95 @@ const ChequeExpenses = () => {
     }
   }, [showPopup]);
 
-  // Fetch data on component mount
+  const fetchPayees = useCallback(async () => {
+    setIsPayeesLoading(true);
+    setPayeesError('');
+
+    try {
+      const response = await api.get('/payees');
+      const payeeData = response.data || [];
+      setPayees(payeeData);
+      setFilteredPayees(payeeData);
+    } catch (error) {
+      console.error('Error fetching payees:', error);
+      setPayees([]);
+      setFilteredPayees([]);
+      setPayeesError('Unable to load payees. You may still type a payee name.');
+    } finally {
+      setIsPayeesLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchChequeData();
-  }, [fetchChequeData]);
+    fetchPayees();
+  }, [fetchChequeData, fetchPayees]);
+
+  useEffect(() => {
+    const query = payeeSearch.trim().toLowerCase();
+    const filtered = query === ''
+      ? payees
+      : payees.filter(payee => payee.payee_name.toLowerCase().includes(query));
+
+    setFilteredPayees(filtered);
+    setHighlightedPayeeIndex(0);
+  }, [payeeSearch, payees]);
+
+  useEffect(() => {
+    const exactMatch = payees.find(
+      payee => payee.payee_name.toLowerCase() === payeeSearch.trim().toLowerCase()
+    );
+    setSelectedPayee(exactMatch || null);
+  }, [payeeSearch, payees]);
+
+  const handlePayeeInputChange = (e) => {
+    const value = e.target.value;
+    setPayeeSearch(value);
+    setFormData(prev => ({ ...prev, payee_name: value }));
+    if (selectedPayee && selectedPayee.payee_name !== value) {
+      setSelectedPayee(null);
+      setFormData(prev => ({ ...prev, vat_reg_number: '' }));
+    }
+    setIsPayeeDropdownOpen(true);
+  };
+
+  const handlePayeeSelect = (payee) => {
+    setSelectedPayee(payee);
+    setPayeeSearch(payee.payee_name);
+    setFormData(prev => ({
+      ...prev,
+      payee_name: payee.payee_name,
+      vat_reg_number: payee.vat_reg_number || ''
+    }));
+    setIsPayeeDropdownOpen(false);
+  };
+
+  const handleClearPayee = () => {
+    setSelectedPayee(null);
+    setPayeeSearch('');
+    setFormData(prev => ({ ...prev, payee_name: '', vat_reg_number: '' }));
+    setIsPayeeDropdownOpen(false);
+  };
+
+  const handlePayeeKeyDown = (e) => {
+    if (!isPayeeDropdownOpen || filteredPayees.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setHighlightedPayeeIndex(prev => (prev + 1) % filteredPayees.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlightedPayeeIndex(prev => (prev - 1 + filteredPayees.length) % filteredPayees.length);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const selected = filteredPayees[highlightedPayeeIndex];
+      if (selected) {
+        handlePayeeSelect(selected);
+      }
+    } else if (e.key === 'Escape') {
+      setIsPayeeDropdownOpen(false);
+    }
+  };
 
   // Calculate total amount when without_vat or vat changes
   useEffect(() => {
@@ -120,10 +217,15 @@ const ChequeExpenses = () => {
         description: formData.description || null
       };
 
-      const response = await api.post('/expenses/cheque/voucher', payload);
+      let response;
+      if (editingId) {
+        response = await api.put(`/expenses/cheque/voucher/${editingId}`, payload);
+      } else {
+        response = await api.post('/expenses/cheque/voucher', payload);
+      }
       
       if (response.status === 201 || response.status === 200) {
-        showPopup('success', 'Cheque expense voucher created successfully!');
+        showPopup('success', editingId ? 'Cheque expense voucher updated successfully!' : 'Cheque expense voucher created successfully!');
         
         // Reset form
         setFormData({
@@ -137,13 +239,68 @@ const ChequeExpenses = () => {
           total_bill_amount: '',
           description: ''
         });
+        setEditingId(null);
         
         // Refresh data
         await fetchChequeData();
       }
     } catch (error) {
-      console.error('Error creating cheque voucher:', error);
-      showPopup('error', error.response?.data?.error || 'Failed to create voucher');
+      console.error(editingId ? 'Error updating cheque voucher:' : 'Error creating cheque voucher:', error);
+      showPopup('error', error.response?.data?.error || (editingId ? 'Failed to update voucher' : 'Failed to create voucher'));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleEdit = (cheque) => {
+    setEditingId(cheque.id);
+    setActiveTab('voucher');
+    setFormData({
+      bill_date: cheque.date || cheque.bill_date || new Date().toISOString().split('T')[0],
+      bill_number: cheque.bill_number || '',
+      payee_name: cheque.payee_name || '',
+      vat_reg_number: cheque.vat_reg_number || '',
+      expense_type: cheque.expense_type || '',
+      without_vat_amount: cheque.without_vat_amount != null ? cheque.without_vat_amount.toString() : '',
+      vat_amount: cheque.vat_amount != null ? cheque.vat_amount.toString() : '',
+      total_bill_amount: cheque.total_bill_amount != null ? cheque.total_bill_amount.toString() : '',
+      description: cheque.description || ''
+    });
+    setPayeeSearch(cheque.payee_name || '');
+    setSelectedPayee(null);
+    document.querySelector('.voucher-form-container')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setSelectedPayee(null);
+    setPayeeSearch('');
+    setFormData({
+      bill_date: new Date().toISOString().split('T')[0],
+      bill_number: '',
+      payee_name: '',
+      vat_reg_number: '',
+      expense_type: '',
+      without_vat_amount: '',
+      vat_amount: '',
+      total_bill_amount: '',
+      description: ''
+    });
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this cheque voucher?')) return;
+
+    setIsLoading(true);
+    try {
+      const response = await api.delete(`/expenses/cheque/voucher/${id}`);
+      if (response.status === 200) {
+        showPopup('success', 'Cheque voucher deleted successfully!');
+        await fetchChequeData();
+      }
+    } catch (error) {
+      console.error('Error deleting cheque voucher:', error);
+      showPopup('error', error.response?.data?.error || 'Failed to delete cheque voucher');
     } finally {
       setIsLoading(false);
     }
@@ -250,8 +407,8 @@ const ChequeExpenses = () => {
         <div className="voucher-form-container">
           <div className="form-card">
             <h3 className="form-title">
-              <FontAwesomeIcon icon={faPlus} />
-              New Expense Voucher
+              <FontAwesomeIcon icon={editingId ? faEdit : faPlus} />
+              {editingId ? 'Edit Expense Voucher' : 'New Expense Voucher'}
             </h3>
             
             <form onSubmit={handleSubmit} className="cheque-form">
@@ -284,17 +441,60 @@ const ChequeExpenses = () => {
               <div className="form-row">
                 <div className="form-group">
                   <label>Payee Name <span className="required">*</span></label>
-                  <input
-                    type="text"
-                    name="payee_name"
-                    value={formData.payee_name}
-                    onChange={handleChange}
-                    required
-                    className="form-input"
-                    placeholder="Enter payee name"
-                  />
+                  <div className="payee-dropdown-wrapper">
+                    <div className="payee-input-inner">
+                      <input
+                        type="text"
+                        name="payee_name"
+                        value={payeeSearch}
+                        onChange={handlePayeeInputChange}
+                        onFocus={() => setIsPayeeDropdownOpen(true)}
+                        onBlur={() => setTimeout(() => setIsPayeeDropdownOpen(false), 150)}
+                        onKeyDown={handlePayeeKeyDown}
+                        ref={payeeInputRef}
+                        required
+                        className="form-input"
+                        placeholder="Search or type payee name"
+                        autoComplete="off"
+                      />
+                      {payeeSearch && (
+                        <button type="button" className="clear-payee-btn" onClick={handleClearPayee}>
+                          ×
+                        </button>
+                      )}
+                    </div>
+
+                    {isPayeeDropdownOpen && !isPayeesLoading && (
+                      <div className="payee-dropdown">
+                        {payeesError ? (
+                          <div className="dropdown-empty">{payeesError}</div>
+                        ) : filteredPayees.length === 0 ? (
+                          <div className="dropdown-empty">
+                            {payees.length === 0 ? 'No payees found. You can still type a payee name.' : 'No matching payees found.'}
+                          </div>
+                        ) : (
+                          filteredPayees.map((payee, index) => (
+                            <button
+                              type="button"
+                              key={payee.id}
+                              className={`dropdown-item ${index === highlightedPayeeIndex ? 'highlighted' : ''}`}
+                              onMouseDown={(event) => event.preventDefault()}
+                              onClick={() => handlePayeeSelect(payee)}
+                            >
+                              <span>{payee.payee_name}</span>
+                              {payee.vat_reg_number ? <span className="dropdown-annotation">{payee.vat_reg_number}</span> : null}
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
+
+                    {isPayeesLoading && (
+                      <div className="dropdown-loading"><FontAwesomeIcon icon={faSpinner} spin /> Loading payees...</div>
+                    )}
+                  </div>
                 </div>
-                
+
                 <div className="form-group">
                   <label>VAT Reg Number</label>
                   <input
@@ -382,6 +582,17 @@ const ChequeExpenses = () => {
               </div>
 
               <div className="form-actions">
+                {editingId && (
+                  <button 
+                    type="button" 
+                    onClick={handleCancelEdit}
+                    className="btn-secondary"
+                    disabled={isLoading}
+                  >
+                    <FontAwesomeIcon icon={faTimes} />
+                    Cancel
+                  </button>
+                )}
                 <button 
                   type="button" 
                   onClick={() => {
@@ -396,6 +607,9 @@ const ChequeExpenses = () => {
                       total_bill_amount: '',
                       description: ''
                     });
+                    if (editingId) {
+                      setEditingId(null);
+                    }
                   }}
                   className="btn-secondary"
                   disabled={isLoading}
@@ -409,7 +623,7 @@ const ChequeExpenses = () => {
                   disabled={isLoading}
                 >
                   <FontAwesomeIcon icon={isLoading ? faSpinner : faSave} spin={isLoading} />
-                  {isLoading ? 'Submitting...' : 'Submit Voucher'}
+                  {isLoading ? (editingId ? 'Updating...' : 'Submitting...') : (editingId ? 'Update Voucher' : 'Submit Voucher')}
                 </button>
               </div>
             </form>
@@ -497,7 +711,21 @@ const ChequeExpenses = () => {
                           className="realise-date-input"
                         />
                       </td>
-                      <td>
+                      <td className="action-cell">
+                        <button
+                          onClick={() => handleEdit(cheque)}
+                          className="edit-btn"
+                          title="Edit"
+                        >
+                          <FontAwesomeIcon icon={faEdit} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(cheque.id)}
+                          className="delete-btn"
+                          title="Delete"
+                        >
+                          <FontAwesomeIcon icon={faTrash} />
+                        </button>
                         <button
                           onClick={() => handleRealiseCheque(cheque.id, cheque.realise_date)}
                           className="save-btn"

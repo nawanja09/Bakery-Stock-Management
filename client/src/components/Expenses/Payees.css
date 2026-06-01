@@ -1,0 +1,435 @@
+/* Payees.css */
+
+.payees-container {
+  padding: 24px;
+  background-color: #f8f9fa;
+  min-height: calc(100vh - 60px);
+}
+
+.payees-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.payees-title {
+  font-size: 1.7rem;
+  font-weight: 700;
+  color: #2c3e50;
+  margin: 0 0 4px 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.title-icon {
+  color: #6d22e6;
+  font-size: 28px;
+}
+
+.payees-subtitle {
+  color: #6c757d;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+/* Buttons */
+.payees-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #6d22e6, #8b4df2);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.payees-btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(109, 34, 230, 0.3);
+}
+
+.payees-btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.payees-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #f8f9fa;
+  color: #495057;
+  border: 1px solid #dee2e6;
+  border-radius: 10px;
+  padding: 10px 18px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.payees-btn-secondary:hover {
+  background: #e9ecef;
+}
+
+/* Form Card */
+.payees-form-card {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(109, 34, 230, 0.08);
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid #ede8fc;
+  animation: slideDown 0.25s ease;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.payees-form-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #ede8fc;
+}
+
+.payees-form-header h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #3b1fa0;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.payees-close-btn {
+  background: none;
+  border: none;
+  color: #999;
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+
+.payees-close-btn:hover {
+  background: #f5f0ff;
+  color: #6d22e6;
+}
+
+.payees-section-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #6d22e6;
+  margin: 18px 0 10px;
+}
+
+.payees-form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.payees-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.payees-form-group label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #444;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.required {
+  color: #e74c3c;
+  margin-left: 2px;
+}
+
+.payees-input,
+.payees-select {
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 0.9rem;
+  color: #333;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  outline: none;
+}
+
+.payees-input:focus,
+.payees-select:focus {
+  border-color: #6d22e6;
+  box-shadow: 0 0 0 3px rgba(109, 34, 230, 0.1);
+}
+
+.payees-textarea {
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 0.9rem;
+  resize: vertical;
+  outline: none;
+  font-family: inherit;
+}
+
+.payees-textarea:focus {
+  border-color: #6d22e6;
+  box-shadow: 0 0 0 3px rgba(109, 34, 230, 0.1);
+}
+
+.payees-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #f0f0f0;
+}
+
+/* Table Card */
+.payees-table-card {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(109, 34, 230, 0.07);
+  overflow: hidden;
+  border: 1px solid #ede8fc;
+}
+
+.payees-table-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px;
+  border-bottom: 1px solid #f0eaff;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.payees-table-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #3b1fa0;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.payees-count {
+  background: #ede8fc;
+  color: #6d22e6;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-radius: 20px;
+  padding: 2px 10px;
+}
+
+.payees-table-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.payees-search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.payees-search-icon {
+  position: absolute;
+  left: 12px;
+  color: #aaa;
+  font-size: 0.85rem;
+}
+
+.payees-search-input {
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 9px 32px 9px 36px;
+  font-size: 0.875rem;
+  width: 280px;
+  outline: none;
+}
+
+.payees-search-input:focus {
+  border-color: #6d22e6;
+}
+
+.payees-clear-search {
+  position: absolute;
+  right: 8px;
+  background: none;
+  border: none;
+  color: #aaa;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.payees-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #dee2e6;
+  background: white;
+  color: #555;
+  border-radius: 8px;
+  padding: 9px 14px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.payees-refresh-btn:hover {
+  background: #f8f9fa;
+}
+
+/* Table */
+.payees-table-container {
+  overflow-x: auto;
+}
+
+.payees-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.payees-table thead tr {
+  background: #f8f5ff;
+}
+
+.payees-table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6d22e6;
+  border-bottom: 2px solid #ede8fc;
+}
+
+.payees-table td {
+  padding: 13px 16px;
+  border-bottom: 1px solid #f5f0ff;
+  color: #333;
+  vertical-align: middle;
+}
+
+.payees-table tbody tr:hover {
+  background: #faf8ff;
+}
+
+.payees-num {
+  color: #999;
+  font-size: 0.8rem;
+  width: 36px;
+}
+
+.payees-name {
+  font-weight: 600;
+  color: #3b1fa0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.payees-row-icon {
+  color: #6d22e6;
+  opacity: 0.6;
+  font-size: 0.85rem;
+}
+
+.payees-vat {
+  font-family: monospace;
+  font-size: 0.8rem;
+}
+
+/* Action Buttons */
+.payees-action-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.payees-edit-btn,
+.payees-delete-btn {
+  border: none;
+  border-radius: 7px;
+  padding: 7px 10px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.payees-edit-btn {
+  background: #e8f0fe;
+  color: #3b1fa0;
+}
+
+.payees-delete-btn {
+  background: #fde8e8;
+  color: #c0392b;
+}
+
+.payees-edit-btn:hover,
+.payees-delete-btn:hover {
+  opacity: 0.8;
+  transform: scale(1.05);
+}
+
+.payees-loading-row,
+.payees-empty-row {
+  text-align: center;
+  padding: 40px !important;
+  color: #999;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .payees-container {
+    padding: 16px;
+  }
+  
+  .payees-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .payees-search-input {
+    width: 100%;
+  }
+  
+  .payees-table-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .payees-table-actions {
+    width: 100%;
+  }
+}

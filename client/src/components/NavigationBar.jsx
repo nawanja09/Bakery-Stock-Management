@@ -630,6 +630,13 @@ const NavigationBar = () => {
                     <span>Bank Details</span>
                   </NavLink>
                 </li>
+                {/* Payees */}
+                <li>
+                  <NavLink to="/expenses/payees" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                    <span className="icon-container"><FontAwesomeIcon icon={faUsers} /></span>
+                    <span>Payees</span>
+                  </NavLink>
+                </li>
               </ul>
             </li>
           </div>

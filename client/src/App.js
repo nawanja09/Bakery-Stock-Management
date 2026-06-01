@@ -81,6 +81,7 @@ import ChequeExpenses from './components/Expenses/ChequeExpenses';
 import BankCharges from './components/Expenses/BankCharges';
 import OnlineExpenses from './components/Expenses/OnlineExpenses';
 import BankDetails from './components/Expenses/BankDetails';
+import Payees from './components/Expenses/Payees';
 
 import './App.css';
 
@@ -192,6 +193,7 @@ function App() {
             <Route path="expenses/bank-charges" element={<BankCharges />} />
             <Route path="expenses/online" element={<OnlineExpenses />} />
             <Route path="expenses/bank-details" element={<BankDetails />} />
+            <Route path="/expenses/payees" element={<Payees />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/login" replace />} />
