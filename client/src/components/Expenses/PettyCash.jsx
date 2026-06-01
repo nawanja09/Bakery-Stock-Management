@@ -325,6 +325,70 @@ const PettyCash = () => {
     return new Date(dateString).toLocaleDateString('en-LK');
   };
 
+  // Print vouchers table
+  const handlePrintVouchers = () => {
+    const printContent = document.getElementById('vouchers-table-container');
+    if (!printContent) {
+      showPopup('error', 'No data to print');
+      return;
+    }
+    const originalTitle = document.title;
+    document.title = 'Petty Cash Vouchers Report';
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Petty Cash Vouchers</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            h2 { text-align: center; }
+            table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #f2f2f2; }
+            .amount { text-align: right; }
+          </style>
+        </head>
+        <body>
+          <h2>Petty Cash Vouchers</h2>
+          ${printContent.cloneNode(true).outerHTML}
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+    printWindow.close();
+    document.title = originalTitle;
+  };
+
+  // Export vouchers to Excel (CSV)
+  const handleExportVouchers = () => {
+    if (!vouchers.length) {
+      showPopup('error', 'No voucher data to export');
+      return;
+    }
+    const headers = ['Date', 'Voucher No.', 'Payee', 'Expense Type', 'Receipt No.', 'Amount (LKR)'];
+    const rows = vouchers.map(v => [
+      formatDate(v.voucher_date || v.date),
+      v.voucher_number,
+      v.payee_name || v.payee,
+      v.expense_type,
+      v.receipt_no || '-',
+      v.amount
+    ]);
+    const csvContent = [headers, ...rows]
+      .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.href = url;
+    link.setAttribute('download', `petty_cash_vouchers_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="expenses-container">
       <div className="expenses-header">
@@ -582,15 +646,15 @@ const PettyCash = () => {
                 >
                   <FontAwesomeIcon icon={isFetching ? faSpinner : faSync} spin={isFetching} />
                 </button>
-                <button className="icon-btn" title="Print">
+                <button className="icon-btn" title="Print" onClick={handlePrintVouchers}>
                   <FontAwesomeIcon icon={faPrint} />
                 </button>
-                <button className="icon-btn" title="Export to Excel">
+                <button className="icon-btn" title="Export to Excel" onClick={handleExportVouchers}>
                   <FontAwesomeIcon icon={faFileExcel} />
                 </button>
               </div>
             </div>
-            <div className="table-container">
+            <div className="table-container" id="vouchers-table-container">
               <table className="data-table">
                 <thead>
                   <tr>
@@ -601,14 +665,14 @@ const PettyCash = () => {
                     <th>Receipt No.</th>
                     <th>Amount (LKR)</th>
                     <th>Actions</th>
-                   </tr>
+                  </tr>
                 </thead>
                 <tbody>
                   {isFetching ? (
                     <tr>
-                      <td colSpan="6" className="loading-row">
+                      <td colSpan="7" className="loading-row">
                         <FontAwesomeIcon icon={faSpinner} spin /> Loading vouchers...
-                      </td>
+                       </td>
                     </tr>
                   ) : vouchers.length > 0 ? (
                     vouchers.map(voucher => (
@@ -637,7 +701,7 @@ const PettyCash = () => {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="6" className="empty-row">No vouchers found</td>
+                      <td colSpan="7" className="empty-row">No vouchers found</td>
                     </tr>
                   )}
                 </tbody>
@@ -762,7 +826,7 @@ const PettyCash = () => {
                     <th>Amount (LKR)</th>
                     <th>Status</th>
                     <th>Actions</th>
-                   </tr>
+                  </tr>
                 </thead>
                 <tbody>
                   {isFetching ? (
