@@ -1,5 +1,5 @@
 // src/components/Expenses/OnlineExpenses.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faSave, 
@@ -13,7 +13,6 @@ import {
   faSync,
   faSpinner,
   faGlobe,
-  faWallet,
   faReceipt
 } from '@fortawesome/free-solid-svg-icons';
 import './OnlineExpenses.css';
@@ -26,7 +25,19 @@ const OnlineExpenses = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [onlineExpenses, setOnlineExpenses] = useState([]);
   const [editingId, setEditingId] = useState(null);
+  
+  // Payee related state
+  const [payees, setPayees] = useState([]);
+  const [payeeSearch, setPayeeSearch] = useState('');
+  const [filteredPayees, setFilteredPayees] = useState([]);
+  const [selectedPayee, setSelectedPayee] = useState(null);
+  const [isPayeesLoading, setIsPayeesLoading] = useState(false);
+  const [payeesError, setPayeesError] = useState('');
+  const [isPayeeDropdownOpen, setIsPayeeDropdownOpen] = useState(false);
+  const [highlightedPayeeIndex, setHighlightedPayeeIndex] = useState(0);
+  
   const { showPopup } = usePopup();
+  const payeeInputRef = useRef(null);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -50,6 +61,51 @@ const OnlineExpenses = () => {
     'Internet'
   ];
 
+  // Fetch payees from database
+  const fetchPayees = useCallback(async () => {
+    setIsPayeesLoading(true);
+    setPayeesError('');
+
+    try {
+      const response = await api.get('/payees');
+      const payeeData = response.data || [];
+      setPayees(payeeData);
+      setFilteredPayees(payeeData);
+    } catch (error) {
+      console.error('Error fetching payees:', error);
+      setPayees([]);
+      setFilteredPayees([]);
+      setPayeesError('Unable to load payees. You may still type a payee name.');
+    } finally {
+      setIsPayeesLoading(false);
+    }
+  }, []);
+
+  // Fetch data on component mount
+  useEffect(() => {
+    fetchOnlineExpenses();
+    fetchPayees();
+  }, []);
+
+  // Filter payees based on search term
+  useEffect(() => {
+    const query = payeeSearch.trim().toLowerCase();
+    const filtered = query === ''
+      ? payees
+      : payees.filter(payee => payee.payee_name.toLowerCase().includes(query));
+    
+    setFilteredPayees(filtered);
+    setHighlightedPayeeIndex(0);
+  }, [payeeSearch, payees]);
+
+  // Update selectedPayee when search matches exactly
+  useEffect(() => {
+    const exactMatch = payees.find(
+      payee => payee.payee_name.toLowerCase() === payeeSearch.trim().toLowerCase()
+    );
+    setSelectedPayee(exactMatch || null);
+  }, [payeeSearch, payees]);
+
   // Calculate total amount when without_vat or vat changes
   useEffect(() => {
     const withoutVat = parseFloat(formData.without_vat_amount) || 0;
@@ -57,11 +113,6 @@ const OnlineExpenses = () => {
     const total = withoutVat + vat;
     setFormData(prev => ({ ...prev, total_bill_amount: total.toFixed(2) }));
   }, [formData.without_vat_amount, formData.vat_amount]);
-
-  // Fetch data on component mount
-  useEffect(() => {
-    fetchOnlineExpenses();
-  }, []);
 
   const fetchOnlineExpenses = async () => {
     setIsFetching(true);
@@ -71,11 +122,59 @@ const OnlineExpenses = () => {
     } catch (error) {
       console.error('Error fetching online expenses:', error);
       showPopup('error', 'Failed to load data from server');
-      // Set demo data if API fails
-      setOnlineExpenses([
-      ]);
+      setOnlineExpenses([]);
     } finally {
       setIsFetching(false);
+    }
+  };
+
+  // Payee input handlers
+  const handlePayeeInputChange = (e) => {
+    const value = e.target.value;
+    setPayeeSearch(value);
+    setFormData(prev => ({ ...prev, payee_name: value }));
+    if (selectedPayee && selectedPayee.payee_name !== value) {
+      setSelectedPayee(null);
+      setFormData(prev => ({ ...prev, vat_reg_number: '' }));
+    }
+    setIsPayeeDropdownOpen(true);
+  };
+
+  const handlePayeeSelect = (payee) => {
+    setSelectedPayee(payee);
+    setPayeeSearch(payee.payee_name);
+    setFormData(prev => ({
+      ...prev,
+      payee_name: payee.payee_name,
+      vat_reg_number: payee.vat_reg_number || ''
+    }));
+    setIsPayeeDropdownOpen(false);
+  };
+
+  const handleClearPayee = () => {
+    setSelectedPayee(null);
+    setPayeeSearch('');
+    setFormData(prev => ({ ...prev, payee_name: '', vat_reg_number: '' }));
+    setIsPayeeDropdownOpen(false);
+  };
+
+  const handlePayeeKeyDown = (e) => {
+    if (!isPayeeDropdownOpen || filteredPayees.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setHighlightedPayeeIndex(prev => (prev + 1) % filteredPayees.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlightedPayeeIndex(prev => (prev - 1 + filteredPayees.length) % filteredPayees.length);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const selected = filteredPayees[highlightedPayeeIndex];
+      if (selected) {
+        handlePayeeSelect(selected);
+      }
+    } else if (e.key === 'Escape') {
+      setIsPayeeDropdownOpen(false);
     }
   };
 
@@ -112,10 +211,15 @@ const OnlineExpenses = () => {
         description: formData.description || null
       };
 
-      const response = await api.post('/expenses/online', payload);
+      let response;
+      if (editingId) {
+        response = await api.put(`/expenses/online/${editingId}`, payload);
+      } else {
+        response = await api.post('/expenses/online', payload);
+      }
       
       if (response.status === 201 || response.status === 200) {
-        showPopup('success', 'Online expense recorded successfully!');
+        showPopup('success', editingId ? 'Online expense updated successfully!' : 'Online expense recorded successfully!');
         
         // Reset form
         setFormData({
@@ -129,13 +233,16 @@ const OnlineExpenses = () => {
           total_bill_amount: '',
           description: ''
         });
+        setPayeeSearch('');
+        setSelectedPayee(null);
+        setEditingId(null);
         
         // Refresh data
         await fetchOnlineExpenses();
       }
     } catch (error) {
-      console.error('Error creating online expense:', error);
-      showPopup('error', error.response?.data?.error || 'Failed to record online expense');
+      console.error(editingId ? 'Error updating online expense:' : 'Error creating online expense:', error);
+      showPopup('error', error.response?.data?.error || (editingId ? 'Failed to update online expense' : 'Failed to record online expense'));
     } finally {
       setIsLoading(false);
     }
@@ -154,6 +261,8 @@ const OnlineExpenses = () => {
       total_bill_amount: expense.total_bill_amount.toString(),
       description: expense.description || ''
     });
+    setPayeeSearch(expense.payee_name);
+    setSelectedPayee(null);
     // Scroll to form
     document.querySelector('.form-card')?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -197,6 +306,8 @@ const OnlineExpenses = () => {
           total_bill_amount: '',
           description: ''
         });
+        setPayeeSearch('');
+        setSelectedPayee(null);
         setEditingId(null);
         
         // Refresh data
@@ -231,6 +342,8 @@ const OnlineExpenses = () => {
 
   const handleCancelEdit = () => {
     setEditingId(null);
+    setSelectedPayee(null);
+    setPayeeSearch('');
     setFormData({
       bill_date: new Date().toISOString().split('T')[0],
       bill_number: '',
@@ -307,15 +420,58 @@ const OnlineExpenses = () => {
           <div className="form-row">
             <div className="form-group">
               <label>Payee Name <span className="required">*</span></label>
-              <input
-                type="text"
-                name="payee_name"
-                value={formData.payee_name}
-                onChange={handleChange}
-                required
-                className="form-input"
-                placeholder="Enter payee name"
-              />
+              <div className="payee-dropdown-wrapper">
+                <div className="payee-input-inner">
+                  <input
+                    type="text"
+                    name="payee_name"
+                    value={payeeSearch}
+                    onChange={handlePayeeInputChange}
+                    onFocus={() => setIsPayeeDropdownOpen(true)}
+                    onBlur={() => setTimeout(() => setIsPayeeDropdownOpen(false), 150)}
+                    onKeyDown={handlePayeeKeyDown}
+                    ref={payeeInputRef}
+                    required
+                    className="form-input"
+                    placeholder="Search or type payee name"
+                    autoComplete="off"
+                  />
+                  {payeeSearch && (
+                    <button type="button" className="clear-payee-btn" onClick={handleClearPayee}>
+                      ×
+                    </button>
+                  )}
+                </div>
+
+                {isPayeeDropdownOpen && !isPayeesLoading && (
+                  <div className="payee-dropdown">
+                    {payeesError ? (
+                      <div className="dropdown-empty">{payeesError}</div>
+                    ) : filteredPayees.length === 0 ? (
+                      <div className="dropdown-empty">
+                        {payees.length === 0 ? 'No payees found. You can still type a payee name.' : 'No matching payees found.'}
+                      </div>
+                    ) : (
+                      filteredPayees.map((payee, index) => (
+                        <button
+                          type="button"
+                          key={payee.id}
+                          className={`dropdown-item ${index === highlightedPayeeIndex ? 'highlighted' : ''}`}
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => handlePayeeSelect(payee)}
+                        >
+                          <span>{payee.payee_name}</span>
+                          {payee.vat_reg_number ? <span className="dropdown-annotation">{payee.vat_reg_number}</span> : null}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+
+                {isPayeesLoading && (
+                  <div className="dropdown-loading"><FontAwesomeIcon icon={faSpinner} spin /> Loading payees...</div>
+                )}
+              </div>
             </div>
             
             <div className="form-group">
@@ -410,6 +566,7 @@ const OnlineExpenses = () => {
                 type="button" 
                 onClick={handleCancelEdit}
                 className="btn-secondary"
+                disabled={isLoading}
               >
                 <FontAwesomeIcon icon={faTimes} />
                 Cancel
@@ -429,6 +586,8 @@ const OnlineExpenses = () => {
                   total_bill_amount: '',
                   description: ''
                 });
+                setPayeeSearch('');
+                setSelectedPayee(null);
                 if (editingId) setEditingId(null);
               }}
               className="btn-secondary"
@@ -503,19 +662,18 @@ const OnlineExpenses = () => {
                 <th>Without VAT Amount</th>
                 <th>VAT Amount</th>
                 <th>Total Bill Amount</th>
-                <th>Balance</th>
                 <th>Description</th>
                 <th>Action</th>
               </tr>
             </thead>
             <tbody>
-                {isFetching ? (
-                    <tr>
-                        <td colSpan="10" className="loading-row">
-                        <FontAwesomeIcon icon={faSpinner} spin /> Loading online expenses...
-                        </td>
-                    </tr>
-                    ) : filteredExpenses.length > 0 ? (
+              {isFetching ? (
+                <tr>
+                  <td colSpan="9" className="loading-row">
+                    <FontAwesomeIcon icon={faSpinner} spin /> Loading online expenses...
+                  </td>
+                </tr>
+              ) : filteredExpenses.length > 0 ? (
                 filteredExpenses.map(expense => (
                   <tr key={expense.id}>
                     <td className="date-cell">{expense.bill_date}</td>
@@ -525,9 +683,6 @@ const OnlineExpenses = () => {
                     <td className="amount-cell">{formatCurrency(expense.without_vat_amount)}</td>
                     <td className="amount-cell">{formatCurrency(expense.vat_amount)}</td>
                     <td className="amount-cell total">{formatCurrency(expense.total_bill_amount)}</td>
-                    <td className={`balance-cell ${expense.balance > 0 ? 'balance-positive' : 'balance-zero'}`}>
-                      {formatCurrency(expense.balance || 0)}
-                    </td>
                     <td className="description-cell">{expense.description || '-'}</td>
                     <td className="action-cell">
                       <button
@@ -549,7 +704,7 @@ const OnlineExpenses = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="10" className="empty-row">No online expenses found</td>
+                  <td colSpan="9" className="empty-row">No online expenses found</td>
                 </tr>
               )}
             </tbody>
