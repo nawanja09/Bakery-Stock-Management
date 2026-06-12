@@ -968,4 +968,28 @@ router.delete('/banks/:id', authenticate, async (req, res) => {
   }
 });
 
+router.delete('/petty-cash/voucher/:id', authenticate, async (req, res) => {
+  const { id } = req.params;
+  console.log(`🗑️ Deleting voucher ID: ${id}`);
+
+  try {
+    const [result] = await pool.query(
+      'DELETE FROM petty_cash_vouchers WHERE id = ?',
+      [id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Voucher not found' });
+    }
+
+    // Update petty cash balance (helper function)
+    await updatePettyCashBalance();
+
+    res.json({ message: 'Voucher deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting voucher:', error);
+    res.status(500).json({ error: 'Failed to delete voucher' });
+  }
+});
+
 module.exports = router;

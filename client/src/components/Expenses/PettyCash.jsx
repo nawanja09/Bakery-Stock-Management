@@ -2,19 +2,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
-  faSave, 
-  faTimes, 
-  faPlus, 
-  faHistory,
-  faMoneyBillWave,
-  faReceipt,
-  faPrint,
-  faFileExcel,
-  faEye,
-  faSync,
-  faSpinner,
-  faEdit,
-  faInfoCircle
+  faSave, faTimes, faPlus, faHistory, faMoneyBillWave, faReceipt,
+  faPrint, faFileExcel, faEye, faSync, faSpinner, faEdit, faTrash, faInfoCircle
 } from '@fortawesome/free-solid-svg-icons';
 import './Expenses.css';
 import { usePopup } from '../context/PopupContext';
@@ -30,19 +19,15 @@ const PettyCash = () => {
   const [reimbursements, setReimbursements] = useState([]);
   const { showPopup } = usePopup();
   const [isEditing, setIsEditing] = useState(false);
+  const [user, setUser] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [suggestedVoucherNo, setSuggestedVoucherNo] = useState('');
   const [suggestedReferenceNo, setSuggestedReferenceNo] = useState('');
-
-  // Reimbursement edit states
   const [isEditingReimbursement, setIsEditingReimbursement] = useState(false);
   const [editingReimbursementId, setEditingReimbursementId] = useState(null);
-
-  // View modal state
   const [showViewModal, setShowViewModal] = useState(false);
   const [selectedReimbursement, setSelectedReimbursement] = useState(null);
 
-  // Voucher Form State
   const [voucherForm, setVoucherForm] = useState({
     date: new Date().toISOString().split('T')[0],
     voucher_number: '',
@@ -55,7 +40,6 @@ const PettyCash = () => {
     receipt_no: ''
   });
 
-  // Reimbursement Form State
   const [reimbursementForm, setReimbursementForm] = useState({
     date: new Date().toISOString().split('T')[0],
     reference_number: '',
@@ -68,7 +52,18 @@ const PettyCash = () => {
     'Utilities', 'Entertainment'
   ];
 
-  // Fetch voucher number suggestion
+  // Helper to get user role directly from localStorage (fallback)
+  const getUserRole = () => {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      try {
+        const parsed = JSON.parse(storedUser);
+        return parsed.role;
+      } catch(e) { return null; }
+    }
+    return null;
+  };
+
   const fetchVoucherSuggestion = useCallback(async () => {
     try {
       const response = await api.get('/expenses/petty-cash/next-voucher-number');
@@ -76,7 +71,6 @@ const PettyCash = () => {
     } catch (error) { console.error('Error fetching voucher suggestion:', error); }
   }, []);
 
-  // Fetch reference number suggestion
   const fetchReferenceSuggestion = useCallback(async () => {
     try {
       const response = await api.get('/expenses/petty-cash/next-reference-number');
@@ -84,7 +78,6 @@ const PettyCash = () => {
     } catch (error) { console.error('Error fetching reference suggestion:', error); }
   }, []);
 
-  // Fetch all data
   const fetchPettyCashData = useCallback(async () => {
     setIsFetching(true);
     try {
@@ -103,6 +96,21 @@ const PettyCash = () => {
     }
   }, [showPopup]);
 
+  useEffect(() => {
+    const loggedInUser = localStorage.getItem('user');
+    if (loggedInUser) {
+      try {
+        const parsed = JSON.parse(loggedInUser);
+        setUser(parsed);
+        console.log('✅ User loaded from localStorage:', parsed); // Debug log
+      } catch (e) {
+        console.error('Error parsing user:', e);
+      }
+    } else {
+      console.warn('⚠️ No user found in localStorage');
+    }
+  }, []);
+
   useEffect(() => { fetchPettyCashData(); }, [fetchPettyCashData]);
   useEffect(() => {
     if (activeTab === 'voucher') fetchVoucherSuggestion();
@@ -119,7 +127,6 @@ const PettyCash = () => {
     setReimbursementForm(prev => ({ ...prev, [name]: value }));
   };
 
-  // Voucher edit
   const handleEdit = (voucher) => {
     setIsEditing(true);
     setEditingId(voucher.id);
@@ -148,7 +155,26 @@ const PettyCash = () => {
     fetchVoucherSuggestion();
   };
 
-  // Submit Voucher
+  const handleDelete = async (id) => {
+    if (window.confirm('Are you sure you want to delete this voucher?')) {
+      setIsLoading(true);
+      try {
+        const response = await api.delete(`/expenses/petty-cash/voucher/${id}`);
+        if (response.status === 200 || response.status === 204) {
+          showPopup('success', 'Petty cash voucher deleted successfully!');
+          await fetchPettyCashData();
+        } else {
+          showPopup('error', response.data?.error || 'Failed to delete voucher');
+        }
+      } catch (error) {
+        console.error('Error deleting voucher:', error);
+        showPopup('error', error.response?.data?.error || 'Failed to delete voucher');
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
   const handleVoucherSubmit = async (e) => {
     e.preventDefault();
     if (!voucherForm.voucher_number || !voucherForm.payee_name || !voucherForm.expense_type || !voucherForm.amount || parseFloat(voucherForm.amount) <= 0) {
@@ -182,7 +208,6 @@ const PettyCash = () => {
     } finally { setIsLoading(false); }
   };
 
-  // Reimbursement submit (create or update)
   const handleReimbursementSubmit = async (e) => {
     e.preventDefault();
     if (!reimbursementForm.reference_number || !reimbursementForm.amount || parseFloat(reimbursementForm.amount) <= 0) {
@@ -233,7 +258,6 @@ const PettyCash = () => {
     fetchReferenceSuggestion();
   };
 
-  // View Reimbursement Details
   const handleViewReimbursement = (reimbursement) => {
     setSelectedReimbursement(reimbursement);
     setShowViewModal(true);
@@ -249,7 +273,6 @@ const PettyCash = () => {
     return new Date(dateString).toLocaleDateString('en-LK');
   };
 
-  // Print vouchers
   const handlePrintVouchers = () => {
     const printContent = document.getElementById('vouchers-table-container');
     if (!printContent) { showPopup('error', 'No data to print'); return; }
@@ -277,13 +300,18 @@ const PettyCash = () => {
     URL.revokeObjectURL(link.href);
   };
 
+  // Determine if user is admin (case-insensitive, with fallback)
+  const isAdmin = () => {
+    const role = user?.role || getUserRole();
+    return role && role.toLowerCase() === 'admin';
+  };
+
   return (
     <div className="expenses-container">
       <div className="expenses-header">
         <h1 className="expenses-title"><FontAwesomeIcon icon={faMoneyBillWave} className="title-icon" /> Petty Cash Management</h1>
       </div>
 
-      {/* Balance Card */}
       <div className="balance-card">
         <div className="balance-icon"><FontAwesomeIcon icon={faMoneyBillWave} /></div>
         <div className="balance-info">
@@ -302,13 +330,11 @@ const PettyCash = () => {
         </div>
       </div>
 
-      {/* Tabs */}
       <div className="expenses-tabs">
         <button className={`tab-button ${activeTab === 'voucher' ? 'active' : ''}`} onClick={() => setActiveTab('voucher')}><FontAwesomeIcon icon={faReceipt} /> Petty Cash Voucher</button>
         <button className={`tab-button ${activeTab === 'reimbursement' ? 'active' : ''}`} onClick={() => setActiveTab('reimbursement')}><FontAwesomeIcon icon={faHistory} /> Reimbursement</button>
       </div>
 
-      {/* Voucher Tab */}
       {activeTab === 'voucher' && (
         <div className="expenses-form-container">
           <div className="form-card">
@@ -341,14 +367,46 @@ const PettyCash = () => {
           <div className="history-section">
             <div className="history-header"><h3>Recent Vouchers</h3><div className="history-actions"><button className="icon-btn" onClick={fetchPettyCashData} disabled={isFetching}><FontAwesomeIcon icon={isFetching ? faSpinner : faSync} spin={isFetching} /></button><button className="icon-btn" onClick={handlePrintVouchers}><FontAwesomeIcon icon={faPrint} /></button><button className="icon-btn" onClick={handleExportVouchers}><FontAwesomeIcon icon={faFileExcel} /></button></div></div>
             <div className="table-container" id="vouchers-table-container">
-              <table className="data-table"><thead><tr><th>Date</th><th>Voucher No.</th><th>Payee</th><th>Expense Type</th><th>Receipt No.</th><th>Amount (LKR)</th><th>Actions</th></tr></thead><tbody>
-                {isFetching ? <tr><td colSpan="7" className="loading-row"><FontAwesomeIcon icon={faSpinner} spin /> Loading vouchers...</td></tr> : vouchers.length > 0 ? vouchers.map(v => (<tr key={v.id}><td>{formatDate(v.voucher_date || v.date)}</td><td className="voucher-number">{v.voucher_number}</td><td>{v.payee_name || v.payee}</td><td>{v.expense_type}</td><td className="receipt-no">{v.receipt_no || '-'}</td><td className="amount-cell">{formatCurrency(v.amount)}</td><td><div className="action-buttons"><button className="action-btn view-btn" title="View"><FontAwesomeIcon icon={faEye} /></button><button className="action-btn edit-btn" title="Edit" onClick={() => handleEdit(v)}><FontAwesomeIcon icon={faEdit} /></button></div></td></tr>)) : <tr><td colSpan="7" className="empty-row">No vouchers found</td></tr>}
-              </tbody></table>
+              <table className="data-table">
+                <thead>
+                  <tr><th>Date</th><th>Voucher No.</th><th>Payee</th><th>Expense Type</th><th>Receipt No.</th><th>Amount (LKR)</th><th>Actions</th></tr>
+                </thead>
+                <tbody>
+                  {isFetching ? (
+                    <tr><td colSpan="7" className="loading-row"><FontAwesomeIcon icon={faSpinner} spin /> Loading vouchers...</td></tr>
+                  ) : vouchers.length > 0 ? (
+                    vouchers.map(v => (
+                      <tr key={v.id}>
+                        <td>{formatDate(v.voucher_date || v.date)}</td>
+                        <td className="voucher-number">{v.voucher_number}</td>
+                        <td>{v.payee_name || v.payee}</td>
+                        <td>{v.expense_type}</td>
+                        <td className="receipt-no">{v.receipt_no || '-'}</td>
+                        <td className="amount-cell">{formatCurrency(v.amount)}</td>
+                        <td>
+                          <div className="action-buttons">
+                            <button className="action-btn view-btn" title="View"><FontAwesomeIcon icon={faEye} /></button>
+                            <button className="action-btn edit-btn" title="Edit" onClick={() => handleEdit(v)}><FontAwesomeIcon icon={faEdit} /></button>
+                            {/* ✅ Fixed: case‑insensitive admin check with fallback */}
+                            {isAdmin() && (
+                              <button className="action-btn delete-btn" title="Delete" onClick={() => handleDelete(v.id)}>
+                                <FontAwesomeIcon icon={faTrash} />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr><td colSpan="7" className="empty-row">No vouchers found</td></tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
       )}
-
+      
       {/* Reimbursement Tab */}
       {activeTab === 'reimbursement' && (
         <div className="expenses-form-container">
@@ -402,7 +460,7 @@ const PettyCash = () => {
         </div>
       )}
 
-      {/* Simple CSS for modal - you can add this to Expenses.css */}
+      {/* Simple CSS for modal */}
       <style>{`
         .modal-overlay {
           position: fixed;
