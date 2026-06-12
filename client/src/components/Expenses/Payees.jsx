@@ -16,7 +16,7 @@ import {
   faPhone,
   faEnvelope,
   faMapMarkerAlt,
-  faIdCard
+  faIdCard  
 } from '@fortawesome/free-solid-svg-icons';
 import './Payees.css';
 import { usePopup } from '../context/PopupContext';

@@ -34,7 +34,7 @@ const loginUser = async (req, res) => {
       res.json({ 
         message: 'Login successful!', 
         token,
-        user: { id: user.id, email: user.email } 
+        user: { id: user.id, email: user.email, role: user.role }
       });
     } else {
       res.status(401).json({ error: 'Invalid credentials' });
@@ -47,7 +47,7 @@ const loginUser = async (req, res) => {
 
 const changePassword = async (req, res) => {
   const { currentPassword, newPassword } = req.body;  
-  const userId = req.user.userId; // Assuming user ID is stored in req.user after authentication
+  const userId = req.user.userId;
 
   try {
     const [rows] = await pool.query(
