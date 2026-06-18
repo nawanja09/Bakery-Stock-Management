@@ -13,7 +13,13 @@ import {
   faSync,
   faSpinner,
   faGlobe,
-  faReceipt
+  faReceipt,
+  faMoneyBillWave,
+  faCheckCircle,
+  faCreditCard,
+  faBuildingColumns,
+  faChevronDown,
+  faChevronUp
 } from '@fortawesome/free-solid-svg-icons';
 import './OnlineExpenses.css';
 import { usePopup } from '../context/PopupContext';
@@ -25,6 +31,14 @@ const OnlineExpenses = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [onlineExpenses, setOnlineExpenses] = useState([]);
   const [editingId, setEditingId] = useState(null);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedForPayment, setSelectedForPayment] = useState([]);
+  const [isFetchingBanks, setIsFetchingBanks] = useState(false);
+  const [banks, setBanks] = useState([]);
+  const [filteredBanks, setFilteredBanks] = useState([]);
+  const [bankSearchTerm, setBankSearchTerm] = useState('');
+  const [isBankDropdownOpen, setIsBankDropdownOpen] = useState(false);
   
   // Payee related state
   const [payees, setPayees] = useState([]);
@@ -38,6 +52,19 @@ const OnlineExpenses = () => {
   
   const { showPopup } = usePopup();
   const payeeInputRef = useRef(null);
+
+  // Payment Form State
+  const [paymentForm, setPaymentForm] = useState({
+    payment_date: new Date().toISOString().split('T')[0],
+    payee_name: '',
+    bank_name: '',
+    voucher_number: '',
+    reference_number: '',
+    expense_type: '',
+    description: '',
+    total_bill_amount: '',
+    transfer_amount: ''
+  });
 
   // Form State
   const [formData, setFormData] = useState({
@@ -60,6 +87,21 @@ const OnlineExpenses = () => {
     'Insurance',
     'Internet'
   ];
+
+  // Fetch banks
+  const fetchBanks = useCallback(async () => {
+    setIsFetchingBanks(true);
+    try {
+      const response = await api.get('/expenses/banks');
+      const banksData = response.data || [];
+      setBanks(banksData);
+      setFilteredBanks(banksData);
+    } catch (error) {
+      console.error('Error fetching banks:', error);
+    } finally {
+      setIsFetchingBanks(false);
+    }
+  }, []);
 
   // Fetch payees from database
   const fetchPayees = useCallback(async () => {
@@ -85,7 +127,20 @@ const OnlineExpenses = () => {
   useEffect(() => {
     fetchOnlineExpenses();
     fetchPayees();
+    fetchBanks();
   }, []);
+
+  // Filter banks based on search term
+  useEffect(() => {
+    if (bankSearchTerm.trim() === '') {
+      setFilteredBanks(banks);
+    } else {
+      const filtered = banks.filter(bank =>
+        bank.bank_name.toLowerCase().includes(bankSearchTerm.toLowerCase())
+      );
+      setFilteredBanks(filtered);
+    }
+  }, [bankSearchTerm, banks]);
 
   // Filter payees based on search term
   useEffect(() => {
@@ -178,9 +233,28 @@ const OnlineExpenses = () => {
     }
   };
 
+  // Bank dropdown handlers
+  const handleBankSelect = (bankName) => {
+    setPaymentForm(prev => ({ ...prev, bank_name: bankName }));
+    setBankSearchTerm(bankName);
+    setIsBankDropdownOpen(false);
+  };
+
+  const handleBankSearchChange = (e) => {
+    const value = e.target.value;
+    setBankSearchTerm(value);
+    setPaymentForm(prev => ({ ...prev, bank_name: value }));
+    setIsBankDropdownOpen(true);
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handlePaymentFormChange = (e) => {
+    const { name, value } = e.target;
+    setPaymentForm(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
@@ -357,6 +431,142 @@ const OnlineExpenses = () => {
     });
   };
 
+  // Selection handlers
+  const handleSelectAll = (e) => {
+    if (e.target.checked) {
+      const allIds = filteredExpenses.map(exp => exp.id);
+      setSelectedIds(allIds);
+    } else {
+      setSelectedIds([]);
+    }
+  };
+
+  const handleSelectOne = (id) => {
+    setSelectedIds(prev => {
+      if (prev.includes(id)) {
+        return prev.filter(item => item !== id);
+      } else {
+        return [...prev, id];
+      }
+    });
+  };
+
+  // Payment handlers
+  const handleOpenPaymentModal = async () => {
+    // If no items selected, use the current filtered expenses
+    let expensesToPay = [];
+    
+    if (selectedIds.length > 0) {
+      // Get selected expenses
+      expensesToPay = onlineExpenses.filter(exp => selectedIds.includes(exp.id));
+    } else {
+      // Use all filtered expenses that have balance > 0
+      expensesToPay = filteredExpenses.filter(exp => parseFloat(exp.balance || 0) > 0);
+    }
+
+    if (expensesToPay.length === 0) {
+      showPopup('error', 'No pending payments available');
+      return;
+    }
+
+    // Get detailed information for the first expense
+    try {
+      const firstExpense = expensesToPay[0];
+      const response = await api.get(`/expenses/online/${firstExpense.id}`);
+      const expenseDetail = response.data;
+      
+      const totalAmount = expensesToPay.reduce((sum, exp) => sum + parseFloat(exp.balance || 0), 0);
+      
+      setSelectedForPayment(expensesToPay);
+      setPaymentForm({
+        payment_date: new Date().toISOString().split('T')[0],
+        payee_name: firstExpense.payee_name,
+        bank_name: '',
+        voucher_number: '',
+        reference_number: '',
+        expense_type: firstExpense.expense_type,
+        description: firstExpense.description || '',
+        total_bill_amount: totalAmount.toFixed(2),
+        transfer_amount: totalAmount.toFixed(2)
+      });
+      
+      // Set payee search for dropdown
+      setPayeeSearch(firstExpense.payee_name);
+      
+      setShowPaymentModal(true);
+    } catch (error) {
+      console.error('Error fetching expense details:', error);
+      showPopup('error', 'Failed to load expense details');
+    }
+  };
+
+  const handleClosePaymentModal = () => {
+    setShowPaymentModal(false);
+    setSelectedForPayment([]);
+    setBankSearchTerm('');
+    setIsBankDropdownOpen(false);
+    setPayeeSearch('');
+  };
+
+  const handleProcessPayment = async () => {
+    // Validation
+    if (!paymentForm.payment_date) {
+      showPopup('error', 'Payment date is required');
+      return;
+    }
+
+    if (selectedForPayment.length === 0) {
+      showPopup('error', 'No expenses selected for payment');
+      return;
+    }
+
+    const transferAmount = parseFloat(paymentForm.transfer_amount) || 0;
+    const totalBalance = selectedForPayment.reduce((sum, exp) => sum + parseFloat(exp.balance || 0), 0);
+
+    if (transferAmount <= 0) {
+      showPopup('error', 'Valid transfer amount is required');
+      return;
+    }
+
+    if (transferAmount > totalBalance) {
+      showPopup('error', `Transfer amount (${transferAmount}) exceeds total balance (${totalBalance})`);
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const expenseIds = selectedForPayment.map(exp => exp.id);
+      
+      const payload = {
+        expense_ids: expenseIds,
+        payment_date: paymentForm.payment_date,
+        bank_name: paymentForm.bank_name || null,
+        voucher_number: paymentForm.voucher_number || null,
+        reference_number: paymentForm.reference_number || null,
+        transfer_amount: transferAmount
+      };
+
+      const response = await api.post('/expenses/online/pay', payload);
+      
+      if (response.status === 200) {
+        showPopup('success', response.data.message || 'Payment processed successfully!');
+        
+        // Reset selections
+        setSelectedIds([]);
+        setShowPaymentModal(false);
+        setSelectedForPayment([]);
+        
+        // Refresh data
+        await fetchOnlineExpenses();
+      }
+    } catch (error) {
+      console.error('Error processing payment:', error);
+      showPopup('error', error.response?.data?.error || 'Failed to process payment');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const formatCurrency = (amount) => {
     if (!amount && amount !== 0) return 'LKR 0.00';
     return new Intl.NumberFormat('en-LK', {
@@ -373,6 +583,10 @@ const OnlineExpenses = () => {
     expense.expense_type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     expense.vat_reg_number?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Check if all filtered items are selected
+  const allSelected = filteredExpenses.length > 0 && 
+    filteredExpenses.every(exp => selectedIds.includes(exp.id));
 
   return (
     <div className="online-expenses-container">
@@ -655,6 +869,14 @@ const OnlineExpenses = () => {
           <table className="online-table">
             <thead>
               <tr>
+                <th style={{ width: '40px' }}>
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={handleSelectAll}
+                    className="select-checkbox"
+                  />
+                </th>
                 <th>Bill Date</th>
                 <th>Bill Number</th>
                 <th>Payee Name</th>
@@ -662,6 +884,7 @@ const OnlineExpenses = () => {
                 <th>Without VAT Amount</th>
                 <th>VAT Amount</th>
                 <th>Total Bill Amount</th>
+                <th>Balance</th>
                 <th>Description</th>
                 <th>Action</th>
               </tr>
@@ -669,13 +892,21 @@ const OnlineExpenses = () => {
             <tbody>
               {isFetching ? (
                 <tr>
-                  <td colSpan="9" className="loading-row">
+                  <td colSpan="11" className="loading-row">
                     <FontAwesomeIcon icon={faSpinner} spin /> Loading online expenses...
                   </td>
                 </tr>
               ) : filteredExpenses.length > 0 ? (
                 filteredExpenses.map(expense => (
                   <tr key={expense.id}>
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(expense.id)}
+                        onChange={() => handleSelectOne(expense.id)}
+                        className="select-checkbox"
+                      />
+                    </td>
                     <td className="date-cell">{expense.bill_date}</td>
                     <td className="bill-number-cell">{expense.bill_number || '-'}</td>
                     <td className="payee-cell">{expense.payee_name}</td>
@@ -683,6 +914,11 @@ const OnlineExpenses = () => {
                     <td className="amount-cell">{formatCurrency(expense.without_vat_amount)}</td>
                     <td className="amount-cell">{formatCurrency(expense.vat_amount)}</td>
                     <td className="amount-cell total">{formatCurrency(expense.total_bill_amount)}</td>
+                    <td className="balance-cell">
+                      <span className={parseFloat(expense.balance || 0) > 0 ? 'balance-positive' : 'balance-zero'}>
+                        {formatCurrency(expense.balance || 0)}
+                      </span>
+                    </td>
                     <td className="description-cell">{expense.description || '-'}</td>
                     <td className="action-cell">
                       <button
@@ -704,13 +940,265 @@ const OnlineExpenses = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="9" className="empty-row">No online expenses found</td>
+                  <td colSpan="11" className="empty-row">No online expenses found</td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
+
+        {/* Payment Action Bar */}
+        <div className="payment-action-bar">
+          <div className="selected-info">
+            {selectedIds.length > 0 && (
+              <span className="selected-count">
+                <FontAwesomeIcon icon={faCheckCircle} /> {selectedIds.length} expense(s) selected
+              </span>
+            )}
+          </div>
+          <button
+            className="btn-pay"
+            onClick={handleOpenPaymentModal}
+            disabled={isLoading}
+          >
+            <FontAwesomeIcon icon={faMoneyBillWave} />
+            Pay
+          </button>
+        </div>
       </div>
+
+      {/* Payment Modal */}
+      {showPaymentModal && (
+        <div className="payment-modal-overlay" onClick={handleClosePaymentModal}>
+          <div className="payment-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="payment-modal-header">
+              <h3>
+                <FontAwesomeIcon icon={faCreditCard} />
+                Payment Details
+              </h3>
+              <button className="payment-modal-close" onClick={handleClosePaymentModal}>×</button>
+            </div>
+
+            <div className="payment-modal-body">
+              {/* Left Column - Payment Details */}
+              <div className="payment-details-section">
+                <div className="payment-section-title">Payment Details</div>
+                
+                <div className="payment-form-row">
+                  <div className="payment-form-group">
+                    <label>Payment Date <span className="required">*</span></label>
+                    <input
+                      type="date"
+                      name="payment_date"
+                      value={paymentForm.payment_date}
+                      onChange={handlePaymentFormChange}
+                      className="payment-input"
+                    />
+                  </div>
+                  
+                  <div className="payment-form-group">
+                    <label>Payee Name</label>
+                    <div className="payee-dropdown-wrapper">
+                      <div className="payee-input-inner">
+                        <input
+                          type="text"
+                          name="payee_name"
+                          value={payeeSearch}
+                          onChange={(e) => {
+                            setPayeeSearch(e.target.value);
+                            setPaymentForm(prev => ({ ...prev, payee_name: e.target.value }));
+                          }}
+                          className="payment-input"
+                          placeholder="Type payee name"
+                          autoComplete="off"
+                          readOnly
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="payment-form-row">
+                  <div className="payment-form-group">
+                    <label>Bank</label>
+                    <div className="custom-select-container">
+                      <div 
+                        className="custom-select-trigger"
+                        onClick={() => setIsBankDropdownOpen(!isBankDropdownOpen)}
+                      >
+                        <input
+                          type="text"
+                          placeholder="Search or select bank..."
+                          value={bankSearchTerm}
+                          onChange={handleBankSearchChange}
+                          onFocus={() => setIsBankDropdownOpen(true)}
+                          className="custom-select-input"
+                          autoComplete="off"
+                        />
+                        <FontAwesomeIcon 
+                          icon={isBankDropdownOpen ? faChevronUp : faChevronDown} 
+                          className="dropdown-icon"
+                        />
+                      </div>
+                      
+                      {isBankDropdownOpen && (
+                        <div className="custom-select-dropdown">
+                          {isFetchingBanks ? (
+                            <div className="dropdown-loading">
+                              <FontAwesomeIcon icon={faSpinner} spin /> Loading banks...
+                            </div>
+                          ) : filteredBanks.length > 0 ? (
+                            filteredBanks.map(bank => (
+                              <div
+                                key={bank.id}
+                                className="dropdown-item"
+                                onClick={() => handleBankSelect(bank.bank_name)}
+                              >
+                                <FontAwesomeIcon icon={faBuildingColumns} className="dropdown-icon-sm" />
+                                {bank.bank_name}
+                              </div>
+                            ))
+                          ) : (
+                            <div className="dropdown-empty">No banks found</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="payment-form-group">
+                    <label>Voucher Number</label>
+                    <input
+                      type="text"
+                      name="voucher_number"
+                      value={paymentForm.voucher_number}
+                      onChange={handlePaymentFormChange}
+                      className="payment-input"
+                      placeholder="Enter voucher number"
+                    />
+                  </div>
+                </div>
+
+                <div className="payment-form-row">
+                  <div className="payment-form-group">
+                    <label>Reference Number</label>
+                    <input
+                      type="text"
+                      name="reference_number"
+                      value={paymentForm.reference_number}
+                      onChange={handlePaymentFormChange}
+                      className="payment-input"
+                      placeholder="Enter reference number"
+                    />
+                  </div>
+                  
+                  <div className="payment-form-group">
+                    <label>Expense Type</label>
+                    <input
+                      type="text"
+                      name="expense_type"
+                      value={paymentForm.expense_type}
+                      onChange={handlePaymentFormChange}
+                      className="payment-input"
+                      readOnly
+                    />
+                  </div>
+                </div>
+
+                <div className="payment-form-row">
+                  <div className="payment-form-group full-width">
+                    <label>Description</label>
+                    <input
+                      type="text"
+                      name="description"
+                      value={paymentForm.description}
+                      onChange={handlePaymentFormChange}
+                      className="payment-input"
+                      placeholder="Enter description"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column - Online Expense Details */}
+              <div className="online-details-section">
+                <div className="payment-section-title">Online Expense Details</div>
+                
+                {selectedForPayment.length > 0 && (
+                  <div className="online-expense-summary">
+                    {selectedForPayment.map((expense, index) => (
+                      <div key={expense.id} className="expense-summary-item">
+                        <div className="expense-summary-row">
+                          <span className="summary-label">Bill Date</span>
+                          <span className="summary-value">{expense.bill_date}</span>
+                        </div>
+                        <div className="expense-summary-row">
+                          <span className="summary-label">Bill Number</span>
+                          <span className="summary-value">{expense.bill_number || '-'}</span>
+                        </div>
+                        <div className="expense-summary-row">
+                          <span className="summary-label">Bill Amount</span>
+                          <span className="summary-value">{formatCurrency(expense.total_bill_amount)}</span>
+                        </div>
+                        {index < selectedForPayment.length - 1 && <hr className="expense-divider" />}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="expense-summary-row total-row">
+                  <span className="summary-label">Total Bill Amount</span>
+                  <span className="summary-value total-amount">
+                    {formatCurrency(selectedForPayment.reduce((sum, exp) => sum + parseFloat(exp.total_bill_amount || 0), 0))}
+                  </span>
+                </div>
+
+                <div className="expense-summary-row balance-row">
+                  <span className="summary-label">Balance</span>
+                  <span className="summary-value balance-amount">
+                    {formatCurrency(selectedForPayment.reduce((sum, exp) => sum + parseFloat(exp.balance || 0), 0))}
+                  </span>
+                </div>
+
+                <div className="payment-form-group transfer-row">
+                  <label>Transfer Amount <span className="required">*</span></label>
+                  <input
+                    type="number"
+                    name="transfer_amount"
+                    value={paymentForm.transfer_amount}
+                    onChange={handlePaymentFormChange}
+                    className="payment-input transfer-input"
+                    placeholder="0.00"
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="payment-modal-footer">
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={handleClosePaymentModal}
+                disabled={isLoading}
+              >
+                <FontAwesomeIcon icon={faTimes} />
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn-pay"
+                onClick={handleProcessPayment}
+                disabled={isLoading}
+              >
+                <FontAwesomeIcon icon={isLoading ? faSpinner : faMoneyBillWave} spin={isLoading} />
+                {isLoading ? 'Processing...' : 'Pay'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

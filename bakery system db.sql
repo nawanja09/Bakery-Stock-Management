@@ -2328,3 +2328,38 @@ CREATE TABLE IF NOT EXISTS `payees` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 
+----------------------------------------------------------------------------------
+---------------------2026-06-05 10:00:00---------------------
+
+-- Table structure for online_expense_payments
+CREATE TABLE `online_expense_payments` (
+  `id` int(11) NOT NULL,
+  `expense_id` int(11) NOT NULL,
+  `payment_date` date NOT NULL,
+  `amount` decimal(15,2) NOT NULL,
+  `bank_name` varchar(255) DEFAULT NULL,
+  `voucher_number` varchar(50) DEFAULT NULL,
+  `reference_number` varchar(50) DEFAULT NULL,
+  `status` varchar(50) DEFAULT 'Completed',
+  `created_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+ALTER TABLE `online_expenses`
+ADD COLUMN `paid_amount` decimal(15,2) DEFAULT 0.00,
+ADD COLUMN `payment_date` date DEFAULT NULL,
+ADD COLUMN `payment_status` varchar(50) DEFAULT 'Pending';
+
+ALTER TABLE `online_expense_payments`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `expense_id` (`expense_id`),
+  ADD KEY `created_by` (`created_by`);
+
+ALTER TABLE `online_expense_payments`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+ALTER TABLE `online_expense_payments`
+  ADD CONSTRAINT `fk_online_expense_payments_expense` FOREIGN KEY (`expense_id`) REFERENCES `online_expenses` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_online_expense_payments_created_by` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL;
+

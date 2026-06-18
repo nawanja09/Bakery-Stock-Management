@@ -992,4 +992,148 @@ router.delete('/petty-cash/voucher/:id', authenticate, async (req, res) => {
   }
 });
 
+// =============================================
+// GET Single Online Expense by ID
+// =============================================
+router.get('/online/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [rows] = await pool.query(
+      `SELECT id, DATE_FORMAT(bill_date, '%Y-%m-%d') as bill_date, 
+              bill_number, payee_name, vat_reg_number, expense_type,
+              without_vat_amount, vat_amount, total_bill_amount, 
+              balance, description
+       FROM online_expenses 
+       WHERE id = ?`,
+      [id]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Online expense not found' });
+    }
+    res.json(rows[0]);
+  } catch (error) {
+    console.error('Error fetching online expense:', error);
+    res.status(500).json({ error: 'Failed to fetch online expense' });
+  }
+});
+
+// =============================================
+// POST Pay Online Expenses (Single or Multiple)
+// =============================================
+router.post('/online/pay', authenticate, async (req, res) => {
+  const { expense_ids, payment_date, bank_name, voucher_number, reference_number, transfer_amount } = req.body;
+  const userId = req.user.userId;
+
+  if (!expense_ids || expense_ids.length === 0) {
+    return res.status(400).json({ error: 'No expenses selected for payment' });
+  }
+
+  if (!payment_date) {
+    return res.status(400).json({ error: 'Payment date is required' });
+  }
+
+  const connection = await pool.getConnection();
+  await connection.beginTransaction();
+
+  try {
+    const results = [];
+
+    // Get all selected expenses
+    const placeholders = expense_ids.map(() => '?').join(',');
+    const [expenses] = await connection.query(
+      `SELECT id, total_bill_amount, balance 
+       FROM online_expenses 
+       WHERE id IN (${placeholders}) AND balance > 0`,
+      expense_ids
+    );
+
+    if (expenses.length === 0) {
+      await connection.rollback();
+      return res.status(400).json({ error: 'No pending payments found for selected expenses' });
+    }
+
+    let totalPaidAmount = 0;
+
+    // Process each expense
+    for (const expense of expenses) {
+      const amountToPay = transfer_amount || expense.balance;
+      
+      if (amountToPay > expense.balance) {
+        await connection.rollback();
+        return res.status(400).json({ 
+          error: `Payment amount (${amountToPay}) exceeds balance (${expense.balance}) for expense ${expense.id}` 
+        });
+      }
+
+      const newBalance = parseFloat(expense.balance) - parseFloat(amountToPay);
+
+      // Update the expense
+      await connection.query(
+        `UPDATE online_expenses 
+         SET balance = ?, 
+             paid_amount = COALESCE(paid_amount, 0) + ?,
+             payment_date = ?,
+             payment_status = CASE 
+               WHEN ? <= 0 THEN 'Paid'
+               ELSE 'Partially Paid'
+             END
+         WHERE id = ?`,
+        [newBalance, amountToPay, payment_date, newBalance, expense.id]
+      );
+
+      totalPaidAmount += parseFloat(amountToPay);
+
+      // Record payment history
+      await connection.query(
+        `INSERT INTO online_expense_payments 
+         (expense_id, payment_date, amount, bank_name, voucher_number, 
+          reference_number, created_by, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'Completed')`,
+        [expense.id, payment_date, amountToPay, bank_name || null, 
+         voucher_number || null, reference_number || null, userId]
+      );
+
+      results.push({
+        id: expense.id,
+        paid_amount: amountToPay,
+        new_balance: newBalance
+      });
+    }
+
+    await connection.commit();
+    
+    res.json({
+      message: `Payment successful for ${results.length} expense(s)`,
+      total_paid: totalPaidAmount,
+      results
+    });
+
+  } catch (error) {
+    await connection.rollback();
+    console.error('Error processing payment:', error);
+    res.status(500).json({ error: 'Failed to process payment' });
+  } finally {
+    connection.release();
+  }
+});
+
+// GET Payment History for an Expense
+router.get('/online/:id/payments', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [rows] = await pool.query(
+      `SELECT id, DATE_FORMAT(payment_date, '%Y-%m-%d') as payment_date, 
+              amount, bank_name, voucher_number, reference_number, status
+       FROM online_expense_payments 
+       WHERE expense_id = ?
+       ORDER BY payment_date DESC, created_at DESC`,
+      [id]
+    );
+    res.json(rows || []);
+  } catch (error) {
+    console.error('Error fetching payment history:', error);
+    res.status(500).json({ error: 'Failed to fetch payment history' });
+  }
+});
+
 module.exports = router;
