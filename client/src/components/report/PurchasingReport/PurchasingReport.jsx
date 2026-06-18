@@ -3,7 +3,7 @@ import { format } from 'date-fns';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
-import Select from 'react-select';  // 🔥 ADD THIS - Import react-select
+import Select from 'react-select';
 import './PurchasingReport.css';
 import api from '../../../api';
 
@@ -13,16 +13,22 @@ const PurchasingReport = () => {
   const [reportData, setReportData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [companyFilter, setCompanyFilter] = useState('');
-  const [selectedItem, setSelectedItem] = useState(null);  // 🔥 CHANGE: from searchTerm to selectedItem
+  const [selectedItem, setSelectedItem] = useState(null);
   const [vatFilter, setVatFilter] = useState('all');
-  const [itemsList, setItemsList] = useState([]);  // 🔥 ADD THIS - Store all items
+  const [itemsList, setItemsList] = useState([]);
 
   const fetchPurchasingReport = async () => {
     setLoading(true);
     try {
+      // 1. Fetch purchases
       const response = await api.get(`/reports/purchasing?startDate=${startDate}&endDate=${endDate}&companyId=${companyFilter}`);
       const purchases = response.data;
 
+      // 2. Fetch items for dropdown
+      const itemsResponse = await api.get('/items');
+      setItemsList(itemsResponse.data);
+
+      // 3. Fetch full details for each purchase with items
       const purchasesWithItems = await Promise.all(
         purchases.map(async (purchase) => {
           try {
@@ -36,11 +42,6 @@ const PurchasingReport = () => {
       );
 
       setReportData(purchasesWithItems);
-      
-      // 🔥 ADD THIS - Fetch all items for dropdown
-      const itemsResponse = await api.get('/items');
-      setItemsList(itemsResponse.data);
-      
     } catch (error) {
       console.error('Error fetching purchasing report:', error);
       alert('Failed to fetch purchasing report');
@@ -49,226 +50,204 @@ const PurchasingReport = () => {
     }
   };
 
+  // =============================================
+  // 🔥 FIXED: getAllItemsFromPurchases function
+  // =============================================
   const getAllItemsFromPurchases = () => {
     const allItems = [];
-    reportData.forEach(purchase => {
-      const isSupplierVatRegistered = purchase.supplier_vat_registered === 1 || purchase.supplier_vat_registered === true;
-      
+
+    reportData.forEach((purchase) => {
+      const isSupplierVatRegistered = 
+        purchase.supplier_vat_registered === 1 || 
+        purchase.supplier_vat_registered === true;
+
+      // Get supplier VAT rate
+      const vatRate = parseFloat(purchase.vat_rate) || 18;
+
+      // Get total bill amount
       let totalBillAmount = 0;
-      let subtotal = 0;
-      let vatAmount = 0;
-      
+      let totalPaidAmount = parseFloat(purchase.paid_amount || 0);
+
       if (purchase.total_with_vat && purchase.total_with_vat > 0) {
         totalBillAmount = parseFloat(purchase.total_with_vat);
-        subtotal = parseFloat(purchase.subtotal || 0);
-        vatAmount = parseFloat(purchase.vat_amount || 0);
-      } 
-      else if (purchase.bill_amount && purchase.bill_amount > 0) {
+      } else if (purchase.bill_amount && purchase.bill_amount > 0) {
         totalBillAmount = parseFloat(purchase.bill_amount);
-        subtotal = parseFloat(purchase.bill_amount);
-        vatAmount = 0;
       }
-      
-      const totalPaidAmount = parseFloat(purchase.paid_amount || 0);
-      
+
+      // 🔥 FIXED: Process items correctly
       if (purchase.items && purchase.items.length > 0) {
-        purchase.items.forEach(item => {
+        purchase.items.forEach((item) => {
           const quantity = Number(item.quantity || 0);
           const unitPrice = Number(item.unit_price || 0);
           const itemSubtotal = quantity * unitPrice;
-          
+
+          // 🔥 FIXED: Calculate VAT per item
           let itemVatAmount = 0;
           let itemTotalPrice = itemSubtotal;
-          
-          if (isSupplierVatRegistered && item.vat_applicable === 1) {
-            const vatRate = Number(purchase.vat_rate || 18);
+
+          // Check if VAT should be applied
+          const isVatApplicable = 
+            isSupplierVatRegistered && 
+            (item.vat_applicable === 1 || item.vat_applicable === true);
+
+          if (isVatApplicable) {
             itemVatAmount = itemSubtotal * (vatRate / 100);
             itemTotalPrice = itemSubtotal + itemVatAmount;
-          } else {
-            itemVatAmount = 0;
-            itemTotalPrice = itemSubtotal;
           }
-          
+
+          // Calculate payment ratio for this item
           const paymentRatio = totalBillAmount > 0 ? totalPaidAmount / totalBillAmount : 0;
           const itemPaidAmount = itemTotalPrice * paymentRatio;
           const itemDueAmount = itemTotalPrice - itemPaidAmount;
-          
+
           allItems.push({
-            ...item,
-            supplier_vat_number: purchase.supplier_vat_number,
-            supplier_vat_registered: isSupplierVatRegistered,
-            invoice_no: purchase.invoice_no,
-            purchase_date: purchase.purchase_date,
-            supplier_name: purchase.supplier_name,
-            payment_method: purchase.payment_method,
-            bill_amount: totalBillAmount,
-            paid_amount: totalPaidAmount,
-            due_amount: totalBillAmount - totalPaidAmount,
+            // Item details
+            item_id: item.item_id,
+            item_name: item.item_name || item.name || 'N/A',
+            quantity: quantity,
+            unit: item.unit || '',
+            unit_price: unitPrice,
+            vat_applicable: isVatApplicable,
+            
+            // Financials per item
+            item_subtotal: itemSubtotal,
+            item_vat_amount: itemVatAmount,
             item_bill_amount: itemTotalPrice,
             item_paid_amount: itemPaidAmount,
             item_due_amount: itemDueAmount,
-            item_subtotal: itemSubtotal,
-            item_vat_amount: itemVatAmount,
-            company_name: purchase.company_name,
-            check_number: purchase.check_number,
-            vat_rate: purchase.vat_rate || 18,
-            is_old_bill: vatAmount === 0 && !isSupplierVatRegistered,
-            is_vat_applicable: item.vat_applicable === 1
+            
+            // Purchase header details
+            purchase_id: purchase.id,
+            invoice_no: purchase.invoice_no || 'N/A',
+            purchase_date: purchase.purchase_date,
+            supplier_name: purchase.supplier_name || 'N/A',
+            supplier_vat_number: purchase.supplier_vat_number || '—',
+            supplier_vat_registered: isSupplierVatRegistered,
+            payment_method: purchase.payment_method || 'N/A',
+            check_number: purchase.check_number || 'N/A',
+            company_name: purchase.company_name || 'N/A',
+            vat_rate: vatRate,
+            
+            // Original bill amounts
+            bill_amount: totalBillAmount,
+            paid_amount: totalPaidAmount,
+            due_amount: totalBillAmount - totalPaidAmount,
+            
+            // Flags
+            is_old_bill: !isSupplierVatRegistered,
+            is_vat_applicable: isVatApplicable
           });
         });
       } else {
-        let finalBillAmount = totalBillAmount;
-        let finalVatAmount = 0;
-        
-        if (!isSupplierVatRegistered) {
-          finalVatAmount = 0;
-          finalBillAmount = subtotal;
-        }
-        
+        // No items found - use purchase level data
+        let subtotal = parseFloat(purchase.subtotal || purchase.bill_amount || 0);
+        let vatAmount = parseFloat(purchase.vat_amount || 0);
+        let totalAmount = totalBillAmount;
+
         allItems.push({
-          supplier_vat_number: purchase.supplier_vat_number,
-          supplier_vat_registered: isSupplierVatRegistered,
-          invoice_no: purchase.invoice_no,
-          purchase_date: purchase.purchase_date,
-          supplier_name: purchase.supplier_name,
           item_name: 'No item details',
           quantity: null,
           unit_price: null,
-          payment_method: purchase.payment_method,
-          bill_amount: finalBillAmount,
-          paid_amount: totalPaidAmount,
-          due_amount: finalBillAmount - totalPaidAmount,
-          item_bill_amount: finalBillAmount,
-          item_paid_amount: totalPaidAmount,
-          item_due_amount: finalBillAmount - totalPaidAmount,
           item_subtotal: subtotal,
-          item_vat_amount: finalVatAmount,
-          company_name: purchase.company_name,
-          check_number: purchase.check_number,
-          is_old_bill: !isSupplierVatRegistered
+          item_vat_amount: vatAmount,
+          item_bill_amount: totalAmount,
+          item_paid_amount: totalPaidAmount,
+          item_due_amount: totalAmount - totalPaidAmount,
+          invoice_no: purchase.invoice_no || 'N/A',
+          purchase_date: purchase.purchase_date,
+          supplier_name: purchase.supplier_name || 'N/A',
+          supplier_vat_number: purchase.supplier_vat_number || '—',
+          supplier_vat_registered: isSupplierVatRegistered,
+          payment_method: purchase.payment_method || 'N/A',
+          check_number: purchase.check_number || 'N/A',
+          company_name: purchase.company_name || 'N/A',
+          bill_amount: totalAmount,
+          paid_amount: totalPaidAmount,
+          due_amount: totalAmount - totalPaidAmount,
+          is_old_bill: !isSupplierVatRegistered,
+          is_vat_applicable: false
         });
       }
     });
+
     return allItems;
   };
 
+  // =============================================
+  // 🔥 FIXED: Item options for react-select
+  // =============================================
+  const itemOptions = useMemo(() => {
+    // Get unique items from report data
+    const uniqueItems = new Map();
+    
+    reportData.forEach(purchase => {
+      if (purchase.items && purchase.items.length > 0) {
+        purchase.items.forEach(item => {
+          if (item.item_id && !uniqueItems.has(item.item_id)) {
+            uniqueItems.set(item.item_id, {
+              value: item.item_id,
+              label: `${item.item_name || item.name || 'Unknown'} ${item.vat_applicable ? '(VAT)' : ''}`,
+              name: item.item_name || item.name || 'Unknown',
+              vat_applicable: item.vat_applicable
+            });
+          }
+        });
+      }
+    });
+
+    return Array.from(uniqueItems.values());
+  }, [reportData]);
+
+  // =============================================
+  // 🔥 FIXED: Filter logic
+  // =============================================
   const allItems = getAllItemsFromPurchases();
 
-  // 🔥 CREATE item options for react-select (same as Add Purchase page)
-  const itemOptions = useMemo(() => {
-    return itemsList.map(item => ({
-      value: item.id,
-      label: `${item.item_code || ''} - ${item.name} ${item.vat_applicable ? '(VAT)' : ''}`,
-      item_code: item.item_code,
-      name: item.name,
-      vat_applicable: item.vat_applicable
-    }));
-  }, [itemsList]);
-
-  // 🔥 MODIFY filter logic - filter by selected item
-  const filteredItems = allItems.filter(item => {
-    // Filter by selected item (item name matches selected item's name)
+  const filteredItems = allItems.filter((item) => {
+    // Filter by selected item (using item_id)
     const matchesItem = !selectedItem || 
-      (item.item_name && item.item_name.toLowerCase().includes(selectedItem.name?.toLowerCase()));
-    
+      (item.item_id && item.item_id === selectedItem.value);
+
     // Filter by VAT status
     const matchesVat = vatFilter === 'all' ||
       (vatFilter === 'yes' ? item.supplier_vat_registered : !item.supplier_vat_registered);
-    
+
     return matchesItem && matchesVat;
   });
 
-  const downloadPDF = () => {
-    const doc = new jsPDF();
-    let yOffset = 15;
-
-    doc.setFontSize(16);
-    doc.text(`Purchasing Report (${format(new Date(startDate), 'MMM dd, yyyy')} - ${format(new Date(endDate), 'MMM dd, yyyy')})`, 15, yOffset);
-    yOffset += 10;
-
-    if (companyFilter) {
-      const companyName = companyFilter === '1' ? 'JH' : companyFilter === '2' ? 'RR' : 'Delights';
-      doc.setFontSize(12);
-      doc.text(`Company: ${companyName}`, 15, yOffset);
-      yOffset += 10;
-    }
-
-    if (selectedItem) {
-      doc.setFontSize(12);
-      doc.text(`Item: ${selectedItem.name}`, 15, yOffset);
-      yOffset += 10;
-    }
-
-    const totalPurchases = filteredItems.reduce((sum, item) => sum + (item.item_bill_amount || 0), 0);
-    const totalPaid = filteredItems.reduce((sum, item) => sum + (item.item_paid_amount || 0), 0);
-    const totalDue = totalPurchases - totalPaid;
-
-    doc.setFontSize(12);
-    doc.text(`Total Purchases: Rs. ${totalPurchases.toFixed(2)}`, 15, yOffset);
-    yOffset += 7;
-    doc.text(`Total Paid: Rs. ${totalPaid.toFixed(2)}`, 15, yOffset);
-    yOffset += 7;
-    doc.text(`Total Due: Rs. ${totalDue.toFixed(2)}`, 15, yOffset);
-    yOffset += 10;
-
-    const tableData = filteredItems.map(item => [
-      item.invoice_no || 'N/A',
-      format(new Date(item.purchase_date), 'MMM dd, yyyy'),
-      item.supplier_name || 'N/A',
-      item.supplier_vat_number || '—',
-      item.company_name || 'N/A',
-      item.check_number || 'N/A',
-      item.item_name || 'N/A',
-      item.quantity ? Number(item.quantity).toFixed(3) : 'N/A',
-      item.unit_price ? `Rs. ${Number(item.unit_price).toFixed(2)}` : 'N/A',
-      item.payment_method || 'N/A',
-      `Rs. ${(item.item_subtotal || 0).toFixed(2)}`,
-      `Rs. ${(item.item_vat_amount || 0).toFixed(2)}`,
-      `Rs. ${(item.item_bill_amount || 0).toFixed(2)}`,
-      `Rs. ${(item.bill_amount || 0).toFixed(2)}`,
-      `Rs. ${(item.item_paid_amount || 0).toFixed(2)}`,
-      `Rs. ${(item.item_due_amount || 0).toFixed(2)}`
-    ]);
-
-    const headers = [
-      'Invoice #', 'Date', 'Supplier', 'VAT Number', 'Company', 'Check #',
-      'Item Name', 'Quantity', 'Unit Price', 'Payment Method',
-      'Subtotal', 'VAT Amount', 'Total Price', 'Bill Amount', 'Paid', 'Due'
-    ];
-
-    autoTable(doc, {
-      head: [headers],
-      body: tableData,
-      startY: yOffset,
-      styles: { fontSize: 7 },
-      headStyles: { fillColor: [41, 128, 185] }
-    });
-
-    doc.save(`purchasing-report-${startDate}-to-${endDate}.pdf`);
-  };
-
+  // =============================================
+  // 🔥 FIXED: Excel Export
+  // =============================================
   const downloadExcel = () => {
+    if (filteredItems.length === 0) {
+      alert('No data to export');
+      return;
+    }
+
     const worksheetData = [];
 
+    // Headers
     worksheetData.push([
-      'Invoice #', 'Date', 'Supplier', 'VAT Number', 'Company', 'Check Number',
-      'Item Name', 'Quantity', 'Unit Price (Rs.)', 'Payment Method',
+      'Invoice #', 'Date', 'Supplier', 'VAT Number', 'Company', 'Check #',
+      'Item Name', 'Quantity', 'Unit', 'Unit Price (Rs.)', 'Payment Method',
       'Subtotal (Rs.)', 'VAT Amount (Rs.)', 'Total Price (Rs.)',
       'Bill Amount (Rs.)', 'Paid Amount (Rs.)', 'Due Amount (Rs.)'
     ]);
 
-    filteredItems.forEach(item => {
+    // Data rows
+    filteredItems.forEach((item) => {
       worksheetData.push([
-        item.invoice_no,
-        format(new Date(item.purchase_date), 'MMM dd, yyyy'),
-        item.supplier_name,
+        item.invoice_no || 'N/A',
+        item.purchase_date ? format(new Date(item.purchase_date), 'MMM dd, yyyy') : 'N/A',
+        item.supplier_name || 'N/A',
         item.supplier_vat_number || '—',
         item.company_name || 'N/A',
         item.check_number || 'N/A',
         item.item_name || 'N/A',
-        item.quantity ? Number(item.quantity) : 'N/A',
-        item.unit_price ? Number(item.unit_price) : 'N/A',
-        item.payment_method,
+        item.quantity !== null && item.quantity !== undefined ? Number(item.quantity).toFixed(3) : 'N/A',
+        item.unit || 'N/A',
+        item.unit_price !== null && item.unit_price !== undefined ? Number(item.unit_price).toFixed(2) : 'N/A',
+        item.payment_method || 'N/A',
         (item.item_subtotal || 0).toFixed(2),
         (item.item_vat_amount || 0).toFixed(2),
         (item.item_bill_amount || 0).toFixed(2),
@@ -278,15 +257,18 @@ const PurchasingReport = () => {
       ]);
     });
 
+    // Add empty row
+    worksheetData.push([]);
+
+    // Totals row
+    const totalSubtotal = filteredItems.reduce((sum, item) => sum + (item.item_subtotal || 0), 0);
+    const totalVat = filteredItems.reduce((sum, item) => sum + (item.item_vat_amount || 0), 0);
     const totalBill = filteredItems.reduce((sum, item) => sum + (item.item_bill_amount || 0), 0);
     const totalPaid = filteredItems.reduce((sum, item) => sum + (item.item_paid_amount || 0), 0);
-    const totalVat = filteredItems.reduce((sum, item) => sum + (item.item_vat_amount || 0), 0);
-    const totalSubtotal = totalBill - totalVat;
     const totalDue = totalBill - totalPaid;
 
-    worksheetData.push([]);
     worksheetData.push([
-      'TOTAL', '', '', '', '', '', '', '', '', '',
+      'TOTAL', '', '', '', '', '', '', '', '', '', '',
       totalSubtotal.toFixed(2),
       totalVat.toFixed(2),
       totalBill.toFixed(2),
@@ -295,41 +277,145 @@ const PurchasingReport = () => {
       totalDue.toFixed(2)
     ]);
 
+    // Create worksheet
     const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+
+    // Set column widths
+    worksheet['!cols'] = [
+      { wch: 15 }, // Invoice #
+      { wch: 14 }, // Date
+      { wch: 25 }, // Supplier
+      { wch: 15 }, // VAT Number
+      { wch: 15 }, // Company
+      { wch: 12 }, // Check #
+      { wch: 25 }, // Item Name
+      { wch: 12 }, // Quantity
+      { wch: 10 }, // Unit
+      { wch: 14 }, // Unit Price
+      { wch: 16 }, // Payment Method
+      { wch: 14 }, // Subtotal
+      { wch: 14 }, // VAT Amount
+      { wch: 14 }, // Total Price
+      { wch: 14 }, // Bill Amount
+      { wch: 14 }, // Paid Amount
+      { wch: 14 }  // Due Amount
+    ];
+
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Purchasing Report');
-
-    worksheet['!cols'] = [
-      { wch: 15 }, { wch: 12 }, { wch: 20 }, { wch: 15 }, { wch: 15 },
-      { wch: 12 }, { wch: 25 }, { wch: 10 }, { wch: 12 }, { wch: 15 },
-      { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }
-    ];
 
     XLSX.writeFile(workbook, `purchasing-report-${startDate}-to-${endDate}.xlsx`);
   };
 
+  // =============================================
+  // 🔥 FIXED: PDF Export
+  // =============================================
+  const downloadPDF = () => {
+    if (filteredItems.length === 0) {
+      alert('No data to export');
+      return;
+    }
+
+    const doc = new jsPDF();
+    let yOffset = 15;
+
+    // Header
+    doc.setFontSize(16);
+    doc.text(`Purchasing Report`, 15, yOffset);
+    yOffset += 8;
+
+    doc.setFontSize(11);
+    doc.text(`Period: ${format(new Date(startDate), 'MMM dd, yyyy')} - ${format(new Date(endDate), 'MMM dd, yyyy')}`, 15, yOffset);
+    yOffset += 7;
+
+    if (companyFilter) {
+      const companyName = companyFilter === '1' ? 'JH' : companyFilter === '2' ? 'RR' : 'Delights';
+      doc.text(`Company: ${companyName}`, 15, yOffset);
+      yOffset += 7;
+    }
+
+    if (selectedItem) {
+      doc.text(`Item: ${selectedItem.label}`, 15, yOffset);
+      yOffset += 7;
+    }
+
+    // Summary
+    const totalBill = filteredItems.reduce((sum, item) => sum + (item.item_bill_amount || 0), 0);
+    const totalPaid = filteredItems.reduce((sum, item) => sum + (item.item_paid_amount || 0), 0);
+    const totalDue = totalBill - totalPaid;
+
+    doc.setFontSize(11);
+    doc.text(`Total Bill: Rs. ${totalBill.toFixed(2)}`, 15, yOffset);
+    yOffset += 6;
+    doc.text(`Total Paid: Rs. ${totalPaid.toFixed(2)}`, 15, yOffset);
+    yOffset += 6;
+    doc.text(`Total Due: Rs. ${totalDue.toFixed(2)}`, 15, yOffset);
+    yOffset += 8;
+
+    // Table
+    const tableData = filteredItems.map((item) => [
+      item.invoice_no || 'N/A',
+      item.purchase_date ? format(new Date(item.purchase_date), 'MMM dd, yyyy') : 'N/A',
+      item.supplier_name || 'N/A',
+      item.item_name || 'N/A',
+      item.quantity !== null ? Number(item.quantity).toFixed(3) : 'N/A',
+      (item.item_subtotal || 0).toFixed(2),
+      (item.item_vat_amount || 0).toFixed(2),
+      (item.item_bill_amount || 0).toFixed(2),
+      (item.item_paid_amount || 0).toFixed(2),
+      (item.item_due_amount || 0).toFixed(2)
+    ]);
+
+    const headers = [
+      'Invoice #', 'Date', 'Supplier', 'Item', 'Qty',
+      'Subtotal', 'VAT', 'Total', 'Paid', 'Due'
+    ];
+
+    autoTable(doc, {
+      head: [headers],
+      body: tableData,
+      startY: yOffset,
+      styles: { fontSize: 7 },
+      headStyles: { fillColor: [41, 128, 185] },
+      columnStyles: {
+        4: { halign: 'right' },
+        5: { halign: 'right' },
+        6: { halign: 'right' },
+        7: { halign: 'right' },
+        8: { halign: 'right' },
+        9: { halign: 'right' }
+      }
+    });
+
+    doc.save(`purchasing-report-${startDate}-to-${endDate}.pdf`);
+  };
+
+  // =============================================
+  // 🔥 FIXED: Render
+  // =============================================
   return (
     <div className="purchasing-report-container">
+      {/* Header */}
       <div className="report-header">
         <h2>Purchasing Report</h2>
         {filteredItems.length > 0 && (
           <div className="report-actions">
             <button onClick={downloadPDF} className="btn btn-success">
-              <span>📄</span> PDF
+              📄 PDF
             </button>
-            <button onClick={downloadExcel} className="btn btn-success">
-              <span>📊</span> Excel
+            <button onClick={downloadExcel} className="btn btn-excel">
+              📊 Excel
             </button>
           </div>
         )}
       </div>
 
-      {/* Filters Section */}
+      {/* Filters */}
       <div className="controls-section">
         <div className="control-group">
           <label>Start Date</label>
-          <input 
-            type="date" 
+          <input
+            type="date"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
             max={endDate}
@@ -339,8 +425,8 @@ const PurchasingReport = () => {
 
         <div className="control-group">
           <label>End Date</label>
-          <input 
-            type="date" 
+          <input
+            type="date"
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
             min={startDate}
@@ -371,12 +457,11 @@ const PurchasingReport = () => {
             className="control-input"
           >
             <option value="all">All</option>
-            <option value="yes">Yes (VAT Registered)</option>
-            <option value="no">No (Non-VAT Registered)</option>
+            <option value="yes">VAT Registered</option>
+            <option value="no">Non-VAT Registered</option>
           </select>
         </div>
 
-        {/* 🔥 REPLACE search input with react-select dropdown */}
         <div className="control-group search-group">
           <label>Search Item</label>
           <Select
@@ -385,7 +470,7 @@ const PurchasingReport = () => {
             onChange={setSelectedItem}
             isSearchable
             isClearable
-            placeholder="Search by item name..."
+            placeholder="Search by item..."
             className="react-select-container"
             classNamePrefix="react-select"
             styles={{
@@ -395,9 +480,7 @@ const PurchasingReport = () => {
                 borderColor: '#e9ecef',
                 borderRadius: '10px',
                 boxShadow: 'none',
-                '&:hover': {
-                  borderColor: '#adb5bd'
-                }
+                '&:hover': { borderColor: '#adb5bd' }
               }),
               menuPortal: (base) => ({ ...base, zIndex: 9999 })
             }}
@@ -405,92 +488,72 @@ const PurchasingReport = () => {
           />
         </div>
 
-        <button 
+        <button
           onClick={fetchPurchasingReport}
           disabled={loading}
           className="btn btn-primary"
         >
-          {loading ? (
-            <>
-              <div className="loading-spinner"></div>
-              Generating...
-            </>
-          ) : (
-            'Generate Report'
-          )}
+          {loading ? 'Generating...' : 'Generate Report'}
         </button>
       </div>
 
-      {/* Report Table */}
+      {/* Table */}
       {loading ? (
-        <div className="loading-overlay">
-          <div className="loading-spinner"></div>
-          Loading report data...
-        </div>
+        <div className="loading-overlay">Loading report data...</div>
       ) : filteredItems.length > 0 ? (
         <div className="table-container">
           <table className="purchasing-report-table">
             <thead>
               <tr>
                 <th>Date</th>
+                <th>Invoice #</th>
                 <th>Supplier</th>
                 <th>VAT Number</th>
                 <th>Company</th>
-                <th>Check #</th>
                 <th>Item Name</th>
-                <th>Quantity</th>
-                <th>Unit Price (Rs.)</th>
+                <th>Qty</th>
+                <th>Unit Price</th>
                 <th>Payment Method</th>
-                <th>Subtotal (Rs.)</th>
-                <th>VAT Amount (Rs.)</th>
-                <th>Total Price (Rs.)</th>
-                <th>Bill Amount (Rs.)</th>
-                <th>Paid (Rs.)</th>
-                <th>Due (Rs.)</th>
+                <th>Subtotal</th>
+                <th>VAT</th>
+                <th>Total Price</th>
+                <th>Bill Amount</th>
+                <th>Paid</th>
+                <th>Due</th>
               </tr>
             </thead>
             <tbody>
-              {filteredItems.map((item, index) => {
-                const displayBillAmount = item.item_bill_amount || item.bill_amount || 0;
-                const displayPaidAmount = item.item_paid_amount || item.paid_amount || 0;
-                const displayDueAmount = displayBillAmount - displayPaidAmount;
-                
-                return (
-                  <tr key={`${item.invoice_no}-${index}`} className={!item.supplier_vat_registered ? 'non-vat-row' : ''}>
-                    <td data-label="Date">{format(new Date(item.purchase_date), 'MMM dd, yyyy')}</td>
-                    <td data-label="Supplier">{item.supplier_name}</td>
-                    <td data-label="VAT Number">{item.supplier_vat_number || '—'}</td>
-                    <td data-label="Company">{item.company_name || 'N/A'}</td>
-                    <td data-label="Check #">{item.check_number || 'N/A'}</td>
-                    <td data-label="Item Name">{item.item_name || 'N/A'}</td>
-                    <td data-label="Quantity">{item.quantity ? Number(item.quantity).toFixed(3) : 'N/A'}</td>
-                    <td data-label="Unit Price">{item.unit_price ? Number(item.unit_price).toFixed(2) : 'N/A'}</td>
-                    <td data-label="Payment Method">{item.payment_method}</td>
-                    <td data-label="Subtotal" className="text-right">{(item.item_subtotal || 0).toFixed(2)}</td>
-                    <td data-label="VAT Amount" className={`text-right ${!item.supplier_vat_registered ? 'vat-zero' : ''}`}>
-                      {item.supplier_vat_registered && item.is_vat_applicable ? 
-                        (item.item_vat_amount || 0).toFixed(2) : 
-                        '0.00'}
-                    </td>
-                    <td data-label="Total Price" className="text-right">{(item.item_bill_amount || 0).toFixed(2)}</td>
-                    <td data-label="Bill Amount" className="text-right">{displayBillAmount.toFixed(2)}</td>
-                    <td data-label="Paid" className="text-right paid-amount">{displayPaidAmount.toFixed(2)}</td>
-                    <td data-label="Due" className={`text-right ${displayDueAmount > 0 ? 'due-amount' : 'paid-amount'}`}>
-                      {displayDueAmount.toFixed(2)}
-                    </td>
-                  </tr>
-                );
-              })}
+              {filteredItems.map((item, index) => (
+                <tr key={`${item.invoice_no}-${index}`}>
+                  <td>{format(new Date(item.purchase_date), 'MMM dd, yyyy')}</td>
+                  <td>{item.invoice_no}</td>
+                  <td>{item.supplier_name}</td>
+                  <td>{item.supplier_vat_number || '—'}</td>
+                  <td>{item.company_name}</td>
+                  <td>{item.item_name}</td>
+                  <td className="text-right">{item.quantity !== null ? Number(item.quantity).toFixed(3) : 'N/A'}</td>
+                  <td className="text-right">{item.unit_price !== null ? Number(item.unit_price).toFixed(2) : 'N/A'}</td>
+                  <td>{item.payment_method}</td>
+                  <td className="text-right">{(item.item_subtotal || 0).toFixed(2)}</td>
+                  <td className="text-right">{(item.item_vat_amount || 0).toFixed(2)}</td>
+                  <td className="text-right">{(item.item_bill_amount || 0).toFixed(2)}</td>
+                  <td className="text-right">{(item.bill_amount || 0).toFixed(2)}</td>
+                  <td className="text-right paid-amount">{(item.item_paid_amount || 0).toFixed(2)}</td>
+                  <td className={`text-right ${(item.item_due_amount || 0) > 0 ? 'due-amount' : 'paid-amount'}`}>
+                    {(item.item_due_amount || 0).toFixed(2)}
+                  </td>
+                </tr>
+              ))}
             </tbody>
             <tfoot>
               <tr>
                 <td colSpan="9" className="text-right"><strong>Totals:</strong></td>
-                <td className="text-right"><strong>{filteredItems.reduce((sum, item) => sum + (item.item_subtotal || 0), 0).toFixed(2)}</strong></td>
-                <td className="text-right"><strong>{filteredItems.reduce((sum, item) => sum + (item.item_vat_amount || 0), 0).toFixed(2)}</strong></td>     
-                <td className="text-right"><strong>{filteredItems.reduce((sum, item) => sum + (item.item_bill_amount || 0), 0).toFixed(2)}</strong></td>
-                <td className="text-right"><strong>{filteredItems.reduce((sum, item) => sum + (item.bill_amount || 0), 0).toFixed(2)}</strong></td>
-                <td className="text-right"><strong>{filteredItems.reduce((sum, item) => sum + (item.item_paid_amount || 0), 0).toFixed(2)}</strong></td>
-                <td className="text-right"><strong>{filteredItems.reduce((sum, item) => sum + (item.item_due_amount || 0), 0).toFixed(2)}</strong></td>
+                <td className="text-right"><strong>{filteredItems.reduce((sum, i) => sum + (i.item_subtotal || 0), 0).toFixed(2)}</strong></td>
+                <td className="text-right"><strong>{filteredItems.reduce((sum, i) => sum + (i.item_vat_amount || 0), 0).toFixed(2)}</strong></td>
+                <td className="text-right"><strong>{filteredItems.reduce((sum, i) => sum + (i.item_bill_amount || 0), 0).toFixed(2)}</strong></td>
+                <td className="text-right"><strong>{filteredItems.reduce((sum, i) => sum + (i.bill_amount || 0), 0).toFixed(2)}</strong></td>
+                <td className="text-right"><strong>{filteredItems.reduce((sum, i) => sum + (i.item_paid_amount || 0), 0).toFixed(2)}</strong></td>
+                <td className="text-right"><strong>{filteredItems.reduce((sum, i) => sum + (i.item_due_amount || 0), 0).toFixed(2)}</strong></td>
               </tr>
             </tfoot>
           </table>
