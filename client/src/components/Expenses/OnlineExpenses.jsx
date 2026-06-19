@@ -451,31 +451,42 @@ const OnlineExpenses = () => {
     });
   };
 
-  // Payment handlers
+  // =============================================
+  // FIXED: Payment handler - ALWAYS opens modal
+  // =============================================
   const handleOpenPaymentModal = async () => {
-    // If no items selected, use the current filtered expenses
     let expensesToPay = [];
     
+    // If items are selected, use those
     if (selectedIds.length > 0) {
-      // Get selected expenses
       expensesToPay = onlineExpenses.filter(exp => selectedIds.includes(exp.id));
-    } else {
-      // Use all filtered expenses that have balance > 0
-      expensesToPay = filteredExpenses.filter(exp => parseFloat(exp.balance || 0) > 0);
     }
-
+    
+    // If no items selected, open empty payment form
     if (expensesToPay.length === 0) {
-      showPopup('error', 'No pending payments available');
+      // Reset payment form with empty values
+      setSelectedForPayment([]);
+      setPaymentForm({
+        payment_date: new Date().toISOString().split('T')[0],
+        payee_name: '',
+        bank_name: '',
+        voucher_number: '',
+        reference_number: '',
+        expense_type: '',
+        description: '',
+        total_bill_amount: '0.00',
+        transfer_amount: '0.00'
+      });
+      setPayeeSearch('');
+      setShowPaymentModal(true);
       return;
     }
 
-    // Get detailed information for the first expense
+    // If expenses found, continue with normal flow
     try {
       const firstExpense = expensesToPay[0];
-      const response = await api.get(`/expenses/online/${firstExpense.id}`);
-      const expenseDetail = response.data;
-      
-      const totalAmount = expensesToPay.reduce((sum, exp) => sum + parseFloat(exp.balance || 0), 0);
+      const totalBalance = expensesToPay.reduce((sum, exp) => sum + parseFloat(exp.balance || 0), 0);
+      const totalBillAmount = expensesToPay.reduce((sum, exp) => sum + parseFloat(exp.total_bill_amount || 0), 0);
       
       setSelectedForPayment(expensesToPay);
       setPaymentForm({
@@ -486,13 +497,11 @@ const OnlineExpenses = () => {
         reference_number: '',
         expense_type: firstExpense.expense_type,
         description: firstExpense.description || '',
-        total_bill_amount: totalAmount.toFixed(2),
-        transfer_amount: totalAmount.toFixed(2)
+        total_bill_amount: totalBillAmount.toFixed(2),
+        transfer_amount: totalBalance.toFixed(2)
       });
       
-      // Set payee search for dropdown
       setPayeeSearch(firstExpense.payee_name);
-      
       setShowPaymentModal(true);
     } catch (error) {
       console.error('Error fetching expense details:', error);
@@ -587,6 +596,44 @@ const OnlineExpenses = () => {
   // Check if all filtered items are selected
   const allSelected = filteredExpenses.length > 0 && 
     filteredExpenses.every(exp => selectedIds.includes(exp.id));
+
+
+  // Update the getTotalBalance function to properly handle the balance
+  const getTotalBalance = () => {
+    console.log('Selected IDs:', selectedIds);
+    console.log('Online Expenses:', onlineExpenses);
+    
+    if (selectedIds.length > 0) {
+      const selectedExpenses = onlineExpenses.filter(exp => selectedIds.includes(exp.id));
+      console.log('Selected Expenses:', selectedExpenses);
+      
+      const total = selectedExpenses.reduce((sum, exp) => {
+        const balance = parseFloat(exp.balance || 0);
+        console.log(`Expense ${exp.id} - Bill Number: ${exp.bill_number}, Balance: ${balance}`);
+        return sum + balance;
+      }, 0);
+      
+      console.log('Total Balance:', total);
+      return total;
+    } else {
+      // When no items selected, show total balance of ALL pending expenses
+      const pendingExpenses = onlineExpenses.filter(exp => parseFloat(exp.balance || 0) > 0);
+      const total = pendingExpenses.reduce((sum, exp) => sum + parseFloat(exp.balance || 0), 0);
+      return total;
+    }
+  };
+
+  // Update the getSelectedCount function
+  const getSelectedCount = () => {
+    if (selectedIds.length > 0) {
+      return selectedIds.length;
+    } else {
+      // When no items selected, count all pending expenses
+      return onlineExpenses.filter(exp => parseFloat(exp.balance || 0) > 0).length;
+    }
+  };
+  const totalBalance = getTotalBalance();
+  const selectedCount = getSelectedCount();
 
   return (
     <div className="online-expenses-container">
@@ -848,17 +895,6 @@ const OnlineExpenses = () => {
                 </button>
               )}
             </div>
-            <button 
-              onClick={fetchOnlineExpenses} 
-              className="refresh-btn"
-              disabled={isFetching}
-            >
-              <FontAwesomeIcon icon={isFetching ? faSpinner : faSync} spin={isFetching} />
-              Refresh
-            </button>
-            <button className="action-icon-btn" title="Print">
-              <FontAwesomeIcon icon={faPrint} />
-            </button>
             <button className="action-icon-btn" title="Export to Excel">
               <FontAwesomeIcon icon={faFileExcel} />
             </button>
@@ -947,12 +983,18 @@ const OnlineExpenses = () => {
           </table>
         </div>
 
-        {/* Payment Action Bar */}
+        {/* Payment Action Bar - FIXED: Pay button always enabled */}
         <div className="payment-action-bar">
           <div className="selected-info">
-            {selectedIds.length > 0 && (
+            {selectedIds.length > 0 ? (
               <span className="selected-count">
                 <FontAwesomeIcon icon={faCheckCircle} /> {selectedIds.length} expense(s) selected
+                <span className="selected-total"> | Total Balance: {formatCurrency(totalBalance)}</span>
+              </span>
+            ) : (
+              <span className="selected-count">
+                <FontAwesomeIcon icon={faReceipt} /> {selectedCount} pending expense(s)
+                <span className="selected-total"> | Total Balance: {formatCurrency(totalBalance)}</span>
               </span>
             )}
           </div>
@@ -975,6 +1017,7 @@ const OnlineExpenses = () => {
               <h3>
                 <FontAwesomeIcon icon={faCreditCard} />
                 Payment Details
+                <span className="payment-count">{selectedForPayment.length} expense(s)</span>
               </h3>
               <button className="payment-modal-close" onClick={handleClosePaymentModal}>×</button>
             </div>
