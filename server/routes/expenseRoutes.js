@@ -1136,4 +1136,160 @@ router.get('/online/:id/payments', async (req, res) => {
   }
 });
 
+router.post('/online', authenticate, async (req, res) => {
+  const {
+    bill_date,
+    bill_number,
+    payee_name,
+    vat_reg_number,
+    expense_type,
+    without_vat_amount,
+    vat_amount,
+    total_bill_amount,
+    description
+  } = req.body;
+
+  const userId = req.user.userId;
+
+  if (!bill_date || !payee_name || !expense_type || !without_vat_amount) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  try {
+    const [result] = await pool.query(
+      `INSERT INTO online_expenses 
+       (bill_date, bill_number, payee_name, vat_reg_number, expense_type,
+        without_vat_amount, vat_amount, total_bill_amount, balance, description, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        bill_date,
+        bill_number || null,
+        payee_name,
+        vat_reg_number || null,
+        expense_type,
+        without_vat_amount,
+        vat_amount || 0,
+        total_bill_amount,
+        total_bill_amount,   // ✅ FIX #1: balance = total_bill_amount
+        description || null,
+        userId
+      ]
+    );
+
+    res.status(201).json({
+      id: result.insertId,
+      message: 'Online expense recorded successfully'
+    });
+
+  } catch (error) {
+    console.error('Error creating online expense:', error);
+    res.status(500).json({ error: 'Failed to record online expense' });
+  }
+});
+
+router.post('/online/pay', authenticate, async (req, res) => {
+  const {
+    expense_ids,
+    payment_date,
+    bank_name,
+    voucher_number,
+    reference_number,
+    transfer_amount
+  } = req.body;
+
+  const userId = req.user.userId;
+
+  if (!expense_ids || expense_ids.length === 0) {
+    return res.status(400).json({ error: 'No expenses selected for payment' });
+  }
+
+  if (!payment_date) {
+    return res.status(400).json({ error: 'Payment date is required' });
+  }
+
+  const connection = await pool.getConnection();
+  await connection.beginTransaction();
+
+  try {
+    const placeholders = expense_ids.map(() => '?').join(',');
+
+    const [expenses] = await connection.query(
+      `SELECT id, balance 
+       FROM online_expenses 
+       WHERE id IN (${placeholders}) AND balance > 0`,
+      expense_ids
+    );
+
+    if (expenses.length === 0) {
+      await connection.rollback();
+      return res.status(400).json({ error: 'No valid pending expenses found' });
+    }
+
+    let remainingAmount = parseFloat(transfer_amount || 0);
+
+    const results = [];
+
+    for (const exp of expenses) {
+
+      if (remainingAmount <= 0) break;
+
+      const payAmount = Math.min(remainingAmount, parseFloat(exp.balance));
+
+      const newBalance = parseFloat(exp.balance) - payAmount;
+
+      // ✅ Update expense balance
+      await connection.query(
+        `UPDATE online_expenses 
+         SET balance = ?,
+             payment_date = ?,
+             payment_status = CASE 
+               WHEN ? <= 0 THEN 'Paid'
+               ELSE 'Partially Paid'
+             END
+         WHERE id = ?`,
+        [newBalance, payment_date, newBalance, exp.id]
+      );
+
+      // ✅ Insert payment history
+      await connection.query(
+        `INSERT INTO online_expense_payments 
+         (expense_id, payment_date, amount, bank_name, voucher_number,
+          reference_number, created_by, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'Completed')`,
+        [
+          exp.id,
+          payment_date,
+          payAmount,
+          bank_name || null,
+          voucher_number || null,
+          reference_number || null,
+          userId
+        ]
+      );
+
+      remainingAmount -= payAmount;
+
+      results.push({
+        expense_id: exp.id,
+        paid: payAmount,
+        remaining_balance: newBalance
+      });
+    }
+
+    await connection.commit();
+
+    res.json({
+      message: 'Payment completed successfully',
+      results
+    });
+
+  } catch (error) {
+    await connection.rollback();
+    console.error('Payment error:', error);
+    res.status(500).json({ error: 'Payment failed' });
+  } finally {
+    connection.release();
+  }
+});
+
 module.exports = router;
