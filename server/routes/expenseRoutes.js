@@ -995,35 +995,107 @@ router.delete('/petty-cash/voucher/:id', authenticate, async (req, res) => {
 // =============================================
 // GET Single Online Expense by ID
 // =============================================
-router.get('/online/:id', async (req, res) => {
+// =============================================
+// PUT Update Online Expense
+// =============================================
+router.put('/online/:id', async (req, res) => {
+  const { id } = req.params;
+  const { 
+    bill_date, 
+    bill_number, 
+    payee_name, 
+    vat_reg_number, 
+    expense_type, 
+    without_vat_amount, 
+    vat_amount, 
+    total_bill_amount, 
+    description 
+  } = req.body;
+
   try {
-    const { id } = req.params;
-    const [rows] = await pool.query(
-      `SELECT id, DATE_FORMAT(bill_date, '%Y-%m-%d') as bill_date, 
-              bill_number, payee_name, vat_reg_number, expense_type,
-              without_vat_amount, vat_amount, total_bill_amount, 
-              balance, description
-       FROM online_expenses 
-       WHERE id = ?`,
+    // ✅ FIX #2: Get current balance to preserve it
+    const [currentExpense] = await pool.query(
+      'SELECT balance FROM online_expenses WHERE id = ?',
       [id]
     );
-    if (rows.length === 0) {
+
+    if (currentExpense.length === 0) {
       return res.status(404).json({ error: 'Online expense not found' });
     }
-    res.json(rows[0]);
+
+    const currentBalance = parseFloat(currentExpense[0].balance) || 0;
+    const newTotalBill = parseFloat(total_bill_amount) || 0;
+    const oldTotalBill = parseFloat(currentExpense[0].total_bill_amount) || 0;
+
+    // ✅ Recalculate balance if total bill amount changed
+    // If total bill increased, balance should increase by the difference
+    // If total bill decreased, balance should decrease by the difference
+    // But we don't want balance to go negative if payments were made
+    let newBalance = currentBalance + (newTotalBill - oldTotalBill);
+    
+    // Don't let balance go negative if total was reduced below payments
+    if (newBalance < 0) {
+      newBalance = 0;
+    }
+
+    const [result] = await pool.query(
+      `UPDATE online_expenses 
+       SET bill_date = ?, 
+           bill_number = ?, 
+           payee_name = ?, 
+           vat_reg_number = ?, 
+           expense_type = ?, 
+           without_vat_amount = ?,
+           vat_amount = ?, 
+           total_bill_amount = ?, 
+           balance = ?,  -- ✅ FIX #2: Update balance
+           description = ?
+       WHERE id = ?`,
+      [
+        bill_date, 
+        bill_number || null, 
+        payee_name, 
+        vat_reg_number || null, 
+        expense_type, 
+        without_vat_amount, 
+        vat_amount || 0, 
+        total_bill_amount, 
+        newBalance,  // ✅ Recalculated balance
+        description || null, 
+        id
+      ]
+    );
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Online expense not found' });
+    }
+    
+    res.json({ message: 'Online expense updated successfully' });
   } catch (error) {
-    console.error('Error fetching online expense:', error);
-    res.status(500).json({ error: 'Failed to fetch online expense' });
+    console.error('Error updating online expense:', error);
+    res.status(500).json({ error: 'Failed to update online expense' });
   }
 });
 
 // =============================================
 // POST Pay Online Expenses (Single or Multiple)
 // =============================================
+// =============================================
+// POST Pay Online Expenses (Single or Multiple)
+// =============================================
 router.post('/online/pay', authenticate, async (req, res) => {
-  const { expense_ids, payment_date, bank_name, voucher_number, reference_number, transfer_amount } = req.body;
+  const { 
+    expense_ids, 
+    payment_date, 
+    bank_name, 
+    voucher_number, 
+    reference_number, 
+    transfer_amount 
+  } = req.body;
+  
   const userId = req.user.userId;
 
+  // Validate required fields
   if (!expense_ids || expense_ids.length === 0) {
     return res.status(400).json({ error: 'No expenses selected for payment' });
   }
@@ -1032,16 +1104,20 @@ router.post('/online/pay', authenticate, async (req, res) => {
     return res.status(400).json({ error: 'Payment date is required' });
   }
 
+  const amountToPay = parseFloat(transfer_amount) || 0;
+  if (amountToPay <= 0) {
+    return res.status(400).json({ error: 'Valid transfer amount is required' });
+  }
+
   const connection = await pool.getConnection();
   await connection.beginTransaction();
 
   try {
-    const results = [];
-
-    // Get all selected expenses
     const placeholders = expense_ids.map(() => '?').join(',');
+    
+    // ✅ Get expenses with their current balance
     const [expenses] = await connection.query(
-      `SELECT id, total_bill_amount, balance 
+      `SELECT id, balance, total_bill_amount 
        FROM online_expenses 
        WHERE id IN (${placeholders}) AND balance > 0`,
       expense_ids
@@ -1049,28 +1125,33 @@ router.post('/online/pay', authenticate, async (req, res) => {
 
     if (expenses.length === 0) {
       await connection.rollback();
-      return res.status(400).json({ error: 'No pending payments found for selected expenses' });
+      return res.status(400).json({ error: 'No valid pending expenses found' });
     }
 
-    let totalPaidAmount = 0;
+    // ✅ Calculate total balance of ALL selected expenses
+    const totalBalance = expenses.reduce((sum, exp) => sum + parseFloat(exp.balance), 0);
+    
+    // ✅ Check if transfer amount exceeds total balance
+    if (amountToPay > totalBalance) {
+      await connection.rollback();
+      return res.status(400).json({ 
+        error: `Transfer amount (${amountToPay}) exceeds total balance (${totalBalance})` 
+      });
+    }
 
-    // Process each expense
+    let remainingAmount = amountToPay;
+    const results = [];
+
     for (const expense of expenses) {
-      const amountToPay = transfer_amount || expense.balance;
-      
-      if (amountToPay > expense.balance) {
-        await connection.rollback();
-        return res.status(400).json({ 
-          error: `Payment amount (${amountToPay}) exceeds balance (${expense.balance}) for expense ${expense.id}` 
-        });
-      }
+      if (remainingAmount <= 0) break;
 
-      const newBalance = parseFloat(expense.balance) - parseFloat(amountToPay);
+      const payAmount = Math.min(remainingAmount, parseFloat(expense.balance));
+      const newBalance = parseFloat(expense.balance) - payAmount;
 
-      // Update the expense
+      // ✅ Update expense balance
       await connection.query(
         `UPDATE online_expenses 
-         SET balance = ?, 
+         SET balance = ?,
              paid_amount = COALESCE(paid_amount, 0) + ?,
              payment_date = ?,
              payment_status = CASE 
@@ -1078,40 +1159,49 @@ router.post('/online/pay', authenticate, async (req, res) => {
                ELSE 'Partially Paid'
              END
          WHERE id = ?`,
-        [newBalance, amountToPay, payment_date, newBalance, expense.id]
+        [newBalance, payAmount, payment_date, newBalance, expense.id]
       );
 
-      totalPaidAmount += parseFloat(amountToPay);
-
-      // Record payment history
+      // ✅ Insert payment history
       await connection.query(
         `INSERT INTO online_expense_payments 
-         (expense_id, payment_date, amount, bank_name, voucher_number, 
+         (expense_id, payment_date, amount, bank_name, voucher_number,
           reference_number, created_by, status)
          VALUES (?, ?, ?, ?, ?, ?, ?, 'Completed')`,
-        [expense.id, payment_date, amountToPay, bank_name || null, 
-         voucher_number || null, reference_number || null, userId]
+        [
+          expense.id,
+          payment_date,
+          payAmount,
+          bank_name || null,
+          voucher_number || null,
+          reference_number || null,
+          userId
+        ]
       );
 
+      remainingAmount -= payAmount;
+
       results.push({
-        id: expense.id,
-        paid_amount: amountToPay,
-        new_balance: newBalance
+        expense_id: expense.id,
+        amount_paid: payAmount,
+        remaining_balance: newBalance,
+        status: newBalance <= 0 ? 'Paid' : 'Partially Paid'
       });
     }
 
     await connection.commit();
-    
+
     res.json({
-      message: `Payment successful for ${results.length} expense(s)`,
-      total_paid: totalPaidAmount,
+      message: `Payment of ${amountToPay} completed successfully`,
+      total_paid: amountToPay,
+      remaining_amount: remainingAmount,
       results
     });
 
   } catch (error) {
     await connection.rollback();
-    console.error('Error processing payment:', error);
-    res.status(500).json({ error: 'Failed to process payment' });
+    console.error('Payment error:', error);
+    res.status(500).json({ error: 'Payment failed: ' + error.message });
   } finally {
     connection.release();
   }
@@ -1136,21 +1226,25 @@ router.get('/online/:id/payments', async (req, res) => {
   }
 });
 
+// =============================================
+// POST Create Online Expense
+// =============================================
 router.post('/online', authenticate, async (req, res) => {
-  const {
-    bill_date,
-    bill_number,
-    payee_name,
-    vat_reg_number,
-    expense_type,
-    without_vat_amount,
-    vat_amount,
-    total_bill_amount,
-    description
+  const { 
+    bill_date, 
+    bill_number, 
+    payee_name, 
+    vat_reg_number, 
+    expense_type, 
+    without_vat_amount, 
+    vat_amount, 
+    total_bill_amount, 
+    description 
   } = req.body;
-
+  
   const userId = req.user.userId;
 
+  // Validation
   if (!bill_date || !payee_name || !expense_type || !without_vat_amount) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
@@ -1158,138 +1252,33 @@ router.post('/online', authenticate, async (req, res) => {
   try {
     const [result] = await pool.query(
       `INSERT INTO online_expenses 
-       (bill_date, bill_number, payee_name, vat_reg_number, expense_type,
+       (bill_date, bill_number, payee_name, vat_reg_number, expense_type, 
         without_vat_amount, vat_amount, total_bill_amount, balance, description, created_by)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        bill_date,
-        bill_number || null,
-        payee_name,
-        vat_reg_number || null,
+        bill_date, 
+        bill_number || null, 
+        payee_name, 
+        vat_reg_number || null, 
         expense_type,
-        without_vat_amount,
-        vat_amount || 0,
-        total_bill_amount,
-        total_bill_amount,   // ✅ FIX #1: balance = total_bill_amount
-        description || null,
+        without_vat_amount, 
+        vat_amount || 0, 
+        total_bill_amount, 
+        total_bill_amount,  // ✅ FIX #1: balance = total_bill_amount
+        description || null, 
         userId
       ]
     );
-
-    res.status(201).json({
-      id: result.insertId,
-      message: 'Online expense recorded successfully'
+    
+    res.status(201).json({ 
+      id: result.insertId, 
+      message: 'Online expense recorded successfully' 
     });
-
   } catch (error) {
     console.error('Error creating online expense:', error);
     res.status(500).json({ error: 'Failed to record online expense' });
   }
 });
 
-router.post('/online/pay', authenticate, async (req, res) => {
-  const {
-    expense_ids,
-    payment_date,
-    bank_name,
-    voucher_number,
-    reference_number,
-    transfer_amount
-  } = req.body;
-
-  const userId = req.user.userId;
-
-  if (!expense_ids || expense_ids.length === 0) {
-    return res.status(400).json({ error: 'No expenses selected for payment' });
-  }
-
-  if (!payment_date) {
-    return res.status(400).json({ error: 'Payment date is required' });
-  }
-
-  const connection = await pool.getConnection();
-  await connection.beginTransaction();
-
-  try {
-    const placeholders = expense_ids.map(() => '?').join(',');
-
-    const [expenses] = await connection.query(
-      `SELECT id, balance 
-       FROM online_expenses 
-       WHERE id IN (${placeholders}) AND balance > 0`,
-      expense_ids
-    );
-
-    if (expenses.length === 0) {
-      await connection.rollback();
-      return res.status(400).json({ error: 'No valid pending expenses found' });
-    }
-
-    let remainingAmount = parseFloat(transfer_amount || 0);
-
-    const results = [];
-
-    for (const exp of expenses) {
-
-      if (remainingAmount <= 0) break;
-
-      const payAmount = Math.min(remainingAmount, parseFloat(exp.balance));
-
-      const newBalance = parseFloat(exp.balance) - payAmount;
-
-      // ✅ Update expense balance
-      await connection.query(
-        `UPDATE online_expenses 
-         SET balance = ?,
-             payment_date = ?,
-             payment_status = CASE 
-               WHEN ? <= 0 THEN 'Paid'
-               ELSE 'Partially Paid'
-             END
-         WHERE id = ?`,
-        [newBalance, payment_date, newBalance, exp.id]
-      );
-
-      // ✅ Insert payment history
-      await connection.query(
-        `INSERT INTO online_expense_payments 
-         (expense_id, payment_date, amount, bank_name, voucher_number,
-          reference_number, created_by, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'Completed')`,
-        [
-          exp.id,
-          payment_date,
-          payAmount,
-          bank_name || null,
-          voucher_number || null,
-          reference_number || null,
-          userId
-        ]
-      );
-
-      remainingAmount -= payAmount;
-
-      results.push({
-        expense_id: exp.id,
-        paid: payAmount,
-        remaining_balance: newBalance
-      });
-    }
-
-    await connection.commit();
-
-    res.json({
-      message: 'Payment completed successfully',
-      results
-    });
-
-  } catch (error) {
-    await connection.rollback();
-    console.error('Payment error:', error);
-    res.status(500).json({ error: 'Payment failed' });
-  } finally {
-    connection.release();
-  }
-});
 
 module.exports = router;

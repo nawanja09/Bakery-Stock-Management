@@ -457,14 +457,18 @@ const OnlineExpenses = () => {
   const handleOpenPaymentModal = async () => {
     let expensesToPay = [];
     
-    // If items are selected, use those
     if (selectedIds.length > 0) {
-      expensesToPay = onlineExpenses.filter(exp => selectedIds.includes(exp.id));
+      expensesToPay = onlineExpenses.filter(exp => {
+        const balance = parseFloat(exp.balance || 0);
+        const total = parseFloat(exp.total_bill_amount || 0);
+        // ✅ Include if balance > 0 OR (balance === 0 AND total > 0 AND no payment)
+        const isPending = balance > 0 || 
+          (balance === 0 && total > 0 && (!exp.payment_status || exp.payment_status === 'Pending'));
+        return selectedIds.includes(exp.id) && isPending;
+      });
     }
     
-    // If no items selected, open empty payment form
     if (expensesToPay.length === 0) {
-      // Reset payment form with empty values
       setSelectedForPayment([]);
       setPaymentForm({
         payment_date: new Date().toISOString().split('T')[0],
@@ -482,11 +486,17 @@ const OnlineExpenses = () => {
       return;
     }
 
-    // If expenses found, continue with normal flow
     try {
       const firstExpense = expensesToPay[0];
-      const totalBalance = expensesToPay.reduce((sum, exp) => sum + parseFloat(exp.balance || 0), 0);
-      const totalBillAmount = expensesToPay.reduce((sum, exp) => sum + parseFloat(exp.total_bill_amount || 0), 0);
+      const totalBalance = expensesToPay.reduce((sum, exp) => {
+        let balanceValue = parseFloat(exp.balance || 0);
+        if (balanceValue === 0) {
+          balanceValue = parseFloat(exp.total_bill_amount || 0);
+        }
+        return sum + balanceValue;
+      }, 0);
+      const totalBillAmount = expensesToPay.reduce((sum, exp) => 
+        sum + parseFloat(exp.total_bill_amount || 0), 0);
       
       setSelectedForPayment(expensesToPay);
       setPaymentForm({
@@ -586,12 +596,24 @@ const OnlineExpenses = () => {
     }).format(amount);
   };
 
-  const filteredExpenses = onlineExpenses.filter(expense =>
-    expense.bill_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    expense.payee_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    expense.expense_type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    expense.vat_reg_number?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredExpenses = onlineExpenses.filter(expense => {
+    const matchesSearch = 
+      expense.bill_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      expense.payee_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      expense.expense_type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      expense.vat_reg_number?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    if (!matchesSearch) return false;
+    
+    const balance = parseFloat(expense.balance || 0);
+    const total = parseFloat(expense.total_bill_amount || 0);
+    
+    // ✅ Show if balance > 0 OR (balance === 0 AND total > 0 AND no payment)
+    const isPending = balance > 0 || 
+      (balance === 0 && total > 0 && (!expense.payment_status || expense.payment_status === 'Pending'));
+    
+    return isPending;
+  });
 
   // Check if all filtered items are selected
   const allSelected = filteredExpenses.length > 0 && 
@@ -599,29 +621,40 @@ const OnlineExpenses = () => {
 
 
   // Update the getTotalBalance function to properly handle the balance
-  const getTotalBalance = () => {
-    console.log('Selected IDs:', selectedIds);
-    console.log('Online Expenses:', onlineExpenses);
-    
+  const getTotalBalance = useCallback(() => {
     if (selectedIds.length > 0) {
       const selectedExpenses = onlineExpenses.filter(exp => selectedIds.includes(exp.id));
-      console.log('Selected Expenses:', selectedExpenses);
-      
       const total = selectedExpenses.reduce((sum, exp) => {
-        const balance = parseFloat(exp.balance || 0);
-        console.log(`Expense ${exp.id} - Bill Number: ${exp.bill_number}, Balance: ${balance}`);
-        return sum + balance;
+        // ✅ FIX: Use total_bill_amount as fallback if balance is 0
+        let balanceValue = parseFloat(exp.balance || 0);
+        const totalAmount = parseFloat(exp.total_bill_amount || 0);
+        
+        // If balance is 0 but total amount > 0 and no payment status, use total amount
+        if (balanceValue === 0 && totalAmount > 0 && 
+            (!exp.payment_status || exp.payment_status === 'Pending')) {
+          balanceValue = totalAmount;
+        }
+        return sum + balanceValue;
       }, 0);
-      
-      console.log('Total Balance:', total);
       return total;
     } else {
       // When no items selected, show total balance of ALL pending expenses
-      const pendingExpenses = onlineExpenses.filter(exp => parseFloat(exp.balance || 0) > 0);
-      const total = pendingExpenses.reduce((sum, exp) => sum + parseFloat(exp.balance || 0), 0);
+      const pendingExpenses = onlineExpenses.filter(exp => {
+        const balance = parseFloat(exp.balance || 0);
+        const total = parseFloat(exp.total_bill_amount || 0);
+        return balance > 0 || (balance === 0 && total > 0 && 
+              (!exp.payment_status || exp.payment_status === 'Pending'));
+      });
+      const total = pendingExpenses.reduce((sum, exp) => {
+        let balanceValue = parseFloat(exp.balance || 0);
+        if (balanceValue === 0) {
+          balanceValue = parseFloat(exp.total_bill_amount || 0);
+        }
+        return sum + balanceValue;
+      }, 0);
       return total;
     }
-  };
+  }, [selectedIds, onlineExpenses]);
 
   // Update the getSelectedCount function
   const getSelectedCount = () => {
@@ -952,7 +985,17 @@ const OnlineExpenses = () => {
                     <td className="amount-cell total">{formatCurrency(expense.total_bill_amount)}</td>
                     <td className="balance-cell">
                       <span className={parseFloat(expense.balance || 0) > 0 ? 'balance-positive' : 'balance-zero'}>
-                        {formatCurrency(expense.balance || 0)}
+                        {(() => {
+                          let balanceValue = parseFloat(expense.balance || 0);
+                          const totalAmount = parseFloat(expense.total_bill_amount || 0);
+                          
+                          // ✅ Show total amount if balance is 0 but no payment has been made
+                          if (balanceValue === 0 && totalAmount > 0 && 
+                              (!expense.payment_status || expense.payment_status === 'Pending')) {
+                            balanceValue = totalAmount;
+                          }
+                          return formatCurrency(balanceValue);
+                        })()}
                       </span>
                     </td>
                     <td className="description-cell">{expense.description || '-'}</td>

@@ -2363,3 +2363,8 @@ ALTER TABLE `online_expense_payments`
   ADD CONSTRAINT `fk_online_expense_payments_expense` FOREIGN KEY (`expense_id`) REFERENCES `online_expenses` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `fk_online_expense_payments_created_by` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL;
 
+
+-- Fix all online expenses where balance is 0 but total_bill_amount > 0
+UPDATE online_expenses 
+SET balance = total_bill_amount 
+WHERE (balance = 0 OR balance IS NULL) AND total_bill_amount > 0;
