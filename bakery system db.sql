@@ -2368,3 +2368,6 @@ ALTER TABLE `online_expense_payments`
 UPDATE online_expenses 
 SET balance = total_bill_amount 
 WHERE (balance = 0 OR balance IS NULL) AND total_bill_amount > 0;
+
+ALTER TABLE wastages 
+ADD COLUMN deleted TINYINT(1) DEFAULT 0;

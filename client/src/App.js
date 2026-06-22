@@ -83,6 +83,8 @@ import OnlineExpenses from './components/Expenses/OnlineExpenses';
 import BankDetails from './components/Expenses/BankDetails';
 import Payees from './components/Expenses/Payees';
 
+import EditWastage from './components/wastage/EditWastage';
+
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
@@ -194,6 +196,8 @@ function App() {
             <Route path="expenses/online" element={<OnlineExpenses />} />
             <Route path="expenses/bank-details" element={<BankDetails />} />
             <Route path="/expenses/payees" element={<Payees />} />
+
+            <Route path="wastage/edit/:id" element={<EditWastage />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/login" replace />} />

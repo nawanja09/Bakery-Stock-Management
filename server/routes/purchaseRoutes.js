@@ -146,6 +146,51 @@ router.get('/latest-prices', async (req, res) => {
   }
 });
 
+// Get latest purchase prices for all items
+router.get('/items/latest-prices', async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT 
+        pi.item_id,
+        i.name as item_name,
+        i.item_code,
+        pi.unit_price,
+        p.purchase_date,
+        p.invoice_no
+      FROM purchase_items pi
+      JOIN purchases p ON pi.purchase_id = p.id
+      JOIN items i ON pi.item_id = i.id
+      WHERE (pi.item_id, p.purchase_date) IN (
+        SELECT 
+          item_id, 
+          MAX(purchase_date) as latest_date
+        FROM purchase_items pi2
+        JOIN purchases p2 ON pi2.purchase_id = p2.id
+        GROUP BY item_id
+      )
+      ORDER BY i.name
+    `);
+
+    const priceMap = {};
+    rows.forEach(row => {
+      if (row.unit_price) {
+        priceMap[row.item_id] = {
+          unit_price: parseFloat(row.unit_price),
+          item_name: row.item_name,
+          item_code: row.item_code,
+          purchase_date: row.purchase_date,
+          invoice_no: row.invoice_no
+        };
+      }
+    });
+
+    res.json(priceMap);
+  } catch (error) {
+    console.error('Error fetching latest purchase prices:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 router.post('/:id/pay', purchaseController.makePayment);
 router.get('/:id/payments', purchaseController.getPaymentHistory);
 router.get('/summary', paymentHistoryController.getPaymentSummary);

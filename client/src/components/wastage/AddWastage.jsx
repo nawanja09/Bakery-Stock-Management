@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Wastage.css';
 import { usePopup } from '../context/PopupContext';
@@ -7,27 +7,59 @@ import api from '../../api';
 const AddWastage = () => {
   const navigate = useNavigate();
   const [items, setItems] = useState([]);
+  const [filteredItems, setFilteredItems] = useState([]);
+  const [itemPrices, setItemPrices] = useState({});
+  const [searchTerm, setSearchTerm] = useState('');
+  const [activeSearchIndex, setActiveSearchIndex] = useState(null);
   const { showPopup } = usePopup();
+  const searchInputRefs = useRef({});
+
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     approved_by: '',
     reason: 'Expired',
     remarks: '',
-    items: [{ item_id: '', quantity: 1, estimated_loss: 0, unit: '' }]
+    items: [{ item_id: '', quantity: 1, estimated_loss: 0, unit: '', unit_price: 0 }]
   });
 
+  // Fetch items and their latest prices
   useEffect(() => {
-    const fetchItems = async () => {
+    const fetchData = async () => {
       try {
-        const response = await api.get('/items');
-        setItems(response.data);
+        const [itemsRes, pricesRes] = await Promise.all([
+          api.get('/items'),
+          api.get('/purchases/items/latest-prices')
+        ]);
+        
+        setItems(itemsRes.data);
+        setFilteredItems(itemsRes.data);
+        setItemPrices(pricesRes.data);
+        
       } catch (error) {
-        console.error('Error fetching items:', error);
+        console.error('Error fetching data:', error);
       }
     };
 
-    fetchItems();
+    fetchData();
   }, []);
+
+  // Filter items based on search term
+  useEffect(() => {
+    if (searchTerm.trim() === '') {
+      setFilteredItems(items);
+    } else {
+      const filtered = items.filter(item => 
+        item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.item_code.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      setFilteredItems(filtered);
+    }
+  }, [searchTerm, items]);
+
+  // Auto-calculate estimated loss whenever quantity or unit_price changes
+  const calculateEstimatedLoss = (quantity, unitPrice) => {
+    return Number((quantity || 0) * (unitPrice || 0));
+  };
 
   const handleItemChange = (index, field, value) => {
     const newItems = [...formData.items];
@@ -39,13 +71,52 @@ const AddWastage = () => {
 
     newItems[index][field] = value;
 
-    // Auto-set unit when item is selected
+    // Auto-set unit and unit_price when item is selected
     if (field === 'item_id') {
       const selectedItem = items.find(item => String(item.id) === String(value));
-      newItems[index].unit = selectedItem ? selectedItem.unit : '';
+      if (selectedItem) {
+        newItems[index].unit = selectedItem.unit || '';
+        // Get the latest purchase price from itemPrices
+        const priceData = itemPrices[selectedItem.id];
+        newItems[index].unit_price = priceData?.unit_price || 0;
+      }
+    }
+
+    // Auto-calculate estimated loss when quantity or unit_price changes
+    if (field === 'quantity' || field === 'unit_price' || field === 'item_id') {
+      const quantity = Number(newItems[index].quantity) || 0;
+      const unitPrice = Number(newItems[index].unit_price) || 0;
+      newItems[index].estimated_loss = calculateEstimatedLoss(quantity, unitPrice);
     }
 
     setFormData({ ...formData, items: newItems });
+  };
+
+  // Handle item selection from search dropdown
+  const handleItemSelect = (index, itemId) => {
+    handleItemChange(index, 'item_id', itemId);
+    // Clear search term and close dropdown
+    setSearchTerm('');
+    setActiveSearchIndex(null);
+    // Focus back on search input
+    if (searchInputRefs.current[index]) {
+      searchInputRefs.current[index].focus();
+    }
+  };
+
+  // Handle search input change
+  const handleSearchChange = (index, value) => {
+    // If there's a selected item and user types, clear the selection
+    if (formData.items[index].item_id) {
+      const newItems = [...formData.items];
+      newItems[index].item_id = '';
+      newItems[index].unit = '';
+      newItems[index].unit_price = 0;
+      newItems[index].estimated_loss = 0;
+      setFormData({ ...formData, items: newItems });
+    }
+    setSearchTerm(value);
+    setActiveSearchIndex(index);
   };
 
   const calculateTotalLoss = () => {
@@ -57,7 +128,7 @@ const AddWastage = () => {
   const addItemRow = () => {
     setFormData({
       ...formData,
-      items: [...formData.items, { item_id: '', quantity: 1, estimated_loss: 0, unit: '' }]
+      items: [...formData.items, { item_id: '', quantity: 1, estimated_loss: 0, unit: '', unit_price: 0 }]
     });
   };
 
@@ -70,8 +141,24 @@ const AddWastage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    // Validate that all items have an item_id
+    const hasEmptyItem = formData.items.some(item => !item.item_id);
+    if (hasEmptyItem) {
+      showPopup('error', 'Please select an item for all rows');
+      return;
+    }
+
+    // Prepare data for API - remove unit_price as it's not needed in the database
+    const submitData = {
+      ...formData,
+      items: formData.items.map(({ unit_price, ...item }) => ({
+        ...item,
+        estimated_loss: Number(item.estimated_loss) || 0
+      }))
+    };
+
     try {
-      const response = await api.post('/wastages', formData);
+      const response = await api.post('/wastages', submitData);
       
       if (response.status === 201) {
         showPopup('success', `Wastage recorded successfully! Note #: ${response.data.wastage_note_number}`);
@@ -80,7 +167,6 @@ const AddWastage = () => {
     } catch (error) {
       console.error('Error creating wastage:', error);
       
-      // Handle specific error cases
       if (error.response?.status === 401) {
         showPopup('error', 'Session expired. Please login again.');
         navigate('/login');
@@ -89,6 +175,20 @@ const AddWastage = () => {
         showPopup('error', `Error: ${errorMessage}`);
       }
     }
+  };
+
+  // Get display name for selected item
+  const getSelectedItemName = (itemId) => {
+    if (!itemId) return '';
+    const item = items.find(i => String(i.id) === String(itemId));
+    return item ? `${item.name} (${item.item_code})` : '';
+  };
+
+  // Get unit price display
+  const getUnitPriceDisplay = (itemId) => {
+    if (!itemId) return '0.00';
+    const priceData = itemPrices[itemId];
+    return priceData ? priceData.unit_price.toFixed(2) : '0.00';
   };
 
   return (
@@ -140,29 +240,71 @@ const AddWastage = () => {
         <table className="item-table">
           <thead>
             <tr>
-              <th>Item Name</th>
-              <th>Quantity</th>
-              <th>Unit of Measurement</th>
-              <th>Estimated Loss (Rs.)</th>
-              <th>Action</th>
+              <th style={{ width: '30%' }}>Item Name</th>
+              <th style={{ width: '12%' }}>Quantity</th>
+              <th style={{ width: '10%' }}>Unit</th>
+              <th style={{ width: '15%' }}>Unit Price (Rs.)</th>
+              <th style={{ width: '18%' }}>Estimated Loss (Rs.)</th>
+              <th style={{ width: '10%' }}>Action</th>
             </tr>
           </thead>
           <tbody>
             {formData.items.map((item, index) => (
               <tr key={index}>
                 <td>
-                  <select
-                    value={item.item_id}
-                    onChange={(e) => handleItemChange(index, 'item_id', e.target.value)}
-                    required
-                  >
-                    <option value="">Select Item</option>
-                    {items.map((itm) => (
-                      <option key={itm.id} value={itm.id}>
-                        {itm.name} ({itm.item_code})
-                      </option>
-                    ))}
-                  </select>
+                  <div className="item-search-container">
+                    <input
+                      ref={el => searchInputRefs.current[index] = el}
+                      type="text"
+                      placeholder="Search item by name or code..."
+                      value={item.item_id ? getSelectedItemName(item.item_id) : searchTerm}
+                      onChange={(e) => handleSearchChange(index, e.target.value)}
+                      onFocus={() => {
+                        if (item.item_id) {
+                          setSearchTerm('');
+                          const newItems = [...formData.items];
+                          newItems[index].item_id = '';
+                          newItems[index].unit = '';
+                          newItems[index].unit_price = 0;
+                          newItems[index].estimated_loss = 0;
+                          setFormData({ ...formData, items: newItems });
+                        }
+                        setActiveSearchIndex(index);
+                      }}
+                      onBlur={() => {
+                        // Delay closing dropdown to allow click on dropdown items
+                        setTimeout(() => {
+                          setActiveSearchIndex(null);
+                        }, 200);
+                      }}
+                      className="item-search-input"
+                    />
+                    {activeSearchIndex === index && searchTerm && !item.item_id && (
+                      <div className="search-dropdown">
+                        {filteredItems.length === 0 ? (
+                          <div className="search-no-results">No items found</div>
+                        ) : (
+                          filteredItems.map((itm) => {
+                            const priceData = itemPrices[itm.id];
+                            const price = priceData?.unit_price || 0;
+                            return (
+                              <div
+                                key={itm.id}
+                                className="search-item"
+                                onClick={() => handleItemSelect(index, itm.id)}
+                                onMouseDown={(e) => e.preventDefault()}
+                              >
+                                <span className="search-item-code">{itm.item_code}</span>
+                                <span className="search-item-name">{itm.name}</span>
+                                <span className="search-item-unit">({itm.unit})</span>
+                                <span className="search-item-price">Rs. {price.toFixed(2)}</span>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </td>
                 <td>
                   <input
@@ -187,8 +329,24 @@ const AddWastage = () => {
                     type="number"
                     min="0"
                     step="0.01"
+                    value={item.unit_price}
+                    onChange={(e) => handleItemChange(index, 'unit_price', e.target.value)}
+                    placeholder="0.00"
+                  />
+                  {item.item_id && (
+                    <small className="price-hint">
+                      Latest: Rs. {getUnitPriceDisplay(item.item_id)}
+                    </small>
+                  )}
+                </td>
+                <td>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
                     value={item.estimated_loss}
-                    onChange={(e) => handleItemChange(index, 'estimated_loss', e.target.value)}
+                    readOnly
+                    className="estimated-loss-display"
                   />
                 </td>
                 <td>
@@ -196,6 +354,7 @@ const AddWastage = () => {
                     type="button"
                     className="btn-remove"
                     onClick={() => removeItemRow(index)}
+                    disabled={formData.items.length <= 1}
                   >
                     Remove
                   </button>
@@ -218,6 +377,17 @@ const AddWastage = () => {
             <strong>Total Estimated Loss:</strong>
             <span>Rs. {calculateTotalLoss()}</span>
           </div>
+        </div>
+
+        <div className="form-group">
+          <label>Remarks</label>
+          <textarea
+            value={formData.remarks}
+            onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
+            rows="3"
+            className="remarks-textarea"
+            placeholder="Any additional notes..."
+          />
         </div>
 
         <button type="submit" className="btn-submit">Save Wastage</button>
