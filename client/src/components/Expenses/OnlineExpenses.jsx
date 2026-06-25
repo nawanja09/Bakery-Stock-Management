@@ -19,7 +19,8 @@ import {
   faCreditCard,
   faBuildingColumns,
   faChevronDown,
-  faChevronUp
+  faChevronUp,
+  faExclamationTriangle
 } from '@fortawesome/free-solid-svg-icons';
 import './OnlineExpenses.css';
 import { usePopup } from '../context/PopupContext';
@@ -62,8 +63,8 @@ const OnlineExpenses = () => {
     reference_number: '',
     expense_type: '',
     description: '',
-    total_bill_amount: '',
-    transfer_amount: ''
+    total_bill_amount: '0.00',
+    transfer_amount: '0.00'
   });
 
   // Form State
@@ -452,7 +453,7 @@ const OnlineExpenses = () => {
   };
 
   // =============================================
-  // FIXED: Payment handler - ALWAYS opens modal
+  // ✅ FIXED: Payment handler with Payee Name Validation
   // =============================================
   const handleOpenPaymentModal = async () => {
     let expensesToPay = [];
@@ -461,7 +462,6 @@ const OnlineExpenses = () => {
       expensesToPay = onlineExpenses.filter(exp => {
         const balance = parseFloat(exp.balance || 0);
         const total = parseFloat(exp.total_bill_amount || 0);
-        // ✅ Include if balance > 0 OR (balance === 0 AND total > 0 AND no payment)
         const isPending = balance > 0 || 
           (balance === 0 && total > 0 && (!exp.payment_status || exp.payment_status === 'Pending'));
         return selectedIds.includes(exp.id) && isPending;
@@ -469,6 +469,7 @@ const OnlineExpenses = () => {
     }
     
     if (expensesToPay.length === 0) {
+      // If no pending expenses selected, still allow opening modal with empty state
       setSelectedForPayment([]);
       setPaymentForm({
         payment_date: new Date().toISOString().split('T')[0],
@@ -486,6 +487,28 @@ const OnlineExpenses = () => {
       return;
     }
 
+    // ✅ VALIDATION: Check if all selected expenses have the same payee name
+    const payeeNames = expensesToPay.map(exp => exp.payee_name).filter(name => name && name.trim() !== '');
+    const uniquePayees = [...new Set(payeeNames)];
+    
+    // Check if there are expenses without a payee name
+    const expensesWithoutPayee = expensesToPay.filter(exp => !exp.payee_name || exp.payee_name.trim() === '');
+    
+    if (expensesWithoutPayee.length > 0) {
+      showPopup('error', `Cannot process payment: ${expensesWithoutPayee.length} selected expense(s) have no Payee Name. Please update these expenses first.`);
+      return;
+    }
+    
+    if (uniquePayees.length > 1) {
+      // Multiple different payees - show error with details
+      const payeeList = uniquePayees.join(', ');
+      showPopup('error', `Cannot process payment: Selected expenses have different Payee Names (${payeeList}). Please select expenses with the same payee.`);
+      return;
+    }
+
+    // ✅ If we reach here, all selected expenses have the same payee name
+    const commonPayeeName = uniquePayees[0];
+
     try {
       const firstExpense = expensesToPay[0];
       const totalBalance = expensesToPay.reduce((sum, exp) => {
@@ -501,7 +524,7 @@ const OnlineExpenses = () => {
       setSelectedForPayment(expensesToPay);
       setPaymentForm({
         payment_date: new Date().toISOString().split('T')[0],
-        payee_name: firstExpense.payee_name,
+        payee_name: commonPayeeName, // ✅ Use the common payee name
         bank_name: '',
         voucher_number: '',
         reference_number: '',
@@ -511,7 +534,7 @@ const OnlineExpenses = () => {
         transfer_amount: totalBalance.toFixed(2)
       });
       
-      setPayeeSearch(firstExpense.payee_name);
+      setPayeeSearch(commonPayeeName);
       setShowPaymentModal(true);
     } catch (error) {
       console.error('Error fetching expense details:', error);
@@ -608,7 +631,6 @@ const OnlineExpenses = () => {
     const balance = parseFloat(expense.balance || 0);
     const total = parseFloat(expense.total_bill_amount || 0);
     
-    // ✅ Show if balance > 0 OR (balance === 0 AND total > 0 AND no payment)
     const isPending = balance > 0 || 
       (balance === 0 && total > 0 && (!expense.payment_status || expense.payment_status === 'Pending'));
     
@@ -619,17 +641,13 @@ const OnlineExpenses = () => {
   const allSelected = filteredExpenses.length > 0 && 
     filteredExpenses.every(exp => selectedIds.includes(exp.id));
 
-
-  // Update the getTotalBalance function to properly handle the balance
   const getTotalBalance = useCallback(() => {
     if (selectedIds.length > 0) {
       const selectedExpenses = onlineExpenses.filter(exp => selectedIds.includes(exp.id));
       const total = selectedExpenses.reduce((sum, exp) => {
-        // ✅ FIX: Use total_bill_amount as fallback if balance is 0
         let balanceValue = parseFloat(exp.balance || 0);
         const totalAmount = parseFloat(exp.total_bill_amount || 0);
         
-        // If balance is 0 but total amount > 0 and no payment status, use total amount
         if (balanceValue === 0 && totalAmount > 0 && 
             (!exp.payment_status || exp.payment_status === 'Pending')) {
           balanceValue = totalAmount;
@@ -638,7 +656,6 @@ const OnlineExpenses = () => {
       }, 0);
       return total;
     } else {
-      // When no items selected, show total balance of ALL pending expenses
       const pendingExpenses = onlineExpenses.filter(exp => {
         const balance = parseFloat(exp.balance || 0);
         const total = parseFloat(exp.total_bill_amount || 0);
@@ -656,17 +673,30 @@ const OnlineExpenses = () => {
     }
   }, [selectedIds, onlineExpenses]);
 
-  // Update the getSelectedCount function
   const getSelectedCount = () => {
     if (selectedIds.length > 0) {
       return selectedIds.length;
     } else {
-      // When no items selected, count all pending expenses
       return onlineExpenses.filter(exp => parseFloat(exp.balance || 0) > 0).length;
     }
   };
+
+  // ✅ NEW: Get selected payee names for display
+  const getSelectedPayeeInfo = () => {
+    if (selectedIds.length === 0) return null;
+    
+    const selectedExpenses = onlineExpenses.filter(exp => selectedIds.includes(exp.id));
+    const payeeNames = selectedExpenses.map(exp => exp.payee_name).filter(name => name && name.trim() !== '');
+    const uniquePayees = [...new Set(payeeNames)];
+    
+    if (uniquePayees.length === 0) return { hasPayee: false, count: 0 };
+    if (uniquePayees.length === 1) return { hasPayee: true, payeeName: uniquePayees[0], count: 1 };
+    return { hasPayee: false, count: uniquePayees.length, payeeNames: uniquePayees };
+  };
+
   const totalBalance = getTotalBalance();
   const selectedCount = getSelectedCount();
+  const payeeInfo = getSelectedPayeeInfo();
 
   return (
     <div className="online-expenses-container">
@@ -989,7 +1019,6 @@ const OnlineExpenses = () => {
                           let balanceValue = parseFloat(expense.balance || 0);
                           const totalAmount = parseFloat(expense.total_bill_amount || 0);
                           
-                          // ✅ Show total amount if balance is 0 but no payment has been made
                           if (balanceValue === 0 && totalAmount > 0 && 
                               (!expense.payment_status || expense.payment_status === 'Pending')) {
                             balanceValue = totalAmount;
@@ -1026,14 +1055,32 @@ const OnlineExpenses = () => {
           </table>
         </div>
 
-        {/* Payment Action Bar - FIXED: Pay button always enabled */}
+        {/* Payment Action Bar - with Payee Validation Status */}
         <div className="payment-action-bar">
           <div className="selected-info">
             {selectedIds.length > 0 ? (
-              <span className="selected-count">
-                <FontAwesomeIcon icon={faCheckCircle} /> {selectedIds.length} expense(s) selected
-                <span className="selected-total"> | Total Balance: {formatCurrency(totalBalance)}</span>
-              </span>
+              <>
+                <span className="selected-count">
+                  <FontAwesomeIcon icon={faCheckCircle} /> {selectedIds.length} expense(s) selected
+                  <span className="selected-total"> | Total Balance: {formatCurrency(totalBalance)}</span>
+                </span>
+                {/* ✅ Payee validation status display */}
+                {payeeInfo && payeeInfo.hasPayee ? (
+                  <span className="payee-status valid">
+                    ✓ Payee: <strong>{payeeInfo.payeeName}</strong>
+                  </span>
+                ) : payeeInfo && !payeeInfo.hasPayee && payeeInfo.count > 1 ? (
+                  <span className="payee-status invalid">
+                    <FontAwesomeIcon icon={faExclamationTriangle} /> 
+                    Multiple payees selected ({payeeInfo.payeeNames?.join(', ')})
+                  </span>
+                ) : payeeInfo && !payeeInfo.hasPayee && payeeInfo.count === 0 ? (
+                  <span className="payee-status warning">
+                    <FontAwesomeIcon icon={faExclamationTriangle} /> 
+                    No payee name found
+                  </span>
+                ) : null}
+              </>
             ) : (
               <span className="selected-count">
                 <FontAwesomeIcon icon={faReceipt} /> {selectedCount} pending expense(s)
@@ -1285,6 +1332,41 @@ const OnlineExpenses = () => {
           </div>
         </div>
       )}
+
+      {/* ✅ Add CSS for payee status display */}
+      <style>{`
+        .payee-status {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 13px;
+          padding: 4px 12px;
+          border-radius: 20px;
+          margin-left: 12px;
+        }
+        .payee-status.valid {
+          background: #d4edda;
+          color: #155724;
+        }
+        .payee-status.invalid {
+          background: #f8d7da;
+          color: #721c24;
+        }
+        .payee-status.warning {
+          background: #fff3cd;
+          color: #856404;
+        }
+        .selected-total {
+          margin-left: 8px;
+          font-weight: 600;
+        }
+        .selected-info {
+          display: flex;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+      `}</style>
     </div>
   );
 };
