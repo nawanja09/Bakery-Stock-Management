@@ -342,58 +342,21 @@ const OnlineExpenses = () => {
     document.querySelector('.form-card')?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const handleUpdate = async (e) => {
-    e.preventDefault();
-    
-    if (!formData.bill_date || !formData.payee_name || !formData.expense_type) {
-      showPopup('error', 'Please fill all required fields');
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const payload = {
-        bill_date: formData.bill_date,
-        bill_number: formData.bill_number || null,
-        payee_name: formData.payee_name,
-        vat_reg_number: formData.vat_reg_number || null,
-        expense_type: formData.expense_type,
-        without_vat_amount: parseFloat(formData.without_vat_amount),
-        vat_amount: parseFloat(formData.vat_amount) || 0,
-        total_bill_amount: parseFloat(formData.total_bill_amount),
-        description: formData.description || null
-      };
-
-      const response = await api.put(`/expenses/online/${editingId}`, payload);
-      
-      if (response.status === 200) {
-        showPopup('success', 'Online expense updated successfully!');
-        
-        // Reset form and editing state
-        setFormData({
-          bill_date: new Date().toISOString().split('T')[0],
-          bill_number: '',
-          payee_name: '',
-          vat_reg_number: '',
-          expense_type: '',
-          without_vat_amount: '',
-          vat_amount: '',
-          total_bill_amount: '',
-          description: ''
-        });
-        setPayeeSearch('');
-        setSelectedPayee(null);
-        setEditingId(null);
-        
-        // Refresh data
-        await fetchOnlineExpenses();
-      }
-    } catch (error) {
-      console.error('Error updating online expense:', error);
-      showPopup('error', error.response?.data?.error || 'Failed to update online expense');
-    } finally {
-      setIsLoading(false);
-    }
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setSelectedPayee(null);
+    setPayeeSearch('');
+    setFormData({
+      bill_date: new Date().toISOString().split('T')[0],
+      bill_number: '',
+      payee_name: '',
+      vat_reg_number: '',
+      expense_type: '',
+      without_vat_amount: '',
+      vat_amount: '',
+      total_bill_amount: '',
+      description: ''
+    });
   };
 
   const handleDelete = async (id) => {
@@ -413,23 +376,6 @@ const OnlineExpenses = () => {
         setIsLoading(false);
       }
     }
-  };
-
-  const handleCancelEdit = () => {
-    setEditingId(null);
-    setSelectedPayee(null);
-    setPayeeSearch('');
-    setFormData({
-      bill_date: new Date().toISOString().split('T')[0],
-      bill_number: '',
-      payee_name: '',
-      vat_reg_number: '',
-      expense_type: '',
-      without_vat_amount: '',
-      vat_amount: '',
-      total_bill_amount: '',
-      description: ''
-    });
   };
 
   // Selection handlers
@@ -452,7 +398,7 @@ const OnlineExpenses = () => {
     });
   };
 
-  // Payment handler with Payee Name Validation
+  // ✅ FIXED: Payment handler with Payee Name Validation
   const handleOpenPaymentModal = async () => {
     let expensesToPay = [];
     
@@ -544,23 +490,21 @@ const OnlineExpenses = () => {
     setPayeeSearch('');
   };
 
-  // =============================================
   // ✅ FIXED: Process Payment with Required Field Validation
-  // =============================================
   const handleProcessPayment = async () => {
-    // ✅ Validation 1: Payment date is required
+    // Validation 1: Payment date is required
     if (!paymentForm.payment_date) {
       showPopup('error', 'Payment date is required');
       return;
     }
 
-    // ✅ Validation 2: Bank name is required
+    // Validation 2: Bank name is required
     if (!paymentForm.bank_name || paymentForm.bank_name.trim() === '') {
       showPopup('error', 'Bank name is required. Please select or enter a bank.');
       return;
     }
 
-    // ✅ Validation 3: Voucher number is required
+    // Validation 3: Voucher number is required
     if (!paymentForm.voucher_number || paymentForm.voucher_number.trim() === '') {
       showPopup('error', 'Voucher number is required. Please enter a voucher number.');
       return;
@@ -703,6 +647,19 @@ const OnlineExpenses = () => {
   const selectedCount = getSelectedCount();
   const payeeInfo = getSelectedPayeeInfo();
 
+  // ✅ FIXED: Get correct balance display value
+  const getDisplayBalance = (expense) => {
+    let balanceValue = parseFloat(expense.balance || 0);
+    const totalAmount = parseFloat(expense.total_bill_amount || 0);
+    
+    // If balance is 0 but total > 0 and status is Pending, show total as balance
+    if (balanceValue === 0 && totalAmount > 0 && 
+        (!expense.payment_status || expense.payment_status === 'Pending')) {
+      balanceValue = totalAmount;
+    }
+    return balanceValue;
+  };
+
   return (
     <div className="online-expenses-container">
       <div className="online-header">
@@ -719,7 +676,7 @@ const OnlineExpenses = () => {
           {editingId ? 'Edit Expense Bill' : 'New Expense Bill'}
         </h3>
         
-        <form onSubmit={editingId ? handleUpdate : handleSubmit} className="online-form">
+        <form onSubmit={editingId ? handleSubmit : handleSubmit} className="online-form">
           <div className="form-row">
             <div className="form-group">
               <label>Bill Date <span className="required">*</span></label>
@@ -1001,56 +958,50 @@ const OnlineExpenses = () => {
                   </td>
                 </tr>
               ) : filteredExpenses.length > 0 ? (
-                filteredExpenses.map(expense => (
-                  <tr key={expense.id}>
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.includes(expense.id)}
-                        onChange={() => handleSelectOne(expense.id)}
-                        className="select-checkbox"
-                      />
-                    </td>
-                    <td className="date-cell">{expense.bill_date}</td>
-                    <td className="bill-number-cell">{expense.bill_number || '-'}</td>
-                    <td className="payee-cell">{expense.payee_name}</td>
-                    <td className="vat-cell">{expense.vat_reg_number || '-'}</td>
-                    <td className="amount-cell">{formatCurrency(expense.without_vat_amount)}</td>
-                    <td className="amount-cell">{formatCurrency(expense.vat_amount)}</td>
-                    <td className="amount-cell total">{formatCurrency(expense.total_bill_amount)}</td>
-                    <td className="balance-cell">
-                      <span className={parseFloat(expense.balance || 0) > 0 ? 'balance-positive' : 'balance-zero'}>
-                        {(() => {
-                          let balanceValue = parseFloat(expense.balance || 0);
-                          const totalAmount = parseFloat(expense.total_bill_amount || 0);
-                          
-                          if (balanceValue === 0 && totalAmount > 0 && 
-                              (!expense.payment_status || expense.payment_status === 'Pending')) {
-                            balanceValue = totalAmount;
-                          }
-                          return formatCurrency(balanceValue);
-                        })()}
-                      </span>
-                    </td>
-                    <td className="description-cell">{expense.description || '-'}</td>
-                    <td className="action-cell">
-                      <button
-                        onClick={() => handleEdit(expense)}
-                        className="edit-btn"
-                        title="Edit"
-                      >
-                        <FontAwesomeIcon icon={faEdit} />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(expense.id)}
-                        className="delete-btn"
-                        title="Delete"
-                      >
-                        <FontAwesomeIcon icon={faTrash} />
-                      </button>
-                    </td>
-                  </tr>
-                ))
+                filteredExpenses.map(expense => {
+                  const displayBalance = getDisplayBalance(expense);
+                  return (
+                    <tr key={expense.id}>
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(expense.id)}
+                          onChange={() => handleSelectOne(expense.id)}
+                          className="select-checkbox"
+                        />
+                      </td>
+                      <td className="date-cell">{expense.bill_date}</td>
+                      <td className="bill-number-cell">{expense.bill_number || '-'}</td>
+                      <td className="payee-cell">{expense.payee_name}</td>
+                      <td className="vat-cell">{expense.vat_reg_number || '-'}</td>
+                      <td className="amount-cell">{formatCurrency(expense.without_vat_amount)}</td>
+                      <td className="amount-cell">{formatCurrency(expense.vat_amount)}</td>
+                      <td className="amount-cell total">{formatCurrency(expense.total_bill_amount)}</td>
+                      <td className="balance-cell">
+                        <span className={displayBalance > 0 ? 'balance-positive' : 'balance-zero'}>
+                          {formatCurrency(displayBalance)}
+                        </span>
+                      </td>
+                      <td className="description-cell">{expense.description || '-'}</td>
+                      <td className="action-cell">
+                        <button
+                          onClick={() => handleEdit(expense)}
+                          className="edit-btn"
+                          title="Edit"
+                        >
+                          <FontAwesomeIcon icon={faEdit} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(expense.id)}
+                          className="delete-btn"
+                          title="Delete"
+                        >
+                          <FontAwesomeIcon icon={faTrash} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
               ) : (
                 <tr>
                   <td colSpan="11" className="empty-row">No online expenses found</td>
@@ -1103,7 +1054,7 @@ const OnlineExpenses = () => {
         </div>
       </div>
 
-      {/* ✅ Payment Modal with Required Fields */}
+      {/* Payment Modal with Required Fields */}
       {showPaymentModal && (
         <div className="payment-modal-overlay" onClick={handleClosePaymentModal}>
           <div className="payment-modal-content" onClick={(e) => e.stopPropagation()}>
@@ -1207,7 +1158,6 @@ const OnlineExpenses = () => {
                         </div>
                       )}
                     </div>
-                    {/* ✅ Show validation message if bank is not selected */}
                     {!paymentForm.bank_name && (
                       <small style={{ color: '#dc3545', fontSize: '12px', marginTop: '4px' }}>
                         Bank name is required
@@ -1230,7 +1180,6 @@ const OnlineExpenses = () => {
                         backgroundColor: !paymentForm.voucher_number ? '#fff8f8' : undefined
                       }}
                     />
-                    {/* ✅ Show validation message if voucher number is empty */}
                     {!paymentForm.voucher_number && (
                       <small style={{ color: '#dc3545', fontSize: '12px', marginTop: '4px' }}>
                         Voucher number is required
@@ -1300,6 +1249,12 @@ const OnlineExpenses = () => {
                           <span className="summary-label">Bill Amount</span>
                           <span className="summary-value">{formatCurrency(expense.total_bill_amount)}</span>
                         </div>
+                        <div className="expense-summary-row">
+                          <span className="summary-label">Balance</span>
+                          <span className="summary-value" style={{ color: parseFloat(expense.balance) > 0 ? '#dc3545' : '#28a745' }}>
+                            {formatCurrency(expense.balance)}
+                          </span>
+                        </div>
                         {index < selectedForPayment.length - 1 && <hr className="expense-divider" />}
                       </div>
                     ))}
@@ -1314,8 +1269,8 @@ const OnlineExpenses = () => {
                 </div>
 
                 <div className="expense-summary-row balance-row">
-                  <span className="summary-label">Balance</span>
-                  <span className="summary-value balance-amount">
+                  <span className="summary-label">Total Balance</span>
+                  <span className="summary-value balance-amount" style={{ color: selectedForPayment.reduce((sum, exp) => sum + parseFloat(exp.balance || 0), 0) > 0 ? '#dc3545' : '#28a745' }}>
                     {formatCurrency(selectedForPayment.reduce((sum, exp) => sum + parseFloat(exp.balance || 0), 0))}
                   </span>
                 </div>
@@ -1351,7 +1306,7 @@ const OnlineExpenses = () => {
                 type="button"
                 className="btn-pay"
                 onClick={handleProcessPayment}
-                disabled={isLoading}
+                disabled={isLoading || !paymentForm.bank_name || !paymentForm.voucher_number || !paymentForm.transfer_amount || parseFloat(paymentForm.transfer_amount) <= 0}
               >
                 <FontAwesomeIcon icon={isLoading ? faSpinner : faMoneyBillWave} spin={isLoading} />
                 {isLoading ? 'Processing...' : 'Pay'}
@@ -1401,6 +1356,74 @@ const OnlineExpenses = () => {
           color: #dc3545;
           font-size: 12px;
           margin-top: 4px;
+        }
+        .balance-positive {
+          color: #dc3545;
+          font-weight: 600;
+        }
+        .balance-zero {
+          color: #28a745;
+          font-weight: 600;
+        }
+        .payee-dropdown-wrapper {
+          position: relative;
+        }
+        .payee-input-inner {
+          position: relative;
+        }
+        .clear-payee-btn {
+          position: absolute;
+          right: 10px;
+          top: 50%;
+          transform: translateY(-50%);
+          background: none;
+          border: none;
+          color: #6c757d;
+          font-size: 18px;
+          cursor: pointer;
+          padding: 0;
+        }
+        .payee-dropdown {
+          position: absolute;
+          z-index: 20;
+          left: 0;
+          right: 0;
+          max-height: 260px;
+          overflow-y: auto;
+          margin-top: 6px;
+          border: 1px solid #dee2e6;
+          border-radius: 10px;
+          background: white;
+          box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08);
+        }
+        .dropdown-item {
+          width: 100%;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 8px;
+          padding: 10px 12px;
+          border: none;
+          background: transparent;
+          text-align: left;
+          cursor: pointer;
+          font-size: 14px;
+          color: #212529;
+        }
+        .dropdown-item:hover,
+        .dropdown-item.highlighted {
+          background: #f1f0ff;
+        }
+        .dropdown-annotation {
+          font-size: 12px;
+          color: #6c757d;
+        }
+        .dropdown-empty,
+        .dropdown-loading {
+          padding: 12px;
+          color: #6c757d;
+          font-size: 13px;
+          background: #f8f9fa;
         }
       `}</style>
     </div>
