@@ -1,7 +1,8 @@
 .sidebar {
   width: 300px;
   height: 100vh;
-  background-color: var(--secondary-color);  box-shadow: 3px 0 10px rgba(190, 189, 189, 0.1);
+  background-color: var(--secondary-color);
+  box-shadow: 3px 0 10px rgba(190, 189, 189, 0.1);
   display: flex;
   flex-direction: column;
   font-family: 'Poppins', sans-serif;
@@ -11,7 +12,6 @@
   padding: 0.5rem 1rem;
   text-align: center;
   border-bottom: 1px solid #eee;
-  
 }
 
 .logo-image {
@@ -19,8 +19,8 @@
   height: 80px;
   margin: 10px auto;
   display: block;
-  border-radius: 50%; 
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); 
+  border-radius: 50%;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
   object-fit: cover;
 }
 
@@ -40,7 +40,7 @@
   margin-bottom: 0.5rem;
 }
 
-.nav-menu a, 
+.nav-menu a,
 .dropdown-header {
   display: flex;
   align-items: center;
@@ -83,6 +83,22 @@
 
 .dropdown.active .dropdown-header .chevron {
   transform: rotate(180deg);
+}
+
+/* Section toggle chevron rotation */
+.section-toggle .chevron {
+  position: absolute;
+  right: 1.5rem;
+  font-size: 0.8rem;
+  transition: transform 0.3s;
+}
+
+.section-toggle .chevron.rotated {
+  transform: rotate(180deg);
+}
+
+.section-toggle {
+  position: relative;
 }
 
 .dropdown-menu {
@@ -143,27 +159,27 @@
   .sidebar {
     width: 70px;
   }
-  
+
   .logo span,
   .nav-menu span,
   .logout-btn span {
     display: none;
   }
-  
+
   .logo-container {
     padding: 1rem 0;
   }
-  
+
   .nav-menu .icon,
   .dropdown-header .icon {
     margin-right: 0;
     font-size: 1.3rem;
   }
-  
+
   .dropdown-header .chevron {
     display: none;
   }
-  
+
   .dropdown-menu {
     position: absolute;
     left: 70px;
@@ -182,6 +198,7 @@
   }
 }
 
+/* Active/Link states */
 .nav-link.active {
   color: #6d22e6;
   cursor: default;
@@ -189,6 +206,11 @@
   background: #e7d7f9;
 }
 
+.section-toggle.active {
+  color: #6d22e6;
+  font-weight: 600;
+  background: #e7d7f9;
+}
 
 /* Vertical section separator */
 .vertical-separator {
@@ -201,27 +223,6 @@
 /* Optional: add spacing around sections */
 .nav-section {
   padding: 0 0.5rem;
-}
-
-.sidebar {
-  width: 300px;
-  height: 100vh;
-  background-color: var(--secondary-color);
-  display: flex;
-  flex-direction: column;
-  font-family: 'Poppins', sans-serif;
-}
-
-.logo-container {
-  padding: 0.5rem 1rem;
-  text-align: center;
-  border-bottom: 1px solid #eee;
-}
-
-.nav-menu ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
 }
 
 .nav-section {
@@ -243,13 +244,6 @@
 .nav-link:hover {
   background-color: #e7d7f9;
   color: #6d22e6;
-}
-
-.icon-container {
-  width: 25px;
-  display: inline-flex;
-  justify-content: center;
-  margin-right: 10px;
 }
 
 .dropdown-submenu {
@@ -288,6 +282,10 @@
   display: none !important;
 }
 
+.sidebar.collapsed .section-toggle .chevron {
+  display: none;
+}
+
 /* Toggle Button */
 .toggle-button {
   padding: 1rem;
@@ -295,7 +293,129 @@
   font-size: 1.2rem;
   color: #555;
 }
+
 .toggle-button:hover {
   background: #e7d7f9;
   color: #6d22e6;
+}
+
+/* Additional styles for Adjustments section */
+.nav-link.adjustment-link {
+  padding-left: 3.5rem;
+  font-size: 0.9rem;
+}
+
+.nav-link.adjustment-link .icon-container {
+  position: absolute;
+  left: 1.5rem;
+}
+
+/* Animation for section expand/collapse */
+.nav-section .section-toggle {
+  transition: all 0.3s ease;
+}
+
+.nav-section .section-toggle:hover {
+  background-color: #e7d7f9;
+  color: #6d22e6;
+}
+
+/* Sub-item hover effects */
+.nav-menu .nav-link:not(.section-toggle):hover {
+  background-color: #f0e6fa;
+  color: #6d22e6;
+  padding-left: 2rem;
+}
+
+/* Active state for sub-items */
+.nav-menu .nav-link:not(.section-toggle).active {
+  background-color: #e7d7f9;
+  color: #6d22e6;
+  font-weight: 600;
+  border-left: 3px solid #6d22e6;
+}
+
+/* Custom scrollbar for nav menu */
+.nav-menu::-webkit-scrollbar {
+  width: 5px;
+}
+
+.nav-menu::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+.nav-menu::-webkit-scrollbar-thumb {
+  background: #c4a3e8;
+  border-radius: 10px;
+}
+
+.nav-menu::-webkit-scrollbar-thumb:hover {
+  background: #6d22e6;
+}
+
+/* Smooth transitions for all interactive elements */
+.nav-menu a,
+.dropdown-header,
+.section-toggle,
+.logout-btn {
+  transition: all 0.3s ease-in-out;
+}
+
+/* Icon hover effects */
+.nav-menu .icon-container svg {
+  transition: transform 0.2s ease;
+}
+
+.nav-link:hover .icon-container svg {
+  transform: scale(1.1);
+}
+
+/* Dropdown menu item hover */
+.dropdown-menu a:hover {
+  background-color: #f0e6fa;
+  padding-left: 3.8rem;
+}
+
+/* Separator between sections */
+.section-separator {
+  margin: 0.5rem 0;
+  background: linear-gradient(to right, transparent, #ddd, transparent);
+}
+
+/* Logo hover effect */
+.logo-image:hover {
+  transform: scale(1.05);
+  transition: transform 0.3s ease;
+}
+
+/* Badge or notification indicator (if needed) */
+.nav-link .badge {
+  background-color: #6d22e6;
+  color: white;
+  border-radius: 50%;
+  padding: 2px 8px;
+  font-size: 0.7rem;
+  margin-left: auto;
+}
+
+/* Tooltip for collapsed sidebar */
+.sidebar.collapsed .nav-link:hover::after {
+  content: attr(title);
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #6d22e6;
+  color: white;
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  z-index: 1000;
+  margin-left: 10px;
+}
+
+.sidebar.collapsed .nav-link {
+  position: relative;
 }
