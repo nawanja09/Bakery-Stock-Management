@@ -452,9 +452,7 @@ const OnlineExpenses = () => {
     });
   };
 
-  // =============================================
-  // ✅ FIXED: Payment handler with Payee Name Validation
-  // =============================================
+  // Payment handler with Payee Name Validation
   const handleOpenPaymentModal = async () => {
     let expensesToPay = [];
     
@@ -469,7 +467,6 @@ const OnlineExpenses = () => {
     }
     
     if (expensesToPay.length === 0) {
-      // If no pending expenses selected, still allow opening modal with empty state
       setSelectedForPayment([]);
       setPaymentForm({
         payment_date: new Date().toISOString().split('T')[0],
@@ -491,7 +488,6 @@ const OnlineExpenses = () => {
     const payeeNames = expensesToPay.map(exp => exp.payee_name).filter(name => name && name.trim() !== '');
     const uniquePayees = [...new Set(payeeNames)];
     
-    // Check if there are expenses without a payee name
     const expensesWithoutPayee = expensesToPay.filter(exp => !exp.payee_name || exp.payee_name.trim() === '');
     
     if (expensesWithoutPayee.length > 0) {
@@ -500,13 +496,11 @@ const OnlineExpenses = () => {
     }
     
     if (uniquePayees.length > 1) {
-      // Multiple different payees - show error with details
       const payeeList = uniquePayees.join(', ');
       showPopup('error', `Cannot process payment: Selected expenses have different Payee Names (${payeeList}). Please select expenses with the same payee.`);
       return;
     }
 
-    // ✅ If we reach here, all selected expenses have the same payee name
     const commonPayeeName = uniquePayees[0];
 
     try {
@@ -524,7 +518,7 @@ const OnlineExpenses = () => {
       setSelectedForPayment(expensesToPay);
       setPaymentForm({
         payment_date: new Date().toISOString().split('T')[0],
-        payee_name: commonPayeeName, // ✅ Use the common payee name
+        payee_name: commonPayeeName,
         bank_name: '',
         voucher_number: '',
         reference_number: '',
@@ -550,10 +544,25 @@ const OnlineExpenses = () => {
     setPayeeSearch('');
   };
 
+  // =============================================
+  // ✅ FIXED: Process Payment with Required Field Validation
+  // =============================================
   const handleProcessPayment = async () => {
-    // Validation
+    // ✅ Validation 1: Payment date is required
     if (!paymentForm.payment_date) {
       showPopup('error', 'Payment date is required');
+      return;
+    }
+
+    // ✅ Validation 2: Bank name is required
+    if (!paymentForm.bank_name || paymentForm.bank_name.trim() === '') {
+      showPopup('error', 'Bank name is required. Please select or enter a bank.');
+      return;
+    }
+
+    // ✅ Validation 3: Voucher number is required
+    if (!paymentForm.voucher_number || paymentForm.voucher_number.trim() === '') {
+      showPopup('error', 'Voucher number is required. Please enter a voucher number.');
       return;
     }
 
@@ -582,8 +591,8 @@ const OnlineExpenses = () => {
       const payload = {
         expense_ids: expenseIds,
         payment_date: paymentForm.payment_date,
-        bank_name: paymentForm.bank_name || null,
-        voucher_number: paymentForm.voucher_number || null,
+        bank_name: paymentForm.bank_name,
+        voucher_number: paymentForm.voucher_number,
         reference_number: paymentForm.reference_number || null,
         transfer_amount: transferAmount
       };
@@ -593,12 +602,10 @@ const OnlineExpenses = () => {
       if (response.status === 200) {
         showPopup('success', response.data.message || 'Payment processed successfully!');
         
-        // Reset selections
         setSelectedIds([]);
         setShowPaymentModal(false);
         setSelectedForPayment([]);
         
-        // Refresh data
         await fetchOnlineExpenses();
       }
     } catch (error) {
@@ -637,7 +644,6 @@ const OnlineExpenses = () => {
     return isPending;
   });
 
-  // Check if all filtered items are selected
   const allSelected = filteredExpenses.length > 0 && 
     filteredExpenses.every(exp => selectedIds.includes(exp.id));
 
@@ -681,7 +687,6 @@ const OnlineExpenses = () => {
     }
   };
 
-  // ✅ NEW: Get selected payee names for display
   const getSelectedPayeeInfo = () => {
     if (selectedIds.length === 0) return null;
     
@@ -1055,7 +1060,7 @@ const OnlineExpenses = () => {
           </table>
         </div>
 
-        {/* Payment Action Bar - with Payee Validation Status */}
+        {/* Payment Action Bar */}
         <div className="payment-action-bar">
           <div className="selected-info">
             {selectedIds.length > 0 ? (
@@ -1064,7 +1069,6 @@ const OnlineExpenses = () => {
                   <FontAwesomeIcon icon={faCheckCircle} /> {selectedIds.length} expense(s) selected
                   <span className="selected-total"> | Total Balance: {formatCurrency(totalBalance)}</span>
                 </span>
-                {/* ✅ Payee validation status display */}
                 {payeeInfo && payeeInfo.hasPayee ? (
                   <span className="payee-status valid">
                     ✓ Payee: <strong>{payeeInfo.payeeName}</strong>
@@ -1099,7 +1103,7 @@ const OnlineExpenses = () => {
         </div>
       </div>
 
-      {/* Payment Modal */}
+      {/* ✅ Payment Modal with Required Fields */}
       {showPaymentModal && (
         <div className="payment-modal-overlay" onClick={handleClosePaymentModal}>
           <div className="payment-modal-content" onClick={(e) => e.stopPropagation()}>
@@ -1126,6 +1130,7 @@ const OnlineExpenses = () => {
                       value={paymentForm.payment_date}
                       onChange={handlePaymentFormChange}
                       className="payment-input"
+                      required
                     />
                   </div>
                   
@@ -1153,7 +1158,7 @@ const OnlineExpenses = () => {
 
                 <div className="payment-form-row">
                   <div className="payment-form-group">
-                    <label>Bank</label>
+                    <label>Bank <span className="required">*</span></label>
                     <div className="custom-select-container">
                       <div 
                         className="custom-select-trigger"
@@ -1167,6 +1172,11 @@ const OnlineExpenses = () => {
                           onFocus={() => setIsBankDropdownOpen(true)}
                           className="custom-select-input"
                           autoComplete="off"
+                          required
+                          style={{
+                            borderColor: !paymentForm.bank_name && bankSearchTerm === '' ? '#dc3545' : undefined,
+                            backgroundColor: !paymentForm.bank_name && bankSearchTerm === '' ? '#fff8f8' : undefined
+                          }}
                         />
                         <FontAwesomeIcon 
                           icon={isBankDropdownOpen ? faChevronUp : faChevronDown} 
@@ -1197,10 +1207,16 @@ const OnlineExpenses = () => {
                         </div>
                       )}
                     </div>
+                    {/* ✅ Show validation message if bank is not selected */}
+                    {!paymentForm.bank_name && (
+                      <small style={{ color: '#dc3545', fontSize: '12px', marginTop: '4px' }}>
+                        Bank name is required
+                      </small>
+                    )}
                   </div>
                   
                   <div className="payment-form-group">
-                    <label>Voucher Number</label>
+                    <label>Voucher Number <span className="required">*</span></label>
                     <input
                       type="text"
                       name="voucher_number"
@@ -1208,7 +1224,18 @@ const OnlineExpenses = () => {
                       onChange={handlePaymentFormChange}
                       className="payment-input"
                       placeholder="Enter voucher number"
+                      required
+                      style={{
+                        borderColor: !paymentForm.voucher_number ? '#dc3545' : undefined,
+                        backgroundColor: !paymentForm.voucher_number ? '#fff8f8' : undefined
+                      }}
                     />
+                    {/* ✅ Show validation message if voucher number is empty */}
+                    {!paymentForm.voucher_number && (
+                      <small style={{ color: '#dc3545', fontSize: '12px', marginTop: '4px' }}>
+                        Voucher number is required
+                      </small>
+                    )}
                   </div>
                 </div>
 
@@ -1221,7 +1248,7 @@ const OnlineExpenses = () => {
                       value={paymentForm.reference_number}
                       onChange={handlePaymentFormChange}
                       className="payment-input"
-                      placeholder="Enter reference number"
+                      placeholder="Enter reference number (optional)"
                     />
                   </div>
                   
@@ -1247,7 +1274,7 @@ const OnlineExpenses = () => {
                       value={paymentForm.description}
                       onChange={handlePaymentFormChange}
                       className="payment-input"
-                      placeholder="Enter description"
+                      placeholder="Enter description (optional)"
                     />
                   </div>
                 </div>
@@ -1304,6 +1331,7 @@ const OnlineExpenses = () => {
                     placeholder="0.00"
                     min="0"
                     step="0.01"
+                    required
                   />
                 </div>
               </div>
@@ -1333,7 +1361,6 @@ const OnlineExpenses = () => {
         </div>
       )}
 
-      {/* ✅ Add CSS for payee status display */}
       <style>{`
         .payee-status {
           display: inline-flex;
@@ -1365,6 +1392,15 @@ const OnlineExpenses = () => {
           align-items: center;
           flex-wrap: wrap;
           gap: 8px;
+        }
+        .payment-input.required-error {
+          border-color: #dc3545;
+          background-color: #fff8f8;
+        }
+        .required-hint {
+          color: #dc3545;
+          font-size: 12px;
+          margin-top: 4px;
         }
       `}</style>
     </div>
