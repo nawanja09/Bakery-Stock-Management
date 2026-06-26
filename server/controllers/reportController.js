@@ -32,6 +32,7 @@ const getStockReport = async (req, res) => {
         COALESCE(wastage.total_wasted, 0) AS total_wasted,
         COALESCE(returns.total_returned, 0) AS total_returned,
         COALESCE(purchase_returns.total_purchase_returned, 0) AS total_purchase_returned,
+        COALESCE(adjustments.total_adjusted, 0) AS total_adjusted,
         (
           COALESCE(prev.closing_balance, 0) +
           COALESCE(ob_today.opening_balance_today, 0) +
@@ -39,7 +40,8 @@ const getStockReport = async (req, res) => {
           COALESCE(issues.total_issued, 0) -
           COALESCE(wastage.total_wasted, 0) +
           COALESCE(returns.total_returned, 0) -
-          COALESCE(purchase_returns.total_purchase_returned, 0)
+          COALESCE(purchase_returns.total_purchase_returned, 0) +
+          COALESCE(adjustments.total_adjusted, 0)
         ) AS closing_balance,
         (
           SELECT pi.unit_price 
@@ -60,7 +62,8 @@ const getStockReport = async (req, res) => {
             COALESCE(issues.total_issued, 0) -
             COALESCE(wastage.total_wasted, 0) +
             COALESCE(returns.total_returned, 0) -
-            COALESCE(purchase_returns.total_purchase_returned, 0)
+            COALESCE(purchase_returns.total_purchase_returned, 0) +
+            COALESCE(adjustments.total_adjusted, 0)
           ) AS closing_balance
         FROM items i2
         LEFT JOIN (
@@ -105,6 +108,12 @@ const getStockReport = async (req, res) => {
           WHERE pr.return_date <= ?
           GROUP BY pri.item_id
         ) purchase_returns ON i2.id = purchase_returns.item_id
+        LEFT JOIN (
+          SELECT item_id, SUM(variance) AS total_adjusted
+          FROM stock_adjustments
+          WHERE DATE(date) <= ?
+          GROUP BY item_id
+        ) adjustments ON i2.id = adjustments.item_id
       ) prev ON i.id = prev.item_id
       LEFT JOIN (
         SELECT item_id, SUM(quantity) AS opening_balance_today
@@ -148,6 +157,12 @@ const getStockReport = async (req, res) => {
         WHERE DATE(pr.return_date) = ?
         GROUP BY pri.item_id
       ) purchase_returns ON i.id = purchase_returns.item_id
+      LEFT JOIN (
+        SELECT item_id, SUM(variance) AS total_adjusted
+        FROM stock_adjustments
+        WHERE DATE(date) = ?
+        GROUP BY item_id
+      ) adjustments ON i.id = adjustments.item_id
       WHERE i.auto_add_to_stock = 1  -- 🔥 AUTO-ADD ITEMS ONLY
         AND i.deleted = FALSE
       ORDER BY i.item_code
@@ -155,9 +170,9 @@ const getStockReport = async (req, res) => {
 
     const params = [
       date, // For unit price subquery
-      prevDateStr, prevDateStr, prevDateStr, prevDateStr, prevDateStr, prevDateStr, // yesterday x6
+      prevDateStr, prevDateStr, prevDateStr, prevDateStr, prevDateStr, prevDateStr, prevDateStr, // yesterday x7
       date,                                              // today opening
-      date, date, date, date, date                       // today purchases/issues/wastage/returns/purchase_returns
+      date, date, date, date, date, date                 // today purchases/issues/wastage/returns/purchase_returns/adjustments
     ];
 
     const [rows] = await pool.query(query, params);
@@ -278,13 +293,21 @@ const getStockReportByRangeAndItem = async (req, res) => {
       [itemId, startDate]
     );
 
+    const [[{ adjusted: preAdjusted = 0 }]] = await pool.query(
+      `SELECT SUM(variance) AS adjusted
+       FROM stock_adjustments
+       WHERE item_id = ? AND DATE(date) < ?`,
+      [itemId, startDate]
+    );
+
     // Calculate initial opening balance
     let runningBalance = openingBalance + 
                         parseFloat(prePurchased || 0) - 
                         parseFloat(preIssued || 0) - 
                         parseFloat(preWasted || 0) +
                         parseFloat(preReturned || 0) -
-                        parseFloat(prePurchaseReturned || 0);
+                        parseFloat(prePurchaseReturned || 0) +
+                        parseFloat(preAdjusted || 0);
 
     for (const date of dateRange) {
       let opening = runningBalance;
@@ -293,6 +316,7 @@ const getStockReportByRangeAndItem = async (req, res) => {
       let wasted = 0;
       let returned = 0;
       let purchaseReturned = 0;
+      let adjusted = 0;
 
       // Check if there's an opening balance specifically for this date
       const [[specificOpening]] = await pool.query(
@@ -346,13 +370,21 @@ const getStockReportByRangeAndItem = async (req, res) => {
         [itemId, date]
       );
 
+      const [[{ adjusted: dbAdjusted = 0 }]] = await pool.query(
+        `SELECT SUM(variance) AS adjusted
+         FROM stock_adjustments
+         WHERE item_id = ? AND DATE(date) = ?`,
+        [itemId, date]
+      );
+
       purchased = parseFloat(dbPurchased || 0);
       issued = parseFloat(dbIssued || 0);
       wasted = parseFloat(dbWasted || 0);
       returned = parseFloat(dbReturned || 0);
       purchaseReturned = parseFloat(dbPurchaseReturned || 0);
+      adjusted = parseFloat(dbAdjusted || 0);
 
-      const closing = opening + purchased - issued - wasted + returned - purchaseReturned;
+      const closing = opening + purchased - issued - wasted + returned - purchaseReturned + adjusted;
       runningBalance = closing;
 
       report.push({
@@ -363,6 +395,7 @@ const getStockReportByRangeAndItem = async (req, res) => {
         wasted,
         returned,
         purchaseReturned,
+        adjusted,
         closing
       });
     }
