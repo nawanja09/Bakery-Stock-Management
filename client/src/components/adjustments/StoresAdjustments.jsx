@@ -145,7 +145,6 @@ const StoresAdjustments = () => {
                     <th>Variance</th>
                     <th>Amount</th>
                     <th>Reason</th>
-                    <th>Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -166,14 +165,6 @@ const StoresAdjustments = () => {
                             Rs. {parseFloat(adj.amount).toFixed(2)}
                           </td>
                           <td className="truncate-text" title={adj.reason}>{adj.reason}</td>
-                          <td>
-                            <button 
-                              className="btn-view"
-                              onClick={() => setSelectedAdjustment(selectedAdjustment?.id === adj.id ? null : adj)}
-                            >
-                              <FontAwesomeIcon icon={faInfoCircle} /> Details
-                            </button>
-                          </td>
                         </tr>
                       )
                     })

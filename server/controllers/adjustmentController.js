@@ -17,14 +17,7 @@ const createAdjustment = async (req, res) => {
       [date, user_name, reference_note, item_id, system_qty, actual_qty, variance, unit_price, amount, reason]
     );
 
-    // 2. Insert the variance into opening_balances to dynamically adjust the overall system stock
-    // This allows the stock to instantly reflect the new 'Actual Quantity' in all dynamic calculations.
-    await connection.query(
-      `INSERT INTO opening_balances (date, item_id, quantity) VALUES (?, ?, ?)`,
-      [date, item_id, variance]
-    );
-
-    // If there is an auto-add/stock movement logic, log it here.
+    // 2. Log the adjustment as a stock movement. Opening balances remain one-time item balances.
     await connection.query(
       `INSERT INTO stock_movements 
        (item_id, quantity, movement_type, reference_id, reference_type, movement_date, notes)
@@ -119,7 +112,8 @@ const getSystemQuantity = async (req, res) => {
           COALESCE(issues.total_issued, 0) -
           COALESCE(wastage.total_wasted, 0) +
           COALESCE(returns.total_returned, 0) -
-          COALESCE(purchase_returns.total_purchase_returned, 0)
+          COALESCE(purchase_returns.total_purchase_returned, 0) +
+          COALESCE(adjustments.total_adjusted, 0)
         ) AS current_stock,
         (
           SELECT pi.unit_price 
@@ -171,10 +165,16 @@ const getSystemQuantity = async (req, res) => {
         WHERE pri.item_id = ?
         GROUP BY pri.item_id
       ) purchase_returns ON i.id = purchase_returns.item_id
+      LEFT JOIN (
+        SELECT item_id, SUM(variance) AS total_adjusted
+        FROM stock_adjustments
+        WHERE item_id = ?
+        GROUP BY item_id
+      ) adjustments ON i.id = adjustments.item_id
       WHERE i.id = ? AND i.deleted = FALSE
     `;
 
-    const [rows] = await pool.query(query, [itemId, itemId, itemId, itemId, itemId, itemId, itemId]);
+    const [rows] = await pool.query(query, [itemId, itemId, itemId, itemId, itemId, itemId, itemId, itemId]);
 
     if (rows.length === 0) {
       return res.status(404).json({ error: 'Item not found' });
