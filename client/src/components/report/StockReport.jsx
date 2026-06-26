@@ -96,6 +96,7 @@ const StockReport = () => {
       Number(item.total_wasted).toFixed(2),
       Number(item.total_returned).toFixed(2),
       Number(item.total_purchase_returned || 0).toFixed(2),
+      Number(item.total_adjusted || 0).toFixed(2),
       Number(item.closing_balance).toFixed(2),
       `Rs. ${calculateValue(item)}`
     ]);
@@ -110,6 +111,7 @@ const StockReport = () => {
       'Wastage',
       'Dept Return',
       'Purchase Return',
+      'Stock Adjustments',
       'Closing',
       'Value (Rs.)'
     ];
@@ -136,6 +138,7 @@ const StockReport = () => {
       'Wastage': Number(item.total_wasted),
       'Dept Return': Number(item.total_returned),
       'Purchase Return': Number(item.total_purchase_returned || 0),
+      'Stock Adjustments': Number(item.total_adjusted || 0),
       'Closing Balance': Number(item.closing_balance),
       'Value (Rs.)': Number(calculateValue(item))
     }));
@@ -204,6 +207,7 @@ const StockReport = () => {
                 <th>Wastage</th>
                 <th>Dept Return</th>
                 <th>Purchase Return</th>
+                <th>Stock Adjustments</th>
                 <th>Closing</th>
                 <th>Value (Rs.)</th>
               </tr>
@@ -220,6 +224,7 @@ const StockReport = () => {
                   <td>{Number(item.total_wasted).toFixed(2)}</td>
                   <td>{Number(item.total_returned).toFixed(2)}</td>
                   <td>{Number(item.total_purchase_returned || 0).toFixed(2)}</td>
+                  <td>{Number(item.total_adjusted || 0).toFixed(2)}</td>
                   <td>{Number(item.closing_balance).toFixed(2)}</td>
                   <td style={{ fontWeight: 'bold', color: '#2e7d32' }}>
                     Rs. {calculateValue(item)}
@@ -229,7 +234,7 @@ const StockReport = () => {
             </tbody>
             <tfoot>
               <tr>
-                <td colSpan="9" style={{ fontWeight: 'bold' }}>Total Value (Rs.)</td>
+                <td colSpan="10" style={{ fontWeight: 'bold' }}>Total Value (Rs.)</td>
                 <td colSpan="2" style={{ fontWeight: 'bold', color: '#2e7d32' }}>
                   Rs. {calculateTotal()}
                 </td>
