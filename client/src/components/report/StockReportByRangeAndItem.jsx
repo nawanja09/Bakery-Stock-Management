@@ -299,11 +299,11 @@ const StockReportByRangeAndItem = () => {
     // Table
     autoTable(doc, {
       head: [
-        ['Date', 'Opening', 'Purchased', 'Issued', 'Wasted', 'Dept Ret', 'Pur Ret', 'Closing', 'Net']
+        ['Date', 'Opening', 'Purchased', 'Issued', 'Wasted', 'Dept Ret', 'Pur Ret', 'Adjustments', 'Closing', 'Net']
       ],
       body: stockData.map(r => {
         const netChange = Number(r.purchased) - Number(r.issued) - Number(r.wasted) + 
-                          Number(r.returned) - Number(r.purchaseReturned || 0);
+                          Number(r.returned) - Number(r.purchaseReturned || 0) + Number(r.adjusted || 0);
         return [
           format(new Date(r.date), 'MMM dd'),
           Number(r.opening).toFixed(2),
@@ -312,6 +312,7 @@ const StockReportByRangeAndItem = () => {
           Number(r.wasted).toFixed(2),
           Number(r.returned).toFixed(2),
           Number(r.purchaseReturned || 0).toFixed(2),
+          Number(r.adjusted || 0).toFixed(2),
           Number(r.closing).toFixed(2),
           netChange.toFixed(2)
         ];
@@ -335,12 +336,12 @@ const StockReportByRangeAndItem = () => {
       [`Item: ${selectedItem ? selectedItem.label : ''}`],
       [`Period: ${format(new Date(startDate), 'MMM dd, yyyy')} to ${format(new Date(endDate), 'MMM dd, yyyy')}`],
       [''],
-      ['Date', 'Opening', 'Purchased', 'Issued', 'Wasted', 'Dept Return', 'Purchase Return', 'Closing', 'Net Change']
+      ['Date', 'Opening', 'Purchased', 'Issued', 'Wasted', 'Dept Return', 'Purchase Return', 'Adjustments', 'Closing', 'Net Change']
     ];
 
     stockData.forEach(r => {
       const netChange = Number(r.purchased) - Number(r.issued) - Number(r.wasted) + 
-                        Number(r.returned) - Number(r.purchaseReturned || 0);
+                        Number(r.returned) - Number(r.purchaseReturned || 0) + Number(r.adjusted || 0);
       worksheetData.push([
         format(new Date(r.date), 'yyyy-MM-dd'),
         Number(r.opening),
@@ -349,6 +350,7 @@ const StockReportByRangeAndItem = () => {
         Number(r.wasted),
         Number(r.returned),
         Number(r.purchaseReturned || 0),
+        Number(r.adjusted || 0),
         Number(r.closing),
         netChange
       ]);
@@ -371,6 +373,7 @@ const StockReportByRangeAndItem = () => {
       totalWasted: stockData.reduce((sum, day) => sum + Number(day.wasted), 0),
       totalReturned: stockData.reduce((sum, day) => sum + Number(day.returned), 0),
       totalPurchaseReturned: stockData.reduce((sum, day) => sum + Number(day.purchaseReturned || 0), 0),
+      totalAdjusted: stockData.reduce((sum, day) => sum + Number(day.adjusted || 0), 0),
       avgClosing: stockData.reduce((sum, day) => sum + Number(day.closing), 0) / stockData.length
     };
   };
@@ -499,6 +502,14 @@ const StockReportByRangeAndItem = () => {
             <div className="summary-value negative">{summary.totalWasted.toFixed(2)}</div>
           </div>
           <div className="summary-card">
+            <div className="summary-label">TOTAL ADJUSTED</div>
+            <div
+              className={`summary-value ${summary.totalAdjusted >= 0 ? 'positive' : 'negative'}`}
+            >
+              {summary.totalAdjusted >= 0 ? '+' : ''}{summary.totalAdjusted.toFixed(2)}
+            </div>
+          </div>
+          <div className="summary-card">
             <div className="summary-label">AVG CLOSING</div>
             <div className="summary-value">{summary.avgClosing.toFixed(2)}</div>
           </div>
@@ -520,6 +531,7 @@ const StockReportByRangeAndItem = () => {
                 <th>WASTED</th>
                 <th>DEPT RET</th>
                 <th>PUR RET</th>
+                <th>ADJUSTMENTS</th>
                 <th>CLOSING</th>
                 <th>NET</th>
                 <th>ACTIONS</th>
@@ -528,10 +540,10 @@ const StockReportByRangeAndItem = () => {
             <tbody>
               {stockData.map((r, index) => {
                 const netChange = Number(r.purchased) - Number(r.issued) - Number(r.wasted) + 
-                                  Number(r.returned) - Number(r.purchaseReturned || 0);
+                                  Number(r.returned) - Number(r.purchaseReturned || 0) + Number(r.adjusted || 0);
                 const hasTransactions = Number(r.purchased) > 0 || Number(r.issued) > 0 || 
                                         Number(r.wasted) > 0 || Number(r.returned) > 0 || 
-                                        Number(r.purchaseReturned || 0) > 0;
+                                        Number(r.purchaseReturned || 0) > 0 || Number(r.adjusted || 0) !== 0;
                 
                 return (
                   <tr 
@@ -546,6 +558,11 @@ const StockReportByRangeAndItem = () => {
                     <td className="text-right negative">-{Number(r.wasted).toFixed(2)}</td>
                     <td className="text-right positive">+{Number(r.returned).toFixed(2)}</td>
                     <td className="text-right negative">-{Number(r.purchaseReturned || 0).toFixed(2)}</td>
+                    <td
+                      className={`text-right ${Number(r.adjusted || 0) >= 0 ? 'positive' : 'negative'}`}
+                    >
+                      {Number(r.adjusted || 0) >= 0 ? '+' : ''}{Number(r.adjusted || 0).toFixed(2)}
+                    </td>
                     <td className="text-right" style={{ fontWeight: '600' }}>{Number(r.closing).toFixed(2)}</td>
                     <td className="text-right" style={{ 
                       color: netChange >= 0 ? '#28a745' : '#dc3545',

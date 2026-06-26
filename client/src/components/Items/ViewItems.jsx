@@ -61,13 +61,19 @@ const ItemsList = () => {
     // Apply VAT filter
     if (filterVat !== 'all') {
       const vatValue = filterVat === 'yes';
-      filtered = filtered.filter(item => item.vat_applicable === vatValue);
+      filtered = filtered.filter(item => {
+        // Convert both to boolean for comparison
+        return Boolean(item.vat_applicable) === vatValue;
+      });
     }
 
     // Apply Auto-Add filter
     if (filterAutoAdd !== 'all') {
       const autoAddValue = filterAutoAdd === 'yes';
-      filtered = filtered.filter(item => item.auto_add_to_stock === autoAddValue);
+      filtered = filtered.filter(item => {
+        // Convert both to boolean for comparison
+        return Boolean(item.auto_add_to_stock) === autoAddValue;
+      });
     }
 
     setFilteredItems(filtered);
