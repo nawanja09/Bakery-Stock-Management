@@ -85,6 +85,9 @@ import Payees from './components/Expenses/Payees';
 
 import EditWastage from './components/wastage/EditWastage';
 
+import StoresBalance from './components/adjustments/StoresBalance';
+import StoresAdjustments from './components/adjustments/StoresAdjustments';
+
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
@@ -198,6 +201,9 @@ function App() {
             <Route path="/expenses/payees" element={<Payees />} />
 
             <Route path="wastage/edit/:id" element={<EditWastage />} />
+
+            <Route path="adjustments/stores-balance" element={<StoresBalance />} />
+            <Route path="adjustments/stores-adjustments" element={<StoresAdjustments />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/login" replace />} />
