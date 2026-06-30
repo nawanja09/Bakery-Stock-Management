@@ -1,9 +1,47 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSave, faCalendarAlt, faUser, faBox, faFileAlt, faExclamationCircle, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { 
+  faSave, faCalendarAlt, faUser, faBox, faFileAlt, 
+  faExclamationCircle, faPlus, faTrash, faTimes,
+  faCheckCircle, faInfoCircle
+} from '@fortawesome/free-solid-svg-icons';
 import api from '../../api';
 import './Adjustments.css';
+
+// Reusable Modal Component
+const Modal = ({ isOpen, onClose, title, message, type = 'info', onConfirm, confirmText = 'Confirm', cancelText = 'Cancel' }) => {
+  if (!isOpen) return null;
+
+  const typeIcons = {
+    danger: faExclamationCircle,
+    success: faCheckCircle,
+    warning: faExclamationCircle,
+    info: faInfoCircle
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <div className={`modal-icon ${type}`}>
+          <FontAwesomeIcon icon={typeIcons[type] || faInfoCircle} />
+        </div>
+        <h3 className="modal-title">{title}</h3>
+        <p className="modal-message">{message}</p>
+        <div className="modal-actions">
+          {onConfirm && (
+            <button className={`btn ${type === 'danger' ? 'btn-danger' : 'btn-primary'}`} onClick={onConfirm}>
+              {confirmText}
+            </button>
+          )}
+          <button className="btn btn-secondary" onClick={onClose}>
+            {cancelText}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const EMPTY_ROW = {
   item_id: '',
@@ -16,8 +54,10 @@ const EMPTY_ROW = {
 };
 
 const StoresBalance = () => {
+  const navigate = useNavigate();
+
   const [generalInfo, setGeneralInfo] = useState({
-    date: new Date().toLocaleDateString().slice(0, 16), 
+    date: new Date().toISOString().slice(0, 16),
     user_name: '',
     reference_note: ''
   });
@@ -26,6 +66,8 @@ const StoresBalance = () => {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ text: '', type: '' });
+  const [modalConfig, setModalConfig] = useState({ isOpen: false });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     fetchItems();
@@ -33,7 +75,6 @@ const StoresBalance = () => {
 
   const fetchItems = async () => {
     try {
-      // Auto-add only items are usually managed by the system dynamically
       const response = await api.get('/items?auto_add_only=true');
       setItems(response.data);
     } catch (error) {
@@ -86,7 +127,6 @@ const StoresBalance = () => {
       const parsedActualQty = parseFloat(actualQty);
       const unitPrice = parseFloat(row.unit_price || 0);
 
-      // Variance = Actual - System (negative implies stock loss)
       const variance = (parsedActualQty - systemQty).toFixed(3);
       const amount = (variance * unitPrice).toFixed(2);
 
@@ -110,7 +150,33 @@ const StoresBalance = () => {
   };
 
   const removeRow = (index) => {
+    if (rows.length === 1) {
+      setModalConfig({
+        isOpen: true,
+        type: 'warning',
+        title: 'Cannot Remove Last Row',
+        message: 'You must have at least one item row. To clear the form, use the "Clear All" option instead.'
+      });
+      return;
+    }
     setRows((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const clearAllRows = () => {
+    if (rows.length === 1) {
+      setRows([{ ...EMPTY_ROW }]);
+    } else {
+      setModalConfig({
+        isOpen: true,
+        type: 'warning',
+        title: 'Clear All Rows?',
+        message: 'This will remove all item rows. Do you want to continue?',
+        onConfirm: () => {
+          setRows([{ ...EMPTY_ROW }]);
+          setModalConfig({ isOpen: false });
+        }
+      });
+    }
   };
 
   const showMessage = (text, type) => {
@@ -118,27 +184,59 @@ const StoresBalance = () => {
     setTimeout(() => setMessage({ text: '', type: '' }), 5000);
   };
 
+  const validateForm = () => {
+    if (!generalInfo.user_name.trim()) {
+      showMessage('Please enter your name in the "Adjusted By" field.', 'error');
+      return false;
+    }
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row.item_id) {
+        showMessage(`Please select an item for row ${i + 1}.`, 'error');
+        return false;
+      }
+      if (!row.actual_qty || row.actual_qty === '') {
+        showMessage(`Please enter the actual quantity for row ${i + 1}.`, 'error');
+        return false;
+      }
+      if (!row.reason || !row.reason.trim()) {
+        showMessage(`Please provide a reason for adjustment in row ${i + 1}.`, 'error');
+        return false;
+      }
+    }
+    return true;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!generalInfo.user_name) {
-      showMessage('Please enter your name in the "Adjusted By" field.', 'error');
+    if (!validateForm()) return;
+
+    // Show confirmation for multiple rows
+    if (rows.length > 1) {
+      setModalConfig({
+        isOpen: true,
+        type: 'info',
+        title: 'Confirm Multiple Adjustments',
+        message: `You are about to create ${rows.length} adjustment entries. Do you want to continue?`,
+        confirmText: 'Yes, Save All',
+        onConfirm: () => {
+          setModalConfig({ isOpen: false });
+          performSubmit();
+        }
+      });
       return;
     }
 
-    // Validate every row
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      if (!row.item_id || !row.actual_qty || !row.reason) {
-        showMessage(`Please fill in all required fields for item row ${i + 1}.`, 'error');
-        return;
-      }
-    }
+    performSubmit();
+  };
 
+  const performSubmit = async () => {
     try {
+      setIsSubmitting(true);
       setLoading(true);
 
-      // Submit each row as a separate adjustment (existing API contract)
       for (const row of rows) {
         await api.post('/adjustments', {
           ...generalInfo,
@@ -153,37 +251,59 @@ const StoresBalance = () => {
         'success'
       );
 
-      // Reset rows but keep general info for convenience
       setRows([{ ...EMPTY_ROW }]);
       setGeneralInfo((prev) => ({ ...prev, reference_note: '' }));
+      
+      // Reset form scroll to top
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      
     } catch (error) {
       console.error('Error saving adjustment:', error);
-      showMessage('Failed to save adjustment(s).', 'error');
+      showMessage('Failed to save adjustment(s). Please check your connection and try again.', 'error');
     } finally {
       setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
   return (
     <div className="adjustments-container">
       <div className="adjustments-header">
-        <h1>Stores Balance Adjustment</h1>
-        <p>Update physical stock counts and record variances</p>
+        <div className="adjustments-header-left">
+          <h1>Stores Balance Adjustment</h1>
+          <p>Update physical stock counts and record variances automatically</p>
+        </div>
+        <div className="adjustments-header-actions">
+          <button 
+            type="button" 
+            className="btn btn-secondary" 
+            onClick={clearAllRows}
+            disabled={loading}
+          >
+            <FontAwesomeIcon icon={faTimes} /> Clear All
+          </button>
+        </div>
       </div>
 
       {message.text && (
         <div className={`alert-message ${message.type}`}>
-          <FontAwesomeIcon icon={message.type === 'error' ? faExclamationCircle : faSave} />
+          <FontAwesomeIcon icon={message.type === 'error' ? faExclamationCircle : faCheckCircle} />
           {message.text}
         </div>
       )}
 
       <form className="adjustments-form" onSubmit={handleSubmit}>
+        {/* General Information Section */}
         <div className="form-section">
-          <h3><FontAwesomeIcon icon={faFileAlt} /> General Information</h3>
+          <h3 className="form-section-title">
+            <FontAwesomeIcon icon={faFileAlt} /> General Information
+          </h3>
           <div className="form-grid">
             <div className="form-group">
-              <label><FontAwesomeIcon icon={faCalendarAlt} /> Date & Time</label>
+              <label>
+                <FontAwesomeIcon icon={faCalendarAlt} /> Date & Time
+                <span className="required">*</span>
+              </label>
               <input
                 type="datetime-local"
                 name="date"
@@ -194,51 +314,62 @@ const StoresBalance = () => {
             </div>
             
             <div className="form-group">
-              <label><FontAwesomeIcon icon={faUser} /> Adjusted By</label>
+              <label>
+                <FontAwesomeIcon icon={faUser} /> Adjusted By
+                <span className="required">*</span>
+              </label>
               <input
                 type="text"
                 name="user_name"
                 value={generalInfo.user_name}
                 onChange={handleGeneralChange}
-                placeholder="Enter your name"
+                placeholder="Enter your full name"
                 required
               />
             </div>
 
             <div className="form-group full-width">
-              <label><FontAwesomeIcon icon={faFileAlt} /> Reference Note</label>
+              <label>
+                <FontAwesomeIcon icon={faFileAlt} /> Reference Note
+              </label>
               <input
                 type="text"
                 name="reference_note"
                 value={generalInfo.reference_note}
                 onChange={handleGeneralChange}
-                placeholder="Optional remarks"
+                placeholder="Optional reference or notes (e.g., inventory count #123)"
               />
+              <span className="help-text">Optional field for tracking purposes</span>
             </div>
           </div>
         </div>
 
+        {/* Stock Count Details Section */}
         <div className="form-section">
-          <h3><FontAwesomeIcon icon={faBox} /> Stock Count Details</h3>
+          <h3 className="form-section-title">
+            <FontAwesomeIcon icon={faBox} /> Stock Count Details
+          </h3>
+          
           <div className="table-responsive">
             <table className="adjustments-table stock-count-table">
               <thead>
                 <tr>
-                  <th>#</th>
-                  <th>Select Item</th>
-                  <th>System Quantity</th>
-                  <th>Actual Physical Quantity</th>
-                  <th>Variance</th>
-                  <th>Unit Price</th>
-                  <th>Total Amount</th>
-                  <th>Reason for Adjustment</th>
-                  <th></th>
+                  <th style={{ width: '40px' }}>#</th>
+                  <th style={{ minWidth: '200px' }}>Select Item <span className="required">*</span></th>
+                  <th style={{ minWidth: '120px' }}>System Qty</th>
+                  <th style={{ minWidth: '150px' }}>Actual Qty <span className="required">*</span></th>
+                  <th style={{ minWidth: '120px' }}>Variance</th>
+                  <th style={{ minWidth: '110px' }}>Unit Price</th>
+                  <th style={{ minWidth: '130px' }}>Total Amount</th>
+                  <th style={{ minWidth: '200px' }}>Reason <span className="required">*</span></th>
+                  <th style={{ width: '50px' }}></th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((row, index) => {
                   const isStockLoss = parseFloat(row.variance) < 0;
                   const isStockGain = parseFloat(row.variance) > 0;
+                  const isDisabled = !row.item_id || loading;
 
                   return (
                     <tr key={index}>
@@ -249,6 +380,7 @@ const StoresBalance = () => {
                           onChange={(e) => handleItemChange(index, e)}
                           required
                           className="table-input"
+                          disabled={loading}
                         >
                           <option value="">-- Choose an Item --</option>
                           {items.map(item => (
@@ -265,6 +397,7 @@ const StoresBalance = () => {
                           className="table-input readonly-input"
                           readOnly
                           placeholder="0.000"
+                          step="0.001"
                         />
                       </td>
                       <td>
@@ -275,7 +408,7 @@ const StoresBalance = () => {
                           onChange={(e) => handleActualQtyChange(index, e)}
                           placeholder="Enter counted qty"
                           required
-                          disabled={!row.item_id || loading}
+                          disabled={isDisabled}
                           className="table-input"
                         />
                       </td>
@@ -283,7 +416,10 @@ const StoresBalance = () => {
                         <input
                           type="text"
                           value={row.variance}
-                          className={`table-input readonly-input ${isStockLoss ? 'text-danger fw-bold' : isStockGain ? 'text-success fw-bold' : ''}`}
+                          className={`table-input readonly-input ${
+                            isStockLoss ? 'text-danger fw-bold' : 
+                            isStockGain ? 'text-success fw-bold' : ''
+                          }`}
                           readOnly
                           placeholder="0.000"
                         />
@@ -302,7 +438,9 @@ const StoresBalance = () => {
                         <input
                           type="text"
                           value={row.amount}
-                          className={`table-input readonly-input ${isStockLoss ? 'text-danger fw-bold bg-danger-light' : ''}`}
+                          className={`table-input readonly-input ${
+                            isStockLoss ? 'text-danger fw-bold bg-danger-light' : ''
+                          }`}
                           readOnly
                           placeholder="0.00"
                         />
@@ -315,19 +453,19 @@ const StoresBalance = () => {
                           placeholder="e.g., damaged during transit"
                           required
                           className="table-input"
-                        ></textarea>
+                          disabled={isDisabled}
+                        />
                       </td>
                       <td>
-                        {rows.length > 1 && (
-                          <button
-                            type="button"
-                            className="btn-remove-row"
-                            onClick={() => removeRow(index)}
-                            title="Remove this item"
-                          >
-                            <FontAwesomeIcon icon={faTrash} />
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          className="btn-remove-row"
+                          onClick={() => removeRow(index)}
+                          title="Remove this item"
+                          disabled={loading}
+                        >
+                          <FontAwesomeIcon icon={faTrash} />
+                        </button>
                       </td>
                     </tr>
                   );
@@ -335,19 +473,53 @@ const StoresBalance = () => {
               </tbody>
             </table>
           </div>
+          
+          {/* Add Row Actions - Left Aligned */}
           <div className="add-row-actions">
-            <button type="button" className="btn-add-row" onClick={addRow}>
+            <button type="button" className="btn-add-row" onClick={addRow} disabled={loading}>
               <FontAwesomeIcon icon={faPlus} /> Add New Item
             </button>
+            <span className="help-text">
+              <span className="item-count-badge">{rows.length}</span> item{rows.length !== 1 ? 's' : ''} ready for adjustment
+            </span>
           </div>
         </div>
 
+        {/* Form Actions */}
         <div className="form-actions">
-          <button type="submit" className="btn-save" disabled={loading}>
-            {loading ? 'Processing...' : <><FontAwesomeIcon icon={faSave} /> Save Adjustment</>}
+          <button 
+            type="button" 
+            className="btn btn-secondary"
+            onClick={() => navigate('/adjustments/stores-adjustments')}
+            disabled={loading}
+          >
+            Cancel
+          </button>
+          <button 
+            type="submit" 
+            className="btn btn-success" 
+            disabled={loading || isSubmitting}
+          >
+            {loading || isSubmitting ? (
+              <>Saving...</>
+            ) : (
+              <><FontAwesomeIcon icon={faSave} /> Save Adjustment</>
+            )}
           </button>
         </div>
       </form>
+
+      {/* Modal */}
+      <Modal
+        isOpen={modalConfig.isOpen}
+        onClose={() => setModalConfig({ isOpen: false })}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        type={modalConfig.type}
+        onConfirm={modalConfig.onConfirm}
+        confirmText={modalConfig.confirmText}
+        cancelText={modalConfig.cancelText}
+      />
     </div>
   );
 };

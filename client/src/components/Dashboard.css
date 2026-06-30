@@ -1,53 +1,55 @@
-/* src/components/Dashboard/Dashboard.css */
 .dashboard-container {
-  padding: 32px;
-  background: l(135deg, #f5f7fa 60%, #e6e6ff 100%);
-  min-height: 100vh;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   display: flex;
-  flex-direction: column; 
-  gap: 24px;
+  flex-direction: column;
+  gap: 1.25rem;
+  min-height: 100%;
 }
 
 .dashboard-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 30px;
+  gap: 1rem;
+  padding: 1.15rem 1.25rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-soft);
 }
 
 .dashboard-header h1 {
   margin: 0;
-  font-size: 28px;
+  font-size: 1.45rem;
   font-weight: 700;
-  color: #2d3748;
+  color: var(--color-heading);
 }
 
 .header-controls {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 0.8rem;
 }
 
 .header-controls input {
-  padding: 8px 16px;
-  border-radius: 20px;
-  border: 1px solid #e2e8f0;
-  outline: none;
-  font-size: 16px;
-  width: 220px;
+  min-width: 220px;
+  padding: 0.7rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: #f9fafb;
 }
 
 .notification-icon {
-  font-size: 22px;
-  color: #f6c23e;
-  margin-right: 10px;
+  font-size: 1.1rem;
+  color: var(--color-warning);
 }
 
 .user-profile {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 0.6rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(107, 33, 168, 0.05);
 }
 
 .user-profile img {
@@ -58,204 +60,64 @@
 
 .user-name {
   font-weight: 600;
-  color: #2d3748;
-  font-size: 15px;
+  color: var(--color-heading);
+  font-size: 0.95rem;
 }
 
 .user-role {
-  color: #718096;
-  font-size: 13px;
+  color: #6b7280;
+  font-size: 0.8rem;
 }
 
-/* Stats Cards */
-.stats-container {
+.dashboard-footer {
   display: flex;
-  flex-wrap: wrap; /* wrap to new line if needed */
-  gap: 15px;
   justify-content: space-between;
-  margin-bottom:20px;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  color: #6b7280;
+  font-size: 0.92rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-soft);
 }
 
-.stat-card {
-  border-radius: 16px;
-  padding: 24px 20px;
-  box-shadow: 0 8px 24px rgba(78, 115, 223, 0.08), 0 1.5px 4px rgba(0,0,0,0.04);
-  transition: transform 0.2s, box-shadow 0.2s;
-  position: relative;
-  overflow: hidden;
-  flex: 1 1 200px;
-  max-width: 300px;
-}
-
-.stat-card:hover {
-  transform: translateY(-6px);
-  box-shadow: 0 12px 32px rgba(78, 115, 223, 0.12), 0 2px 8px rgba(0,0,0,0.06);
-}
-
-.wastage-card { background: #ffe0e6; }
-.balance-card { background: #fff5d9; }
-.purchasing-card { background: #e6fff5; }
-.issues-card { background: #e6e6ff; }
-
-.stat-header {
-  display: flex;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-.stat-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-  margin-right: 12px;
-  font-size: 22px;
-}
-
-.wastage-card .stat-icon { background: #ff6384; color: white; }
-.balance-card .stat-icon { background: #f6c23e; color: white; }
-.purchasing-card .stat-icon { background: #1cc88a; color: white; }
-.issues-card .stat-icon { background: #6f42c1; color: white; }
-
-.stat-title {
-  font-size: 17px;
-  color: #4a5568;
+.dev-name {
+  color: var(--color-primary);
   font-weight: 600;
 }
 
-.stat-value {
-  font-size: 32px;
-  font-weight: 700;
-  color: #2d3748;
-  margin-bottom: 2px;
-  letter-spacing: 1px;
+@media (max-width: 900px) {
+  .dashboard-header,
+  .dashboard-footer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .header-controls {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .header-controls input {
+    min-width: 0;
+    flex: 1;
+  }
 }
 
-.stat-change {
-  font-size: 15px;
-  font-weight: 500;
-  margin-top: 2px;
-}
+@media (max-width: 640px) {
+  .dashboard-header {
+    padding: 1rem;
+  }
 
-.positive { color: #38a169; }
-.neutral { color: #718096; }
+  .header-controls {
+    gap: 0.6rem;
+  }
 
-/* Dashboard Content */
-.dashboard-content {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-.dashboard-section {
-  background: white;
-  border-radius: 16px;
-  padding: 24px;
-  box-shadow: 0 4px 16px rgba(78, 115, 223, 0.07), 0 1px 2px rgba(0,0,0,0.03);
-}
-
-.dashboard-section h2 {
-  font-size: 20px;
-  color: #2d3748;
-  margin-bottom: 18px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-}
-
-/* Operating Balance */
-.operating-balance {
-  grid-column: span 4;
-}
-
-.balance-container {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.balance-items {
-  display: flex;
-  gap: 20px;
-}
-
-.balance-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.balance-color {
-  width: 20px;
-  height: 20px;
-  border-radius: 4px;
-}
-
-.bayer { background-color: #4e73df; }
-.wnk { background-color: #1cc88a; }
-
-.balance-months {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.balance-month {
-  font-size: 14px;
-  color: #4a5568;
-  background: #f7fafc;
-  padding: 6px 12px;
-  border-radius: 20px;
-}
-
-/* Total Sales */
-.total-sales {
-  grid-column: span 5;
-}
-
-.sales-chart-container {
-  display: flex;
-  height: 250px;
-  position: relative;
-}
-
-.sales-labels {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: 10px 0;
-  font-size: 12px;
-  color: #718096;
-  width: 30px;
-}
-
-.sales-bars {
-  flex: 1;
-  display: flex;
-  align-items: flex-end;
-  gap: 12px;
-  padding: 0 20px;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.sales-bar {
-  width: 30px;
-  border-radius: 4px 4px 0 0;
-  background: linear-gradient(to top, #4e73df, #36b9cc);
-}
-
-.sales-days {
-  position: absolute;
-  bottom: 0;
-  left: 30px;
-  right: 0;
-  display: flex;
-  justify-content: space-between;
-  padding: 10px 20px 0;
-  font-size: 12px;
-  color: #718096;
+  .user-profile {
+    width: 100%;
+    justify-content: space-between;
+  }
 }
 
 .sales-legend {
