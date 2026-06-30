@@ -87,6 +87,7 @@ import EditWastage from './components/wastage/EditWastage';
 
 import StoresBalance from './components/adjustments/StoresBalance';
 import StoresAdjustments from './components/adjustments/StoresAdjustments';
+import EditAdjustment from './components/adjustments/EditAdjustment';
 
 import './App.css';
 
@@ -204,6 +205,7 @@ function App() {
 
             <Route path="adjustments/stores-balance" element={<StoresBalance />} />
             <Route path="adjustments/stores-adjustments" element={<StoresAdjustments />} />
+            <Route path="adjustments/edit/:id" element={<EditAdjustment />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/login" replace />} />

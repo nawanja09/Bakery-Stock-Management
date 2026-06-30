@@ -44,7 +44,8 @@ const createAdjustment = async (req, res) => {
 // Get all adjustments
 const getAdjustments = async (req, res) => {
   try {
-    const { startDate, endDate, item_id, reference_note } = req.query;
+    const { startDate, endDate, item_id, reference_note, search } = req.query;
+    const normalizedSearch = search?.trim();
 
     let query = `
       SELECT 
@@ -60,6 +61,7 @@ const getAdjustments = async (req, res) => {
         sa.amount,
         sa.reason,
         i.name AS item_name,
+        i.item_code AS item_code,
         i.unit
       FROM stock_adjustments sa
       JOIN items i ON sa.item_id = i.id
@@ -81,6 +83,17 @@ const getAdjustments = async (req, res) => {
     if (reference_note) {
       query += ` AND sa.reference_note LIKE ?`;
       params.push(`%${reference_note}%`);
+    }
+
+    if (normalizedSearch) {
+      const searchTerm = `%${normalizedSearch.toLowerCase()}%`;
+      query += ` AND (
+        LOWER(i.name) LIKE ? OR
+        LOWER(i.item_code) LIKE ? OR
+        LOWER(COALESCE(sa.reason, '')) LIKE ? OR
+        LOWER(COALESCE(sa.reference_note, '')) LIKE ?
+      )`;
+      params.push(searchTerm, searchTerm, searchTerm, searchTerm);
     }
 
     query += ` ORDER BY sa.date DESC, sa.id DESC`;
@@ -192,8 +205,130 @@ const getSystemQuantity = async (req, res) => {
   }
 };
 
+// Get single adjustment by ID
+const getAdjustmentById = async (req, res) => {
+  const { id } = req.params;
+  
+  try {
+    const [rows] = await pool.query(
+      `SELECT 
+        sa.id,
+        sa.date,
+        sa.user_name,
+        sa.reference_note,
+        sa.item_id,
+        sa.system_qty,
+        sa.actual_qty,
+        sa.variance,
+        sa.unit_price,
+        sa.amount,
+        sa.reason,
+        i.name AS item_name,
+        i.item_code AS item_code,
+        i.unit
+      FROM stock_adjustments sa
+      JOIN items i ON sa.item_id = i.id
+      WHERE sa.id = ?`,
+      [id]
+    );
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Adjustment not found' });
+    }
+    
+    res.json(rows[0]);
+  } catch (error) {
+    console.error('Error fetching adjustment:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+const updateAdjustment = async (req, res) => {
+  const { id } = req.params;
+  const {
+    date,
+    user_name,
+    reference_note,
+    item_id,
+    system_qty,
+    actual_qty,
+    variance,
+    unit_price,
+    amount,
+    reason
+  } = req.body;
+
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const [result] = await connection.query(
+      `UPDATE stock_adjustments
+       SET date = ?, user_name = ?, reference_note = ?, item_id = ?, system_qty = ?, actual_qty = ?, variance = ?, unit_price = ?, amount = ?, reason = ?
+       WHERE id = ?`,
+      [date, user_name, reference_note, item_id, system_qty, actual_qty, variance, unit_price, amount, reason, id]
+    );
+
+    if (result.affectedRows === 0) {
+      await connection.rollback();
+      return res.status(404).json({ error: 'Adjustment not found' });
+    }
+
+    await connection.query(
+      `UPDATE stock_movements
+       SET quantity = ?, notes = ?, movement_date = ?
+       WHERE reference_type = 'stock_adjustments' AND reference_id = ?`,
+      [variance, reason, date, id]
+    );
+
+    await connection.commit();
+    res.json({ message: 'Adjustment updated successfully.' });
+  } catch (error) {
+    await connection.rollback();
+    console.error('Error updating adjustment:', error);
+    res.status(500).json({ error: 'Server error: ' + error.message });
+  } finally {
+    connection.release();
+  }
+};
+
+const deleteAdjustment = async (req, res) => {
+  const { id } = req.params;
+
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const [result] = await connection.query('DELETE FROM stock_adjustments WHERE id = ?', [id]);
+
+    if (result.affectedRows === 0) {
+      await connection.rollback();
+      return res.status(404).json({ error: 'Adjustment not found' });
+    }
+
+    await connection.query(
+      `DELETE FROM stock_movements WHERE reference_type = 'stock_adjustments' AND reference_id = ?`,
+      [id]
+    );
+
+    await connection.commit();
+    res.json({ message: 'Adjustment deleted successfully.' });
+  } catch (error) {
+    await connection.rollback();
+    console.error('Error deleting adjustment:', error);
+    res.status(500).json({ error: 'Server error: ' + error.message });
+  } finally {
+    connection.release();
+  }
+};
+
 module.exports = {
   createAdjustment,
   getAdjustments,
-  getSystemQuantity
+  getSystemQuantity,
+  getAdjustmentById,
+  updateAdjustment,
+  deleteAdjustment
 };

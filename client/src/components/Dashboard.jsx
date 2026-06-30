@@ -12,32 +12,32 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch chart data
         const chartsResponse = await api.get('/dashboard/charts');
         setChartData(chartsResponse.data);
-
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
       } finally {
         setLoading(false);
       }
     };
-    
+
     fetchData();
   }, []);
 
   if (loading) {
-    return <div className="loading">Loading dashboard...</div>;
+    return <div className="panel-card" style={{ padding: '1.25rem' }}>Loading dashboard...</div>;
   }
 
   return (
-    <div className="dashboard-container">
-      {/* Top Navigation Bar */}
-      <div className="dashboard-header">
-        <h1>Dashboard</h1>
+    <div className="dashboard-container page-shell">
+      <section className="dashboard-header" aria-label="Dashboard overview">
+        <div>
+          <h1>Dashboard</h1>
+          <p className="page-subtitle">Operational insights at a glance for the bakery team.</p>
+        </div>
         <div className="header-controls">
-          <input type="text" placeholder="Search here..." />
-          <span className="notification-icon">&#128276;</span>
+          <input type="text" placeholder="Search here..." aria-label="Search dashboard" />
+          <span className="notification-icon" aria-label="Notifications">🔔</span>
           <div className="user-profile">
             <img src={icon} alt="profile" />
             <div>
@@ -46,16 +46,12 @@ const Dashboard = () => {
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Stats Cards */}
-      {/* Premium Stats Dashboard Component */}
       <StatsDashboard />
 
-      {/* Chart Stats Section */}       
       {chartData && <ChartStats chartData={chartData} />}
 
-      {/* Footer Section */}
       <footer className="dashboard-footer">
         <p>© {new Date().getFullYear()} Bakery Stock Management System. All rights reserved.</p>
         <p>Developed by <span className="dev-name">Nawanjana Nethmini</span></p>
