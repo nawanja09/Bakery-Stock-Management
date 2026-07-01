@@ -1,4 +1,7 @@
-/* src/components/Layout.css */
+/* ============================================================
+   LAYOUT — App Shell
+   ============================================================ */
+
 .layout-container {
   display: flex;
   min-height: 100vh;
@@ -9,16 +12,54 @@
   flex: 1;
   min-width: 0;
   overflow-y: auto;
-  padding: 1.25rem 1.5rem 2rem;
+  padding: 1.75rem 2rem 3rem;
   background: transparent;
+  transition: padding var(--transition);
 }
 
+/* Content width constraint */
+.main-content > .container {
+  width: min(1360px, calc(100% - 1rem));
+  margin: 0 auto;
+}
+
+/* Content header bar */
+.content-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
 @media (max-width: 900px) {
   .layout-container {
     flex-direction: column;
   }
 
   .main-content {
-    padding: 1rem;
+    padding: 1.25rem 1rem 2rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .main-content {
+    padding: 1rem 0.75rem 1.5rem;
+  }
+}
+
+@media (min-width: 1440px) {
+  .main-content {
+    padding: 2rem 2.5rem 3.5rem;
+  }
+}
+
+@media (min-width: 1920px) {
+  .main-content {
+    padding: 2.5rem 3rem 4rem;
   }
 }

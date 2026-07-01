@@ -1,50 +1,40 @@
 .app {
   min-height: 100vh;
   width: 100%;
-  background: var(--color-background);
+  background: linear-gradient(180deg, rgba(255, 250, 244, 0.9), rgba(248, 248, 248, 1));
+  color: var(--color-text);
 }
 
-
-/* ============================= */
-/* ✨ General Responsive Helpers */
-/* ============================= */
-/* Hide elements on mobile */
-@media (max-width: 768px) {
-  .hide-on-mobile {
-    display: none;
-  }
+.hide-on-mobile {
+  display: none;
 }
 
-/* Show elements only on desktop */
-@media (min-width: 769px) {
-  .show-on-desktop {
-    display: block;
-  }
-  
-  .hide-on-desktop {
-    display: none;
-  }
+.show-on-desktop {
+  display: block;
 }
 
-/* Table container for horizontal scrolling */
-.table-container {
+.hide-on-desktop {
+  display: none;
+}
+
+.table-container,
+.table-responsive {
   overflow-x: auto;
   width: 100%;
 }
 
-/* Form input sizes */
-input, select, textarea {
+input,
+select,
+textarea {
   max-width: 100%;
   box-sizing: border-box;
 }
 
-/* Button sizes */
 .btn {
   min-width: auto;
   white-space: nowrap;
 }
 
-/* Modal positioning */
 .modal-overlay {
   align-items: flex-start;
   padding-top: 20px;
@@ -55,11 +45,23 @@ input, select, textarea {
   overflow-y: auto;
 }
 
-/* Global Responsive Adjustments */
+@media (max-width: 768px) {
+  .hide-on-mobile {
+    display: none;
+  }
+
+  .show-on-desktop {
+    display: none;
+  }
+
+  .hide-on-desktop {
+    display: block;
+  }
+}
+
 @media (max-width: 1200px) {
-  /* Desktop/Laptop adjustments */
-  .dashboard-container, 
-  .main-content, 
+  .dashboard-container,
+  .main-content,
   .wastage-container,
   .issuance-container,
   .purchase-container,
@@ -85,16 +87,15 @@ input, select, textarea {
 }
 
 @media (max-width: 900px) {
-  /* Tablet/Large Mobile adjustments */
   .dashboard-container {
     flex-direction: column;
   }
-  
+
   .main-content {
     padding: 1rem;
   }
-  
-  .wastage-table, 
+
+  .wastage-table,
   .item-table,
   .purchase-table,
   .issuance-table,
@@ -102,48 +103,48 @@ input, select, textarea {
   .supplier-table {
     font-size: 0.95rem;
   }
-  
+
   .details-row {
     flex-direction: column;
     gap: 10px;
   }
-  
+
   .stats-container {
     flex-wrap: wrap;
   }
-  
+
   .stat-card {
     flex: 1 1 calc(50% - 15px);
     max-width: none;
   }
-  
+
   .chart-stats-row {
     flex-direction: column;
   }
-  
+
   .chart-box {
     min-width: 100%;
   }
-  
+
   .form-layout {
     grid-template-columns: 1fr;
   }
-  
+
   .form-actions {
     flex-direction: column;
     gap: 10px;
   }
-  
-  .btn-save, 
+
+  .btn-save,
   .btn-cancel {
     width: 100%;
   }
-  
+
   .header-buttons {
     flex-direction: column;
     align-items: stretch;
   }
-  
+
   .btn-add {
     width: 100%;
     justify-content: center;
@@ -151,17 +152,16 @@ input, select, textarea {
 }
 
 @media (max-width: 600px) {
-  /* Mobile adjustments */
-  .dashboard-container, 
-  .main-content, 
+  .dashboard-container,
+  .main-content,
   .wastage-container,
   .issuance-container,
   .purchase-container,
   .item-container {
     padding: 10px;
   }
-  
-  .wastage-table, 
+
+  .wastage-table,
   .item-table,
   .purchase-table,
   .issuance-table,
@@ -171,46 +171,52 @@ input, select, textarea {
     overflow-x: auto;
     display: block;
   }
-  
-  .wastage-table th, .wastage-table td,
-  .item-table th, .item-table td,
-  .purchase-table th, .purchase-table td,
-  .issuance-table th, .issuance-table td,
-  .opening-balance-table th, .opening-balance-table td,
-  .supplier-table th, .supplier-table td {
+
+  .wastage-table th,
+  .wastage-table td,
+  .item-table th,
+  .item-table td,
+  .purchase-table th,
+  .purchase-table td,
+  .issuance-table th,
+  .issuance-table td,
+  .opening-balance-table th,
+  .opening-balance-table td,
+  .supplier-table th,
+  .supplier-table td {
     padding: 6px;
   }
-  
+
   .details-row > div {
     min-width: 120px;
   }
-  
+
   .stat-card {
     flex: 1 1 100%;
   }
-  
+
   .header-controls {
     flex-direction: column;
     gap: 10px;
   }
-  
+
   .header-controls input {
     width: 100%;
   }
-  
+
   .user-profile {
     justify-content: center;
   }
-  
+
   .modal-content {
     width: 95%;
     padding: 15px;
   }
-  
+
   .form-row {
     flex-direction: column;
   }
-  
+
   .actions {
     flex-direction: column;
     gap: 5px;

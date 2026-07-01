@@ -1,11 +1,11 @@
 :root {
-  --bg: #f8fafc;
-  --card: #ffffff;
-  --text: #0f172a;
-  --muted: #64748b;
-  --line: #e5e7eb;
-  --primary: #6366f1;
-  --primary-dark: #4f46e5;
+  --bg: var(--color-background);
+  --card: var(--color-surface);
+  --text: var(--color-text);
+  --muted: var(--color-text-muted);
+  --line: var(--color-border);
+  --primary: var(--color-primary);
+  --primary-dark: var(--color-primary-dark);
 }
 
 /* Layout */

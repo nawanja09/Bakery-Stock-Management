@@ -1,28 +1,28 @@
 /* ── AddPurchaseReturn.css ── */
 
 :root {
-  --brand: #111827;
-  --brand-light: #374151;
-  --accent: #2563eb;
-  --accent-soft: #eff6ff;
-  --success: #059669;
-  --success-soft: #ecfdf5;
-  --warning: #d97706;
-  --warning-soft: #fffbeb;
-  --danger: #dc2626;
-  --danger-soft: #fef2f2;
-  --surface: #ffffff;
-  --bg: #f9fafb;
-  --border: #e5e7eb;
-  --border-focus: #2563eb;
-  --text-primary: #111827;
-  --text-secondary: #6b7280;
-  --text-tertiary: #9ca3af;
+  --brand: var(--color-text);
+  --brand-light: var(--color-text-secondary);
+  --accent: var(--color-primary);
+  --accent-soft: var(--color-primary-light);
+  --success: var(--color-success);
+  --success-soft: var(--color-success-light);
+  --warning: var(--color-warning);
+  --warning-soft: var(--color-warning-light);
+  --danger: var(--color-danger);
+  --danger-soft: var(--color-danger-light);
+  --surface: var(--color-surface);
+  --bg: var(--color-background);
+  --border: var(--color-border);
+  --border-focus: var(--color-primary);
+  --text-primary: var(--color-text);
+  --text-secondary: var(--color-text-secondary);
+  --text-tertiary: var(--color-text-muted);
   --radius: 10px;
   --radius-sm: 6px;
-  --shadow-sm: 0 1px 3px rgba(0,0,0,.08);
-  --shadow: 0 4px 16px rgba(0,0,0,.08);
-  --font: 'DM Sans', 'Segoe UI', system-ui, sans-serif;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+  --shadow: 0 4px 16px rgba(0,0,0,0.08);
+  --font: var(--font-family);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
