@@ -342,7 +342,7 @@ const PettyCash = () => {
             <form onSubmit={handleVoucherSubmit} className="expenses-form">
               <div className="form-row">
                 <div className="form-group"><label>Date <span className="required">*</span></label><input type="date" name="date" value={voucherForm.date} onChange={handleVoucherChange} required className="form-input" /></div>
-                <div className="form-group"><label>Voucher Number <span className="required">*</span></label><div className="input-with-button"><input type="text" name="voucher_number" value={voucherForm.voucher_number} onChange={handleVoucherChange} required className="form-input" placeholder="Enter voucher number" /><button type="button" className="btn-suggest" onClick={() => setVoucherForm(prev => ({ ...prev, voucher_number: suggestedVoucherNo }))}>Use Suggested</button></div></div>
+                <div className="form-group"><label>Voucher Number <span className="required">*</span></label><div className="input-with-button"><input type="text" name="voucher_number" value={voucherForm.voucher_number} onChange={handleVoucherChange} required className="form-input" placeholder="Enter voucher number" /></div></div>
               </div>
               <div className="form-row">
                 <div className="form-group"><label>Employee Name</label><input type="text" name="employee_name" value={voucherForm.employee_name} onChange={handleVoucherChange} className="form-input" placeholder="Optional" /></div>
@@ -415,7 +415,7 @@ const PettyCash = () => {
             <form onSubmit={handleReimbursementSubmit} className="expenses-form">
               <div className="form-row">
                 <div className="form-group"><label>Date <span className="required">*</span></label><input type="date" name="date" value={reimbursementForm.date} onChange={handleReimbursementChange} required className="form-input" /></div>
-                <div className="form-group"><label>Reference Number <span className="required">*</span></label><div className="input-with-button"><input type="text" name="reference_number" value={reimbursementForm.reference_number} onChange={handleReimbursementChange} required className="form-input" placeholder="Enter reference number" /><button type="button" className="btn-suggest" onClick={() => setReimbursementForm(prev => ({ ...prev, reference_number: suggestedReferenceNo }))}>Use Suggested</button></div></div>
+                <div className="form-group"><label>Reference Number <span className="required">*</span></label><div className="input-with-button"><input type="text" name="reference_number" value={reimbursementForm.reference_number} onChange={handleReimbursementChange} required className="form-input" placeholder="Enter reference number" /></div></div>
               </div>
               <div className="form-row"><div className="form-group left-align"><label>Amount (LKR) <span className="required">*</span></label><input type="number" name="amount" value={reimbursementForm.amount} onChange={handleReimbursementChange} required min="0.01" step="0.01" className="form-input amount-input" placeholder="0.00" /></div></div>
               <div className="form-actions">

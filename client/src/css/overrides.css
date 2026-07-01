@@ -1,0 +1,258 @@
+/* ============================================================
+   OVERRIDES — Global brand enforcement
+   Bakery Stock Management System
+   ============================================================ */
+
+/* ── Page Backgrounds ── */
+body,
+#root,
+.app,
+.layout-container,
+.main-content {
+  background: var(--color-background) !important;
+  color: var(--color-text) !important;
+}
+
+/* ── Primary Buttons (all variants) ── */
+.btn-primary,
+.fg-btn-primary,
+.btn-save,
+.btn-add,
+.btn-generate,
+.btn-primary[type="submit"],
+button.btn-primary,
+input[type="submit"].btn-primary {
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%) !important;
+  color: #fff !important;
+  box-shadow: 0 8px 24px rgba(210, 105, 30, 0.22) !important;
+  border-color: transparent !important;
+}
+
+.btn-primary:hover:not(:disabled),
+.fg-btn-primary:hover:not(:disabled),
+.btn-save:hover:not(:disabled),
+.btn-add:hover:not(:disabled),
+.btn-generate:hover:not(:disabled) {
+  box-shadow: 0 14px 32px rgba(210, 105, 30, 0.30) !important;
+  transform: translateY(-2px) !important;
+}
+
+/* ── Secondary / Cancel / Back / Export ── */
+.btn-secondary,
+.btn-cancel,
+.btn-back,
+.btn-export,
+.btn-outline-secondary,
+.btn-secondary[type="button"] {
+  background: var(--color-surface) !important;
+  color: var(--color-text-secondary, #44403c) !important;
+  border-color: var(--color-border) !important;
+  box-shadow: 0 1px 3px rgba(28, 25, 23, 0.06) !important;
+}
+
+.btn-secondary:hover:not(:disabled),
+.btn-cancel:hover:not(:disabled),
+.btn-back:hover:not(:disabled),
+.btn-export:hover:not(:disabled),
+.btn-outline-secondary:hover:not(:disabled) {
+  background: var(--color-surface-strong, #f5f0ea) !important;
+  border-color: var(--color-border-strong, #d6cbbf) !important;
+}
+
+/* ── Success ── */
+.btn-success {
+  background: linear-gradient(135deg, #16a34a, #15803d) !important;
+  color: #fff !important;
+  border-color: transparent !important;
+  box-shadow: 0 6px 18px rgba(22, 163, 74, 0.22) !important;
+}
+.btn-success:hover:not(:disabled) {
+  box-shadow: 0 10px 26px rgba(22, 163, 74, 0.30) !important;
+}
+
+/* ── Warning ── */
+.btn-warning {
+  background: linear-gradient(135deg, #d97706, #b45309) !important;
+  color: #fff !important;
+  border-color: transparent !important;
+}
+
+/* ── Danger ── */
+.btn-danger {
+  background: linear-gradient(135deg, #dc2626, #b91c1c) !important;
+  color: #fff !important;
+  border-color: transparent !important;
+  box-shadow: 0 6px 18px rgba(220, 38, 38, 0.22) !important;
+}
+
+/* ── Info ── */
+.btn-info {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
+  color: #fff !important;
+  border-color: transparent !important;
+}
+
+/* ── Outline variants ── */
+.btn-outline {
+  background: transparent !important;
+  border-color: var(--color-primary) !important;
+  color: var(--color-primary) !important;
+}
+.btn-outline:hover:not(:disabled) { background: rgba(210, 105, 30, 0.08) !important; }
+
+.btn-outline-success { background: transparent !important; border-color: #16a34a !important; color: #16a34a !important; }
+.btn-outline-success:hover:not(:disabled) { background: rgba(22, 163, 74, 0.08) !important; }
+
+.btn-outline-warning { background: transparent !important; border-color: #d97706 !important; color: #d97706 !important; }
+.btn-outline-warning:hover:not(:disabled) { background: rgba(217, 119, 6, 0.08) !important; }
+
+.btn-outline-danger { background: transparent !important; border-color: #dc2626 !important; color: #dc2626 !important; }
+.btn-outline-danger:hover:not(:disabled) { background: rgba(220, 38, 38, 0.08) !important; }
+
+/* ── Form Focus ── */
+input:focus,
+select:focus,
+textarea:focus,
+.form-control:focus,
+.minimal-input:focus,
+.minimal-select:focus,
+.fg-search-input:focus,
+.search-input:focus,
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  outline: none !important;
+  border-color: var(--color-primary) !important;
+  box-shadow: 0 0 0 4px rgba(210, 105, 30, 0.18) !important;
+}
+
+/* ── Card Surfaces ── */
+.table-shell,
+.table-card,
+.table-responsive,
+.fg-table-wrapper,
+.card,
+.panel-card,
+.alert-card,
+.report-summary,
+.summary-card,
+.minimal-card {
+  background: var(--color-surface) !important;
+  border-color: var(--color-border) !important;
+}
+
+/* ── Table Row Hover ── */
+.table-shell tbody tr:hover,
+.data-table tbody tr:hover,
+.erp-data-table tbody tr:hover,
+.table-card tbody tr:hover {
+  background: rgba(210, 105, 30, 0.06) !important;
+}
+
+.table-shell tbody tr:nth-child(even),
+.data-table tbody tr:nth-child(even),
+.erp-data-table tbody tr:nth-child(even),
+.table-card tbody tr:nth-child(even) {
+  background: rgba(210, 105, 30, 0.025) !important;
+}
+
+/* ── Badges ── */
+.badge-primary,
+.fg-tag {
+  background: rgba(210, 105, 30, 0.10) !important;
+  color: var(--color-primary) !important;
+}
+
+.badge-success,
+.fg-badge {
+  background: rgba(22, 163, 74, 0.10) !important;
+  color: #16a34a !important;
+}
+
+.badge-warning {
+  background: rgba(217, 119, 6, 0.10) !important;
+  color: #d97706 !important;
+}
+
+.badge-danger {
+  background: rgba(220, 38, 38, 0.10) !important;
+  color: #dc2626 !important;
+}
+
+/* ── Toggle Switches ── */
+.minimal-toggle-switch input:checked + .toggle-animate {
+  background-color: var(--color-primary) !important;
+}
+
+.minimal-toggle-switch.vat-toggle input:checked + .toggle-animate {
+  background-color: var(--color-success) !important;
+}
+
+.minimal-toggle-switch input:focus + .toggle-animate {
+  outline: 2px solid var(--color-primary) !important;
+  outline-offset: 2px !important;
+}
+
+/* ── Typography ── */
+.page-title,
+.section-title,
+.content-header h1,
+.content-header h2,
+.page-header h1,
+.page-header h2 {
+  color: var(--color-heading) !important;
+}
+
+.page-subtitle,
+.description-text,
+.helper-text,
+.user-role,
+.info-label,
+.fg-empty-text,
+.loading-state,
+.empty-state {
+  color: var(--color-text-muted) !important;
+}
+
+/* ── Dashboard surfaces ── */
+.dashboard-header,
+.dashboard-footer {
+  background: var(--color-surface) !important;
+  border-color: var(--color-border) !important;
+}
+
+/* ── Loading / Empty ── */
+.loading-state,
+.empty-state {
+  background: var(--color-surface) !important;
+}
+
+/* ── React-Select brand integration ── */
+.react-select__control--is-focused {
+  border-color: var(--color-primary) !important;
+  box-shadow: 0 0 0 4px rgba(210, 105, 30, 0.18) !important;
+}
+
+.react-select__control:hover {
+  border-color: var(--color-primary) !important;
+}
+
+.react-select__option--is-selected {
+  background: var(--color-primary) !important;
+  color: #fff !important;
+}
+
+.react-select__option--is-focused:not(.react-select__option--is-selected) {
+  background: rgba(210, 105, 30, 0.08) !important;
+  color: var(--color-text) !important;
+}
+
+/* ── Global page content animation ── */
+.main-content > * {
+  animation: slideUp 0.28s ease-out both;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

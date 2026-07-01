@@ -1,19 +1,19 @@
 /* Modern Minimalist Design System */
 :root {
-  --primary: #3b82f6;
-  --primary-dark: #2563eb;
-  --primary-light: #dbeafe;
-  --surface: #ffffff;
-  --background: #f8fafc;
-  --background-light: #f1f5f9;
-  --text-primary: #1e293b;
-  --text-secondary: #64748b;
-  --text-muted: #94a3b8;
-  --border: #e2e8f0;
-  --border-light: #f1f5f9;
-  --success: #10b981;
-  --error: #ef4444;
-  --warning: #f59e0b;
+  --primary: var(--color-primary);
+  --primary-dark: var(--color-primary-dark);
+  --primary-light: var(--color-primary-light);
+  --surface: var(--color-surface);
+  --background: var(--color-background);
+  --background-light: var(--color-surface-hover);
+  --text-primary: var(--color-text);
+  --text-secondary: var(--color-text-secondary);
+  --text-muted: var(--color-text-muted);
+  --border: var(--color-border);
+  --border-light: var(--color-border-light);
+  --success: var(--color-success);
+  --error: var(--color-danger);
+  --warning: var(--color-warning);
   
   --radius-sm: 4px;
   --radius: 8px;

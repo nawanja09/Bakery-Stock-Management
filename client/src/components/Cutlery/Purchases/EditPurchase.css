@@ -1,10 +1,10 @@
 :root {
-  --bg: #f4f6fb;
-  --card: #ffffff;
-  --border: #e5e7eb;
-  --primary: #5b3df5;
-  --text: #111827;
-  --muted: #6b7280;
+  --bg: var(--color-background);
+  --card: var(--color-surface);
+  --border: var(--color-border);
+  --primary: var(--color-primary);
+  --text: var(--color-text);
+  --muted: var(--color-text-muted);
   --radius: 12px;
 }
 

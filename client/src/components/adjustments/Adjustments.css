@@ -4,30 +4,30 @@
 /* CSS Variables - Design System */
 :root {
   /* Primary Colors */
-  --primary: #3498db;
-  --primary-dark: #2980b9;
-  --primary-light: #ebf5fb;
-  --primary-gradient: linear-gradient(135deg, #3498db, #2980b9);
+  --primary: var(--color-primary);
+  --primary-dark: var(--color-primary-dark);
+  --primary-light: var(--color-primary-light);
+  --primary-gradient: linear-gradient(135deg, var(--primary), var(--primary-dark));
   
   /* Semantic Colors */
-  --success: #38a169;
-  --success-light: #f0fff4;
-  --success-border: #c6f6d5;
-  --warning: #ed8936;
-  --warning-light: #fffbeb;
-  --warning-border: #fde68a;
-  --danger: #e53e3e;
-  --danger-light: #fff5f5;
-  --danger-border: #feb2b2;
-  --info: #3498db;
-  --info-light: #ebf8ff;
+  --success: var(--color-success);
+  --success-light: var(--color-success-light);
+  --success-border: rgba(34, 197, 94, 0.18);
+  --warning: var(--color-warning);
+  --warning-light: var(--color-warning-light);
+  --warning-border: rgba(245, 158, 11, 0.18);
+  --danger: var(--color-danger);
+  --danger-light: var(--color-danger-light);
+  --danger-border: rgba(239, 68, 68, 0.18);
+  --info: var(--color-info);
+  --info-light: var(--color-info-light);
   
   /* Neutral Colors */
-  --background: #f8f9fa;
-  --surface: #ffffff;
-  --surface-hover: #f7fafc;
-  --border: #e2e8f0;
-  --border-dark: #cbd5e0;
+  --background: var(--color-background);
+  --surface: var(--color-surface);
+  --surface-hover: var(--color-surface-hover);
+  --border: var(--color-border);
+  --border-dark: var(--color-border-light);
   
   /* Text Colors */
   --text-primary: #2d3748;

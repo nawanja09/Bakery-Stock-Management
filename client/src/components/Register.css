@@ -1,106 +1,200 @@
+/* ============================================================
+   REGISTER — Consistent with Login premium design
+   (Login.css covers shared styles; this extends specifics)
+   ============================================================ */
+
 .register-container {
-  max-width: 430px;
-  margin: 3rem auto;
-  padding: 2rem;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 18px;
-  box-shadow: var(--shadow-card);
+  width: 100%;
+  max-width: 460px;
+  margin: 2rem auto;
+  padding: 2.25rem 2rem;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(210, 105, 30, 0.12);
+  border-radius: var(--radius-xl, 28px);
+  box-shadow:
+    0 24px 56px rgba(28, 25, 23, 0.12),
+    0 4px 12px rgba(210, 105, 30, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
   text-align: center;
-  font-family: 'Poppins', sans-serif;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  animation: cardEntrance 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
+@keyframes cardEntrance {
+  from { opacity: 0; transform: scale(0.92) translateY(20px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* Logo */
 .logo-header {
   display: flex;
-  justify-content: center;
-  margin-bottom: 1rem;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.85rem;
+  margin-bottom: 1.75rem;
 }
 
-.logo-image {
-  width: 78px;
-  height: 78px;
-  border-radius: 50%;
+.logo-header .logo-image,
+.register-container .logo-image {
+  width: 80px;
+  height: 80px;
+  border-radius: 20px;
   object-fit: cover;
+  box-shadow:
+    0 8px 24px rgba(210, 105, 30, 0.22),
+    0 0 0 4px rgba(210, 105, 30, 0.12);
+  display: block;
+  margin: 0 auto;
+  animation: logoFloat 3s ease-in-out infinite;
+}
+
+@keyframes logoFloat {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-4px); }
 }
 
 .register-container h2 {
+  margin: 0;
+  font-size: 1.65rem;
   color: var(--color-heading);
-  font-size: 1.5rem;
-  margin-bottom: 1.2rem;
+  font-weight: 800;
+  letter-spacing: -0.025em;
 }
 
+/* Form groups */
 .form-group {
   text-align: left;
-  margin-bottom: 0.95rem;
+  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
 }
 
-label {
-  font-size: 0.92rem;
-  color: var(--color-heading);
-  font-weight: 600;
-  margin-bottom: 0.4rem;
+/* Scoped labels (avoid global override) */
+.register-container label,
+.register-container .form-group label {
   display: block;
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--color-text-secondary, #44403c);
+  letter-spacing: 0.01em;
+  margin-bottom: 0;
 }
 
-input {
+/* Scoped inputs */
+.register-container input,
+.register-container .form-group input {
   width: 100%;
   min-height: 48px;
-  padding: 0.8rem 0.95rem;
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  font-size: 0.95rem;
-  outline: none;
+  padding: 0.8rem 1rem;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: 0.92rem;
+  background: #fff;
+  color: var(--color-text);
   transition: border-color var(--transition), box-shadow var(--transition);
+  outline: none;
 }
 
-input:focus {
+.register-container input:focus,
+.register-container .form-group input:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 4px rgba(107, 33, 168, 0.12);
+  box-shadow: 0 0 0 4px rgba(210, 105, 30, 0.16);
 }
 
-button {
+.register-container input::placeholder {
+  color: var(--color-text-placeholder, #a8a29e);
+  font-size: 0.88rem;
+}
+
+/* Submit button */
+.register-container button,
+.register-container button[type="submit"] {
   width: 100%;
-  min-height: 46px;
-  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
-  color: white;
-  font-size: 0.95rem;
-  font-weight: 700;
+  min-height: 52px;
   border: none;
-  border-radius: 10px;
-  padding: 0.75rem 1rem;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
+  color: #fff;
+  font-size: 0.98rem;
+  font-weight: 700;
   cursor: pointer;
-  transition: transform var(--transition), box-shadow var(--transition);
-  margin-top: 0.6rem;
+  letter-spacing: 0.01em;
+  box-shadow: 0 10px 28px rgba(210, 105, 30, 0.28);
+  transition: transform var(--transition), box-shadow var(--transition), opacity var(--transition);
+  margin-top: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  position: relative;
+  overflow: hidden;
 }
 
-button:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 10px 20px rgba(107, 33, 168, 0.2);
+.register-container button::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 60%);
+  pointer-events: none;
 }
 
+.register-container button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 36px rgba(210, 105, 30, 0.34);
+}
+
+.register-container button:disabled {
+  background: var(--color-border);
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+  opacity: 0.7;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Links */
 .login-link {
-  margin-top: 1rem;
+  margin-top: 1.25rem;
+  text-align: center;
 }
 
 .login-link h4 {
-  font-size: 0.95rem;
-  color: #6b7280;
-  font-weight: 500;
+  font-size: 0.88rem;
+  color: var(--color-text-muted);
+  font-weight: 400;
+  margin: 0;
 }
 
 .login-link a {
   color: var(--color-primary);
+  font-weight: 700;
   text-decoration: none;
-  font-weight: 600;
+  transition: color var(--transition);
 }
 
 .login-link a:hover {
+  color: var(--color-primary-dark);
   text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
+/* Responsive */
 @media (max-width: 640px) {
   .register-container {
     margin: 1rem;
-    padding: 1.25rem;
+    padding: 1.75rem 1.25rem;
+    border-radius: var(--radius-lg);
+  }
+
+  .register-container h2 {
+    font-size: 1.45rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .register-container {
+    padding: 1.25rem 1rem;
   }
 }

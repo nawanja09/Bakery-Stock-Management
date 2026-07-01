@@ -1,21 +1,21 @@
 /* ── PurchaseReturnHistory.css ── */
 
 :root {
-  --prh-bg: #f9fafb;
-  --prh-surface: #ffffff;
-  --prh-border: #e5e7eb;
-  --prh-brand: #2563eb;
-  --prh-brand-hover: #1d4ed8;
-  --prh-text-primary: #111827;
-  --prh-text-secondary: #4b5563;
-  --prh-text-tertiary: #6b7280;
+  --prh-bg: var(--color-background);
+  --prh-surface: var(--color-surface);
+  --prh-border: var(--color-border);
+  --prh-brand: var(--color-primary);
+  --prh-brand-hover: var(--color-primary-dark);
+  --prh-text-primary: var(--color-text);
+  --prh-text-secondary: var(--color-text-secondary);
+  --prh-text-tertiary: var(--color-text-muted);
 
-  --prh-success: #059669;
-  --prh-success-bg: #d1fae5;
-  --prh-warning: #d97706;
-  --prh-warning-bg: #fef3c7;
-  --prh-danger: #dc2626;
-  --prh-danger-bg: #fee2e2;
+  --prh-success: var(--color-success);
+  --prh-success-bg: rgba(34, 197, 94, 0.12);
+  --prh-warning: var(--color-warning);
+  --prh-warning-bg: rgba(245, 158, 11, 0.12);
+  --prh-danger: var(--color-danger);
+  --prh-danger-bg: rgba(239, 68, 68, 0.12);
 
   --prh-radius-sm: 6px;
   --prh-radius: 8px;
@@ -25,7 +25,7 @@
   --prh-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   --prh-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
 
-  --prh-font: 'Inter', system-ui, -apple-system, sans-serif;
+  --prh-font: var(--font-family);
   --prh-transition: all 0.2s ease-in-out;
 }
 
