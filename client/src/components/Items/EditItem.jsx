@@ -5,6 +5,7 @@ import { faSave, faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import './ItemManagement.css';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
+import { ITEM_TYPE_OPTIONS, DEFAULT_ITEM_TYPE } from './itemTypeOptions';
 
 const EditItem = () => {
   const { id } = useParams();
@@ -17,6 +18,7 @@ const EditItem = () => {
     item_code: '',
     item_name: '',
     unit: 'kg',
+    item_type: DEFAULT_ITEM_TYPE,
     vat_applicable: false,
     auto_add_to_stock: true,
     reorder_level: ''
@@ -36,6 +38,7 @@ const EditItem = () => {
         item_code: item.item_code || '',
         item_name: item.name || '',
         unit: item.unit || 'kg',
+        item_type: item.item_type || DEFAULT_ITEM_TYPE,
         vat_applicable: item.vat_applicable || false,
         auto_add_to_stock: item.auto_add_to_stock !== undefined ? item.auto_add_to_stock : true,
         reorder_level: item.reorder_level || ''
@@ -84,6 +87,7 @@ const EditItem = () => {
         item_code: formData.item_code,
         name: formData.item_name,
         unit: formData.unit,
+        item_type: formData.item_type || DEFAULT_ITEM_TYPE,
         vat_applicable: formData.vat_applicable,
         auto_add_to_stock: formData.auto_add_to_stock,
         reorder_level: formData.reorder_level
@@ -179,6 +183,20 @@ const EditItem = () => {
                 <option value="L">Liters (L)</option>
                 <option value="ml">Milliliters (ml)</option>
                 <option value="quantity">Quantity (pcs)</option>
+              </select>
+            </div>
+
+            <div className="minimal-form-group">
+              <label className="minimal-label">Item Type</label>
+              <select
+                name="item_type"
+                value={formData.item_type}
+                onChange={handleChange}
+                className="minimal-select"
+              >
+                {ITEM_TYPE_OPTIONS.map((type) => (
+                  <option key={type} value={type}>{type}</option>
+                ))}
               </select>
             </div>
 

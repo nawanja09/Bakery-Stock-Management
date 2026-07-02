@@ -2390,3 +2390,26 @@ CREATE TABLE IF NOT EXISTS stock_adjustments (
 ) ENGINE=InnoDB
 DEFAULT CHARSET=utf8mb4
 COLLATE=utf8mb4_unicode_ci;
+
+
+-------------------------------------------------------------------------------------------------------------------
+----------------------------------------------------- 2026-06-05 10:30:00 -----------------------------------------------------
+--add item_type column to items table and create item_types table for categorization
+ALTER TABLE `items` 
+ADD COLUMN `item_type` VARCHAR(50) NULL DEFAULT 'Other' AFTER `name`;
+
+--create item_types table to store predefined item types
+CREATE TABLE `item_types` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `type_name` VARCHAR(50) NOT NULL UNIQUE,
+  `created_at` timestamp NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Insert default item types
+INSERT INTO `item_types` (type_name) VALUES 
+('Vegetables'),
+('Meat'),
+('Packing'),
+('Fruits'),
+('Other');
