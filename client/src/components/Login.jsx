@@ -49,47 +49,49 @@ const Login = () => {
   };
 
   return (
-    <div className="login-container">
-      <div className="login-header">
-        <img src={bakeryLogo} alt="Bakery Logo" className="logo-image" />
-        <h2>Welcome back!</h2>
+    <div className="login-page-wrapper">
+      <div className="login-container">
+        <div className="login-header">
+          <img src={bakeryLogo} alt="Bakery Logo" className="logo-image" />
+          <h2>Welcome back!</h2>
+        </div>
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label htmlFor="email">Email :</label>
+            <input
+              type="email"
+              id="email"
+              name="email"
+              value={formData.email}
+              onChange={handleChange}
+              required
+            />
+          </div>
+          
+          <div className="form-group">
+            <label htmlFor="password">Password :</label>
+            <input
+              type="password"
+              id="password"
+              name="password"
+              value={formData.password}
+              onChange={handleChange}
+              required
+            />
+          </div>
+          
+          <button 
+            type="submit" 
+            className="login-button"
+            disabled={isLoading}
+          >
+            {isLoading ? 'Logging in...' : 'Login'}
+          </button>
+          <div className="register-link">
+            <h4>Don't have an account? <Link to="/register">Register</Link></h4>
+          </div>
+        </form>
       </div>
-      <form onSubmit={handleSubmit}>
-        <div className="form-group">
-          <label htmlFor="email">Email :</label>
-          <input
-            type="email"
-            id="email"
-            name="email"
-            value={formData.email}
-            onChange={handleChange}
-            required
-          />
-        </div>
-        
-        <div className="form-group">
-          <label htmlFor="password">Password :</label>
-          <input
-            type="password"
-            id="password"
-            name="password"
-            value={formData.password}
-            onChange={handleChange}
-            required
-          />
-        </div>
-        
-        <button 
-          type="submit" 
-          className="login-button"
-          disabled={isLoading}
-        >
-          {isLoading ? 'Logging in...' : 'Login'}
-        </button>
-        <div className="register-link">
-          <h4>Don't have an account? <Link to="/register">Register</Link></h4>
-        </div>
-      </form>
     </div>
   );
 };

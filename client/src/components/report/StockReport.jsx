@@ -8,6 +8,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faDownload, faFileExcel, faCalendar } from '@fortawesome/free-solid-svg-icons';
 import './StockReport.css';
 import api from '../../api';
+import { formatCurrency, formatNumber } from '../../utils/formatters';
 
 const StockReport = () => {
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -65,14 +66,14 @@ const StockReport = () => {
     if (!item) return '0.00';
     const closingBalance = Number(item.closing_balance) || 0;
     const unitPrice = itemPrices[item.id] || item.unit_price || 0;
-    return (closingBalance * unitPrice).toFixed(2);
+    return closingBalance * unitPrice;
   };
 
   const calculateTotal = () => {
     const total = stockData.reduce((acc, item) => {
       return acc + Number(calculateValue(item));
     }, 0);
-    return total.toFixed(2);
+    return total;
   };
 
   const downloadPDF = () => {
@@ -90,15 +91,15 @@ const StockReport = () => {
       item.item_code,
       item.item_name,
       item.unit,
-      Number(item.opening_balance).toFixed(2),
-      Number(item.total_purchased).toFixed(2),
-      Number(item.total_issued).toFixed(2),
-      Number(item.total_wasted).toFixed(2),
-      Number(item.total_returned).toFixed(2),
-      Number(item.total_purchase_returned || 0).toFixed(2),
-      Number(item.total_adjusted || 0).toFixed(2),
-      Number(item.closing_balance).toFixed(2),
-      `Rs. ${calculateValue(item)}`
+      formatNumber(item.opening_balance, 2, 2),
+      formatNumber(item.total_purchased, 2, 2),
+      formatNumber(item.total_issued, 2, 2),
+      formatNumber(item.total_wasted, 2, 2),
+      formatNumber(item.total_returned, 2, 2),
+      formatNumber(item.total_purchase_returned || 0, 2, 2),
+      formatNumber(item.total_adjusted || 0, 2, 2),
+      formatNumber(item.closing_balance, 2, 2),
+      formatCurrency(calculateValue(item))
     ]);
     
     const headers = [
@@ -218,16 +219,16 @@ const StockReport = () => {
                   <td>{item.item_code}</td>
                   <td>{item.item_name}</td>
                   <td>{item.unit}</td>
-                  <td>{Number(item.opening_balance).toFixed(2)}</td>
-                  <td>{Number(item.total_purchased).toFixed(2)}</td>
-                  <td>{Number(item.total_issued).toFixed(2)}</td>
-                  <td>{Number(item.total_wasted).toFixed(2)}</td>
-                  <td>{Number(item.total_returned).toFixed(2)}</td>
-                  <td>{Number(item.total_purchase_returned || 0).toFixed(2)}</td>
-                  <td>{Number(item.total_adjusted || 0).toFixed(2)}</td>
-                  <td>{Number(item.closing_balance).toFixed(2)}</td>
+                  <td>{formatNumber(item.opening_balance, 2, 2)}</td>
+                  <td>{formatNumber(item.total_purchased, 2, 2)}</td>
+                  <td>{formatNumber(item.total_issued, 2, 2)}</td>
+                  <td>{formatNumber(item.total_wasted, 2, 2)}</td>
+                  <td>{formatNumber(item.total_returned, 2, 2)}</td>
+                  <td>{formatNumber(item.total_purchase_returned || 0, 2, 2)}</td>
+                  <td>{formatNumber(item.total_adjusted || 0, 2, 2)}</td>
+                  <td>{formatNumber(item.closing_balance, 2, 2)}</td>
                   <td style={{ fontWeight: 'bold', color: '#2e7d32' }}>
-                    Rs. {calculateValue(item)}
+                    {formatCurrency(calculateValue(item))}
                   </td>
                 </tr>
               ))}
@@ -236,7 +237,7 @@ const StockReport = () => {
               <tr>
                 <td colSpan="10" style={{ fontWeight: 'bold' }}>Total Value (Rs.)</td>
                 <td colSpan="2" style={{ fontWeight: 'bold', color: '#2e7d32' }}>
-                  Rs. {calculateTotal()}
+                  {formatCurrency(calculateTotal())}
                 </td>
               </tr>
             </tfoot>

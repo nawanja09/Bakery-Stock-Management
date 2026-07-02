@@ -5,6 +5,7 @@ import { usePopup } from '../context/PopupContext';
 import './Issuance.css';
 import api from '../../api';
 import Select from 'react-select';
+import { formatNumber } from '../../utils/formatters';
 
 const IssueToDepartment = () => {
   const navigate = useNavigate();
@@ -19,6 +20,7 @@ const IssueToDepartment = () => {
 
   const [formData, setFormData] = useState({
     issuance_date: new Date().toLocaleDateString('en-CA'),
+    issuance_time: new Date().toTimeString().slice(0, 5),
     department_id: '',
     received_by: '',
     remarks: '',
@@ -68,7 +70,8 @@ const IssueToDepartment = () => {
         });
 
         setFormData({
-          issuance_date: issuance.issuance_date ? issuance.issuance_date.split('T')[0] : new Date().toLocaleDateString('en-CA'),
+          issuance_date: issuance.issuance_date_only || new Date().toLocaleDateString('en-CA'),
+          issuance_time: issuance.issuance_time || new Date().toTimeString().slice(0, 5),
           department_id: issuance.department_id || '',
           received_by: issuance.received_by || '',
           remarks: issuance.remarks || '',
@@ -133,7 +136,7 @@ const IssueToDepartment = () => {
     const now = Date.now();
     const timeSinceLastSubmit = now - lastSubmitTime;
 
-    // 🕒 Check for double click within 2 seconds
+    // Check for double click within 2 seconds
     if (timeSinceLastSubmit < 2000) {
       showPopup('warning', 'Duplicate submission detected! Please wait a moment.');
       return;
@@ -145,7 +148,7 @@ const IssueToDepartment = () => {
     }
 
     setIsSubmitting(true);
-    setLastSubmitTime(now); // record this submit time
+    setLastSubmitTime(now);
 
     if (!currentUser || !currentUser.id) {
       alert('User information is missing. Please login again.');
@@ -155,8 +158,14 @@ const IssueToDepartment = () => {
     }
 
     const payload = {
-      ...formData,
+      issuance_date: formData.issuance_date,
+      issuance_time: formData.issuance_time,
       issued_by: currentUser.id,
+      department_id: formData.department_id,
+      received_by: formData.received_by,
+      remarks: formData.remarks,
+      approved_by: formData.approved_by,
+      check_number: formData.check_number,
       items: formData.items.filter(it => it.item_id || (Number(it.quantity) > 0))
     };
 
@@ -208,7 +217,15 @@ const IssueToDepartment = () => {
               required
             />
           </div>
-
+          <div className="form-group">
+            <label>Issuance Time</label>
+            <input
+              type="time"
+              value={formData.issuance_time}
+              onChange={(e) => setFormData({ ...formData, issuance_time: e.target.value })}
+              required
+            />
+          </div>
           <div className="form-group">
             <label>Department</label>
             <select
@@ -231,6 +248,9 @@ const IssueToDepartment = () => {
               required
             />
           </div>
+        </div>
+
+        <div className="form-row">
           <div className="form-group">
             <label>Time of Day</label>
             <textarea
@@ -241,70 +261,72 @@ const IssueToDepartment = () => {
         </div>
 
         <h3>Issued Items</h3>
-        <table className="item-table">
-          <thead>
-            <tr>
-              <th>Item Name</th>
-              <th>Current Stock</th>
-              <th>Quantity to Issue</th>
-              <th>Unit of Measurement</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {formData.items.map((item, index) => (
-              <tr key={index}>
-                <td style={{ minWidth: 240 }}>
-                  <Select
-                    options={itemOptions}
-                    value={itemOptions.find(opt => String(opt.value) === String(item.item_id)) || null}
-                    onChange={(selected) => handleItemChange(index, 'item_id', selected ? selected.value : '')}
-                    isSearchable
-                    placeholder="Search or select item..."
-                    menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
-                    styles={selectStyles}
-                    closeMenuOnScroll={true}
-                  />
-                </td>
-                <td>
-                  <input
-                    type="text"
-                    value={item.current_stock}
-                    readOnly
-                    className={`stock-display ${item.current_stock <= 0 ? 'stock-low' : ''}`}
-                  />
-                </td>
-                <td>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.001"
-                    value={item.quantity}
-                    onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
-                    required
-                  />
-                </td>
-                <td>
-                  <input
-                    type="text"
-                    value={item.unit}
-                    readOnly
-                    className="unit-display"
-                  />
-                </td>
-                <td>
-                  <button
-                    type="button"
-                    className="btn-remove"
-                    onClick={() => removeItemRow(index)}
-                  >
-                    Remove
-                  </button>
-                </td>
+        <div className="table-responsive">
+          <table className="item-table">
+            <thead>
+              <tr>
+                <th>Item Name</th>
+                <th>Current Stock</th>
+                <th>Quantity to Issue</th>
+                <th>Unit of Measurement</th>
+                <th>Action</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {formData.items.map((item, index) => (
+                <tr key={index}>
+                  <td style={{ minWidth: 240 }}>
+                    <Select
+                      options={itemOptions}
+                      value={itemOptions.find(opt => String(opt.value) === String(item.item_id)) || null}
+                      onChange={(selected) => handleItemChange(index, 'item_id', selected ? selected.value : '')}
+                      isSearchable
+                      placeholder="Search or select item..."
+                      menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                      styles={selectStyles}
+                      closeMenuOnScroll={true}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="text"
+                      value={formatNumber(item.current_stock, 3, 3)}
+                      readOnly
+                      className={`stock-display ${item.current_stock <= 0 ? 'stock-low' : ''}`}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.001"
+                      value={item.quantity}
+                      onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
+                      required
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="text"
+                      value={item.unit}
+                      readOnly
+                      className="unit-display"
+                    />
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      className="btn-remove"
+                      onClick={() => removeItemRow(index)}
+                    >
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
         <button type="button" className="btn-add" onClick={addItemRow}>
           + Add Item
@@ -313,7 +335,7 @@ const IssueToDepartment = () => {
         <button
           type="submit"
           className="btn-submit"
-          disabled={isSubmitting}  // 👈 prevent double click
+          disabled={isSubmitting}
         >
           {isSubmitting ? 'Submitting...' : (id ? 'Update Issuance' : 'Save Issuance')}
         </button>

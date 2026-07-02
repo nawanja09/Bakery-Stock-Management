@@ -2413,3 +2413,6 @@ INSERT INTO `item_types` (type_name) VALUES
 ('Packing'),
 ('Fruits'),
 ('Other');
+
+---Issuances table modification to ensure issuance_datetime is NOT NULL
+ALTER TABLE `issuances` MODIFY COLUMN `issuance_date` DATETIME NOT NULL;

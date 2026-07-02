@@ -9,6 +9,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import api from '../../api';
 import './Adjustments.css';
+import { formatCurrency, formatNumber, formatQuantity } from '../../utils/formatters';
 
 // Reusable Skeleton Component
 const TableSkeleton = ({ rows = 5, cols = 8 }) => (
@@ -326,7 +327,7 @@ const StoresAdjustments = () => {
         />
         <SummaryCard 
           label="Total Value Adjusted" 
-          value={`Rs. ${stats.totalValue.toFixed(2)}`} 
+          value={formatCurrency(stats.totalValue)} 
           icon={faBox}
           type="warning"
         />
@@ -390,7 +391,7 @@ const StoresAdjustments = () => {
           <h3>Adjustment Records</h3>
           <div className="data-card-actions">
             <span className="pagination-entries">
-              {adjustments.length} entries found
+              {formatNumber(adjustments.length)} entries found
             </span>
           </div>
         </div>
@@ -445,13 +446,13 @@ const StoresAdjustments = () => {
                             <strong>{adj.item_name}</strong>
                             {adj.item_code && <div style={{ fontSize: '12px', color: 'var(--text-light)' }}>{adj.item_code}</div>}
                           </td>
-                          <td>{parseFloat(adj.system_qty).toFixed(3)} {adj.unit}</td>
-                          <td>{parseFloat(adj.actual_qty).toFixed(3)} {adj.unit}</td>
+                          <td>{formatQuantity(adj.system_qty)} {adj.unit}</td>
+                          <td>{formatQuantity(adj.actual_qty)} {adj.unit}</td>
                           <td className={isLoss ? 'text-danger fw-bold' : isGain ? 'text-success fw-bold' : ''}>
-                            {isGain ? '+' : ''}{varianceNum.toFixed(3)} {adj.unit}
+                            {isGain ? '+' : ''}{formatQuantity(varianceNum)} {adj.unit}
                           </td>
                           <td className={isLoss ? 'text-danger fw-bold' : ''}>
-                            Rs. {parseFloat(adj.amount).toFixed(2)}
+                            {formatCurrency(adj.amount)}
                           </td>
                           <td><StatusBadge status={adj.status || 'completed'} /></td>
                           <td className="truncate-text" title={adj.reason}>{adj.reason}</td>
@@ -571,7 +572,7 @@ const StoresAdjustments = () => {
             </div>
             <div className="detail-item">
               <span className="detail-label">Unit Price</span>
-              <span className="detail-value">Rs. {parseFloat(selectedAdjustment.unit_price).toFixed(2)}</span>
+              <span className="detail-value">{formatCurrency(selectedAdjustment.unit_price)}</span>
             </div>
             <div className="detail-item">
               <span className="detail-label">Status</span>
@@ -581,7 +582,7 @@ const StoresAdjustments = () => {
               <span className="detail-label">Variance</span>
               <span className={`detail-value ${parseFloat(selectedAdjustment.variance) < 0 ? 'text-danger' : 'text-success'}`}>
                 {parseFloat(selectedAdjustment.variance) > 0 ? '+' : ''}
-                {parseFloat(selectedAdjustment.variance).toFixed(3)} {selectedAdjustment.unit}
+                {formatQuantity(selectedAdjustment.variance)} {selectedAdjustment.unit}
               </span>
             </div>
             <div className="detail-item full-width">
