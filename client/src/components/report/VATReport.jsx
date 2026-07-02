@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
 import api from '../../api';
 import PurchaseDetailsModal from '../purchase/PurchaseDetailsModal';
+import { formatNumber } from '../../utils/formatters';
 import './VATReport.css';
 
 const VATReport = () => {
@@ -165,9 +166,9 @@ const VATReport = () => {
         item.invoiceNo,
         item.supplierTIN,
         item.supplierName,
-        item.netAmount.toFixed(2),
-        item.vatAmount.toFixed(2),
-        item.disallowableVATAmount.toFixed(2)
+        formatNumber(item.netAmount, 2, 2),
+        formatNumber(item.vatAmount, 2, 2),
+        formatNumber(item.disallowableVATAmount, 2, 2)
       ]);
     });
 
@@ -182,9 +183,9 @@ const VATReport = () => {
       '',
       '',
       '',
-      totalNetAmount.toFixed(2),
-      totalVATAmount.toFixed(2),
-      totalDisallowableVAT.toFixed(2)
+      formatNumber(totalNetAmount, 2, 2),
+      formatNumber(totalVATAmount, 2, 2),
+      formatNumber(totalDisallowableVAT, 2, 2)
     ]);
 
     const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
@@ -308,18 +309,18 @@ const VATReport = () => {
                     <td>{item.invoiceNo}</td>
                     <td>{item.supplierTIN}</td>
                     <td>{item.supplierName}</td>
-                    <td className="amount-col">{item.netAmount.toFixed(2)}</td>
-                    <td className="amount-col vat-amount">{item.vatAmount.toFixed(2)}</td>
-                    <td className="amount-col disallowable-vat-amount">{item.disallowableVATAmount.toFixed(2)}</td>
+                    <td className="amount-col">{formatNumber(item.netAmount, 2, 2)}</td>
+                    <td className="amount-col vat-amount">{formatNumber(item.vatAmount, 2, 2)}</td>
+                    <td className="amount-col disallowable-vat-amount">{formatNumber(item.disallowableVATAmount, 2, 2)}</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr>
                   <td colSpan="4" className="text-right"><strong>TOTAL</strong></td>
-                  <td className="amount-col"><strong>{totalNetAmount.toFixed(2)}</strong></td>
-                  <td className="amount-col vat-amount"><strong>{totalVATAmount.toFixed(2)}</strong></td>
-                  <td className="amount-col disallowable-vat-amount"><strong>{totalDisallowableVAT.toFixed(2)}</strong></td>
+                  <td className="amount-col"><strong>{formatNumber(totalNetAmount, 2, 2)}</strong></td>
+                  <td className="amount-col vat-amount"><strong>{formatNumber(totalVATAmount, 2, 2)}</strong></td>
+                  <td className="amount-col disallowable-vat-amount"><strong>{formatNumber(totalDisallowableVAT, 2, 2)}</strong></td>
                 </tr>
               </tfoot>
             </table>
@@ -330,19 +331,19 @@ const VATReport = () => {
               <h3>Summary</h3>
               <div className="summary-column">
                 <span>Total Net Amount:</span>
-                <span>Rs. {totalNetAmount.toFixed(2)}</span>
+                <span>Rs. {formatNumber(totalNetAmount, 2, 2)}</span>
               </div>
               <div className="summary-column vat">
                 <span>Total VAT (18%):</span>
-                <span>Rs. {totalVATAmount.toFixed(2)}</span>
+                <span>Rs. {formatNumber(totalVATAmount, 2, 2)}</span>
               </div>
               <div className="summary-column disallowable-vat">
                 <span>Total Disallowable VAT:</span>
-                <span>Rs. {totalDisallowableVAT.toFixed(2)}</span>
+                <span>Rs. {formatNumber(totalDisallowableVAT, 2, 2)}</span>
               </div>
               <div className="summary-column total">
                 <span>Total with VAT:</span>
-                <span>Rs. {(totalNetAmount + totalVATAmount).toFixed(2)}</span>
+                <span>Rs. {formatNumber(totalNetAmount + totalVATAmount, 2, 2)}</span>
               </div>
             </div>
           </div>

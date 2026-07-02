@@ -16,6 +16,7 @@ import {
   faUtensils
 } from '@fortawesome/free-solid-svg-icons';
 import api from '../../../api';
+import { formatNumber } from '../../../utils/formatters';
 import './BakeryStockReport.css';
 
 const BakeryStockReport = () => {
@@ -63,10 +64,10 @@ const BakeryStockReport = () => {
       item.item_code,
       item.item_name,
       item.unit,
-      Number(item.opening_balance).toFixed(3),
-      Number(item.previous_day_issuance).toFixed(3),
-      Number(item.production_requirement).toFixed(3),
-      Number(item.closing_balance).toFixed(3)
+      formatNumber(item.opening_balance, 3, 3),
+      formatNumber(item.previous_day_issuance, 3, 3),
+      formatNumber(item.production_requirement, 3, 3),
+      formatNumber(item.closing_balance, 3, 3)
     ]);
 
     autoTable(doc, {
@@ -93,10 +94,10 @@ const BakeryStockReport = () => {
 
       doc.setFontSize(10);
       doc.text('Summary:', 14, finalY);
-      doc.text(`Total Opening: ${totalOpening.toFixed(3)}`, 14, finalY + 7);
-      doc.text(`Total Issuance: ${totalIssuance.toFixed(3)}`, 14, finalY + 14);
-      doc.text(`Total Requirement: ${totalRequirement.toFixed(3)}`, 14, finalY + 21);
-      doc.text(`Total Closing: ${totalClosing.toFixed(3)}`, 14, finalY + 28);
+      doc.text(`Total Opening: ${formatNumber(totalOpening, 3, 3)}`, 14, finalY + 7);
+      doc.text(`Total Issuance: ${formatNumber(totalIssuance, 3, 3)}`, 14, finalY + 14);
+      doc.text(`Total Requirement: ${formatNumber(totalRequirement, 3, 3)}`, 14, finalY + 21);
+      doc.text(`Total Closing: ${formatNumber(totalClosing, 3, 3)}`, 14, finalY + 28);
     }
 
     doc.save(`bakery-stock-report-${selectedDate}.pdf`);
@@ -239,26 +240,26 @@ const BakeryStockReport = () => {
           <div className="summary-cards">
             <div className="summary-card">
               <div className="summary-label">Total Opening Balance</div>
-              <div className="summary-value">{totals.opening.toFixed(3)}</div>
+              <div className="summary-value">{formatNumber(totals.opening, 3, 3)}</div>
               <div className="summary-count">{reportData.length} items</div>
             </div>
             <div className="summary-card positive">
               <div className="summary-label">Total Issuance</div>
-              <div className="summary-value">+{totals.issuance.toFixed(3)}</div>
+              <div className="summary-value">+{formatNumber(totals.issuance, 3, 3)}</div>
               <div className="summary-count">
                 {reportData.filter(item => item.previous_day_issuance > 0).length} items
               </div>
             </div>
             <div className="summary-card negative">
               <div className="summary-label">Total Requirement</div>
-              <div className="summary-value">-{totals.requirement.toFixed(3)}</div>
+              <div className="summary-value">-{formatNumber(totals.requirement, 3, 3)}</div>
               <div className="summary-count">
                 {reportData.filter(item => item.production_requirement > 0).length} items
               </div>
             </div>
             <div className="summary-card total">
               <div className="summary-label">Total Closing Balance</div>
-              <div className="summary-value">{totals.closing.toFixed(3)}</div>
+              <div className="summary-value">{formatNumber(totals.closing, 3, 3)}</div>
               <div className="summary-count">{reportData.length} items</div>
             </div>
           </div>
@@ -283,11 +284,11 @@ const BakeryStockReport = () => {
                     <td className="item-code">{item.item_code}</td>
                     <td className="item-name">{item.item_name}</td>
                     <td className="unit">{item.unit}</td>
-                    <td className="number">{Number(item.opening_balance).toFixed(3)}</td>
-                    <td className="number positive">+{Number(item.previous_day_issuance).toFixed(3)}</td>
-                    <td className="number negative">-{Number(item.production_requirement).toFixed(3)}</td>
+                    <td className="number">{formatNumber(item.opening_balance, 3, 3)}</td>
+                    <td className="number positive">+{formatNumber(item.previous_day_issuance, 3, 3)}</td>
+                    <td className="number negative">-{formatNumber(item.production_requirement, 3, 3)}</td>
                     <td className="number closing">
-                      {Number(item.closing_balance).toFixed(3)}
+                      {formatNumber(item.closing_balance, 3, 3)}
                     </td>
                   </tr>
                 ))}
@@ -295,10 +296,10 @@ const BakeryStockReport = () => {
               <tfoot>
                 <tr className="table-totals">
                   <td colSpan="3"><strong>Grand Totals</strong></td>
-                  <td><strong>{totals.opening.toFixed(3)}</strong></td>
-                  <td><strong className="positive">+{totals.issuance.toFixed(3)}</strong></td>
-                  <td><strong className="negative">-{totals.requirement.toFixed(3)}</strong></td>
-                  <td><strong>{totals.closing.toFixed(3)}</strong></td>
+                  <td><strong>{formatNumber(totals.opening, 3, 3)}</strong></td>
+                  <td><strong className="positive">+{formatNumber(totals.issuance, 3, 3)}</strong></td>
+                  <td><strong className="negative">-{formatNumber(totals.requirement, 3, 3)}</strong></td>
+                  <td><strong>{formatNumber(totals.closing, 3, 3)}</strong></td>
                 </tr>
               </tfoot>
             </table>

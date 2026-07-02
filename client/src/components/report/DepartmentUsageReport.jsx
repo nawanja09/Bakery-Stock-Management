@@ -97,12 +97,12 @@ const DepartmentUsageReport = () => {
       item.item_code,
       item.item_name,
       item.unit,
-      item.opening_balance.toFixed(3),
-      `-${item.bakery.toFixed(3)}`,
-      `-${item.pastry.toFixed(3)}`,
-      `-${item.savory.toFixed(3)}`,
-      `-${item.cake.toFixed(3)}`,
-      item.due_balance.toFixed(3)
+      formatQuantity(item.opening_balance),
+      `-${formatQuantity(item.bakery)}`,
+      `-${formatQuantity(item.pastry)}`,
+      `-${formatQuantity(item.savory)}`,
+      `-${formatQuantity(item.cake)}`,
+      formatQuantity(item.due_balance)
     ]);
 
     autoTable(doc, {
@@ -126,8 +126,8 @@ const DepartmentUsageReport = () => {
     const finalY = doc.lastAutoTable.finalY + 10;
     
     doc.setFontSize(10);
-    doc.text(`Total Opening Balance: ${totals.opening.toFixed(3)}`, 14, finalY);
-    doc.text(`Total Due Balance: ${totals.due.toFixed(3)}`, 14, finalY + 7);
+    doc.text(`Total Opening Balance: ${formatQuantity(totals.opening)}`, 14, finalY);
+    doc.text(`Total Due Balance: ${formatQuantity(totals.due)}`, 14, finalY + 7);
 
     doc.save(`department-usage-report-${startDate}-to-${endDate}.pdf`);
   };

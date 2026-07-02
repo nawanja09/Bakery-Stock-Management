@@ -6,6 +6,7 @@ import * as XLSX from 'xlsx';
 import Select from 'react-select';
 import './PurchasingReport.css';
 import api from '../../../api';
+import { formatNumber } from '../../../utils/formatters';
 
 const PurchasingReport = () => {
   const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-01'));
@@ -244,16 +245,16 @@ const PurchasingReport = () => {
         item.company_name || 'N/A',
         item.check_number || 'N/A',
         item.item_name || 'N/A',
-        item.quantity !== null && item.quantity !== undefined ? Number(item.quantity).toFixed(3) : 'N/A',
+        item.quantity !== null && item.quantity !== undefined ? formatNumber(item.quantity, 3, 3) : 'N/A',
         item.unit || 'N/A',
-        item.unit_price !== null && item.unit_price !== undefined ? Number(item.unit_price).toFixed(2) : 'N/A',
+        item.unit_price !== null && item.unit_price !== undefined ? formatNumber(item.unit_price, 2, 2) : 'N/A',
         item.payment_method || 'N/A',
-        (item.item_subtotal || 0).toFixed(2),
-        (item.item_vat_amount || 0).toFixed(2),
-        (item.item_bill_amount || 0).toFixed(2),
-        (item.bill_amount || 0).toFixed(2),
-        (item.item_paid_amount || 0).toFixed(2),
-        (item.item_due_amount || 0).toFixed(2)
+        formatNumber(item.item_subtotal || 0, 2, 2),
+        formatNumber(item.item_vat_amount || 0, 2, 2),
+        formatNumber(item.item_bill_amount || 0, 2, 2),
+        formatNumber(item.bill_amount || 0, 2, 2),
+        formatNumber(item.item_paid_amount || 0, 2, 2),
+        formatNumber(item.item_due_amount || 0, 2, 2)
       ]);
     });
 
@@ -269,12 +270,12 @@ const PurchasingReport = () => {
 
     worksheetData.push([
       'TOTAL', '', '', '', '', '', '', '', '', '', '',
-      totalSubtotal.toFixed(2),
-      totalVat.toFixed(2),
-      totalBill.toFixed(2),
-      totalBill.toFixed(2),
-      totalPaid.toFixed(2),
-      totalDue.toFixed(2)
+      formatNumber(totalSubtotal, 2, 2),
+      formatNumber(totalVat, 2, 2),
+      formatNumber(totalBill, 2, 2),
+      formatNumber(totalBill, 2, 2),
+      formatNumber(totalPaid, 2, 2),
+      formatNumber(totalDue, 2, 2)
     ]);
 
     // Create worksheet
@@ -345,11 +346,11 @@ const PurchasingReport = () => {
     const totalDue = totalBill - totalPaid;
 
     doc.setFontSize(11);
-    doc.text(`Total Bill: Rs. ${totalBill.toFixed(2)}`, 15, yOffset);
+    doc.text(`Total Bill: Rs. ${formatNumber(totalBill, 2, 2)}`, 15, yOffset);
     yOffset += 6;
-    doc.text(`Total Paid: Rs. ${totalPaid.toFixed(2)}`, 15, yOffset);
+    doc.text(`Total Paid: Rs. ${formatNumber(totalPaid, 2, 2)}`, 15, yOffset);
     yOffset += 6;
-    doc.text(`Total Due: Rs. ${totalDue.toFixed(2)}`, 15, yOffset);
+    doc.text(`Total Due: Rs. ${formatNumber(totalDue, 2, 2)}`, 15, yOffset);
     yOffset += 8;
 
     // Table
@@ -358,12 +359,12 @@ const PurchasingReport = () => {
       item.purchase_date ? format(new Date(item.purchase_date), 'MMM dd, yyyy') : 'N/A',
       item.supplier_name || 'N/A',
       item.item_name || 'N/A',
-      item.quantity !== null ? Number(item.quantity).toFixed(3) : 'N/A',
-      (item.item_subtotal || 0).toFixed(2),
-      (item.item_vat_amount || 0).toFixed(2),
-      (item.item_bill_amount || 0).toFixed(2),
-      (item.item_paid_amount || 0).toFixed(2),
-      (item.item_due_amount || 0).toFixed(2)
+      item.quantity !== null ? formatNumber(item.quantity, 3, 3) : 'N/A',
+      formatNumber(item.item_subtotal || 0, 2, 2),
+      formatNumber(item.item_vat_amount || 0, 2, 2),
+      formatNumber(item.item_bill_amount || 0, 2, 2),
+      formatNumber(item.item_paid_amount || 0, 2, 2),
+      formatNumber(item.item_due_amount || 0, 2, 2)
     ]);
 
     const headers = [
@@ -531,16 +532,16 @@ const PurchasingReport = () => {
                   <td>{item.supplier_vat_number || '—'}</td>
                   <td>{item.company_name}</td>
                   <td>{item.item_name}</td>
-                  <td className="text-right">{item.quantity !== null ? Number(item.quantity).toFixed(3) : 'N/A'}</td>
-                  <td className="text-right">{item.unit_price !== null ? Number(item.unit_price).toFixed(2) : 'N/A'}</td>
+                  <td className="text-right">{item.quantity !== null ? formatNumber(item.quantity, 3, 3) : 'N/A'}</td>
+                  <td className="text-right">{item.unit_price !== null ? formatNumber(item.unit_price, 2, 2) : 'N/A'}</td>
                   <td>{item.payment_method}</td>
-                  <td className="text-right">{(item.item_subtotal || 0).toFixed(2)}</td>
-                  <td className="text-right">{(item.item_vat_amount || 0).toFixed(2)}</td>
-                  <td className="text-right">{(item.item_bill_amount || 0).toFixed(2)}</td>
-                  <td className="text-right">{(item.bill_amount || 0).toFixed(2)}</td>
-                  <td className="text-right paid-amount">{(item.item_paid_amount || 0).toFixed(2)}</td>
+                  <td className="text-right">{formatNumber(item.item_subtotal || 0, 2, 2)}</td>
+                  <td className="text-right">{formatNumber(item.item_vat_amount || 0, 2, 2)}</td>
+                  <td className="text-right">{formatNumber(item.item_bill_amount || 0, 2, 2)}</td>
+                  <td className="text-right">{formatNumber(item.bill_amount || 0, 2, 2)}</td>
+                  <td className="text-right paid-amount">{formatNumber(item.item_paid_amount || 0, 2, 2)}</td>
                   <td className={`text-right ${(item.item_due_amount || 0) > 0 ? 'due-amount' : 'paid-amount'}`}>
-                    {(item.item_due_amount || 0).toFixed(2)}
+                    {formatNumber(item.item_due_amount || 0, 2, 2)}
                   </td>
                 </tr>
               ))}
@@ -548,12 +549,12 @@ const PurchasingReport = () => {
             <tfoot>
               <tr>
                 <td colSpan="9" className="text-right"><strong>Totals:</strong></td>
-                <td className="text-right"><strong>{filteredItems.reduce((sum, i) => sum + (i.item_subtotal || 0), 0).toFixed(2)}</strong></td>
-                <td className="text-right"><strong>{filteredItems.reduce((sum, i) => sum + (i.item_vat_amount || 0), 0).toFixed(2)}</strong></td>
-                <td className="text-right"><strong>{filteredItems.reduce((sum, i) => sum + (i.item_bill_amount || 0), 0).toFixed(2)}</strong></td>
-                <td className="text-right"><strong>{filteredItems.reduce((sum, i) => sum + (i.bill_amount || 0), 0).toFixed(2)}</strong></td>
-                <td className="text-right"><strong>{filteredItems.reduce((sum, i) => sum + (i.item_paid_amount || 0), 0).toFixed(2)}</strong></td>
-                <td className="text-right"><strong>{filteredItems.reduce((sum, i) => sum + (i.item_due_amount || 0), 0).toFixed(2)}</strong></td>
+                <td className="text-right"><strong>{formatNumber(filteredItems.reduce((sum, i) => sum + (i.item_subtotal || 0), 0), 2, 2)}</strong></td>
+                <td className="text-right"><strong>{formatNumber(filteredItems.reduce((sum, i) => sum + (i.item_vat_amount || 0), 0), 2, 2)}</strong></td>
+                <td className="text-right"><strong>{formatNumber(filteredItems.reduce((sum, i) => sum + (i.item_bill_amount || 0), 0), 2, 2)}</strong></td>
+                <td className="text-right"><strong>{formatNumber(filteredItems.reduce((sum, i) => sum + (i.bill_amount || 0), 0), 2, 2)}</strong></td>
+                <td className="text-right"><strong>{formatNumber(filteredItems.reduce((sum, i) => sum + (i.item_paid_amount || 0), 0), 2, 2)}</strong></td>
+                <td className="text-right"><strong>{formatNumber(filteredItems.reduce((sum, i) => sum + (i.item_due_amount || 0), 0), 2, 2)}</strong></td>
               </tr>
             </tfoot>
           </table>

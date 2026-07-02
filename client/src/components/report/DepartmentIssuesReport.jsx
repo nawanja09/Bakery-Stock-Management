@@ -8,6 +8,7 @@ import { format } from 'date-fns';
 import './DepartmentIssuesReport.css';
 import Select from 'react-select';
 import api from '../../api';
+import { formatNumber } from '../../utils/formatters';
 
 const DepartmentIssuesReport = () => {
   const [departments, setDepartments] = useState([]);
@@ -101,15 +102,15 @@ const DepartmentIssuesReport = () => {
         row.department_name,
         row.item_code,
         row.item_name,
-        parseFloat(row.quantity).toFixed(3),
+        formatNumber(row.quantity, 3, 3),
         row.unit,
-        row.unit_price ? `Rs. ${parseFloat(row.unit_price).toFixed(2)}` : 'N/A',
-        row.total_price ? `Rs. ${parseFloat(row.total_price).toFixed(2)}` : 'N/A',
+        row.unit_price ? `Rs. ${formatNumber(row.unit_price, 2, 2)}` : 'N/A',
+        row.total_price ? `Rs. ${formatNumber(row.total_price, 2, 2)}` : 'N/A',
         row.received_by,
         row.remarks || 'N/A'
       ]),
       foot: [
-        ['', '', '', '', '', '', 'Grand Total:', `Rs. ${grandTotal.toFixed(2)}`, '', '']
+        ['', '', '', '', '', '', 'Grand Total:', `Rs. ${formatNumber(grandTotal, 2, 2)}`, '', '']
       ]
     });
 
@@ -127,10 +128,10 @@ const DepartmentIssuesReport = () => {
       'Department': row.department_name,
       'Item Code': row.item_code,
       'Item Name': row.item_name,
-      'Quantity': parseFloat(row.quantity).toFixed(3),
+      'Quantity': formatNumber(row.quantity, 3, 3),
       'Unit': row.unit,
-      'Unit Price (Rs.)': row.unit_price ? parseFloat(row.unit_price).toFixed(2) : 'N/A',
-      'Total Price (Rs.)': row.total_price ? parseFloat(row.total_price).toFixed(2) : 'N/A',
+      'Unit Price (Rs.)': row.unit_price ? formatNumber(row.unit_price, 2, 2) : 'N/A',
+      'Total Price (Rs.)': row.total_price ? formatNumber(row.total_price, 2, 2) : 'N/A',
       'Received By': row.received_by,
       'Remarks': row.remarks || 'N/A'
     }));
@@ -141,7 +142,7 @@ const DepartmentIssuesReport = () => {
     
     // Add grand total
     const grandTotal = reportData.reduce((total, row) => total + (parseFloat(row.total_price) || 0), 0);
-    XLSX.utils.sheet_add_aoa(worksheet, [['', '', '', '', '', '', 'Grand Total:', `Rs. ${grandTotal.toFixed(2)}`]], { origin: -1 });
+    XLSX.utils.sheet_add_aoa(worksheet, [['', '', '', '', '', '', 'Grand Total:', `Rs. ${formatNumber(grandTotal, 2, 2)}`]], { origin: -1 });
     
     XLSX.writeFile(workbook, `issuance-report-${startDate}-to-${endDate}.xlsx`);
   };
@@ -267,11 +268,11 @@ const DepartmentIssuesReport = () => {
                     <td>{row.department_name}</td>
                     <td>{row.item_code}</td>
                     <td>{row.item_name}</td>
-                    <td>{parseFloat(row.quantity).toFixed(3)}</td>
+                    <td>{formatNumber(row.quantity, 3, 3)}</td>
                     <td>{row.unit}</td>
-                    <td>{row.unit_price ? `Rs. ${parseFloat(row.unit_price).toFixed(2)}` : 'N/A'}</td>
+                    <td>{row.unit_price ? `Rs. ${formatNumber(row.unit_price, 2, 2)}` : 'N/A'}</td>
                     <td style={{ fontWeight: 'bold' }}>
-                      {row.total_price ? `Rs. ${parseFloat(row.total_price).toFixed(2)}` : 'N/A'}
+                      {row.total_price ? `Rs. ${formatNumber(row.total_price, 2, 2)}` : 'N/A'}
                     </td>
                     <td>{row.received_by}</td>
                     <td>{row.remarks || 'N/A'}</td>
@@ -283,17 +284,21 @@ const DepartmentIssuesReport = () => {
                   <td colSpan="4"></td>
                   <td>Grand Total Quantity:</td>
                   <td>
-                    {reportData
-                      .reduce((total, row) => total + (parseFloat(row.quantity) || 0), 0)
-                      .toFixed(3)}
+                    {formatNumber(
+                      reportData.reduce((total, row) => total + (parseFloat(row.quantity) || 0), 0),
+                      3,
+                      3
+                    )}
                   </td>
                   <td>Grand Total:</td>
                   <td colSpan="1"></td>
                   <td>
                     Rs.{" "}
-                    {reportData
-                      .reduce((total, row) => total + (parseFloat(row.total_price) || 0), 0)
-                      .toFixed(2)}
+                    {formatNumber(
+                      reportData.reduce((total, row) => total + (parseFloat(row.total_price) || 0), 0),
+                      2,
+                      2
+                    )}
                   </td>
                   <td colSpan="2"></td>
                 </tr>
