@@ -8,6 +8,7 @@ import { faDownload, faFileExcel, faCalendar, faFilter } from '@fortawesome/free
 import Select from 'react-select';
 import api from '../../api';
 import './DepartmentUsageReport.css';
+import { formatNumber, formatQuantity } from '../../utils/formatters';
 
 const DepartmentUsageReport = () => {
   const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-01')); // First day of current month
@@ -295,20 +296,20 @@ const DepartmentUsageReport = () => {
         <div className="summary-cards">
           <div className="summary-card">
             <div className="summary-label">Total Items</div>
-            <div className="summary-value">{filteredData.length}</div>
+            <div className="summary-value">{formatNumber(filteredData.length)}</div>
           </div>
           <div className="summary-card">
             <div className="summary-label">Total Opening</div>
-            <div className="summary-value">{totals.opening.toFixed(3)}</div>
+            <div className="summary-value">{formatQuantity(totals.opening)}</div>
           </div>
           <div className="summary-card">
             <div className="summary-label">Total Due</div>
-            <div className="summary-value">{totals.due.toFixed(3)}</div>
+            <div className="summary-value">{formatQuantity(totals.due)}</div>
           </div>
           <div className="summary-card">
             <div className="summary-label">Total Issued</div>
             <div className="summary-value negative">
-              {(totals.bakery + totals.pastry + totals.savory + totals.cake).toFixed(3)}
+              {formatQuantity(totals.bakery + totals.pastry + totals.savory + totals.cake)}
             </div>
           </div>
         </div>
@@ -342,13 +343,13 @@ const DepartmentUsageReport = () => {
                   <td className="item-code">{item.item_code}</td>
                   <td className="item-name">{item.item_name}</td>
                   <td className="unit">{item.unit}</td>
-                  <td className="opening-balance">{item.opening_balance.toFixed(3)}</td>
-                  <td className="issuance negative">-{item.bakery.toFixed(3)}</td>
-                  <td className="issuance negative">-{item.pastry.toFixed(3)}</td>
-                  <td className="issuance negative">-{item.savory.toFixed(3)}</td>
-                  <td className="issuance negative">-{item.cake.toFixed(3)}</td>
+                  <td className="opening-balance">{formatQuantity(item.opening_balance)}</td>
+                  <td className="issuance negative">-{formatQuantity(item.bakery)}</td>
+                  <td className="issuance negative">-{formatQuantity(item.pastry)}</td>
+                  <td className="issuance negative">-{formatQuantity(item.savory)}</td>
+                  <td className="issuance negative">-{formatQuantity(item.cake)}</td>
                   <td className={`due-balance ${item.due_balance < 0 ? 'negative' : item.due_balance === 0 ? 'zero' : 'positive'}`}>
-                    {item.due_balance.toFixed(3)}
+                    {formatQuantity(item.due_balance)}
                   </td>
                 </tr>
               ))}
@@ -356,12 +357,12 @@ const DepartmentUsageReport = () => {
             <tfoot>
               <tr className="totals-row">
                 <td colSpan="3"><strong>Totals</strong></td>
-                <td><strong>{totals.opening.toFixed(3)}</strong></td>
-                <td className="negative"><strong>-{totals.bakery.toFixed(3)}</strong></td>
-                <td className="negative"><strong>-{totals.pastry.toFixed(3)}</strong></td>
-                <td className="negative"><strong>-{totals.savory.toFixed(3)}</strong></td>
-                <td className="negative"><strong>-{totals.cake.toFixed(3)}</strong></td>
-                <td><strong>{totals.due.toFixed(3)}</strong></td>
+                <td><strong>{formatQuantity(totals.opening)}</strong></td>
+                <td className="negative"><strong>-{formatQuantity(totals.bakery)}</strong></td>
+                <td className="negative"><strong>-{formatQuantity(totals.pastry)}</strong></td>
+                <td className="negative"><strong>-{formatQuantity(totals.savory)}</strong></td>
+                <td className="negative"><strong>-{formatQuantity(totals.cake)}</strong></td>
+                <td><strong>{formatQuantity(totals.due)}</strong></td>
               </tr>
             </tfoot>
           </table>

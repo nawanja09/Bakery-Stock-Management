@@ -27,6 +27,7 @@ import dayjs from 'dayjs';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
 import './Purchase.css';
+import { formatQuantity } from '../../utils/formatters';
 
 const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
   const params = useParams();
@@ -478,7 +479,7 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
                         )}
                       </td>
                       <td>{item.item_code || '-'}</td>
-                      <td className="text-right">{Number(item.quantity).toFixed(3)}</td>
+                      <td className="text-right">{formatQuantity(item.quantity)}</td>
                       <td>{item.unit || '-'}</td>
                       <td className="text-right">
                         <span className={isPriceDifferent ? 'price-different' : ''}>
@@ -531,7 +532,7 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
               <div className="stat">
                 <span className="stat-label">Total Quantity:</span>
                 <span className="stat-value">
-                  {purchase.items?.reduce((sum, item) => sum + parseFloat(item.quantity), 0).toFixed(3)}
+                  {formatQuantity(purchase.items?.reduce((sum, item) => sum + parseFloat(item.quantity), 0))}
                 </span>
               </div>
             </div>

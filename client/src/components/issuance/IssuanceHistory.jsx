@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { usePopup } from '../context/PopupContext';
 import './Issuance.css';
 import api from '../../api';
+import { formatNumber, formatQuantity } from '../../utils/formatters';
 
 // Modal version of IssuanceDetails for popup use
 const IssuanceDetailsModal = ({ id, onClose }) => {
@@ -35,10 +36,9 @@ const IssuanceDetailsModal = ({ id, onClose }) => {
       </div>
       <div className="details-row vertical">
         <ul className="details-list">
-          <li><strong>Date:</strong> {new Date(issuance.issuance_date).toLocaleDateString()}</li>
+          <li><strong>Date & Time:</strong> {new Date(issuance.issuance_date).toLocaleString()}</li>
           <li><strong>Received By:</strong> {issuance.received_by}</li>
           <li><strong>Department:</strong> {issuance.department_name}</li>
-          <li><strong>Time of Day:</strong> {issuance.remarks || 'N/A'}</li>
         </ul>
       </div>
       <div className="items-table">
@@ -57,7 +57,7 @@ const IssuanceDetailsModal = ({ id, onClose }) => {
               <tr key={index}>
                 <td>{item.item_code}</td>
                 <td>{item.item_name}</td>
-                <td>{Number(item.quantity).toFixed(3)}</td>
+                <td>{formatQuantity(item.quantity)}</td>
                 <td>{item.unit}</td>
               </tr>
             ))}
@@ -76,7 +76,6 @@ const IssuanceHistory = () => {
   // Filter states
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
-  const [timeOfDay, setTimeOfDay] = useState('');
 
   const handleView = (id) => setSelectedIssuanceId(id);
   const handleEdit = (id) => { window.location.href = `/issuance/edit/${id}`; };
@@ -85,7 +84,7 @@ const IssuanceHistory = () => {
     const fetchIssuances = async () => {
       try {
         const response = await api.get('/issuances');
-        const sorted = response.data.sort((a, b) => b.id - a.id);
+        const sorted = response.data.sort((a, b) => new Date(b.issuance_date) - new Date(a.issuance_date));
         setIssuances(sorted);
       } catch (error) {
         console.error('Error fetching issuances:', error);
@@ -106,10 +105,7 @@ const IssuanceHistory = () => {
       (!from || issuanceDate >= from) &&
       (!to || issuanceDate <= to);
 
-    const matchesTime =
-      !timeOfDay || (issuance.remarks && issuance.remarks.toLowerCase() === timeOfDay.toLowerCase());
-
-    return matchesDate && matchesTime;
+    return matchesDate;
   });
 
   if (loading) return <div className="loading">Loading...</div>;
@@ -141,20 +137,7 @@ const IssuanceHistory = () => {
             className="filter-input"
           />
         </label>
-        <label>
-          Time:
-          <select
-            value={timeOfDay}
-            onChange={(e) => setTimeOfDay(e.target.value)}
-            className="filter-input"
-          >
-            <option value="">All</option>
-            <option value="Morning">Morning</option>
-            <option value="Evening">Evening</option>
-          </select>
-        </label>
       </div>
-
 
       {/* Table */}
       <div className="table-responsive">
@@ -162,10 +145,10 @@ const IssuanceHistory = () => {
           <thead>
             <tr>
               <th>ID</th>
-              <th>Date</th>
-              <th>Time of Day</th>
+              <th>Date & Time</th>
               <th>Department</th>
               <th>Received By</th>
+              <th>Time of Day</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -173,12 +156,12 @@ const IssuanceHistory = () => {
             {filteredIssuances.length > 0 ? (
               filteredIssuances.map(issuance => (
                 <tr key={issuance.id}>
-                  <td>{issuance.id}</td>
-                  <td>{new Date(issuance.issuance_date).toLocaleDateString()}</td>
-                  <td>{issuance.remarks}</td>
-                  <td>{issuance.department_name}</td>
-                  <td>{issuance.received_by}</td>
-                  <td className="actions-column">
+                  <td data-label="ID">{formatNumber(issuance.id)}</td>
+                  <td data-label="Date & Time">{new Date(issuance.issuance_date).toLocaleString()}</td>
+                  <td data-label="Department">{issuance.department_name}</td>
+                  <td data-label="Received By">{issuance.received_by}</td>
+                  <td data-label="Time of Day">{issuance.remarks}</td>
+                  <td data-label="Actions" className="actions-column">
                     <button className="btn-view" onClick={() => handleView(issuance.id)}>View</button>
                     <button className="btn-edit" onClick={() => handleEdit(issuance.id)}>Edit</button>
                   </td>
@@ -186,7 +169,7 @@ const IssuanceHistory = () => {
               ))
             ) : (
               <tr>
-                <td colSpan="7" style={{ textAlign: 'center', color: '#888' }}>
+                <td colSpan="5" style={{ textAlign: 'center', color: '#888' }}>
                   No issuance records found.
                 </td>
               </tr>

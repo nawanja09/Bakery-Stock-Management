@@ -15,6 +15,7 @@ import {
   faClock,
   faExclamationTriangle
 } from '@fortawesome/free-solid-svg-icons';
+import { formatCurrency, formatQuantity } from '../../utils/formatters';
 
 const WastageHistory = () => {
   const [wastages, setWastages] = useState([]);
@@ -328,10 +329,10 @@ const WastageHistory = () => {
                           <tr key={idx}>
                             <td><span className="item-code">{item.item_code}</span></td>
                             <td>{item.item_name}</td>
-                            <td className="text-right">{item.quantity}</td>
+                            <td className="text-right">{formatQuantity(item.quantity)}</td>
                             <td>{item.unit}</td>
                             <td className="text-right loss-amount">
-                              Rs. {isNaN(Number(item.estimated_loss)) ? '0.00' : Number(item.estimated_loss).toFixed(2)}
+                              {formatCurrency(item.estimated_loss)}
                             </td>
                           </tr>
                         ))}
@@ -343,10 +344,12 @@ const WastageHistory = () => {
                           </td>
                           <td className="text-right total-loss-amount">
                             <strong>
-                              Rs. {selectedWastage.items ? 
+                              {selectedWastage.items ? 
+                                formatCurrency(
                                 selectedWastage.items.reduce((total, item) => 
                                   total + (parseFloat(item.estimated_loss) || 0), 0
-                                ).toFixed(2) : '0.00'}
+                                )
+                              ) : formatCurrency(0)}
                             </strong>
                           </td>
                         </tr>

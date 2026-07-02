@@ -3,7 +3,8 @@ const pool = require('../config/db');
 // Create new issuance
 const createIssuance = async (req, res) => {
   const { 
-    issuance_date, 
+    issuance_date,  // "2026-07-02" (date only)
+    issuance_time,  // "14:30" (time only)
     issued_by, 
     department_id, 
     received_by, 
@@ -18,12 +19,17 @@ const createIssuance = async (req, res) => {
   try {
     await connection.beginTransaction();
 
+    // Combine date and time into one datetime
+    const datetime = issuance_time 
+      ? `${issuance_date} ${issuance_time}:00`
+      : `${issuance_date} 00:00:00`;
+
     // Insert issuance
     const [issuanceResult] = await connection.query(
       `INSERT INTO issuances 
       (issuance_date, issued_by, department_id, received_by, remarks, approved_by, check_number) 
       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [issuance_date, issued_by, department_id, received_by, remarks, approved_by, check_number]
+      [datetime, issued_by, department_id, received_by, remarks, approved_by, check_number]
     );
     
     const issuanceId = issuanceResult.insertId;
@@ -60,6 +66,8 @@ const getAllIssuances = async (req, res) => {
       SELECT
         i.id,
         i.issuance_date,
+        DATE_FORMAT(i.issuance_date, '%Y-%m-%d') AS issuance_date_only,
+        TIME_FORMAT(i.issuance_date, '%H:%i') AS issuance_time,
         u.email AS issued_by_email,
         d.name AS department_name,
         i.received_by,
@@ -102,7 +110,9 @@ const getIssuanceById = async (req, res) => {
   try {
     const [issuance] = await pool.query(`
       SELECT 
-        i.*, 
+        i.*,
+        DATE_FORMAT(i.issuance_date, '%Y-%m-%d') AS issuance_date_only,
+        TIME_FORMAT(i.issuance_date, '%H:%i') AS issuance_time,
         u.email AS issued_by_email,
         d.name AS department_name
       FROM issuances i
@@ -141,7 +151,8 @@ const getIssuanceById = async (req, res) => {
 const updateIssuance = async (req, res) => {
   const { id } = req.params;
   const { 
-    issuance_date, 
+    issuance_date,
+    issuance_time,
     issued_by, 
     department_id, 
     received_by, 
@@ -156,13 +167,18 @@ const updateIssuance = async (req, res) => {
   try {
     await connection.beginTransaction();
 
+    // Combine date and time into one datetime
+    const datetime = issuance_time 
+      ? `${issuance_date} ${issuance_time}:00`
+      : `${issuance_date} 00:00:00`;
+
     // Update issuance
     await connection.query(
       `UPDATE issuances 
        SET issuance_date = ?, issued_by = ?, department_id = ?, received_by = ?, 
            remarks = ?, approved_by = ?, check_number = ?
        WHERE id = ?`,
-      [issuance_date, issued_by, department_id, received_by, remarks, approved_by, check_number, id]
+      [datetime, issued_by, department_id, received_by, remarks, approved_by, check_number, id]
     );
 
     // Delete existing items
@@ -193,6 +209,7 @@ const updateIssuance = async (req, res) => {
   }
 };
 
+// Get items with current stock
 const getItemsWithStock = async (req, res) => {
   try {
     const [items] = await pool.query(`

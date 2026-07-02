@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './OpeningBalance.css';
 import api from '../../api';
+import { formatQuantity } from '../../utils/formatters';
 
 const OpeningBalanceHistory = () => {
   const [balances, setBalances] = useState([]);
@@ -125,7 +126,7 @@ const OpeningBalanceHistory = () => {
                       onChange={handleEditChange}
                     />
                   ) : (
-                    Number(balance.quantity).toFixed(3)
+                    formatQuantity(balance.quantity)
                   )}
                 </td>
                 <td>{balance.unit}</td>

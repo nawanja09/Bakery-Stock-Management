@@ -5,6 +5,7 @@ import { usePopup } from '../context/PopupContext';
 import './Issuance.css';
 import api from '../../api';
 import Select from 'react-select';
+import { formatNumber } from '../../utils/formatters';
 
 const EditIssuance = () => {
   const { id } = useParams();
@@ -19,6 +20,7 @@ const EditIssuance = () => {
 
   const [formData, setFormData] = useState({
     issuance_date: new Date().toLocaleDateString('en-CA'),
+    issuance_time: new Date().toTimeString().slice(0, 5),
     department_id: '',
     received_by: '',
     remarks: '',
@@ -47,11 +49,6 @@ const EditIssuance = () => {
         const issuanceResponse = await api.get(`/issuances/${id}`);
         const issuanceData = issuanceResponse.data;
 
-        // normalize date to YYYY-MM-DD for input[type=date]
-        const issuanceDate = issuanceData.issuance_date
-          ? new Date(issuanceData.issuance_date).toLocaleDateString('en-CA')
-          : new Date().toLocaleDateString('en-CA');
-
         const itemsWithStock = (issuanceData.items || []).map(item => {
           const itemData = (itemsResponse.data || []).find(i => String(i.id) === String(item.item_id));
           return {
@@ -68,7 +65,8 @@ const EditIssuance = () => {
         }
 
         setFormData({
-          issuance_date: issuanceDate,
+          issuance_date: issuanceData.issuance_date_only || new Date().toLocaleDateString('en-CA'),
+          issuance_time: issuanceData.issuance_time || new Date().toTimeString().slice(0, 5),
           department_id: issuanceData.department_id || '',
           received_by: issuanceData.received_by || '',
           remarks: issuanceData.remarks || '',
@@ -113,7 +111,6 @@ const EditIssuance = () => {
     let parsedValue = value;
 
     if (field === 'quantity') {
-      // allow decimals; ensure numeric fallback
       parsedValue = value === '' || value === null ? '' : Number(value);
       if (isNaN(parsedValue)) parsedValue = 0;
     }
@@ -121,7 +118,6 @@ const EditIssuance = () => {
     newItems[index] = { ...newItems[index], [field]: parsedValue };
 
     if (field === 'item_id') {
-      // if value may be object or primitive, we expect id primitive
       const selectedItem = items.find(it => String(it.id) === String(value));
       newItems[index].unit = selectedItem ? selectedItem.unit : '';
       newItems[index].current_stock = selectedItem ? selectedItem.current_stock : 0;
@@ -129,7 +125,6 @@ const EditIssuance = () => {
 
     setFormData(prev => ({ ...prev, items: newItems }));
 
-    // auto add row if editing last row and user entered something meaningful
     const isLast = index === formData.items.length - 1;
     if (isLast && (field === 'item_id' || field === 'quantity')) {
       const hasValue = newItems[index].item_id || (Number(newItems[index].quantity) > 0);
@@ -156,9 +151,8 @@ const EditIssuance = () => {
     const now = Date.now();
     const timeSinceLastSubmit = now - lastSubmitTime;
 
-    // 🕒 check for duplicate submission within 2 seconds
     if (timeSinceLastSubmit < 2000) {
-      showPopup('warning', '⚠️ Duplicate submission detected! Please wait a moment.');
+      showPopup('warning', 'Duplicate submission detected! Please wait a moment.');
       return;
     }
 
@@ -178,9 +172,14 @@ const EditIssuance = () => {
     }
 
     const payload = {
-      ...formData,
+      issuance_date: formData.issuance_date,
+      issuance_time: formData.issuance_time,
       issued_by: currentUser.id,
-      // filter out empty rows
+      department_id: formData.department_id,
+      received_by: formData.received_by,
+      remarks: formData.remarks,
+      approved_by: formData.approved_by,
+      check_number: formData.check_number,
       items: formData.items.filter(it => it.item_id || (Number(it.quantity) > 0))
     };
 
@@ -203,7 +202,6 @@ const EditIssuance = () => {
     current_stock: itm.current_stock
   }));
 
-  // react-select styles to ensure portal z-index
   const selectStyles = {
     menuPortal: base => ({ ...base, zIndex: 9999 })
   };
@@ -231,6 +229,15 @@ const EditIssuance = () => {
             />
           </div>
           <div className="form-group">
+            <label>Issuance Time</label>
+            <input
+              type="time"
+              value={formData.issuance_time}
+              onChange={(e) => setFormData({ ...formData, issuance_time: e.target.value })}
+              required
+            />
+          </div>
+          <div className="form-group">
             <label>Department</label>
             <select
               value={formData.department_id}
@@ -252,6 +259,9 @@ const EditIssuance = () => {
               required
             />
           </div>
+        </div>
+
+        <div className="form-row">
           <div className="form-group">
             <label>Time of Day</label>
             <textarea
@@ -262,64 +272,65 @@ const EditIssuance = () => {
         </div>
 
         <h3>Issued Items</h3>
-        <table className="item-table">
-          <thead>
-            <tr>
-              <th>Item Name</th>
-              <th>Current Stock</th>
-              <th>Quantity</th>
-              <th>Unit of Measurement</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {formData.items.map((item, index) => (
-              <tr key={index}>
-                <td style={{ minWidth: 240 }}>
-                  <Select
-                    options={itemOptions}
-                    value={itemOptions.find(opt => String(opt.value) === String(item.item_id)) || null}
-                    onChange={(selected) => {
-                      // selected may be null if cleared
-                      handleItemChange(index, 'item_id', selected ? selected.value : '');
-                    }}
-                    isSearchable
-                    placeholder="Search or select item..."
-                    menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
-                    styles={selectStyles}
-                    closeMenuOnScroll={true}
-                  />
-                </td>
-                <td>
-                  <input
-                    type="text"
-                    value={item.current_stock}
-                    readOnly
-                    className={`stock-display ${item.current_stock <= 0 ? 'stock-low' : ''}`}
-                  />
-                </td>
-                <td>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.001"
-                    value={item.quantity}
-                    onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
-                    required
-                  />
-                </td>
-                <td>
-                  <input type="text" value={item.unit} readOnly className="unit-display" />
-                </td>
-                <td>
-                  <button type="button" className="btn-remove" onClick={() => removeItemRow(index)}>
-                    Remove
-                  </button>
-                </td>
+        <div className="table-responsive">
+          <table className="item-table">
+            <thead>
+              <tr>
+                <th>Item Name</th>
+                <th>Current Stock</th>
+                <th>Quantity</th>
+                <th>Unit of Measurement</th>
+                <th>Action</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {formData.items.map((item, index) => (
+                <tr key={index}>
+                  <td style={{ minWidth: 240 }}>
+                    <Select
+                      options={itemOptions}
+                      value={itemOptions.find(opt => String(opt.value) === String(item.item_id)) || null}
+                      onChange={(selected) => {
+                        handleItemChange(index, 'item_id', selected ? selected.value : '');
+                      }}
+                      isSearchable
+                      placeholder="Search or select item..."
+                      menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                      styles={selectStyles}
+                      closeMenuOnScroll={true}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="text"
+                      value={formatNumber(item.current_stock, 3, 3)}
+                      readOnly
+                      className={`stock-display ${item.current_stock <= 0 ? 'stock-low' : ''}`}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.001"
+                      value={item.quantity}
+                      onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
+                      required
+                    />
+                  </td>
+                  <td>
+                    <input type="text" value={item.unit} readOnly className="unit-display" />
+                  </td>
+                  <td>
+                    <button type="button" className="btn-remove" onClick={() => removeItemRow(index)}>
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
         <button type="button" className="btn-add" onClick={addItemRow}>
           + Add Item
