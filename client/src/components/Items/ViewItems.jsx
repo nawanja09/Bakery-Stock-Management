@@ -14,6 +14,7 @@ import {
 import './ItemManagement.css';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
+import { ITEM_TYPE_OPTIONS } from './itemTypeOptions';
 
 const ItemsList = () => {
   const [items, setItems] = useState([]);
@@ -22,6 +23,7 @@ const ItemsList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterVat, setFilterVat] = useState('all');
   const [filterAutoAdd, setFilterAutoAdd] = useState('all');
+  const [filterItemType, setFilterItemType] = useState('all');
   const { showPopup } = usePopup();
   const navigate = useNavigate();
 
@@ -31,7 +33,7 @@ const ItemsList = () => {
 
   useEffect(() => {
     filterItems();
-  }, [searchTerm, filterVat, filterAutoAdd, items]);
+  }, [searchTerm, filterVat, filterAutoAdd, filterItemType, items]);
 
   const fetchItems = async () => {
     try {
@@ -76,6 +78,11 @@ const ItemsList = () => {
       });
     }
 
+    // Apply Item Type filter
+    if (filterItemType !== 'all') {
+      filtered = filtered.filter(item => (item.item_type || 'Other') === filterItemType);
+    }
+
     setFilteredItems(filtered);
   };
 
@@ -102,6 +109,7 @@ const ItemsList = () => {
     setSearchTerm('');
     setFilterVat('all');
     setFilterAutoAdd('all');
+    setFilterItemType('all');
   };
 
   if (loading) {
@@ -176,7 +184,20 @@ const ItemsList = () => {
           </select>
         </div>
 
-        {(searchTerm || filterVat !== 'all' || filterAutoAdd !== 'all') && (
+        <div className="filter-dropdown">
+          <select
+            value={filterItemType}
+            onChange={(e) => setFilterItemType(e.target.value)}
+            className="minimal-select filter-select"
+          >
+            <option value="all">All Item Types</option>
+            {ITEM_TYPE_OPTIONS.map((type) => (
+              <option key={type} value={type}>{type}</option>
+            ))}
+          </select>
+        </div>
+
+        {(searchTerm || filterVat !== 'all' || filterAutoAdd !== 'all' || filterItemType !== 'all') && (
           <button 
             onClick={clearSearch}
             className="minimal-button minimal-button-secondary clear-filters"
@@ -191,16 +212,16 @@ const ItemsList = () => {
           <div className="empty-state-icon">📦</div>
           <h3>No Items Found</h3>
           <p>
-            {searchTerm || filterVat !== 'all' || filterAutoAdd !== 'all'
+            {searchTerm || filterVat !== 'all' || filterAutoAdd !== 'all' || filterItemType !== 'all'
               ? "No items match your search criteria. Try adjusting your filters." 
               : "Get started by adding your first item."}
           </p>
-          {(searchTerm || filterVat !== 'all' || filterAutoAdd !== 'all') && (
+          {(searchTerm || filterVat !== 'all' || filterAutoAdd !== 'all' || filterItemType !== 'all') && (
             <button onClick={clearSearch} className="minimal-button minimal-button-secondary">
               Clear All Filters
             </button>
           )}
-          {!searchTerm && filterVat === 'all' && filterAutoAdd === 'all' && (
+          {!searchTerm && filterVat === 'all' && filterAutoAdd === 'all' && filterItemType === 'all' && (
             <button 
               onClick={() => navigate('/items/add')} 
               className="minimal-button minimal-button-primary"
@@ -219,6 +240,7 @@ const ItemsList = () => {
                   <th>Item Code</th>
                   <th>Item Name</th>
                   <th>Unit</th>
+                  <th>Item Type</th>
                   <th>VAT Status</th>
                   <th>Auto-Add to Stock</th>
                   <th>Current Stock</th>
@@ -237,6 +259,9 @@ const ItemsList = () => {
                     </td>
                     <td>
                       <span className="unit-badge">{item.unit}</span>
+                    </td>
+                    <td>
+                      <span className="unit-badge">{item.item_type || 'Other'}</span>
                     </td>
                     <td>
                       <span className={`vat-status-badge ${item.vat_applicable ? 'applicable' : 'not-applicable'}`}>

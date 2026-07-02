@@ -4,7 +4,7 @@ const pool = require('../config/db');
 // CREATE ITEM with Auto-Add functionality
 // =============================================
 const createItem = async (req, res) => {
-  const { item_code, name, unit, vat_applicable, auto_add_to_stock, reorder_level } = req.body;
+  const { item_code, name, unit, item_type, vat_applicable, auto_add_to_stock, reorder_level } = req.body;
 
   const connection = await pool.getConnection();
   
@@ -13,8 +13,8 @@ const createItem = async (req, res) => {
 
     // Insert item
     const [result] = await connection.query(
-      'INSERT INTO items (item_code, name, unit, vat_applicable, auto_add_to_stock, reorder_level) VALUES (?, ?, ?, ?, ?, ?)',
-      [item_code, name, unit, vat_applicable || false, auto_add_to_stock !== undefined ? auto_add_to_stock : true, reorder_level]
+      'INSERT INTO items (item_code, name, unit, item_type, vat_applicable, auto_add_to_stock, reorder_level) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [item_code, name, unit, item_type || 'Other', vat_applicable || false, auto_add_to_stock !== undefined ? auto_add_to_stock : true, reorder_level]
     );
 
     // Auto-add to stock if enabled (default is true)
@@ -67,8 +67,9 @@ const getAllItems = async (req, res) => {
         i.id, 
         i.item_code, 
         i.name, 
-        i.unit, 
-        i.vat_applicable, 
+        i.unit,
+        i.item_type,
+        i.vat_applicable,
         i.auto_add_to_stock,
         i.reorder_level,
         COALESCE(ob.quantity, 0) as current_stock
@@ -99,7 +100,7 @@ const getItemById = async (req, res) => {
 
   try {
     const [rows] = await pool.query(
-      `SELECT id, item_code, name, unit, vat_applicable, auto_add_to_stock, reorder_level 
+      `SELECT id, item_code, name, unit, item_type, vat_applicable, auto_add_to_stock, reorder_level 
        FROM items WHERE id = ? AND deleted = FALSE`, 
       [id]
     );
@@ -120,7 +121,7 @@ const getItemById = async (req, res) => {
 // =============================================
 const updateItem = async (req, res) => {
   const { id } = req.params;
-  const { item_code, name, unit, vat_applicable, auto_add_to_stock, reorder_level } = req.body;
+  const { item_code, name, unit, item_type, vat_applicable, auto_add_to_stock, reorder_level } = req.body;
 
   const connection = await pool.getConnection();
   
@@ -135,8 +136,8 @@ const updateItem = async (req, res) => {
 
     // Update item
     const [result] = await connection.query(
-      'UPDATE items SET item_code = ?, name = ?, unit = ?, vat_applicable = ?, auto_add_to_stock = ?, reorder_level = ? WHERE id = ? AND deleted = FALSE',
-      [item_code, name, unit, vat_applicable || false, auto_add_to_stock !== undefined ? auto_add_to_stock : true, reorder_level, id]
+      'UPDATE items SET item_code = ?, name = ?, unit = ?, item_type = ?, vat_applicable = ?, auto_add_to_stock = ?, reorder_level = ? WHERE id = ? AND deleted = FALSE',
+      [item_code, name, unit, item_type || 'Other', vat_applicable || false, auto_add_to_stock !== undefined ? auto_add_to_stock : true, reorder_level, id]
     );
     
     if (result.affectedRows === 0) {
