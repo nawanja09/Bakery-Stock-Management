@@ -17,6 +17,7 @@ import {
   faExclamationTriangle
 } from '@fortawesome/free-solid-svg-icons';
 import api from '../../api';
+import { formatNumber } from '../../utils/formatters';
 import './StockReport.css';   
 
 // Transaction Details Modal Component
@@ -97,9 +98,9 @@ const TransactionDetailsModal = ({ date, itemId, itemName, onClose }) => {
                       <tr key={i}>
                         <td>{p.invoice_no}</td>
                         <td>{p.supplier_name}</td>
-                        <td>{Number(p.quantity).toFixed(3)}</td>
-                        <td>{Number(p.unit_price).toFixed(2)}</td>
-                        <td>{Number(p.total_price).toFixed(2)}</td>
+                        <td>{formatNumber(p.quantity, 3, 3)}</td>
+                        <td>{formatNumber(p.unit_price, 2, 2)}</td>
+                        <td>{formatNumber(p.total_price, 2, 2)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -130,7 +131,7 @@ const TransactionDetailsModal = ({ date, itemId, itemName, onClose }) => {
                         <td>ISS-{i.issuance_id}</td>
                         <td>{i.department_name}</td>
                         <td>{i.received_by}</td>
-                        <td>{Number(i.quantity).toFixed(3)}</td>
+                        <td>{formatNumber(i.quantity, 3, 3)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -159,7 +160,7 @@ const TransactionDetailsModal = ({ date, itemId, itemName, onClose }) => {
                       <tr key={idx}>
                         <td>{w.wastage_note_number}</td>
                         <td>{w.reason}</td>
-                        <td>{Number(w.quantity).toFixed(3)}</td>
+                        <td>{formatNumber(w.quantity, 3, 3)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -188,7 +189,7 @@ const TransactionDetailsModal = ({ date, itemId, itemName, onClose }) => {
                       <tr key={idx}>
                         <td>{pr.return_number}</td>
                         <td>{pr.supplier_name}</td>
-                        <td>{Number(pr.quantity).toFixed(3)}</td>
+                        <td>{formatNumber(pr.quantity, 3, 3)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -306,15 +307,15 @@ const StockReportByRangeAndItem = () => {
                           Number(r.returned) - Number(r.purchaseReturned || 0) + Number(r.adjusted || 0);
         return [
           format(new Date(r.date), 'MMM dd'),
-          Number(r.opening).toFixed(2),
-          Number(r.purchased).toFixed(2),
-          Number(r.issued).toFixed(2),
-          Number(r.wasted).toFixed(2),
-          Number(r.returned).toFixed(2),
-          Number(r.purchaseReturned || 0).toFixed(2),
-          Number(r.adjusted || 0).toFixed(2),
-          Number(r.closing).toFixed(2),
-          netChange.toFixed(2)
+          formatNumber(r.opening, 2, 2),
+          formatNumber(r.purchased, 2, 2),
+          formatNumber(r.issued, 2, 2),
+          formatNumber(r.wasted, 2, 2),
+          formatNumber(r.returned, 2, 2),
+          formatNumber(r.purchaseReturned || 0, 2, 2),
+          formatNumber(r.adjusted || 0, 2, 2),
+          formatNumber(r.closing, 2, 2),
+          formatNumber(netChange, 2, 2)
         ];
       }),
       startY: 40,
@@ -491,27 +492,27 @@ const StockReportByRangeAndItem = () => {
         <div className="summary-cards">
           <div className="summary-card">
             <div className="summary-label">TOTAL PURCHASED</div>
-            <div className="summary-value positive">{summary.totalPurchased.toFixed(2)}</div>
+            <div className="summary-value positive">{formatNumber(summary.totalPurchased, 2, 2)}</div>
           </div>
           <div className="summary-card">
             <div className="summary-label">TOTAL ISSUED</div>
-            <div className="summary-value negative">{summary.totalIssued.toFixed(2)}</div>
+            <div className="summary-value negative">{formatNumber(summary.totalIssued, 2, 2)}</div>
           </div>
           <div className="summary-card">
             <div className="summary-label">TOTAL WASTED</div>
-            <div className="summary-value negative">{summary.totalWasted.toFixed(2)}</div>
+            <div className="summary-value negative">{formatNumber(summary.totalWasted, 2, 2)}</div>
           </div>
           <div className="summary-card">
             <div className="summary-label">TOTAL ADJUSTED</div>
             <div
               className={`summary-value ${summary.totalAdjusted >= 0 ? 'positive' : 'negative'}`}
             >
-              {summary.totalAdjusted >= 0 ? '+' : ''}{summary.totalAdjusted.toFixed(2)}
+              {summary.totalAdjusted >= 0 ? '+' : ''}{formatNumber(summary.totalAdjusted, 2, 2)}
             </div>
           </div>
           <div className="summary-card">
             <div className="summary-label">AVG CLOSING</div>
-            <div className="summary-value">{summary.avgClosing.toFixed(2)}</div>
+            <div className="summary-value">{formatNumber(summary.avgClosing, 2, 2)}</div>
           </div>
         </div>
       )}
@@ -552,23 +553,23 @@ const StockReportByRangeAndItem = () => {
                     onClick={() => hasTransactions && handleRowClick(r)}
                   >
                     <td>{format(new Date(r.date), 'MMM dd')}</td>
-                    <td className="text-right">{Number(r.opening).toFixed(2)}</td>
-                    <td className="text-right positive">+{Number(r.purchased).toFixed(2)}</td>
-                    <td className="text-right negative">-{Number(r.issued).toFixed(2)}</td>
-                    <td className="text-right negative">-{Number(r.wasted).toFixed(2)}</td>
-                    <td className="text-right positive">+{Number(r.returned).toFixed(2)}</td>
-                    <td className="text-right negative">-{Number(r.purchaseReturned || 0).toFixed(2)}</td>
+                    <td className="text-right">{formatNumber(r.opening, 2, 2)}</td>
+                    <td className="text-right positive">+{formatNumber(r.purchased, 2, 2)}</td>
+                    <td className="text-right negative">-{formatNumber(r.issued, 2, 2)}</td>
+                    <td className="text-right negative">-{formatNumber(r.wasted, 2, 2)}</td>
+                    <td className="text-right positive">+{formatNumber(r.returned, 2, 2)}</td>
+                    <td className="text-right negative">-{formatNumber(r.purchaseReturned || 0, 2, 2)}</td>
                     <td
                       className={`text-right ${Number(r.adjusted || 0) >= 0 ? 'positive' : 'negative'}`}
                     >
-                      {Number(r.adjusted || 0) >= 0 ? '+' : ''}{Number(r.adjusted || 0).toFixed(2)}
+                      {Number(r.adjusted || 0) >= 0 ? '+' : ''}{formatNumber(r.adjusted || 0, 2, 2)}
                     </td>
-                    <td className="text-right" style={{ fontWeight: '600' }}>{Number(r.closing).toFixed(2)}</td>
+                    <td className="text-right" style={{ fontWeight: '600' }}>{formatNumber(r.closing, 2, 2)}</td>
                     <td className="text-right" style={{ 
                       color: netChange >= 0 ? '#28a745' : '#dc3545',
                       fontWeight: '600'
                     }}>
-                      {netChange >= 0 ? '+' : ''}{netChange.toFixed(2)}
+                      {netChange >= 0 ? '+' : ''}{formatNumber(netChange, 2, 2)}
                     </td>
                     <td className="text-center">
                       {hasTransactions && (

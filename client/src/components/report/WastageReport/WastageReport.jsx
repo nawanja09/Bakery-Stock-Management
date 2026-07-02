@@ -5,6 +5,7 @@ import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import '../PurchasingReport/PurchasingReport.css';
 import api from '../../../api';
+import { formatNumber } from '../../../utils/formatters';
 
 const WastageReport = () => {
   const [startDate, setStartDate] = useState(format(subDays(new Date(), 7), 'yyyy-MM-dd'));
@@ -53,7 +54,7 @@ const WastageReport = () => {
         item.item_name,
         item.quantity,
         item.unit,
-        Number(item.estimated_loss).toFixed(2)
+        formatNumber(item.estimated_loss, 2, 2)
       ])
     );
 
@@ -83,7 +84,7 @@ const WastageReport = () => {
     }, 0);
 
     doc.setFontSize(12);
-    doc.text(`Total Estimated Loss: Rs. ${totalLoss.toFixed(2)}`, 15, doc.lastAutoTable.finalY + 15);
+    doc.text(`Total Estimated Loss: Rs. ${formatNumber(totalLoss, 2, 2)}`, 15, doc.lastAutoTable.finalY + 15);
 
     doc.save(`wastage-report-${startDate}-to-${endDate}.pdf`);
   };
@@ -159,11 +160,11 @@ const WastageReport = () => {
             <div className="stat-label">Total Items</div>
           </div>
           <div className="stat-card">
-            <div className="stat-value">Rs. {totalLoss.toFixed(2)}</div>
+            <div className="stat-value">Rs. {formatNumber(totalLoss, 2, 2)}</div>
             <div className="stat-label">Total Loss</div>
           </div>
           <div className="stat-card">
-            <div className="stat-value">Rs. {avgLossPerNote.toFixed(2)}</div>
+            <div className="stat-value">Rs. {formatNumber(avgLossPerNote, 2, 2)}</div>
             <div className="stat-label">Avg. per Note</div>
           </div>
         </div>
@@ -258,7 +259,7 @@ const WastageReport = () => {
                       <td>{wastage.entered_by}</td>
                       <td>{wastage.items.length}</td>
                       <td className="loss-amount">
-                        Rs. {totalLoss.toFixed(2)}
+                        Rs. {formatNumber(totalLoss, 2, 2)}
                       </td>
                     </tr>
                     {isExpanded && (
@@ -282,7 +283,7 @@ const WastageReport = () => {
                                   <td>{item.quantity}</td>
                                   <td>{item.unit}</td>
                                   <td className="loss-amount">
-                                    Rs. {Number(item.estimated_loss).toFixed(2)}
+                                    Rs. {formatNumber(item.estimated_loss, 2, 2)}
                                   </td>
                                 </tr>
                               ))}
@@ -299,7 +300,7 @@ const WastageReport = () => {
               <tr className="total-row">
                 <td colSpan="6">Grand Total</td>
                 <td>{totalItems}</td>
-                <td className="loss-amount">Rs. {totalLoss.toFixed(2)}</td>
+                <td className="loss-amount">Rs. {formatNumber(totalLoss, 2, 2)}</td>
               </tr>
             </tfoot>
           </table>
