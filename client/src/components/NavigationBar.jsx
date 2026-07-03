@@ -131,7 +131,7 @@ const NavigationBar = () => {
 
             {!isCollapsed && activeSection === 'raw' && (
               <>
-                {/* Items Management */}
+                {/* Items Management
                 <li className={`dropdown ${activeDropdown === 'items' ? 'active' : ''}`}>
                   <div className="dropdown-header" onClick={() => toggleDropdown('items')}>
                     <span className="icon-container"><FontAwesomeIcon icon={faBox} /></span>
@@ -145,16 +145,19 @@ const NavigationBar = () => {
                         <span>Add New Items</span>
                       </NavLink>
                     </li>
+                  </ul>
+                </li> */}
+
+                
                     <li>
                       <NavLink to="/items" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                        <span className="icon-container"><FontAwesomeIcon icon={faList} /></span>
-                        <span>View Items</span>
+                        <span className="icon-container"><FontAwesomeIcon icon={faBox} /></span>
+                        <span>Items Management</span>
                       </NavLink>
                     </li>
-                  </ul>
-                </li>
 
-                {/* Opening Balances */}
+
+                {/* Opening Balances 
                 <li className={`dropdown ${activeDropdown === 'opening' ? 'active' : ''}`}>
                   <div className="dropdown-header" onClick={() => toggleDropdown('opening')}>
                     <span className="icon-container"><FontAwesomeIcon icon={faBalanceScale} /></span>
@@ -176,6 +179,7 @@ const NavigationBar = () => {
                     </li>
                   </ul>
                 </li>
+                */}
 
                 {/* Purchase */}
                 <li className={`dropdown ${activeDropdown === 'purchase' ? 'active' : ''}`}>
