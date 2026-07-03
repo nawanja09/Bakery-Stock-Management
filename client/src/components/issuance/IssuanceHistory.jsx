@@ -1,9 +1,42 @@
 import React, { useState, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { Link } from 'react-router-dom';
 import { usePopup } from '../context/PopupContext';
 import './Issuance.css';
 import api from '../../api';
 import { formatNumber, formatQuantity } from '../../utils/formatters';
+
+const ModalPortal = ({ children, onClose }) => {
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  if (typeof document === 'undefined') return null;
+
+  return ReactDOM.createPortal(
+    <div className="issuance-modal-overlay" onClick={onClose}>
+      <div className="issuance-modal-content" onClick={(e) => e.stopPropagation()}>
+        {children}
+      </div>
+    </div>,
+    document.body
+  );
+};
 
 // Modal version of IssuanceDetails for popup use
 const IssuanceDetailsModal = ({ id, onClose }) => {
@@ -179,11 +212,9 @@ const IssuanceHistory = () => {
       </div>
 
       {selectedIssuanceId && (
-        <div className="modal-overlay" onClick={() => setSelectedIssuanceId(null)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <IssuanceDetailsModal id={selectedIssuanceId} onClose={() => setSelectedIssuanceId(null)} />
-          </div>
-        </div>
+        <ModalPortal onClose={() => setSelectedIssuanceId(null)}>
+          <IssuanceDetailsModal id={selectedIssuanceId} onClose={() => setSelectedIssuanceId(null)} />
+        </ModalPortal>
       )}
     </div>
   );
