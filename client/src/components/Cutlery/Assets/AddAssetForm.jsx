@@ -1,4 +1,5 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import './AddAssetForm.css';
 
 const AddAssetForm = ({ onSubmit, onCancel }) => {
@@ -60,10 +61,22 @@ const AddAssetForm = ({ onSubmit, onCancel }) => {
   };
 
   const triggerFileInput = () => fileInputRef.current?.click();
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const handleKey = (e) => {
+      if (e.key === 'Escape') onCancel();
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener('keydown', handleKey);
+    };
+  }, [onCancel]);
 
-  return (
-    <div className="add-asset-overlay">
-      <div className="add-asset-card">
+  const inner = (
+    <div className="add-asset-overlay" onClick={onCancel}>
+      <div className="add-asset-card" onClick={(e) => e.stopPropagation()}>
         <div className="add-asset-header">
           <h2>Add New Asset</h2>
           <button className="btn-close" onClick={onCancel} disabled={submitting}>×</button>
@@ -130,6 +143,9 @@ const AddAssetForm = ({ onSubmit, onCancel }) => {
       </div>
     </div>
   );
+
+  if (typeof document === 'undefined') return inner;
+  return ReactDOM.createPortal(inner, document.body);
 };
 
 export default AddAssetForm;

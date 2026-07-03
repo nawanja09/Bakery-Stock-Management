@@ -427,6 +427,9 @@ const AddFinishedGoodsWastage = () => {
                     isDisabled={formData.wastage_type === 'Production' && !formData.production_id}
                     className="minimal-select"
                     classNamePrefix="select"
+                    menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                    menuPosition="fixed"
+                    styles={{ menuPortal: base => ({ ...base, zIndex: 99999 }) }}
                   />
                 </div>
                 
