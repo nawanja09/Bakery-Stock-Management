@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { format } from 'date-fns';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -50,6 +50,23 @@ const PurchasingReport = () => {
       setLoading(false);
     }
   };
+
+  // Fetch items on component mount so the Search Item dropdown
+  // is populated even before a report is generated.
+  useEffect(() => {
+    let mounted = true;
+    const loadItems = async () => {
+      try {
+        const res = await api.get('/items');
+        if (mounted && res && res.data) setItemsList(res.data);
+      } catch (err) {
+        console.error('Error loading items for dropdown:', err);
+      }
+    };
+
+    loadItems();
+    return () => { mounted = false; };
+  }, []);
 
   // =============================================
   // 🔥 FIXED: getAllItemsFromPurchases function
@@ -178,16 +195,26 @@ const PurchasingReport = () => {
   // 🔥 FIXED: Item options for react-select
   // =============================================
   const itemOptions = useMemo(() => {
-    // Get unique items from report data
+    // Prefer the items list fetched from the /items API (populates dropdown
+    // even before generating a report). Fall back to extracting unique
+    // items from reportData when itemsList is empty.
+    if (itemsList && itemsList.length > 0) {
+      return itemsList.map((it) => ({
+        value: it.id || it.item_id,
+        label: `${it.name || it.item_name || 'Unknown'}${it.vat_applicable ? ' (VAT)' : ''}`,
+        name: it.name || it.item_name || 'Unknown',
+        vat_applicable: it.vat_applicable
+      }));
+    }
+
     const uniqueItems = new Map();
-    
-    reportData.forEach(purchase => {
+    reportData.forEach((purchase) => {
       if (purchase.items && purchase.items.length > 0) {
-        purchase.items.forEach(item => {
+        purchase.items.forEach((item) => {
           if (item.item_id && !uniqueItems.has(item.item_id)) {
             uniqueItems.set(item.item_id, {
               value: item.item_id,
-              label: `${item.item_name || item.name || 'Unknown'} ${item.vat_applicable ? '(VAT)' : ''}`,
+              label: `${item.item_name || item.name || 'Unknown'}${item.vat_applicable ? ' (VAT)' : ''}`,
               name: item.item_name || item.name || 'Unknown',
               vat_applicable: item.vat_applicable
             });
@@ -197,7 +224,7 @@ const PurchasingReport = () => {
     });
 
     return Array.from(uniqueItems.values());
-  }, [reportData]);
+  }, [itemsList, reportData]);
 
   // =============================================
   // 🔥 FIXED: Filter logic
