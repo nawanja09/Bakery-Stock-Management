@@ -118,16 +118,16 @@ const Purchases = () => {
 
   return (
     <div className="purchases-page">
-      <header className="page-header">
-        <div>
+      <div className="purchases-header">
+        <div className="purchases-title">
           <h1>Purchases</h1>
           <p>Manage cutlery purchase records</p>
         </div>
 
-        <button className="primary-btn" onClick={() => setShowAddForm(true)}>
+        <button className="btn-add-purchase" onClick={() => setShowAddForm(true)}>
           <FiPlus /> New Purchase
         </button>
-      </header>
+      </div>
 
       <div className="content-card">
         {purchases.length === 0 ? (
