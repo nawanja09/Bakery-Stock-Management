@@ -63,6 +63,7 @@ import Assets from './components/Cutlery/Assets/Assets';
 import ViewAsset from './components/Cutlery/Assets/ViewAsset';
 import EditAsset from './components/Cutlery/Assets/EditAsset';
 import Transfers from './components/Cutlery/Transfers/Transfers';
+import ViewCutleryTransfer from './components/Cutlery/Transfers/ViewTransfer';
 import Purchases from './components/Cutlery/Purchases/Purchases';
 import Damages from './components/Cutlery/Damages/Damages';
 import CutleryStockReport from './components/Cutlery/Reports/CutleryStockReport';
@@ -181,6 +182,7 @@ function App() {
             <Route path="cutlery/assets/view/:id" element={<ViewAsset />} />
             <Route path="cutlery/assets/edit/:id" element={<EditAsset />} />
             <Route path="cutlery/transfer" element={<Transfers />} />
+            <Route path="cutlery/transfer/view/:id" element={<ViewCutleryTransfer />} />
             <Route path="cutlery/purchasing" element={<Purchases />} />
             <Route path="cutlery/damage" element={<Damages />} />
             <Route path="cutlery/reports/inventory" element={<CutleryStockReport />} />
