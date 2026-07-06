@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { usePopup } from '../../context/PopupContext';
 import api from '../../../api';
 import AddTransferForm from './AddTransferForm';
-import ViewTransfer from './ViewTransfer';
 import EditTransfer from './EditTransfer';
 import './Transfers.css';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -12,9 +12,10 @@ const Transfers = () => {
   const [transfers, setTransfers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [viewingTransfer, setViewingTransfer] = useState(null);
   const [editingTransfer, setEditingTransfer] = useState(null);
   const { showPopup } = usePopup();
+  const navigate = useNavigate();
+  const location = useLocation();
   const isMounted = useRef(true);
   const fetchCount = useRef(0);
 
@@ -70,6 +71,18 @@ const Transfers = () => {
       isMounted.current = false;
     };
   }, [fetchTransfers]);
+
+  // Check state to trigger editing on redirect
+  useEffect(() => {
+    if (location.state?.editTransferId && transfers.length > 0) {
+      const trans = transfers.find(t => t.id === location.state.editTransferId);
+      if (trans) {
+        setEditingTransfer(trans);
+        // Clear location state to avoid reopening on page refresh
+        window.history.replaceState(null, '');
+      }
+    }
+  }, [location, transfers]);
 
   const handleAddTransfer = async (data) => {
     try {
@@ -135,11 +148,14 @@ const Transfers = () => {
   return (
     <div className="transfers-page">
       <header className="page-header">
-        <div>
+        <div className="header-title-container">
           <h1>Transfers</h1>
           <p>Cutlery movement between locations</p>
         </div>
         <div className="header-actions">
+          <button className="btn-primary" onClick={() => setShowAddForm(true)}>
+            <FontAwesomeIcon icon={faPlus} /> Add Transfer
+          </button>
           <button 
             className="btn-refresh"
             onClick={fetchTransfers}
@@ -148,9 +164,6 @@ const Transfers = () => {
           >
             <FontAwesomeIcon icon={faSync} spin={loading} /> Refresh
           </button>
-          <button className="btn-primary" onClick={() => setShowAddForm(true)}>
-            <FontAwesomeIcon icon={faPlus} /> New Transfer
-          </button>
         </div>
       </header>
 
@@ -158,17 +171,6 @@ const Transfers = () => {
         <AddTransferForm
           onSubmit={handleAddTransfer}
           onCancel={() => setShowAddForm(false)}
-        />
-      )}
-
-      {viewingTransfer && (
-        <ViewTransfer
-          transfer={viewingTransfer}
-          onClose={() => setViewingTransfer(null)}
-          onEdit={() => {
-            setEditingTransfer(viewingTransfer);
-            setViewingTransfer(null);
-          }}
         />
       )}
 
@@ -235,7 +237,7 @@ const Transfers = () => {
                       <td className="right actions" data-label="Actions">
                         <button 
                           className="icon-btn view"
-                          onClick={() => setViewingTransfer(t)} 
+                          onClick={() => navigate(`/cutlery/transfer/view/${t.id}`)} 
                           title="View"
                         >
                           <FontAwesomeIcon icon={faEye} />
