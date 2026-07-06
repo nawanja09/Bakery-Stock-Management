@@ -147,25 +147,12 @@ const Transfers = () => {
 
   return (
     <div className="transfers-page">
-      <header className="page-header">
-        <div className="header-title-container">
+      <div className="purchases-header">
           <h1>Transfers</h1>
-          <p>Cutlery movement between locations</p>
-        </div>
-        <div className="header-actions">
-          <button className="btn-primary" onClick={() => setShowAddForm(true)}>
+          <button className="btn-add-transfer" onClick={() => setShowAddForm(true)}>
             <FontAwesomeIcon icon={faPlus} /> Add Transfer
           </button>
-          <button 
-            className="btn-refresh"
-            onClick={fetchTransfers}
-            disabled={loading}
-            title="Refresh"
-          >
-            <FontAwesomeIcon icon={faSync} spin={loading} /> Refresh
-          </button>
-        </div>
-      </header>
+      </div>
 
       {showAddForm && (
         <AddTransferForm
