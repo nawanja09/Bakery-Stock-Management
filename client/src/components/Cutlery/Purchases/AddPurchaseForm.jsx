@@ -53,6 +53,7 @@ const AddPurchaseForm = ({ onSubmit, onCancel }) => {
   };
 
   const addItem = () => setFormData(prev => ({ ...prev, items: [...prev.items, { asset_id: '', quantity: 1, unit_price: 0 }] }));
+  
   const removeItem = (index) => {
     if (formData.items.length > 1) {
       const newItems = [...formData.items];
@@ -87,9 +88,13 @@ const AddPurchaseForm = ({ onSubmit, onCancel }) => {
     };
 
     setSubmitting(true);
-    try { await onSubmit(submitData); } 
-    catch { showPopup('error', 'Failed to submit form'); } 
-    finally { setSubmitting(false); }
+    try { 
+      await onSubmit(submitData); 
+    } catch { 
+      showPopup('error', 'Failed to submit form'); 
+    } finally { 
+      setSubmitting(false); 
+    }
   };
 
   const formatCurrency = (amount) => new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR', minimumFractionDigits: 2 }).format(amount);
@@ -149,38 +154,101 @@ const AddPurchaseForm = ({ onSubmit, onCancel }) => {
             </div>
           </div>
 
-          {/* Items */}
+          {/* Items Section */}
           <div className="form-section">
             <h4>Purchase Items</h4>
             <div className="items-header">
-              <span>Items ({formData.items.length})</span>
-              <button type="button" className="btn-add-item" onClick={addItem} disabled={submitting}>+ Add Item</button>
+              <div className="items-header-left">
+                <span>Items</span>
+                <span className="items-count">({formData.items.length})</span>
+              </div>
+              <button type="button" className="btn-add-item" onClick={addItem} disabled={submitting}>
+                + Add Item
+              </button>
             </div>
-            <div className="items-list">
-              {formData.items.map((item, i) => (
-                <div key={i} className="item-row">
-                  <div className="form-group">
-                    <label>Asset *</label>
-                    <select value={item.asset_id} onChange={e => handleItemChange(i, 'asset_id', e.target.value)} required disabled={submitting}>
-                      <option value="">Select Asset</option>
-                      {formOptions.assets.map(a => <option key={a.id} value={a.id}>{a.asset_name}</option>)}
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label>Quantity *</label>
-                    <input type="number" value={item.quantity} onChange={e => handleItemChange(i, 'quantity', e.target.value)} min="1" step="1" required disabled={submitting} />
-                  </div>
-                  <div className="form-group">
-                    <label>Unit Price (LKR) *</label>
-                    <input type="number" value={item.unit_price} onChange={e => handleItemChange(i, 'unit_price', e.target.value)} min="0" step="0.01" required disabled={submitting} />
-                  </div>
-                  <div className="form-group">
-                    <label>Total</label>
-                    <input type="text" value={formatCurrency((item.quantity || 0) * (item.unit_price || 0))} readOnly className="readonly-input" />
-                  </div>
-                  {formData.items.length > 1 && <button type="button" className="btn-remove-item" onClick={() => removeItem(i)} disabled={submitting} title="Remove Item">×</button>}
-                </div>
-              ))}
+            
+            <div className="items-table-wrapper">
+              <table className="items-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: '30%' }}>Asset</th>
+                    <th style={{ width: '15%' }}>Quantity</th>
+                    <th style={{ width: '20%' }}>Unit Price (LKR)</th>
+                    <th style={{ width: '20%' }}>Total</th>
+                    <th style={{ width: '15%' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {formData.items.map((item, i) => (
+                    <tr key={i}>
+                      <td>
+                        <div className="form-group">
+                          <select 
+                            value={item.asset_id} 
+                            onChange={e => handleItemChange(i, 'asset_id', e.target.value)} 
+                            required 
+                            disabled={submitting}
+                          >
+                            <option value="">Select Asset</option>
+                            {formOptions.assets.map(a => (
+                              <option key={a.id} value={a.id}>{a.asset_name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </td>
+                      <td>
+                        <div className="form-group">
+                          <input 
+                            type="number" 
+                            value={item.quantity} 
+                            onChange={e => handleItemChange(i, 'quantity', e.target.value)} 
+                            min="1" 
+                            step="1" 
+                            required 
+                            disabled={submitting}
+                          />
+                        </div>
+                      </td>
+                      <td>
+                        <div className="form-group">
+                          <input 
+                            type="number" 
+                            value={item.unit_price} 
+                            onChange={e => handleItemChange(i, 'unit_price', e.target.value)} 
+                            min="0" 
+                            step="0.01" 
+                            required 
+                            disabled={submitting}
+                          />
+                        </div>
+                      </td>
+                      <td>
+                        <div className="form-group">
+                          <input 
+                            type="text" 
+                            value={formatCurrency((item.quantity || 0) * (item.unit_price || 0))} 
+                            readOnly 
+                            className="readonly-input" 
+                          />
+                        </div>
+                      </td>
+                      <td>
+                        {formData.items.length > 1 && (
+                          <button 
+                            type="button" 
+                            className="btn-remove-item-table" 
+                            onClick={() => removeItem(i)} 
+                            disabled={submitting} 
+                            title="Remove Item"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
 
@@ -192,7 +260,12 @@ const AddPurchaseForm = ({ onSubmit, onCancel }) => {
 
           {/* Actions */}
           <div className="form-actions">
-            <button type="submit" className="btn-submit" disabled={submitting}>{submitting ? 'Creating...' : 'Create Purchase'}</button>
+            <button type="button" className="btn-cancel" onClick={onCancel} disabled={submitting}>
+              Cancel
+            </button>
+            <button type="submit" className="btn-submit" disabled={submitting}>
+              {submitting ? 'Creating...' : 'Create Purchase'}
+            </button>
           </div>
         </form>
       </div>
