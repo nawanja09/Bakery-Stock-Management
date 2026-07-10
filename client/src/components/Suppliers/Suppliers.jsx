@@ -439,12 +439,9 @@ const Suppliers = () => {
                     <tr>
                       <th>Supplier Name</th>
                       <th>Address</th>
-                      <th>City</th>
-                      <th>VAT Status</th>
                       <th>VAT Number</th>
                       <th>Contact Person</th>
                       <th>Contact Phone</th>
-                      <th>Contact Email</th>
                       <th>Actions</th>
                     </tr>
                   </thead>
@@ -452,13 +449,7 @@ const Suppliers = () => {
                     {filteredSuppliers.map(supplier => (
                       <tr key={supplier.id} className="supplier-row">
                         <td className="supplier-name">{supplier.name}</td>
-                        <td>{supplier.address}</td>
-                        <td>{supplier.city}</td>
-                        <td>
-                          <span className={`vat-badge ${supplier.vat_registered ? 'yes' : 'no'}`}>
-                            {supplier.vat_registered ? 'Registered' : 'Not Registered'}
-                          </span>
-                        </td>
+                        <td title={supplier.address}>{supplier.address}</td>
                         <td>
                           {supplier.vat_registered ? (
                             <span className="vat-number">{supplier.vat_number}</span>
@@ -468,7 +459,6 @@ const Suppliers = () => {
                         </td>
                         <td>{supplier.contact_name}</td>
                         <td>{supplier.contact_phone}</td>
-                        <td>{supplier.contact_email || '-'}</td>
                         <td className="actions">
                           <button 
                             className="btn-edit" 

@@ -341,10 +341,23 @@ input:checked + .toggle-slider:before {
   overflow-x: auto;
 }
 
+/* Improved Table Layout */
 .supplier-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 1200px;
+  min-width: 1000px;
+  table-layout: fixed;
+}
+
+.supplier-table th,
+.supplier-table td {
+  padding: 15px;
+  border-bottom: 1px solid #e1e8ed;
+  color: #2c3e50;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .supplier-table th {
@@ -356,11 +369,60 @@ input:checked + .toggle-slider:before {
   font-size: 14px;
 }
 
-.supplier-table td {
-  padding: 15px;
-  border-bottom: 1px solid #e1e8ed;
-  color: #2c3e50;
-  font-size: 14px;
+/* Column Width Distribution */
+.supplier-table th:nth-child(1),
+.supplier-table td:nth-child(1) {
+  width: 18%; /* Supplier Name */
+}
+
+.supplier-table th:nth-child(2),
+.supplier-table td:nth-child(2) {
+  width: 25%; /* Address */
+  max-width: 300px;
+}
+
+.supplier-table th:nth-child(3),
+.supplier-table td:nth-child(3) {
+  width: 15%; /* VAT Number */
+}
+
+.supplier-table th:nth-child(4),
+.supplier-table td:nth-child(4) {
+  width: 17%; /* Contact Person */
+}
+
+.supplier-table th:nth-child(5),
+.supplier-table td:nth-child(5) {
+  width: 15%; /* Contact Phone */
+}
+
+.supplier-table th:nth-child(6),
+.supplier-table td:nth-child(6) {
+  width: 10%; /* Actions */
+  min-width: 100px;
+}
+
+/* Address column hover tooltip */
+.supplier-table td:nth-child(2) {
+  position: relative;
+  cursor: help;
+}
+
+.supplier-table td:nth-child(2):hover {
+  overflow: visible;
+  white-space: normal;
+  word-break: break-word;
+  background-color: #f8f9fa;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+  position: relative;
+}
+
+/* Keep Actions column compact */
+.supplier-table .actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: nowrap;
 }
 
 .supplier-row:hover {
@@ -502,5 +564,12 @@ input:checked + .toggle-slider:before {
 
   .supplier-table {
     min-width: 800px;
+    table-layout: fixed;
+  }
+  
+  .supplier-table th:nth-child(2),
+  .supplier-table td:nth-child(2) {
+    max-width: 200px;
+    width: 20%;
   }
 }
