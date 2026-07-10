@@ -150,7 +150,7 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
         <div className="error-icon">⚠️</div>
         <h3>Error Loading Purchase</h3>
         <p>{error}</p>
-        <button onClick={handleBack} className="btn-primary">
+        <button onClick={handleBack} className="btn btn-primary">
           {isModal ? 'Close' : 'Back to History'}
         </button>
       </div>
@@ -163,7 +163,7 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
         <div className="not-found-icon">🔍</div>
         <h3>Purchase Not Found</h3>
         <p>The purchase you're looking for doesn't exist or has been deleted.</p>
-        <button onClick={handleBack} className="btn-primary">
+        <button onClick={handleBack} className="btn btn-primary">
           {isModal ? 'Close' : 'Back to History'}
         </button>
       </div>
@@ -196,15 +196,15 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
           </div>
         </div>
         <div className="header-actions">
-          <button onClick={handlePrint} className="btn-outline">
+          <button onClick={handlePrint} className="btn btn-outline">
             <FontAwesomeIcon icon={faPrint} />
             Print
           </button>
-          <button onClick={handlePDF} className="btn-outline">
+          <button onClick={handlePDF} className="btn btn-outline">
             <FontAwesomeIcon icon={faFilePdf} />
             PDF
           </button>
-          <button onClick={handleEdit} className="btn-primary">
+          <button onClick={handleEdit} className="btn btn-primary">
             <FontAwesomeIcon icon={faEdit} />
             Edit
           </button>
@@ -446,11 +446,11 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
             <table className="items-details-table">
               <thead>
                 <tr>
-                  <th>#</th>
-                  <th>Item Name</th>
-                  <th>Item Code</th>
+                  <th className="text-left">#</th>
+                  <th className="text-left">Item Name</th>
+                  <th className="text-left">Item Code</th>
                   <th className="text-right">Quantity</th>
-                  <th>Unit</th>
+                  <th className="text-center">Unit</th>
                   <th className="text-right">Unit Price</th>
                   <th className="text-right">Amount</th>
                   {supplierDetails?.vat_registered && (
@@ -471,16 +471,16 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
 
                   return (
                     <tr key={index} className={item.vat_applicable ? 'vat-applicable-row' : ''}>
-                      <td>{index + 1}</td>
-                      <td>
+                      <td className="text-left">{index + 1}</td>
+                      <td className="text-left">
                         <div className="item-name">{item.item_name}</div>
                         {item.vat_applicable && (
                           <small className="vat-applicable-badge">VAT Applicable</small>
                         )}
                       </td>
-                      <td>{item.item_code || '-'}</td>
+                      <td className="text-left">{item.item_code || '-'}</td>
                       <td className="text-right">{formatQuantity(item.quantity)}</td>
-                      <td>{item.unit || '-'}</td>
+                      <td className="text-center">{item.unit || '-'}</td>
                       <td className="text-right">
                         <span className={isPriceDifferent ? 'price-different' : ''}>
                           {formatCurrency(item.unit_price)}
@@ -558,31 +558,31 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
               <table className="payment-history-table">
                 <thead>
                   <tr>
-                    <th>#</th>
-                    <th>Payment Date</th>
-                    <th>Amount</th>
-                    <th>Method</th>
-                    <th>Reference</th>
-                    <th>Recorded By</th>
-                    <th>Recorded At</th>
-                    <th>Notes</th>
+                    <th className="text-left">#</th>
+                    <th className="text-left">Payment Date</th>
+                    <th className="text-right">Amount</th>
+                    <th className="text-left">Method</th>
+                    <th className="text-left">Reference</th>
+                    <th className="text-left">Recorded By</th>
+                    <th className="text-left">Recorded At</th>
+                    <th className="text-left">Notes</th>
                   </tr>
                 </thead>
                 <tbody>
                   {purchase.payments.map((payment, index) => (
                     <tr key={payment.id}>
-                      <td>{index + 1}</td>
-                      <td>{formatDate(payment.payment_date)}</td>
+                      <td className="text-left">{index + 1}</td>
+                      <td className="text-left">{formatDate(payment.payment_date)}</td>
                       <td className="text-right paid-amount">{formatCurrency(payment.amount)}</td>
-                      <td>
+                      <td className="text-left">
                         <span className={`payment-method-badge ${payment.payment_method?.toLowerCase()}`}>
                           {payment.payment_method?.replace('_', ' ')}
                         </span>
                       </td>
-                      <td>{payment.check_number || '-'}</td>
-                      <td>{payment.created_by_name || '-'}</td>
-                      <td>{formatDateTime(payment.created_at)}</td>
-                      <td>{payment.notes || '-'}</td>
+                      <td className="text-left">{payment.check_number || '-'}</td>
+                      <td className="text-left">{payment.created_by_name || '-'}</td>
+                      <td className="text-left">{formatDateTime(payment.created_at)}</td>
+                      <td className="text-left">{payment.notes || '-'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -679,7 +679,7 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
       {/* Action Buttons */}
       {!isModal && (
         <div className="details-actions">
-          <button onClick={handleBack} className="btn-secondary">
+          <button onClick={handleBack} className="btn btn-secondary">
             <FontAwesomeIcon icon={faArrowLeft} />
             Back to History
           </button>

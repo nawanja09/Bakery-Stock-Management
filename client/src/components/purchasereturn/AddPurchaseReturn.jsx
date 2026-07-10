@@ -24,7 +24,6 @@ import Select from 'react-select';
 import dayjs from 'dayjs';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
-import SettlementModal from './SettlementModal';
 import './AddPurchaseReturn.css';
 
 const AddPurchaseReturn = () => {
@@ -42,13 +41,6 @@ const AddPurchaseReturn = () => {
   const [currentStock, setCurrentStock] = useState({});
   const [loadingStock, setLoadingStock] = useState(false);
   
-  // NEW: Bill settlement states
-  const [supplierBills, setSupplierBills] = useState([]);
-  const [selectedBillsForSettlement, setSelectedBillsForSettlement] = useState([]);
-  const [loadingBills, setLoadingBills] = useState(false);
-  const [showSettlementModal, setShowSettlementModal] = useState(false);
-  const [returnAmount, setReturnAmount] = useState(0);
-  
   const [formData, setFormData] = useState({
     supplier_id: '',
     payment_method: 'CASH',
@@ -65,11 +57,7 @@ const AddPurchaseReturn = () => {
   
   const VAT_RATE = 18;
 
-  // Calculate return amount whenever items change
-  useEffect(() => {
-    const total = calculateReturnTotal();
-    setReturnAmount(total);
-  }, [returnItems, supplierVatRegistered]);
+
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('user'));
@@ -83,16 +71,6 @@ const AddPurchaseReturn = () => {
     fetchPreviousPrices();
     fetchAllCurrentStock();
   }, []);
-
-  // Fetch supplier bills when supplier changes
-  useEffect(() => {
-    if (formData.supplier_id) {
-      fetchSupplierBills(formData.supplier_id);
-    } else {
-      setSupplierBills([]);
-      setSelectedBillsForSettlement([]);
-    }
-  }, [formData.supplier_id]);
 
   const fetchSuppliers = async () => {
     try {
@@ -149,25 +127,6 @@ const AddPurchaseReturn = () => {
     }
   };
 
-  // NEW: Fetch supplier bills from last 3 months with non-paid status
-  const fetchSupplierBills = async (supplierId) => {
-    try {
-      setLoadingBills(true);
-      // Get bills from last 3 months that have balance > 0
-      const threeMonthsAgo = dayjs().subtract(3, 'months').format('YYYY-MM-DD');
-      const response = await api.get(`/purchases/supplier/${supplierId}/bills?fromDate=${threeMonthsAgo}`);
-      
-      // Filter bills with balance > 0
-      const billsWithBalance = response.data.filter(bill => parseFloat(bill.balance_amount) > 0);
-      setSupplierBills(billsWithBalance);
-    } catch (error) {
-      console.error('Error fetching supplier bills:', error);
-      setSupplierBills([]);
-    } finally {
-      setLoadingBills(false);
-    }
-  };
-
   const fetchItemStock = async (itemId) => {
     try {
       const response = await api.get(`/purchase-returns/stock/item/${itemId}`);
@@ -180,7 +139,6 @@ const AddPurchaseReturn = () => {
   const handleSupplierChange = async (e) => {
     const supplierId = e.target.value;
     setFormData(prev => ({ ...prev, supplier_id: supplierId }));
-    setSelectedBillsForSettlement([]); // Reset selected bills when supplier changes
     
     if (supplierId) {
       try {
@@ -194,60 +152,6 @@ const AddPurchaseReturn = () => {
     } else {
       setSupplierVatRegistered(false);
       setSupplierVatNumber('');
-    }
-  };
-
-  // NEW: Handle bill selection for settlement
-  const handleBillSelection = (bill, amount) => {
-    const existingIndex = selectedBillsForSettlement.findIndex(b => b.purchase_id === bill.id);
-    const maxAmount = Math.min(bill.balance_amount, returnAmount - getTotalSelectedAmount() + (existingIndex >= 0 ? selectedBillsForSettlement[existingIndex].amount : 0));
-    const allocatedAmount = Math.min(amount, maxAmount);
-    
-    if (allocatedAmount <= 0 && existingIndex >= 0) {
-      // Remove if amount is zero
-      setSelectedBillsForSettlement(prev => prev.filter(b => b.purchase_id !== bill.id));
-    } else if (allocatedAmount > 0) {
-      const entry = {
-        purchase_id: bill.id,
-        invoice_no: bill.invoice_no,
-        purchase_date: bill.purchase_date,
-        total_amount: bill.total_with_vat,
-        paid_amount: bill.paid_amount,
-        balance_amount: bill.balance_amount,
-        amount: allocatedAmount
-      };
-      
-      if (existingIndex >= 0) {
-        const updated = [...selectedBillsForSettlement];
-        updated[existingIndex] = entry;
-        setSelectedBillsForSettlement(updated);
-      } else {
-        setSelectedBillsForSettlement(prev => [...prev, entry]);
-      }
-    }
-  };
-
-  const getTotalSelectedAmount = () => {
-    return selectedBillsForSettlement.reduce((sum, bill) => sum + bill.amount, 0);
-  };
-
-  const handleSettleWithBills = () => {
-    if (returnAmount <= 0) {
-      showPopup('warning', 'Please add items to return first');
-      return;
-    }
-    setShowSettlementModal(true);
-  };
-
-  const handleSettlementConfirm = (settlementData) => {
-    setSelectedBillsForSettlement(settlementData.settlements);
-    if (settlementData.note) {
-      setRemarks(prev => prev ? `${prev}\nSettlement: ${settlementData.note}` : `Settlement: ${settlementData.note}`);
-    }
-    setShowSettlementModal(false);
-    
-    if (settlementData.settlements.length > 0) {
-      showPopup('success', `Settlement of Rs. ${settlementData.settlements.reduce((s, b) => s + b.amount, 0).toFixed(2)} applied to ${settlementData.settlements.length} bill(s)`);
     }
   };
 
@@ -377,14 +281,6 @@ const AddPurchaseReturn = () => {
 
     setIsSubmitting(true);
     const { grandTotal } = calculateTotals();
-    
-    // Validate settlement doesn't exceed return total
-    const totalSettled = getTotalSelectedAmount();
-    if (totalSettled > grandTotal) {
-      showPopup('error', `Settlement amount (${totalSettled.toFixed(2)}) cannot exceed return total (${grandTotal.toFixed(2)})`);
-      setIsSubmitting(false);
-      return;
-    }
 
     const itemsToReturn = returnItems
       .filter(item => item.return_quantity > 0 && item.unit_price > 0 && item.item_id)
@@ -407,11 +303,7 @@ const AddPurchaseReturn = () => {
       returned_by: currentUser.id,
       payment_method: formData.payment_method,
       company_id: formData.company_id || null,
-      check_number: formData.check_number || null,
-      settlements: selectedBillsForSettlement.map(bill => ({
-        purchase_id: bill.purchase_id,
-        amount: bill.amount
-      }))
+      check_number: formData.check_number || null
     };
 
     try {
@@ -431,8 +323,6 @@ const AddPurchaseReturn = () => {
   };
 
   const totals = calculateTotals();
-  const totalSelectedSettlement = getTotalSelectedAmount();
-  const remainingAfterSettlement = totals.grandTotal - totalSelectedSettlement;
 
   const itemOptions = itemsList.map(item => ({
     value: item.id,
@@ -521,21 +411,6 @@ const AddPurchaseReturn = () => {
           <div className="form-row">
             <div className="form-group">
               <label>
-                <FontAwesomeIcon icon={faCreditCard} /> Payment Method *
-              </label>
-              <select
-                value={formData.payment_method}
-                onChange={(e) => setFormData({ ...formData, payment_method: e.target.value })}
-                className="form-control"
-                required
-              >
-                <option value="CASH">Cash</option>
-                <option value="BANK_TRANSFER">Bank Transfer</option>
-                <option value="CHEQUE">Cheque</option>
-              </select>
-            </div>
-            <div className="form-group">
-              <label>
                 <FontAwesomeIcon icon={faBuilding} /> Company
               </label>
               <select
@@ -548,33 +423,6 @@ const AddPurchaseReturn = () => {
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
-              <span className="field-note">Optional</span>
-            </div>
-          </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label>
-                <FontAwesomeIcon icon={faUniversity} /> Reference / Check No.
-              </label>
-              <input
-                type="text"
-                value={formData.check_number}
-                onChange={(e) => setFormData({ ...formData, check_number: e.target.value })}
-                placeholder="Optional"
-                className="form-control"
-              />
-              <span className="field-note">For cheque or bank transfer reference</span>
-            </div>
-            <div className="form-group">
-              <label>Remarks</label>
-              <textarea
-                value={formData.remarks}
-                onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
-                rows="2"
-                className="form-control"
-                placeholder="Add any notes or remarks..."
-              />
             </div>
           </div>
         </div>
@@ -735,17 +583,6 @@ const AddPurchaseReturn = () => {
             </table>
           </div>
 
-          {!hasItemsToReturn() && returnItems.length > 0 && (
-            <div className="warning-message">
-              <FontAwesomeIcon icon={faExclamationTriangle} />
-              Please enter a return quantity for at least one item.
-            </div>
-          )}
-        </div>
-
-        {/* ── SUMMARY ── */}
-        <div className="form-card">
-          <h2>Summary</h2>
           <div className="summary-section">
             <div className="summary-row">
               <span>Subtotal (Net Amount)</span>
@@ -761,129 +598,6 @@ const AddPurchaseReturn = () => {
             </div>
           </div>
         </div>
-
-        {/* ── BILL SETTLEMENT SECTION (NEW) ── */}
-        {formData.supplier_id && (
-          <div className="form-card bill-settlement-card">
-            <div className="section-header">
-              <h2>
-                <FontAwesomeIcon icon={faReceipt} />
-                Bill Settlement (Last 3 Months)
-              </h2>
-              {returnAmount > 0 && (
-                <button
-                  type="button"
-                  className="btn-settle-bills"
-                  onClick={handleSettleWithBills}
-                >
-                  <FontAwesomeIcon icon={faBalanceScale} />
-                  Settle with Bills
-                </button>
-              )}
-            </div>
-
-            {loadingBills ? (
-              <div className="loading-bills">Loading bills...</div>
-            ) : supplierBills.length === 0 ? (
-              <div className="no-bills-message">
-                <FontAwesomeIcon icon={faFileInvoice} />
-                <p>No outstanding bills found for this supplier from the last 3 months.</p>
-                <small>The return amount will be carried forward as balance.</small>
-              </div>
-            ) : (
-              <>
-                <div className="bills-table-container">
-                  <table className="bills-table">
-                    <thead>
-                      <tr>
-                        <th>Invoice #</th>
-                        <th>Date</th>
-                        <th>Total Amount</th>
-                        <th>Paid</th>
-                        <th>Balance</th>
-                        <th style={{ width: '180px' }}>Settlement Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {supplierBills.map(bill => {
-                        const selectedBill = selectedBillsForSettlement.find(b => b.purchase_id === bill.id);
-                        const allocatedAmount = selectedBill?.amount || 0;
-                        const remainingForThisBill = bill.balance_amount - allocatedAmount;
-                        
-                        return (
-                          <tr key={bill.id} className={allocatedAmount > 0 ? 'bill-selected' : ''}>
-                            <td>
-                              <span className="invoice-badge-small">{bill.invoice_no}</span>
-                            </td>
-                            <td>{dayjs(bill.purchase_date).format('DD MMM YYYY')}</td>
-                            <td className="text-right">Rs. {parseFloat(bill.total_with_vat).toFixed(2)}</td>
-                            <td className="text-right">Rs. {parseFloat(bill.paid_amount).toFixed(2)}</td>
-                            <td className="text-right balance-amount">Rs. {parseFloat(bill.balance_amount).toFixed(2)}</td>
-                            <td>
-                              <div className="settlement-input-group">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  max={bill.balance_amount}
-                                  step="0.01"
-                                  value={allocatedAmount}
-                                  onChange={(e) => handleBillSelection(bill, parseFloat(e.target.value) || 0)}
-                                  placeholder="0.00"
-                                  className="settlement-amount-input"
-                                  disabled={returnAmount <= 0}
-                                />
-                                {allocatedAmount > 0 && (
-                                  <span className="allocated-check">
-                                    <FontAwesomeIcon icon={faCheckCircle} />
-                                  </span>
-                                )}
-                              </div>
-                              {remainingForThisBill > 0 && allocatedAmount > 0 && (
-                                <small className="remaining-hint">
-                                  Remaining: Rs. {remainingForThisBill.toFixed(2)}
-                                </small>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Settlement Summary */}
-                {totalSelectedSettlement > 0 && (
-                  <div className="settlement-summary-card">
-                    <div className="settlement-summary-header">
-                      <FontAwesomeIcon icon={faMoneyBillWave} />
-                      <span>Settlement Summary</span>
-                    </div>
-                    <div className="settlement-summary-details">
-                      <div className="summary-detail">
-                        <span>Return Total:</span>
-                        <span>Rs. {totals.grandTotal.toFixed(2)}</span>
-                      </div>
-                      <div className="summary-detail success">
-                        <span>Settlement Amount:</span>
-                        <span>Rs. {totalSelectedSettlement.toFixed(2)}</span>
-                      </div>
-                      <div className="summary-detail warning">
-                        <span>Balance to Carry:</span>
-                        <span>Rs. {remainingAfterSettlement.toFixed(2)}</span>
-                      </div>
-                    </div>
-                    {remainingAfterSettlement === 0 && (
-                      <div className="fully-settled-badge">
-                        <FontAwesomeIcon icon={faCheckCircle} />
-                        Fully Settled
-                      </div>
-                    )}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        )}
 
         {/* ── ACTIONS ── */}
         <div className="form-actions">
@@ -904,17 +618,6 @@ const AddPurchaseReturn = () => {
           </button>
         </div>
       </form>
-
-      {/* Settlement Modal */}
-      <SettlementModal
-        isOpen={showSettlementModal}
-        onClose={() => setShowSettlementModal(false)}
-        supplierId={formData.supplier_id}
-        supplierName={suppliers.find(s => s.id === parseInt(formData.supplier_id))?.name || ''}
-        returnAmount={totals.grandTotal}
-        existingSettlements={selectedBillsForSettlement}
-        onConfirm={handleSettlementConfirm}
-      />
     </div>
   );
 };

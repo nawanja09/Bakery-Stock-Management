@@ -46,6 +46,8 @@ const purchaseReturnRoutes = require('./routes/purchaseReturnRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
 const expenseRoutes = require('./routes/expenseRoutes');
 const payeeRoutes = require('./routes/payeeRoutes');
+const supplierCreditRoutes = require('./routes/supplierCreditRoutes');
+
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -119,6 +121,8 @@ app.use('/api/cutlery-reports', cutleryStockReportRoutes);
 app.use('/api/purchase-returns', purchaseReturnRoutes);
 app.use('/api/purchases', paymentRoutes);
 app.use('/api/expenses', expenseRoutes);
+app.use('/api/suppliers', supplierCreditRoutes);
+
 
 // Error handling middleware for file uploads
 app.use((err, req, res, next) => {

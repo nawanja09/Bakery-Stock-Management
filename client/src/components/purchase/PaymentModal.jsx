@@ -269,12 +269,12 @@ const PaymentModal = ({ purchase, onClose, onPaymentComplete }) => {
             </div>
 
             <div className="form-actions">
-              <button type="button" className="btn-secondary" onClick={onClose}>
+              <button type="button" className="btn btn-secondary" onClick={onClose}>
                 Cancel
               </button>
               <button 
                 type="submit" 
-                className="btn-primary"
+                className="btn btn-primary"
                 disabled={submitting}
               >
                 {submitting ? 'Processing...' : 'Process Payment'}

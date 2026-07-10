@@ -291,61 +291,68 @@ const createPurchaseReturn = async (req, res) => {
       );
     }
 
-    // Update purchase balances if settlements were made
+    // ─── Auto-create Supplier Credit for remaining balance ───────────────
+    // Settlement against invoices is now handled from the Invoice page.
+    // We still support legacy `settlements` field for backward compat but
+    // the primary flow is: return amount becomes a supplier credit.
     if (settlements && settlements.length > 0) {
       for (const settlement of settlements) {
         const settlementAmount = parseFloat(settlement.amount) || 0;
-        
-        const [purchase] = await connection.query(
-          `SELECT balance_amount, paid_amount, total_with_vat 
-           FROM purchases WHERE id = ?`,
+
+        const [purchaseRows] = await connection.query(
+          `SELECT balance_amount, paid_amount, total_with_vat FROM purchases WHERE id = ?`,
           [settlement.purchase_id]
         );
 
-        if (purchase.length > 0) {
-          const currentBalance = parseFloat(purchase[0].balance_amount) || 0;
-          const currentPaid = parseFloat(purchase[0].paid_amount) || 0;
-          
-          const newBalance = currentBalance - settlementAmount;
-          const newPaid = currentPaid + settlementAmount;
+        if (purchaseRows.length > 0) {
+          const currentBalance = parseFloat(purchaseRows[0].balance_amount) || 0;
+          const currentPaid    = parseFloat(purchaseRows[0].paid_amount)    || 0;
+
+          const newBalance      = Math.max(0, currentBalance - settlementAmount);
+          const newPaid         = currentPaid + settlementAmount;
           const newBalanceStatus = newBalance > 0 ? 1 : 0;
 
           let paymentStatus = 'Non-Paid';
-          if (newPaid >= purchase[0].total_with_vat) {
-            paymentStatus = 'Paid';
-          } else if (newPaid > 0) {
-            paymentStatus = 'Partially Paid';
-          }
+          if (newPaid >= purchaseRows[0].total_with_vat) paymentStatus = 'Paid';
+          else if (newPaid > 0) paymentStatus = 'Partially Paid';
 
           await connection.query(
-            `UPDATE purchases 
-             SET balance_amount = ?, 
-                 paid_amount = ?,
-                 balance_status = ?,
-                 payment_status = ?
-             WHERE id = ?`,
+            `UPDATE purchases SET balance_amount = ?, paid_amount = ?, balance_status = ?, payment_status = ? WHERE id = ?`,
             [newBalance, newPaid, newBalanceStatus, paymentStatus, settlement.purchase_id]
           );
 
           await connection.query(
-            `INSERT INTO payment_history 
-             (purchase_id, payment_date, amount, payment_method, notes, created_by)
+            `INSERT INTO payment_history (purchase_id, payment_date, amount, payment_method, notes, created_by)
              VALUES (?, ?, ?, ?, ?, ?)`,
-            [
-              settlement.purchase_id,
-              return_date,
-              settlementAmount,
-              payment_method || 'CASH',
-              `Return settlement from return #${return_number}`,
-              returned_by
-            ]
+            [settlement.purchase_id, return_date, settlementAmount, payment_method || 'CASH',
+             `Return settlement from return #${return_number}`, returned_by]
           );
         }
       }
     }
 
+    // Auto-create a purchase_return_credit for the unsettled balance
+    const remainingForCredit = balanceAmount; // amount not settled against any invoice
+    if (remainingForCredit > 0) {
+      const datePart  = return_date.replace(/-/g, '');
+      const rand      = Math.floor(Math.random() * 9000) + 1000;
+      const creditNum = `CRD-${datePart}-${rand}`;
+
+      try {
+        await connection.query(`
+          INSERT INTO purchase_return_credits
+            (credit_number, purchase_return_id, supplier_id, original_amount,
+             remaining_credit, status, credit_date)
+          VALUES (?, ?, ?, ?, ?, 'Active', ?)
+        `, [creditNum, returnId, supplier_id, remainingForCredit, remainingForCredit, return_date]);
+      } catch (creditErr) {
+        // Non-fatal — table may not exist yet if migration hasn't run
+        console.warn('Could not create return credit (migration pending?):', creditErr.message);
+      }
+    }
+
     await connection.commit();
-    
+
     res.status(201).json({
       message: 'Purchase return created successfully!',
       return_number,

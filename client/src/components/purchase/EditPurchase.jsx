@@ -672,14 +672,14 @@ const EditPurchase = () => {
             <table className="items-table">
               <thead>
                 <tr>
-                  <th style={{ width: '35%' }}>Item Name</th>
-                  <th style={{ width: '10%' }}>Quantity</th>
-                  <th style={{ width: '8%' }}>Unit</th>
-                  <th style={{ width: '15%' }}>Unit Price (Net)</th>
-                  <th style={{ width: '12%' }}>Amount</th>
-                  {supplierVatRegistered && <th style={{ width: '10%' }}>VAT 18%</th>}
-                  <th style={{ width: '12%' }}>Line Total</th>
-                  <th style={{ width: '8%' , textAlign: 'center'}}>Action</th>
+                  <th className="text-left" style={{ width: '35%' }}>Item Name</th>
+                  <th className="text-right" style={{ width: '10%' }}>Quantity</th>
+                  <th className="text-center" style={{ width: '8%' }}>Unit</th>
+                  <th className="text-right" style={{ width: '15%' }}>Unit Price (Net)</th>
+                  <th className="text-right" style={{ width: '12%' }}>Amount</th>
+                  {supplierVatRegistered && <th className="text-right" style={{ width: '10%' }}>VAT 18%</th>}
+                  <th className="text-right" style={{ width: '12%' }}>Line Total</th>
+                  <th className="text-center" style={{ width: '8%' }}>Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -759,10 +759,10 @@ const EditPurchase = () => {
                       <td className="text-right">
                         <strong>Rs. {item.lineTotal.toFixed(2)}</strong>
                       </td>
-                      <td className="action-cell">
+                      <td className="text-center action-cell">
                         <button 
                           type="button" 
-                          className="btn-delete-item"
+                          className="btn btn-outline-danger btn-sm"
                           onClick={() => removeItemRow(index)}
                           disabled={formData.items.length <= 1}
                           title="Remove this item"
@@ -779,7 +779,7 @@ const EditPurchase = () => {
 
           {/* Add Item Button - Positioned below table on the left */}
           <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-start' }}>
-            <button type="button" className="btn-add-item" onClick={addItemRow}>
+            <button type="button" className="btn btn-secondary" onClick={addItemRow}>
               <FontAwesomeIcon icon={faPlus} /> Add Item
             </button>
           </div>
@@ -849,31 +849,15 @@ const EditPurchase = () => {
                 />
                 <button 
                   type="button" 
-                  className="btn-small"
+                  className="btn btn-outline-success btn-sm"
                   onClick={setFullPayment}
-                  style={{ 
-                    background: '#28a745', 
-                    color: 'white',
-                    border: 'none',
-                    padding: '0 12px',
-                    borderRadius: '4px',
-                    cursor: 'pointer'
-                  }}
                 >
                   Full
                 </button>
                 <button 
                   type="button" 
-                  className="btn-small"
+                  className="btn btn-outline-secondary btn-sm"
                   onClick={setNoPayment}
-                  style={{ 
-                    background: '#6c757d', 
-                    color: 'white',
-                    border: 'none',
-                    padding: '0 12px',
-                    borderRadius: '4px',
-                    cursor: 'pointer'
-                  }}
                 >
                   None
                 </button>
@@ -910,10 +894,10 @@ const EditPurchase = () => {
         </div>
 
         <div className="form-actions">
-          <button type="button" onClick={() => navigate('/purchase/history')} className="btn-secondary">
+          <button type="button" onClick={() => navigate('/purchase/history')} className="btn btn-secondary">
             Cancel
           </button>
-          <button type="submit" className="btn-primary" disabled={isSubmitting}>
+          <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
             <FontAwesomeIcon icon={faSave} />
             {isSubmitting ? 'Updating...' : 'Update Purchase'}
           </button>

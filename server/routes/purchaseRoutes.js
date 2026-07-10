@@ -14,6 +14,8 @@ router.get('/previous-prices', purchaseController.getPreviousPurchasePrices);
 
 // Specific routes must come BEFORE parameterized routes
 router.get('/non-paid', purchaseController.getNonPaidPurchases);
+router.get('/pending/:supplierId', purchaseController.getPendingInvoicesBySupplier);
+
 
 // Add this route for getting purchase details by ID
 router.get('/details/:id', async (req, res) => {

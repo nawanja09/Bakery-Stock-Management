@@ -738,7 +738,7 @@ const PurchaseHistory = () => {
                         onChange={toggleSelectAll}
                       />
                     </th>
-                    <th className="sortable-header" onClick={() => handleSort('invoice_no')}>
+                    <th className="sortable-header text-left" onClick={() => handleSort('invoice_no')}>
                       Invoice #
                       {sortConfig.key === 'invoice_no' && (
                         <FontAwesomeIcon 
@@ -747,7 +747,7 @@ const PurchaseHistory = () => {
                         />
                       )}
                     </th>
-                    <th className="sortable-header" onClick={() => handleSort('purchase_date')}>
+                    <th className="sortable-header text-left" onClick={() => handleSort('purchase_date')}>
                       Date
                       {sortConfig.key === 'purchase_date' && (
                         <FontAwesomeIcon 
@@ -756,9 +756,9 @@ const PurchaseHistory = () => {
                         />
                       )}
                     </th>
-                    <th>Supplier</th>
-                    <th>Company</th>
-                    <th className="sortable-header amount-col" onClick={() => handleSort('total_with_vat')}>
+                    <th className="text-left">Supplier</th>
+                    <th className="text-left">Company</th>
+                    <th className="sortable-header amount-col text-right" onClick={() => handleSort('total_with_vat')}>
                       Total
                       {sortConfig.key === 'total_with_vat' && (
                         <FontAwesomeIcon 
@@ -767,8 +767,8 @@ const PurchaseHistory = () => {
                         />
                       )}
                     </th>
-                    <th className="amount-col">Paid</th>
-                    <th className="amount-col">Balance</th>
+                    <th className="amount-col text-right">Paid</th>
+                    <th className="amount-col text-right">Balance</th>
                     <th>Status</th>
                     <th className="actions-col">Actions</th>
                   </tr>
@@ -794,29 +794,29 @@ const PurchaseHistory = () => {
                             onChange={() => toggleSelect(purchase.id)}
                           />
                         </td>
-                        <td>
+                        <td className="text-left">
                           <div className="invoice-cell">
                             <FontAwesomeIcon icon={faReceipt} className="invoice-icon" />
                             <span className="invoice-number">{invoiceNumber}</span>
                           </div>
                         </td>
-                        <td>
+                        <td className="text-left">
                           <div className="date-cell">
                             <span className="date-main">{formatDate(purchase.purchase_date)}</span>
                           </div>
                         </td>
-                        <td>
+                        <td className="text-left">
                           <div className="supplier-cell">
                             <span className="supplier-name">{purchase.supplier_name}</span>
                           </div>
                         </td>
-                        <td>
+                        <td className="text-left">
                           <span className="company-tag">{purchase.company_name}</span>
                         </td>
-                        <td className="amount-cell">
+                        <td className="amount-cell text-right">
                           <span className="amount-value">{formatCurrency(purchase.total_with_vat)}</span>
                         </td>
-                        <td className="amount-cell">
+                        <td className="amount-cell text-right">
                           <span className="amount-paid">{formatCurrency(purchase.paid_amount)}</span>
                           {purchase.payment_status === 'Partially Paid' && (
                             <div className="mini-progress-bar">
@@ -824,12 +824,12 @@ const PurchaseHistory = () => {
                             </div>
                           )}
                         </td>
-                        <td className="amount-cell">
+                        <td className="amount-cell text-right">
                           <span className={`amount-balance ${purchase.balance_amount > 0 ? 'due' : 'zero'}`}>
                             {formatCurrency(purchase.balance_amount)}
                           </span>
                         </td>
-                        <td>
+                        <td className="text-center">
                           <div 
                             className="status-badge"
                             style={{ backgroundColor: statusConfig.bgColor, color: statusConfig.color }}
@@ -838,7 +838,7 @@ const PurchaseHistory = () => {
                             <span>{statusConfig.textFull}</span>
                           </div>
                         </td>
-                        <td className="actions-col" onClick={(e) => e.stopPropagation()}>
+                        <td className="actions-col text-center" onClick={(e) => e.stopPropagation()}>
                           <div className="action-buttons-group">
                             <Link to={`/purchase/${purchase.id}`} className="action-btn-icon view">
                               <FontAwesomeIcon icon={faEye} />

@@ -1,0 +1,364 @@
+// controllers/supplierCreditController.js
+const pool = require('../config/db');
+
+// ─────────────────────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────────────────────
+const formatNum = (v) => parseFloat(v) || 0;
+
+// ─────────────────────────────────────────────────────────────
+// GET /api/suppliers/:id/credits
+// Returns all active/partial supplier credits (overpayments + return credits)
+// ─────────────────────────────────────────────────────────────
+const getSupplierCredits = async (req, res) => {
+  const { id: supplierId } = req.params;
+  try {
+    const [overpayments] = await pool.query(`
+      SELECT
+        so.id,
+        'overpayment'        AS credit_type,
+        'Advance Payment'    AS source,
+        so.overpayment_number AS credit_number,
+        so.payment_date      AS credit_date,
+        so.original_amount,
+        so.remaining_credit,
+        so.status,
+        so.voucher_number,
+        so.reference_number,
+        so.notes,
+        u.name               AS created_by_name
+      FROM supplier_overpayments so
+      LEFT JOIN users u ON so.created_by = u.id
+      WHERE so.supplier_id = ?
+        AND so.status != 'Fully Used'
+      ORDER BY so.payment_date DESC
+    `, [supplierId]);
+
+    const [returnCredits] = await pool.query(`
+      SELECT
+        prc.id,
+        'return_credit'      AS credit_type,
+        'Purchase Return'    AS source,
+        prc.credit_number,
+        prc.credit_date,
+        prc.original_amount,
+        prc.remaining_credit,
+        prc.status,
+        pr.return_number     AS reference_number,
+        NULL                 AS voucher_number,
+        NULL                 AS notes,
+        NULL                 AS created_by_name
+      FROM purchase_return_credits prc
+      JOIN purchase_returns pr ON prc.purchase_return_id = pr.id
+      WHERE prc.supplier_id = ?
+        AND prc.status != 'Fully Used'
+      ORDER BY prc.credit_date DESC
+    `, [supplierId]);
+
+    res.json({
+      overpayments: overpayments.map(r => ({
+        ...r,
+        original_amount: formatNum(r.original_amount),
+        remaining_credit: formatNum(r.remaining_credit)
+      })),
+      return_credits: returnCredits.map(r => ({
+        ...r,
+        original_amount: formatNum(r.original_amount),
+        remaining_credit: formatNum(r.remaining_credit)
+      }))
+    });
+  } catch (error) {
+    console.error('Error fetching supplier credits:', error);
+    res.status(500).json({ error: 'Server error: ' + error.message });
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
+// GET /api/suppliers/:id/outstanding
+// Returns summary of supplier outstanding invoices + credits
+// ─────────────────────────────────────────────────────────────
+const getSupplierOutstanding = async (req, res) => {
+  const { id: supplierId } = req.params;
+  try {
+    const [[invoiceSummary]] = await pool.query(`
+      SELECT
+        COUNT(*)                       AS total_invoices,
+        COALESCE(SUM(total_with_vat),0) AS total_billed,
+        COALESCE(SUM(paid_amount),0)    AS total_paid,
+        COALESCE(SUM(balance_amount),0) AS total_outstanding
+      FROM purchases
+      WHERE supplier_id = ?
+        AND balance_amount > 0
+        AND (deleted = FALSE OR deleted IS NULL)
+    `, [supplierId]);
+
+    const [[creditSummary]] = await pool.query(`
+      SELECT
+        COALESCE(SUM(remaining_credit),0) AS overpayment_credit
+      FROM supplier_overpayments
+      WHERE supplier_id = ? AND status != 'Fully Used'
+    `, [supplierId]);
+
+    const [[returnCreditSummary]] = await pool.query(`
+      SELECT
+        COALESCE(SUM(remaining_credit),0) AS return_credit
+      FROM purchase_return_credits
+      WHERE supplier_id = ? AND status != 'Fully Used'
+    `, [supplierId]);
+
+    res.json({
+      total_invoices: invoiceSummary.total_invoices,
+      total_billed: formatNum(invoiceSummary.total_billed),
+      total_paid: formatNum(invoiceSummary.total_paid),
+      total_outstanding: formatNum(invoiceSummary.total_outstanding),
+      overpayment_credit: formatNum(creditSummary.overpayment_credit),
+      return_credit: formatNum(returnCreditSummary.return_credit),
+      total_credit: formatNum(creditSummary.overpayment_credit) + formatNum(returnCreditSummary.return_credit)
+    });
+  } catch (error) {
+    console.error('Error fetching supplier outstanding:', error);
+    res.status(500).json({ error: 'Server error: ' + error.message });
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
+// POST /api/suppliers/pay-now
+// Record an advance payment (Supplier Overpayment)
+// Body: { supplier_id, payment_date, payment_method, voucher_number,
+//         reference_number, amount, notes, created_by }
+// ─────────────────────────────────────────────────────────────
+const createOverpayment = async (req, res) => {
+  const {
+    supplier_id,
+    payment_date,
+    payment_method,
+    voucher_number,
+    reference_number,
+    amount,
+    notes,
+    created_by
+  } = req.body;
+
+  if (!supplier_id) return res.status(400).json({ error: 'Supplier is required' });
+  if (!payment_date) return res.status(400).json({ error: 'Payment date is required' });
+  if (!amount || parseFloat(amount) <= 0) return res.status(400).json({ error: 'Amount must be greater than 0' });
+  if (!created_by) return res.status(400).json({ error: 'Created by is required' });
+
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    // Generate unique overpayment number
+    const datePart = payment_date.replace(/-/g, '');
+    const rand = Math.floor(Math.random() * 9000) + 1000;
+    const overpayment_number = `OVP-${datePart}-${rand}`;
+
+    const [result] = await connection.query(`
+      INSERT INTO supplier_overpayments
+        (overpayment_number, supplier_id, payment_date, payment_method,
+         voucher_number, reference_number, original_amount, remaining_credit,
+         status, notes, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Active', ?, ?)
+    `, [
+      overpayment_number, supplier_id, payment_date, payment_method,
+      voucher_number || null, reference_number || null,
+      parseFloat(amount), parseFloat(amount),
+      notes || null, created_by
+    ]);
+
+    await connection.commit();
+    res.status(201).json({
+      message: 'Advance payment recorded successfully!',
+      overpayment_id: result.insertId,
+      overpayment_number,
+      amount: parseFloat(amount)
+    });
+  } catch (error) {
+    await connection.rollback();
+    console.error('Error creating overpayment:', error);
+    res.status(500).json({ error: 'Server error: ' + error.message });
+  } finally {
+    connection.release();
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
+// POST /api/suppliers/settle-credit
+// Settle one or more credits against one invoice
+// Body: {
+//   purchase_id,
+//   settlement_date,
+//   settled_by,
+//   notes,
+//   credits: [
+//     { credit_type: 'overpayment'|'return_credit', credit_id, amount }
+//   ]
+// }
+// ─────────────────────────────────────────────────────────────
+const settleCreditToInvoice = async (req, res) => {
+  const { purchase_id, settlement_date, settled_by, notes, credits } = req.body;
+
+  if (!purchase_id) return res.status(400).json({ error: 'Invoice (purchase_id) is required' });
+  if (!credits || credits.length === 0) return res.status(400).json({ error: 'At least one credit is required' });
+  if (!settled_by) return res.status(400).json({ error: 'settled_by is required' });
+
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    // Get current invoice state
+    const [[invoice]] = await connection.query(
+      'SELECT * FROM purchases WHERE id = ? FOR UPDATE',
+      [purchase_id]
+    );
+    if (!invoice) throw new Error('Invoice not found');
+    if (formatNum(invoice.balance_amount) <= 0) throw new Error('Invoice already fully paid');
+
+    let remainingInvoiceBalance = formatNum(invoice.balance_amount);
+    let totalSettled = 0;
+
+    for (const credit of credits) {
+      const amount = formatNum(credit.amount);
+      if (amount <= 0) continue;
+
+      if (amount > remainingInvoiceBalance + 0.001) {
+        throw new Error(`Credit amount ${amount} exceeds remaining invoice balance ${remainingInvoiceBalance}`);
+      }
+
+      if (credit.credit_type === 'overpayment') {
+        // Get and lock overpayment
+        const [[op]] = await connection.query(
+          'SELECT * FROM supplier_overpayments WHERE id = ? FOR UPDATE',
+          [credit.credit_id]
+        );
+        if (!op) throw new Error(`Overpayment ${credit.credit_id} not found`);
+        if (formatNum(op.remaining_credit) < amount - 0.001) {
+          throw new Error(`Insufficient credit in overpayment ${op.overpayment_number}`);
+        }
+
+        const newRemaining = formatNum(op.remaining_credit) - amount;
+        const newStatus = newRemaining <= 0.001 ? 'Fully Used' : newRemaining < formatNum(op.original_amount) ? 'Partially Used' : 'Active';
+
+        await connection.query(
+          'UPDATE supplier_overpayments SET remaining_credit = ?, status = ?, updated_by = ? WHERE id = ?',
+          [Math.max(0, newRemaining), newStatus, settled_by, op.id]
+        );
+
+        await connection.query(`
+          INSERT INTO credit_allocations
+            (credit_type, overpayment_id, return_credit_id, purchase_id, allocated_amount, settlement_date, settled_by, notes)
+          VALUES ('overpayment', ?, NULL, ?, ?, ?, ?, ?)
+        `, [op.id, purchase_id, amount, settlement_date, settled_by, notes || null]);
+
+      } else if (credit.credit_type === 'return_credit') {
+        // Get and lock return credit
+        const [[rc]] = await connection.query(
+          'SELECT * FROM purchase_return_credits WHERE id = ? FOR UPDATE',
+          [credit.credit_id]
+        );
+        if (!rc) throw new Error(`Return credit ${credit.credit_id} not found`);
+        if (formatNum(rc.remaining_credit) < amount - 0.001) {
+          throw new Error(`Insufficient credit in return credit ${rc.credit_number}`);
+        }
+
+        const newRemaining = formatNum(rc.remaining_credit) - amount;
+        const newStatus = newRemaining <= 0.001 ? 'Fully Used' : newRemaining < formatNum(rc.original_amount) ? 'Partially Used' : 'Active';
+
+        await connection.query(
+          'UPDATE purchase_return_credits SET remaining_credit = ?, status = ?, updated_at = NOW() WHERE id = ?',
+          [Math.max(0, newRemaining), newStatus, rc.id]
+        );
+
+        await connection.query(`
+          INSERT INTO credit_allocations
+            (credit_type, overpayment_id, return_credit_id, purchase_id, allocated_amount, settlement_date, settled_by, notes)
+          VALUES ('return_credit', NULL, ?, ?, ?, ?, ?, ?)
+        `, [rc.id, purchase_id, amount, settlement_date, settled_by, notes || null]);
+      } else {
+        throw new Error(`Unknown credit_type: ${credit.credit_type}`);
+      }
+
+      totalSettled += amount;
+      remainingInvoiceBalance -= amount;
+    }
+
+    // Update invoice paid_amount and balance
+    const newPaidAmount = formatNum(invoice.paid_amount) + totalSettled;
+    const newBalance = Math.max(0, formatNum(invoice.total_with_vat) - newPaidAmount);
+    const newBalanceStatus = newBalance > 0 ? 1 : 0;
+    let newPaymentStatus = 'Non-Paid';
+    if (newBalance <= 0) newPaymentStatus = 'Paid';
+    else if (newPaidAmount > 0) newPaymentStatus = 'Partially Paid';
+
+    await connection.query(
+      `UPDATE purchases SET paid_amount = ?, balance_amount = ?, balance_status = ?, payment_status = ? WHERE id = ?`,
+      [newPaidAmount, newBalance, newBalanceStatus, newPaymentStatus, purchase_id]
+    );
+
+    // Also record in payment_history for audit trail
+    await connection.query(`
+      INSERT INTO payment_history
+        (purchase_id, payment_date, amount, payment_method, notes, created_by)
+      VALUES (?, ?, ?, 'CREDIT', ?, ?)
+    `, [purchase_id, settlement_date, totalSettled, `Credit settlement: ${notes || 'Applied supplier credit'}`, settled_by]);
+
+    await connection.commit();
+    res.json({
+      message: 'Credit settled successfully!',
+      total_settled: totalSettled,
+      new_balance: newBalance,
+      payment_status: newPaymentStatus
+    });
+  } catch (error) {
+    await connection.rollback();
+    console.error('Error settling credit:', error);
+    res.status(500).json({ error: 'Server error: ' + error.message });
+  } finally {
+    connection.release();
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
+// GET /api/suppliers/:id/credit-history
+// Full allocation history for a supplier
+// ─────────────────────────────────────────────────────────────
+const getSupplierCreditHistory = async (req, res) => {
+  const { id: supplierId } = req.params;
+  try {
+    const [history] = await pool.query(`
+      SELECT
+        ca.id,
+        ca.credit_type,
+        ca.allocated_amount,
+        ca.settlement_date,
+        ca.notes,
+        p.invoice_no,
+        p.purchase_date,
+        CASE ca.credit_type
+          WHEN 'overpayment'   THEN so.overpayment_number
+          WHEN 'return_credit' THEN prc.credit_number
+        END AS credit_number,
+        u.name AS settled_by_name
+      FROM credit_allocations ca
+      JOIN purchases p ON ca.purchase_id = p.id
+      LEFT JOIN supplier_overpayments so ON ca.overpayment_id = so.id
+      LEFT JOIN purchase_return_credits prc ON ca.return_credit_id = prc.id
+      LEFT JOIN users u ON ca.settled_by = u.id
+      WHERE p.supplier_id = ?
+      ORDER BY ca.settlement_date DESC, ca.id DESC
+    `, [supplierId]);
+
+    res.json(history);
+  } catch (error) {
+    console.error('Error fetching credit history:', error);
+    res.status(500).json({ error: 'Server error: ' + error.message });
+  }
+};
+
+module.exports = {
+  getSupplierCredits,
+  getSupplierOutstanding,
+  createOverpayment,
+  settleCreditToInvoice,
+  getSupplierCreditHistory
+};
