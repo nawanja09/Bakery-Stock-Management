@@ -146,8 +146,7 @@ const EditAdjustment = () => {
     <div className="adjustments-container">
       <div className="adjustments-header">
         <div className="adjustments-header-left">
-          <h1>Edit Adjustment</h1>
-          <p>Update the selected stock adjustment entry</p>
+          <h1>RM Adjustment - Edit</h1>
         </div>
         <div className="adjustments-header-actions">
           <button type="button" className="btn btn-secondary" onClick={() => navigate('/adjustments/stores-adjustments')}>

@@ -294,15 +294,16 @@ const StoresAdjustments = () => {
       {/* Header */}
       <div className="adjustments-header">
         <div className="adjustments-header-left">
-          <h1>Stores Adjustments History</h1>
-          <p>View and manage all stock balance adjustment records</p>
+          <h1>Stores Adjustment Summary</h1>
         </div>
+        {/*
         <div className="adjustments-header-actions">
           <button className="btn btn-primary" onClick={() => navigate('/adjustments/stores-balance')}>
             <FontAwesomeIcon icon={faPlus} /> New Adjustment
           </button>
           
         </div>
+        */}
       </div>
 
       {/* Summary Cards */}
