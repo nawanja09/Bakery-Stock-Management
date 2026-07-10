@@ -270,8 +270,7 @@ const StoresBalance = () => {
     <div className="adjustments-container">
       <div className="adjustments-header">
         <div className="adjustments-header-left">
-          <h1>Stores Balance Adjustment</h1>
-          <p>Update physical stock counts and record variances automatically</p>
+          <h1>RM Adjustment</h1>
         </div>
         <div className="adjustments-header-actions">
           <button 
@@ -479,9 +478,6 @@ const StoresBalance = () => {
             <button type="button" className="btn-add-row" onClick={addRow} disabled={loading}>
               <FontAwesomeIcon icon={faPlus} /> Add New Item
             </button>
-            <span className="help-text">
-              <span className="item-count-badge">{rows.length}</span> item{rows.length !== 1 ? 's' : ''} ready for adjustment
-            </span>
           </div>
         </div>
 
