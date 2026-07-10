@@ -7,7 +7,6 @@ import {
   faPlus, 
   faTrash,
   faMoneyBillWave,
-  faCreditCard,
   faUniversity,
   faCheckCircle,
   faExclamationTriangle,
@@ -16,16 +15,14 @@ import {
   faUser,
   faCalendar,
   faPercent,
-  faReceipt,
-  faWallet,
   faBoxes,
   faShoppingCart
 } from '@fortawesome/free-solid-svg-icons';
 import Select from 'react-select';
-import dayjs from 'dayjs';
-import './Purchase.css';
+import './NewPurchase.css';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
+import PendingInvoicesSection from './PendingInvoicesSection';
 
 const AddPurchase = () => {
   const navigate = useNavigate();
@@ -483,18 +480,12 @@ const AddPurchase = () => {
 
   return (
     <div className="purchase-container">
-      {/* Header */}
-      <div className="page-header">
-        <div className="header-left">
-          <h1 className="page-title">
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'flex-start', width: '100%' }}>
+        <div className="header-left" style={{ display: 'flex', justifyContent: 'flex-start', width: '100%' }}>
+          <h1 className="page-title" style={{ justifyContent: 'flex-start', textAlign: 'left', margin: '0 0 6px 0' }}>
             <FontAwesomeIcon icon={faShoppingCart} className="page-icon" />
-            New Purchase
+            RM Purchasing Invoice
           </h1>
-          <p className="page-subtitle">Create a new purchase invoice</p>
-        </div>
-        <div className="header-badge">
-          <FontAwesomeIcon icon={faBoxes} />
-          <span>{formData.items.length} Items</span>
         </div>
       </div>
 
@@ -574,23 +565,6 @@ const AddPurchase = () => {
 
             <div className="form-group">
               <label>
-                <FontAwesomeIcon icon={faCreditCard} />
-                Payment Method
-              </label>
-              <select
-                value={formData.payment_method}
-                onChange={(e) => setFormData({...formData, payment_method: e.target.value})}
-                className="form-control"
-                required
-              >
-                <option value="CASH">Cash</option>
-                <option value="BANK_TRANSFER">Bank Transfer</option>
-                <option value="CHEQUE">Cheque</option>
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label>
                 <FontAwesomeIcon icon={faBuilding} />
                 Company
               </label>
@@ -620,17 +594,6 @@ const AddPurchase = () => {
                 className="form-control"
               />
             </div>
-
-            <div className="form-group full-width">
-              <label>Remarks</label>
-              <textarea 
-                value={formData.remarks}
-                onChange={(e) => setFormData({...formData, remarks: e.target.value})}
-                rows="2"
-                className="form-control"
-                placeholder="Add any notes or remarks..."
-              />
-            </div>
           </div>
         </div>
 
@@ -647,14 +610,14 @@ const AddPurchase = () => {
               <table className="items-table">
                 <thead>
                   <tr>
-                    <th style={{ width: '35%' }}>Item Name</th>
-                    <th style={{ width: '10%' }}>Quantity</th>
-                    <th style={{ width: '8%' }}>Unit</th>
-                    <th style={{ width: '15%' }}>Unit Price (Net)</th>
-                    <th style={{ width: '12%' }}>Amount</th>
-                    {supplierVatRegistered && <th style={{ width: '10%' }}>VAT 18%</th>}
-                    <th style={{ width: '12%' }}>Line Total</th>
-                    <th style={{ width: '8%' }}>Action</th>
+                    <th className="text-left" style={{ width: '35%' }}>Item Name</th>
+                    <th className="text-right" style={{ width: '10%' }}>Quantity</th>
+                    <th className="text-center" style={{ width: '8%' }}>Unit</th>
+                    <th className="text-right" style={{ width: '15%' }}>Unit Price (Net)</th>
+                    <th className="text-right" style={{ width: '12%' }}>Amount</th>
+                    {supplierVatRegistered && <th className="text-right" style={{ width: '10%' }}>VAT 18%</th>}
+                    <th className="text-right" style={{ width: '12%' }}>Line Total</th>
+                    <th className="text-center" style={{ width: '8%' }}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -737,7 +700,7 @@ const AddPurchase = () => {
                         <td className="text-center">
                           <button 
                             type="button" 
-                            className="btn-delete-item"
+                            className="btn btn-outline-danger btn-sm"
                             onClick={() => removeItemRow(index)}
                             disabled={formData.items.length <= 1}
                             title="Remove item"
@@ -752,120 +715,9 @@ const AddPurchase = () => {
               </table>
             </div>
 
-          {/* Mobile Items View (Cards) */}
-          <div className="mobile-items-view">
-            {formData.items.map((item, index) => {
-              const previousPrice = previousPurchasePrices[item.id] || 0;
-              
-              return (
-                <div key={index} className="mobile-item-card">
-                  <div className="mobile-item-header">
-                    <span className="item-number">Item {index + 1}</span>
-                    {formData.items.length > 1 && (
-                      <button 
-                        type="button" 
-                        className="btn-remove-mobile"
-                        onClick={() => removeItemRow(index)}
-                      >
-                        <FontAwesomeIcon icon={faTrash} />
-                      </button>
-                    )}
-                  </div>
-                  
-                  <div className="mobile-item-body">
-                    <div className="mobile-item-field full">
-                      <label>Item</label>
-                      <Select
-                        options={itemOptions}
-                        value={itemOptions.find(opt => opt.value === item.id) || null}
-                        onChange={(selected) => handleItemSelect(index, selected)}
-                        isSearchable
-                        placeholder="Select item..."
-                        className="react-select-container"
-                        classNamePrefix="react-select"
-                      />
-                    </div>
-
-                    <div className="mobile-item-row">
-                      <div className="mobile-item-field">
-                        <label>Qty</label>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.001"
-                          value={item.quantity}
-                          onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
-                          className="mobile-input"
-                        />
-                      </div>
-
-                      <div className="mobile-item-field">
-                        <label>Unit</label>
-                        <input
-                          type="text"
-                          value={item.unit}
-                          readOnly
-                          className="mobile-input unit-display"
-                        />
-                      </div>
-
-                      <div className="mobile-item-field">
-                        <label>Unit Price</label>
-                        <input
-                          type="number"
-                          min="0.01"
-                          step="0.01"
-                          value={item.unit_price}
-                          onChange={(e) => handleItemChange(index, 'unit_price', e.target.value)}
-                          className={`mobile-input ${previousPrice && item.unit_price !== previousPrice ? 'price-different' : ''}`}
-                        />
-                      </div>
-                    </div>
-
-                    {previousPrice > 0 && (
-                      <div className="price-hint-mobile">
-                        Previous price: Rs. {previousPrice.toFixed(2)}
-                      </div>
-                    )}
-
-                    {item.vat_applicable && (
-                      <div className="vat-badge-mobile">VAT Applicable</div>
-                    )}
-
-                    <div className="mobile-item-totals">
-                      <div className="total-row">
-                        <span>Amount:</span>
-                        <span>Rs. {item.amount.toFixed(2)}</span>
-                      </div>
-                      {supplierVatRegistered && (
-                        <div className="total-row vat">
-                          <span>VAT:</span>
-                          <span>Rs. {item.vat.toFixed(2)}</span>
-                        </div>
-                      )}
-                      <div className="total-row grand">
-                        <span>Line Total:</span>
-                        <span>Rs. {item.lineTotal.toFixed(2)}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-            
-            <button 
-              type="button" 
-              className="btn-add-item-mobile"
-              onClick={addItemRow}
-            >
-              <FontAwesomeIcon icon={faPlus} />
-              Add Item
-            </button>
-          </div>
-
           <button 
             type="button" 
-            className="btn-add-item"
+            className="btn btn-secondary"
             onClick={addItemRow}
           >
           <FontAwesomeIcon icon={faPlus} />
@@ -873,117 +725,25 @@ const AddPurchase = () => {
           </button>
         </div>
 
-        {/* Payment Section */}
-        <div className="form-section">
-          <div className="section-header">
-            <h2>
-              <FontAwesomeIcon icon={faWallet} className="section-icon" />
-              Payment Information
-            </h2>
-          </div>
+        {formData.supplier_id && (
+          <PendingInvoicesSection
+            supplierId={formData.supplier_id}
+            supplierName={selectedSupplier?.name || ''}
+            suppliers={suppliers}
+          />
+        )}
 
-          {/* Summary Cards */}
-          <div className="summary-cards">
-            <div className="summary-card">
-              <div className="summary-icon" style={{ background: '#e0f2fe' }}>
-                <FontAwesomeIcon icon={faReceipt} style={{ color: '#0284c7' }} />
-              </div>
-              <div className="summary-details">
-                <span className="summary-label">Subtotal</span>
-                <span className="summary-value">Rs. {formData.subtotal.toFixed(2)}</span>
-              </div>
-            </div>
-
-            <div className="summary-card">
-              <div className="summary-icon" style={{ background: '#fef3c7' }}>
-                <FontAwesomeIcon icon={faPercent} style={{ color: '#d97706' }} />
-              </div>
-              <div className="summary-details">
-                <span className="summary-label">VAT</span>
-                <span className="summary-value">Rs. {formData.vat_amount.toFixed(2)}</span>
-              </div>
-            </div>
-
-            <div className="summary-card highlight">
-              <div className="summary-icon" style={{ background: '#d1fae5' }}>
-                <FontAwesomeIcon icon={faWallet} style={{ color: '#059669' }} />
-              </div>
-              <div className="summary-details">
-                <span className="summary-label">Grand Total</span>
-                <span className="summary-value grand">Rs. {formData.total_with_vat.toFixed(2)}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Payment Status */}
-          <div className="payment-status-card" style={{ background: paymentInfo.bg }}>
-            <div className="payment-status-icon">
-              <FontAwesomeIcon icon={paymentInfo.icon} style={{ color: paymentInfo.color }} />
-            </div>
-            <div className="payment-status-info">
-              <span className="payment-status-label">Payment Status</span>
-              <span className="payment-status-value" style={{ color: paymentInfo.color }}>
-                {paymentInfo.text}
-              </span>
-            </div>
-            <div className="payment-status-badge" style={{ background: paymentInfo.color }}>
-              {formData.payment_status}
-            </div>
-          </div>
-
-          {/* Payment Input */}
-          <div className="payment-grid">
-            <div className="payment-field">
-              <label>Paid Amount (Rs.)</label>
-              <div className="amount-input-group">
-                <input 
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.paid_amount}
-                  onChange={handlePaidAmountChange}
-                  className="amount-input"
-                  required
-                />
-                <div className="amount-actions">
-                  <button 
-                    type="button" 
-                    className="action-btn full"
-                    onClick={setFullPayment}
-                  >
-                    Full
-                  </button>
-                  <button 
-                    type="button" 
-                    className="action-btn none"
-                    onClick={setNoPayment}
-                  >
-                    None
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="payment-field">
-              <label>Balance Amount (Rs.)</label>
-              <div className={`balance-display ${formData.balance_amount > 0 ? 'due' : 'paid'}`}>
-                Rs. {formData.balance_amount.toFixed(2)}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Form Actions */}
         <div className="form-actions">
-          <button 
-            type="submit" 
-            className="btn-submit"
+          <button
+            type="submit"
+            className="btn btn-primary btn-lg"
             disabled={isSubmitting}
           >
             <FontAwesomeIcon icon={faSave} />
             {isSubmitting ? 'Creating...' : 'Create Purchase'}
           </button>
         </div>
+
       </form>
     </div>
   );

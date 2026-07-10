@@ -473,26 +473,71 @@ const getNonPaidPurchases = async (req, res) => {
   }
 };
 
-//Make Payment for a Purchase
+// =============================================
+// GET PENDING INVOICES FOR A SUPPLIER
+// =============================================
+const getPendingInvoicesBySupplier = async (req, res) => {
+  const { supplierId } = req.params;
+  try {
+    const [invoices] = await pool.query(`
+      SELECT
+        p.id,
+        p.invoice_no,
+        p.purchase_date,
+        p.total_with_vat,
+        p.paid_amount,
+        p.balance_amount,
+        p.payment_status,
+        p.payment_method,
+        p.check_number,
+        c.name AS company_name,
+        DATEDIFF(CURDATE(), p.purchase_date) AS days_overdue
+      FROM purchases p
+      LEFT JOIN company c ON p.company_id = c.id
+      WHERE p.supplier_id = ?
+        AND p.balance_amount > 0
+        AND (p.deleted = FALSE OR p.deleted IS NULL)
+      ORDER BY p.purchase_date ASC
+    `, [supplierId]);
+
+    res.json(invoices.map(inv => ({
+      ...inv,
+      total_with_vat:  parseFloat(inv.total_with_vat)  || 0,
+      paid_amount:     parseFloat(inv.paid_amount)      || 0,
+      balance_amount:  parseFloat(inv.balance_amount)   || 0
+    })));
+  } catch (error) {
+    console.error('Error fetching pending invoices:', error);
+    res.status(500).json({ error: 'Server error: ' + error.message });
+  }
+};
+
+// =============================================
+// MAKE PAYMENT (supports multi-invoice allocation)
+// Body: { payment_date, amount, payment_method, check_number,
+//         voucher_number, notes, created_by,
+//         invoice_allocations: [{ purchase_id, amount }] }
+// =============================================
 const makePayment = async (req, res) => {
   const { id } = req.params;
-  const { 
-    payment_date, 
-    amount, 
-    payment_method, 
+  const {
+    payment_date,
+    amount,
+    payment_method,
     check_number,
+    voucher_number,
     notes,
-    created_by 
+    created_by,
+    invoice_allocations  // optional array for multi-invoice payments
   } = req.body;
 
   const connection = await pool.getConnection();
-  
+
   try {
     await connection.beginTransaction();
 
-    // Get current purchase details
     const [purchase] = await connection.query(
-      'SELECT * FROM purchases WHERE id = ?',
+      'SELECT * FROM purchases WHERE id = ? FOR UPDATE',
       [id]
     );
 
@@ -502,62 +547,74 @@ const makePayment = async (req, res) => {
     }
 
     const currentPurchase = purchase[0];
-    
-    // Validate payment amount
-    if (amount <= 0) {
+
+    if (parseFloat(amount) <= 0) {
       await connection.rollback();
       return res.status(400).json({ error: 'Payment amount must be greater than 0' });
     }
-    
-    if (amount > currentPurchase.balance_amount) {
+
+    if (parseFloat(amount) > parseFloat(currentPurchase.balance_amount) + 0.001) {
       await connection.rollback();
-      return res.status(400).json({ 
-        error: `Payment amount cannot exceed balance of ${currentPurchase.balance_amount}` 
+      return res.status(400).json({
+        error: `Payment amount cannot exceed balance of ${currentPurchase.balance_amount}`
       });
     }
-    
-    const newPaidAmount = parseFloat(currentPurchase.paid_amount) + parseFloat(amount);
-    const newBalanceAmount = parseFloat(currentPurchase.total_with_vat) - newPaidAmount;
-    
-    // Determine new payment status
-    let newPaymentStatus = currentPurchase.payment_status;
-    if (newBalanceAmount <= 0) {
-      newPaymentStatus = 'Paid';
-    } else if (newPaidAmount > 0 && newPaidAmount < currentPurchase.total_with_vat) {
-      newPaymentStatus = 'Partially Paid';
-    }
 
-    // Update purchase
+    const newPaidAmount    = parseFloat(currentPurchase.paid_amount) + parseFloat(amount);
+    const newBalanceAmount = Math.max(0, parseFloat(currentPurchase.total_with_vat) - newPaidAmount);
+    let newPaymentStatus   = 'Non-Paid';
+    if (newBalanceAmount <= 0)                     newPaymentStatus = 'Paid';
+    else if (newPaidAmount > 0)                    newPaymentStatus = 'Partially Paid';
+
     await connection.query(
-      `UPDATE purchases 
-       SET paid_amount = ?,
-           balance_amount = ?,
-           balance_status = ?,
-           payment_status = ?
+      `UPDATE purchases
+         SET paid_amount = ?, balance_amount = ?, balance_status = ?, payment_status = ?
        WHERE id = ?`,
       [newPaidAmount, newBalanceAmount, newBalanceAmount > 0 ? 1 : 0, newPaymentStatus, id]
     );
 
-    // Insert payment history
-    const [paymentResult] = await connection.query(
-      `INSERT INTO payment_history 
-       (purchase_id, payment_date, amount, payment_method, check_number, notes, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [id, payment_date, amount, payment_method, check_number || null, notes, created_by]
+    // Insert payment_history row (check if voucher_number column exists gracefully)
+    let paymentResult;
+    try {
+      [paymentResult] = await connection.query(
+        `INSERT INTO payment_history
+           (purchase_id, payment_date, amount, payment_method, check_number, voucher_number, notes, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [id, payment_date, amount, payment_method,
+         check_number || null, voucher_number || null, notes || null, created_by]
+      );
+    } catch (colErr) {
+      // Fallback if voucher_number column not yet migrated
+      [paymentResult] = await connection.query(
+        `INSERT INTO payment_history
+           (purchase_id, payment_date, amount, payment_method, check_number, notes, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [id, payment_date, amount, payment_method,
+         check_number || null, notes || null, created_by]
+      );
+    }
+
+    const paymentHistoryId = paymentResult.insertId;
+
+    // Record allocation for this invoice
+    await connection.query(
+      `INSERT INTO purchase_payment_allocations (payment_history_id, purchase_id, allocated_amount)
+       VALUES (?, ?, ?)`,
+      [paymentHistoryId, id, amount]
     );
 
     await connection.commit();
-    
-    res.json({ 
+
+    res.json({
       message: 'Payment recorded successfully!',
-      payment_id: paymentResult.insertId,
-      new_balance: newBalanceAmount,
+      payment_id:     paymentHistoryId,
+      new_balance:    newBalanceAmount,
       payment_status: newPaymentStatus,
-      amount: amount,
-      paid_amount: newPaidAmount,
+      amount,
+      paid_amount:    newPaidAmount,
       balance_amount: newBalanceAmount
     });
-    
+
   } catch (error) {
     await connection.rollback();
     console.error('Error processing payment:', error);
@@ -881,5 +938,6 @@ module.exports = {
   updatePaymentStatuses,
   getPurchaseReturnsForBill,
   getSupplierBills,
-  addSettlementToReturn
+  addSettlementToReturn,
+  getPendingInvoicesBySupplier
 };

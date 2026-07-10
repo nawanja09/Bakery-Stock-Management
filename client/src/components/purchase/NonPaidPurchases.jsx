@@ -164,7 +164,7 @@ const NonPaidPurchases = () => {
           </h1>
           <p className="subtitle">Bills with pending payments (Balance &gt; 0)</p>
         </div>
-        <Link to="/purchase/new" className="btn-primary">
+        <Link to="/purchase/new" className="btn btn-primary">
           <FontAwesomeIcon icon={faFileInvoice} />
           <span>New Purchase</span>
         </Link>
@@ -259,7 +259,7 @@ const NonPaidPurchases = () => {
             </div>
 
             <div className="filter-actions">
-              <button onClick={clearFilters} className="btn-clear">
+              <button onClick={clearFilters} className="btn btn-outline-secondary">
                 Clear Filters
               </button>
               <span className="result-count">
@@ -277,7 +277,7 @@ const NonPaidPurchases = () => {
             <div className="empty-icon">✅</div>
             <h3>No Outstanding Bills</h3>
             <p>All purchases are paid or no bills match your criteria.</p>
-            <Link to="/purchase/new" className="btn-primary">
+            <Link to="/purchase/new" className="btn btn-primary">
               <FontAwesomeIcon icon={faFileInvoice} />
               Create New Purchase
             </Link>
@@ -286,16 +286,16 @@ const NonPaidPurchases = () => {
           <table className="purchase-table">
             <thead>
               <tr>
-                <th>Invoice #</th>
-                <th>Date</th>
-                <th>Supplier</th>
-                <th>Company</th>
-                <th className="amount-col">Total</th>
-                <th className="amount-col">Paid</th>
-                <th className="amount-col">Balance</th>
-                <th>Status</th>
-                <th>Days Overdue</th>
-                <th>Actions</th>
+                <th className="text-left">Invoice #</th>
+                <th className="text-left">Date</th>
+                <th className="text-left">Supplier</th>
+                <th className="text-left">Company</th>
+                <th className="amount-col text-right">Total</th>
+                <th className="amount-col text-right">Paid</th>
+                <th className="amount-col text-right">Balance</th>
+                <th className="text-center">Status</th>
+                <th className="text-center">Days Overdue</th>
+                <th className="text-center">Actions</th>
                </tr>
             </thead>
             <tbody>
@@ -305,11 +305,11 @@ const NonPaidPurchases = () => {
                 
                 return (
                   <tr key={purchase.id}>
-                    <td>
+                    <td className="text-left">
                       <span className="invoice-badge">{purchase.invoice_no}</span>
                     </td>
-                    <td>{formatDate(purchase.purchase_date)}</td>
-                    <td>
+                    <td className="text-left">{formatDate(purchase.purchase_date)}</td>
+                    <td className="text-left">
                       <div className="supplier-info">
                         <span className="supplier-name">{purchase.supplier_name}</span>
                         {purchase.check_number && (
@@ -317,19 +317,19 @@ const NonPaidPurchases = () => {
                         )}
                       </div>
                     </td>
-                    <td>
+                    <td className="text-left">
                       <span className="company-badge">{purchase.company_name}</span>
                     </td>
-                    <td className="amount-col total-col">{formatCurrency(purchase.total_with_vat)}</td>
-                    <td className="amount-col">{formatCurrency(purchase.paid_amount)}</td>
-                    <td className="amount-col due-amount">{formatCurrency(purchase.balance_amount)}</td>
-                    <td>
+                    <td className="amount-col total-col text-right">{formatCurrency(purchase.total_with_vat)}</td>
+                    <td className="amount-col text-right">{formatCurrency(purchase.paid_amount)}</td>
+                    <td className="amount-col due-amount text-right">{formatCurrency(purchase.balance_amount)}</td>
+                    <td className="text-center">
                       <span className={`payment-badge ${statusInfo.class}`}>
                         <FontAwesomeIcon icon={statusInfo.icon} />
                         {statusInfo.text}
                       </span>
                     </td>
-                    <td>
+                    <td className="text-center">
                       {daysOverdue > 0 ? (
                         <span className={`days-badge ${getOverdueClass(daysOverdue)}`}>
                           {daysOverdue} days
@@ -338,7 +338,7 @@ const NonPaidPurchases = () => {
                         <span className="days-badge normal">Today</span>
                       )}
                     </td>
-                    <td className="actions-cell">
+                    <td className="actions-cell text-center">
                       <Link to={`/purchase/${purchase.id}`} className="action-btn view" title="View Details">
                         <FontAwesomeIcon icon={faEye} />
                       </Link>
