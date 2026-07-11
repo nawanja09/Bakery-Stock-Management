@@ -123,7 +123,6 @@ app.use('/api/purchases', paymentRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/suppliers', supplierCreditRoutes);
 
-
 // Error handling middleware for file uploads
 app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {

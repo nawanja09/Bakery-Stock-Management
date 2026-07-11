@@ -5,6 +5,38 @@ const pool = require('../config/db');
 // HELPERS
 // ─────────────────────────────────────────────────────────────
 const formatNum = (v) => parseFloat(v) || 0;
+const VALID_PAYMENT_METHODS = ['CASH', 'BANK_TRANSFER', 'CHEQUE', 'CREDIT'];
+
+const isValidPaymentMethod = (method) => VALID_PAYMENT_METHODS.includes(method);
+
+const ensureUnsettledReturnCredits = async () => {
+  try {
+    const [returnsWithoutCredits] = await pool.query(`
+      SELECT pr.id, pr.supplier_id, pr.return_date, pr.balance_amount
+      FROM purchase_returns pr
+      LEFT JOIN purchase_return_credits prc ON prc.purchase_return_id = pr.id
+      WHERE pr.balance_amount > 0
+        AND prc.id IS NULL
+    `);
+
+    for (const returnRow of returnsWithoutCredits) {
+      const remainingCredit = formatNum(returnRow.balance_amount);
+      if (remainingCredit <= 0) continue;
+
+      const datePart = (returnRow.return_date || new Date()).toISOString().slice(0, 10).replace(/-/g, '');
+      const rand = Math.floor(Math.random() * 9000) + 1000;
+      const creditNumber = `CRD-${datePart}-${rand}`;
+
+      await pool.query(`
+        INSERT INTO purchase_return_credits
+          (credit_number, purchase_return_id, supplier_id, original_amount, remaining_credit, status, credit_date)
+        VALUES (?, ?, ?, ?, ?, 'Active', ?)
+      `, [creditNumber, returnRow.id, returnRow.supplier_id, remainingCredit, remainingCredit, returnRow.return_date]);
+    }
+  } catch (error) {
+    console.warn('Unable to ensure unsettled return credits:', error.message);
+  }
+};
 
 // ─────────────────────────────────────────────────────────────
 // GET /api/suppliers/:id/credits
@@ -13,6 +45,7 @@ const formatNum = (v) => parseFloat(v) || 0;
 const getSupplierCredits = async (req, res) => {
   const { id: supplierId } = req.params;
   try {
+    await ensureUnsettledReturnCredits();
     const [overpayments] = await pool.query(`
       SELECT
         so.id,
@@ -80,6 +113,7 @@ const getSupplierCredits = async (req, res) => {
 const getSupplierOutstanding = async (req, res) => {
   const { id: supplierId } = req.params;
   try {
+    await ensureUnsettledReturnCredits();
     const [[invoiceSummary]] = await pool.query(`
       SELECT
         COUNT(*)                       AS total_invoices,
@@ -136,22 +170,33 @@ const createOverpayment = async (req, res) => {
     reference_number,
     amount,
     notes,
-    created_by
+    created_by,
+    purchase_id
   } = req.body;
 
   if (!supplier_id) return res.status(400).json({ error: 'Supplier is required' });
   if (!payment_date) return res.status(400).json({ error: 'Payment date is required' });
   if (!amount || parseFloat(amount) <= 0) return res.status(400).json({ error: 'Amount must be greater than 0' });
   if (!created_by) return res.status(400).json({ error: 'Created by is required' });
+  if (!payment_method || !isValidPaymentMethod(payment_method)) {
+    return res.status(400).json({ error: 'Payment method is invalid' });
+  }
 
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
 
-    // Generate unique overpayment number
+    const [supplierRows] = await connection.query('SELECT id FROM supplier WHERE id = ? LIMIT 1', [supplier_id]);
+    if (supplierRows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ error: 'Supplier not found' });
+    }
+
+    // Advance payments are intentionally not linked to a purchase invoice.
+    // They remain available as supplier credits until they are allocated.
     const datePart = payment_date.replace(/-/g, '');
     const rand = Math.floor(Math.random() * 9000) + 1000;
-    const overpayment_number = `OVP-${datePart}-${rand}`;
+    const overpayment_number = `ADV-${datePart}-${rand}`;
 
     const [result] = await connection.query(`
       INSERT INTO supplier_overpayments
@@ -167,11 +212,22 @@ const createOverpayment = async (req, res) => {
     ]);
 
     await connection.commit();
+
+    // Fetch the inserted overpayment row to return a complete representation
+    const [[inserted]] = await connection.query(
+      `SELECT so.id, so.overpayment_number, so.supplier_id, s.name AS supplier_name, so.payment_date, so.payment_method, so.voucher_number, so.reference_number, so.original_amount, so.remaining_credit, so.status, so.notes, so.created_by
+       FROM supplier_overpayments so
+       JOIN supplier s ON so.supplier_id = s.id
+       WHERE so.id = ? LIMIT 1`,
+      [result.insertId]
+    );
+
     res.status(201).json({
       message: 'Advance payment recorded successfully!',
       overpayment_id: result.insertId,
       overpayment_number,
-      amount: parseFloat(amount)
+      amount: parseFloat(amount),
+      overpayment: inserted || null
     });
   } catch (error) {
     await connection.rollback();
@@ -201,6 +257,7 @@ const settleCreditToInvoice = async (req, res) => {
   if (!purchase_id) return res.status(400).json({ error: 'Invoice (purchase_id) is required' });
   if (!credits || credits.length === 0) return res.status(400).json({ error: 'At least one credit is required' });
   if (!settled_by) return res.status(400).json({ error: 'settled_by is required' });
+  if (!settlement_date) return res.status(400).json({ error: 'Settlement date is required' });
 
   const connection = await pool.getConnection();
   try {
@@ -211,8 +268,14 @@ const settleCreditToInvoice = async (req, res) => {
       'SELECT * FROM purchases WHERE id = ? FOR UPDATE',
       [purchase_id]
     );
-    if (!invoice) throw new Error('Invoice not found');
-    if (formatNum(invoice.balance_amount) <= 0) throw new Error('Invoice already fully paid');
+    if (!invoice) {
+      await connection.rollback();
+      return res.status(404).json({ error: 'Invoice not found' });
+    }
+    if (formatNum(invoice.balance_amount) <= 0) {
+      await connection.rollback();
+      return res.status(400).json({ error: 'Invoice already fully paid' });
+    }
 
     let remainingInvoiceBalance = formatNum(invoice.balance_amount);
     let totalSettled = 0;
@@ -222,7 +285,8 @@ const settleCreditToInvoice = async (req, res) => {
       if (amount <= 0) continue;
 
       if (amount > remainingInvoiceBalance + 0.001) {
-        throw new Error(`Credit amount ${amount} exceeds remaining invoice balance ${remainingInvoiceBalance}`);
+        await connection.rollback();
+        return res.status(400).json({ error: `Credit amount ${amount} exceeds remaining invoice balance ${remainingInvoiceBalance}` });
       }
 
       if (credit.credit_type === 'overpayment') {
@@ -231,9 +295,13 @@ const settleCreditToInvoice = async (req, res) => {
           'SELECT * FROM supplier_overpayments WHERE id = ? FOR UPDATE',
           [credit.credit_id]
         );
-        if (!op) throw new Error(`Overpayment ${credit.credit_id} not found`);
+        if (!op) {
+          await connection.rollback();
+          return res.status(404).json({ error: `Overpayment ${credit.credit_id} not found` });
+        }
         if (formatNum(op.remaining_credit) < amount - 0.001) {
-          throw new Error(`Insufficient credit in overpayment ${op.overpayment_number}`);
+          await connection.rollback();
+          return res.status(400).json({ error: `Insufficient credit in overpayment ${op.overpayment_number}` });
         }
 
         const newRemaining = formatNum(op.remaining_credit) - amount;
@@ -256,9 +324,13 @@ const settleCreditToInvoice = async (req, res) => {
           'SELECT * FROM purchase_return_credits WHERE id = ? FOR UPDATE',
           [credit.credit_id]
         );
-        if (!rc) throw new Error(`Return credit ${credit.credit_id} not found`);
+        if (!rc) {
+          await connection.rollback();
+          return res.status(404).json({ error: `Return credit ${credit.credit_id} not found` });
+        }
         if (formatNum(rc.remaining_credit) < amount - 0.001) {
-          throw new Error(`Insufficient credit in return credit ${rc.credit_number}`);
+          await connection.rollback();
+          return res.status(400).json({ error: `Insufficient credit in return credit ${rc.credit_number}` });
         }
 
         const newRemaining = formatNum(rc.remaining_credit) - amount;
@@ -275,7 +347,8 @@ const settleCreditToInvoice = async (req, res) => {
           VALUES ('return_credit', NULL, ?, ?, ?, ?, ?, ?)
         `, [rc.id, purchase_id, amount, settlement_date, settled_by, notes || null]);
       } else {
-        throw new Error(`Unknown credit_type: ${credit.credit_type}`);
+        await connection.rollback();
+        return res.status(400).json({ error: `Unknown credit_type: ${credit.credit_type}` });
       }
 
       totalSettled += amount;
@@ -364,6 +437,7 @@ const getSupplierCreditHistory = async (req, res) => {
 // ─────────────────────────────────────────────────────────────
 const getAllOutstandingRecords = async (req, res) => {
   try {
+    await ensureUnsettledReturnCredits();
     // 1. Outstanding invoices
     const [invoices] = await pool.query(`
       SELECT
@@ -373,6 +447,7 @@ const getAllOutstandingRecords = async (req, res) => {
         'Invoice'       AS document_type,
         p.invoice_no    AS document_number,
         p.purchase_date AS transaction_date,
+        p.balance_amount AS balance_amount,
         p.balance_amount AS outstanding_amount,
         p.payment_status AS status
       FROM purchases p
@@ -425,10 +500,17 @@ const getAllOutstandingRecords = async (req, res) => {
         outstanding_amount: formatNum(r.outstanding_amount)
       }));
 
+    const normalizedInvoices = normalize(invoices);
+    const normalizedAdvances = normalize(advances);
+    const normalizedReturnCredits = normalize(returnCredits);
+
     res.json({
-      invoices: normalize(invoices),
-      advances: normalize(advances),
-      return_credits: normalize(returnCredits)
+      OutstandingInvoices: normalizedInvoices,
+      AdvancePayments: normalizedAdvances,
+      PurchaseReturnCredits: normalizedReturnCredits,
+      invoices: normalizedInvoices,
+      advances: normalizedAdvances,
+      return_credits: normalizedReturnCredits
     });
   } catch (error) {
     console.error('Error fetching all outstanding records:', error);

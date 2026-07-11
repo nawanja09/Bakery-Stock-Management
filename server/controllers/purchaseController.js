@@ -1,5 +1,41 @@
 const pool = require('../config/db');
 
+const resolveUserId = async (connection, ...candidateIds) => {
+  for (const candidateId of candidateIds) {
+    const numericId = Number(candidateId);
+    if (Number.isInteger(numericId) && numericId > 0) {
+      const [rows] = await connection.query('SELECT id FROM users WHERE id = ? LIMIT 1', [numericId]);
+      if (rows.length > 0) {
+        return numericId;
+      }
+    }
+  }
+
+  const [rows] = await connection.query('SELECT id FROM users ORDER BY id LIMIT 1');
+  return rows[0]?.id || null;
+};
+
+const calculatePaymentState = (paidAmount, totalAmount) => {
+  const parsedPaidAmount = parseFloat(paidAmount) || 0;
+  const parsedTotalAmount = parseFloat(totalAmount) || 0;
+  const balanceAmount = Math.max(0, parsedTotalAmount - parsedPaidAmount);
+  const balanceStatus = balanceAmount > 0 ? 1 : 0;
+
+  let paymentStatus = 'Non-Paid';
+  if (parsedTotalAmount > 0 && parsedPaidAmount >= parsedTotalAmount) {
+    paymentStatus = 'Paid';
+  } else if (parsedPaidAmount > 0 && parsedPaidAmount < parsedTotalAmount) {
+    paymentStatus = 'Partially Paid';
+  }
+
+  return {
+    paid_amount: parsedPaidAmount,
+    balance_amount: balanceAmount,
+    balance_status: balanceStatus,
+    payment_status: paymentStatus
+  };
+};
+
 // Create new purchase with payment status handling
 const createPurchase = async (req, res) => {
   const { 
@@ -39,12 +75,16 @@ const createPurchase = async (req, res) => {
       });
     }
 
-    // Determine payment status based on paid amount
-    let payment_status = 'Non-Paid';
-    if (paid_amount >= total_with_vat && total_with_vat > 0) {
-      payment_status = 'Paid';
-    } else if (paid_amount > 0 && paid_amount < total_with_vat) {
-      payment_status = 'Partially Paid';
+    const paymentState = calculatePaymentState(paid_amount, total_with_vat);
+    const normalizedPaidAmount = paymentState.paid_amount;
+    const normalizedBalanceAmount = paymentState.balance_amount;
+    const normalizedBalanceStatus = paymentState.balance_status;
+    const normalizedPaymentStatus = paymentState.payment_status;
+    const resolvedPreparedBy = await resolveUserId(connection, prepared_by, req.user?.id);
+
+    if (!resolvedPreparedBy) {
+      await connection.rollback();
+      return res.status(400).json({ error: 'No valid user found for purchase audit' });
     }
 
     // Insert purchase
@@ -55,19 +95,19 @@ const createPurchase = async (req, res) => {
        payment_method, check_number, remarks, prepared_by, company_id, payment_status) 
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [invoice_no, purchase_date, supplier_id, total_with_vat, subtotal, vat_amount, 
-       total_with_vat, vat_rate, paid_amount, balance_amount, balance_status, 
-       payment_method, check_number, remarks, prepared_by, company_id, payment_status]
+       total_with_vat, vat_rate, normalizedPaidAmount, normalizedBalanceAmount, normalizedBalanceStatus, 
+       payment_method, check_number, remarks, prepared_by, company_id, normalizedPaymentStatus]
     );
     
     const purchaseId = purchaseResult.insertId;
 
     // If payment was made, record in payment history
-    if (paid_amount > 0) {
+    if (normalizedPaidAmount > 0) {
       await connection.query(
         `INSERT INTO payment_history 
         (purchase_id, payment_date, amount, payment_method, check_number, notes, created_by)
         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [purchaseId, purchase_date, paid_amount, payment_method, check_number, 'Initial payment', prepared_by]
+        [purchaseId, purchase_date, normalizedPaidAmount, payment_method, check_number, 'Initial payment', resolvedPreparedBy]
       );
     }
 
@@ -87,9 +127,9 @@ const createPurchase = async (req, res) => {
       message: 'Purchase created successfully!', 
       invoice_no,
       purchase_id: purchaseId,
-      payment_status,
-      paid_amount,
-      balance_amount
+      payment_status: normalizedPaymentStatus,
+      paid_amount: normalizedPaidAmount,
+      balance_amount: normalizedBalanceAmount
     });
     
   } catch (error) {
@@ -304,13 +344,11 @@ const updatePurchase = async (req, res) => {
       });
     }
 
-    // Determine payment status
-    let payment_status = 'Non-Paid';
-    if (paid_amount >= total_with_vat && total_with_vat > 0) {
-      payment_status = 'Paid';
-    } else if (paid_amount > 0 && paid_amount < total_with_vat) {
-      payment_status = 'Partially Paid';
-    }
+    const paymentState = calculatePaymentState(paid_amount, total_with_vat);
+    const normalizedPaidAmount = paymentState.paid_amount;
+    const normalizedBalanceAmount = paymentState.balance_amount;
+    const normalizedBalanceStatus = paymentState.balance_status;
+    const normalizedPaymentStatus = paymentState.payment_status;
 
     // Update purchase
     await connection.query(
@@ -321,8 +359,8 @@ const updatePurchase = async (req, res) => {
            remarks = ?, prepared_by = ?, company_id = ?, payment_status = ?
        WHERE id = ?`,
       [invoice_no, purchase_date, supplier_id, total_with_vat, subtotal, vat_amount, 
-       total_with_vat, vat_rate, paid_amount, balance_amount, balance_status, 
-       payment_method, check_number, remarks, prepared_by, company_id, payment_status, id]
+       total_with_vat, vat_rate, normalizedPaidAmount, normalizedBalanceAmount, normalizedBalanceStatus, 
+       payment_method, check_number, remarks, resolvedPreparedBy, company_id, normalizedPaymentStatus]
     );
 
     // Delete existing items and re-insert
@@ -341,7 +379,7 @@ const updatePurchase = async (req, res) => {
     res.json({ 
       message: 'Purchase updated successfully!',
       invoice_no,
-      payment_status
+      payment_status: normalizedPaymentStatus
     });
     
   } catch (error) {
@@ -528,91 +566,122 @@ const makePayment = async (req, res) => {
     voucher_number,
     notes,
     created_by,
-    invoice_allocations  // optional array for multi-invoice payments
+    invoice_allocations
   } = req.body;
+
+  const validMethods = ['CASH', 'BANK_TRANSFER', 'CHEQUE', 'CREDIT'];
+  const normalizedAllocations = Array.isArray(invoice_allocations) && invoice_allocations.length > 0
+    ? invoice_allocations
+        .map((allocation) => ({
+          purchase_id: allocation.purchase_id || allocation.id,
+          amount: parseFloat(allocation.amount) || 0
+        }))
+        .filter((allocation) => allocation.purchase_id && allocation.amount > 0)
+    : (id ? [{ purchase_id: id, amount: parseFloat(amount) || 0 }] : []);
+
+  if (!payment_date) {
+    return res.status(400).json({ error: 'Payment date is required' });
+  }
+  if (!payment_method || !validMethods.includes(payment_method)) {
+    return res.status(400).json({ error: 'Payment method is invalid' });
+  }
+  if (normalizedAllocations.length === 0) {
+    return res.status(400).json({ error: 'At least one invoice allocation is required' });
+  }
 
   const connection = await pool.getConnection();
 
   try {
     await connection.beginTransaction();
 
-    const [purchase] = await connection.query(
-      'SELECT * FROM purchases WHERE id = ? FOR UPDATE',
-      [id]
-    );
-
-    if (purchase.length === 0) {
-      await connection.rollback();
-      return res.status(404).json({ error: 'Purchase not found' });
-    }
-
-    const currentPurchase = purchase[0];
-
-    if (parseFloat(amount) <= 0) {
+    const totalAllocatedAmount = normalizedAllocations.reduce((sum, allocation) => sum + allocation.amount, 0);
+    if (totalAllocatedAmount <= 0) {
       await connection.rollback();
       return res.status(400).json({ error: 'Payment amount must be greater than 0' });
     }
 
-    if (parseFloat(amount) > parseFloat(currentPurchase.balance_amount) + 0.001) {
+    const paymentHistoryPurchaseId = normalizedAllocations[0].purchase_id;
+    const resolvedCreatedBy = await resolveUserId(connection, created_by, req.user?.id);
+
+    if (!resolvedCreatedBy) {
       await connection.rollback();
-      return res.status(400).json({
-        error: `Payment amount cannot exceed balance of ${currentPurchase.balance_amount}`
-      });
+      return res.status(400).json({ error: 'No valid user found for payment audit' });
     }
 
-    const newPaidAmount    = parseFloat(currentPurchase.paid_amount) + parseFloat(amount);
-    const newBalanceAmount = Math.max(0, parseFloat(currentPurchase.total_with_vat) - newPaidAmount);
-    let newPaymentStatus   = 'Non-Paid';
-    if (newBalanceAmount <= 0)                     newPaymentStatus = 'Paid';
-    else if (newPaidAmount > 0)                    newPaymentStatus = 'Partially Paid';
-
-    await connection.query(
-      `UPDATE purchases
-         SET paid_amount = ?, balance_amount = ?, balance_status = ?, payment_status = ?
-       WHERE id = ?`,
-      [newPaidAmount, newBalanceAmount, newBalanceAmount > 0 ? 1 : 0, newPaymentStatus, id]
-    );
-
-    // Insert payment_history row (check if voucher_number column exists gracefully)
     let paymentResult;
     try {
       [paymentResult] = await connection.query(
         `INSERT INTO payment_history
            (purchase_id, payment_date, amount, payment_method, check_number, voucher_number, notes, created_by)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [id, payment_date, amount, payment_method,
-         check_number || null, voucher_number || null, notes || null, created_by]
+        [paymentHistoryPurchaseId, payment_date, totalAllocatedAmount, payment_method,
+         check_number || null, voucher_number || null, notes || null, resolvedCreatedBy]
       );
     } catch (colErr) {
-      // Fallback if voucher_number column not yet migrated
       [paymentResult] = await connection.query(
         `INSERT INTO payment_history
            (purchase_id, payment_date, amount, payment_method, check_number, notes, created_by)
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [id, payment_date, amount, payment_method,
-         check_number || null, notes || null, created_by]
+        [paymentHistoryPurchaseId, payment_date, totalAllocatedAmount, payment_method,
+         check_number || null, notes || null, resolvedCreatedBy]
       );
     }
 
     const paymentHistoryId = paymentResult.insertId;
 
-    // Record allocation for this invoice
-    await connection.query(
-      `INSERT INTO purchase_payment_allocations (payment_history_id, purchase_id, allocated_amount)
-       VALUES (?, ?, ?)`,
-      [paymentHistoryId, id, amount]
-    );
+    let totalApplied = 0;
+    for (const allocation of normalizedAllocations) {
+      const purchaseId = allocation.purchase_id;
+      const amountToApply = allocation.amount;
+
+      const [purchaseRows] = await connection.query(
+        'SELECT * FROM purchases WHERE id = ? FOR UPDATE',
+        [purchaseId]
+      );
+
+      if (purchaseRows.length === 0) {
+        await connection.rollback();
+        return res.status(404).json({ error: `Purchase ${purchaseId} not found` });
+      }
+
+      const currentPurchase = purchaseRows[0];
+      if (amountToApply > parseFloat(currentPurchase.balance_amount) + 0.001) {
+        await connection.rollback();
+        return res.status(400).json({
+          error: `Payment amount for invoice ${currentPurchase.invoice_no} cannot exceed balance of ${currentPurchase.balance_amount}`
+        });
+      }
+
+      const newPaidAmount = parseFloat(currentPurchase.paid_amount || 0) + amountToApply;
+      const newBalanceAmount = Math.max(0, parseFloat(currentPurchase.total_with_vat || 0) - newPaidAmount);
+      let newPaymentStatus = 'Non-Paid';
+      if (newBalanceAmount <= 0) newPaymentStatus = 'Paid';
+      else if (newPaidAmount > 0) newPaymentStatus = 'Partially Paid';
+
+      await connection.query(
+        `UPDATE purchases
+           SET paid_amount = ?, balance_amount = ?, balance_status = ?, payment_status = ?
+         WHERE id = ?`,
+        [newPaidAmount, newBalanceAmount, newBalanceAmount > 0 ? 1 : 0, newPaymentStatus, purchaseId]
+      );
+
+      await connection.query(
+        `INSERT INTO purchase_payment_allocations (payment_history_id, purchase_id, allocated_amount)
+         VALUES (?, ?, ?)`,
+        [paymentHistoryId, purchaseId, amountToApply]
+      );
+
+      totalApplied += amountToApply;
+    }
 
     await connection.commit();
 
     res.json({
       message: 'Payment recorded successfully!',
-      payment_id:     paymentHistoryId,
-      new_balance:    newBalanceAmount,
-      payment_status: newPaymentStatus,
-      amount,
-      paid_amount:    newPaidAmount,
-      balance_amount: newBalanceAmount
+      payment_id: paymentHistoryId,
+      amount: totalAllocatedAmount,
+      applied_amount: totalApplied,
+      invoice_count: normalizedAllocations.length
     });
 
   } catch (error) {

@@ -94,7 +94,7 @@ const PayNowModal = ({ isOpen, onClose, supplierId, supplierName, onSuccess }) =
         <div className="pnm-header">
           <h3>
             <FontAwesomeIcon icon={faPaperPlane} />
-            Overpayment
+            Advance Payment
           </h3>
           <button className="pnm-close" onClick={onClose} type="button">
             <FontAwesomeIcon icon={faTimes} />
@@ -106,7 +106,7 @@ const PayNowModal = ({ isOpen, onClose, supplierId, supplierName, onSuccess }) =
             <FontAwesomeIcon icon={faInfoCircle} />
             <div>
               <strong>Supplier: {supplierName}</strong><br/>
-              This creates an overpayment (Supplier Credit) that is not tied to any specific invoice. You can allocate this credit to invoices later.
+              This creates an advance supplier payment that is not tied to any specific invoice. You can allocate this credit to invoices later.
             </div>
           </div>
 
@@ -199,7 +199,7 @@ const PayNowModal = ({ isOpen, onClose, supplierId, supplierName, onSuccess }) =
           >
             {submitting
               ? <><FontAwesomeIcon icon={faSpinner} spin /> Processing...</>
-              : <><FontAwesomeIcon icon={faMoneyBillWave} /> Pay Now</>}
+              : <><FontAwesomeIcon icon={faMoneyBillWave} /> Save</>}
           </button>
         </div>
 

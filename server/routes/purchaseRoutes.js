@@ -193,6 +193,7 @@ router.get('/items/latest-prices', async (req, res) => {
   }
 });
 
+router.post('/pay-multiple', purchaseController.makePayment);
 router.post('/:id/pay', purchaseController.makePayment);
 router.get('/:id/payments', purchaseController.getPaymentHistory);
 router.get('/summary', paymentHistoryController.getPaymentSummary);
