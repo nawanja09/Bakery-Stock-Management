@@ -37,6 +37,7 @@ const AddPurchase = () => {
   const [supplierVatRegistered, setSupplierVatRegistered] = useState(false);
   const [supplierVatNumber, setSupplierVatNumber] = useState('');
   const [previousPurchasePrices, setPreviousPurchasePrices] = useState({});
+  const [pendingRefreshKey, setPendingRefreshKey] = useState(0);
   
   const VAT_RATE = 18;
 
@@ -422,6 +423,8 @@ const AddPurchase = () => {
       }
       
       showPopup('success', successMessage);
+      setPendingRefreshKey((prev) => prev + 1);
+      window.dispatchEvent(new Event('purchase-payment-updated'));
       navigate('/purchase/history');
     } catch (error) {
       console.error('Error creating purchase:', error);
@@ -725,12 +728,6 @@ const AddPurchase = () => {
           </button>
         </div>
 
-        <PendingInvoicesSection
-          supplierId={formData.supplier_id}
-          supplierName={selectedSupplier?.name || ''}
-          suppliers={suppliers}
-        />
-
         <div className="form-actions">
           <button
             type="submit"
@@ -741,6 +738,13 @@ const AddPurchase = () => {
             {isSubmitting ? 'Creating...' : 'Create Purchase'}
           </button>
         </div>
+
+        <PendingInvoicesSection
+          supplierId={formData.supplier_id}
+          supplierName={selectedSupplier?.name || ''}
+          suppliers={suppliers}
+          refreshKey={pendingRefreshKey}
+        />
 
       </form>
     </div>

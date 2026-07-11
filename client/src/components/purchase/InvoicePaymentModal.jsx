@@ -81,20 +81,26 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
 
     setSubmitting(true);
     try {
-      for (const alloc of allocations) {
-        if (alloc.allocated <= 0) continue;
-        await api.post(`/purchases/${alloc.id}/pay`, {
-          payment_date:   formData.payment_date,
-          amount:         alloc.allocated,
-          payment_method: formData.payment_method,
-          check_number:   formData.check_number || null,
-          voucher_number: formData.voucher_number || null,
-          notes:          formData.notes || null,
-          created_by:     currentUser.id
-        });
-      }
-      showPopup('success', `Payment of Rs. ${formData.amount.toFixed(2)} recorded successfully!`);
-      onSuccess && onSuccess({ amount: formData.amount, allocations });
+      const payloadAllocations = allocations
+        .filter((alloc) => alloc.allocated > 0)
+        .map((alloc) => ({
+          id: alloc.id,
+          purchase_id: alloc.id,
+          amount: alloc.allocated
+        }));
+
+      const response = await api.post('/purchases/pay-multiple', {
+        payment_date:   formData.payment_date,
+        amount:         formData.amount,
+        payment_method: formData.payment_method,
+        check_number:   formData.check_number || null,
+        voucher_number: formData.voucher_number || null,
+        notes:          formData.notes || null,
+        created_by:     currentUser.id,
+        invoice_allocations: payloadAllocations
+      });
+      showPopup('success', response.data.message || `Payment of Rs. ${formData.amount.toFixed(2)} recorded successfully!`);
+      onSuccess && onSuccess({ amount: formData.amount, allocations, response });
       onClose();
     } catch (err) {
       console.error(err);

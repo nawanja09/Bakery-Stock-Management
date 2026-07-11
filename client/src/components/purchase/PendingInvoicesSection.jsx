@@ -33,7 +33,7 @@ import SettleNowModal from './SettleNowModal';
  *   supplierName – optional; display name for the active supplier filter
  *   suppliers    – full supplier list for the filter dropdown
  */
-const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [] }) => {
+const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refreshKey = 0 }) => {
   const { showPopup } = usePopup();
 
   // ── Raw data (all suppliers) ──────────────────────────────────────────────
@@ -70,9 +70,12 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [] }) =>
     setLoading(true);
     try {
       const { data } = await api.get('/suppliers/outstanding/all');
-      setAllInvoices(data.invoices || []);
-      setAllAdvances(data.advances || []);
-      setAllReturnCredits(data.return_credits || []);
+      const outstandingInvoices = data.OutstandingInvoices || data.invoices || [];
+      const advancePayments = data.AdvancePayments || data.advances || [];
+      const purchaseReturnCredits = data.PurchaseReturnCredits || data.return_credits || [];
+      setAllInvoices(outstandingInvoices);
+      setAllAdvances(advancePayments);
+      setAllReturnCredits(purchaseReturnCredits);
       setSelectedInvoiceIds(new Set());
     } catch (err) {
       console.error('Error fetching all outstanding records:', err);
@@ -84,6 +87,17 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [] }) =>
 
   useEffect(() => {
     fetchAllOutstanding();
+  }, [fetchAllOutstanding, refreshKey]);
+
+  useEffect(() => {
+    const handlePurchasePaymentUpdated = () => {
+      fetchAllOutstanding();
+    };
+
+    window.addEventListener('purchase-payment-updated', handlePurchasePaymentUpdated);
+    return () => {
+      window.removeEventListener('purchase-payment-updated', handlePurchasePaymentUpdated);
+    };
   }, [fetchAllOutstanding]);
 
   // ── Build unified flat list ───────────────────────────────────────────────
@@ -220,6 +234,10 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [] }) =>
     : '';
 
   const selectedInvoicesList = allInvoices.filter((i) => selectedInvoiceIds.has(i.id));
+  const selectedTotal = useMemo(() =>
+    selectedInvoicesList.reduce((sum, invoice) => sum + parseFloat(invoice.balance_amount || 0), 0),
+    [selectedInvoicesList]
+  );
   const activeSupplierForModal = selectedInvoicesList[0]
     ? suppliers.find((s) => String(s.id) === String(selectedInvoicesList[0].supplier_id))?.name ||
       activeSupplierName
@@ -234,7 +252,11 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [] }) =>
         onClose={() => setShowPayModal(false)}
         supplierName={activeSupplierForModal}
         selectedInvoices={selectedInvoicesList}
-        onSuccess={() => fetchAllOutstanding()}
+        onSuccess={async () => {
+          setShowPayModal(false);
+          await fetchAllOutstanding();
+          window.dispatchEvent(new Event('purchase-payment-updated'));
+        }}
       />
 
       <PayNowModal
@@ -242,7 +264,32 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [] }) =>
         onClose={() => setShowPayNowModal(false)}
         supplierId={activeFilterId}
         supplierName={activeSupplierName}
-        onSuccess={() => fetchAllOutstanding()}
+        onSuccess={async (responseData) => {
+          // If backend returned the created overpayment, optimistically prepend it
+          try {
+            const op = responseData?.overpayment;
+            if (op && String(op.supplier_id) === String(activeFilterId)) {
+              const mapped = {
+                id: op.id,
+                supplier_id: op.supplier_id,
+                supplier_name: op.supplier_name || activeSupplierName,
+                document_type: 'Advance Payment',
+                document_number: op.overpayment_number,
+                transaction_date: op.payment_date,
+                outstanding_amount: parseFloat(op.remaining_credit || responseData.amount || 0),
+                status: op.status || 'Active',
+                _rowType: 'advance'
+              };
+
+              setAllAdvances(prev => [mapped, ...prev]);
+            }
+          } catch (e) {
+            console.error('Error prepending new overpayment:', e);
+          }
+
+          // Always refresh from server to ensure canonical state
+          await fetchAllOutstanding();
+        }}
       />
 
       <SettleNowModal
@@ -253,14 +300,19 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [] }) =>
         }}
         supplierId={settleInvoice?.supplier_id}
         invoice={settleInvoice}
-        onSuccess={() => fetchAllOutstanding()}
+        onSuccess={async () => {
+          setShowSettleModal(false);
+          setSettleInvoice(null);
+          await fetchAllOutstanding();
+          window.dispatchEvent(new Event('purchase-payment-updated'));
+        }}
       />
 
       {/* ── Section Header ── */}
       <div className="pis-header">
         <h3>
           <FontAwesomeIcon icon={faFileInvoiceDollar} />
-          Outstanding Invoices &amp; Payments
+          Pending Invoices / Payments
         </h3>
         <div className="pis-header-actions">
           <button
@@ -269,7 +321,7 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [] }) =>
             type="button"
             title={!activeFilterId ? 'Filter by a supplier first' : 'Record outstanding payment'}
           >
-            <FontAwesomeIcon icon={faPaperPlane} /> Pay Now (Outstanding)
+            <FontAwesomeIcon icon={faPaperPlane} /> Pay Now (Advance Payment)
           </button>
           <button
             className="pis-btn-pay"
@@ -506,7 +558,7 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [] }) =>
                           title="Settle with available credit"
                           type="button"
                         >
-                          <FontAwesomeIcon icon={faBalanceScale} /> Settle
+                          <FontAwesomeIcon icon={faBalanceScale} /> Settle Now
                         </button>
                       )}
                     </td>
@@ -516,6 +568,18 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [] }) =>
             )}
           </tbody>
         </table>
+      </div>
+
+      <div className="pis-selection-summary">
+        <span>Selected Total: {formatCurrency(selectedTotal)}</span>
+        <button
+          className="pis-btn-pay"
+          onClick={handlePaySelected}
+          disabled={selectedInvoiceIds.size === 0}
+          type="button"
+        >
+          <FontAwesomeIcon icon={faCheckCircle} /> Pay Selected
+        </button>
       </div>
 
       {/* ── Available Credits Sub-section ── */}

@@ -618,19 +618,6 @@ const EditPurchase = () => {
             </div>
 
             <div className="form-group">
-              <label>Payment Method *</label>
-              <select
-                value={formData.payment_method}
-                onChange={(e) => setFormData({ ...formData, payment_method: e.target.value })}
-                required
-              >
-                <option value="CASH">Cash</option>
-                <option value="BANK_TRANSFER">Bank Transfer</option>
-                <option value="CHEQUE">Cheque</option>
-              </select>
-            </div>
-
-            <div className="form-group">
               <label>Company *</label>
               <select
                 value={formData.company_id}
@@ -650,15 +637,6 @@ const EditPurchase = () => {
                 type="text"
                 value={formData.check_number}
                 onChange={(e) => setFormData({ ...formData, check_number: e.target.value })}
-              />
-            </div>
-
-            <div className="form-group full-width">
-              <label>Remarks</label>
-              <textarea
-                value={formData.remarks}
-                onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
-                rows="3"
               />
             </div>
           </div>
@@ -796,99 +774,6 @@ const EditPurchase = () => {
             <div className="vat-row total">
               <span>Grand Total:</span>
               <span>Rs. {formData.total_with_vat.toFixed(2)}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Payment Information Section */}
-        <div className="form-card">
-          <h3>Payment Information</h3>
-          
-          <div className="payment-status-banner" style={{
-            background: paymentInfo.bg,
-            border: `1px solid ${paymentInfo.color}`,
-            borderRadius: '8px',
-            padding: '16px',
-            marginBottom: '20px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <FontAwesomeIcon icon={paymentInfo.icon} style={{ color: paymentInfo.color, fontSize: '24px' }} />
-              <div>
-                <div style={{ fontWeight: '600', color: paymentInfo.color, fontSize: '16px' }}>
-                  {paymentInfo.text}
-                </div>
-                <div style={{ color: '#6c757d', fontSize: '14px' }}>
-                  Total: {formatCurrency(formData.total_with_vat)} | 
-                  Paid: {formatCurrency(formData.paid_amount)} | 
-                  Balance: {formatCurrency(formData.balance_amount)}
-                </div>
-              </div>
-            </div>
-            <div>
-              <span className={`payment-badge ${formData.payment_status?.toLowerCase().replace(' ', '-')}`}>
-                {formData.payment_status}
-              </span>
-            </div>
-          </div>
-
-          <div className="payment-section">
-            <div className="form-group">
-              <label>Paid Amount (Rs.) *</label>
-              <div className="amount-input-group" style={{ display: 'flex', gap: '8px' }}>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.paid_amount}
-                  onChange={handlePaidAmountChange}
-                  required
-                  style={{ flex: 1 }}
-                />
-                <button 
-                  type="button" 
-                  className="btn btn-outline-success btn-sm"
-                  onClick={setFullPayment}
-                >
-                  Full
-                </button>
-                <button 
-                  type="button" 
-                  className="btn btn-outline-secondary btn-sm"
-                  onClick={setNoPayment}
-                >
-                  None
-                </button>
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label>Balance Amount</label>
-              <input
-                type="number"
-                value={formData.balance_amount.toFixed(2)}
-                readOnly
-                className={formData.balance_amount > 0 ? 'due-amount' : ''}
-              />
-            </div>
-
-            <div className="balance-info">
-              <div className="info-item">
-                <span className="label">Total Bill:</span>
-                <span className="value">Rs. {formData.total_with_vat.toFixed(2)}</span>
-              </div>
-              <div className="info-item">
-                <span className="label">Paid:</span>
-                <span className="value">Rs. {formData.paid_amount.toFixed(2)}</span>
-              </div>
-              <div className="info-item">
-                <span className="label">Balance:</span>
-                <span className={`value ${formData.balance_amount > 0 ? 'due-amount' : ''}`}>
-                  Rs. {formData.balance_amount.toFixed(2)}
-                </span>
-              </div>
             </div>
           </div>
         </div>
