@@ -84,6 +84,20 @@ const SettleNowModal = ({ isOpen, onClose, invoice, supplierId, onSuccess }) => 
 
     if (creditsToApply.length === 0) return showPopup('error', 'Please allocate at least one credit');
 
+    // Cross-supplier guard: every credit must belong to the same supplier as the invoice
+    if (invoice?.supplier_id) {
+      const mismatch = credits
+        .filter(c => parseFloat(allocations[c.id]) > 0)
+        .find(c => c.supplier_id && String(c.supplier_id) !== String(invoice.supplier_id));
+      if (mismatch) {
+        return showPopup(
+          'error',
+          `Cannot use ${mismatch.credit_number} to settle this invoice — ` +
+          'the credit belongs to a different supplier.'
+        );
+      }
+    }
+
     setSubmitting(true);
     try {
       const response = await api.post('/suppliers/settle-credit', {

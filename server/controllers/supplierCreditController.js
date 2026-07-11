@@ -355,10 +355,92 @@ const getSupplierCreditHistory = async (req, res) => {
   }
 };
 
+// ─────────────────────────────────────────────────────────────
+// GET /api/suppliers/outstanding/all
+// Returns all outstanding records across ALL suppliers:
+//   - Outstanding Purchase Invoices (balance_amount > 0)
+//   - Supplier Advance Payments / Overpayments
+//   - Unsettled Purchase Return Credits
+// ─────────────────────────────────────────────────────────────
+const getAllOutstandingRecords = async (req, res) => {
+  try {
+    // 1. Outstanding invoices
+    const [invoices] = await pool.query(`
+      SELECT
+        p.id,
+        s.id            AS supplier_id,
+        s.name          AS supplier_name,
+        'Invoice'       AS document_type,
+        p.invoice_no    AS document_number,
+        p.purchase_date AS transaction_date,
+        p.balance_amount AS outstanding_amount,
+        p.payment_status AS status
+      FROM purchases p
+      JOIN supplier s ON p.supplier_id = s.id
+      WHERE p.balance_amount > 0
+        AND (p.deleted = FALSE OR p.deleted IS NULL)
+      ORDER BY s.name ASC, p.purchase_date DESC
+    `);
+
+    // 2. Advance payments (overpayments)
+    const [advances] = await pool.query(`
+      SELECT
+        so.id,
+        s.id                    AS supplier_id,
+        s.name                  AS supplier_name,
+        'Advance Payment'       AS document_type,
+        so.overpayment_number   AS document_number,
+        so.payment_date         AS transaction_date,
+        so.remaining_credit     AS outstanding_amount,
+        so.status
+      FROM supplier_overpayments so
+      JOIN supplier s ON so.supplier_id = s.id
+      WHERE so.status != 'Fully Used'
+        AND so.remaining_credit > 0
+      ORDER BY s.name ASC, so.payment_date DESC
+    `);
+
+    // 3. Unsettled purchase return credits
+    const [returnCredits] = await pool.query(`
+      SELECT
+        prc.id,
+        s.id                        AS supplier_id,
+        s.name                      AS supplier_name,
+        'Purchase Return Credit'    AS document_type,
+        prc.credit_number           AS document_number,
+        prc.credit_date             AS transaction_date,
+        prc.remaining_credit        AS outstanding_amount,
+        prc.status
+      FROM purchase_return_credits prc
+      JOIN supplier s ON prc.supplier_id = s.id
+      WHERE prc.status != 'Fully Used'
+        AND prc.remaining_credit > 0
+      ORDER BY s.name ASC, prc.credit_date DESC
+    `);
+
+    // Normalize numeric fields
+    const normalize = (records) =>
+      records.map((r) => ({
+        ...r,
+        outstanding_amount: formatNum(r.outstanding_amount)
+      }));
+
+    res.json({
+      invoices: normalize(invoices),
+      advances: normalize(advances),
+      return_credits: normalize(returnCredits)
+    });
+  } catch (error) {
+    console.error('Error fetching all outstanding records:', error);
+    res.status(500).json({ error: 'Server error: ' + error.message });
+  }
+};
+
 module.exports = {
   getSupplierCredits,
   getSupplierOutstanding,
   createOverpayment,
   settleCreditToInvoice,
-  getSupplierCreditHistory
+  getSupplierCreditHistory,
+  getAllOutstandingRecords
 };

@@ -1,5 +1,5 @@
 // src/components/purchase/PendingInvoicesSection.jsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faFileInvoiceDollar,
@@ -9,9 +9,15 @@ import {
   faSpinner,
   faSearch,
   faReceipt,
-  faWallet
+  faWallet,
+  faExclamationTriangle,
+  faFileInvoice,
+  faMoneyBillWave,
+  faFilter,
+  faTimes
 } from '@fortawesome/free-solid-svg-icons';
 import dayjs from 'dayjs';
+import { usePopup } from '../context/PopupContext';
 import api from '../../api';
 import './PendingInvoicesSection.css';
 
@@ -19,57 +25,116 @@ import InvoicePaymentModal from './InvoicePaymentModal';
 import PayNowModal from './PayNowModal';
 import SettleNowModal from './SettleNowModal';
 
+/**
+ * PendingInvoicesSection
+ *
+ * Props:
+ *   supplierId   – optional; when set by the Basic Info form, auto-filters the table
+ *   supplierName – optional; display name for the active supplier filter
+ *   suppliers    – full supplier list for the filter dropdown
+ */
 const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [] }) => {
-  const [invoices, setInvoices] = useState([]);
-  const [outstanding, setOutstanding] = useState(null);
-  const [credits, setCredits] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [supplierSearch, setSupplierSearch] = useState('');
-  const [activeSupplierId, setActiveSupplierId] = useState(supplierId || '');
+  const { showPopup } = usePopup();
 
+  // ── Raw data (all suppliers) ──────────────────────────────────────────────
+  const [allInvoices, setAllInvoices] = useState([]);
+  const [allAdvances, setAllAdvances] = useState([]);
+  const [allReturnCredits, setAllReturnCredits] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  // ── Filter state ──────────────────────────────────────────────────────────
+  const [supplierSearch, setSupplierSearch] = useState('');
+  // activeFilterId: the supplier currently used to filter the table.
+  // Synced from the parent's supplierId prop.
+  const [activeFilterId, setActiveFilterId] = useState(supplierId || '');
+
+  // ── Modal state ───────────────────────────────────────────────────────────
   const [showPayModal, setShowPayModal] = useState(false);
   const [showPayNowModal, setShowPayNowModal] = useState(false);
   const [showSettleModal, setShowSettleModal] = useState(false);
 
+  // ── Selection state ───────────────────────────────────────────────────────
+  // Only Invoice rows are selectable for "Pay Selected"
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState(new Set());
+  // Settle target (single invoice row)
   const [settleInvoice, setSettleInvoice] = useState(null);
 
+  // ── Sync active filter when parent supplier changes ───────────────────────
   useEffect(() => {
-    setActiveSupplierId(supplierId || '');
+    setActiveFilterId(supplierId || '');
+    setSelectedInvoiceIds(new Set());
   }, [supplierId]);
 
-  const fetchData = useCallback(async (selectedSupplierId = activeSupplierId) => {
-    if (!selectedSupplierId) return;
-
+  // ── Fetch ALL outstanding records on mount ────────────────────────────────
+  const fetchAllOutstanding = useCallback(async () => {
     setLoading(true);
     try {
-      const [invRes, outRes, creditRes] = await Promise.all([
-        api.get(`/purchases/pending/${selectedSupplierId}`),
-        api.get(`/suppliers/${selectedSupplierId}/outstanding`),
-        api.get(`/suppliers/${selectedSupplierId}/credits`)
-      ]);
-
-      setInvoices(invRes.data || []);
-      setOutstanding(outRes.data || null);
-      setCredits([...(creditRes.data?.overpayments || []), ...(creditRes.data?.return_credits || [])]);
+      const { data } = await api.get('/suppliers/outstanding/all');
+      setAllInvoices(data.invoices || []);
+      setAllAdvances(data.advances || []);
+      setAllReturnCredits(data.return_credits || []);
       setSelectedInvoiceIds(new Set());
     } catch (err) {
-      console.error('Error fetching pending invoices:', err);
+      console.error('Error fetching all outstanding records:', err);
+      showPopup('error', 'Failed to load outstanding records');
     } finally {
       setLoading(false);
     }
-  }, [activeSupplierId]);
+  }, [showPopup]);
 
   useEffect(() => {
-    if (activeSupplierId) {
-      fetchData(activeSupplierId);
-    } else {
-      setInvoices([]);
-      setOutstanding(null);
-      setCredits([]);
-      setSelectedInvoiceIds(new Set());
-    }
-  }, [activeSupplierId, fetchData]);
+    fetchAllOutstanding();
+  }, [fetchAllOutstanding]);
+
+  // ── Build unified flat list ───────────────────────────────────────────────
+  const allRecords = useMemo(() => {
+    const invoices = allInvoices.map((r) => ({ ...r, _rowType: 'invoice' }));
+    const advances = allAdvances.map((r) => ({ ...r, _rowType: 'advance' }));
+    const credits = allReturnCredits.map((r) => ({ ...r, _rowType: 'return_credit' }));
+    return [...invoices, ...advances, ...credits];
+  }, [allInvoices, allAdvances, allReturnCredits]);
+
+  // ── Apply filters (supplier search text + active filter dropdown) ─────────
+  const filteredRecords = useMemo(() => {
+    const term = supplierSearch.toLowerCase().trim();
+    return allRecords.filter((r) => {
+      const matchesText = !term || r.supplier_name?.toLowerCase().includes(term);
+      const matchesId = !activeFilterId || String(r.supplier_id) === String(activeFilterId);
+      return matchesText && matchesId;
+    });
+  }, [allRecords, supplierSearch, activeFilterId]);
+
+  // Filtered suppliers list for the dropdown (text search)
+  const filteredSuppliers = useMemo(() => {
+    const term = supplierSearch.toLowerCase().trim();
+    return !term
+      ? suppliers
+      : suppliers.filter((s) => s.name?.toLowerCase().includes(term));
+  }, [suppliers, supplierSearch]);
+
+  // ── Summary cards ─────────────────────────────────────────────────────────
+  const summaryStats = useMemo(() => {
+    const records = activeFilterId
+      ? allRecords.filter((r) => String(r.supplier_id) === String(activeFilterId))
+      : allRecords;
+
+    const totalOutstandingInvoices = records
+      .filter((r) => r._rowType === 'invoice')
+      .reduce((s, r) => s + r.outstanding_amount, 0);
+
+    const totalAvailableCredit = [
+      ...records.filter((r) => r._rowType === 'advance'),
+      ...records.filter((r) => r._rowType === 'return_credit')
+    ].reduce((s, r) => s + r.outstanding_amount, 0);
+
+    const invoiceCount = records.filter((r) => r._rowType === 'invoice').length;
+    const creditCount = records.filter((r) => r._rowType !== 'invoice').length;
+
+    return { totalOutstandingInvoices, totalAvailableCredit, invoiceCount, creditCount };
+  }, [allRecords, activeFilterId]);
+
+  // ── Selection helpers ─────────────────────────────────────────────────────
+  const selectableInvoices = filteredRecords.filter((r) => r._rowType === 'invoice');
 
   const toggleSelection = (id) => {
     const next = new Set(selectedInvoiceIds);
@@ -79,8 +144,47 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [] }) =>
   };
 
   const toggleAll = () => {
-    if (selectedInvoiceIds.size === invoices.length) setSelectedInvoiceIds(new Set());
-    else setSelectedInvoiceIds(new Set(invoices.map(i => i.id)));
+    if (selectedInvoiceIds.size === selectableInvoices.length) {
+      setSelectedInvoiceIds(new Set());
+    } else {
+      setSelectedInvoiceIds(new Set(selectableInvoices.map((i) => i.id)));
+    }
+  };
+
+  // ── Cross-supplier validation ─────────────────────────────────────────────
+  const validateSameSupplier = (records, actionName) => {
+    const ids = [...new Set(records.map((r) => r.supplier_id))];
+    if (ids.length > 1) {
+      showPopup(
+        'error',
+        `Cannot ${actionName}: selected records belong to different suppliers. ` +
+          'Please select records from the same supplier only.'
+      );
+      return false;
+    }
+    return true;
+  };
+
+  // ── Action handlers ───────────────────────────────────────────────────────
+  const handlePaySelected = () => {
+    const selected = allInvoices.filter((i) => selectedInvoiceIds.has(i.id));
+    if (selected.length === 0) {
+      showPopup('warning', 'Please select at least one invoice to pay.');
+      return;
+    }
+    if (!validateSameSupplier(selected, 'pay')) return;
+    setShowPayModal(true);
+  };
+
+  const handlePayNow = () => {
+    if (!activeFilterId) {
+      showPopup(
+        'warning',
+        'Please filter by a specific supplier before recording an outstanding payment.'
+      );
+      return;
+    }
+    setShowPayNowModal(true);
   };
 
   const handleSettleClick = (invoice) => {
@@ -88,92 +192,89 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [] }) =>
     setShowSettleModal(true);
   };
 
+  const handleClearFilter = () => {
+    setActiveFilterId('');
+    setSupplierSearch('');
+    setSelectedInvoiceIds(new Set());
+  };
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
   const formatCurrency = (amount) => {
     const numeric = parseFloat(amount) || 0;
     return `Rs. ${numeric.toFixed(2)}`;
   };
 
-  const filteredSuppliers = suppliers.filter((supplier) => {
-    const term = supplierSearch.toLowerCase();
-    return !term || supplier.name?.toLowerCase().includes(term);
-  });
+  const getDocIcon = (type) => {
+    switch (type) {
+      case 'Invoice':
+        return faFileInvoice;
+      case 'Advance Payment':
+        return faMoneyBillWave;
+      default:
+        return faReceipt;
+    }
+  };
 
-  if (!supplierId && !suppliers.length) return null;
+  const activeSupplierName = activeFilterId
+    ? supplierName || suppliers.find((s) => String(s.id) === String(activeFilterId))?.name || ''
+    : '';
 
-  const selectedInvoicesList = invoices.filter(i => selectedInvoiceIds.has(i.id));
+  const selectedInvoicesList = allInvoices.filter((i) => selectedInvoiceIds.has(i.id));
+  const activeSupplierForModal = selectedInvoicesList[0]
+    ? suppliers.find((s) => String(s.id) === String(selectedInvoicesList[0].supplier_id))?.name ||
+      activeSupplierName
+    : activeSupplierName;
 
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="pis-container">
+      {/* ── Modals ── */}
       <InvoicePaymentModal
         isOpen={showPayModal}
         onClose={() => setShowPayModal(false)}
-        supplierName={supplierName || (suppliers.find((s) => s.id === activeSupplierId)?.name || '')}
+        supplierName={activeSupplierForModal}
         selectedInvoices={selectedInvoicesList}
-        onSuccess={() => fetchData(activeSupplierId)}
+        onSuccess={() => fetchAllOutstanding()}
       />
 
       <PayNowModal
         isOpen={showPayNowModal}
         onClose={() => setShowPayNowModal(false)}
-        supplierId={activeSupplierId}
-        supplierName={supplierName || (suppliers.find((s) => s.id === activeSupplierId)?.name || '')}
-        onSuccess={() => fetchData(activeSupplierId)}
+        supplierId={activeFilterId}
+        supplierName={activeSupplierName}
+        onSuccess={() => fetchAllOutstanding()}
       />
 
       <SettleNowModal
         isOpen={showSettleModal}
-        onClose={() => { setShowSettleModal(false); setSettleInvoice(null); }}
-        supplierId={activeSupplierId}
+        onClose={() => {
+          setShowSettleModal(false);
+          setSettleInvoice(null);
+        }}
+        supplierId={settleInvoice?.supplier_id}
         invoice={settleInvoice}
-        onSuccess={() => fetchData(activeSupplierId)}
+        onSuccess={() => fetchAllOutstanding()}
       />
 
-      <div className="pis-filter-bar">
-        <div className="pis-filter-group">
-          <label htmlFor="supplier-search">Supplier Search</label>
-          <div className="pis-filter-input-wrap">
-            <FontAwesomeIcon icon={faSearch} />
-            <input
-              id="supplier-search"
-              type="text"
-              value={supplierSearch}
-              onChange={(e) => setSupplierSearch(e.target.value)}
-              placeholder="Search supplier"
-            />
-          </div>
-        </div>
-        <div className="pis-filter-group">
-          <label htmlFor="supplier-select">Display Records For</label>
-          <select
-            id="supplier-select"
-            value={activeSupplierId}
-            onChange={(e) => setActiveSupplierId(e.target.value)}
-          >
-            <option value="">Select supplier</option>
-            {filteredSuppliers.map((supplier) => (
-              <option key={supplier.id} value={supplier.id}>
-                {supplier.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
+      {/* ── Section Header ── */}
       <div className="pis-header">
-        <h3><FontAwesomeIcon icon={faFileInvoiceDollar} /> Outstanding Invoices & Payments</h3>
+        <h3>
+          <FontAwesomeIcon icon={faFileInvoiceDollar} />
+          Outstanding Invoices &amp; Payments
+        </h3>
         <div className="pis-header-actions">
           <button
             className="pis-btn-pay-now"
-            onClick={() => setShowPayNowModal(true)}
+            onClick={handlePayNow}
             type="button"
-            disabled={!activeSupplierId}
+            title={!activeFilterId ? 'Filter by a supplier first' : 'Record outstanding payment'}
           >
-            <FontAwesomeIcon icon={faPaperPlane} /> Pay Now (Advance)
+            <FontAwesomeIcon icon={faPaperPlane} /> Pay Now (Outstanding)
           </button>
           <button
             className="pis-btn-pay"
-            onClick={() => setShowPayModal(true)}
-            disabled={selectedInvoiceIds.size === 0 || !activeSupplierId}
+            onClick={handlePaySelected}
+            disabled={selectedInvoiceIds.size === 0}
             type="button"
           >
             <FontAwesomeIcon icon={faCheckCircle} />
@@ -182,27 +283,110 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [] }) =>
         </div>
       </div>
 
-      {outstanding && (
-        <div className="pis-summary-grid">
-          <div className="pis-summary-item debt">
-            <span>Total Outstanding</span>
-            <strong>{formatCurrency(outstanding.total_outstanding)}</strong>
+      {/* ── Summary Cards ── */}
+      <div className="pis-summary-grid">
+        <div className="pis-summary-item debt">
+          <span>Outstanding Invoices</span>
+          <strong>{formatCurrency(summaryStats.totalOutstandingInvoices)}</strong>
+        </div>
+        <div className="pis-summary-item credit">
+          <span>Available Credits</span>
+          <strong>{formatCurrency(summaryStats.totalAvailableCredit)}</strong>
+        </div>
+        <div className="pis-summary-item">
+          <span>Pending Invoices</span>
+          <strong>{summaryStats.invoiceCount}</strong>
+        </div>
+        <div className="pis-summary-item">
+          <span>Credit Documents</span>
+          <strong>{summaryStats.creditCount}</strong>
+        </div>
+      </div>
+
+      {/* ── Filter Bar ── */}
+      <div className="pis-filter-bar">
+        <div className="pis-filter-group">
+          <label htmlFor="pis-supplier-search">
+            <FontAwesomeIcon icon={faFilter} /> Supplier Search / Filter
+          </label>
+          <div className="pis-filter-input-wrap">
+            <FontAwesomeIcon icon={faSearch} />
+            <input
+              id="pis-supplier-search"
+              type="text"
+              value={supplierSearch}
+              onChange={(e) => setSupplierSearch(e.target.value)}
+              placeholder="Type to search suppliers…"
+            />
+            {supplierSearch && (
+              <button
+                type="button"
+                className="pis-clear-btn"
+                onClick={() => setSupplierSearch('')}
+                title="Clear search"
+              >
+                <FontAwesomeIcon icon={faTimes} />
+              </button>
+            )}
           </div>
-          <div className="pis-summary-item credit">
-            <span>Available Credit</span>
-            <strong>{formatCurrency(outstanding.total_credit)}</strong>
+        </div>
+
+        <div className="pis-filter-group">
+          <label htmlFor="pis-supplier-select">Display Records For</label>
+          <div className="pis-filter-select-wrap">
+            <select
+              id="pis-supplier-select"
+              value={activeFilterId}
+              onChange={(e) => {
+                setActiveFilterId(e.target.value);
+                setSelectedInvoiceIds(new Set());
+              }}
+            >
+              <option value="">— All Suppliers —</option>
+              {filteredSuppliers.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+            {activeFilterId && (
+              <button
+                type="button"
+                className="pis-clear-filter-btn"
+                onClick={handleClearFilter}
+                title="Clear filter"
+              >
+                <FontAwesomeIcon icon={faTimes} /> Clear
+              </button>
+            )}
           </div>
-          <div className="pis-summary-item">
-            <span>Total Invoices</span>
-            <strong>{outstanding.total_invoices}</strong>
-          </div>
-          <div className="pis-summary-item">
-            <span>Total Billed</span>
-            <strong>{formatCurrency(outstanding.total_billed)}</strong>
-          </div>
+        </div>
+      </div>
+
+      {/* Active filter notice */}
+      {activeFilterId && (
+        <div className="pis-active-filter-notice">
+          <FontAwesomeIcon icon={faFilter} />
+          Showing records for: <strong>{activeSupplierName}</strong>
+          <button type="button" onClick={handleClearFilter} className="pis-notice-clear">
+            Show All
+          </button>
         </div>
       )}
 
+      {/* Cross-supplier warning when invoices from multiple suppliers selected */}
+      {selectedInvoiceIds.size > 0 &&
+        new Set(selectedInvoicesList.map((i) => i.supplier_id)).size > 1 && (
+          <div className="pis-cross-supplier-warning">
+            <FontAwesomeIcon icon={faExclamationTriangle} />
+            <span>
+              Selected invoices belong to <strong>different suppliers</strong>. Please select
+              invoices from the same supplier only before paying.
+            </span>
+          </div>
+        )}
+
+      {/* ── Unified Table ── */}
       <div className="pis-table-container">
         <table className="pis-table">
           <thead>
@@ -211,67 +395,120 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [] }) =>
                 <input
                   type="checkbox"
                   className="pis-checkbox"
-                  checked={invoices.length > 0 && selectedInvoiceIds.size === invoices.length}
+                  checked={
+                    selectableInvoices.length > 0 &&
+                    selectedInvoiceIds.size === selectableInvoices.length
+                  }
                   onChange={toggleAll}
+                  title="Select all invoices"
                 />
               </th>
-              <th>Invoice No.</th>
-              <th>Date</th>
-              <th className="pis-amount">Total Amount</th>
-              <th className="pis-amount">Paid</th>
-              <th className="pis-amount">Balance Due</th>
-              <th style={{ width: '140px' }}></th>
+              <th>Supplier Name</th>
+              <th>Document Type</th>
+              <th>Document Number</th>
+              <th>Transaction Date</th>
+              <th className="pis-amount">Outstanding Amount</th>
+              <th>Status</th>
+              <th style={{ width: '120px' }}></th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="7" className="pis-empty">
+                <td colSpan="8" className="pis-empty">
                   <FontAwesomeIcon icon={faSpinner} spin />
-                  <p>Loading pending invoices...</p>
+                  <p>Loading outstanding records…</p>
                 </td>
               </tr>
-            ) : invoices.length === 0 ? (
+            ) : filteredRecords.length === 0 ? (
               <tr>
-                <td colSpan="7" className="pis-empty">
+                <td colSpan="8" className="pis-empty">
                   <FontAwesomeIcon icon={faCheckCircle} style={{ color: '#10b981' }} />
-                  <p>No pending invoices for this supplier.</p>
+                  <p>
+                    {activeFilterId || supplierSearch
+                      ? 'No outstanding records match the current filter.'
+                      : 'No outstanding invoices, payments, or credits found.'}
+                  </p>
                 </td>
               </tr>
             ) : (
-              invoices.map((invoice) => {
-                const isSelected = selectedInvoiceIds.has(invoice.id);
+              filteredRecords.map((record) => {
+                const isInvoice = record._rowType === 'invoice';
+                const isSelected = isInvoice && selectedInvoiceIds.has(record.id);
+                const rowKey = `${record._rowType}-${record.id}`;
+
                 return (
-                  <tr key={invoice.id} className={isSelected ? 'selected' : ''}>
+                  <tr
+                    key={rowKey}
+                    className={`${isSelected ? 'selected' : ''} pis-row-${record._rowType}`}
+                  >
+                    {/* Checkbox – only for invoice rows */}
                     <td style={{ textAlign: 'center' }}>
-                      <input
-                        type="checkbox"
-                        className="pis-checkbox"
-                        checked={isSelected}
-                        onChange={() => toggleSelection(invoice.id)}
-                      />
+                      {isInvoice ? (
+                        <input
+                          type="checkbox"
+                          className="pis-checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelection(record.id)}
+                        />
+                      ) : (
+                        <span className="pis-no-check" title="Credits cannot be directly paid" />
+                      )}
                     </td>
+
+                    {/* Supplier Name */}
                     <td>
-                      <div className="pis-invoice-num">{invoice.invoice_no}</div>
-                      <div className="pis-subtle">{invoice.company_name || 'No Company'}</div>
+                      <div className="pis-supplier-name">{record.supplier_name}</div>
                     </td>
+
+                    {/* Document Type */}
                     <td>
-                      <div className="pis-date">{dayjs(invoice.purchase_date).format('DD MMM YYYY')}</div>
-                      {invoice.days_overdue > 30 && <span className="pis-overdue">Overdue</span>}
+                      <span className={`pis-doc-badge pis-doc-${record._rowType}`}>
+                        <FontAwesomeIcon icon={getDocIcon(record.document_type)} />
+                        {record.document_type}
+                      </span>
                     </td>
-                    <td className="pis-amount">{formatCurrency(invoice.total_with_vat)}</td>
-                    <td className="pis-amount">{formatCurrency(invoice.paid_amount)}</td>
-                    <td className="pis-balance">{formatCurrency(invoice.balance_amount)}</td>
+
+                    {/* Document Number */}
+                    <td>
+                      <div className="pis-invoice-num">{record.document_number}</div>
+                    </td>
+
+                    {/* Transaction Date */}
+                    <td>
+                      <div className="pis-date">
+                        {record.transaction_date
+                          ? dayjs(record.transaction_date).format('DD MMM YYYY')
+                          : '—'}
+                      </div>
+                    </td>
+
+                    {/* Outstanding Amount */}
+                    <td className="pis-amount">
+                      <span className={isInvoice ? 'pis-amount-debt' : 'pis-amount-credit'}>
+                        {formatCurrency(record.outstanding_amount)}
+                      </span>
+                    </td>
+
+                    {/* Status */}
+                    <td>
+                      <span className={`pis-status-badge pis-status-${(record.status || '').toLowerCase().replace(/\s+/g, '-')}`}>
+                        {record.status || 'Active'}
+                      </span>
+                    </td>
+
+                    {/* Action */}
                     <td className="pis-actions">
-                      <button
-                        className="pis-btn-settle"
-                        onClick={() => handleSettleClick(invoice)}
-                        disabled={!outstanding || outstanding.total_credit <= 0}
-                        title={(!outstanding || outstanding.total_credit <= 0) ? 'No available credits' : 'Settle with credit'}
-                        type="button"
-                      >
-                        <FontAwesomeIcon icon={faBalanceScale} /> Settle
-                      </button>
+                      {isInvoice && (
+                        <button
+                          className="pis-btn-settle"
+                          onClick={() => handleSettleClick(record)}
+                          title="Settle with available credit"
+                          type="button"
+                        >
+                          <FontAwesomeIcon icon={faBalanceScale} /> Settle
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );
@@ -281,57 +518,25 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [] }) =>
         </table>
       </div>
 
+      {/* ── Available Credits Sub-section ── */}
       <div className="pis-credit-section">
         <div className="pis-credit-header">
-          <h4><FontAwesomeIcon icon={faWallet} /> Available Supplier Credits</h4>
-          <span>Advance payments and unsettled return credits</span>
+          <h4>
+            <FontAwesomeIcon icon={faWallet} /> Available Supplier Credits
+          </h4>
+          <span>Outstanding payments and unsettled return credits (shown in table above)</span>
         </div>
-
-        {loading ? (
-          <div className="pis-empty">
-            <FontAwesomeIcon icon={faSpinner} spin />
-            <p>Loading supplier credits...</p>
-          </div>
-        ) : credits.length === 0 ? (
-          <div className="pis-empty">
-            <FontAwesomeIcon icon={faReceipt} />
-            <p>No available advance payments or return credits for this supplier.</p>
-          </div>
-        ) : (
-          <div className="pis-credit-table-wrap">
-            <table className="pis-table pis-credit-table">
-              <thead>
-                <tr>
-                  <th>Type</th>
-                  <th>Reference</th>
-                  <th>Date</th>
-                  <th className="pis-amount">Original</th>
-                  <th className="pis-amount">Available</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {credits.map((credit) => (
-                  <tr key={`${credit.credit_type}-${credit.id}`}>
-                    <td>
-                      <span className={`pis-credit-badge ${credit.credit_type === 'return_credit' ? 'return' : 'advance'}`}>
-                        {credit.credit_type === 'return_credit' ? 'Purchase Return Credit' : 'Advance Payment'}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="pis-invoice-num">{credit.credit_number}</div>
-                      <div className="pis-subtle">{credit.reference_number || credit.notes || 'Supplier credit'}</div>
-                    </td>
-                    <td>{dayjs(credit.credit_date).format('DD MMM YYYY')}</td>
-                    <td className="pis-amount">{formatCurrency(credit.original_amount)}</td>
-                    <td className="pis-amount">{formatCurrency(credit.remaining_credit)}</td>
-                    <td>{credit.status || 'Active'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <div className="pis-credit-legend">
+          <span className="pis-credit-badge advance">
+            <FontAwesomeIcon icon={faMoneyBillWave} /> Advance Payment
+          </span>
+          <span className="pis-credit-badge return">
+            <FontAwesomeIcon icon={faReceipt} /> Purchase Return Credit
+          </span>
+          <span className="pis-credit-badge invoice-legend">
+            <FontAwesomeIcon icon={faFileInvoice} /> Outstanding Invoice
+          </span>
+        </div>
       </div>
     </div>
   );

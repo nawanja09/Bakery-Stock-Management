@@ -12,6 +12,10 @@ router.get('/:id/outstanding', supplierCreditController.getSupplierOutstanding);
 // GET credit allocation history for a supplier
 router.get('/:id/credit-history', supplierCreditController.getSupplierCreditHistory);
 
+// GET all outstanding records across ALL suppliers (invoices + advances + return credits)
+// NOTE: This must come before parameterized /:id routes
+router.get('/outstanding/all', supplierCreditController.getAllOutstandingRecords);
+
 // POST Pay Now (advance payment → overpayment)
 router.post('/pay-now', supplierCreditController.createOverpayment);
 
