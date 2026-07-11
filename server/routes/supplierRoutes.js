@@ -56,6 +56,11 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET all outstanding records across ALL suppliers
+// Must be registered BEFORE the /:id route to avoid route conflicts
+const supplierCreditController = require('../controllers/supplierCreditController');
+router.get('/outstanding/all', supplierCreditController.getAllOutstandingRecords);
+
 // GET single supplier
 router.get('/:id', async (req, res) => {
   const { id } = req.params;

@@ -725,13 +725,11 @@ const AddPurchase = () => {
           </button>
         </div>
 
-        {formData.supplier_id && (
-          <PendingInvoicesSection
-            supplierId={formData.supplier_id}
-            supplierName={selectedSupplier?.name || ''}
-            suppliers={suppliers}
-          />
-        )}
+        <PendingInvoicesSection
+          supplierId={formData.supplier_id}
+          supplierName={selectedSupplier?.name || ''}
+          suppliers={suppliers}
+        />
 
         <div className="form-actions">
           <button

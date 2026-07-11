@@ -61,6 +61,17 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
 
   const handleSubmit = async e => {
     e.preventDefault();
+
+    // Cross-supplier guard: all invoices must belong to the same supplier
+    const uniqueSupplierIds = [...new Set(selectedInvoices.map(inv => inv.supplier_id).filter(Boolean))];
+    if (uniqueSupplierIds.length > 1) {
+      return showPopup(
+        'error',
+        'Cannot pay invoices from different suppliers in one transaction. ' +
+        'Please select invoices belonging to the same supplier only.'
+      );
+    }
+
     if (!formData.payment_date) return showPopup('error', 'Payment date is required');
     if (formData.amount <= 0)   return showPopup('error', 'Amount must be greater than 0');
     if (formData.amount > totalBalance + 0.01) return showPopup('error', `Amount exceeds total balance of Rs. ${totalBalance.toFixed(2)}`);

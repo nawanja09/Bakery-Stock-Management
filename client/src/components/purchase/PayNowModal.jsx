@@ -1,5 +1,5 @@
 // src/components/purchase/PayNowModal.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTimes, faPaperPlane, faInfoCircle, faMoneyBillWave, faSpinner } from '@fortawesome/free-solid-svg-icons';
 import dayjs from 'dayjs';
@@ -11,15 +11,28 @@ const PayNowModal = ({ isOpen, onClose, supplierId, supplierName, onSuccess }) =
   const { showPopup } = usePopup();
   const currentUser = JSON.parse(localStorage.getItem('user'));
 
-  const [formData, setFormData] = useState({
+  const defaultForm = {
     payment_date: dayjs().format('YYYY-MM-DD'),
     payment_method: 'CASH',
     voucher_number: '',
     reference_number: '',
     amount: '',
     notes: ''
-  });
+  };
+
+  const [formData, setFormData] = useState(defaultForm);
   const [submitting, setSubmitting] = useState(false);
+
+  // Reset form to defaults every time the modal is opened
+  useEffect(() => {
+    if (isOpen) {
+      setFormData({
+        ...defaultForm,
+        payment_date: dayjs().format('YYYY-MM-DD')
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -51,8 +64,20 @@ const PayNowModal = ({ isOpen, onClose, supplierId, supplierName, onSuccess }) =
         created_by: currentUser.id
       });
 
-      showPopup('success', response.data.message || 'Overpayment recorded successfully!');
-      onSuccess && onSuccess(response.data);
+      showPopup('success', response.data.message || 'Advance payment recorded successfully!');
+
+      // Refresh the outstanding list BEFORE closing the modal so the
+      // new Supplier Overpayment / Advance Payment row is visible.
+      if (onSuccess) {
+        await onSuccess(response.data);
+      }
+
+      // Reset form so a re-open always shows a clean slate
+      setFormData({
+        ...defaultForm,
+        payment_date: dayjs().format('YYYY-MM-DD')
+      });
+
       onClose();
     } catch (err) {
       console.error(err);
