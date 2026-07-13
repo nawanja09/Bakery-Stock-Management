@@ -38,7 +38,7 @@ const ModalPortal = ({ children, onClose }) => {
   );
 };
 
-// Modal version of IssuanceDetails for popup use
+// Modal version of IssuanceDetails for popup use - FIXED UI
 const IssuanceDetailsModal = ({ id, onClose }) => {
   const [issuance, setIssuance] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -58,44 +58,101 @@ const IssuanceDetailsModal = ({ id, onClose }) => {
     fetchIssuance();
   }, [id, showPopup]);
 
-  if (loading) return <div className="loading">Loading...</div>;
-  if (!issuance) return <div>No issuance data found</div>;
+  if (loading) return (
+    <div className="modal-loading">
+      <div className="loading-spinner"></div>
+      <p>Loading issuance details...</p>
+    </div>
+  );
+  
+  if (!issuance) return (
+    <div className="modal-error">
+      <p>No issuance data found</p>
+      <button onClick={onClose} className="btn-secondary">Close</button>
+    </div>
+  );
 
   return (
-    <div className="issuance-details">
-      <div className="header-with-actions">
-        <h2>Issuance ID: {issuance.id}</h2>
-        <button className="btn-close" onClick={onClose}>&#10005;</button>
+    <div className="issuance-detail-modal">
+      {/* Header */}
+      <div className="detail-modal-header">
+        <div className="detail-modal-title">
+          <h2>Issuance Details</h2>
+          <span className="detail-id">#{issuance.id}</span>
+        </div>
+        <button className="btn-close-modal" onClick={onClose}>&#10005;</button>
       </div>
-      <div className="details-row vertical">
-        <ul className="details-list">
-          <li><strong>Date & Time:</strong> {new Date(issuance.issuance_date).toLocaleString()}</li>
-          <li><strong>Received By:</strong> {issuance.received_by}</li>
-          <li><strong>Department:</strong> {issuance.department_name}</li>
-        </ul>
+
+      {/* Information Cards */}
+      <div className="detail-info-grid">
+        <div className="detail-info-card">
+          <span className="detail-label">Date & Time</span>
+          <span className="detail-value">{new Date(issuance.issuance_date).toLocaleString()}</span>
+        </div>
+        <div className="detail-info-card">
+          <span className="detail-label">Department</span>
+          <span className="detail-value">{issuance.department_name || 'N/A'}</span>
+        </div>
+        <div className="detail-info-card">
+          <span className="detail-label">Received By</span>
+          <span className="detail-value">{issuance.received_by || 'N/A'}</span>
+        </div>
+        <div className="detail-info-card">
+          <span className="detail-label">Time of Day</span>
+          <span className="detail-value">{issuance.remarks || 'N/A'}</span>
+        </div>
+        {issuance.approved_by && (
+          <div className="detail-info-card">
+            <span className="detail-label">Approved By</span>
+            <span className="detail-value">{issuance.approved_by}</span>
+          </div>
+        )}
+        {issuance.check_number && (
+          <div className="detail-info-card">
+            <span className="detail-label">Check Number</span>
+            <span className="detail-value">{issuance.check_number}</span>
+          </div>
+        )}
       </div>
-      <div className="items-table">
+
+      {/* Items Table */}
+      <div className="detail-items-section">
         <h3>Issued Items</h3>
-        <table>
-          <thead>
-            <tr>
-              <th>Item Code</th>
-              <th>Item Name</th>
-              <th>Quantity</th>
-              <th>Unit</th>
-            </tr>
-          </thead>
-          <tbody>
-            {issuance.items.map((item, index) => (
-              <tr key={index}>
-                <td>{item.item_code}</td>
-                <td>{item.item_name}</td>
-                <td>{formatQuantity(item.quantity)}</td>
-                <td>{item.unit}</td>
+        <div className="detail-table-responsive">
+          <table className="detail-items-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Item Code</th>
+                <th>Item Name</th>
+                <th>Quantity</th>
+                <th>Unit</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {issuance.items && issuance.items.length > 0 ? (
+                issuance.items.map((item, index) => (
+                  <tr key={index}>
+                    <td>{index + 1}</td>
+                    <td><span className="item-code-badge">{item.item_code || 'N/A'}</span></td>
+                    <td>{item.item_name}</td>
+                    <td className="quantity-cell">{formatQuantity(item.quantity)}</td>
+                    <td>{item.unit || 'N/A'}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="5" className="no-items-message">No items found in this issuance</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Footer Actions */}
+      <div className="detail-modal-footer">
+        <button onClick={onClose} className="btn-secondary">Close</button>
       </div>
     </div>
   );
@@ -146,8 +203,7 @@ const IssuanceHistory = () => {
   return (
     <div className="issuance-container">
       <div className="header-with-actions">
-        <h2 style={{ margin: 0 }}>Issuance History</h2>
-        <Link to="/issuance/issue" className="btn-primary">+ New Issuance</Link>
+        <h2 style={{ margin: 0 }}>RM Issue Summary</h2>
       </div>
 
       {/* Filter Section - Single Line */}
@@ -202,7 +258,7 @@ const IssuanceHistory = () => {
               ))
             ) : (
               <tr>
-                <td colSpan="5" style={{ textAlign: 'center', color: '#888' }}>
+                <td colSpan="6" style={{ textAlign: 'center', color: '#888' }}>
                   No issuance records found.
                 </td>
               </tr>
