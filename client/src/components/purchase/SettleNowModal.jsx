@@ -7,16 +7,12 @@ import { usePopup } from '../context/PopupContext';
 import api from '../../api';
 import './SettleNowModal.css';
 
-/**
- * SettleNowModal
- * Applies supplier credits to a specific invoice
- */
 const SettleNowModal = ({ isOpen, onClose, invoice, supplierId, onSuccess }) => {
   const { showPopup } = usePopup();
   const currentUser = JSON.parse(localStorage.getItem('user'));
 
   const [credits, setCredits] = useState([]);
-  const [allocations, setAllocations] = useState({}); // { [creditId]: amount }
+  const [allocations, setAllocations] = useState({});
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -28,11 +24,10 @@ const SettleNowModal = ({ isOpen, onClose, invoice, supplierId, onSuccess }) => 
     setLoading(true);
     try {
       const { data } = await api.get(`/suppliers/${supplierId}/credits`);
-      // Combine overpayments and return credits
       const combined = [
         ...(data.overpayments || []),
         ...(data.return_credits || [])
-      ].sort((a, b) => new Date(a.credit_date) - new Date(b.credit_date)); // oldest first
+      ].sort((a, b) => new Date(a.credit_date) - new Date(b.credit_date));
       setCredits(combined);
       setAllocations({});
     } catch (err) {
@@ -52,11 +47,9 @@ const SettleNowModal = ({ isOpen, onClose, invoice, supplierId, onSuccess }) => 
     let amt = parseFloat(value);
     if (isNaN(amt)) amt = 0;
 
-    // Cannot exceed the credit's remaining balance
     const maxForCredit = parseFloat(credit.remaining_credit);
     if (amt > maxForCredit) amt = maxForCredit;
 
-    // Cannot exceed invoice remaining balance (excluding current credit's existing allocation)
     const currentAlloc = parseFloat(allocations[credit.id]) || 0;
     const maxForInvoice = parseFloat(invoice.balance_amount) - (totalAllocated - currentAlloc);
     if (amt > maxForInvoice) amt = maxForInvoice;
@@ -84,7 +77,6 @@ const SettleNowModal = ({ isOpen, onClose, invoice, supplierId, onSuccess }) => 
 
     if (creditsToApply.length === 0) return showPopup('error', 'Please allocate at least one credit');
 
-    // Cross-supplier guard: every credit must belong to the same supplier as the invoice
     if (invoice?.supplier_id) {
       const mismatch = credits
         .filter(c => parseFloat(allocations[c.id]) > 0)
@@ -109,7 +101,12 @@ const SettleNowModal = ({ isOpen, onClose, invoice, supplierId, onSuccess }) => 
       });
 
       showPopup('success', response.data.message || 'Credit settled successfully!');
-      onSuccess && onSuccess(response.data);
+      
+      // ✅ Fix: Call onSuccess with the response data
+      if (onSuccess) {
+        await onSuccess(response.data);
+      }
+      
       onClose();
     } catch (err) {
       console.error(err);

@@ -23,7 +23,6 @@ const PayNowModal = ({ isOpen, onClose, supplierId, supplierName, onSuccess }) =
   const [formData, setFormData] = useState(defaultForm);
   const [submitting, setSubmitting] = useState(false);
 
-  // Reset form to defaults every time the modal is opened
   useEffect(() => {
     if (isOpen) {
       setFormData({
@@ -31,7 +30,6 @@ const PayNowModal = ({ isOpen, onClose, supplierId, supplierName, onSuccess }) =
         payment_date: dayjs().format('YYYY-MM-DD')
       });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
   if (!isOpen) return null;
@@ -66,13 +64,10 @@ const PayNowModal = ({ isOpen, onClose, supplierId, supplierName, onSuccess }) =
 
       showPopup('success', response.data.message || 'Advance payment recorded successfully!');
 
-      // Refresh the outstanding list BEFORE closing the modal so the
-      // new Supplier Overpayment / Advance Payment row is visible.
       if (onSuccess) {
         await onSuccess(response.data);
       }
 
-      // Reset form so a re-open always shows a clean slate
       setFormData({
         ...defaultForm,
         payment_date: dayjs().format('YYYY-MM-DD')
@@ -110,7 +105,8 @@ const PayNowModal = ({ isOpen, onClose, supplierId, supplierName, onSuccess }) =
             </div>
           </div>
 
-          <form className="pnm-form" onSubmit={handleSubmit} id="pnm-form">
+          {/* ✅ FIX: Changed from <form> to <div> with an ID and using handleSubmit directly */}
+          <div className="pnm-form" id="pnm-form">
             <div className="pnm-form-group">
               <label>Supplier Name</label>
               <input type="text" value={supplierName || ''} readOnly />
@@ -163,17 +159,19 @@ const PayNowModal = ({ isOpen, onClose, supplierId, supplierName, onSuccess }) =
 
             <div className="pnm-form-group">
               <label>Amount (Rs.) *</label>
-              <input
-                type="number"
-                name="amount"
-                value={formData.amount}
-                onChange={handleChange}
-                min="0.01"
-                step="0.01"
-                placeholder="0.00"
-                required
-                className="pnm-amount-input"
-              />
+              <div className="pnm-amount-wrapper">
+                <input
+                  type="number"
+                  name="amount"
+                  value={formData.amount}
+                  onChange={handleChange}
+                  min="0.01"
+                  step="0.01"
+                  placeholder="0.00"
+                  required
+                  className="pnm-amount-input"
+                />
+              </div>
             </div>
 
             <div className="pnm-form-group">
@@ -186,15 +184,15 @@ const PayNowModal = ({ isOpen, onClose, supplierId, supplierName, onSuccess }) =
                 placeholder="Add payment notes..."
               />
             </div>
-          </form>
+          </div>
         </div>
 
         <div className="pnm-footer">
           <button className="pnm-btn-cancel" onClick={onClose} type="button">Cancel</button>
           <button
             className="pnm-btn-submit"
-            type="submit"
-            form="pnm-form"
+            type="button"
+            onClick={handleSubmit}  // ✅ Directly call handleSubmit
             disabled={submitting || !formData.amount || parseFloat(formData.amount) <= 0}
           >
             {submitting

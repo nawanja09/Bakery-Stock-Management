@@ -1,9 +1,6 @@
 // controllers/supplierCreditController.js
 const pool = require('../config/db');
 
-// ─────────────────────────────────────────────────────────────
-// HELPERS
-// ─────────────────────────────────────────────────────────────
 const formatNum = (v) => parseFloat(v) || 0;
 const VALID_PAYMENT_METHODS = ['CASH', 'BANK_TRANSFER', 'CHEQUE', 'CREDIT'];
 
@@ -38,14 +35,12 @@ const ensureUnsettledReturnCredits = async () => {
   }
 };
 
-// ─────────────────────────────────────────────────────────────
 // GET /api/suppliers/:id/credits
-// Returns all active/partial supplier credits (overpayments + return credits)
-// ─────────────────────────────────────────────────────────────
 const getSupplierCredits = async (req, res) => {
   const { id: supplierId } = req.params;
   try {
     await ensureUnsettledReturnCredits();
+    
     const [overpayments] = await pool.query(`
       SELECT
         so.id,
@@ -59,11 +54,13 @@ const getSupplierCredits = async (req, res) => {
         so.voucher_number,
         so.reference_number,
         so.notes,
-        u.name               AS created_by_name
+        u.name               AS created_by_name,
+        so.supplier_id
       FROM supplier_overpayments so
       LEFT JOIN users u ON so.created_by = u.id
       WHERE so.supplier_id = ?
         AND so.status != 'Fully Used'
+        AND so.remaining_credit > 0
       ORDER BY so.payment_date DESC
     `, [supplierId]);
 
@@ -80,11 +77,13 @@ const getSupplierCredits = async (req, res) => {
         pr.return_number     AS reference_number,
         NULL                 AS voucher_number,
         NULL                 AS notes,
-        NULL                 AS created_by_name
+        NULL                 AS created_by_name,
+        prc.supplier_id
       FROM purchase_return_credits prc
       JOIN purchase_returns pr ON prc.purchase_return_id = pr.id
       WHERE prc.supplier_id = ?
         AND prc.status != 'Fully Used'
+        AND prc.remaining_credit > 0
       ORDER BY prc.credit_date DESC
     `, [supplierId]);
 
@@ -106,14 +105,12 @@ const getSupplierCredits = async (req, res) => {
   }
 };
 
-// ─────────────────────────────────────────────────────────────
 // GET /api/suppliers/:id/outstanding
-// Returns summary of supplier outstanding invoices + credits
-// ─────────────────────────────────────────────────────────────
 const getSupplierOutstanding = async (req, res) => {
   const { id: supplierId } = req.params;
   try {
     await ensureUnsettledReturnCredits();
+    
     const [[invoiceSummary]] = await pool.query(`
       SELECT
         COUNT(*)                       AS total_invoices,
@@ -130,18 +127,18 @@ const getSupplierOutstanding = async (req, res) => {
       SELECT
         COALESCE(SUM(remaining_credit),0) AS overpayment_credit
       FROM supplier_overpayments
-      WHERE supplier_id = ? AND status != 'Fully Used'
+      WHERE supplier_id = ? AND status != 'Fully Used' AND remaining_credit > 0
     `, [supplierId]);
 
     const [[returnCreditSummary]] = await pool.query(`
       SELECT
         COALESCE(SUM(remaining_credit),0) AS return_credit
       FROM purchase_return_credits
-      WHERE supplier_id = ? AND status != 'Fully Used'
+      WHERE supplier_id = ? AND status != 'Fully Used' AND remaining_credit > 0
     `, [supplierId]);
 
     res.json({
-      total_invoices: invoiceSummary.total_invoices,
+      total_invoices: invoiceSummary.total_invoices || 0,
       total_billed: formatNum(invoiceSummary.total_billed),
       total_paid: formatNum(invoiceSummary.total_paid),
       total_outstanding: formatNum(invoiceSummary.total_outstanding),
@@ -155,12 +152,7 @@ const getSupplierOutstanding = async (req, res) => {
   }
 };
 
-// ─────────────────────────────────────────────────────────────
 // POST /api/suppliers/pay-now
-// Record an advance payment (Supplier Overpayment)
-// Body: { supplier_id, payment_date, payment_method, voucher_number,
-//         reference_number, amount, notes, created_by }
-// ─────────────────────────────────────────────────────────────
 const createOverpayment = async (req, res) => {
   const {
     supplier_id,
@@ -186,14 +178,12 @@ const createOverpayment = async (req, res) => {
   try {
     await connection.beginTransaction();
 
-    const [supplierRows] = await connection.query('SELECT id FROM supplier WHERE id = ? LIMIT 1', [supplier_id]);
+    const [supplierRows] = await connection.query('SELECT id, name FROM supplier WHERE id = ? LIMIT 1', [supplier_id]);
     if (supplierRows.length === 0) {
       await connection.rollback();
       return res.status(404).json({ error: 'Supplier not found' });
     }
 
-    // Advance payments are intentionally not linked to a purchase invoice.
-    // They remain available as supplier credits until they are allocated.
     const datePart = payment_date.replace(/-/g, '');
     const rand = Math.floor(Math.random() * 9000) + 1000;
     const overpayment_number = `ADV-${datePart}-${rand}`;
@@ -213,9 +203,11 @@ const createOverpayment = async (req, res) => {
 
     await connection.commit();
 
-    // Fetch the inserted overpayment row to return a complete representation
     const [[inserted]] = await connection.query(
-      `SELECT so.id, so.overpayment_number, so.supplier_id, s.name AS supplier_name, so.payment_date, so.payment_method, so.voucher_number, so.reference_number, so.original_amount, so.remaining_credit, so.status, so.notes, so.created_by
+      `SELECT so.id, so.overpayment_number, so.supplier_id, s.name AS supplier_name, 
+              so.payment_date, so.payment_method, so.voucher_number, 
+              so.reference_number, so.original_amount, so.remaining_credit, 
+              so.status, so.notes, so.created_by
        FROM supplier_overpayments so
        JOIN supplier s ON so.supplier_id = s.id
        WHERE so.id = ? LIMIT 1`,
@@ -238,19 +230,7 @@ const createOverpayment = async (req, res) => {
   }
 };
 
-// ─────────────────────────────────────────────────────────────
 // POST /api/suppliers/settle-credit
-// Settle one or more credits against one invoice
-// Body: {
-//   purchase_id,
-//   settlement_date,
-//   settled_by,
-//   notes,
-//   credits: [
-//     { credit_type: 'overpayment'|'return_credit', credit_id, amount }
-//   ]
-// }
-// ─────────────────────────────────────────────────────────────
 const settleCreditToInvoice = async (req, res) => {
   const { purchase_id, settlement_date, settled_by, notes, credits } = req.body;
 
@@ -263,7 +243,6 @@ const settleCreditToInvoice = async (req, res) => {
   try {
     await connection.beginTransaction();
 
-    // Get current invoice state
     const [[invoice]] = await connection.query(
       'SELECT * FROM purchases WHERE id = ? FOR UPDATE',
       [purchase_id]
@@ -286,11 +265,12 @@ const settleCreditToInvoice = async (req, res) => {
 
       if (amount > remainingInvoiceBalance + 0.001) {
         await connection.rollback();
-        return res.status(400).json({ error: `Credit amount ${amount} exceeds remaining invoice balance ${remainingInvoiceBalance}` });
+        return res.status(400).json({ 
+          error: `Credit amount ${amount} exceeds remaining invoice balance ${remainingInvoiceBalance}` 
+        });
       }
 
       if (credit.credit_type === 'overpayment') {
-        // Get and lock overpayment
         const [[op]] = await connection.query(
           'SELECT * FROM supplier_overpayments WHERE id = ? FOR UPDATE',
           [credit.credit_id]
@@ -305,7 +285,8 @@ const settleCreditToInvoice = async (req, res) => {
         }
 
         const newRemaining = formatNum(op.remaining_credit) - amount;
-        const newStatus = newRemaining <= 0.001 ? 'Fully Used' : newRemaining < formatNum(op.original_amount) ? 'Partially Used' : 'Active';
+        const newStatus = newRemaining <= 0.001 ? 'Fully Used' : 
+                         newRemaining < formatNum(op.original_amount) ? 'Partially Used' : 'Active';
 
         await connection.query(
           'UPDATE supplier_overpayments SET remaining_credit = ?, status = ?, updated_by = ? WHERE id = ?',
@@ -314,12 +295,12 @@ const settleCreditToInvoice = async (req, res) => {
 
         await connection.query(`
           INSERT INTO credit_allocations
-            (credit_type, overpayment_id, return_credit_id, purchase_id, allocated_amount, settlement_date, settled_by, notes)
+            (credit_type, overpayment_id, return_credit_id, purchase_id, 
+             allocated_amount, settlement_date, settled_by, notes)
           VALUES ('overpayment', ?, NULL, ?, ?, ?, ?, ?)
         `, [op.id, purchase_id, amount, settlement_date, settled_by, notes || null]);
 
       } else if (credit.credit_type === 'return_credit') {
-        // Get and lock return credit
         const [[rc]] = await connection.query(
           'SELECT * FROM purchase_return_credits WHERE id = ? FOR UPDATE',
           [credit.credit_id]
@@ -334,7 +315,8 @@ const settleCreditToInvoice = async (req, res) => {
         }
 
         const newRemaining = formatNum(rc.remaining_credit) - amount;
-        const newStatus = newRemaining <= 0.001 ? 'Fully Used' : newRemaining < formatNum(rc.original_amount) ? 'Partially Used' : 'Active';
+        const newStatus = newRemaining <= 0.001 ? 'Fully Used' : 
+                         newRemaining < formatNum(rc.original_amount) ? 'Partially Used' : 'Active';
 
         await connection.query(
           'UPDATE purchase_return_credits SET remaining_credit = ?, status = ?, updated_at = NOW() WHERE id = ?',
@@ -343,7 +325,8 @@ const settleCreditToInvoice = async (req, res) => {
 
         await connection.query(`
           INSERT INTO credit_allocations
-            (credit_type, overpayment_id, return_credit_id, purchase_id, allocated_amount, settlement_date, settled_by, notes)
+            (credit_type, overpayment_id, return_credit_id, purchase_id, 
+             allocated_amount, settlement_date, settled_by, notes)
           VALUES ('return_credit', NULL, ?, ?, ?, ?, ?, ?)
         `, [rc.id, purchase_id, amount, settlement_date, settled_by, notes || null]);
       } else {
@@ -355,7 +338,6 @@ const settleCreditToInvoice = async (req, res) => {
       remainingInvoiceBalance -= amount;
     }
 
-    // Update invoice paid_amount and balance
     const newPaidAmount = formatNum(invoice.paid_amount) + totalSettled;
     const newBalance = Math.max(0, formatNum(invoice.total_with_vat) - newPaidAmount);
     const newBalanceStatus = newBalance > 0 ? 1 : 0;
@@ -368,7 +350,6 @@ const settleCreditToInvoice = async (req, res) => {
       [newPaidAmount, newBalance, newBalanceStatus, newPaymentStatus, purchase_id]
     );
 
-    // Also record in payment_history for audit trail
     await connection.query(`
       INSERT INTO payment_history
         (purchase_id, payment_date, amount, payment_method, notes, created_by)
@@ -391,10 +372,7 @@ const settleCreditToInvoice = async (req, res) => {
   }
 };
 
-// ─────────────────────────────────────────────────────────────
 // GET /api/suppliers/:id/credit-history
-// Full allocation history for a supplier
-// ─────────────────────────────────────────────────────────────
 const getSupplierCreditHistory = async (req, res) => {
   const { id: supplierId } = req.params;
   try {
@@ -428,17 +406,11 @@ const getSupplierCreditHistory = async (req, res) => {
   }
 };
 
-// ─────────────────────────────────────────────────────────────
 // GET /api/suppliers/outstanding/all
-// Returns all outstanding records across ALL suppliers:
-//   - Outstanding Purchase Invoices (balance_amount > 0)
-//   - Supplier Advance Payments / Overpayments
-//   - Unsettled Purchase Return Credits
-// ─────────────────────────────────────────────────────────────
 const getAllOutstandingRecords = async (req, res) => {
   try {
     await ensureUnsettledReturnCredits();
-    // 1. Outstanding invoices
+    
     const [invoices] = await pool.query(`
       SELECT
         p.id,
@@ -447,8 +419,8 @@ const getAllOutstandingRecords = async (req, res) => {
         'Invoice'       AS document_type,
         p.invoice_no    AS document_number,
         p.purchase_date AS transaction_date,
-        p.balance_amount AS balance_amount,
         p.balance_amount AS outstanding_amount,
+        p.balance_amount AS balance_amount,
         p.payment_status AS status
       FROM purchases p
       JOIN supplier s ON p.supplier_id = s.id
@@ -457,7 +429,6 @@ const getAllOutstandingRecords = async (req, res) => {
       ORDER BY s.name ASC, p.purchase_date DESC
     `);
 
-    // 2. Advance payments (overpayments)
     const [advances] = await pool.query(`
       SELECT
         so.id,
@@ -475,7 +446,6 @@ const getAllOutstandingRecords = async (req, res) => {
       ORDER BY s.name ASC, so.payment_date DESC
     `);
 
-    // 3. Unsettled purchase return credits
     const [returnCredits] = await pool.query(`
       SELECT
         prc.id,
@@ -493,11 +463,11 @@ const getAllOutstandingRecords = async (req, res) => {
       ORDER BY s.name ASC, prc.credit_date DESC
     `);
 
-    // Normalize numeric fields
     const normalize = (records) =>
       records.map((r) => ({
         ...r,
-        outstanding_amount: formatNum(r.outstanding_amount)
+        outstanding_amount: formatNum(r.outstanding_amount),
+        balance_amount: formatNum(r.balance_amount || r.outstanding_amount)
       }));
 
     const normalizedInvoices = normalize(invoices);

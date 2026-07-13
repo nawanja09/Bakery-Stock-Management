@@ -1,3 +1,4 @@
+// controllers/purchaseController.js
 const pool = require('../config/db');
 
 const resolveUserId = async (connection, ...candidateIds) => {
@@ -96,7 +97,7 @@ const createPurchase = async (req, res) => {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [invoice_no, purchase_date, supplier_id, total_with_vat, subtotal, vat_amount, 
        total_with_vat, vat_rate, normalizedPaidAmount, normalizedBalanceAmount, normalizedBalanceStatus, 
-       payment_method, check_number, remarks, prepared_by, company_id, normalizedPaymentStatus]
+       payment_method, check_number, remarks, resolvedPreparedBy, company_id, normalizedPaymentStatus]
     );
     
     const purchaseId = purchaseResult.insertId;
@@ -148,7 +149,7 @@ const createPurchase = async (req, res) => {
   }
 };
 
-// Update getAllPurchases function with better data formatting
+// Get all purchases
 const getAllPurchases = async (req, res) => {
   try {
     const [purchases] = await pool.query(`
@@ -175,12 +176,9 @@ const getAllPurchases = async (req, res) => {
       ORDER BY p.purchase_date DESC, p.id DESC
     `);
 
-    // Get payment counts and return counts for each purchase
     for (let purchase of purchases) {
-      // Ensure invoice_no is a string and not null
       purchase.invoice_no = purchase.invoice_no ? String(purchase.invoice_no) : 'N/A';
       
-      // Get payment count and total payments
       const [payments] = await pool.query(
         `SELECT COUNT(*) as payment_count, COALESCE(SUM(amount), 0) as total_payments
          FROM payment_history 
@@ -190,7 +188,6 @@ const getAllPurchases = async (req, res) => {
       purchase.payment_count = payments[0]?.payment_count || 0;
       purchase.total_payments = payments[0]?.total_payments || 0;
 
-      // Get return total
       const [returns] = await pool.query(
         `SELECT COALESCE(SUM(pri.total_amount), 0) as total_returns
          FROM purchase_returns pr
@@ -200,7 +197,6 @@ const getAllPurchases = async (req, res) => {
       );
       purchase.total_returns = returns[0]?.total_returns || 0;
       
-      // Format amounts to numbers
       purchase.subtotal = parseFloat(purchase.subtotal) || 0;
       purchase.vat_amount = parseFloat(purchase.vat_amount) || 0;
       purchase.total_with_vat = parseFloat(purchase.total_with_vat) || 0;
@@ -267,7 +263,6 @@ const getPurchaseById = async (req, res) => {
       ORDER BY ph.payment_date DESC
     `, [id]);
 
-    // 🔥 FIXED: Specify table alias for total_amount
     const [returns] = await pool.query(`
       SELECT 
         pr.id,
@@ -331,7 +326,6 @@ const updatePurchase = async (req, res) => {
   try {
     await connection.beginTransaction();
 
-    // Check duplicate invoice
     const [existing] = await connection.query(
       'SELECT id FROM purchases WHERE invoice_no = ? AND id != ?',
       [invoice_no, id]
@@ -344,13 +338,19 @@ const updatePurchase = async (req, res) => {
       });
     }
 
+    const resolvedPreparedBy = await resolveUserId(connection, prepared_by, req.user?.id);
+
+    if (!resolvedPreparedBy) {
+      await connection.rollback();
+      return res.status(400).json({ error: 'No valid user found for purchase audit' });
+    }
+
     const paymentState = calculatePaymentState(paid_amount, total_with_vat);
     const normalizedPaidAmount = paymentState.paid_amount;
     const normalizedBalanceAmount = paymentState.balance_amount;
     const normalizedBalanceStatus = paymentState.balance_status;
     const normalizedPaymentStatus = paymentState.payment_status;
 
-    // Update purchase
     await connection.query(
       `UPDATE purchases 
        SET invoice_no = ?, purchase_date = ?, supplier_id = ?, bill_amount = ?, subtotal = ?, 
@@ -360,10 +360,9 @@ const updatePurchase = async (req, res) => {
        WHERE id = ?`,
       [invoice_no, purchase_date, supplier_id, total_with_vat, subtotal, vat_amount, 
        total_with_vat, vat_rate, normalizedPaidAmount, normalizedBalanceAmount, normalizedBalanceStatus, 
-       payment_method, check_number, remarks, resolvedPreparedBy, company_id, normalizedPaymentStatus]
+       payment_method, check_number, remarks, resolvedPreparedBy, company_id, normalizedPaymentStatus, id]
     );
 
-    // Delete existing items and re-insert
     await connection.query(`DELETE FROM purchase_items WHERE purchase_id = ?`, [id]);
 
     for (const item of items) {
@@ -449,9 +448,7 @@ const getPreviousPurchasePrices = async (req, res) => {
   }
 };
 
-// =============================================
 // GET NON-PAID PURCHASES (Balance > 0 only)
-// =============================================
 const getNonPaidPurchases = async (req, res) => {
   try {
     const [purchases] = await pool.query(`
@@ -481,7 +478,7 @@ const getNonPaidPurchases = async (req, res) => {
         JOIN purchase_return_items pri ON pr.id = pri.return_id
         GROUP BY purchase_id
       ) pr ON p.id = pr.purchase_id
-      WHERE p.balance_amount > 0  -- Only show bills with balance > 0
+      WHERE p.balance_amount > 0
         AND p.deleted = FALSE
       ORDER BY 
         CASE 
@@ -491,7 +488,6 @@ const getNonPaidPurchases = async (req, res) => {
         p.purchase_date ASC
     `);
 
-    // Get payment history summary for each purchase
     for (let purchase of purchases) {
       const [payments] = await pool.query(
         `SELECT COUNT(*) as payment_count, COALESCE(SUM(amount), 0) as total_paid
@@ -511,9 +507,7 @@ const getNonPaidPurchases = async (req, res) => {
   }
 };
 
-// =============================================
 // GET PENDING INVOICES FOR A SUPPLIER
-// =============================================
 const getPendingInvoicesBySupplier = async (req, res) => {
   const { supplierId } = req.params;
   try {
@@ -550,12 +544,7 @@ const getPendingInvoicesBySupplier = async (req, res) => {
   }
 };
 
-// =============================================
 // MAKE PAYMENT (supports multi-invoice allocation)
-// Body: { payment_date, amount, payment_method, check_number,
-//         voucher_number, notes, created_by,
-//         invoice_allocations: [{ purchase_id, amount }] }
-// =============================================
 const makePayment = async (req, res) => {
   const { id } = req.params;
   const {
@@ -693,7 +682,7 @@ const makePayment = async (req, res) => {
   }
 };
 
-//Get Payment History for a Purchase
+// Get Payment History for a Purchase
 const getPaymentHistory = async (req, res) => {
   const { id } = req.params;
 
@@ -715,7 +704,7 @@ const getPaymentHistory = async (req, res) => {
   }
 };
 
-//Update existing purchase with payment status 
+// Update existing purchase with payment status
 const updatePaymentStatuses = async (req, res) => {
   try {
     const [result] = await pool.query(`
@@ -738,9 +727,7 @@ const updatePaymentStatuses = async (req, res) => {
   }
 };
 
-// =============================================
 // GET PURCHASE RETURNS FOR A BILL
-// =============================================
 const getPurchaseReturnsForBill = async (req, res) => {
   const { id } = req.params;
 
@@ -802,7 +789,6 @@ const getSupplierBills = async (req, res) => {
     
     const [bills] = await pool.query(query, params);
     
-    // Format amounts as numbers
     const formattedBills = bills.map(bill => ({
       ...bill,
       total_with_vat: parseFloat(bill.total_with_vat) || 0,
@@ -817,7 +803,7 @@ const getSupplierBills = async (req, res) => {
   }
 };
 
-// Add this new function before module.exports
+// Add settlement to return
 const addSettlementToReturn = async (req, res) => {
   const connection = await pool.getConnection();
   
@@ -841,7 +827,6 @@ const addSettlementToReturn = async (req, res) => {
       throw new Error('User ID is required');
     }
 
-    // Get current return details
     const [returns] = await connection.query(
       `SELECT * FROM purchase_returns WHERE id = ?`,
       [id]
@@ -855,7 +840,6 @@ const addSettlementToReturn = async (req, res) => {
     const currentSettledAmount = parseFloat(purchaseReturn.settled_amount) || 0;
     const totalAmount = parseFloat(purchaseReturn.total_amount) || 0;
     
-    // Parse existing settlement details
     let existingSettlements = [];
     if (purchaseReturn.settlement_details) {
       try {
@@ -867,7 +851,6 @@ const addSettlementToReturn = async (req, res) => {
       }
     }
 
-    // Calculate new settlement amount
     let newSettledAmount = 0;
     const enhancedSettlements = [...existingSettlements];
     
@@ -877,15 +860,12 @@ const addSettlementToReturn = async (req, res) => {
       
       newSettledAmount += settlementAmount;
       
-      // Check if this purchase is already in settlements
       const existingIndex = existingSettlements.findIndex(s => s.purchase_id === settlement.purchase_id);
       
       if (existingIndex >= 0) {
-        // Update existing settlement amount
         enhancedSettlements[existingIndex].amount = 
           (enhancedSettlements[existingIndex].amount || 0) + settlementAmount;
       } else {
-        // Get purchase details for this settlement
         const [purchaseDetails] = await connection.query(
           `SELECT id, invoice_no, DATE(purchase_date) as purchase_date FROM purchases WHERE id = ?`,
           [settlement.purchase_id]
@@ -903,7 +883,6 @@ const addSettlementToReturn = async (req, res) => {
     const totalSettledAmount = currentSettledAmount + newSettledAmount;
     const newBalanceAmount = totalAmount - totalSettledAmount;
 
-    // Update purchase return
     await connection.query(
       `UPDATE purchase_returns 
        SET settled_amount = ?, 
@@ -913,14 +892,12 @@ const addSettlementToReturn = async (req, res) => {
       [totalSettledAmount, newBalanceAmount, JSON.stringify(enhancedSettlements), id]
     );
 
-    // Update purchase bills and create payment history
     const settlementDate = settlement_date || purchaseReturn.return_date;
     
     for (const settlement of settlements) {
       const settlementAmount = parseFloat(settlement.amount) || 0;
       if (settlementAmount <= 0) continue;
       
-      // Get current purchase bill details
       const [purchase] = await connection.query(
         `SELECT balance_amount, paid_amount, total_with_vat FROM purchases WHERE id = ?`,
         [settlement.purchase_id]
@@ -951,7 +928,6 @@ const addSettlementToReturn = async (req, res) => {
           [newBalance, newPaid, newBalanceStatus, paymentStatus, settlement.purchase_id]
         );
 
-        // Add payment history entry
         await connection.query(
           `INSERT INTO payment_history 
            (purchase_id, payment_date, amount, payment_method, notes, created_by)
