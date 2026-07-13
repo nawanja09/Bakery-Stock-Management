@@ -105,13 +105,15 @@ const PurchaseHistory = () => {
   const [filteredPurchases, setFilteredPurchases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [companyFilter, setCompanyFilter] = useState('');
-  const [searchInput, setSearchInput] = useState('');
+  const [invoiceSearch, setInvoiceSearch] = useState('');
+  const [supplierSearch, setSupplierSearch] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [companies, setCompanies] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [vatFilter, setVatFilter] = useState('all');
   const [viewMode, setViewMode] = useState(() => {
     return window.innerWidth < 768 ? 'cards' : 'table';
   });
@@ -123,7 +125,8 @@ const PurchaseHistory = () => {
   const [quickFilter, setQuickFilter] = useState('all');
   const tableRef = useRef(null);
 
-  const debouncedSearch = useDebounce(searchInput, 300);
+  const debouncedInvoiceSearch = useDebounce(invoiceSearch, 300);
+  const debouncedSupplierSearch = useDebounce(supplierSearch, 300);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -173,37 +176,54 @@ const PurchaseHistory = () => {
       });
     }
 
-    if (debouncedSearch) {
-      const query = debouncedSearch.toLowerCase();
+    if (debouncedInvoiceSearch) {
+      const query = debouncedInvoiceSearch.toLowerCase();
       filtered = filtered.filter(purchase => {
-        const invoiceNumber = purchase.invoice_no || purchase.invoice_number || '';
-        return invoiceNumber.toLowerCase().includes(query) ||
-          (purchase.supplier_name || '').toLowerCase().includes(query) ||
-          (purchase.company_name || '').toLowerCase().includes(query) ||
-          (purchase.check_number || '').toLowerCase().includes(query);
+        const invoiceNumber = String(purchase.invoice_no || purchase.invoice_number || '');
+        return invoiceNumber.toLowerCase().includes(query);
+      });
+    }
+
+    if (debouncedSupplierSearch) {
+      const query = debouncedSupplierSearch.toLowerCase();
+      filtered = filtered.filter(purchase => {
+        return String(purchase.supplier_name || '').toLowerCase().includes(query);
       });
     }
 
     if (companyFilter) {
+      // Filter by company_id (matching the selected company.id from dropdown)
       filtered = filtered.filter(purchase =>
-        purchase.company_id?.toString() === companyFilter
+        String(purchase.company_id) === String(companyFilter) ||
+        String(purchase.company_name || '').toLowerCase() === String(
+          companies.find(c => String(c.id) === String(companyFilter))?.name || ''
+        ).toLowerCase()
       );
     }
 
     if (startDate) {
-      filtered = filtered.filter(purchase =>
-        dayjs(purchase.purchase_date).isAfter(dayjs(startDate).subtract(1, 'day'))
-      );
+      filtered = filtered.filter(purchase => {
+        if (!purchase.purchase_date) return false;
+        return dayjs(purchase.purchase_date).format('YYYY-MM-DD') >= startDate;
+      });
     }
 
     if (endDate) {
-      filtered = filtered.filter(purchase =>
-        dayjs(purchase.purchase_date).isBefore(dayjs(endDate).add(1, 'day'))
-      );
+      filtered = filtered.filter(purchase => {
+        if (!purchase.purchase_date) return false;
+        return dayjs(purchase.purchase_date).format('YYYY-MM-DD') <= endDate;
+      });
     }
 
     if (statusFilter !== 'all') {
-      filtered = filtered.filter(purchase => purchase.payment_status === statusFilter);
+      filtered = filtered.filter(purchase => String(purchase.payment_status).toLowerCase() === String(statusFilter).toLowerCase());
+    }
+
+    if (vatFilter !== 'all') {
+      filtered = filtered.filter(purchase => {
+        const hasVat = parseFloat(purchase.vat_amount || 0) > 0;
+        return vatFilter === 'with_vat' ? hasVat : !hasVat;
+      });
     }
 
     if (sortConfig.key) {
@@ -222,7 +242,7 @@ const PurchaseHistory = () => {
     }
 
     setFilteredPurchases(filtered);
-  }, [purchases, debouncedSearch, companyFilter, startDate, endDate, statusFilter, sortConfig, quickFilter]);
+  }, [purchases, debouncedInvoiceSearch, debouncedSupplierSearch, companyFilter, startDate, endDate, statusFilter, vatFilter, sortConfig, quickFilter]);
 
   const handleSort = (key) => {
     setSortConfig({
@@ -293,15 +313,17 @@ const PurchaseHistory = () => {
   };
 
   const clearFilters = () => {
-    setSearchInput('');
+    setInvoiceSearch('');
+    setSupplierSearch('');
     setCompanyFilter('');
     setStartDate('');
     setEndDate('');
     setStatusFilter('all');
+    setVatFilter('all');
     setQuickFilter('all');
   };
 
-  const hasActiveFilters = searchInput || companyFilter || startDate || endDate || statusFilter !== 'all' || quickFilter !== 'all';
+  const hasActiveFilters = invoiceSearch || supplierSearch || companyFilter || startDate || endDate || statusFilter !== 'all' || vatFilter !== 'all' || quickFilter !== 'all';
 
   const summary = {
     total_purchases: filteredPurchases.length,
@@ -462,167 +484,54 @@ const PurchaseHistory = () => {
       
       {responsive.isMobile && <MobileFilterSheet />}
 
-      {/* Header */}
-      <header className="responsive-header">
-        <div className="header-main">
-          <div className="header-title-section">
-            {responsive.isMobile && (
-              <button className="mobile-menu-btn" onClick={() => setShowMobileMenu(!showMobileMenu)}>
-                <FontAwesomeIcon icon={faBars} />
-              </button>
-            )}
-            <div className="title-wrapper">
-              <h1 className="responsive-title">
-                <FontAwesomeIcon icon={faFileInvoice} className="title-icon" />
-                Purchasing Summary Report
-              </h1>
-            </div>
-          </div>
-        </div>
+      <header className="responsive-header" style={{ borderBottom: 'none', paddingBottom: 0 }}>
+        <h2 style={{ fontWeight: 'bold', margin: '0' }}>Purchasing Summary Report</h2>
       </header>
 
       {/* Search and Filter Bar */}
-      <div className="search-section-responsive">
-        <div className="search-wrapper-responsive">
-          <FontAwesomeIcon icon={faSearch} className="search-icon-abs" />
-          <input
-            type="text"
-            placeholder="Search by invoice, supplier, or company..."
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            className="search-input-responsive"
-          />
-          {searchInput && (
-            <button className="clear-search-btn" onClick={() => setSearchInput('')}>
-              <FontAwesomeIcon icon={faTimes} />
-            </button>
-          )}
+      <div className="search-filters-container" style={{ display: 'flex', flexWrap: 'wrap', gap: '15px', padding: '15px 20px', backgroundColor: '#fff', borderBottom: '1px solid #eee' }}>
+        <div className="filter-group">
+          <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Date Range</label>
+          <div style={{ display: 'flex', gap: '5px' }}>
+            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} style={{ padding: '6px', border: '1px solid #ddd', borderRadius: '4px' }} />
+            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} style={{ padding: '6px', border: '1px solid #ddd', borderRadius: '4px' }} />
+          </div>
         </div>
-
-        {responsive.isMobile ? (
-          <button 
-            className={`filter-fab ${hasActiveFilters ? 'active' : ''}`}
-            onClick={() => setShowMobileFilters(true)}
-          >
-            <FontAwesomeIcon icon={faFilter} />
-            {hasActiveFilters && <span className="filter-badge-mobile"></span>}
-          </button>
-        ) : (
-          <button 
-            className={`filter-btn-responsive ${hasActiveFilters ? 'active' : ''}`}
-            onClick={() => setShowFilters(!showFilters)}
-          >
-            <FontAwesomeIcon icon={faFilter} />
-            <span>Filters</span>
-            {hasActiveFilters && <span className="filter-count-badge"></span>}
-          </button>
-        )}
+        <div className="filter-group">
+          <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Invoice No.</label>
+          <input type="text" placeholder="Search Invoice..." value={invoiceSearch} onChange={(e) => setInvoiceSearch(e.target.value)} style={{ padding: '6px', border: '1px solid #ddd', borderRadius: '4px' }} />
+        </div>
+        <div className="filter-group">
+          <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Supplier</label>
+          <input type="text" placeholder="Search Supplier..." value={supplierSearch} onChange={(e) => setSupplierSearch(e.target.value)} style={{ padding: '6px', border: '1px solid #ddd', borderRadius: '4px' }} />
+        </div>
+        <div className="filter-group">
+          <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Company</label>
+          <select value={companyFilter} onChange={(e) => setCompanyFilter(e.target.value)} style={{ padding: '6px', border: '1px solid #ddd', borderRadius: '4px' }}>
+            <option value="">All Companies</option>
+            {companies.map(company => (
+              <option key={company.id} value={company.id}>{company.name}</option>
+            ))}
+          </select>
+        </div>
+        <div className="filter-group">
+          <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Paid Status</label>
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ padding: '6px', border: '1px solid #ddd', borderRadius: '4px' }}>
+            <option value="all">All</option>
+            <option value="Paid">Paid</option>
+            <option value="Partially Paid">Partially Paid</option>
+            <option value="Non-Paid">Non-Paid</option>
+          </select>
+        </div>
+        <div className="filter-group">
+          <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>VAT</label>
+          <select value={vatFilter} onChange={(e) => setVatFilter(e.target.value)} style={{ padding: '6px', border: '1px solid #ddd', borderRadius: '4px' }}>
+            <option value="all">All</option>
+            <option value="with_vat">With VAT</option>
+            <option value="without_vat">Without VAT</option>
+          </select>
+        </div>
       </div>
-
-      {/* Active Filters Display */}
-      {hasActiveFilters && (
-        <div className="active-filters-responsive">
-          <div className="filters-scroll">
-            {quickFilter !== 'all' && (
-              <div className="filter-tag-responsive">
-                <span>{quickFilter.charAt(0).toUpperCase() + quickFilter.slice(1)}</span>
-                <button onClick={() => setQuickFilter('all')}>
-                  <FontAwesomeIcon icon={faTimes} />
-                </button>
-              </div>
-            )}
-            {companyFilter && (
-              <div className="filter-tag-responsive">
-                <span>{companies.find(c => c.id.toString() === companyFilter)?.name}</span>
-                <button onClick={() => setCompanyFilter('')}>
-                  <FontAwesomeIcon icon={faTimes} />
-                </button>
-              </div>
-            )}
-            {startDate && (
-              <div className="filter-tag-responsive">
-                <span>From {formatMobileDate(startDate)}</span>
-                <button onClick={() => setStartDate('')}>
-                  <FontAwesomeIcon icon={faTimes} />
-                </button>
-              </div>
-            )}
-            {endDate && (
-              <div className="filter-tag-responsive">
-                <span>To {formatMobileDate(endDate)}</span>
-                <button onClick={() => setEndDate('')}>
-                  <FontAwesomeIcon icon={faTimes} />
-                </button>
-              </div>
-            )}
-            {statusFilter !== 'all' && (
-              <div className="filter-tag-responsive">
-                <span>{statusFilter}</span>
-                <button onClick={() => setStatusFilter('all')}>
-                  <FontAwesomeIcon icon={faTimes} />
-                </button>
-              </div>
-            )}
-          </div>
-          <button className="clear-filters-link" onClick={clearFilters}>
-            Clear all
-          </button>
-        </div>
-      )}
-
-      {/* Expanded Filters Panel */}
-      {!responsive.isMobile && showFilters && (
-        <div className="filters-panel-responsive">
-          <div className="filters-grid-responsive">
-            <div className="filter-group-responsive">
-              <label>Company</label>
-              <select
-                value={companyFilter}
-                onChange={(e) => setCompanyFilter(e.target.value)}
-                className="filter-select-responsive"
-              >
-                <option value="">All Companies</option>
-                {companies.map(company => (
-                  <option key={company.id} value={company.id}>{company.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="filter-group-responsive">
-              <label>Date Range</label>
-              <div className="date-inputs-responsive">
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="date-input"
-                />
-                <span className="date-separator">-</span>
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="date-input"
-                />
-              </div>
-            </div>
-
-            <div className="filter-group-responsive">
-              <label>Status</label>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="filter-select-responsive"
-              >
-                <option value="all">All Status</option>
-                <option value="Paid">Paid</option>
-                <option value="Partially Paid">Partially Paid</option>
-                <option value="Non-Paid">Non-Paid</option>
-              </select>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Main Content Area */}
       <div className="content-area-responsive">
@@ -646,46 +555,43 @@ const PurchaseHistory = () => {
               <table className="data-table-responsive">
                 <thead>
                   <tr>
-                    <th className="checkbox-col">
-                      <input
-                        type="checkbox"
-                        checked={selectedPurchases.size === filteredPurchases.length && filteredPurchases.length > 0}
-                        onChange={toggleSelectAll}
-                      />
-                    </th>
-                    <th className="sortable-header text-left" onClick={() => handleSort('invoice_no')}>
-                      Invoice #
-                      {sortConfig.key === 'invoice_no' && (
-                        <FontAwesomeIcon 
-                          icon={sortConfig.direction === 'asc' ? faArrowUp : faArrowDown}
-                          className="sort-indicator"
-                        />
-                      )}
-                    </th>
                     <th className="sortable-header text-left" onClick={() => handleSort('purchase_date')}>
                       Date
                       {sortConfig.key === 'purchase_date' && (
-                        <FontAwesomeIcon 
-                          icon={sortConfig.direction === 'asc' ? faArrowUp : faArrowDown}
-                          className="sort-indicator"
-                        />
+                        <FontAwesomeIcon icon={sortConfig.direction === 'asc' ? faArrowUp : faArrowDown} className="sort-indicator" />
                       )}
                     </th>
-                    <th className="text-left">Supplier</th>
+                    <th className="sortable-header text-left" onClick={() => handleSort('invoice_no')}>
+                      Invoice No.
+                      {sortConfig.key === 'invoice_no' && (
+                        <FontAwesomeIcon icon={sortConfig.direction === 'asc' ? faArrowUp : faArrowDown} className="sort-indicator" />
+                      )}
+                    </th>
+                    <th className="text-left">Supplier Name</th>
                     <th className="text-left">Company</th>
-                    <th className="sortable-header amount-col text-right" onClick={() => handleSort('total_with_vat')}>
-                      Total
-                      {sortConfig.key === 'total_with_vat' && (
-                        <FontAwesomeIcon 
-                          icon={sortConfig.direction === 'asc' ? faArrowUp : faArrowDown}
-                          className="sort-indicator"
-                        />
+                    <th className="sortable-header amount-col text-right" onClick={() => handleSort('subtotal')}>
+                      Amount
+                      {sortConfig.key === 'subtotal' && (
+                        <FontAwesomeIcon icon={sortConfig.direction === 'asc' ? faArrowUp : faArrowDown} className="sort-indicator" />
                       )}
                     </th>
-                    <th className="amount-col text-right">Paid</th>
+                    <th className="sortable-header amount-col text-right" onClick={() => handleSort('vat_amount')}>
+                      VAT 18%
+                      {sortConfig.key === 'vat_amount' && (
+                        <FontAwesomeIcon icon={sortConfig.direction === 'asc' ? faArrowUp : faArrowDown} className="sort-indicator" />
+                      )}
+                    </th>
+                    <th className="sortable-header amount-col text-right" onClick={() => handleSort('total_with_vat')}>
+                      Total Amount
+                      {sortConfig.key === 'total_with_vat' && (
+                        <FontAwesomeIcon icon={sortConfig.direction === 'asc' ? faArrowUp : faArrowDown} className="sort-indicator" />
+                      )}
+                    </th>
+                    <th className="text-left">Payment Method</th>
+                    <th className="amount-col text-right">Paid Amount</th>
                     <th className="amount-col text-right">Balance</th>
-                    <th>Status</th>
-                    <th className="actions-col">Actions</th>
+                    <th>Paid Status</th>
+                    <th className="actions-col">View Button</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -702,42 +608,34 @@ const PurchaseHistory = () => {
                         onMouseLeave={() => setHoveredRow(null)}
                         onClick={() => window.location.href = `/purchase/${purchase.id}`}
                       >
-                        <td className="checkbox-col" onClick={(e) => e.stopPropagation()}>
-                          <input
-                            type="checkbox"
-                            checked={selectedPurchases.has(purchase.id)}
-                            onChange={() => toggleSelect(purchase.id)}
-                          />
-                        </td>
-                        <td className="text-left">
-                          <div className="invoice-cell">
-                            <FontAwesomeIcon icon={faReceipt} className="invoice-icon" />
-                            <span className="invoice-number">{invoiceNumber}</span>
-                          </div>
-                        </td>
                         <td className="text-left">
                           <div className="date-cell">
                             <span className="date-main">{formatDate(purchase.purchase_date)}</span>
                           </div>
                         </td>
                         <td className="text-left">
-                          <div className="supplier-cell">
-                            <span className="supplier-name">{purchase.supplier_name}</span>
-                          </div>
+                          <span className="invoice-number">{invoiceNumber}</span>
                         </td>
                         <td className="text-left">
-                          <span className="company-tag">{purchase.company_name}</span>
+                          <span className="supplier-name">{purchase.supplier_name}</span>
+                        </td>
+                        <td className="text-left">
+                          <span style={{ fontSize: '13px', color: '#475569', background: '#f1f5f9', padding: '2px 8px', borderRadius: '4px', whiteSpace: 'nowrap' }}>{purchase.company_name || 'N/A'}</span>
+                        </td>
+                        <td className="amount-cell text-right">
+                          <span className="amount-value">{formatCurrency(purchase.subtotal || 0)}</span>
+                        </td>
+                        <td className="amount-cell text-right">
+                          <span className="amount-value">{formatCurrency(purchase.vat_amount || 0)}</span>
                         </td>
                         <td className="amount-cell text-right">
                           <span className="amount-value">{formatCurrency(purchase.total_with_vat)}</span>
                         </td>
+                        <td className="text-left">
+                          <span>{purchase.payment_method || 'N/A'}</span>
+                        </td>
                         <td className="amount-cell text-right">
                           <span className="amount-paid">{formatCurrency(purchase.paid_amount)}</span>
-                          {purchase.payment_status === 'Partially Paid' && (
-                            <div className="mini-progress-bar">
-                              <div className="mini-progress-fill" style={{ width: `${paidPercentage}%` }} />
-                            </div>
-                          )}
                         </td>
                         <td className="amount-cell text-right">
                           <span className={`amount-balance ${purchase.balance_amount > 0 ? 'due' : 'zero'}`}>
@@ -754,14 +652,9 @@ const PurchaseHistory = () => {
                           </div>
                         </td>
                         <td className="actions-col text-center" onClick={(e) => e.stopPropagation()}>
-                          <div className="action-buttons-group">
-                            <Link to={`/purchase/${purchase.id}`} className="action-btn-icon view">
-                              <FontAwesomeIcon icon={faEye} />
-                            </Link>
-                            <Link to={`/purchase/edit/${purchase.id}`} className="action-btn-icon edit">
-                              <FontAwesomeIcon icon={faEdit} />
-                            </Link>
-                          </div>
+                          <Link to={`/purchase/${purchase.id}`} style={{ textDecoration: 'none', background: '#3b82f6', color: 'white', padding: '6px 12px', borderRadius: '4px', fontSize: '13px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                            <FontAwesomeIcon icon={faEye} /> View
+                          </Link>
                         </td>
                       </tr>
                     );

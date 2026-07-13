@@ -559,10 +559,7 @@ const EditPurchase = () => {
           <button onClick={() => navigate('/purchase/history')} className="back-button">
             <FontAwesomeIcon icon={faArrowLeft} />
           </button>
-          <div>
-            <h1>Edit Purchase</h1>
-            <p className="subtitle">Invoice: {formData.invoice_no}</p>
-          </div>
+           <h1>Edit RM Purchase Invoice</h1>
         </div>
       </div>
 
