@@ -425,7 +425,7 @@ const PurchasingReport = () => {
     <div className="purchasing-report-container">
       {/* Header */}
       <div className="report-header">
-        <h2>Purchasing Report</h2>
+        <h2>Purchasing Item Detail</h2>
         {filteredItems.length > 0 && (
           <div className="report-actions">
             <button onClick={downloadPDF} className="btn btn-success">
@@ -575,13 +575,90 @@ const PurchasingReport = () => {
             </tbody>
             <tfoot>
               <tr>
-                <td colSpan="9" className="text-right"><strong>Totals:</strong></td>
-                <td className="text-right"><strong>{formatNumber(filteredItems.reduce((sum, i) => sum + (i.item_subtotal || 0), 0), 2, 2)}</strong></td>
-                <td className="text-right"><strong>{formatNumber(filteredItems.reduce((sum, i) => sum + (i.item_vat_amount || 0), 0), 2, 2)}</strong></td>
-                <td className="text-right"><strong>{formatNumber(filteredItems.reduce((sum, i) => sum + (i.item_bill_amount || 0), 0), 2, 2)}</strong></td>
-                <td className="text-right"><strong>{formatNumber(filteredItems.reduce((sum, i) => sum + (i.bill_amount || 0), 0), 2, 2)}</strong></td>
-                <td className="text-right"><strong>{formatNumber(filteredItems.reduce((sum, i) => sum + (i.item_paid_amount || 0), 0), 2, 2)}</strong></td>
-                <td className="text-right"><strong>{formatNumber(filteredItems.reduce((sum, i) => sum + (i.item_due_amount || 0), 0), 2, 2)}</strong></td>
+                <td colSpan="6" className="text-right"><strong>Totals:</strong></td>
+
+                {/* Total Quantity */}
+                <td className="text-right">
+                  <strong>
+                    {formatNumber(
+                      filteredItems.reduce((sum, i) => sum + (Number(i.quantity) || 0), 0),
+                      3,
+                      3
+                    )}
+                  </strong>
+                </td>
+
+                {/* Unit Price column empty */}
+                <td></td>
+
+                {/* Payment Method column empty */}
+                <td></td>
+
+                {/* Subtotal */}
+                <td className="text-right">
+                  <strong>
+                    {formatNumber(
+                      filteredItems.reduce((sum, i) => sum + (i.item_subtotal || 0), 0),
+                      2,
+                      2
+                    )}
+                  </strong>
+                </td>
+
+                {/* VAT */}
+                <td className="text-right">
+                  <strong>
+                    {formatNumber(
+                      filteredItems.reduce((sum, i) => sum + (i.item_vat_amount || 0), 2),
+                      2,
+                      2
+                    )}
+                  </strong>
+                </td>
+
+                {/* Total Price */}
+                <td className="text-right">
+                  <strong>
+                    {formatNumber(
+                      filteredItems.reduce((sum, i) => sum + (i.item_bill_amount || 0), 0),
+                      2,
+                      2
+                    )}
+                  </strong>
+                </td>
+
+                {/* Bill Amount */}
+                <td className="text-right">
+                  <strong>
+                    {formatNumber(
+                      filteredItems.reduce((sum, i) => sum + (i.bill_amount || 0), 0),
+                      2,
+                      2
+                    )}
+                  </strong>
+                </td>
+
+                {/* Paid */}
+                <td className="text-right">
+                  <strong>
+                    {formatNumber(
+                      filteredItems.reduce((sum, i) => sum + (i.item_paid_amount || 0), 0),
+                      2,
+                      2
+                    )}
+                  </strong>
+                </td>
+
+                {/* Due */}
+                <td className="text-right">
+                  <strong>
+                    {formatNumber(
+                      filteredItems.reduce((sum, i) => sum + (i.item_due_amount || 0), 0),
+                      2,
+                      2
+                    )}
+                  </strong>
+                </td>
               </tr>
             </tfoot>
           </table>
