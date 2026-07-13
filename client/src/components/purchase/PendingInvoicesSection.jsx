@@ -14,7 +14,9 @@ import {
   faFileInvoice,
   faMoneyBillWave,
   faFilter,
-  faTimes
+  faTimes,
+  faPlus,
+  faCreditCard
 } from '@fortawesome/free-solid-svg-icons';
 import dayjs from 'dayjs';
 import { usePopup } from '../context/PopupContext';
@@ -25,47 +27,31 @@ import InvoicePaymentModal from './InvoicePaymentModal';
 import PayNowModal from './PayNowModal';
 import SettleNowModal from './SettleNowModal';
 
-/**
- * PendingInvoicesSection
- *
- * Props:
- *   supplierId   – optional; when set by the Basic Info form, auto-filters the table
- *   supplierName – optional; display name for the active supplier filter
- *   suppliers    – full supplier list for the filter dropdown
- */
 const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refreshKey = 0 }) => {
   const { showPopup } = usePopup();
 
-  // ── Raw data (all suppliers) ──────────────────────────────────────────────
   const [allInvoices, setAllInvoices] = useState([]);
   const [allAdvances, setAllAdvances] = useState([]);
   const [allReturnCredits, setAllReturnCredits] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // ── Filter state ──────────────────────────────────────────────────────────
   const [supplierSearch, setSupplierSearch] = useState('');
-  // activeFilterId: the supplier currently used to filter the table.
-  // Synced from the parent's supplierId prop.
   const [activeFilterId, setActiveFilterId] = useState(supplierId || '');
 
-  // ── Modal state ───────────────────────────────────────────────────────────
   const [showPayModal, setShowPayModal] = useState(false);
   const [showPayNowModal, setShowPayNowModal] = useState(false);
   const [showSettleModal, setShowSettleModal] = useState(false);
 
-  // ── Selection state ───────────────────────────────────────────────────────
-  // Only Invoice rows are selectable for "Pay Selected"
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState(new Set());
-  // Settle target (single invoice row)
   const [settleInvoice, setSettleInvoice] = useState(null);
 
-  // ── Sync active filter when parent supplier changes ───────────────────────
+  // ── Sync active filter when parent supplier changes ──
   useEffect(() => {
     setActiveFilterId(supplierId || '');
     setSelectedInvoiceIds(new Set());
   }, [supplierId]);
 
-  // ── Fetch ALL outstanding records on mount ────────────────────────────────
+  // ── Fetch ALL outstanding records ──
   const fetchAllOutstanding = useCallback(async () => {
     setLoading(true);
     try {
@@ -100,7 +86,7 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
     };
   }, [fetchAllOutstanding]);
 
-  // ── Build unified flat list ───────────────────────────────────────────────
+  // ── Build unified flat list ──
   const allRecords = useMemo(() => {
     const invoices = allInvoices.map((r) => ({ ...r, _rowType: 'invoice' }));
     const advances = allAdvances.map((r) => ({ ...r, _rowType: 'advance' }));
@@ -108,7 +94,7 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
     return [...invoices, ...advances, ...credits];
   }, [allInvoices, allAdvances, allReturnCredits]);
 
-  // ── Apply filters (supplier search text + active filter dropdown) ─────────
+  // ── Apply filters ──
   const filteredRecords = useMemo(() => {
     const term = supplierSearch.toLowerCase().trim();
     return allRecords.filter((r) => {
@@ -118,7 +104,6 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
     });
   }, [allRecords, supplierSearch, activeFilterId]);
 
-  // Filtered suppliers list for the dropdown (text search)
   const filteredSuppliers = useMemo(() => {
     const term = supplierSearch.toLowerCase().trim();
     return !term
@@ -126,7 +111,7 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
       : suppliers.filter((s) => s.name?.toLowerCase().includes(term));
   }, [suppliers, supplierSearch]);
 
-  // ── Summary cards ─────────────────────────────────────────────────────────
+  // ── Summary cards ──
   const summaryStats = useMemo(() => {
     const records = activeFilterId
       ? allRecords.filter((r) => String(r.supplier_id) === String(activeFilterId))
@@ -147,7 +132,7 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
     return { totalOutstandingInvoices, totalAvailableCredit, invoiceCount, creditCount };
   }, [allRecords, activeFilterId]);
 
-  // ── Selection helpers ─────────────────────────────────────────────────────
+  // ── Selection helpers ──
   const selectableInvoices = filteredRecords.filter((r) => r._rowType === 'invoice');
 
   const toggleSelection = (id) => {
@@ -165,7 +150,7 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
     }
   };
 
-  // ── Cross-supplier validation ─────────────────────────────────────────────
+  // ── Cross-supplier validation ──
   const validateSameSupplier = (records, actionName) => {
     const ids = [...new Set(records.map((r) => r.supplier_id))];
     if (ids.length > 1) {
@@ -179,7 +164,7 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
     return true;
   };
 
-  // ── Action handlers ───────────────────────────────────────────────────────
+  // ── Action handlers ──
   const handlePaySelected = () => {
     const selected = allInvoices.filter((i) => selectedInvoiceIds.has(i.id));
     if (selected.length === 0) {
@@ -212,7 +197,7 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
     setSelectedInvoiceIds(new Set());
   };
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
+  // ── Helpers ──
   const formatCurrency = (amount) => {
     const numeric = parseFloat(amount) || 0;
     return `Rs. ${numeric.toFixed(2)}`;
@@ -243,7 +228,7 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
       activeSupplierName
     : activeSupplierName;
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // ── Render ──
   return (
     <div className="pis-container">
       {/* ── Modals ── */}
@@ -265,30 +250,9 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
         supplierId={activeFilterId}
         supplierName={activeSupplierName}
         onSuccess={async (responseData) => {
-          // If backend returned the created overpayment, optimistically prepend it
-          try {
-            const op = responseData?.overpayment;
-            if (op && String(op.supplier_id) === String(activeFilterId)) {
-              const mapped = {
-                id: op.id,
-                supplier_id: op.supplier_id,
-                supplier_name: op.supplier_name || activeSupplierName,
-                document_type: 'Advance Payment',
-                document_number: op.overpayment_number,
-                transaction_date: op.payment_date,
-                outstanding_amount: parseFloat(op.remaining_credit || responseData.amount || 0),
-                status: op.status || 'Active',
-                _rowType: 'advance'
-              };
-
-              setAllAdvances(prev => [mapped, ...prev]);
-            }
-          } catch (e) {
-            console.error('Error prepending new overpayment:', e);
-          }
-
-          // Always refresh from server to ensure canonical state
+          // Refresh from server to ensure canonical state
           await fetchAllOutstanding();
+          window.dispatchEvent(new Event('purchase-payment-updated'));
         }}
       />
 

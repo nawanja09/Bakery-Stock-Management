@@ -9,15 +9,6 @@ import { usePopup } from '../context/PopupContext';
 import api from '../../api';
 import './InvoicePaymentModal.css';
 
-/**
- * InvoicePaymentModal
- * Props:
- *   isOpen         – boolean
- *   onClose        – () => void
- *   selectedInvoices – array of invoice objects { id, invoice_no, balance_amount, ... }
- *   supplierName   – string
- *   onSuccess      – (result) => void   called after successful save
- */
 const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierName, onSuccess }) => {
   const { showPopup } = usePopup();
   const currentUser = JSON.parse(localStorage.getItem('user'));
@@ -62,7 +53,6 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
   const handleSubmit = async e => {
     e.preventDefault();
 
-    // Cross-supplier guard: all invoices must belong to the same supplier
     const uniqueSupplierIds = [...new Set(selectedInvoices.map(inv => inv.supplier_id).filter(Boolean))];
     if (uniqueSupplierIds.length > 1) {
       return showPopup(
@@ -100,7 +90,16 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
         invoice_allocations: payloadAllocations
       });
       showPopup('success', response.data.message || `Payment of Rs. ${formData.amount.toFixed(2)} recorded successfully!`);
-      onSuccess && onSuccess({ amount: formData.amount, allocations, response });
+      
+      // ✅ Fix: Call onSuccess with the response data
+      if (onSuccess) {
+        await onSuccess({ 
+          amount: formData.amount, 
+          allocations, 
+          response: response.data 
+        });
+      }
+      
       onClose();
     } catch (err) {
       console.error(err);
