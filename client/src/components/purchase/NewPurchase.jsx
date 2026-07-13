@@ -613,14 +613,14 @@ const AddPurchase = () => {
               <table className="items-table">
                 <thead>
                   <tr>
-                    <th>Item Name</th>
-                    <th>Quantity</th>
-                    <th>Unit</th>
-                    <th>Unit Price (Net)</th>
-                    <th>Amount</th>
-                    {supplierVatRegistered && <th>VAT 18%</th>}
-                    <th>Line Total</th>
-                    <th>Action</th>
+                    <th className="text-left" style={{ width: '35%' }}>Item Name</th>
+                    <th className="text-right" style={{ width: '10%' }}>Quantity</th>
+                    <th className="text-center" style={{ width: '8%' }}>Unit</th>
+                    <th className="text-right" style={{ width: '15%' }}>Unit Price (Net)</th>
+                    <th className="text-right" style={{ width: '12%' }}>Amount</th>
+                    {supplierVatRegistered && <th className="text-right" style={{ width: '10%' }}>VAT 18%</th>}
+                    <th className="text-right" style={{ width: '12%' }}>Line Total</th>
+                    <th className="text-center" style={{ width: '8%' }}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -633,20 +633,27 @@ const AddPurchase = () => {
                         <td>
                           <Select
                             options={itemOptions}
-                            value={selectedOption}
+                            value={itemOptions.find(opt => opt.value === item.id) || null}
                             onChange={(selected) => handleItemSelect(index, selected)}
                             isSearchable
-                            isClearable
                             placeholder="Select item..."
                             className="react-select-container"
                             classNamePrefix="react-select"
-                            menuPortalTarget={document.body}
+                            components={customSelectComponents}
                             styles={{
+                              control: (base) => ({
+                                ...base,
+                                minHeight: '38px',
+                                borderColor: '#ced4da'
+                              }),
                               menuPortal: (base) => ({ ...base, zIndex: 9999 })
                             }}
+                            menuPortalTarget={document.body}
                           />
                           {item.vat_applicable && (
-                            <small className="vat-applicable-label">✓ VAT Applicable</small>
+                            <small style={{ color: '#28a745', display: 'block', marginTop: '4px' }}>
+                              ✓ VAT Applicable
+                            </small>
                           )}
                         </td>
                         <td>
@@ -676,25 +683,27 @@ const AddPurchase = () => {
                             value={item.unit_price}
                             onChange={(e) => handleItemChange(index, 'unit_price', e.target.value)}
                             required
-                            className={`price-input ${previousPrice && item.unit_price !== previousPrice ? 'price-different' : ''}`}
+                            className={previousPrice && item.unit_price !== previousPrice ? 'price-different' : ''}
                           />
                           {previousPrice > 0 && (
-                            <small className={`price-hint ${item.unit_price !== previousPrice ? 'different' : ''}`}>
+                            <small style={{ display: 'block', fontSize: '11px', color: '#6c757d' }}>
                               Prev: Rs.{previousPrice}
                             </small>
                           )}
                         </td>
-                        <td className="amount-cell">Rs. {item.amount.toFixed(2)}</td>
+                        <td className="text-right">Rs. {item.amount.toFixed(2)}</td>
                         {supplierVatRegistered && (
-                          <td className="vat-cell">
+                          <td className="text-right vat-column">
                             {item.vat_applicable ? `Rs. ${item.vat.toFixed(2)}` : '-'}
                           </td>
                         )}
-                        <td className="total-cell">Rs. {item.lineTotal.toFixed(2)}</td>
-                        <td>
+                        <td className="text-right">
+                          <strong>Rs. {item.lineTotal.toFixed(2)}</strong>
+                        </td>
+                        <td className="text-center">
                           <button 
                             type="button" 
-                            className="btn-remove-item"
+                            className="btn btn-outline-danger btn-sm"
                             onClick={() => removeItemRow(index)}
                             disabled={formData.items.length <= 1}
                             title="Remove item"
