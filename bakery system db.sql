@@ -43892,3 +43892,8 @@ CREATE TABLE IF NOT EXISTS purchase_return_credits (
     FOREIGN KEY (purchase_return_id) REFERENCES purchase_returns(id),
     FOREIGN KEY (supplier_id) REFERENCES supplier(id)
 );
+
+
+ALTER TABLE bank_details
+  ADD COLUMN company ENUM('JH', 'RD', 'RR') NOT NULL DEFAULT 'JH'
+  AFTER current_balance;
