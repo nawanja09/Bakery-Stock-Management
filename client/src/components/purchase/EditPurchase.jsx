@@ -7,7 +7,7 @@ import Select from 'react-select';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowLeft, faSave, faPlus, faTrash, faMoneyBillWave, faCreditCard, faCheckCircle, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
 import dayjs from 'dayjs';
-import './Purchase.css';
+import './NewPurchase.css';
 
 const EditPurchase = () => {
   const { id } = useParams();
