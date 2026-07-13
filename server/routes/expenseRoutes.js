@@ -1090,8 +1090,7 @@ router.get('/banks/all', async (req, res) => {
     const [rows] = await pool.query(
       `SELECT id, bank_name, account_number, branch_name, account_type,
               currency, opening_balance, current_balance,
-              contact_person, contact_phone, contact_email,
-              notes, status
+              company, notes, status
        FROM bank_details 
        ORDER BY bank_name ASC`
     );
@@ -1132,9 +1131,7 @@ router.post('/banks', authenticate, async (req, res) => {
     currency,
     opening_balance,
     current_balance,
-    contact_person,
-    contact_phone,
-    contact_email,
+    company,
     notes
   } = req.body;
   
@@ -1148,9 +1145,8 @@ router.post('/banks', authenticate, async (req, res) => {
     const [result] = await pool.query(
       `INSERT INTO bank_details 
        (bank_name, account_number, branch_name, account_type, currency, 
-        opening_balance, current_balance, contact_person, contact_phone, 
-        contact_email, notes, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        opening_balance, current_balance, company, notes, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         bank_name,
         account_number || null,
@@ -1159,9 +1155,7 @@ router.post('/banks', authenticate, async (req, res) => {
         currency || 'LKR',
         opening_balance || 0,
         current_balance || opening_balance || 0,
-        contact_person || null,
-        contact_phone || null,
-        contact_email || null,
+        company || 'JH',
         notes || null,
         userId
       ]
@@ -1191,9 +1185,7 @@ router.put('/banks/:id', authenticate, async (req, res) => {
     currency,
     opening_balance,
     current_balance,
-    contact_person,
-    contact_phone,
-    contact_email,
+    company,
     notes,
     status
   } = req.body;
@@ -1207,8 +1199,7 @@ router.put('/banks/:id', authenticate, async (req, res) => {
       `UPDATE bank_details 
        SET bank_name = ?, account_number = ?, branch_name = ?, 
            account_type = ?, currency = ?, opening_balance = ?, 
-           current_balance = ?, contact_person = ?, contact_phone = ?, 
-           contact_email = ?, notes = ?, status = ?
+           current_balance = ?, company = ?, notes = ?, status = ?
        WHERE id = ?`,
       [
         bank_name,
@@ -1218,9 +1209,7 @@ router.put('/banks/:id', authenticate, async (req, res) => {
         currency || 'LKR',
         opening_balance || 0,
         current_balance || 0,
-        contact_person || null,
-        contact_phone || null,
-        contact_email || null,
+        company || 'JH',
         notes || null,
         status || 'Active',
         id

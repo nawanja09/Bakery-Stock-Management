@@ -28,9 +28,7 @@ const emptyForm = {
   currency: 'LKR',
   opening_balance: '',
   current_balance: '',
-  contact_person: '',
-  contact_phone: '',
-  contact_email: '',
+  company: 'JH',
   notes: '',
   status: 'Active'
 };
@@ -111,9 +109,7 @@ const BankDetails = () => {
       currency: bank.currency || 'LKR',
       opening_balance: bank.opening_balance ?? '',
       current_balance: bank.current_balance ?? bank.opening_balance ?? '',
-      contact_person: bank.contact_person || '',
-      contact_phone: bank.contact_phone || '',
-      contact_email: bank.contact_email || '',
+      company: bank.company || 'JH',
       notes: bank.notes || '',
       status: bank.status || 'Active'
     });
@@ -255,6 +251,14 @@ const BankDetails = () => {
                 </select>
               </div>
               <div className="bd-form-group">
+                <label>Company <span className="bd-required">*</span></label>
+                <select name="company" value={formData.company} onChange={handleChange} className="bd-select">
+                  <option value="JH">JH</option>
+                  <option value="RD">RD</option>
+                  <option value="RR">RR</option>
+                </select>
+              </div>
+              <div className="bd-form-group">
                 <label>Status</label>
                 <select name="status" value={formData.status} onChange={handleChange} className="bd-select">
                   <option value="Active">Active</option>
@@ -288,43 +292,6 @@ const BankDetails = () => {
                   placeholder="0.00"
                   min="0"
                   step="0.01"
-                  className="bd-input"
-                />
-              </div>
-            </div>
-
-            <div className="bd-section-label">Contact Information</div>
-            <div className="bd-form-row">
-              <div className="bd-form-group">
-                <label>Contact Person</label>
-                <input
-                  type="text"
-                  name="contact_person"
-                  value={formData.contact_person}
-                  onChange={handleChange}
-                  placeholder="e.g. John Silva"
-                  className="bd-input"
-                />
-              </div>
-              <div className="bd-form-group">
-                <label>Contact Phone</label>
-                <input
-                  type="text"
-                  name="contact_phone"
-                  value={formData.contact_phone}
-                  onChange={handleChange}
-                  placeholder="e.g. 011-2345678"
-                  className="bd-input"
-                />
-              </div>
-              <div className="bd-form-group">
-                <label>Contact Email</label>
-                <input
-                  type="email"
-                  name="contact_email"
-                  value={formData.contact_email}
-                  onChange={handleChange}
-                  placeholder="e.g. bank@example.com"
                   className="bd-input"
                 />
               </div>
@@ -392,6 +359,7 @@ const BankDetails = () => {
                 <th>Account Number</th>
                 <th>Branch</th>
                 <th>Type</th>
+                <th>Company</th>
                 <th>Current Balance</th>
                 <th>Status</th>
                 <th>Actions</th>
@@ -400,7 +368,7 @@ const BankDetails = () => {
             <tbody>
               {isFetching ? (
                 <tr>
-                  <td colSpan="8" className="bd-loading-row">
+                  <td colSpan="9" className="bd-loading-row">
                     <FontAwesomeIcon icon={faSpinner} spin /> Loading banks...
                   </td>
                 </tr>
@@ -416,6 +384,9 @@ const BankDetails = () => {
                     <td>{bank.branch_name || '—'}</td>
                     <td>
                       <span className="bd-badge bd-badge-type">{bank.account_type || 'Current'}</span>
+                    </td>
+                    <td>
+                      <span className="bd-badge bd-badge-company">{bank.company || '—'}</span>
                     </td>
                     <td className="bd-balance">
                       <FontAwesomeIcon icon={faMoneyBillWave} className="bd-money-icon" />
@@ -445,7 +416,7 @@ const BankDetails = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="8" className="bd-empty-row">
+                  <td colSpan="9" className="bd-empty-row">
                     <FontAwesomeIcon icon={faBuildingColumns} style={{ fontSize: '2rem', opacity: 0.3 }} />
                     <p>No banks found. Add your first bank to get started.</p>
                   </td>
