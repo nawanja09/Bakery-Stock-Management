@@ -150,10 +150,7 @@ const DepartmentIssuesReport = () => {
   return (
     <div className="report-container">
       <header className="report-header">
-        <div>
-          <h2>Issuance Report</h2>
-          <p className="report-subtitle">Track item issuance across departments</p>
-        </div>
+          <h2>RM Issue Item Detail</h2>
       </header>
 
       <section className="controls-grid" aria-label="Report filters">
@@ -280,27 +277,52 @@ const DepartmentIssuesReport = () => {
                 ))}
               </tbody>
               <tfoot>
-                <tr style={{ backgroundColor: '#f8f9fa', fontWeight: 'bold' }}>
-                  <td colSpan="4"></td>
-                  <td>Grand Total Quantity:</td>
+                <tr
+                  style={{
+                    backgroundColor: "#f8f9fa",
+                    fontWeight: "bold",
+                  }}
+                >
+                  <td colSpan={3}></td>
+
+                  <td style={{ textAlign: "right" }}>Grand Total:</td>
+
+                  {/* Quantity Column */}
                   <td>
                     {formatNumber(
-                      reportData.reduce((total, row) => total + (parseFloat(row.quantity) || 0), 0),
+                      reportData.reduce(
+                        (total, row) => total + (parseFloat(row.quantity) || 0),
+                        0
+                      ),
                       3,
                       3
                     )}
                   </td>
-                  <td>Grand Total:</td>
-                  <td colSpan="1"></td>
+
+                  {/* Unit */}
+                  <td></td>
+
+                  {/* Unit Price */}
+                  <td></td>
+
+                  {/* Total Price */}
                   <td>
-                    Rs.{" "}
+                    Rs.&nbsp;
                     {formatNumber(
-                      reportData.reduce((total, row) => total + (parseFloat(row.total_price) || 0), 0),
+                      reportData.reduce(
+                        (total, row) => total + (parseFloat(row.total_price) || 0),
+                        0
+                      ),
                       2,
                       2
                     )}
                   </td>
-                  <td colSpan="2"></td>
+
+                  {/* Received By */}
+                  <td></td>
+
+                  {/* Remarks */}
+                  <td></td>
                 </tr>
               </tfoot>
             </table>

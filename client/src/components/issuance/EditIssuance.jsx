@@ -6,6 +6,7 @@ import './Issuance.css';
 import api from '../../api';
 import Select from 'react-select';
 import { formatNumber } from '../../utils/formatters';
+import { FaTrashAlt } from "react-icons/fa";
 
 const EditIssuance = () => {
   const { id } = useParams();
@@ -37,15 +38,12 @@ const EditIssuance = () => {
       try {
         setLoading(true);
 
-        // fetch items first (so we can map stock)
         const itemsResponse = await api.get('/issuances/items/with-stock');
         setItems(itemsResponse.data || []);
 
-        // fetch departments
         const departmentsRes = await api.get('/departments');
         setDepartments(departmentsRes.data || []);
 
-        // then fetch issuance
         const issuanceResponse = await api.get(`/issuances/${id}`);
         const issuanceData = issuanceResponse.data;
 
@@ -59,7 +57,6 @@ const EditIssuance = () => {
           };
         });
 
-        // ensure at least one empty row if none
         if (itemsWithStock.length === 0) {
           itemsWithStock.push({ item_id: '', quantity: 1, unit: '', current_stock: 0 });
         }
@@ -86,7 +83,6 @@ const EditIssuance = () => {
 
     if (id) fetchAll();
     else {
-      // no id? just fetch departments & items
       const fetchBasics = async () => {
         try {
           setLoading(true);
@@ -203,7 +199,57 @@ const EditIssuance = () => {
   }));
 
   const selectStyles = {
-    menuPortal: base => ({ ...base, zIndex: 9999 })
+    menuPortal: base => ({ ...base, zIndex: 9999 }),
+    control: (base) => ({
+      ...base,
+      minHeight: 40,
+      borderColor: '#e2e6ee',
+      borderRadius: 8,
+      boxShadow: 'none',
+      '&:hover': { borderColor: '#b8bdd0' }
+    }),
+    option: (base, state) => ({
+      ...base,
+      padding: '10px 14px',
+      fontSize: 14,
+      whiteSpace: 'normal',
+      wordBreak: 'break-word',
+      backgroundColor: state.isSelected ? '#6c5ce7' : state.isFocused ? '#f0f2fe' : 'transparent',
+      color: state.isSelected ? '#ffffff' : '#1a1a2e',
+      cursor: 'pointer'
+    }),
+    singleValue: (base) => ({
+      ...base,
+      fontSize: 14,
+      fontWeight: 500,
+      color: '#1a1a2e',
+      overflow: 'visible',
+      whiteSpace: 'normal',
+      wordBreak: 'break-word',
+      maxWidth: '100%'
+    }),
+    placeholder: (base) => ({
+      ...base,
+      color: '#a0a0b8',
+      fontSize: 14
+    }),
+    menu: (base) => ({
+      ...base,
+      borderRadius: 10,
+      boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+      border: '1px solid #e2e6ee',
+      overflow: 'hidden'
+    }),
+    menuList: (base) => ({
+      ...base,
+      padding: '4px 0',
+      maxHeight: 280
+    }),
+    valueContainer: (base) => ({
+      ...base,
+      padding: '2px 8px',
+      overflow: 'visible'
+    })
   };
 
   if (loading) return <div className="loading">Loading...</div>;
@@ -211,7 +257,7 @@ const EditIssuance = () => {
   return (
     <div className="issuance-container">
       <div className="header-with-actions">
-        <h2>Edit Issuance to Department</h2>
+        <h2>Edit RM Issue</h2>
         <button onClick={() => navigate('/issuance/history')} className="btn-secondary">
           ← Back to History
         </button>
@@ -259,48 +305,53 @@ const EditIssuance = () => {
               required
             />
           </div>
-        </div>
-
-        <div className="form-row">
           <div className="form-group">
             <label>Time of Day</label>
-            <textarea
+            <input
+              type="text"
               value={formData.remarks}
               onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
+              placeholder="Time of Day"
             />
           </div>
         </div>
 
-        <h3>Issued Items</h3>
+        <div className="section-title">
+          Issued Items
+        </div>
+
         <div className="table-responsive">
           <table className="item-table">
             <thead>
               <tr>
-                <th>Item Name</th>
-                <th>Current Stock</th>
-                <th>Quantity</th>
-                <th>Unit of Measurement</th>
-                <th>Action</th>
+                <th className="col-item-name">Item Name</th>
+                <th className="col-stock">Current Stock</th>
+                <th className="col-quantity">Quantity to Issue</th>
+                <th className="col-unit">Unit</th>
+                <th className="col-action">Action</th>
               </tr>
             </thead>
             <tbody>
               {formData.items.map((item, index) => (
                 <tr key={index}>
-                  <td style={{ minWidth: 240 }}>
-                    <Select
-                      options={itemOptions}
-                      value={itemOptions.find(opt => String(opt.value) === String(item.item_id)) || null}
-                      onChange={(selected) => {
-                        handleItemChange(index, 'item_id', selected ? selected.value : '');
-                      }}
-                      isSearchable
-                      placeholder="Search or select item..."
-                      menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
-                      styles={selectStyles}
-                      closeMenuOnScroll={true}
-                    />
+                  <td className="col-item-name">
+                    <div className="item-select-container">
+                      <Select
+                        options={itemOptions}
+                        value={itemOptions.find(opt => String(opt.value) === String(item.item_id)) || null}
+                        onChange={(selected) => {
+                          handleItemChange(index, 'item_id', selected ? selected.value : '');
+                        }}
+                        isSearchable
+                        placeholder="Search or select item..."
+                        menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                        styles={selectStyles}
+                        closeMenuOnScroll={true}
+                        classNamePrefix="select"
+                      />
+                    </div>
                   </td>
-                  <td>
+                  <td className="col-stock">
                     <input
                       type="text"
                       value={formatNumber(item.current_stock, 3, 3)}
@@ -308,7 +359,7 @@ const EditIssuance = () => {
                       className={`stock-display ${item.current_stock <= 0 ? 'stock-low' : ''}`}
                     />
                   </td>
-                  <td>
+                  <td className="col-quantity">
                     <input
                       type="number"
                       min="0"
@@ -316,14 +367,25 @@ const EditIssuance = () => {
                       value={item.quantity}
                       onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
                       required
+                      className="quantity-input"
                     />
                   </td>
-                  <td>
-                    <input type="text" value={item.unit} readOnly className="unit-display" />
+                  <td className="col-unit">
+                    <input
+                      type="text"
+                      value={item.unit}
+                      readOnly
+                      className="unit-display"
+                    />
                   </td>
-                  <td>
-                    <button type="button" className="btn-remove" onClick={() => removeItemRow(index)}>
-                      Remove
+                  <td className="col-action">
+                    <button
+                      type="button"
+                      className="btn-remove"
+                      onClick={() => removeItemRow(index)}
+                      disabled={formData.items.length <= 1}
+                    >
+                        <FaTrashAlt />
                     </button>
                   </td>
                 </tr>
@@ -332,12 +394,8 @@ const EditIssuance = () => {
           </table>
         </div>
 
-        <button type="button" className="btn-add" onClick={addItemRow}>
-          + Add Item
-        </button>
-
-        <button 
-          type="submit" 
+        <button
+          type="submit"
           className="btn-submit"
           disabled={isSubmitting}
         >
