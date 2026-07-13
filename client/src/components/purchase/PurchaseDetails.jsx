@@ -190,24 +190,7 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
           <button onClick={handleBack} className="back-button">
             <FontAwesomeIcon icon={isModal ? faTimesCircle : faArrowLeft} />
           </button>
-          <div>
-            <h1>Purchase Details</h1>
-            <p className="subtitle">Invoice #{purchase.invoice_no}</p>
-          </div>
-        </div>
-        <div className="header-actions">
-          <button onClick={handlePrint} className="btn btn-outline">
-            <FontAwesomeIcon icon={faPrint} />
-            Print
-          </button>
-          <button onClick={handlePDF} className="btn btn-outline">
-            <FontAwesomeIcon icon={faFilePdf} />
-            PDF
-          </button>
-          <button onClick={handleEdit} className="btn btn-primary">
-            <FontAwesomeIcon icon={faEdit} />
-            Edit
-          </button>
+          <h1>RM Purchase Invoice Details</h1>
         </div>
       </div>
 
@@ -220,41 +203,12 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
         </span>
       </div>
 
-      {/* Supplier Information Card */}
       <div className="details-grid">
         <div className="detail-card">
-          <div className="card-header">
-            <FontAwesomeIcon icon={faBuilding} />
-            <h3>Supplier Information</h3>
-          </div>
           <div className="card-content">
             <div className="info-row">
               <span className="label">Supplier Name:</span>
-              <span className="value highlight">{purchase.supplier_name}</span>
-            </div>
-            
-            {supplierDetails && (
-              <>
-                <div className="info-row">
-                  <span className="label">
-                    <FontAwesomeIcon icon={faMapMarkerAlt} className="icon-small" />
-                  </span>
-                  <span className="value">{supplierDetails.address || 'N/A'}</span>
-                </div>
-                <div className="info-row">
-                  <span className="label">
-                    <FontAwesomeIcon icon={faCity} className="icon-small" />
-                  </span>
-                  <span className="value">{supplierDetails.city || 'N/A'}</span>
-                </div>
-              </>
-            )}
-
-            <div className="info-row vat-status">
-              <span className="label">VAT Registered:</span>
-              <span className={`value vat-badge ${supplierDetails?.vat_registered ? 'yes' : 'no'}`}>
-                {supplierDetails?.vat_registered ? 'Yes' : 'No'}
-              </span>
+              <span className="value">{purchase.supplier_name}</span>
             </div>
 
             {supplierDetails?.vat_registered && supplierDetails?.vat_number && (
@@ -263,19 +217,6 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
                 <span className="value vat-number">{supplierDetails.vat_number}</span>
               </div>
             )}
-          </div>
-        </div>
-
-        <div className="detail-card">
-          <div className="card-header">
-            <FontAwesomeIcon icon={faUser} />
-            <h3>Contact Information</h3>
-          </div>
-          <div className="card-content">
-            <div className="info-row">
-              <span className="label">Contact Person:</span>
-              <span className="value">{supplierDetails?.contact_name || purchase.contact_name || 'N/A'}</span>
-            </div>
             {supplierDetails?.contact_phone && (
               <div className="info-row">
                 <span className="label">
@@ -284,23 +225,6 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
                 <span className="value">{supplierDetails.contact_phone}</span>
               </div>
             )}
-            {supplierDetails?.contact_email && (
-              <div className="info-row">
-                <span className="label">
-                  <FontAwesomeIcon icon={faEnvelope} className="icon-small" />
-                </span>
-                <span className="value">{supplierDetails.contact_email}</span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="detail-card">
-          <div className="card-header">
-            <FontAwesomeIcon icon={faCalendar} />
-            <h3>Purchase Details</h3>
-          </div>
-          <div className="card-content">
             <div className="info-row">
               <span className="label">Purchase Date:</span>
               <span className="value">{formatDate(purchase.purchase_date)}</span>
@@ -314,22 +238,8 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
               <span className="value">{purchase.company_name || 'N/A'}</span>
             </div>
             <div className="info-row">
-              <span className="label">Payment Method:</span>
-              <span className={`payment-method-badge ${purchase.payment_method?.toLowerCase()}`}>
-                {purchase.payment_method?.replace('_', ' ') || 'N/A'}
-              </span>
-            </div>
-            <div className="info-row">
               <span className="label">Reference No:</span>
               <span className="value">{purchase.check_number || 'N/A'}</span>
-            </div>
-            <div className="info-row">
-              <span className="label">Prepared By:</span>
-              <span className="value">{purchase.prepared_by_name || 'N/A'}</span>
-            </div>
-            <div className="info-row">
-              <span className="label">Created At:</span>
-              <span className="value">{formatDateTime(purchase.created_at)}</span>
             </div>
           </div>
         </div>
