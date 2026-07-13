@@ -474,97 +474,12 @@ const PurchaseHistory = () => {
             <div className="title-wrapper">
               <h1 className="responsive-title">
                 <FontAwesomeIcon icon={faFileInvoice} className="title-icon" />
-                Purchase History
+                Purchasing Summary Report
               </h1>
-              <p className="title-subtitle">Track and manage your procurement activities</p>
             </div>
-          </div>
-          
-          <div className="header-actions-responsive">
-            <Link to="/purchase/new" className="btn-primary-responsive">
-              <FontAwesomeIcon icon={faPlus} />
-              <span className="btn-text">New Purchase</span>
-            </Link>
           </div>
         </div>
       </header>
-
-      {/* Stats Cards - Single Row Layout */}
-      <div className="stats-row-responsive">
-        <div className="stat-card-row primary">
-          <div className="stat-row-content">
-            <div className="stat-row-icon">
-              <FontAwesomeIcon icon={faWallet} />
-            </div>
-            <div className="stat-row-info">
-              <span className="stat-row-label">Total Spend</span>
-              <span className="stat-row-value">
-                {responsive.isMobile ? formatCompactCurrency(summary.total_amount) : formatCurrency(summary.total_amount)}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="stat-card-row success">
-          <div className="stat-row-content">
-            <div className="stat-row-icon">
-              <FontAwesomeIcon icon={faCheckCircle} />
-            </div>
-            <div className="stat-row-info">
-              <span className="stat-row-label">Paid</span>
-              <span className="stat-row-value">
-                {responsive.isMobile ? formatCompactCurrency(summary.total_paid) : formatCurrency(summary.total_paid)}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="stat-card-row warning">
-          <div className="stat-row-content">
-            <div className="stat-row-icon">
-              <FontAwesomeIcon icon={faExclamationTriangle} />
-            </div>
-            <div className="stat-row-info">
-              <span className="stat-row-label">Pending</span>
-              <span className="stat-row-value">
-                {responsive.isMobile ? formatCompactCurrency(summary.total_balance) : formatCurrency(summary.total_balance)}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="stat-card-row info">
-          <div className="stat-row-content">
-            <div className="stat-row-icon">
-              <FontAwesomeIcon icon={faChartPie} />
-            </div>
-            <div className="stat-row-info">
-              <span className="stat-row-label">Completion</span>
-              <span className="stat-row-value">{paymentCompletionRate}%</span>
-              <span className="stat-row-subtext">({summary.paid_count} of {summary.total_purchases})</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Quick Stats Bar */}
-      <div className="quick-stats-row">
-        <div className="stat-chip-row">
-          <span className="chip-dot paid"></span>
-          <span>Paid: {summary.paid_count}</span>
-        </div>
-        <div className="stat-chip-row">
-          <span className="chip-dot partial"></span>
-          <span>Partial: {summary.partially_paid_count}</span>
-        </div>
-        <div className="stat-chip-row">
-          <span className="chip-dot unpaid"></span>
-          <span>Unpaid: {summary.non_paid_count}</span>
-        </div>
-        <div className="stat-chip-row total">
-          <span>Total: {summary.total_purchases}</span>
-        </div>
-      </div>
 
       {/* Search and Filter Bar */}
       <div className="search-section-responsive">
