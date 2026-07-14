@@ -1,6 +1,12 @@
-/* ============================= */
-/* Container & Layout            */
-/* ============================= */
+/* =============================================== */
+/* ADD / EDIT ITEM PAGES                            */
+/* Shared styles for AddNewItems.jsx & EditItem.jsx */
+/* Design tokens follow the app's --color-* system  */
+/* =============================================== */
+
+/* ------------------------------- */
+/* Page Container & Card           */
+/* ------------------------------- */
 
 .minimal-container {
   min-height: 100vh;
@@ -11,6 +17,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  box-sizing: border-box;
 }
 
 .minimal-card {
@@ -29,9 +36,9 @@
   transform: translateY(-1px);
 }
 
-/* ============================= */
-/* Header Section                */
-/* ============================= */
+/* ------------------------------- */
+/* Header                          */
+/* ------------------------------- */
 
 .minimal-header {
   display: flex;
@@ -46,7 +53,7 @@
   margin: 0;
   font-size: 1.5rem;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--color-heading);
   letter-spacing: -0.025em;
 }
 
@@ -56,17 +63,18 @@
   justify-content: center;
   width: 2.5rem;
   height: 2.5rem;
+  flex-shrink: 0;
   border: none;
   background: transparent;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .minimal-icon-button:hover {
-  background: var(--border-color);
-  color: var(--text-primary);
+  background: var(--color-border-light);
+  color: var(--color-text);
 }
 
 .minimal-icon-button.back-button {
@@ -75,11 +83,12 @@
 
 .header-spacer {
   width: 2.5rem;
+  flex-shrink: 0;
 }
 
-/* ============================= */
-/* Form Styles                   */
-/* ============================= */
+/* ------------------------------- */
+/* Form Layout                     */
+/* ------------------------------- */
 
 .minimal-form {
   padding: 2rem;
@@ -100,18 +109,23 @@
   border: 1px solid var(--color-border-light);
   border-radius: var(--radius-md);
   background: var(--color-surface-hover);
+  transition: border-color 0.2s ease;
+}
+
+.minimal-form-group:focus-within {
+  border-color: var(--color-primary);
 }
 
 .minimal-label {
   font-size: 0.875rem;
   font-weight: 500;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.025em;
 }
 
 .required-star {
-  color: var(--danger-color);
+  color: var(--color-danger-dark);
   margin-left: 0.25rem;
 }
 
@@ -126,62 +140,98 @@
   border-radius: var(--radius-md);
   transition: all 0.2s ease;
   box-shadow: inset 0 1px 2px rgba(28, 25, 23, 0.03);
+  box-sizing: border-box;
 }
 
 .minimal-input:hover,
 .minimal-select:hover {
-  border-color: var(--border-focus);
+  border-color: var(--color-primary-muted);
 }
 
 .minimal-input:focus,
 .minimal-select:focus {
   outline: none;
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-focus-ring);
 }
 
 .minimal-input::placeholder {
-  color: var(--text-muted);
-  opacity: 0.5;
+  color: var(--color-text-muted);
+  opacity: 0.7;
+}
+
+.minimal-select {
+  cursor: pointer;
 }
 
 .minimal-helper-text {
   font-size: 0.75rem;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
   margin-top: 0.25rem;
+  line-height: 1.4;
 }
 
-/* ============================= */
-/* Enhanced Minimalist Toggle Switch */
-/* Inspired by DesignLabThemes */
-/* ============================= */
+/* ------------------------------- */
+/* Toggle Switches                 */
+/* (VAT Applicable / Auto-Add)     */
+/* ------------------------------- */
 
 .minimal-toggle-group {
   margin: 1.5rem 0;
   padding: 1rem 1.25rem;
-  background: var(--background);
+  background: var(--color-surface-hover);
   border-radius: var(--radius-lg);
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--color-border);
   transition: all 0.2s ease;
 }
 
 .minimal-toggle-group:hover {
-  border-color: var(--border-focus);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+  border-color: var(--color-primary-muted);
+  box-shadow: var(--shadow-sm);
 }
 
-.minimal-toggle-label {
+/* Two-column layout used on the Edit Item page */
+.toggle-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.25rem;
+  margin: 1.5rem 0;
+}
+
+.toggle-column {
+  padding: 1rem 1.25rem;
+  background: var(--color-surface-hover);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  transition: all 0.2s ease;
+}
+
+.toggle-column:hover {
+  border-color: var(--color-primary-muted);
+  box-shadow: var(--shadow-sm);
+}
+
+.minimal-toggle-label,
+.toggle-column .minimal-toggle-label {
   display: flex;
   align-items: center;
   justify-content: space-between;
   cursor: pointer;
   font-weight: 500;
-  color: var(--text-primary);
+  color: var(--color-text);
   font-size: 0.95rem;
   margin-bottom: 0.5rem;
 }
 
-/* Main toggle container */
+.toggle-column .minimal-helper-text {
+  margin-top: 0.5rem;
+  display: block;
+  font-style: italic;
+  padding-left: 0.5rem;
+  border-left: 2px solid var(--color-border);
+}
+
+/* Toggle container */
 .minimal-toggle-switch {
   cursor: pointer;
   display: inline-block;
@@ -190,7 +240,7 @@
   text-align: left;
   width: 80px;
   height: 32px;
-  border-radius: 32px;
+  border-radius: var(--radius-full);
   line-height: 1.2;
   font-size: 13px;
   font-weight: 600;
@@ -198,7 +248,6 @@
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-/* Hide the actual checkbox */
 .minimal-toggle-switch input {
   position: absolute;
   left: 0;
@@ -212,18 +261,16 @@
   cursor: pointer;
 }
 
-/* Animated background */
 .minimal-toggle-switch .toggle-animate {
   position: relative;
   width: 80px;
   height: 32px;
-  background-color: #a0aec0;
-  border-radius: 32px;
+  background-color: var(--color-text-muted);
+  border-radius: var(--radius-full);
   transition: background-color 0.25s ease-out;
   box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
-/* Sliding knob */
 .minimal-toggle-switch .toggle-animate:before {
   content: "";
   display: block;
@@ -231,7 +278,7 @@
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background-color: white;
+  background-color: #ffffff;
   top: 4px;
   left: 4px;
   transition: left 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.1);
@@ -239,21 +286,17 @@
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
 }
 
-/* Checked state background */
 .minimal-toggle-switch input:checked + .toggle-animate {
-  background-color: #2563eb;
+  background-color: var(--color-primary);
 }
 
-/* Checked state knob position */
 .minimal-toggle-switch input:checked + .toggle-animate:before {
   left: 52px;
-  background-color: #ffffff;
 }
 
-/* OFF text */
 .toggle-off {
   float: left;
-  color: white;
+  color: #ffffff;
   padding: 7px 0 0 12px;
   opacity: 1;
   transition: opacity 0.2s ease-out;
@@ -261,10 +304,9 @@
   letter-spacing: 0.3px;
 }
 
-/* ON text */
 .toggle-on {
   float: right;
-  color: white;
+  color: #ffffff;
   padding: 7px 12px 0 0;
   opacity: 0;
   transition: opacity 0.2s ease-out;
@@ -272,41 +314,82 @@
   letter-spacing: 0.3px;
 }
 
-/* Hide OFF text when checked */
 .minimal-toggle-switch input:checked + .toggle-animate .toggle-off {
   opacity: 0;
   display: none;
 }
 
-/* Show ON text when checked */
 .minimal-toggle-switch input:checked + .toggle-animate .toggle-on {
   opacity: 1;
   display: block;
 }
 
-/* VAT toggle variation */
+/* Toggle color variants */
 .minimal-toggle-switch.vat-toggle input:checked + .toggle-animate {
-  background-color: #059669;
+  background-color: var(--color-success-dark);
 }
 
-/* Stock toggle variation */
 .minimal-toggle-switch.stock-toggle input:checked + .toggle-animate {
-  background-color: #2563eb;
+  background-color: var(--color-primary);
 }
 
-/* Focus state for accessibility */
 .minimal-toggle-switch input:focus + .toggle-animate {
-  outline: 2px solid #2563eb;
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 
-/* ============================= */
-/* Info Box                      */
-/* ============================= */
+/* ------------------------------- */
+/* Info Message                    */
+/* (Add Item: Auto-Add callout)    */
+/* ------------------------------- */
+
+.info-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 1rem 1.1rem;
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  margin: 1.5rem 0;
+  border: 1px solid transparent;
+}
+
+.info-message svg {
+  margin-top: 0.15rem;
+  flex-shrink: 0;
+}
+
+.info-message strong {
+  font-weight: 600;
+}
+
+.info-success {
+  background: var(--color-success-light);
+  color: var(--color-success-dark);
+  border-color: var(--color-success-dark);
+}
+
+.info-warning {
+  background: var(--color-danger-light);
+  color: var(--color-danger-dark);
+  border-color: var(--color-danger-dark);
+}
+
+.info-error {
+  background: var(--color-danger-light);
+  color: var(--color-danger-dark);
+  border-color: var(--color-danger-dark);
+}
+
+/* ------------------------------- */
+/* Info Box                        */
+/* (Edit Item: summary panel)      */
+/* ------------------------------- */
 
 .minimal-info-box {
-  background: var(--background);
-  border: 1px solid var(--border-color);
+  background: var(--color-surface-hover);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   padding: 1.25rem;
   margin: 1.5rem 0;
@@ -315,7 +398,7 @@
 .info-box-title {
   font-size: 0.875rem;
   font-weight: 600;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   margin: 0 0 1rem 0;
   text-transform: uppercase;
   letter-spacing: 0.025em;
@@ -335,27 +418,27 @@
 
 .info-label {
   font-size: 0.75rem;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
   text-transform: uppercase;
 }
 
 .info-value {
   font-size: 0.95rem;
   font-weight: 500;
-  color: var(--text-primary);
+  color: var(--color-heading);
 }
 
 .info-value.vat-active {
-  color: #059669;
+  color: var(--color-success-dark);
 }
 
 .info-value.vat-inactive {
-  color: var(--text-muted);
+  color: var(--color-text-muted);
 }
 
-/* ============================= */
-/* Form Actions                  */
-/* ============================= */
+/* ------------------------------- */
+/* Form Actions & Buttons          */
+/* ------------------------------- */
 
 .minimal-form-actions {
   display: flex;
@@ -364,7 +447,7 @@
   gap: 1rem;
   margin-top: 2rem;
   padding-top: 1.5rem;
-  border-top: 1px solid var(--border-color);
+  border-top: 1px solid var(--color-border);
 }
 
 .minimal-button {
@@ -382,39 +465,42 @@
 }
 
 .minimal-button-primary {
-  background: #2563eb;
-  color: white;
+  background: var(--color-primary);
+  color: #ffffff;
 }
 
 .minimal-button-primary:hover:not(:disabled) {
-  background: #1d4ed8;
+  background: var(--color-primary-dark);
   transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
 }
 
 .minimal-button-secondary {
   background: transparent;
-  color: var(--text-secondary);
-  border: 1px solid var(--border-color);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
 }
 
 .minimal-button-secondary:hover:not(:disabled) {
-  background: var(--background);
-  color: var(--text-primary);
-  border-color: var(--text-muted);
+  background: var(--color-surface-hover);
+  color: var(--color-text);
+  border-color: var(--color-text-muted);
 }
 
 .minimal-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  transform: none;
 }
 
 .button-icon {
   font-size: 1rem;
 }
 
-/* ============================= */
-/* Loading State                 */
-/* ============================= */
+/* ------------------------------- */
+/* Loading State                   */
+/* (Edit Item: fetch in progress)  */
+/* ------------------------------- */
 
 .loading-card {
   padding: 3rem;
@@ -425,8 +511,8 @@
   width: 2.5rem;
   height: 2.5rem;
   margin: 0 auto 1rem;
-  border: 3px solid var(--border-color);
-  border-top-color: #2563eb;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-primary);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -436,8 +522,144 @@
 }
 
 .loading-text {
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   margin: 0;
+}
+
+/* ------------------------------- */
+/* Responsive: Add / Edit pages    */
+/* ------------------------------- */
+
+@media (max-width: 640px) {
+  .toggle-row {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .minimal-container {
+    padding: 1rem;
+  }
+
+  .minimal-header {
+    padding: 1rem 1.25rem;
+  }
+
+  .minimal-form {
+    padding: 1.25rem;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .info-grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .minimal-form-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .minimal-button {
+    width: 100%;
+  }
+
+  .minimal-toggle-switch,
+  .minimal-toggle-switch input,
+  .minimal-toggle-switch .toggle-animate {
+    width: 72px;
+    height: 28px;
+  }
+
+  .minimal-toggle-switch .toggle-animate:before {
+    width: 20px;
+    height: 20px;
+    top: 4px;
+    left: 4px;
+  }
+
+  .minimal-toggle-switch input:checked + .toggle-animate:before {
+    left: 48px;
+  }
+
+  .toggle-off,
+  .toggle-on {
+    padding-top: 6px;
+    font-size: 11px;
+  }
+}
+
+@media (min-width: 481px) and (max-width: 768px) {
+  .minimal-container {
+    padding: 1.5rem;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+
+  .toggle-row {
+    grid-template-columns: 1fr;
+  }
+
+  .info-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  .minimal-card {
+    max-width: 700px;
+  }
+
+  .form-grid {
+    gap: 1.25rem;
+  }
+}
+
+@media (min-width: 1025px) and (max-width: 1400px) {
+  .minimal-card {
+    max-width: 800px;
+  }
+}
+
+@media (min-width: 1401px) {
+  .minimal-card {
+    max-width: 900px;
+  }
+
+  .minimal-title {
+    font-size: 1.75rem;
+  }
+
+  .minimal-input,
+  .minimal-select {
+    padding: 0.875rem 1.25rem;
+    font-size: 1rem;
+  }
+
+  .minimal-button {
+    padding: 0.875rem 2rem;
+    font-size: 1rem;
+  }
+}
+
+@media print {
+  .minimal-container {
+    background: none;
+    padding: 0;
+  }
+
+  .minimal-icon-button,
+  .minimal-form-actions {
+    display: none;
+  }
 }
 
 /* ============================= */
@@ -683,6 +905,28 @@
   color: var(--color-danger-dark);
 }
 
+/* Item Status Badge (Active / Inactive) */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.28rem 0.7rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: var(--radius-full);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.status-badge.active {
+  background: var(--color-success-light);
+  color: var(--color-success-dark);
+}
+
+.status-badge.inactive {
+  background: var(--color-danger-light);
+  color: var(--color-danger-dark);
+}
+
 /* Reorder Level */
 .reorder-level {
   font-weight: 600;
@@ -804,42 +1048,11 @@
 }
 
 /* ============================= */
-/* Responsive Design             */
+/* Responsive Design (Table/List) */
 /* ============================= */
 
 /* Mobile (up to 480px) */
 @media (max-width: 480px) {
-  .minimal-container {
-    padding: 1rem;
-  }
-
-  .minimal-header {
-    padding: 1rem 1.25rem;
-  }
-
-  .minimal-form {
-    padding: 1.25rem;
-  }
-
-  .form-grid {
-    grid-template-columns: 1fr;
-    gap: 1rem;
-  }
-
-  .minimal-form-actions {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .minimal-button {
-    width: 100%;
-  }
-
-  .info-grid {
-    grid-template-columns: 1fr;
-    gap: 0.75rem;
-  }
-
   .items-table-container {
     padding: 0 0.75rem 1.5rem;
   }
@@ -871,37 +1084,6 @@
     min-width: 800px;
   }
 
-  .minimal-toggle-switch {
-    width: 72px;
-    height: 28px;
-  }
-  
-  .minimal-toggle-switch input {
-    width: 72px;
-    height: 28px;
-  }
-  
-  .minimal-toggle-switch .toggle-animate {
-    width: 72px;
-    height: 28px;
-  }
-  
-  .minimal-toggle-switch .toggle-animate:before {
-    width: 20px;
-    height: 20px;
-    top: 4px;
-    left: 4px;
-  }
-  
-  .minimal-toggle-switch input:checked + .toggle-animate:before {
-    left: 48px;
-  }
-  
-  .toggle-off, .toggle-on {
-    padding-top: 6px;
-    font-size: 11px;
-  }
-
   .table-footer {
     flex-direction: column;
     gap: 1rem;
@@ -916,19 +1098,6 @@
 
 /* Tablet (481px - 768px) */
 @media (min-width: 481px) and (max-width: 768px) {
-  .minimal-container {
-    padding: 1.5rem;
-  }
-
-  .form-grid {
-    grid-template-columns: 1fr;
-    gap: 1.25rem;
-  }
-
-  .info-grid {
-    grid-template-columns: 1fr;
-  }
-
   .items-search input {
     width: 100%;
   }
@@ -961,14 +1130,6 @@
 
 /* Laptop (769px - 1024px) */
 @media (min-width: 769px) and (max-width: 1024px) {
-  .minimal-card {
-    max-width: 700px;
-  }
-
-  .form-grid {
-    gap: 1.25rem;
-  }
-
   .items-search input {
     width: 100%;
   }
@@ -985,10 +1146,6 @@
 
 /* Desktop (1025px - 1400px) */
 @media (min-width: 1025px) and (max-width: 1400px) {
-  .minimal-card {
-    max-width: 800px;
-  }
-
   .items-table-container {
     padding: 0 3rem;
   }
@@ -996,43 +1153,14 @@
 
 /* Large Desktop (1401px and above) */
 @media (min-width: 1401px) {
-  .minimal-card {
-    max-width: 900px;
-  }
-
   .items-table-container {
     max-width: 1600px;
     padding: 0 4rem;
-  }
-
-  .minimal-title {
-    font-size: 1.75rem;
-  }
-
-  .minimal-input,
-  .minimal-select {
-    padding: 0.875rem 1.25rem;
-    font-size: 1rem;
-  }
-
-  .minimal-button {
-    padding: 0.875rem 2rem;
-    font-size: 1rem;
   }
 }
 
 /* Print Styles */
 @media print {
-  .minimal-container {
-    background: white;
-    padding: 0;
-  }
-
-  .minimal-card {
-    box-shadow: none;
-  }
-
-  .minimal-form-actions,
   .btn-add,
   .items-search,
   .btn-icon {

@@ -43897,3 +43897,8 @@ CREATE TABLE IF NOT EXISTS purchase_return_credits (
 ALTER TABLE bank_details
   ADD COLUMN company ENUM('JH', 'RD', 'RR') NOT NULL DEFAULT 'JH'
   AFTER current_balance;
+
+
+-- Add status column to items table
+ALTER TABLE `items` 
+ADD COLUMN `status` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=Active, 0=Inactive' AFTER `deleted`;

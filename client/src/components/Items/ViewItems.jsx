@@ -9,7 +9,8 @@ import {
   faTimes,
   faCheck,
   faBan,
-  faInfoCircle
+  faInfoCircle,
+  faCircle
 } from '@fortawesome/free-solid-svg-icons';
 import './ItemManagement.css';
 import { usePopup } from '../context/PopupContext';
@@ -24,6 +25,7 @@ const ItemsList = () => {
   const [filterVat, setFilterVat] = useState('all');
   const [filterAutoAdd, setFilterAutoAdd] = useState('all');
   const [filterItemType, setFilterItemType] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('all'); // Add status filter
   const { showPopup } = usePopup();
   const navigate = useNavigate();
 
@@ -33,7 +35,7 @@ const ItemsList = () => {
 
   useEffect(() => {
     filterItems();
-  }, [searchTerm, filterVat, filterAutoAdd, filterItemType, items]);
+  }, [searchTerm, filterVat, filterAutoAdd, filterItemType, filterStatus, items]);
 
   const fetchItems = async () => {
     try {
@@ -64,7 +66,6 @@ const ItemsList = () => {
     if (filterVat !== 'all') {
       const vatValue = filterVat === 'yes';
       filtered = filtered.filter(item => {
-        // Convert both to boolean for comparison
         return Boolean(item.vat_applicable) === vatValue;
       });
     }
@@ -73,7 +74,6 @@ const ItemsList = () => {
     if (filterAutoAdd !== 'all') {
       const autoAddValue = filterAutoAdd === 'yes';
       filtered = filtered.filter(item => {
-        // Convert both to boolean for comparison
         return Boolean(item.auto_add_to_stock) === autoAddValue;
       });
     }
@@ -81,6 +81,12 @@ const ItemsList = () => {
     // Apply Item Type filter
     if (filterItemType !== 'all') {
       filtered = filtered.filter(item => (item.item_type || 'Other') === filterItemType);
+    }
+
+    // Apply Status filter
+    if (filterStatus !== 'all') {
+      const statusValue = filterStatus === 'active' ? 1 : 0;
+      filtered = filtered.filter(item => item.status === statusValue);
     }
 
     setFilteredItems(filtered);
@@ -110,6 +116,7 @@ const ItemsList = () => {
     setFilterVat('all');
     setFilterAutoAdd('all');
     setFilterItemType('all');
+    setFilterStatus('all');
   };
 
   if (loading) {
@@ -197,7 +204,20 @@ const ItemsList = () => {
           </select>
         </div>
 
-        {(searchTerm || filterVat !== 'all' || filterAutoAdd !== 'all' || filterItemType !== 'all') && (
+        {/* Status Filter Dropdown */}
+        <div className="filter-dropdown">
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="minimal-select filter-select"
+          >
+            <option value="all">All Status</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+
+        {(searchTerm || filterVat !== 'all' || filterAutoAdd !== 'all' || filterItemType !== 'all' || filterStatus !== 'all') && (
           <button 
             onClick={clearSearch}
             className="minimal-button minimal-button-secondary clear-filters"
@@ -212,16 +232,16 @@ const ItemsList = () => {
           <div className="empty-state-icon">📦</div>
           <h3>No Items Found</h3>
           <p>
-            {searchTerm || filterVat !== 'all' || filterAutoAdd !== 'all' || filterItemType !== 'all'
+            {searchTerm || filterVat !== 'all' || filterAutoAdd !== 'all' || filterItemType !== 'all' || filterStatus !== 'all'
               ? "No items match your search criteria. Try adjusting your filters." 
               : "Get started by adding your first item."}
           </p>
-          {(searchTerm || filterVat !== 'all' || filterAutoAdd !== 'all' || filterItemType !== 'all') && (
+          {(searchTerm || filterVat !== 'all' || filterAutoAdd !== 'all' || filterItemType !== 'all' || filterStatus !== 'all') && (
             <button onClick={clearSearch} className="minimal-button minimal-button-secondary">
               Clear All Filters
             </button>
           )}
-          {!searchTerm && filterVat === 'all' && filterAutoAdd === 'all' && filterItemType === 'all' && (
+          {!searchTerm && filterVat === 'all' && filterAutoAdd === 'all' && filterItemType === 'all' && filterStatus === 'all' && (
             <button 
               onClick={() => navigate('/items/add')} 
               className="minimal-button minimal-button-primary"
@@ -243,6 +263,7 @@ const ItemsList = () => {
                   <th>Item Type</th>
                   <th>VAT Status</th>
                   <th>Auto-Add to Stock</th>
+                  <th>Status</th>
                   <th>Current Stock</th>
                   <th>Reorder Level</th>
                   <th>Actions</th>
@@ -281,6 +302,19 @@ const ItemsList = () => {
                           Auto-managed
                         </small>
                       )}
+                    </td>
+                    <td>
+                      <span className={`status-badge ${item.status === 1 ? 'active' : 'inactive'}`}>
+                        <FontAwesomeIcon 
+                          icon={faCircle} 
+                          style={{ 
+                            fontSize: '0.6rem', 
+                            marginRight: '4px',
+                            color: item.status === 1 ? '#28a745' : '#dc3545'
+                          }} 
+                        />
+                        {item.status === 1 ? 'Active' : 'Inactive'}
+                      </span>
                     </td>
                     <td>
                       <span className="current-stock">{item.current_stock || 0}</span>
@@ -326,6 +360,9 @@ const ItemsList = () => {
               )}
               <span className="stat-item">
                 <strong>{items.filter(i => i.auto_add_to_stock).length}</strong> Auto-Add
+              </span>
+              <span className="stat-item">
+                <strong>{items.filter(i => i.status === 1).length}</strong> Active
               </span>
             </div>
             <div className="table-export">

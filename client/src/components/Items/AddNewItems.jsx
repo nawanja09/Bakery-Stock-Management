@@ -15,7 +15,8 @@ const AddItem = () => {
     item_type: DEFAULT_ITEM_TYPE,
     vat_applicable: false,
     auto_add_to_stock: true,
-    reorder_level: ''
+    reorder_level: '',
+    status: true // Add status field (true = Active)
   });
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
@@ -43,7 +44,8 @@ const AddItem = () => {
         item_type: formData.item_type || DEFAULT_ITEM_TYPE,
         vat_applicable: formData.vat_applicable,
         auto_add_to_stock: formData.auto_add_to_stock,
-        reorder_level: formData.reorder_level
+        reorder_level: formData.reorder_level,
+        status: formData.status ? 1 : 0 // Convert boolean to 1/0
       };
 
       const response = await api.post('/items', payload);
@@ -59,7 +61,8 @@ const AddItem = () => {
           item_type: DEFAULT_ITEM_TYPE,
           vat_applicable: false,
           auto_add_to_stock: true,
-          reorder_level: ''
+          reorder_level: '',
+          status: true
         });
       } else {
         showPopup('error', data.error || 'Failed to add item');
@@ -157,6 +160,21 @@ const AddItem = () => {
                 className="minimal-input"
                 placeholder="0"
               />
+            </div>
+
+            {/* New Status Field */}
+            <div className="minimal-form-group">
+              <label className="minimal-label">Status <span className="required-star">*</span></label>
+              <select
+                name="status"
+                value={formData.status ? 'active' : 'inactive'}
+                onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value === 'active' }))}
+                required
+                className="minimal-select"
+              >
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
             </div>
           </div>
 

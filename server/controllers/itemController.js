@@ -4,17 +4,26 @@ const pool = require('../config/db');
 // CREATE ITEM with Auto-Add functionality
 // =============================================
 const createItem = async (req, res) => {
-  const { item_code, name, unit, item_type, vat_applicable, auto_add_to_stock, reorder_level } = req.body;
+  const { 
+    item_code, 
+    name, 
+    unit, 
+    item_type, 
+    vat_applicable, 
+    auto_add_to_stock, 
+    reorder_level,
+    status // Add status
+  } = req.body;
 
   const connection = await pool.getConnection();
   
   try {
     await connection.beginTransaction();
 
-    // Insert item
+    // Insert item with status
     const [result] = await connection.query(
-      'INSERT INTO items (item_code, name, unit, item_type, vat_applicable, auto_add_to_stock, reorder_level) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [item_code, name, unit, item_type || 'Other', vat_applicable || false, auto_add_to_stock !== undefined ? auto_add_to_stock : true, reorder_level]
+      'INSERT INTO items (item_code, name, unit, item_type, vat_applicable, auto_add_to_stock, reorder_level, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [item_code, name, unit, item_type || 'Other', vat_applicable || false, auto_add_to_stock !== undefined ? auto_add_to_stock : true, reorder_level, status !== undefined ? status : 1]
     );
 
     // Auto-add to stock if enabled (default is true)
@@ -60,7 +69,7 @@ const createItem = async (req, res) => {
 // =============================================
 const getAllItems = async (req, res) => {
   try {
-    const { auto_add_only } = req.query;
+    const { auto_add_only, status } = req.query;
     
     let query = `
       SELECT 
@@ -72,6 +81,7 @@ const getAllItems = async (req, res) => {
         i.vat_applicable,
         i.auto_add_to_stock,
         i.reorder_level,
+        i.status,
         COALESCE(
           (SELECT COALESCE(SUM(quantity), 0) FROM opening_balances WHERE item_id = i.id) +
           (SELECT COALESCE(SUM(pi.quantity), 0) 
@@ -97,6 +107,13 @@ const getAllItems = async (req, res) => {
     
     if (auto_add_only === 'true') {
       query += ' AND i.auto_add_to_stock = 1';
+    }
+    
+    // Add status filter
+    if (status === 'active') {
+      query += ' AND i.status = 1';
+    } else if (status === 'inactive') {
+      query += ' AND i.status = 0';
     }
     
     query += ' ORDER BY i.item_code';
@@ -126,6 +143,7 @@ const getItemById = async (req, res) => {
         i.vat_applicable,
         i.auto_add_to_stock,
         i.reorder_level,
+        i.status,
         COALESCE(
           (SELECT COALESCE(SUM(quantity), 0) FROM opening_balances WHERE item_id = i.id) +
           (SELECT COALESCE(SUM(pi.quantity), 0) 
@@ -165,7 +183,16 @@ const getItemById = async (req, res) => {
 // =============================================
 const updateItem = async (req, res) => {
   const { id } = req.params;
-  const { item_code, name, unit, item_type, vat_applicable, auto_add_to_stock, reorder_level } = req.body;
+  const { 
+    item_code, 
+    name, 
+    unit, 
+    item_type, 
+    vat_applicable, 
+    auto_add_to_stock, 
+    reorder_level,
+    status // Add status
+  } = req.body;
 
   const connection = await pool.getConnection();
   
@@ -178,10 +205,10 @@ const updateItem = async (req, res) => {
       [id]
     );
 
-    // Update item
+    // Update item with status
     const [result] = await connection.query(
-      'UPDATE items SET item_code = ?, name = ?, unit = ?, item_type = ?, vat_applicable = ?, auto_add_to_stock = ?, reorder_level = ? WHERE id = ? AND deleted = FALSE',
-      [item_code, name, unit, item_type || 'Other', vat_applicable || false, auto_add_to_stock !== undefined ? auto_add_to_stock : true, reorder_level, id]
+      'UPDATE items SET item_code = ?, name = ?, unit = ?, item_type = ?, vat_applicable = ?, auto_add_to_stock = ?, reorder_level = ?, status = ? WHERE id = ? AND deleted = FALSE',
+      [item_code, name, unit, item_type || 'Other', vat_applicable || false, auto_add_to_stock !== undefined ? auto_add_to_stock : true, reorder_level, status !== undefined ? status : 1, id]
     );
     
     if (result.affectedRows === 0) {
@@ -303,6 +330,7 @@ const getItemsWithoutOpeningBalance = async (req, res) => {
       WHERE ob.item_id IS NULL 
         AND i.deleted = FALSE
         AND i.auto_add_to_stock = FALSE
+        AND i.status = 1
       ORDER BY i.item_code
     `);
     res.json(rows);
