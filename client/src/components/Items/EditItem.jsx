@@ -21,7 +21,8 @@ const EditItem = () => {
     item_type: DEFAULT_ITEM_TYPE,
     vat_applicable: false,
     auto_add_to_stock: true,
-    reorder_level: ''
+    reorder_level: '',
+    status: true // Add status field
   });
 
   useEffect(() => {
@@ -41,7 +42,8 @@ const EditItem = () => {
         item_type: item.item_type || DEFAULT_ITEM_TYPE,
         vat_applicable: item.vat_applicable || false,
         auto_add_to_stock: item.auto_add_to_stock !== undefined ? item.auto_add_to_stock : true,
-        reorder_level: item.reorder_level || ''
+        reorder_level: item.reorder_level || '',
+        status: item.status !== undefined ? item.status === 1 : true // Convert 1/0 to boolean
       });
     } catch (error) {
       console.error('Error fetching item:', error);
@@ -90,7 +92,8 @@ const EditItem = () => {
         item_type: formData.item_type || DEFAULT_ITEM_TYPE,
         vat_applicable: formData.vat_applicable,
         auto_add_to_stock: formData.auto_add_to_stock,
-        reorder_level: formData.reorder_level
+        reorder_level: formData.reorder_level,
+        status: formData.status ? 1 : 0 // Convert boolean to 1/0
       };
 
       const response = await api.put(`/items/${id}`, payload);
@@ -215,6 +218,22 @@ const EditItem = () => {
               />
               <span className="minimal-helper-text">Alert when stock falls below this level</span>
             </div>
+
+            {/* Status Field */}
+            <div className="minimal-form-group">
+              <label className="minimal-label">Status <span className="required-star">*</span></label>
+              <select
+                name="status"
+                value={formData.status ? 'active' : 'inactive'}
+                onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value === 'active' }))}
+                required
+                className="minimal-select"
+              >
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+              <span className="minimal-helper-text">Active items are available for use in transactions</span>
+            </div>
           </div>
 
           {/* Two-column toggle section */}
@@ -283,6 +302,12 @@ const EditItem = () => {
                 <span className="info-label">Auto-Add to Stock:</span>
                 <span className={`info-value ${formData.auto_add_to_stock ? 'vat-active' : 'vat-inactive'}`}>
                   {formData.auto_add_to_stock ? 'Enabled' : 'Disabled'}
+                </span>
+              </div>
+              <div className="info-item">
+                <span className="info-label">Status:</span>
+                <span className={`info-value ${formData.status ? 'vat-active' : 'vat-inactive'}`}>
+                  {formData.status ? 'Active' : 'Inactive'}
                 </span>
               </div>
             </div>
