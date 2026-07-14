@@ -6,16 +6,13 @@ import { usePopup } from '../context/PopupContext';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faEye, 
-  faEdit, 
-  faTrash, 
-  faPlus,
-  faTimes,
-  faCheckCircle,
-  faMoneyBillWave,
   faClock,
-  faExclamationTriangle
+  faExclamationTriangle,
+  faMoneyBillWave,
+  faTimes,
+  faFileAlt
 } from '@fortawesome/free-solid-svg-icons';
-import { formatCurrency, formatQuantity } from '../../utils/formatters';
+import { formatCurrency } from '../../utils/formatters';
 
 const WastageHistory = () => {
   const [wastages, setWastages] = useState([]);
@@ -69,6 +66,13 @@ const WastageHistory = () => {
     }
   };
 
+  // Calculate total loss for a wastage
+  const calculateTotalLoss = (wastageId) => {
+    // This would be calculated from the items, but we need to fetch items or store total in DB
+    // For now, we'll use a placeholder - ideally you'd fetch this from the API
+    return 0;
+  };
+
   // View Wastage Details
   const handleView = async (id) => {
     setModalOpen(true);
@@ -91,33 +95,6 @@ const WastageHistory = () => {
       showPopup('error', 'Failed to load wastage details');
     } finally {
       setModalLoading(false);
-    }
-  };
-
-  // Edit Wastage - Navigate to edit page
-  const handleEdit = (id) => {
-    navigate(`/wastage/edit/${id}`);
-  };
-
-  // Delete Wastage
-  const handleDelete = async (id, noteNumber) => {
-    if (!window.confirm(`Are you sure you want to delete wastage note #${noteNumber}?`)) {
-      return;
-    }
-
-    try {
-      const token = localStorage.getItem('token');
-      await api.delete(`/wastages/${id}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      showPopup('success', `Wastage #${noteNumber} deleted successfully`);
-      fetchWastages();
-    } catch (error) {
-      console.error('Error deleting wastage:', error);
-      showPopup('error', 'Failed to delete wastage');
     }
   };
 
@@ -157,9 +134,6 @@ const WastageHistory = () => {
           <button onClick={fetchWastages} className="btn-primary">
             Retry
           </button>
-          <button onClick={() => navigate('/wastage/add')} className="btn-add">
-            <FontAwesomeIcon icon={faPlus} /> Record New Wastage
-          </button>
         </div>
       </div>
     );
@@ -168,51 +142,44 @@ const WastageHistory = () => {
   return (
     <div className="wastage-container">
       <div className="header-section">
-        <div className="header-left">
-          <h2>Wastage History</h2>
-          <span className="record-count">{wastages.length} records</span>
-        </div>
-        <button onClick={() => navigate('/wastage/add')} className="btn-add">
-          <FontAwesomeIcon icon={faPlus} /> Record New Wastage
-        </button>
+          <h2>RM Wastage Summary</h2>
       </div>
       
       {wastages.length === 0 ? (
         <div className="no-records">
           <div className="no-records-icon">📋</div>
           <p>No wastage records found</p>
-          <button onClick={() => navigate('/wastage/add')} className="btn-add">
-            <FontAwesomeIcon icon={faPlus} /> Record New Wastage
-          </button>
         </div>
       ) : (
         <div className="table-responsive">
           <table className="wastage-table">
             <thead>
               <tr>
-                <th>Note #</th>
-                <th>Date</th>
-                <th>Approved By</th>
-                <th>Reason</th>
-                <th>Remarks</th>
-                <th className="actions-header">Actions</th>
+                <th className="center-align">Date</th>
+                <th className="center-align">Approved By</th>
+                <th className="center-align">Reason</th>
+                <th className="center-align">Remarks</th>
+                <th className="center-align">Total Loss</th>
+                <th className="center-align actions-header">Actions</th>
               </tr>
             </thead>
             <tbody>
               {wastages.map(wastage => {
                 const statusInfo = getStatusInfo(wastage.reason);
+                // Calculate total loss from items - this would need to be fetched
+                // For now, we'll use a placeholder or calculate from the data
+                const totalLoss = wastage.items 
+                  ? wastage.items.reduce((sum, item) => sum + (Number(item.estimated_loss) || 0), 0)
+                  : 0;
                 return (
                   <tr key={wastage.id} className="wastage-row">
-                    <td>
-                      <span className="note-number">{wastage.wastage_note_number}</span>
-                    </td>
-                    <td>{new Date(wastage.date).toLocaleDateString('en-US', {
+                    <td className="center-align">{new Date(wastage.date).toLocaleDateString('en-US', {
                       year: 'numeric',
                       month: 'short',
                       day: 'numeric'
                     })}</td>
-                    <td>{wastage.approved_by}</td>
-                    <td>
+                    <td className="center-align">{wastage.approved_by}</td>
+                    <td className="center-align">
                       <span className="reason-badge" style={{ 
                         backgroundColor: statusInfo.bg,
                         color: statusInfo.color,
@@ -222,10 +189,13 @@ const WastageHistory = () => {
                         {wastage.reason}
                       </span>
                     </td>
-                    <td className="remarks-cell">
+                    <td className="center-align remarks-cell">
                       {wastage.remarks || <span className="no-remarks">—</span>}
                     </td>
-                    <td className="actions-cell">
+                    <td className="center-align loss-amount">
+                      {formatCurrency(totalLoss)}
+                    </td>
+                    <td className="center-align actions-cell">
                       <button
                         className="action-btn view-btn"
                         onClick={() => handleView(wastage.id)}
@@ -233,20 +203,7 @@ const WastageHistory = () => {
                       >
                         <FontAwesomeIcon icon={faEye} />
                       </button>
-                      <button
-                        className="action-btn edit-btn"
-                        onClick={() => handleEdit(wastage.id)}
-                        title="Edit Wastage"
-                      >
-                        <FontAwesomeIcon icon={faEdit} />
-                      </button>
-                      <button
-                        className="action-btn delete-btn"
-                        onClick={() => handleDelete(wastage.id, wastage.wastage_note_number)}
-                        title="Delete Wastage"
-                      >
-                        <FontAwesomeIcon icon={faTrash} />
-                      </button>
+                      {/* Removed Edit and Delete buttons */}
                     </td>
                   </tr>
                 );
@@ -256,13 +213,13 @@ const WastageHistory = () => {
         </div>
       )}
 
-      {/* Modal for wastage details */}
+      {/* Modal for wastage details - Enhanced with larger size */}
       {modalOpen && (
         <div className="modal-overlay" onClick={closeModal}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
+          <div className="modal-content modal-large" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h2>
-                <FontAwesomeIcon icon={faEye} /> Wastage Details
+                <FontAwesomeIcon icon={faFileAlt} /> Wastage Details
               </h2>
               <button className="modal-close" onClick={closeModal}>
                 <FontAwesomeIcon icon={faTimes} />
@@ -314,47 +271,49 @@ const WastageHistory = () => {
 
                   <div className="items-table-wrapper">
                     <h4>Wasted Items</h4>
-                    <table className="items-details-table">
-                      <thead>
-                        <tr>
-                          <th>Item Code</th>
-                          <th>Item Name</th>
-                          <th className="text-right">Quantity</th>
-                          <th>Unit</th>
-                          <th className="text-right">Estimated Loss (Rs.)</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {selectedWastage.items && selectedWastage.items.map((item, idx) => (
-                          <tr key={idx}>
-                            <td><span className="item-code">{item.item_code}</span></td>
-                            <td>{item.item_name}</td>
-                            <td className="text-right">{formatQuantity(item.quantity)}</td>
-                            <td>{item.unit}</td>
-                            <td className="text-right loss-amount">
-                              {formatCurrency(item.estimated_loss)}
+                    <div className="items-table-scroll">
+                      <table className="items-details-table">
+                        <thead>
+                          <tr>
+                            <th className="center-align">Item Code</th>
+                            <th className="center-align">Item Name</th>
+                            <th className="center-align">Quantity</th>
+                            <th className="center-align">Unit</th>
+                            <th className="center-align">Estimated Loss (Rs.)</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedWastage.items && selectedWastage.items.map((item, idx) => (
+                            <tr key={idx}>
+                              <td className="center-align"><span className="item-code">{item.item_code}</span></td>
+                              <td className="center-align">{item.item_name}</td>
+                              <td className="center-align">{Number(item.quantity).toFixed(3)}</td>
+                              <td className="center-align">{item.unit}</td>
+                              <td className="center-align loss-amount">
+                                {formatCurrency(item.estimated_loss)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr>
+                            <td colSpan="4" className="center-align">
+                              <strong>Total Estimated Loss:</strong>
+                            </td>
+                            <td className="center-align total-loss-amount">
+                              <strong>
+                                {selectedWastage.items ? 
+                                  formatCurrency(
+                                  selectedWastage.items.reduce((total, item) => 
+                                    total + (parseFloat(item.estimated_loss) || 0), 0
+                                  )
+                                ) : formatCurrency(0)}
+                              </strong>
                             </td>
                           </tr>
-                        ))}
-                      </tbody>
-                      <tfoot>
-                        <tr>
-                          <td colSpan="4" className="text-right">
-                            <strong>Total Estimated Loss:</strong>
-                          </td>
-                          <td className="text-right total-loss-amount">
-                            <strong>
-                              {selectedWastage.items ? 
-                                formatCurrency(
-                                selectedWastage.items.reduce((total, item) => 
-                                  total + (parseFloat(item.estimated_loss) || 0), 0
-                                )
-                              ) : formatCurrency(0)}
-                            </strong>
-                          </td>
-                        </tr>
-                      </tfoot>
-                    </table>
+                        </tfoot>
+                      </table>
+                    </div>
                   </div>
                 </div>
               )}

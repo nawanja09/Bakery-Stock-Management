@@ -1,313 +1,473 @@
-import React, { useState } from 'react';
-import { format, subDays } from 'date-fns';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import * as XLSX from 'xlsx';
-import '../PurchasingReport/PurchasingReport.css';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import './WastageReport.css';
 import api from '../../../api';
-import { formatNumber } from '../../../utils/formatters';
+import { usePopup } from '../../context/PopupContext';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { 
+  faFileAlt,
+  faSearch,
+  faCalendarAlt,
+  faBoxOpen,
+  faTimes,
+  faEye,
+  faClock,
+  faExclamationTriangle,
+  faMoneyBillWave
+} from '@fortawesome/free-solid-svg-icons';
+import { formatCurrency } from '../../../utils/formatters';
+
 
 const WastageReport = () => {
-  const [startDate, setStartDate] = useState(format(subDays(new Date(), 7), 'yyyy-MM-dd'));
-  const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [wastageData, setWastageData] = useState([]);
+  const navigate = useNavigate();
+  const { showPopup } = usePopup();
+  
   const [loading, setLoading] = useState(false);
-  const [expandedRows, setExpandedRows] = useState(new Set());
+  const [items, setItems] = useState([]);
+  const [wastageData, setWastageData] = useState([]);
+  const [filteredData, setFilteredData] = useState([]);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedWastage, setSelectedWastage] = useState(null);
+  const [modalLoading, setModalLoading] = useState(false);
+  
+  // Filters
+  const [filters, setFilters] = useState({
+    startDate: '',
+    endDate: '',
+    itemId: ''
+  });
 
-  const fetchWastageReport = async () => {
+  useEffect(() => {
+    fetchItems();
+    fetchWastageData();
+  }, []);
+
+  useEffect(() => {
+    applyFilters();
+  }, [filters, wastageData]);
+
+  const fetchItems = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await api.get('/items', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      setItems(response.data);
+    } catch (error) {
+      console.error('Error fetching items:', error);
+    }
+  };
+
+  const fetchWastageData = async () => {
     setLoading(true);
     try {
-      const response = await api.get(`/reports/wastage?startDate=${startDate}&endDate=${endDate}`);
-      setWastageData(response.data);
-      setExpandedRows(new Set()); // Collapse all rows when new data loads
+      const token = localStorage.getItem('token');
+      const response = await api.get('/wastages', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      // Fetch detailed items for each wastage
+      const detailedWastages = await Promise.all(
+        response.data.map(async (wastage) => {
+          const detailRes = await api.get(`/wastages/${wastage.id}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          return detailRes.data;
+        })
+      );
+      
+      setWastageData(detailedWastages);
+      setFilteredData(detailedWastages);
     } catch (error) {
-      console.error('Error fetching wastage report:', error);
-      alert('Failed to fetch wastage report');
+      console.error('Error fetching wastage data:', error);
+      showPopup('error', 'Failed to load wastage data');
     } finally {
       setLoading(false);
     }
   };
 
-  const toggleRowExpand = (wastageId) => {
-    const newExpandedRows = new Set(expandedRows);
-    if (newExpandedRows.has(wastageId)) {
-      newExpandedRows.delete(wastageId);
-    } else {
-      newExpandedRows.add(wastageId);
-    }
-    setExpandedRows(newExpandedRows);
-  };
-
-  const downloadPDF = () => {
-    const doc = new jsPDF();
-    const dateRange = `${format(new Date(startDate), 'MMM dd, yyyy')} - ${format(new Date(endDate), 'MMM dd, yyyy')}`;
+  const applyFilters = () => {
+    let filtered = [...wastageData];
     
-    doc.setFontSize(16);
-    doc.text(`Wastage Report - ${dateRange}`, 15, 15);
-
-    const tableData = wastageData.flatMap(wastage => 
-      wastage.items.map(item => [
-        wastage.wastage_note_number,
-        format(new Date(wastage.date), 'MM/dd/yyyy'),
-        wastage.reason,
-        item.item_code,
-        item.item_name,
-        item.quantity,
-        item.unit,
-        formatNumber(item.estimated_loss, 2, 2)
-      ])
-    );
-
-    const headers = [
-      'Note #', 
-      'Date', 
-      'Reason', 
-      'Item Code', 
-      'Item Name', 
-      'Quantity', 
-      'Unit', 
-      'Loss (Rs.)'
-    ];
-
-    autoTable(doc, {
-      head: [headers],
-      body: tableData,
-      startY: 25,
-      styles: { fontSize: 9 },
-      headStyles: { fillColor: [22, 160, 133] }
-    });
-
-    const totalLoss = wastageData.reduce((total, wastage) => {
-      return total + wastage.items.reduce((wTotal, item) => 
-        wTotal + (Number(item.estimated_loss) || 0), 0
+    // Date range filter
+    if (filters.startDate) {
+      filtered = filtered.filter(w => w.date >= filters.startDate);
+    }
+    if (filters.endDate) {
+      filtered = filtered.filter(w => w.date <= filters.endDate);
+    }
+    
+    // Item filter - filter by items within each wastage
+    if (filters.itemId) {
+      filtered = filtered.filter(w => 
+        w.items && w.items.some(item => String(item.item_id) === String(filters.itemId))
       );
-    }, 0);
-
-    doc.setFontSize(12);
-    doc.text(`Total Estimated Loss: Rs. ${formatNumber(totalLoss, 2, 2)}`, 15, doc.lastAutoTable.finalY + 15);
-
-    doc.save(`wastage-report-${startDate}-to-${endDate}.pdf`);
+    }
+    
+    setFilteredData(filtered);
   };
 
-  const downloadExcel = () => {
-    const worksheetData = wastageData.flatMap(wastage => 
-      wastage.items.map(item => ({
-        'Note No': wastage.wastage_note_number,
-        'Date': format(new Date(wastage.date), 'MM/dd/yyyy'),
-        'Reason': wastage.reason,
-        'Approved By': wastage.approved_by,
-        'Entered By': wastage.entered_by,
-        'Item Code': item.item_code,
-        'Item Name': item.item_name,
-        'Quantity': item.quantity,
-        'Unit': item.unit,
-        'Estimated Loss (Rs.)': Number(item.estimated_loss)
-      }))
-    );
-
-    const totalLoss = wastageData.reduce((total, wastage) => {
-      return total + wastage.items.reduce((wTotal, item) => 
-        wTotal + (Number(item.estimated_loss) || 0), 0
-      );
-    }, 0);
-
-    worksheetData.push({});
-    worksheetData.push({
-      'Item Name': 'TOTAL ESTIMATED LOSS',
-      'Estimated Loss (Rs.)': totalLoss
-    });
-
-    const worksheet = XLSX.utils.json_to_sheet(worksheetData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Wastage Report');
-
-    XLSX.writeFile(workbook, `wastage-report-${startDate}-to-${endDate}.xlsx`);
+  const handleFilterChange = (field, value) => {
+    setFilters(prev => ({ ...prev, [field]: value }));
   };
 
-  // Calculate summary statistics
-  const totalWastageNotes = wastageData.length;
-  const totalItems = wastageData.reduce((total, wastage) => total + wastage.items.length, 0);
-  const totalLoss = wastageData.reduce((total, wastage) => 
-    total + wastage.items.reduce((wTotal, item) => wTotal + (Number(item.estimated_loss) || 0), 0
-  ), 0);
-  const avgLossPerNote = totalWastageNotes > 0 ? totalLoss / totalWastageNotes : 0;
+  const clearFilters = () => {
+    setFilters({
+      startDate: '',
+      endDate: '',
+      itemId: ''
+    });
+  };
+
+  const handleViewDetails = async (wastageId) => {
+    setModalOpen(true);
+    setModalLoading(true);
+    setSelectedWastage(null);
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await api.get(`/wastages/${wastageId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      setSelectedWastage(response.data);
+    } catch (err) {
+      console.error('Error fetching wastage details:', err);
+      showPopup('error', 'Failed to load wastage details');
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const closeModal = () => {
+    setModalOpen(false);
+    setSelectedWastage(null);
+  };
+
+  const getStatusInfo = (reason) => {
+    const statusMap = {
+      'Expired': { icon: faClock, color: '#dc3545', bg: '#f8d7da' },
+      'Damaged': { icon: faExclamationTriangle, color: '#fd7e14', bg: '#fff3cd' },
+      'Overproduction': { icon: faMoneyBillWave, color: '#28a745', bg: '#d4edda' },
+      'Poor Storage': { icon: faExclamationTriangle, color: '#856404', bg: '#fff3cd' },
+      'Forecasting errors': { icon: faClock, color: '#6c757d', bg: '#e9ecef' },
+      'Human error': { icon: faExclamationTriangle, color: '#6c757d', bg: '#e9ecef' },
+      'Other': { icon: faTimes, color: '#6c757d', bg: '#e9ecef' }
+    };
+    return statusMap[reason] || statusMap['Other'];
+  };
+
+  // Group items by wastage for display
+  const getWastageItems = (wastage) => {
+    if (!wastage.items || wastage.items.length === 0) return [];
+    return wastage.items;
+  };
+
+  // Calculate total loss for a wastage
+  const getTotalLoss = (wastage) => {
+    if (!wastage.items) return 0;
+    return wastage.items.reduce((sum, item) => sum + (Number(item.estimated_loss) || 0), 0);
+  };
+
+  if (loading) {
+    return (
+      <div className="report-container">
+        <div className="loading-container">
+          <div className="loading-spinner"></div>
+          <p>Loading wastage report...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="wastage-report-container">
+    <div className="report-container">
+      {/* Header */}
       <div className="report-header">
-        <h2>Wastage Report</h2>
-        {wastageData.length > 0 && (
-          <div className="report-actions">
-            <button onClick={downloadPDF} className="btn btn-success">
-              <span>📄</span> PDF
-            </button>
-            <button onClick={downloadExcel} className="btn btn-success">
-              <span>📊</span> Excel
-            </button>
-          </div>
-        )}
+          <h2>
+            RM Wastage Item Detail
+          </h2>
       </div>
 
-      {/* Summary Statistics */}
-      {wastageData.length > 0 && (
-        <div className="stats-overview">
-          <div className="stat-card">
-            <div className="stat-value">{totalWastageNotes}</div>
-            <div className="stat-label">Wastage Notes</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-value">{totalItems}</div>
-            <div className="stat-label">Total Items</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-value">Rs. {formatNumber(totalLoss, 2, 2)}</div>
-            <div className="stat-label">Total Loss</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-value">Rs. {formatNumber(avgLossPerNote, 2, 2)}</div>
-            <div className="stat-label">Avg. per Note</div>
+      <div className="filters-section">
+        <div className="filters-grid">
+          <div className="filters-row">
+            {/* Date Range */}
+            <div className="filter-group date-range-group">
+              <label>
+                <FontAwesomeIcon icon={faCalendarAlt} className="filter-icon" />
+                Date Range
+              </label>
+
+              <div className="date-range-inputs">
+                <input
+                  type="date"
+                  value={filters.startDate}
+                  onChange={(e) => handleFilterChange('startDate', e.target.value)}
+                  className="filter-input"
+                />
+
+                <span className="date-separator">to</span>
+
+                <input
+                  type="date"
+                  value={filters.endDate}
+                  onChange={(e) => handleFilterChange('endDate', e.target.value)}
+                  className="filter-input"
+                />
+              </div>
+            </div>
+
+            {/* Item */}
+            <div className="filter-group">
+              <label>
+                <FontAwesomeIcon icon={faBoxOpen} className="filter-icon" />
+                Item
+              </label>
+
+              <select
+                value={filters.itemId}
+                onChange={(e) => handleFilterChange('itemId', e.target.value)}
+                className="filter-select"
+              >
+                <option value="">All Items</option>
+                {items.map(item => (
+                  <option key={item.id} value={item.id}>
+                    {item.item_code} - {item.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="filter-actions">
+              <button onClick={clearFilters} className="btn-clear">
+                <FontAwesomeIcon icon={faTimes} /> Clear Filters
+              </button>
+            </div>
           </div>
         </div>
-      )}
-      
-      <div className="controls-section">
-        <div className="control-group">
-          <label>Start Date</label>
-          <input 
-            type="date" 
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            max={endDate}
-            className="control-input"
-          />
-        </div>
-        
-        <div className="control-group">
-          <label>End Date</label>
-          <input 
-            type="date" 
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            min={startDate}
-            max={format(new Date(), 'yyyy-MM-dd')}
-            className="control-input"
-          />
-        </div>
-        
-        <button 
-          onClick={fetchWastageReport}
-          disabled={loading}
-          className="btn btn-primary"
-        >
-          {loading ? (
-            <>
-              <div className="loading-spinner"></div>
-              Generating...
-            </>
-          ) : (
-            'Generate Report'
-          )}
-        </button>
       </div>
 
-      {loading ? (
-        <div className="loading-overlay">
-          <div className="loading-spinner"></div>
-          Loading wastage report...
+      {/* Results - Item-wise Wastage Details */}
+      {filteredData.length === 0 ? (
+        <div className="no-records">
+          <div className="no-records-icon">📊</div>
+          <p>No wastage records found matching the filters</p>
         </div>
-      ) : wastageData.length > 0 ? (
-        <div className="table-container">
-          <table className="purchasing-report-table wastage-report-table compact-view">
+      ) : (
+        <div className="table-responsive">
+          <table className="report-table">
             <thead>
               <tr>
-                <th style={{width: '60px'}}></th>
-                <th>Note #</th>
-                <th>Date</th>
-                <th>Reason</th>
-                <th>Approved By</th>
-                <th>Entered By</th>
-                <th>Items</th>
-                <th>Total Loss</th>
+                <th className="center-align">Date</th>
+                <th className="center-align">Wastage No.</th>
+                <th className="center-align">Item Code</th>
+                <th className="center-align">Item Name</th>
+                <th className="center-align">Quantity</th>
+                <th className="center-align">Unit</th>
+                <th className="center-align">Reason</th>
+                <th className="center-align">Loss Amount</th>
+                <th className="center-align actions-header">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {wastageData.map((wastage) => {
-                const totalLoss = wastage.items.reduce((total, item) => 
-                  total + (Number(item.estimated_loss) || 0), 0
-                );
-                const isExpanded = expandedRows.has(wastage.id);
-
-                return (
-                  <React.Fragment key={wastage.id}>
-                    <tr>
-                      <td>
-                        <button 
-                          onClick={() => toggleRowExpand(wastage.id)}
-                          className="expand-toggle"
-                        >
-                          {isExpanded ? '−' : '+'}
-                        </button>
-                      </td>
-                      <td>{wastage.wastage_note_number}</td>
-                      <td>{format(new Date(wastage.date), 'MMM dd, yyyy')}</td>
-                      <td>{wastage.reason}</td>
-                      <td>
-                        <span className={`status-badge ${wastage.approved_by ? 'status-approved' : 'status-pending'}`}>
-                          {wastage.approved_by || 'Pending'}
+              {filteredData.map(wastage => {
+                const statusInfo = getStatusInfo(wastage.reason);
+                const items = getWastageItems(wastage);
+                
+                // If no items, show a single row with no items
+                if (items.length === 0) {
+                  return (
+                    <tr key={wastage.id} className="report-row">
+                      <td className="center-align">{new Date(wastage.date).toLocaleDateString()}</td>
+                      <td className="center-align">{wastage.wastage_note_number}</td>
+                      <td className="center-align" colSpan="3">No items</td>
+                      <td className="center-align">
+                        <span className="reason-badge" style={{ 
+                          backgroundColor: statusInfo.bg,
+                          color: statusInfo.color,
+                          borderColor: statusInfo.color
+                        }}>
+                          <FontAwesomeIcon icon={statusInfo.icon} className="reason-icon" />
+                          {wastage.reason}
                         </span>
                       </td>
-                      <td>{wastage.entered_by}</td>
-                      <td>{wastage.items.length}</td>
-                      <td className="loss-amount">
-                        Rs. {formatNumber(totalLoss, 2, 2)}
+                      <td className="center-align">0.00</td>
+                      <td className="center-align">
+                        <button
+                          className="action-btn view-btn"
+                          onClick={() => handleViewDetails(wastage.id)}
+                          title="View Details"
+                        >
+                          <FontAwesomeIcon icon={faEye} />
+                        </button>
                       </td>
                     </tr>
-                    {isExpanded && (
-                      <tr className="expanded-row">
-                        <td colSpan="8">
-                          <table className="items-table">
-                            <thead>
-                              <tr>
-                                <th>Item Code</th>
-                                <th>Item Name</th>
-                                <th>Quantity</th>
-                                <th>Unit</th>
-                                <th>Estimated Loss</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {wastage.items.map((item, index) => (
-                                <tr key={index}>
-                                  <td>{item.item_code}</td>
-                                  <td>{item.item_name}</td>
-                                  <td>{item.quantity}</td>
-                                  <td>{item.unit}</td>
-                                  <td className="loss-amount">
-                                    Rs. {formatNumber(item.estimated_loss, 2, 2)}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </td>
-                      </tr>
-                    )}
-                  </React.Fragment>
-                );
+                  );
+                }
+
+                // Show each item as a separate row
+                return items.map((item, index) => (
+                  <tr key={`${wastage.id}-${item.id || index}`} className="report-row">
+                    <td className="center-align">
+                      {index === 0 ? new Date(wastage.date).toLocaleDateString() : ''}
+                    </td>
+                    <td className="center-align">
+                      {index === 0 ? wastage.wastage_note_number : ''}
+                    </td>
+                    <td className="center-align">{item.item_code || '-'}</td>
+                    <td className="center-align">{item.item_name || '-'}</td>
+                    <td className="center-align">{Number(item.quantity || 0).toFixed(3)}</td>
+                    <td className="center-align">{item.unit || '-'}</td>
+                    <td className="center-align">
+                      {index === 0 ? (
+                        <span className="reason-badge" style={{ 
+                          backgroundColor: statusInfo.bg,
+                          color: statusInfo.color,
+                          borderColor: statusInfo.color
+                        }}>
+                          <FontAwesomeIcon icon={statusInfo.icon} className="reason-icon" />
+                          {wastage.reason}
+                        </span>
+                      ) : ''}
+                    </td>
+                    <td className="center-align loss-amount">
+                      {formatCurrency(item.estimated_loss || 0)}
+                    </td>
+                    <td className="center-align">
+                      {index === 0 && (
+                        <button
+                          className="action-btn view-btn"
+                          onClick={() => handleViewDetails(wastage.id)}
+                          title="View Details"
+                        >
+                          <FontAwesomeIcon icon={faEye} />
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ));
               })}
             </tbody>
             <tfoot>
-              <tr className="total-row">
-                <td colSpan="6">Grand Total</td>
-                <td>{totalItems}</td>
-                <td className="loss-amount">Rs. {formatNumber(totalLoss, 2, 2)}</td>
+              <tr>
+                <td colSpan="7" className="center-align">
+                  <strong>Grand Total Loss:</strong>
+                </td>
+                <td className="center-align total-loss-amount">
+                  <strong>
+                    {formatCurrency(
+                      filteredData.reduce((sum, w) => sum + getTotalLoss(w), 0)
+                    )}
+                  </strong>
+                </td>
+                <td></td>
               </tr>
             </tfoot>
           </table>
         </div>
-      ) : (
-        <div className="empty-state">
-          <p>No wastage data found. Select a date range and generate the report.</p>
+      )}
+
+      {/* Modal for wastage details - Enhanced with larger size */}
+      {modalOpen && (
+        <div className="modal-overlay" onClick={closeModal}>
+          <div className="modal-content modal-large" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>
+                <FontAwesomeIcon icon={faFileAlt} /> Wastage Details
+              </h2>
+              <button className="modal-close" onClick={closeModal}>
+                <FontAwesomeIcon icon={faTimes} />
+              </button>
+            </div>
+            <div className="modal-body">
+              {modalLoading && (
+                <div className="loading-container">
+                  <div className="loading-spinner"></div>
+                  <p>Loading details...</p>
+                </div>
+              )}
+              {selectedWastage && (
+                <div className="wastage-details-modal">
+                  <div className="detail-header">
+                    <h3>{selectedWastage.wastage_note_number}</h3>
+                    <span className="detail-status">
+                      <FontAwesomeIcon icon={getStatusInfo(selectedWastage.reason).icon} />
+                      {selectedWastage.reason}
+                    </span>
+                  </div>
+                  
+                  <div className="details-grid">
+                    <div className="detail-item">
+                      <label>Date</label>
+                      <span>{new Date(selectedWastage.date).toLocaleDateString()}</span>
+                    </div>
+                    <div className="detail-item">
+                      <label>Approved By</label>
+                      <span>{selectedWastage.approved_by}</span>
+                    </div>
+                    <div className="detail-item">
+                      <label>Entered By</label>
+                      <span>{selectedWastage.entered_by}</span>
+                    </div>
+                  </div>
+
+                  {selectedWastage.remarks && (
+                    <div className="remarks-section">
+                      <label>Remarks</label>
+                      <p>{selectedWastage.remarks}</p>
+                    </div>
+                  )}
+
+                  <div className="items-table-wrapper">
+                    <h4>Wasted Items</h4>
+                    <div className="items-table-scroll">
+                      <table className="items-details-table">
+                        <thead>
+                          <tr>
+                            <th className="center-align">Item Code</th>
+                            <th className="center-align">Item Name</th>
+                            <th className="center-align">Quantity</th>
+                            <th className="center-align">Unit</th>
+                            <th className="center-align">Estimated Loss (Rs.)</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedWastage.items && selectedWastage.items.map((item, idx) => (
+                            <tr key={idx}>
+                              <td className="center-align">{item.item_code}</td>
+                              <td className="center-align">{item.item_name}</td>
+                              <td className="center-align">{Number(item.quantity).toFixed(3)}</td>
+                              <td className="center-align">{item.unit}</td>
+                              <td className="center-align loss-amount">
+                                {formatCurrency(item.estimated_loss)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr>
+                            <td colSpan="4" className="center-align">
+                              <strong>Total Estimated Loss:</strong>
+                            </td>
+                            <td className="center-align total-loss-amount">
+                              <strong>
+                                {selectedWastage.items ? 
+                                  formatCurrency(
+                                  selectedWastage.items.reduce((total, item) => 
+                                    total + (parseFloat(item.estimated_loss) || 0), 0
+                                  )
+                                ) : formatCurrency(0)}
+                              </strong>
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

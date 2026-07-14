@@ -53,7 +53,7 @@ const createWastage = async (req, res) => {
   }
 };
 
-// Get all wastages (excluding soft-deleted)
+// Get all wastages (excluding soft-deleted) with total loss
 const getAllWastages = async (req, res) => {
   try {
     const [wastages] = await pool.query(`
@@ -65,12 +65,41 @@ const getAllWastages = async (req, res) => {
         w.reason,
         w.remarks,
         COALESCE(w.deleted, 0) AS deleted,
-        u.email AS entered_by
+        u.email AS entered_by,
+        COALESCE((
+          SELECT SUM(wi.estimated_loss) 
+          FROM wastage_items wi 
+          WHERE wi.wastage_id = w.id
+        ), 0) AS total_loss
       FROM wastages w
       LEFT JOIN users u ON w.entered_by = u.id
       WHERE COALESCE(w.deleted, 0) = 0
       ORDER BY w.date DESC
     `);
+
+    // Optionally, also fetch items for each wastage if you want to display them
+    // in the history list (though you already fetch them in the modal view)
+    const wastageIds = wastages.map(w => w.id);
+    if (wastageIds.length > 0) {
+      const [items] = await pool.query(`
+        SELECT 
+          wi.wastage_id,
+          wi.item_id,
+          wi.quantity,
+          wi.estimated_loss,
+          i.item_code,
+          i.name AS item_name,
+          i.unit
+        FROM wastage_items wi
+        JOIN items i ON wi.item_id = i.id
+        WHERE wi.wastage_id IN (?)
+      `, [wastageIds]);
+
+      // Attach items to their wastages
+      wastages.forEach(wastage => {
+        wastage.items = items.filter(item => item.wastage_id === wastage.id);
+      });
+    }
 
     res.json(wastages);
 
