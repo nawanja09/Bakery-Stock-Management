@@ -254,9 +254,13 @@ const NavigationBar = () => {
 
                 {/* Wastage */}
                 <li>
-                  <NavLink to="/wastage/history" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                  <NavLink to="/wastage/add" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>  
                     <span className="icon-container"><FontAwesomeIcon icon={faTrashAlt} /></span>
-                    <span>Wastage</span>
+                    <span>Add Wastage</span>
+                  </NavLink>
+                  <NavLink to="/wastage/history" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                    <span className="icon-container"><FontAwesomeIcon icon={faHistory} /></span>
+                    <span>Wastage History</span>
                   </NavLink>
                 </li>
 

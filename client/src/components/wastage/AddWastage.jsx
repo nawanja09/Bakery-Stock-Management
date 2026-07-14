@@ -196,7 +196,7 @@ const AddWastage = () => {
       <button onClick={() => navigate('/wastage/history')} className="btn-secondary">
         ← Back to History
       </button>
-      <h2>Record Wastage</h2>
+      <h2>RM Wastage</h2>
       <form onSubmit={handleSubmit}>
         <div className="form-row">
           <div className="form-group">
@@ -233,6 +233,16 @@ const AddWastage = () => {
               <option value="Human error">Human error</option>
               <option value="Other">Other</option>
             </select>
+          </div>
+          <div className="form-group">
+            <label>Remarks</label>
+            <textarea
+              value={formData.remarks}
+              onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
+              rows="1"
+              className="remarks-textarea"
+              placeholder="Any additional notes..."
+            />
           </div>
         </div>
 
@@ -377,17 +387,6 @@ const AddWastage = () => {
             <strong>Total Estimated Loss:</strong>
             <span>Rs. {calculateTotalLoss()}</span>
           </div>
-        </div>
-
-        <div className="form-group">
-          <label>Remarks</label>
-          <textarea
-            value={formData.remarks}
-            onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
-            rows="3"
-            className="remarks-textarea"
-            placeholder="Any additional notes..."
-          />
         </div>
 
         <button type="submit" className="btn-submit">Save Wastage</button>
