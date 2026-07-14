@@ -24,6 +24,12 @@ const ReturnDetailsModal = ({ id, onClose }) => {
     fetchReturn();
   }, [id, showPopup]);
 
+  // Helper function to format stock value safely
+  const formatStock = (value) => {
+    const num = parseFloat(value) || 0;
+    return num.toFixed(3);
+  };
+
   if (loading) return <div className="loading">Loading...</div>;
   if (!returnRecord) return <div>No return data found</div>;
 
@@ -46,32 +52,43 @@ const ReturnDetailsModal = ({ id, onClose }) => {
       
       <div className="items-table">
         <h3>Returned Items</h3>
-        <table>
-          <thead>
-            <tr>
-              <th>Item Code</th>
-              <th>Item Name</th>
-              <th>Quantity</th>
-              <th>Unit</th>
-              <th>Reason</th>
-            </tr>
-          </thead>
-          <tbody>
-            {returnRecord.items.map((item, index) => (
-              <tr key={index}>
-                <td>{item.item_code}</td>
-                <td>{item.item_name}</td>
-                <td>{Number(item.quantity).toFixed(3)}</td>
-                <td>{item.unit}</td>
-                <td>
-                  <span className={`reason-badge reason-${item.reason.toLowerCase().replace(' ', '-')}`}>
-                    {item.reason}
-                  </span>
-                </td>
+        <div className="table-responsive">
+          <table className="details-table">
+            <thead>
+              <tr>
+                <th>Item Code</th>
+                <th>Item Name</th>
+                <th>Quantity</th>
+                <th>Unit</th>
+                <th>Reason</th>
+                <th>Current Stock</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {returnRecord.items.map((item, index) => {
+                const currentStock = parseFloat(item.current_stock_quantity) || 0;
+                return (
+                  <tr key={index}>
+                    <td>{item.item_code}</td>
+                    <td>{item.item_name}</td>
+                    <td>{Number(item.quantity).toFixed(3)}</td>
+                    <td>{item.unit}</td>
+                    <td>
+                      <span className={`reason-badge reason-${item.reason.toLowerCase().replace(' ', '-')}`}>
+                        {item.reason}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={`stock-badge ${currentStock <= 0 ? 'stock-zero' : currentStock < 10 ? 'stock-low' : ''}`}>
+                        {formatStock(currentStock)}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
@@ -128,7 +145,7 @@ const ReturnsHistory = () => {
   return (
     <div className="returns-container">
       <div className="header-with-actions">
-        <h2 style={{ margin: 0 }}>Returns History</h2>
+        <h2 style={{ margin: 0 }}>Department Return Summary</h2>
         <Link to="/returns/add" className="btn-primary">+ New Return</Link>
       </div>
 
@@ -201,7 +218,7 @@ const ReturnsHistory = () => {
               ))
             ) : (
               <tr>
-                <td colSpan="7" style={{ textAlign: 'center', color: '#888' }}>
+                <td colSpan="6" style={{ textAlign: 'center', color: '#888' }}>
                   No return records found.
                 </td>
               </tr>

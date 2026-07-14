@@ -4,12 +4,14 @@ import { usePopup } from '../context/PopupContext';
 import './Returns.css';
 import api from '../../api';
 import Select from 'react-select';
+import { FaTrash } from 'react-icons/fa';
 
 const AddReturn = () => {
   const navigate = useNavigate();
   const [departments, setDepartments] = useState([]);
   const [items, setItems] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
+  const [itemStockMap, setItemStockMap] = useState({});
   const { showPopup } = usePopup();
 
   const [formData, setFormData] = useState({
@@ -28,10 +30,17 @@ const AddReturn = () => {
       try {
         const [deptRes, itemsRes] = await Promise.all([
           api.get('/departments'),
-          api.get('/items')
+          api.get('/items') // මෙය දැන් calculated stock එක return කරයි
         ]);
         setDepartments(deptRes.data || []);
         setItems(itemsRes.data || []);
+        
+        // Stock data එක itemsRes.data එකෙන්ම ගන්න
+        const stockMap = {};
+        itemsRes.data.forEach(item => {
+          stockMap[item.id] = item.current_stock || 0;
+        });
+        setItemStockMap(stockMap);
       } catch (error) {
         console.error('Error fetching basics:', error);
         showPopup('error', 'Failed to load departments or items');
@@ -40,6 +49,34 @@ const AddReturn = () => {
 
     fetchBasics();
   }, [showPopup]);
+
+  const fetchAllItemStocks = async (itemsList) => {
+    try {
+      const stockMap = {};
+      for (const item of itemsList) {
+        const response = await api.get(`/items/${item.id}`);
+        stockMap[item.id] = response.data.current_stock || 0;
+      }
+      setItemStockMap(stockMap);
+    } catch (error) {
+      console.error('Error fetching item stocks:', error);
+    }
+  };
+
+  const fetchItemStock = async (itemId) => {
+    try {
+      const response = await api.get(`/items/${itemId}`);
+      const stock = response.data.current_stock || 0;
+      setItemStockMap(prev => ({
+        ...prev,
+        [itemId]: stock
+      }));
+      return stock;
+    } catch (error) {
+      console.error('Error fetching item stock:', error);
+      return 0;
+    }
+  };
 
   const handleItemChange = (index, field, value) => {
     const newItems = [...formData.items];
@@ -54,11 +91,14 @@ const AddReturn = () => {
     if (field === 'item_id') {
       const selectedItem = items.find(it => String(it.id) === String(value));
       newItems[index].unit = selectedItem ? selectedItem.unit : '';
+      
+      if (value) {
+        fetchItemStock(value);
+      }
     }
 
     setFormData(prev => ({ ...prev, items: newItems }));
 
-    // Auto-add new row when editing last row
     const isLast = index === formData.items.length - 1;
     if (isLast && (field === 'item_id' || field === 'quantity') && value) {
       const hasValue = newItems[index].item_id || (Number(newItems[index].quantity) > 0);
@@ -88,7 +128,6 @@ const AddReturn = () => {
       return;
     }
 
-    // Filter out empty rows
     const validItems = formData.items.filter(item => 
       item.item_id && Number(item.quantity) > 0
     );
@@ -105,6 +144,10 @@ const AddReturn = () => {
 
     try {
       const response = await api.post('/returns', payload);
+      
+      // After successful return, refresh all stock values
+      await fetchAllItemStocks(items);
+      
       showPopup('success', `Return recorded successfully! Reference: ${response.data.return_number}`);
       navigate('/returns/history');
     } catch (error) {
@@ -126,7 +169,7 @@ const AddReturn = () => {
   return (
     <div className="returns-container">
       <div className="header-with-actions">
-        <h2>Add New Return</h2>
+        <h2>Department Returns</h2>
         <button onClick={() => navigate('/returns/history')} className="btn-secondary">
           ← Back to History
         </button>
@@ -185,6 +228,7 @@ const AddReturn = () => {
           <thead>
             <tr>
               <th>Item Name</th>
+              <th>Current Stock</th>
               <th>Quantity</th>
               <th>Unit</th>
               <th>Reason for Return</th>
@@ -204,6 +248,11 @@ const AddReturn = () => {
                     menuPortalTarget={document.body}
                     styles={selectStyles}
                   />
+                </td>
+                <td>
+                  <span className="current-stock-display">
+                    {item.item_id ? (itemStockMap[item.item_id] || 0) : '-'}
+                  </span>
                 </td>
                 <td>
                   <input
@@ -242,8 +291,9 @@ const AddReturn = () => {
                     className="btn-remove"
                     onClick={() => removeItemRow(index)}
                     disabled={formData.items.length <= 1}
+                    title="Remove item"
                   >
-                    Remove
+                    <FaTrash />
                   </button>
                 </td>
               </tr>

@@ -270,6 +270,10 @@ const NavigationBar = () => {
                     <span className="icon-container"><FontAwesomeIcon icon={faUndo} /></span>
                     <span>Department Returns</span>
                   </NavLink>
+                  <NavLink to="/returns/add" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                    <span className="icon-container"><FontAwesomeIcon icon={faUndo} /></span>
+                    <span>Add Department Return</span>
+                  </NavLink>
                 </li>
 
                 {/* Reports */}
@@ -291,6 +295,7 @@ const NavigationBar = () => {
                     <li><NavLink to="/reports/wastage" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faTrash} /></span><span>Wastage Report</span></NavLink></li>
                     <li><NavLink to="/reports/department" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faShareSquare} /></span><span>Issuance Report</span></NavLink></li>
                     <li><NavLink to="/reports/stock/items" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faBox} /></span><span>Item Wise Stock Report</span></NavLink></li>
+                    <li><NavLink to="/reports/department-return-item-wise" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faShareSquare} /></span><span>Department Return Item Detail</span></NavLink></li>
                   </ul>
                 </li>
 

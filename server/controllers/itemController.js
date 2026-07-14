@@ -56,11 +56,11 @@ const createItem = async (req, res) => {
 };
 
 // =============================================
-// GET ALL ITEMS with stock info
+// GET ALL ITEMS with calculated stock
 // =============================================
 const getAllItems = async (req, res) => {
   try {
-    const { auto_add_only } = req.query; // Optional filter
+    const { auto_add_only } = req.query;
     
     let query = `
       SELECT 
@@ -72,9 +72,26 @@ const getAllItems = async (req, res) => {
         i.vat_applicable,
         i.auto_add_to_stock,
         i.reorder_level,
-        COALESCE(ob.quantity, 0) as current_stock
+        COALESCE(
+          (SELECT COALESCE(SUM(quantity), 0) FROM opening_balances WHERE item_id = i.id) +
+          (SELECT COALESCE(SUM(pi.quantity), 0) 
+           FROM purchase_items pi 
+           JOIN purchases p ON pi.purchase_id = p.id 
+           WHERE pi.item_id = i.id) -
+          (SELECT COALESCE(SUM(ii.quantity), 0) 
+           FROM issuance_items ii 
+           JOIN issuances iss ON ii.issuance_id = iss.id 
+           WHERE ii.item_id = i.id) -
+          (SELECT COALESCE(SUM(wi.quantity), 0) 
+           FROM wastage_items wi 
+           JOIN wastages w ON wi.wastage_id = w.id 
+           WHERE wi.item_id = i.id) +
+          (SELECT COALESCE(SUM(ri.quantity), 0) 
+           FROM return_items ri 
+           JOIN returns r ON ri.return_id = r.id 
+           WHERE ri.item_id = i.id),
+        0) AS current_stock
       FROM items i
-      LEFT JOIN opening_balances ob ON i.id = ob.item_id
       WHERE i.deleted = FALSE
     `;
     
@@ -93,17 +110,44 @@ const getAllItems = async (req, res) => {
 };
 
 // =============================================
-// GET ITEM BY ID
+// GET ITEM BY ID with calculated stock
 // =============================================
 const getItemById = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const [rows] = await pool.query(
-      `SELECT id, item_code, name, unit, item_type, vat_applicable, auto_add_to_stock, reorder_level 
-       FROM items WHERE id = ? AND deleted = FALSE`, 
-      [id]
-    );
+    const [rows] = await pool.query(`
+      SELECT 
+        i.id, 
+        i.item_code, 
+        i.name, 
+        i.unit,
+        i.item_type,
+        i.vat_applicable,
+        i.auto_add_to_stock,
+        i.reorder_level,
+        COALESCE(
+          (SELECT COALESCE(SUM(quantity), 0) FROM opening_balances WHERE item_id = i.id) +
+          (SELECT COALESCE(SUM(pi.quantity), 0) 
+           FROM purchase_items pi 
+           JOIN purchases p ON pi.purchase_id = p.id 
+           WHERE pi.item_id = i.id) -
+          (SELECT COALESCE(SUM(ii.quantity), 0) 
+           FROM issuance_items ii 
+           JOIN issuances iss ON ii.issuance_id = iss.id 
+           WHERE ii.item_id = i.id) -
+          (SELECT COALESCE(SUM(wi.quantity), 0) 
+           FROM wastage_items wi 
+           JOIN wastages w ON wi.wastage_id = w.id 
+           WHERE wi.item_id = i.id) +
+          (SELECT COALESCE(SUM(ri.quantity), 0) 
+           FROM return_items ri 
+           JOIN returns r ON ri.return_id = r.id 
+           WHERE ri.item_id = i.id),
+        0) AS current_stock
+      FROM items i
+      WHERE i.id = ? AND i.deleted = FALSE
+    `, [id]);
     
     if (rows.length === 0) {
       return res.status(404).json({ error: 'Item not found' });
@@ -258,7 +302,7 @@ const getItemsWithoutOpeningBalance = async (req, res) => {
       LEFT JOIN opening_balances ob ON i.id = ob.item_id
       WHERE ob.item_id IS NULL 
         AND i.deleted = FALSE
-        AND i.auto_add_to_stock = FALSE  -- Only show manual items
+        AND i.auto_add_to_stock = FALSE
       ORDER BY i.item_code
     `);
     res.json(rows);

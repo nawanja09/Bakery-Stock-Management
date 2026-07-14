@@ -965,6 +965,139 @@ const getDailyPurchaseReturnTransactions = async (req, res) => {
   }
 };
 
+// =============================================
+// DEPARTMENT RETURN ITEM WISE DETAIL REPORT
+// =============================================
+const getDepartmentReturnItemWiseReport = async (req, res) => {
+  try {
+    const { 
+      startDate, 
+      endDate, 
+      departmentId, 
+      reason,
+      searchTerm,
+      sortBy = 'return_date',
+      sortOrder = 'DESC'
+    } = req.query;
+
+    // Build the base query
+    let query = `
+      SELECT 
+        r.id AS return_id,
+        r.return_number,
+        DATE(r.return_date) AS return_date,
+        d.id AS department_id,
+        d.name AS department_name,
+        i.id AS item_id,
+        i.item_code,
+        i.name AS item_name,
+        i.unit,
+        i.item_type AS category,
+        ri.quantity AS returned_quantity,
+        ri.reason AS return_reason,
+        r.received_by,
+        r.remarks,
+        u.email AS entered_by,
+        r.created_at
+      FROM returns r
+      JOIN return_items ri ON r.id = ri.return_id
+      JOIN items i ON ri.item_id = i.id
+      JOIN departments d ON r.department_id = d.id
+      JOIN users u ON r.entered_by = u.id
+      WHERE 1=1
+    `;
+
+    const params = [];
+
+    // Date range filter
+    if (startDate && endDate) {
+      query += ` AND DATE(r.return_date) BETWEEN ? AND ?`;
+      params.push(startDate, endDate);
+    } else if (startDate) {
+      query += ` AND DATE(r.return_date) >= ?`;
+      params.push(startDate);
+    } else if (endDate) {
+      query += ` AND DATE(r.return_date) <= ?`;
+      params.push(endDate);
+    }
+
+    // Department filter
+    if (departmentId && departmentId !== 'all') {
+      query += ` AND r.department_id = ?`;
+      params.push(departmentId);
+    }
+
+    // Reason filter
+    if (reason && reason !== 'all') {
+      query += ` AND ri.reason = ?`;
+      params.push(reason);
+    }
+
+    // Search term filter (item name or item code)
+    if (searchTerm) {
+      query += ` AND (i.name LIKE ? OR i.item_code LIKE ?)`;
+      params.push(`%${searchTerm}%`, `%${searchTerm}%`);
+    }
+
+    // Sorting
+    const validSortColumns = {
+      'item_name': 'i.name',
+      'return_date': 'r.return_date',
+      'returned_quantity': 'ri.quantity',
+      'department_name': 'd.name',
+      'item_code': 'i.item_code',
+      'return_reason': 'ri.reason'
+    };
+
+    const sortColumn = validSortColumns[sortBy] || 'r.return_date';
+    const sortDirection = sortOrder.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+    query += ` ORDER BY ${sortColumn} ${sortDirection}, r.return_date DESC`;
+
+    const [rows] = await pool.query(query, params);
+
+    // Calculate summary statistics
+    const summary = {
+      totalItems: rows.length,
+      totalReturnQuantity: 0,
+      totalTransactions: 0,
+      itemSummary: {}
+    };
+
+    // Process data for summary
+    const uniqueReturns = new Set();
+    rows.forEach(row => {
+      summary.totalReturnQuantity += parseFloat(row.returned_quantity) || 0;
+      uniqueReturns.add(row.return_id);
+      
+      // Item-wise summary
+      const itemKey = row.item_id;
+      if (!summary.itemSummary[itemKey]) {
+        summary.itemSummary[itemKey] = {
+          item_code: row.item_code,
+          item_name: row.item_name,
+          total_quantity: 0,
+          return_count: 0,
+          unit: row.unit
+        };
+      }
+      summary.itemSummary[itemKey].total_quantity += parseFloat(row.returned_quantity) || 0;
+      summary.itemSummary[itemKey].return_count += 1;
+    });
+    summary.totalTransactions = uniqueReturns.size;
+
+    // Convert item summary to array
+    summary.itemSummaryList = Object.values(summary.itemSummary);
+
+    res.json({
+      data: rows,
+      summary: summary
+    });
+
+  } catch (error) {
+    console.error('Error generating department return item wise report:', error);
+    res.status(500).json({ error: 'Server error: ' + error.message });
+  }
+};
 
 module.exports = {
   getStockReport,
@@ -979,5 +1112,6 @@ module.exports = {
   getDailyWastageTransactions,
   getDailyReturnTransactions,
   getPurchasingItemWiseReport,
-  getDailyPurchaseReturnTransactions
+  getDailyPurchaseReturnTransactions,
+  getDepartmentReturnItemWiseReport
 };

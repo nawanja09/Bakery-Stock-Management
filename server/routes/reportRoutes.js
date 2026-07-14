@@ -17,4 +17,6 @@ router.get('/daily-transactions/returns', reportController.getDailyReturnTransac
 router.get('/daily-transactions/purchase-returns', reportController.getDailyPurchaseReturnTransactions);  // ← ADD THIS LINE
 router.get('/purchasing-item-wise', reportController.getPurchasingItemWiseReport);
 
+router.get('/department-return-item-wise', reportController.getDepartmentReturnItemWiseReport);
+
 module.exports = router;
