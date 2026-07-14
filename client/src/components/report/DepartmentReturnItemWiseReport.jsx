@@ -32,7 +32,6 @@ const DepartmentReturnItemWiseReport = () => {
     startDate: format(new Date(new Date().setDate(1)), 'yyyy-MM-dd'), // First day of current month
     endDate: format(new Date(), 'yyyy-MM-dd'),
     departmentId: 'all',
-    reason: 'all',
     searchTerm: '',
     sortBy: 'return_date',
     sortOrder: 'DESC'
@@ -92,7 +91,6 @@ const DepartmentReturnItemWiseReport = () => {
       startDate: format(new Date(new Date().setDate(1)), 'yyyy-MM-dd'),
       endDate: format(new Date(), 'yyyy-MM-dd'),
       departmentId: 'all',
-      reason: 'all',
       searchTerm: '',
       sortBy: 'return_date',
       sortOrder: 'DESC'
@@ -282,7 +280,6 @@ const DepartmentReturnItemWiseReport = () => {
             <div className="filter-group search-group">
               <label>Search</label>
               <div className="search-input-wrapper">
-                <FontAwesomeIcon icon={faSearch} className="search-icon" />
                 <input
                   type="text"
                   value={filters.searchTerm}
