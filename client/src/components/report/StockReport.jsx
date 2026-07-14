@@ -154,7 +154,6 @@ const StockReport = () => {
     <div className="report-container">
       <div className="report-header">
         <h2>Daily Stock Report</h2>
-        <p className="report-subtitle">View opening and closing balances for all items</p>
       </div>
 
       <div className="controls-grid">

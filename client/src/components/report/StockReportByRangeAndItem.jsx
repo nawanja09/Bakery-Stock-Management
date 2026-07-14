@@ -385,19 +385,8 @@ const StockReportByRangeAndItem = () => {
     <div className="report-container">
       <div className="report-header">
         <h2>
-          <FontAwesomeIcon icon={faChartLine} style={{ marginRight: '12px', color: '#0066cc' }} />
-          Auto-Managed Stock Trend
+          RM Item Wise Stock Movement
         </h2>
-        <p className="report-subtitle">Analyze stock movements for Auto-Add enabled items</p>
-      </div>
-
-      {/* Info Banner */}
-      <div className="info-banner">
-        <FontAwesomeIcon icon={faInfoCircle} style={{ marginRight: '8px', color: '#0066cc' }} />
-        <span>
-          <strong>Auto-Add Items Only:</strong> Dropdown shows only items with Auto-Add enabled.
-          Manual items are not available in this report.
-        </span>
       </div>
 
       {/* Controls */}
