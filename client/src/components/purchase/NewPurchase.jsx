@@ -483,13 +483,8 @@ const AddPurchase = () => {
 
   return (
     <div className="purchase-container">
-      <div className="page-header" style={{ display: 'flex', justifyContent: 'flex-start', width: '100%' }}>
-        <div className="header-left" style={{ display: 'flex', justifyContent: 'flex-start', width: '100%' }}>
-          <h1 className="page-title" style={{ justifyContent: 'flex-start', textAlign: 'left', margin: '0 0 6px 0' }}>
-            <FontAwesomeIcon icon={faShoppingCart} className="page-icon" />
-            RM Purchasing Invoice
-          </h1>
-        </div>
+      <div className="page-header">
+          <h1>RM Purchasing Invoice</h1>
       </div>
 
       <form onSubmit={handleSubmit} className="purchase-form">

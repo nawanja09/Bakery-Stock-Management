@@ -287,15 +287,6 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
           >
             <FontAwesomeIcon icon={faPaperPlane} /> Pay Now (Advance Payment)
           </button>
-          <button
-            className="pis-btn-pay"
-            onClick={handlePaySelected}
-            disabled={selectedInvoiceIds.size === 0}
-            type="button"
-          >
-            <FontAwesomeIcon icon={faCheckCircle} />
-            Pay Selected ({selectedInvoiceIds.size})
-          </button>
         </div>
       </div>
 
