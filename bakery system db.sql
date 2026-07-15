@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Jul 11, 2026 at 07:13 AM
+-- Generation Time: Jul 15, 2026 at 08:20 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -62,9 +62,7 @@ CREATE TABLE `bank_details` (
   `currency` varchar(10) DEFAULT 'LKR',
   `opening_balance` decimal(15,2) DEFAULT 0.00,
   `current_balance` decimal(15,2) DEFAULT 0.00,
-  `contact_person` varchar(255) DEFAULT NULL,
-  `contact_phone` varchar(50) DEFAULT NULL,
-  `contact_email` varchar(100) DEFAULT NULL,
+  `company` enum('JH','RD','RR') NOT NULL DEFAULT 'JH',
   `notes` text DEFAULT NULL,
   `status` varchar(20) DEFAULT 'Active',
   `created_by` int(11) DEFAULT NULL,
@@ -76,8 +74,9 @@ CREATE TABLE `bank_details` (
 -- Dumping data for table `bank_details`
 --
 
-INSERT INTO `bank_details` (`id`, `bank_name`, `account_number`, `branch_name`, `account_type`, `currency`, `opening_balance`, `current_balance`, `contact_person`, `contact_phone`, `contact_email`, `notes`, `status`, `created_by`, `created_at`, `updated_at`) VALUES
-(2, 'Peoples Bank', '002110004837', 'Colombo', 'Current', 'LKR', 1200.00, 100000.00, 'A.N Traders', '0767611153', 'ravonBakery@gmail.com', NULL, 'Active', 2, '2026-05-29 07:19:46', '2026-05-29 07:19:46');
+INSERT INTO `bank_details` (`id`, `bank_name`, `account_number`, `branch_name`, `account_type`, `currency`, `opening_balance`, `current_balance`, `company`, `notes`, `status`, `created_by`, `created_at`, `updated_at`) VALUES
+(2, 'Peoples Bank', '002110004837', 'Colombo', 'Current', 'LKR', 1200.00, 100000.00, 'JH', NULL, 'Active', 2, '2026-05-29 07:19:46', '2026-05-29 07:19:46'),
+(3, 'BOC Bank', '0000456783', 'Malabe', 'Current', 'LKR', 0.00, 1000.00, 'JH', NULL, 'Active', 2, '2026-07-13 03:45:52', '2026-07-13 03:45:52');
 
 -- --------------------------------------------------------
 
@@ -265,6 +264,15 @@ CREATE TABLE `credit_allocations` (
   `notes` text DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `credit_allocations`
+--
+
+INSERT INTO `credit_allocations` (`id`, `credit_type`, `overpayment_id`, `return_credit_id`, `purchase_id`, `allocated_amount`, `settlement_date`, `settled_by`, `notes`, `created_at`) VALUES
+(1, 'overpayment', 1, NULL, 2150, 310.00, '2026-07-13', 2, 'Settled from available supplier credits', '2026-07-13 02:55:19'),
+(2, 'overpayment', 1, NULL, 2150, 62.00, '2026-07-13', 2, 'Settled from available supplier credits', '2026-07-13 07:07:43'),
+(3, 'return_credit', NULL, 1, 2150, 62.00, '2026-07-13', 2, 'Settled from available supplier credits', '2026-07-13 07:07:43');
 
 -- --------------------------------------------------------
 
@@ -5445,7 +5453,8 @@ INSERT INTO `issuances` (`id`, `issuance_date`, `issued_by`, `department_id`, `r
 (3901, '2026-04-29 00:00:00', 5, 14, 'intimo', NULL, NULL, 'evening', '', '', '2026-05-22 07:13:31'),
 (3902, '2026-04-29 00:00:00', 5, 4, 'ragavan', NULL, NULL, 'evening', '', '', '2026-05-22 07:14:01'),
 (3903, '2026-07-02 16:00:00', 2, 5, 'Admin', NULL, NULL, 'Evening', '', '', '2026-07-02 10:27:06'),
-(3904, '2026-07-02 15:59:00', 2, 3, 'Admin', NULL, NULL, 'Evening', '', '', '2026-07-02 10:29:56');
+(3904, '2026-07-02 15:59:00', 2, 3, 'Admin', NULL, NULL, 'Evening', '', '', '2026-07-02 10:29:56'),
+(3905, '2026-07-13 13:50:00', 2, 2, 'sss', NULL, NULL, 'Evening', '', '', '2026-07-13 08:22:22');
 
 -- --------------------------------------------------------
 
@@ -30997,7 +31006,8 @@ INSERT INTO `issuance_items` (`id`, `issuance_id`, `item_id`, `quantity`) VALUES
 (41201, 3902, 209, 1.000),
 (41202, 3902, 0, 1.000),
 (41204, 3903, 79, 1.000),
-(41205, 3904, 78, 1.000);
+(41205, 3904, 78, 1.000),
+(41206, 3905, 233, 1.000);
 
 -- --------------------------------------------------------
 
@@ -31016,613 +31026,614 @@ CREATE TABLE `items` (
   `reorder_level` decimal(10,0) NOT NULL,
   `current_stock` decimal(10,2) NOT NULL DEFAULT 0.00,
   `created_at` timestamp NULL DEFAULT current_timestamp(),
-  `deleted` tinyint(1) DEFAULT 0
+  `deleted` tinyint(1) DEFAULT 0,
+  `status` tinyint(1) NOT NULL DEFAULT 1 COMMENT '1=Active, 0=Inactive'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `items`
 --
 
-INSERT INTO `items` (`id`, `item_code`, `name`, `item_type`, `unit`, `vat_applicable`, `auto_add_to_stock`, `reorder_level`, `current_stock`, `created_at`, `deleted`) VALUES
-(1, 'F12', 'Guava', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:01:41', 0),
-(2, 'F11', 'Banana Abul', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:02:03', 0),
-(3, 'F10', 'Karatha Kolomba Mango', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:02:22', 0),
-(4, 'F1', 'Banana', 'Fruits', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:02:49', 0),
-(5, 'F2', 'Passion', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:03:14', 0),
-(6, 'F3', 'T J C Mango', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:03:40', 0),
-(7, 'F5', 'Papaya', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:04:03', 0),
-(8, 'F4', 'Lime', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:04:24', 0),
-(9, 'F6', 'Watermelons', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:05:04', 0),
-(10, 'F7', 'Avocado', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:05:33', 0),
-(11, 'F8', 'Pineapple', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:06:00', 0),
-(12, 'F9', 'Orange', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:06:24', 0),
-(13, 'V73', 'Kakiri', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:10:24', 0),
-(14, 'V72', 'Dhel', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:11:16', 0),
-(15, 'V71', 'Tamarind - 100g', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:12:19', 0),
-(16, 'V70', 'Raw Mango', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:12:51', 0),
-(17, 'V69', 'Bell Pepper Yellow ', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:13:42', 0),
-(18, 'V68', 'Cucumber', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:14:32', 0),
-(19, 'V67', 'Ash Plantain', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:26:35', 0),
-(20, 'V66', 'Sweet Potato', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:27:18', 0),
-(21, 'V65', 'Kohila', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:27:55', 0),
-(22, 'V64', 'Ladies Fingers', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:28:55', 0),
-(23, 'V63', 'Pumpkin', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:29:40', 0),
-(24, 'V62', 'Murunga', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:30:25', 0),
-(25, 'V61', 'Jack (Kos)', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:31:11', 0),
-(26, 'V60', 'Thalana Batu', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:31:47', 0),
-(27, 'V59', 'Watakolu', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:32:22', 0),
-(28, 'V58', 'Kesel muwa', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:32:59', 0),
-(29, 'V57', 'Amberalla', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:33:51', 0),
-(30, 'V56', 'Alu Kesel', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:34:17', 0),
-(31, 'V55', 'Manioc', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:34:51', 0),
-(32, 'V53', 'Polos', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:35:36', 0),
-(33, 'V52', 'Ridged Gourd', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:36:15', 0),
-(34, 'V51', 'Athu Gowa', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:36:45', 0),
-(35, 'V50', 'Basil', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:37:05', 0),
-(36, 'V49', 'Long Beans', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:37:33', 0),
-(37, 'V48', 'Onion leaves', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:38:08', 0),
-(38, 'V46', 'Mustard Seeds', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:38:51', 0),
-(39, 'V45', 'Rosemary', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:39:51', 0),
-(40, 'V44', 'Radish (Rabu)', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:40:45', 0),
-(41, 'V43', 'Gotukola (Bale)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 06:41:37', 0),
-(42, 'V42', 'Mushrooms Packet', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 06:42:16', 0),
-(43, 'V41', 'Pathola', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:43:52', 0),
-(44, 'V40', 'Bell Pepper Red', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:44:48', 0),
-(45, 'V39', 'Kathurumurunga(Bale)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 06:45:56', 0),
-(46, 'V38', 'Mukunuwanna (Bale)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 06:47:00', 0),
-(47, 'V37', 'Kankun (Bale)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 06:47:37', 0),
-(48, 'V36', 'Curry Leaves (Bale)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 06:48:34', 0),
-(49, 'V35', 'Saldiri', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:49:59', 0),
-(50, 'V34', 'Gerkin', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:50:40', 0),
-(51, 'V33', 'Nokol', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:51:06', 0),
-(52, 'V32', 'Drumsticks', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:51:47', 0),
-(53, 'V31', 'Beatroot', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:52:33', 0),
-(54, 'V30', 'Bitter Gourd', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:53:26', 0),
-(55, 'V29', 'Coriender Leave', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:54:56', 0),
-(56, 'V27', 'Parsely', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:55:28', 0),
-(59, 'V26', 'Minchi Leaves', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:57:22', 0),
-(60, 'V25', 'Cauliflower', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:58:17', 0),
-(61, 'V24', 'Japanese Gerkin', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:58:59', 0),
-(62, 'V23', 'Sukini', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:59:35', 0),
-(63, 'V22', 'Bell Pepper - Green ', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:00:25', 0),
-(64, 'V21', 'Red Cabbage', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:00:55', 0),
-(65, 'V20', 'Salad Leaves', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:01:25', 0),
-(66, 'V19', 'Pachoi', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:01:55', 0),
-(67, 'V18', 'Chinees Cabbage', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:02:30', 0),
-(68, 'V17', 'Ginger', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:33:10', 0),
-(69, 'V16', 'Kochchi', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:33:39', 0),
-(70, 'V15', 'Ash Pumpkin ', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:35:05', 0),
-(71, 'V14', 'Brinjal', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:35:56', 0),
-(72, 'V13', 'Green Chily', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:36:25', 0),
-(73, 'V12', 'Tomato', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:36:49', 0),
-(74, 'V11', 'Sera', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:37:14', 0),
-(75, 'V10', 'Cabbage', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:37:45', 0),
-(76, 'V1', 'Coconuts', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 07:38:44', 0),
-(77, 'V2', 'Garlic', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:39:18', 0),
-(78, 'V3', 'Onion', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:40:13', 0),
-(79, 'V4', 'Potato', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:40:52', 0),
-(80, 'V5', 'Beans', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:41:12', 0),
-(81, 'V6', 'Carrot', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:42:09', 0),
-(82, 'V7', 'Capsicum', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:42:38', 0),
-(83, 'V8', 'Leeks', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:43:12', 0),
-(84, 'V9', 'Tamarind - 250g', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:44:28', 0),
-(85, 'S23', 'Maduru Seeds', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:45:37', 0),
-(86, 'S22', 'White Rice', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:46:08', 0),
-(87, 'S21', 'Cinnamon Powder', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:46:46', 0),
-(88, 'S20', 'Coffee Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 07:47:40', 0),
-(89, 'S19', 'Sadikka', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:48:15', 0),
-(90, 'S18', 'Samba Kakulu 1Kg', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:49:38', 0),
-(91, 'S17', 'Enasal', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:50:07', 0),
-(92, 'S16', 'Kunisso', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:50:55', 0),
-(93, 'S15', 'Cummin Seeds', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:51:42', 0),
-(94, 'S14', 'Samba 5Kg', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:52:20', 0),
-(95, 'S13', 'Dry fish - KATTA ', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:52:59', 0),
-(96, 'S12', 'Ulu Hal', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:53:24', 0),
-(97, 'S11', 'Karadamungu', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:53:48', 0),
-(98, 'S10', 'Karabu neti', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:54:15', 0),
-(100, 'S6', 'Papadam', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:55:33', 0),
-(101, 'S1', 'Dry fish small', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:56:12', 0),
-(102, 'S2', 'Cinnamon Pieces Loose', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:57:08', 0),
-(103, 'S3', 'Dhal', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:57:28', 0),
-(104, 'S4', 'Cummin Seed 100g', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:58:08', 0),
-(105, 'S5', 'Nadu Rice - 5Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 07:58:44', 0),
-(106, 'S7', 'Soya', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:59:07', 0),
-(107, 'S8', 'Dry Chillies', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:00:28', 0),
-(108, 'G14', 'Fortune Sunflower Oil - 500ml', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:03:02', 0),
-(109, 'G13', 'Brown Sugar Loose', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:03:41', 0),
-(110, 'G7', 'Nestea Paper Cup Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 08:04:28', 0),
-(111, 'G6', 'Nescafe Paper Cup pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 08:05:08', 0),
-(112, 'G1', 'Sugar Loose', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:06:00', 0),
-(113, 'G2', 'Oil', 'Other', 'L', 1, 1, 0, 0.00, '2025-09-01 08:06:49', 0),
-(114, 'G3', 'Kithul Treacle - 750ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 08:07:59', 0),
-(115, 'G5', 'Kithul Treacle - 350ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 08:08:29', 0),
-(116, 'M44', 'Fish Thilapiya', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:10:02', 0),
-(117, 'M43', 'Katugoi Fish', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:10:35', 0),
-(118, 'M42', 'Atawalla Fish', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:11:15', 0),
-(119, 'M40', 'Muhudu Kukula Dry Sparts', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:12:03', 0),
-(120, 'M39', 'Kelawalla Fish', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:12:40', 0),
-(121, 'M38', 'Fish Batta', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:13:09', 0),
-(122, 'M37', 'Crab', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:14:19', 0),
-(123, 'M36', 'Fish Salaya', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:15:08', 0),
-(124, 'M34', 'Para Malu', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:15:47', 0),
-(125, 'M33', 'Gal Malu', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:16:08', 0),
-(126, 'M32', 'Bollu', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:16:32', 0),
-(127, 'M31', 'Ala Goduwa', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:17:03', 0),
-(128, 'M28', 'Dry Sprats', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:18:00', 0),
-(129, 'M27', 'Cuttle Fish - 1Kg', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:19:18', 0),
-(130, 'M30', 'Koppara', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:19:41', 0),
-(131, 'M25', 'Bala Malu', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:20:03', 0),
-(132, 'M24', 'Linna (Mackeral)', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:21:39', 0),
-(133, 'M23', 'Lena Paraw', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:22:18', 0),
-(134, 'M1', 'Pork - 5Kg', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:23:06', 0),
-(135, 'M2', 'Pork Bacon - 1kg', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:24:15', 0),
-(136, 'M3', 'Tuna - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 08:25:51', 0),
-(137, 'M4', 'Chicken Bockwest - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 08:26:41', 0),
-(138, 'M6', 'Chicken Hot Dog - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 08:28:09', 0),
-(139, 'M7', 'Mutton - 2Kg', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 08:29:01', 0),
-(140, 'M8', 'Whole Chicken Legs', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:30:10', 0),
-(141, 'M9', 'Chicken Burger - 1Kg', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:30:50', 0),
-(142, 'M10', 'Chicken Hum - 1Kg', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:31:34', 0),
-(143, 'M11', 'Eggs', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 08:32:00', 0),
-(144, 'M12', 'Chicken Catering Sausages - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 08:33:28', 0),
-(145, 'M14', 'Chicken Skinless Breast(Large)', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:34:51', 0),
-(146, 'M15', 'Whole Chicken', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:35:36', 0),
-(147, 'M16', 'Prawns - S', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:36:25', 0),
-(148, 'M17', 'Prawns - L', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:37:03', 0),
-(149, 'M35', 'Chicken Liver - Bulk', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:38:06', 0),
-(150, 'M22', 'Chicken Thighs - Bulk', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:38:45', 0),
-(151, 'I13', 'Ice Cube', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:40:18', 0),
-(152, 'I11', 'Fruit & Nut Ice Cream - 1L', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 08:41:27', 0),
-(153, 'I10', 'Strawberry Ice Cream - 1L', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 08:43:04', 0),
-(154, 'I9', 'Vanila Ice Cream - 1L', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 08:44:13', 0),
-(155, 'I8', 'Chocalate Ice Cream -  1 L', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 08:45:11', 0),
-(156, 'I1', 'Strawberry Ice Cream - 4L', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 08:45:56', 0),
-(157, 'I2', 'Chocalate Ice Cream -  4L', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 08:46:28', 0),
-(158, 'I5', 'Fruit & Nut Ice Cream - 4L', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 08:47:22', 0),
-(159, 'I6', 'Kithul Hakuru Ice Cream - 900ml', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 08:48:46', 0),
-(160, 'I7', 'Karatha Kolomban - 900ml', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 08:49:21', 0),
-(161, 'R72', 'Sesame oil - 640ml', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 08:51:47', 0),
-(162, 'R71', 'Bay Leaves', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:52:14', 0),
-(163, 'R70', 'Highland Curd - 950ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 08:53:27', 0),
-(164, 'R69', 'Set Kiri - 900ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 08:54:11', 0),
-(165, 'R67', 'Drinking Chocolate - CADBURY - 10.5Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 08:54:44', 0),
-(166, 'R66', 'Seeni Hakuru', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:56:14', 0),
-(167, 'R65', 'Red Rice', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 08:57:44', 0),
-(168, 'R64', 'Ginger Powder', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 08:58:25', 0),
-(169, 'R63', 'Kotmale Curd', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 08:59:47', 0),
-(170, 'R62', 'Green Peas - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:00:27', 0),
-(171, 'R61', 'CIC Curd Tub 800g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:01:30', 0),
-(172, 'R60', 'Thandoori Masala Powder', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:02:40', 0),
-(173, 'R59', 'Kernal Corn', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:03:28', 0),
-(174, 'R58', 'Hoi Sin Sauce', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:05:03', 0),
-(175, 'R41', 'Prawns Cracker - 60g ', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:06:13', 0),
-(176, 'R57', 'Set Kiri Curd - 450ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:06:55', 0),
-(177, 'R56', 'Roasted Curry Powder - 500g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:08:48', 0),
-(178, 'R55', 'Salt - 400g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:09:32', 0),
-(179, 'R54', 'Coriander Powder', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:10:16', 0),
-(180, 'R53', 'Kithul Hakuru', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:11:00', 0),
-(181, 'R51', 'Maggie Seasoning Bottle - 800ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:12:14', 0),
-(182, 'R49', 'Maggie Coconut Powder - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:13:12', 0),
-(183, 'R2', 'Maggie Coconut Powder - 300g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:14:14', 0),
-(184, 'R48', 'Richlife Set Kiri - 900ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:15:07', 0),
-(185, 'R1', 'Maggie Seasoning Powder - 500g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:16:14', 0),
-(186, 'R3', 'Rasarco Biriyani Flavour - 500ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:18:07', 0),
-(187, 'R4', 'Biriyani Masala Powder -  50g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:19:04', 0),
-(188, 'R5', 'Milan Pasta - 1 Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:21:46', 0),
-(189, 'R6', 'Milan Spaghetti', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:22:37', 0),
-(190, 'R7', 'Milk Cream Style Corn - 425g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:24:58', 0),
-(191, 'R8', 'Whole Mushroom - 425g', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 09:25:47', 0),
-(192, 'R9', 'Tom Yum Paste - 400g', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 09:26:41', 0),
-(193, 'R10', 'Keeri Samba Rice - 5Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:27:28', 0),
-(194, 'R11', 'Basmathi Rice - 5Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:28:10', 0),
-(195, 'R12', 'Salt Packet - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:28:57', 0),
-(196, 'R42', 'Chili Pieces - 500g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:29:52', 0),
-(197, 'R52', 'Chili Pieces - 250g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:30:26', 0),
-(198, 'R13', 'Chili Pieces - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:31:31', 0),
-(199, 'R14', 'Chili Powder - 500g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:32:07', 0),
-(200, 'R50', 'Chili Powder -  1KG', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:33:00', 0),
-(201, 'R15', 'Curry Powder - 500g', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 09:34:08', 0),
-(202, 'R16', 'Cursh Pepper - 500g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:35:44', 0),
-(203, 'R17', 'Cumin Powder -  100g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:40:05', 0),
-(204, 'R18', 'Turmeric Powder - 500g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:41:37', 0),
-(205, 'R19', 'Artificial Vinegar - 4L', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:43:08', 0),
-(206, 'R20', 'Chili Sauce - 5Kg', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 09:43:57', 0),
-(207, 'R22', 'Oyster Sauce - 5L (5.7Kg)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:45:02', 0),
-(208, 'R21', 'Soya Sauce - 5L', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:46:19', 0),
-(209, 'R23', 'Tomato Sauce - 4Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:47:02', 0),
-(210, 'R24', 'Squid Fish Sauce - 700ml', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 09:48:07', 0),
-(211, 'R25', 'Tomato Paste - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:49:10', 0),
-(212, 'R26', 'Sesame Oil - 320ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:50:22', 0),
-(213, 'R27', 'Chinese Noodles Loose', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:51:24', 0),
-(214, 'R28', 'Tabasco Pepper Sauce - 60ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:52:20', 0),
-(215, 'R29', 'Heinz Apple Cider Vinegar - 473ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:53:31', 0),
-(216, 'R30', 'Mustard Cream Bottle - 675g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:54:38', 0),
-(217, 'R31', 'Mango Chutney Bottle - 885g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:55:49', 0),
-(218, 'R32', 'Rice Vermicelli 500g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:56:37', 0),
-(219, 'R33', 'Rice Stick - 375g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:57:17', 0),
-(220, 'R35', 'Gamboge Paste - 500g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:58:00', 0),
-(221, 'R36', 'Oregano', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:58:26', 0),
-(222, 'R37', 'French Frice', 'Other', 'kg', 1, 1, 0, 0.00, '2025-09-01 09:59:54', 0),
-(223, 'R38', 'Corn flour - 1 Kg Pack', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 10:00:50', 0),
-(224, 'R39', 'True Choice Baby Corn - 425g', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 10:01:43', 0),
-(225, 'A12', 'S/Roll Pastry Sheet', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 10:04:20', 0),
-(226, 'A11', 'Masterpuff - 1Kg', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 10:05:00', 0),
-(227, 'A9', 'Sesame Seed Black', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 10:05:47', 0),
-(228, 'A8', 'Sesame Seed White', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 10:06:22', 0),
-(229, 'A1', 'Instant Yeast 2 in1 - 500g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:07:18', 0),
-(230, 'A2', 'Maja 5L', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 10:07:43', 0),
-(231, 'A3', 'Mayonnaise - 3Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:08:21', 0),
-(232, 'A4', 'Hyco Bread Compound Box - 20Kg', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 10:09:06', 0),
-(233, 'A6', 'Flour', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 10:09:44', 0),
-(234, 'A7', 'Beehive kg', 'Other', 'kg', 1, 1, 0, 0.00, '2025-09-01 10:11:10', 0),
-(235, 'C109', 'Blue Berry Bottle - 2.7Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:13:25', 0),
-(236, 'C108', 'MD Wood Apple - 500g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:14:01', 0),
-(237, 'C107', 'Biscuit Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:14:37', 0),
-(238, 'C106', 'MD Passion Fruit Cordial ', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:15:25', 0),
-(239, 'C105', 'Rose Water - 750ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:16:03', 0),
-(240, 'C104', 'Neutral Glazinggle - 7Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:17:10', 0),
-(241, 'C103', 'Motha Moss Jelly Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:17:50', 0),
-(242, 'C102', 'Chocolate Vermicili Pack', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 10:19:08', 0),
-(243, 'C101', 'Red Colour - 500ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:20:28', 0),
-(244, 'C100', 'Green Colour - 500ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:21:00', 0),
-(245, 'C99', 'Pebbles Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:21:35', 0),
-(246, 'C98', 'White Compound - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:22:42', 0),
-(248, 'C97', 'Fuschia Pink Colour Bottle - 28ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:25:34', 0),
-(249, 'C7', 'White Couverture Block', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:26:38', 0),
-(250, 'C96', 'Muffin Mixer Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:27:05', 0),
-(251, 'C95', 'Thaim', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 10:29:54', 0),
-(252, 'C93', 'Black Olives - 340g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:31:03', 0),
-(253, 'C92', 'Harischandra Kurakkan Flour', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 10:32:05', 0),
-(254, 'R68', 'MD Tomato Paste', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:32:36', 0),
-(255, 'C91', 'Chocolate Chip - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:33:36', 0),
-(256, 'C90', 'Decoma Black Fondent - 1000g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:34:33', 0),
-(257, 'C89', 'White Colour Essence', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:35:24', 0),
-(258, 'C88', 'Strawberry Essence', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:36:17', 0),
-(259, 'C87', 'Colour Vermicili Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:37:00', 0),
-(260, 'C86', 'MD fresh Strawberry Jam', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:37:54', 0),
-(261, 'C85', 'Rasarco Strawberry Essence', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:39:12', 0),
-(262, 'C84', 'Liquid Gluecose', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:39:58', 0),
-(263, 'C83', 'Coco Powder - 500g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:40:39', 0),
-(264, 'C82', 'Sugar Ball', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:42:04', 0),
-(265, 'C80', 'Milk Compound Block - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:42:55', 0),
-(266, 'C79', 'Sprinkles', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:44:42', 0),
-(267, 'C78', 'Colour Dust Bottle', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:46:05', 0),
-(268, 'C77', 'Super Fine Dark 1800gx1DZ- 1.8kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:47:31', 0),
-(269, 'C76', 'Dark Compound Blocks', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:48:56', 0),
-(270, 'C74', 'Strawberry Fields', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:49:52', 0),
-(271, 'C73', 'Motha Gelatine - 500g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:55:19', 0),
-(272, 'C71', 'Rasaco Lemon Yellow - 500ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:56:09', 0),
-(273, 'C70', 'Coco Powder Loose', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:58:22', 0),
-(274, 'C69', 'Black Colouring Bottle - 28ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:59:21', 0),
-(275, 'C68', 'Cherry Bottle Green', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:59:57', 0),
-(276, 'C67', 'White Rice Flour', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 11:00:28', 0),
-(277, 'C66', 'Red Rice Flour', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 11:01:15', 0),
-(278, 'K65', 'Cooking Chololate A', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 11:02:38', 0),
-(279, 'K64', 'Olo Chocolate Biscut ', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 11:03:30', 0),
-(280, 'K63', 'Chocolate Wafers', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 11:04:32', 0),
-(281, 'K41', 'Dark Sweet Cherry', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 11:05:15', 0),
-(282, 'C61', 'Dedicated Coconut - 500g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 11:06:30', 0),
-(283, 'C60', 'Rasarco Brilliant Blue', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 11:07:31', 0),
-(284, 'C59', 'Rasarco Banana Flavour', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 11:08:29', 0),
-(285, 'C58', 'Baking Soda', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 11:09:18', 0),
-(286, 'C57', 'Cherry Bottle - RED', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 11:10:22', 0),
-(287, 'C56', 'Golden Custard', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 11:10:59', 0),
-(288, 'C55', 'Amond', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 11:11:28', 0),
-(289, 'C54', 'Peanut', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 11:11:57', 0),
-(290, 'K53', 'Citrus Peel', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 11:12:30', 0),
-(291, 'K52', 'Raisins', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 11:13:20', 0),
-(292, 'K51', 'Black Currrant Loose ', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 11:14:15', 0),
-(293, 'K50', 'Dark Couverture 55% CS 1Kg', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 11:15:19', 0),
-(294, 'K49', 'Drinking Chocolate - Swiss Miss', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 11:17:11', 0),
-(295, 'K48', 'Dehydrated Cashew Pieces - 1kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 11:18:18', 0),
-(296, 'K47', 'Holsen Peach - 825g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 11:19:18', 0),
-(297, 'K46', 'Quick Oats - 1.19Kg', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 11:20:50', 0),
-(298, 'K45', 'Couverture A', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 11:22:22', 0),
-(299, 'K36', 'Mayflower 15kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 11:23:07', 0),
-(300, 'K1', 'Motha Icing Sugar - 2.4Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 11:24:02', 0),
-(301, 'K2', 'Oasis Icing Sugar 2Kg - Now Qty 2.4Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 11:25:07', 0),
-(302, 'K3', 'Motha Baking Power - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 11:25:44', 0),
-(303, 'K4', 'Cashew Calibrated Pieces - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 11:29:49', 0),
-(304, 'K5', 'Armond Flavour - 500ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 11:31:21', 0),
-(305, 'K6', 'Rose Flavour - 500ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 11:45:17', 0),
-(306, 'K7', 'Rasarco Vanilla Flavour - 500ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 02:52:41', 0),
-(307, 'K8', 'Rasarco Chocolate Food Flavours - 500ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 02:53:55', 0),
-(308, 'K9', 'Rasarco Pineapple Flavour - 500ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 02:54:41', 0),
-(309, 'K11', 'Rasarco Lemon Yellow Color - 28ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 02:55:40', 0),
-(310, 'K12', 'Artificial Cherry Red Loose', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-02 02:57:28', 0),
-(311, 'K13', 'Artificial Cherry Green Loose', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-02 02:58:03', 0),
-(312, 'K14', 'Pointing Color Egg Yellow - 500g ', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-02 02:58:52', 0),
-(313, 'K14A', 'Pointing Color Blood Red - 500g ', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 02:59:49', 0),
-(314, 'K15', 'Plums', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-02 03:00:46', 0),
-(315, 'K16', 'Cashew Nuts', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-02 03:01:06', 0),
-(316, 'K17', 'Drinking Chocolate Powder - 2.5Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:02:44', 0),
-(317, 'K18', 'MD Strawberry Jam - 500g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:03:44', 0),
-(318, 'K19', 'MD Mix Fruit Jam - 500g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:04:51', 0),
-(319, 'K20', 'Maliban Gold Marie - 350g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:05:40', 0),
-(320, 'K21', 'Golden Syrup - 470g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:06:26', 0),
-(321, 'K22', 'MD Pineapple Jam - 500g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:07:11', 0),
-(322, 'K23', 'Dilettante Chocolate Sauce - 900ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:08:15', 0),
-(323, 'K25', 'Chocolate Vermicili - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:09:00', 0),
-(324, 'K26', 'Color Vermicelli - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:09:55', 0),
-(325, 'K27', 'Melon Jam - 5Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:10:45', 0),
-(326, 'K28', 'Dates Loose', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-02 03:11:18', 0),
-(327, 'K29', 'Amanda Vegetable Fat - 15Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:12:08', 0),
-(328, 'K31', 'Millac Gold Whipping - 1L', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-02 03:12:56', 0),
-(329, 'K32', 'Redman Whipping Cream - 1100g', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-02 03:14:46', 0),
-(330, 'K33', 'Decoma White Fondent - 1000g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:15:26', 0),
-(331, 'K34', 'Coco Powder - 1Kg', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-02 03:16:06', 0),
-(332, 'K35', 'Couverture B Cooking Chocolate - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:17:07', 0),
-(333, 'B93', 'Ice Peach Tea - 750ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:19:38', 0),
-(334, 'B92', 'Ice Blueberry Tea - 2L', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:20:33', 0),
-(335, 'B91', 'Watawala', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-02 03:21:00', 0),
-(336, 'B90', 'Coffee Beans 500g Pack (Indulgence)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:22:39', 0),
-(337, 'B89', 'Soda 1L', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:23:09', 0),
-(338, 'B88', 'Coca Cola - 1L', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:23:43', 0),
-(339, 'B87', 'Zesta Green Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:24:30', 0),
-(340, 'B86', 'Sprite Glass Bottle - 300ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:25:34', 0),
-(341, 'B85', 'Lavazza Coffee - 1Kg(ORO)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:26:53', 0),
-(342, 'B84', 'Water Bottle - 1L', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-02 03:27:27', 0),
-(343, 'B83', 'Raththi 3 in 1 - 400g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:28:04', 0),
-(344, 'B82', 'Soda 750ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:28:36', 0),
-(345, 'B81', 'Star Selection Premium - Coffee Been 500g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:29:38', 0),
-(346, 'B60', 'Lavazza eGusto - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:30:35', 0),
-(347, 'B59', 'Sunquick Mix Fruited - 2L', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:31:26', 0),
-(348, 'B56', 'Top Leaf - Black Tea Powder - 500g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:32:17', 0),
-(349, 'B55', 'Top Leaf - Black Tea Powder - 250g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:32:48', 0),
-(350, 'B54', 'Pelawatte Milk Powder - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:33:23', 0),
-(351, 'B53', 'Rockland Red Rum', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:33:55', 0),
-(352, 'B52', 'Top Leaf - Black Tea Powder - 100g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:34:34', 0),
-(353, 'B51', 'Lavazza Gold', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:35:05', 0),
-(354, 'B50', 'Monin Caramel Sauce - 1.89L', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:36:03', 0),
-(355, 'B49', 'Monin Strawberry MixFruit', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:43:03', 0),
-(356, 'B48', 'MONIN CARAMEL', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:43:57', 0),
-(357, 'B47', 'CREAME ESPRESSO', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:44:58', 0),
-(358, 'B46', 'Brown Sugar 100 Packets', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:45:47', 0),
-(359, 'B44', 'Ceylonta Tea Bag', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:46:59', 0),
-(360, 'B43', 'Monin Mint Mojito - 1000ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:47:45', 0),
-(361, 'B42', 'Lakspray - 400g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:48:51', 0),
-(362, 'B35', 'Sprite - 1050ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:52:55', 0),
-(363, 'B32', 'Tonic - 500ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:53:30', 0),
-(364, 'B31', 'MD Artificial Cordial Sherbet - 750ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:54:37', 0),
-(365, 'B1', 'EGB - 500ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:55:03', 0),
-(366, 'B2', 'Coca Cola - 400ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:55:54', 0),
-(367, 'B3', 'Sprite - 400ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:57:01', 0),
-(368, 'B7', 'Soda - 1.5ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:57:55', 0),
-(369, 'B4', 'Soda - 400ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:58:19', 0),
-(370, 'B5', 'EGB - 400ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:58:52', 0),
-(371, 'B6', 'Sprite Pet -  1.5L', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:59:31', 0),
-(372, 'B8', 'Water Bottle - 500ml', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-02 03:59:56', 0),
-(373, 'B9', 'Ambewela Fresh Milk - 1000ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:02:49', 0),
-(374, 'B10', 'Nescafe classic soft pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:03:30', 0),
-(375, 'B12', 'Sunquick Orange - 2L', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:04:03', 0),
-(376, 'B13', 'Lakspray milk powder - 1kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:04:48', 0),
-(377, 'B14', 'Raththi 3 in 1 - 200g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:05:12', 0),
-(378, 'B15', 'Lipton Ceylonta Tea Bag (50 Bags) -  100g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:06:22', 0),
-(379, 'B16', 'Lipton Ceylonta Green Tea Bag -  30g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:07:44', 0),
-(380, 'B18', 'Milkmaid - 5.15ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:08:23', 0),
-(381, 'B19', 'Water Can - 19L', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:08:54', 0),
-(382, 'B20', 'Nescafe Premix - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:09:41', 0),
-(383, 'B22', 'Lavazza Coffee - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:10:12', 0),
-(384, 'B23', 'Top Leaf - Black Tea Bag (2gx50) 100g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:11:11', 0),
-(385, 'B24', 'Top Leaf - Black Tea Bag (2gx100) 200g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:11:56', 0),
-(386, 'B25', 'White Sugar 100 packets', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:12:33', 0),
-(387, 'B26', 'High-Mid Tea 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:13:07', 0),
-(388, 'B27', 'Monin Vanilla - 1L', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:13:37', 0),
-(389, 'B28', 'Monin Blue Curacao - 1L', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:14:51', 0),
-(390, 'B29', 'Monin Strawberry - 1L', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:15:29', 0),
-(391, 'B30', 'Monin Hazelnut - 1L', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:16:11', 0),
-(392, 'B17', 'Cream Cheese - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:17:11', 0),
-(395, 'C15', 'Fry Best Frying Fat - 15Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:19:40', 0),
-(397, 'C14', 'Richlife Process Cheese Slices - 10s', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:21:00', 0),
-(398, 'C12', 'Cream Cheese - 2Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:21:59', 0),
-(399, 'C11', 'Meadowlea Fat Spread - 5Kg', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-02 04:23:05', 0),
-(400, 'C2', 'Mozzarella Cheese - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:23:44', 0),
-(401, 'C3', 'Mozzarella Cheese - 500g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:24:18', 0),
-(402, 'C4', 'Pizza Cheese 2Kg (PCs)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:25:04', 0),
-(403, 'C5', 'Astra Margerine - 5Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:25:55', 0),
-(405, 'C6', 'Pelwaththa Butter - 5Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:28:01', 0),
-(406, 'C9', 'Happy Cow Cheese - 120g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:28:42', 0),
-(407, 'C10', 'Anchor cheddar cheese slices', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:29:27', 0),
-(408, 'P30', '80ml Transparent Lid Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:06:44', 0),
-(409, 'P29 ', '80ml Transparent Cup Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:07:29', 0),
-(410, 'P28 ', 'Chef Hat', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:08:10', 0),
-(411, 'P27 ', 'Garbage Bag XXL Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:08:52', 0),
-(412, 'P26 ', 'Coffee Cup Black Lid (S)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:09:42', 0),
-(413, 'P25', '80ml Plain White Lid', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:10:38', 0),
-(414, 'P24 ', '80ml Plain Cups White Cups', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:11:07', 0),
-(415, 'P1 ', 'Lunch Box (S)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:11:35', 0),
-(416, 'P2 ', 'Lunch Box (M)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:12:10', 0),
-(417, 'P3', 'Lunch Box (L)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:12:48', 0),
-(418, 'P4 ', 'Lunch Box Plain -S', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:13:26', 0),
-(419, 'P5 ', 'Lunch Box Plain - L', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:14:42', 0),
-(420, 'P6 ', 'Cake 3lb Pack (12*12*4)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:15:33', 0),
-(421, 'P7 ', 'Cake Gateau Box  10 x 10 x 4', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:16:04', 0),
-(422, 'P8 ', 'Cake Box 2LB 11.5 x 8.5 x 4', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:16:37', 0),
-(423, 'P9 ', 'Bento Box 6x6', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:17:17', 0),
-(425, 'P11 ', 'Cake Slice Box Pack (L)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:19:01', 0),
-(426, 'P12 ', 'Cake 1lb (8.5*6*4)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:19:36', 0),
-(427, 'P13 ', 'Cake box (10*10*4)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:20:17', 0),
-(428, 'P14 ', 'Cake Box 2lb (11.5*8.5*4)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:20:57', 0),
-(429, 'P15 ', 'Cake Box 1Lb - 8.5x6x4 Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:21:34', 0),
-(430, 'P16 ', 'Cup Cake 4Pcs Box', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:22:23', 0),
-(431, 'P17 ', 'Cup Cake 6Pcs Box', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:22:54', 0),
-(432, 'P18', 'Cup Cake 9Pcs Box', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:24:59', 0),
-(433, 'P19', 'Cup Cake 12Pcs Box', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:26:00', 0),
-(434, 'P20 ', 'Cup Cake 20Pcs Box', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:28:16', 0),
-(435, 'P21 ', 'Cake Box White - 8x15', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:29:17', 0),
-(436, 'P22 ', 'Cake Box White - 10x10', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:30:10', 0),
-(437, 'P23 ', 'Bento Box - 8x8', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:31:01', 0),
-(438, 'P68 ', 'Garbage Bag XL Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:32:09', 0),
-(439, 'P67 ', 'Garbage Bag M Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:34:05', 0),
-(440, 'P51 ', 'Grocerry Bag (S) 100 Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:35:18', 0),
-(441, 'P52 ', 'Grocerry Bag (L) 100 Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:35:56', 0),
-(444, 'I4', 'Vanilla Ice Cream - 4l', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-03 10:50:02', 0),
-(445, 'B21', 'Nestea Premix - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 05:13:10', 0),
-(446, 'P65', 'Brown Paper (M) Size', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 06:30:23', 0),
-(447, 'P54', 'Shopping Bag (M) Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 06:33:37', 0),
-(448, 'P111', 'Ice Coffee Cup (250ml)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 06:33:37', 0),
-(449, 'P66', 'Brown Paper (L)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 06:42:20', 0),
-(450, 'P10', 'Cake Slice Box Pack (S)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 06:42:20', 0),
-(451, 'P112', 'Ice Coffee Bottles', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-08 06:42:20', 0),
-(452, 'P122', 'Ice Coffee Straw Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 06:42:20', 0),
-(453, 'P53', 'Shopping Bags(s)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 07:09:54', 0),
-(454, 'P56', 'Shopping Bags(XL)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 07:28:27', 0),
-(455, 'P57', 'Jumbo Shopping Bag (Cake Bag)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 07:28:27', 0),
-(456, 'P58', 'Garbage Bag Pack - S', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 07:28:27', 0),
-(457, 'P59', 'Garbage Bag Pack - L', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 07:28:27', 0),
-(458, 'P60', 'Lunch sheet', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 07:28:27', 0),
-(459, 'P61', 'Bread Cover Bag', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 07:28:27', 0),
-(460, 'P62', 'Piping Bag (s) Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 07:28:27', 0),
-(461, 'P63', 'Piping Bag (L) Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 07:28:27', 0),
-(463, 'P136', 'Wooden Spoon Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 07:28:27', 0),
-(464, 'P135', 'Lava cup', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 07:28:27', 0),
-(465, 'P132', 'Brown Colour Cup Cake Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 07:28:27', 0),
-(466, 'P102', 'Cup Cake Paper - S', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 07:28:27', 0),
-(467, 'P103', 'Cup Cake Paper - M', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 07:28:27', 0),
-(468, 'P104', 'Cup Cake Cup+Lid - L', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 07:28:27', 0),
-(469, 'P105', 'Curry Cup Lid Pack - S', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 07:28:27', 0),
-(470, 'P106', 'Curry Cup Pack - S', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 07:28:27', 0),
-(471, 'P107', 'Curry Cup Lid Pack - L', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 07:28:27', 0),
-(472, 'P108', 'Curry Cup Pack - L', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 07:28:27', 0),
-(473, 'P55', 'Shopping Bags(L)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 07:28:27', 0),
-(474, 'P259', 'Cleaning Brush - (Kohu Brush)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-09 06:20:36', 0),
-(475, 'P258', ' Toilet Cleaner', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-09 06:27:24', 0),
-(476, 'P257', ' Glass Cleaner', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-09 06:27:24', 0),
-(479, 'P252', ' Pine Oil', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-09 06:27:24', 0),
-(480, 'P253', ' Hand Wash', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-09 06:27:24', 0),
-(481, 'P254', ' Dish Wash Liquid', 'Other', 'L', 0, 1, 0, 0.00, '2025-09-09 06:27:24', 0),
-(482, 'P255', ' Tile Cleaner', 'Other', 'L', 0, 1, 0, 0.00, '2025-09-09 06:27:24', 0),
-(483, 'P223', ' Candle Box', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-09 06:44:39', 0),
-(484, 'P222', ' Ice Cream Stick Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-09 06:44:39', 0),
-(485, 'P221', ' BBQ Sticks 10\' Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-09 06:44:39', 0),
-(486, 'P201', ' BBQ Picks 6\' Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-09 06:44:39', 0),
-(487, 'P202', ' BBQ Sticks Pack 6\'', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-09 06:44:39', 0),
-(491, 'P206', ' Bill Roll', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-09 06:44:39', 0),
-(493, 'P208', ' Paper Serviette Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-09 06:44:39', 0),
-(495, 'P210', ' Toothpick Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-09 06:44:39', 0),
-(496, 'P211', ' Clean Wrap Roll', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-09 06:44:39', 0),
-(497, 'P212', ' Rubber Gloves Box', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-09 06:44:39', 0),
-(498, 'P213', ' Politine Gloves Box - 100 pieces', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-09 06:44:39', 0),
-(500, 'P215', ' White Papers', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-09 06:44:39', 0),
-(501, 'P216', ' Aluminum Foil', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-09 06:44:39', 0),
-(502, 'P217', ' Baking Paper', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-09 06:44:39', 0),
-(505, 'P220', ' Disposable Gloves Box', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-09 06:44:39', 0),
-(506, 'C110', 'Chocolate Muffin Mix Pack 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-09 07:37:23', 0),
-(507, 'P109', 'Juice Cup Lid Pack\r\n', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-10 03:25:36', 0),
-(508, 'P110', 'Juice Cup Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-10 03:25:36', 0),
-(509, 'P125', 'Juice Straw Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-10 05:09:02', 0),
-(510, 'P123', 'Paper Plates 25nos', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-10 05:46:15', 0),
-(511, 'P124', 'Chili Paste Cup + Lid 100', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-10 08:22:59', 0),
-(512, 'R73', 'Pepper powder - 500g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-10 08:22:59', 0),
-(513, 'M46', 'Dry Fish Keeramin', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-18 11:00:29', 0),
-(514, 'P121', 'Doughnut Cup Pack ', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-20 07:43:05', 0),
-(515, 'S24', 'Kadala', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-23 09:11:34', 0),
-(516, 'S25', 'Kadala parippu', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-23 09:13:21', 0),
-(518, 'M47', 'Prawns (M)', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-23 09:14:00', 0),
-(519, 'M48', 'Fish - Muhudu Kukula', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-23 09:14:29', 0),
-(520, 'V74', 'Thibbatu', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-25 03:33:10', 0),
-(521, 'P120 ', 'Eclair Box Pack (250g Food Tray)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-30 07:22:49', 0),
-(522, 'P151', 'Cake Board 2LB (11.25*11.25)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-30 11:19:09', 0),
-(523, 'P152', 'Cake Board 1LB (8*5.5)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-30 11:19:09', 0),
-(524, 'P153', 'Round Board L (10*10)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-30 11:19:09', 0),
-(525, 'P154', 'Round Board S (8*8)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-30 11:19:09', 0),
-(526, 'P155', 'Bento Board 6x6', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-30 11:19:09', 0),
-(527, 'P156', 'Cake Board 3lb (12*16)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-30 11:19:09', 0),
-(528, 'P157', 'Cup Cake 4Pcs Board', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-30 11:19:09', 0),
-(529, 'P158', 'Cup Cake 6Pcs Board', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-30 11:19:09', 0),
-(530, 'P159', 'Cup Cake 9Pcs Board', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-30 11:19:09', 0),
-(531, 'P160', 'Cup Cake 12Pcs Board', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-30 11:19:09', 0),
-(532, 'P161', 'Cup Cake 20Pcs Board', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-30 11:19:09', 0),
-(533, 'P162', 'Customized Box Board', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-30 11:19:09', 0),
-(534, 'P163', 'Cake Board square - 9x9', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-30 11:19:09', 0),
-(535, 'P164', 'Cake Board square - 8x10.25', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-30 11:19:09', 0),
-(536, 'P165', 'Cake Board square - 12x16', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-30 11:19:09', 0),
-(537, 'P116', 'Ice Coffee Paper Cup Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-30 11:42:12', 0),
-(540, 'V75', 'Dabala', 'Other', 'kg', 0, 1, 1, 0.00, '2025-10-16 06:09:22', 0),
-(541, 'P300', 'Petty Cash Item', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-10-17 04:26:15', 0),
-(543, 'P133', 'Craft coffee sleeve cup (250ml) ', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-10-22 06:15:51', 0),
-(544, 'P134', 'Broom feather monara FB-0329', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-10-22 06:38:09', 0),
-(546, 'K37', 'Moss Green Colouring Bottle', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-10-23 04:19:10', 0),
-(549, 'P137', 'Brown Paper (S) Size', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-10-24 09:37:31', 0),
-(550, 'C111', 'Navy Blue Colour', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-10-31 04:37:05', 0),
-(551, 'C112', 'Gold dust', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-10-31 11:26:58', 0),
-(554, 'V76', 'Kos Mallum', 'Other', 'kg', 0, 1, 0, 0.00, '2025-11-03 05:53:10', 0),
-(555, 'P113', 'Ice coffee Bottles White Caps ', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-11-03 05:57:44', 0),
-(556, 'P114', 'Coffee Cup Pack - S', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-11-13 05:31:10', 0),
-(557, 'P117', 'Swiss Roll Packet', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-11-13 05:33:04', 0),
-(558, 'P126', 'Milo Cup', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-11-13 05:44:01', 0),
-(559, 'P127', 'Coffee Cup Pack - L', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-11-13 05:47:21', 0),
-(560, 'P166', 'Wooden Coffee Stirrer', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-11-13 05:48:56', 0),
-(561, 'P167', 'Lunch Box - Transparent ', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-11-13 08:58:05', 0);
-INSERT INTO `items` (`id`, `item_code`, `name`, `item_type`, `unit`, `vat_applicable`, `auto_add_to_stock`, `reorder_level`, `current_stock`, `created_at`, `deleted`) VALUES
-(562, 'P168', 'Lunch Box - Transparent - Lid', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-11-13 08:58:38', 0),
-(563, 'P169', 'Shopping Bag - XXL', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-11-13 09:17:14', 0),
-(565, 'C208', 'Rasarco Chocolate Browns - 500ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-11-14 02:30:09', 0),
-(566, 'C17', 'Dilmah Tea Bag Box', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-11-14 05:15:19', 0),
-(568, 'M49', 'Fish Hurulla', 'Other', 'kg', 0, 1, 0, 0.00, '2025-11-24 05:06:59', 0),
-(569, 'M50', 'Fish - Squid', 'Other', 'kg', 0, 1, 0, 0.00, '2025-11-24 05:07:39', 1),
-(570, 'V77', 'Batana', 'Other', 'kg', 0, 1, 0, 0.00, '2025-11-24 05:09:12', 0),
-(571, 'V80', 'Goraka ', 'Other', 'kg', 0, 1, 0, 0.00, '2025-11-24 05:09:41', 0),
-(572, 'V81', 'Wam Batu', 'Other', 'kg', 0, 1, 0, 0.00, '2025-11-24 05:10:08', 1),
-(573, 'M51', 'Fish - Habaraliya', 'Other', 'kg', 0, 1, 0, 0.00, '2025-11-24 05:13:09', 0),
-(574, 'M235', 'Cake board - 14\"', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-12-09 08:44:59', 0),
-(575, 'P170', 'Soup Cup', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-12-12 10:13:33', 0),
-(576, 'P171', 'Soup Cup - Lid1', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-12-12 10:13:59', 0),
-(577, 'A13', 'High Sugar Yeast', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-12-16 04:30:44', 0),
-(578, 'C113', 'Rasarco White Flavour -500ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-12-16 04:49:36', 0),
-(579, 'C114', 'Tea Powder', 'Other', 'kg', 0, 1, 0, 0.00, '2025-12-17 08:55:51', 0),
-(581, 'K40', 'Prawns Crackers - 100g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-12-19 04:34:44', 0),
-(585, 'M60', 'Chicken Bacon', 'Other', 'kg', 0, 1, 0, 0.00, '2025-12-22 04:19:00', 0),
-(586, 'K38', 'Ice Peach Tea Concentrate - 2L', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-12-26 03:58:26', 0),
-(587, 'K39', 'Mauri Strawberry Pie Filling', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-12-31 11:07:42', 0),
-(588, 'Z001', 'Konda Kewm', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-12-31 11:10:13', 0),
-(589, 'Z002', 'Asmi', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-12-31 11:10:39', 0),
-(590, 'Z003', 'Mun Kewum', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-12-31 11:11:11', 0),
-(591, 'Z004', 'Kokis', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-12-31 11:11:38', 0),
-(592, 'B94', 'Lemanade', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-12-31 11:22:13', 0),
-(593, 'B95', 'kik cola', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-12-31 11:23:34', 0),
-(594, 'A14', 'Golden Pastry Mix - 12.5KG', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-01-09 03:06:33', 0),
-(595, 'M59', 'Lomassa fish', 'Other', 'kg', 0, 1, 0, 0.00, '2026-01-09 03:41:14', 0),
-(596, 'P214', 'Wooden Fork - 16cm', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-01-12 10:49:12', 0),
-(604, 'P301', '1L PP White Tub and Lid', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-01-12 10:50:45', 0),
-(605, 'V100', 'Rampe leaves', 'Other', 'kg', 0, 1, 0, 0.00, '2026-01-19 03:41:32', 0),
-(607, 'P302', '250ml Paper Cup', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-01-19 08:21:53', 0),
-(608, 'B99', '7 UP MEGA', 'Other', 'L', 0, 1, 0, 0.00, '2026-01-22 05:07:28', 0),
-(614, 'C115', 'BLACK COLOURING BOTTLE 500ML', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-01-22 10:53:20', 0),
-(615, 'C116', 'GOLD BALL', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-01-22 11:00:26', 0),
-(616, 'C117', 'WHITE BALL', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-01-22 11:01:15', 0),
-(617, 'C118', 'COLOUR SUGAR BALL', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-01-22 11:01:49', 0),
-(618, 'C119', 'AMOND POWDER', 'Other', 'kg', 0, 1, 0, 0.00, '2026-01-22 11:02:38', 0),
-(619, 'R74', 'PEPPER POWDER 250g', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-01-23 07:21:54', 0),
-(620, 'D96', 'Sunquick Blackcurrent 350ML', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-01-23 08:32:25', 0),
-(621, 'D97', 'Sunquick Blackcurrent 2L', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-01-23 08:33:55', 0),
-(626, 'P260', 'Curry Bowl with lid 500ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-01-23 08:57:52', 0),
-(627, 'P303', 'Mop Cleaner 1L', 'Other', 'L', 0, 1, 0, 0.00, '2026-01-26 07:27:00', 0),
-(628, 'P207', 'Birthday Topper', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-01-30 04:13:41', 0),
-(629, 'P119', 'Cake box -14\'\'', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-01-30 04:31:16', 0),
-(630, 'B100', 'Lavazza Rossa Espresso 1kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-02-03 04:26:59', 0),
-(631, 'B101', 'Pepsi 1L', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-02-06 04:31:02', 0),
-(632, 'K55', 'Instant Oats', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-02-12 09:29:06', 0),
-(633, 'K56', 'Corn Flakes', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-02-12 09:30:00', 0),
-(634, 'C120', 'Kelloggs Chocos Duet K Pack 20g', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-02-16 04:56:15', 0),
-(635, 'C121', 'Kelloggs Chocos  K Pack 20g', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-02-16 05:00:18', 0),
-(640, 'F13', 'Strawberry ', 'Other', 'kg', 0, 1, 0, 0.00, '2026-02-16 08:11:20', 0),
-(641, 'S26', 'Mahaduru ', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-02-17 05:05:39', 0),
-(645, 'P130', 'Cookies Bag Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-02-17 08:19:52', 0),
-(646, 'P304', 'Cake Box (Tall) - 10\" ', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-02-18 03:05:47', 0),
-(647, 'P305', 'Cake Box (Tall) - 12\" ', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-02-18 03:06:19', 0),
-(648, 'P306', 'Cake Box (Tall) - 14\" ', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-02-18 03:06:48', 0),
-(649, 'R75', 'Cummin seeds', 'Other', 'kg', 0, 1, 0, 0.00, '2026-02-20 09:49:07', 0),
-(650, 'B102', 'Coca Cola 1.5L', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-02-23 06:15:39', 0),
-(651, 'B96', 'Fresh Milk  1000ml (Suddhi)', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-02-25 09:13:41', 0),
-(652, 'M61', 'Chicken Wings', 'Other', 'kg', 0, 1, 0, 0.00, '2026-03-09 10:51:08', 0),
-(657, 'P180', 'Cup Cake Liner', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-03-11 05:20:01', 0),
-(660, 'P310', ' Salad Cup (500ml)', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-03-12 09:02:13', 0),
-(661, 'R76', 'Curry Powder 250g', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-04-04 05:32:12', 0),
-(662, 'C122', 'Strawberry Cream 140g', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-04-06 06:51:41', 0),
-(663, 'C123', 'Vanilla Cream 140g', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-04-06 06:53:05', 0),
-(664, 'B001', 'Klo Biscuits', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-04-20 09:15:25', 0),
-(665, 'DIE0255', 'dum dum white', 'Other', 'quantity', 0, 1, 1, 0.00, '2026-05-27 06:23:11', 0);
+INSERT INTO `items` (`id`, `item_code`, `name`, `item_type`, `unit`, `vat_applicable`, `auto_add_to_stock`, `reorder_level`, `current_stock`, `created_at`, `deleted`, `status`) VALUES
+(1, 'F12', 'Guava', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:01:41', 0, 1),
+(2, 'F11', 'Banana Abul', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:02:03', 0, 1),
+(3, 'F10', 'Karatha Kolomba Mango', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:02:22', 0, 1),
+(4, 'F1', 'Banana', 'Fruits', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:02:49', 0, 1),
+(5, 'F2', 'Passion', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:03:14', 0, 1),
+(6, 'F3', 'T J C Mango', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:03:40', 0, 1),
+(7, 'F5', 'Papaya', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:04:03', 0, 1),
+(8, 'F4', 'Lime', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:04:24', 0, 1),
+(9, 'F6', 'Watermelons', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:05:04', 0, 1),
+(10, 'F7', 'Avocado', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:05:33', 0, 1),
+(11, 'F8', 'Pineapple', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:06:00', 0, 1),
+(12, 'F9', 'Orange', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:06:24', 0, 1),
+(13, 'V73', 'Kakiri', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:10:24', 0, 1),
+(14, 'V72', 'Dhel', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:11:16', 0, 1),
+(15, 'V71', 'Tamarind - 100g', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:12:19', 0, 1),
+(16, 'V70', 'Raw Mango', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:12:51', 0, 1),
+(17, 'V69', 'Bell Pepper Yellow ', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:13:42', 0, 1),
+(18, 'V68', 'Cucumber', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:14:32', 0, 1),
+(19, 'V67', 'Ash Plantain', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:26:35', 0, 1),
+(20, 'V66', 'Sweet Potato', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:27:18', 0, 1),
+(21, 'V65', 'Kohila', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:27:55', 0, 1),
+(22, 'V64', 'Ladies Fingers', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:28:55', 0, 1),
+(23, 'V63', 'Pumpkin', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:29:40', 0, 1),
+(24, 'V62', 'Murunga', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:30:25', 0, 1),
+(25, 'V61', 'Jack (Kos)', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:31:11', 0, 1),
+(26, 'V60', 'Thalana Batu', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:31:47', 0, 1),
+(27, 'V59', 'Watakolu', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:32:22', 0, 1),
+(28, 'V58', 'Kesel muwa', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:32:59', 0, 1),
+(29, 'V57', 'Amberalla', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:33:51', 0, 1),
+(30, 'V56', 'Alu Kesel', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:34:17', 0, 1),
+(31, 'V55', 'Manioc', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:34:51', 0, 1),
+(32, 'V53', 'Polos', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:35:36', 0, 1),
+(33, 'V52', 'Ridged Gourd', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:36:15', 0, 1),
+(34, 'V51', 'Athu Gowa', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:36:45', 0, 1),
+(35, 'V50', 'Basil', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:37:05', 0, 1),
+(36, 'V49', 'Long Beans', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:37:33', 0, 1),
+(37, 'V48', 'Onion leaves', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:38:08', 0, 1),
+(38, 'V46', 'Mustard Seeds', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:38:51', 0, 1),
+(39, 'V45', 'Rosemary', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:39:51', 0, 1),
+(40, 'V44', 'Radish (Rabu)', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:40:45', 0, 1),
+(41, 'V43', 'Gotukola (Bale)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 06:41:37', 0, 1),
+(42, 'V42', 'Mushrooms Packet', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 06:42:16', 0, 1),
+(43, 'V41', 'Pathola', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:43:52', 0, 1),
+(44, 'V40', 'Bell Pepper Red', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:44:48', 0, 1),
+(45, 'V39', 'Kathurumurunga(Bale)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 06:45:56', 0, 1),
+(46, 'V38', 'Mukunuwanna (Bale)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 06:47:00', 0, 1),
+(47, 'V37', 'Kankun (Bale)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 06:47:37', 0, 1),
+(48, 'V36', 'Curry Leaves (Bale)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 06:48:34', 0, 1),
+(49, 'V35', 'Saldiri', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:49:59', 0, 1),
+(50, 'V34', 'Gerkin', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:50:40', 0, 1),
+(51, 'V33', 'Nokol', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:51:06', 0, 1),
+(52, 'V32', 'Drumsticks', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:51:47', 0, 1),
+(53, 'V31', 'Beatroot', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:52:33', 0, 1),
+(54, 'V30', 'Bitter Gourd', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:53:26', 0, 1),
+(55, 'V29', 'Coriender Leave', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:54:56', 0, 1),
+(56, 'V27', 'Parsely', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:55:28', 0, 1),
+(59, 'V26', 'Minchi Leaves', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:57:22', 0, 1),
+(60, 'V25', 'Cauliflower', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:58:17', 0, 1),
+(61, 'V24', 'Japanese Gerkin', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:58:59', 0, 1),
+(62, 'V23', 'Sukini', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 06:59:35', 0, 1),
+(63, 'V22', 'Bell Pepper - Green ', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:00:25', 0, 1),
+(64, 'V21', 'Red Cabbage', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:00:55', 0, 1),
+(65, 'V20', 'Salad Leaves', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:01:25', 0, 1),
+(66, 'V19', 'Pachoi', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:01:55', 0, 1),
+(67, 'V18', 'Chinees Cabbage', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:02:30', 0, 1),
+(68, 'V17', 'Ginger', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:33:10', 0, 1),
+(69, 'V16', 'Kochchi', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:33:39', 0, 1),
+(70, 'V15', 'Ash Pumpkin ', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:35:05', 0, 1),
+(71, 'V14', 'Brinjal', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:35:56', 0, 1),
+(72, 'V13', 'Green Chily', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:36:25', 0, 1),
+(73, 'V12', 'Tomato', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:36:49', 0, 1),
+(74, 'V11', 'Sera', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:37:14', 0, 1),
+(75, 'V10', 'Cabbage', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:37:45', 0, 1),
+(76, 'V1', 'Coconuts', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 07:38:44', 0, 1),
+(77, 'V2', 'Garlic', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:39:18', 0, 1),
+(78, 'V3', 'Onion', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:40:13', 0, 1),
+(79, 'V4', 'Potato', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:40:52', 0, 1),
+(80, 'V5', 'Beans', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:41:12', 0, 1),
+(81, 'V6', 'Carrot', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:42:09', 0, 1),
+(82, 'V7', 'Capsicum', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:42:38', 0, 1),
+(83, 'V8', 'Leeks', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:43:12', 0, 1),
+(84, 'V9', 'Tamarind - 250g', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:44:28', 0, 1),
+(85, 'S23', 'Maduru Seeds', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:45:37', 0, 1),
+(86, 'S22', 'White Rice', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:46:08', 0, 1),
+(87, 'S21', 'Cinnamon Powder', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:46:46', 0, 1),
+(88, 'S20', 'Coffee Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 07:47:40', 0, 1),
+(89, 'S19', 'Sadikka', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:48:15', 0, 1),
+(90, 'S18', 'Samba Kakulu 1Kg', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:49:38', 0, 1),
+(91, 'S17', 'Enasal', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:50:07', 0, 1),
+(92, 'S16', 'Kunisso', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:50:55', 0, 1),
+(93, 'S15', 'Cummin Seeds', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:51:42', 0, 1),
+(94, 'S14', 'Samba 5Kg', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:52:20', 0, 1),
+(95, 'S13', 'Dry fish - KATTA ', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:52:59', 0, 1),
+(96, 'S12', 'Ulu Hal', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:53:24', 0, 1),
+(97, 'S11', 'Karadamungu', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:53:48', 0, 1),
+(98, 'S10', 'Karabu neti', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:54:15', 0, 1),
+(100, 'S6', 'Papadam', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:55:33', 0, 1),
+(101, 'S1', 'Dry fish small', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:56:12', 0, 1),
+(102, 'S2', 'Cinnamon Pieces Loose', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:57:08', 0, 1),
+(103, 'S3', 'Dhal', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:57:28', 0, 1),
+(104, 'S4', 'Cummin Seed 100g', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:58:08', 0, 1),
+(105, 'S5', 'Nadu Rice - 5Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 07:58:44', 0, 1),
+(106, 'S7', 'Soya', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 07:59:07', 0, 1),
+(107, 'S8', 'Dry Chillies', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:00:28', 0, 1),
+(108, 'G14', 'Fortune Sunflower Oil - 500ml', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:03:02', 0, 1),
+(109, 'G13', 'Brown Sugar Loose', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:03:41', 0, 1),
+(110, 'G7', 'Nestea Paper Cup Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 08:04:28', 0, 1),
+(111, 'G6', 'Nescafe Paper Cup pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 08:05:08', 0, 1),
+(112, 'G1', 'Sugar Loose', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:06:00', 0, 1),
+(113, 'G2', 'Oil', 'Other', 'L', 1, 1, 0, 0.00, '2025-09-01 08:06:49', 0, 1),
+(114, 'G3', 'Kithul Treacle - 750ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 08:07:59', 0, 1),
+(115, 'G5', 'Kithul Treacle - 350ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 08:08:29', 0, 1),
+(116, 'M44', 'Fish Thilapiya', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:10:02', 0, 1),
+(117, 'M43', 'Katugoi Fish', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:10:35', 0, 1),
+(118, 'M42', 'Atawalla Fish', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:11:15', 0, 1),
+(119, 'M40', 'Muhudu Kukula Dry Sparts', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:12:03', 0, 1),
+(120, 'M39', 'Kelawalla Fish', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:12:40', 0, 1),
+(121, 'M38', 'Fish Batta', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:13:09', 0, 1),
+(122, 'M37', 'Crab', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:14:19', 0, 1),
+(123, 'M36', 'Fish Salaya', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:15:08', 0, 1),
+(124, 'M34', 'Para Malu', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:15:47', 0, 1),
+(125, 'M33', 'Gal Malu', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:16:08', 0, 1),
+(126, 'M32', 'Bollu', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:16:32', 0, 1),
+(127, 'M31', 'Ala Goduwa', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:17:03', 0, 1),
+(128, 'M28', 'Dry Sprats', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:18:00', 0, 1),
+(129, 'M27', 'Cuttle Fish - 1Kg', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:19:18', 0, 1),
+(130, 'M30', 'Koppara', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:19:41', 0, 1),
+(131, 'M25', 'Bala Malu', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:20:03', 0, 1),
+(132, 'M24', 'Linna (Mackeral)', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:21:39', 0, 1),
+(133, 'M23', 'Lena Paraw', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:22:18', 0, 1),
+(134, 'M1', 'Pork - 5Kg', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:23:06', 0, 1),
+(135, 'M2', 'Pork Bacon - 1kg', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:24:15', 0, 1),
+(136, 'M3', 'Tuna - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 08:25:51', 0, 1),
+(137, 'M4', 'Chicken Bockwest - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 08:26:41', 0, 1),
+(138, 'M6', 'Chicken Hot Dog - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 08:28:09', 0, 1),
+(139, 'M7', 'Mutton - 2Kg', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 08:29:01', 0, 1),
+(140, 'M8', 'Whole Chicken Legs', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:30:10', 0, 1),
+(141, 'M9', 'Chicken Burger - 1Kg', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:30:50', 0, 1),
+(142, 'M10', 'Chicken Hum - 1Kg', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:31:34', 0, 1),
+(143, 'M11', 'Eggs', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 08:32:00', 0, 1),
+(144, 'M12', 'Chicken Catering Sausages - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 08:33:28', 0, 1),
+(145, 'M14', 'Chicken Skinless Breast(Large)', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:34:51', 0, 1),
+(146, 'M15', 'Whole Chicken', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:35:36', 0, 1),
+(147, 'M16', 'Prawns - S', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:36:25', 0, 1),
+(148, 'M17', 'Prawns - L', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:37:03', 0, 1),
+(149, 'M35', 'Chicken Liver - Bulk', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:38:06', 0, 1),
+(150, 'M22', 'Chicken Thighs - Bulk', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:38:45', 0, 1),
+(151, 'I13', 'Ice Cube', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:40:18', 0, 1),
+(152, 'I11', 'Fruit & Nut Ice Cream - 1L', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 08:41:27', 0, 1),
+(153, 'I10', 'Strawberry Ice Cream - 1L', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 08:43:04', 0, 1),
+(154, 'I9', 'Vanila Ice Cream - 1L', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 08:44:13', 0, 1),
+(155, 'I8', 'Chocalate Ice Cream -  1 L', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 08:45:11', 0, 1),
+(156, 'I1', 'Strawberry Ice Cream - 4L', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 08:45:56', 0, 1),
+(157, 'I2', 'Chocalate Ice Cream -  4L', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 08:46:28', 0, 1),
+(158, 'I5', 'Fruit & Nut Ice Cream - 4L', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 08:47:22', 0, 1),
+(159, 'I6', 'Kithul Hakuru Ice Cream - 900ml', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 08:48:46', 0, 1),
+(160, 'I7', 'Karatha Kolomban - 900ml', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 08:49:21', 0, 1),
+(161, 'R72', 'Sesame oil - 640ml', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 08:51:47', 0, 1),
+(162, 'R71', 'Bay Leaves', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:52:14', 0, 1),
+(163, 'R70', 'Highland Curd - 950ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 08:53:27', 0, 1),
+(164, 'R69', 'Set Kiri - 900ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 08:54:11', 0, 1),
+(165, 'R67', 'Drinking Chocolate - CADBURY - 10.5Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 08:54:44', 0, 1),
+(166, 'R66', 'Seeni Hakuru', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 08:56:14', 0, 1),
+(167, 'R65', 'Red Rice', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 08:57:44', 0, 1),
+(168, 'R64', 'Ginger Powder', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 08:58:25', 0, 1),
+(169, 'R63', 'Kotmale Curd', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 08:59:47', 0, 1),
+(170, 'R62', 'Green Peas - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:00:27', 0, 1),
+(171, 'R61', 'CIC Curd Tub 800g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:01:30', 0, 1),
+(172, 'R60', 'Thandoori Masala Powder', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:02:40', 0, 1),
+(173, 'R59', 'Kernal Corn', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:03:28', 0, 1),
+(174, 'R58', 'Hoi Sin Sauce', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:05:03', 0, 1),
+(175, 'R41', 'Prawns Cracker - 60g ', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:06:13', 0, 1),
+(176, 'R57', 'Set Kiri Curd - 450ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:06:55', 0, 1),
+(177, 'R56', 'Roasted Curry Powder - 500g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:08:48', 0, 1),
+(178, 'R55', 'Salt - 400g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:09:32', 0, 1),
+(179, 'R54', 'Coriander Powder', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:10:16', 0, 1),
+(180, 'R53', 'Kithul Hakuru', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:11:00', 0, 1),
+(181, 'R51', 'Maggie Seasoning Bottle - 800ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:12:14', 0, 1),
+(182, 'R49', 'Maggie Coconut Powder - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:13:12', 0, 1),
+(183, 'R2', 'Maggie Coconut Powder - 300g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:14:14', 0, 1),
+(184, 'R48', 'Richlife Set Kiri - 900ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:15:07', 0, 1),
+(185, 'R1', 'Maggie Seasoning Powder - 500g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:16:14', 0, 1),
+(186, 'R3', 'Rasarco Biriyani Flavour - 500ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:18:07', 0, 1),
+(187, 'R4', 'Biriyani Masala Powder -  50g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:19:04', 0, 1),
+(188, 'R5', 'Milan Pasta - 1 Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:21:46', 0, 1),
+(189, 'R6', 'Milan Spaghetti', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:22:37', 0, 1),
+(190, 'R7', 'Milk Cream Style Corn - 425g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:24:58', 0, 1),
+(191, 'R8', 'Whole Mushroom - 425g', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 09:25:47', 0, 1),
+(192, 'R9', 'Tom Yum Paste - 400g', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 09:26:41', 0, 1),
+(193, 'R10', 'Keeri Samba Rice - 5Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:27:28', 0, 1),
+(194, 'R11', 'Basmathi Rice - 5Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:28:10', 0, 1),
+(195, 'R12', 'Salt Packet - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:28:57', 0, 1),
+(196, 'R42', 'Chili Pieces - 500g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:29:52', 0, 1),
+(197, 'R52', 'Chili Pieces - 250g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:30:26', 0, 1),
+(198, 'R13', 'Chili Pieces - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:31:31', 0, 1),
+(199, 'R14', 'Chili Powder - 500g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:32:07', 0, 1),
+(200, 'R50', 'Chili Powder -  1KG', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:33:00', 0, 1),
+(201, 'R15', 'Curry Powder - 500g', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 09:34:08', 0, 1),
+(202, 'R16', 'Cursh Pepper - 500g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:35:44', 0, 1),
+(203, 'R17', 'Cumin Powder -  100g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:40:05', 0, 1),
+(204, 'R18', 'Turmeric Powder - 500g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:41:37', 0, 1),
+(205, 'R19', 'Artificial Vinegar - 4L', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:43:08', 0, 1),
+(206, 'R20', 'Chili Sauce - 5Kg', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 09:43:57', 0, 1),
+(207, 'R22', 'Oyster Sauce - 5L (5.7Kg)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:45:02', 0, 1),
+(208, 'R21', 'Soya Sauce - 5L', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:46:19', 0, 1),
+(209, 'R23', 'Tomato Sauce - 4Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:47:02', 0, 1),
+(210, 'R24', 'Squid Fish Sauce - 700ml', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 09:48:07', 0, 1),
+(211, 'R25', 'Tomato Paste - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:49:10', 0, 1),
+(212, 'R26', 'Sesame Oil - 320ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:50:22', 0, 1),
+(213, 'R27', 'Chinese Noodles Loose', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:51:24', 0, 1),
+(214, 'R28', 'Tabasco Pepper Sauce - 60ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:52:20', 0, 1),
+(215, 'R29', 'Heinz Apple Cider Vinegar - 473ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:53:31', 0, 1),
+(216, 'R30', 'Mustard Cream Bottle - 675g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:54:38', 0, 1),
+(217, 'R31', 'Mango Chutney Bottle - 885g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:55:49', 0, 1),
+(218, 'R32', 'Rice Vermicelli 500g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:56:37', 0, 1),
+(219, 'R33', 'Rice Stick - 375g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:57:17', 0, 1),
+(220, 'R35', 'Gamboge Paste - 500g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:58:00', 0, 1),
+(221, 'R36', 'Oregano', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 09:58:26', 0, 1),
+(222, 'R37', 'French Frice', 'Other', 'kg', 1, 1, 0, 0.00, '2025-09-01 09:59:54', 0, 1),
+(223, 'R38', 'Corn flour - 1 Kg Pack', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 10:00:50', 0, 1),
+(224, 'R39', 'True Choice Baby Corn - 425g', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 10:01:43', 0, 1),
+(225, 'A12', 'S/Roll Pastry Sheet', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 10:04:20', 0, 0),
+(226, 'A11', 'Masterpuff - 1Kg', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 10:05:00', 0, 1),
+(227, 'A9', 'Sesame Seed Black', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 10:05:47', 0, 1),
+(228, 'A8', 'Sesame Seed White', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 10:06:22', 0, 1),
+(229, 'A1', 'Instant Yeast 2 in1 - 500g', 'Other', 'quantity', 0, 1, 0, 2.00, '2025-09-01 10:07:18', 0, 1),
+(230, 'A2', 'Maja 5L', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 10:07:43', 0, 1),
+(231, 'A3', 'Mayonnaise - 3Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:08:21', 0, 1),
+(232, 'A4', 'Hyco Bread Compound Box - 20Kg', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 10:09:06', 0, 1),
+(233, 'A6', 'Flour', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 10:09:44', 0, 1),
+(234, 'A7', 'Beehive kg', 'Other', 'kg', 1, 1, 0, 0.00, '2025-09-01 10:11:10', 0, 1),
+(235, 'C109', 'Blue Berry Bottle - 2.7Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:13:25', 0, 1),
+(236, 'C108', 'MD Wood Apple - 500g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:14:01', 0, 1),
+(237, 'C107', 'Biscuit Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:14:37', 0, 1),
+(238, 'C106', 'MD Passion Fruit Cordial ', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:15:25', 0, 1),
+(239, 'C105', 'Rose Water - 750ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:16:03', 0, 1),
+(240, 'C104', 'Neutral Glazinggle - 7Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:17:10', 0, 1),
+(241, 'C103', 'Motha Moss Jelly Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:17:50', 0, 1),
+(242, 'C102', 'Chocolate Vermicili Pack', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 10:19:08', 0, 1),
+(243, 'C101', 'Red Colour - 500ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:20:28', 0, 1),
+(244, 'C100', 'Green Colour - 500ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:21:00', 0, 1),
+(245, 'C99', 'Pebbles Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:21:35', 0, 1),
+(246, 'C98', 'White Compound - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:22:42', 0, 1),
+(248, 'C97', 'Fuschia Pink Colour Bottle - 28ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:25:34', 0, 1),
+(249, 'C7', 'White Couverture Block', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:26:38', 0, 1),
+(250, 'C96', 'Muffin Mixer Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:27:05', 0, 1),
+(251, 'C95', 'Thaim', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 10:29:54', 0, 1),
+(252, 'C93', 'Black Olives - 340g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:31:03', 0, 1),
+(253, 'C92', 'Harischandra Kurakkan Flour', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 10:32:05', 0, 1),
+(254, 'R68', 'MD Tomato Paste', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:32:36', 0, 1),
+(255, 'C91', 'Chocolate Chip - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:33:36', 0, 1),
+(256, 'C90', 'Decoma Black Fondent - 1000g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:34:33', 0, 1),
+(257, 'C89', 'White Colour Essence', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:35:24', 0, 1),
+(258, 'C88', 'Strawberry Essence', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:36:17', 0, 1),
+(259, 'C87', 'Colour Vermicili Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:37:00', 0, 1),
+(260, 'C86', 'MD fresh Strawberry Jam', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:37:54', 0, 1),
+(261, 'C85', 'Rasarco Strawberry Essence', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:39:12', 0, 1),
+(262, 'C84', 'Liquid Gluecose', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:39:58', 0, 1),
+(263, 'C83', 'Coco Powder - 500g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:40:39', 0, 1),
+(264, 'C82', 'Sugar Ball', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:42:04', 0, 1),
+(265, 'C80', 'Milk Compound Block - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:42:55', 0, 1),
+(266, 'C79', 'Sprinkles', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:44:42', 0, 1),
+(267, 'C78', 'Colour Dust Bottle', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:46:05', 0, 1),
+(268, 'C77', 'Super Fine Dark 1800gx1DZ- 1.8kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:47:31', 0, 1),
+(269, 'C76', 'Dark Compound Blocks', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:48:56', 0, 1),
+(270, 'C74', 'Strawberry Fields', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:49:52', 0, 1),
+(271, 'C73', 'Motha Gelatine - 500g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:55:19', 0, 1),
+(272, 'C71', 'Rasaco Lemon Yellow - 500ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:56:09', 0, 1),
+(273, 'C70', 'Coco Powder Loose', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:58:22', 0, 1),
+(274, 'C69', 'Black Colouring Bottle - 28ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:59:21', 0, 1),
+(275, 'C68', 'Cherry Bottle Green', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 10:59:57', 0, 1),
+(276, 'C67', 'White Rice Flour', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 11:00:28', 0, 1),
+(277, 'C66', 'Red Rice Flour', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 11:01:15', 0, 1),
+(278, 'K65', 'Cooking Chololate A', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 11:02:38', 0, 1),
+(279, 'K64', 'Olo Chocolate Biscut ', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 11:03:30', 0, 1),
+(280, 'K63', 'Chocolate Wafers', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 11:04:32', 0, 1),
+(281, 'K41', 'Dark Sweet Cherry', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 11:05:15', 0, 1),
+(282, 'C61', 'Dedicated Coconut - 500g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 11:06:30', 0, 1),
+(283, 'C60', 'Rasarco Brilliant Blue', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 11:07:31', 0, 1),
+(284, 'C59', 'Rasarco Banana Flavour', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 11:08:29', 0, 1),
+(285, 'C58', 'Baking Soda', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 11:09:18', 0, 1),
+(286, 'C57', 'Cherry Bottle - RED', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 11:10:22', 0, 1),
+(287, 'C56', 'Golden Custard', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 11:10:59', 0, 1),
+(288, 'C55', 'Amond', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 11:11:28', 0, 1),
+(289, 'C54', 'Peanut', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 11:11:57', 0, 1),
+(290, 'K53', 'Citrus Peel', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 11:12:30', 0, 1),
+(291, 'K52', 'Raisins', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 11:13:20', 0, 1),
+(292, 'K51', 'Black Currrant Loose ', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 11:14:15', 0, 1),
+(293, 'K50', 'Dark Couverture 55% CS 1Kg', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-01 11:15:19', 0, 1),
+(294, 'K49', 'Drinking Chocolate - Swiss Miss', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 11:17:11', 0, 1),
+(295, 'K48', 'Dehydrated Cashew Pieces - 1kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 11:18:18', 0, 1),
+(296, 'K47', 'Holsen Peach - 825g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 11:19:18', 0, 1),
+(297, 'K46', 'Quick Oats - 1.19Kg', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-01 11:20:50', 0, 1),
+(298, 'K45', 'Couverture A', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 11:22:22', 0, 1),
+(299, 'K36', 'Mayflower 15kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 11:23:07', 0, 1),
+(300, 'K1', 'Motha Icing Sugar - 2.4Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 11:24:02', 0, 1),
+(301, 'K2', 'Oasis Icing Sugar 2Kg - Now Qty 2.4Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 11:25:07', 0, 1),
+(302, 'K3', 'Motha Baking Power - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 11:25:44', 0, 1),
+(303, 'K4', 'Cashew Calibrated Pieces - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 11:29:49', 0, 1),
+(304, 'K5', 'Armond Flavour - 500ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 11:31:21', 0, 1),
+(305, 'K6', 'Rose Flavour - 500ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-01 11:45:17', 0, 1),
+(306, 'K7', 'Rasarco Vanilla Flavour - 500ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 02:52:41', 0, 1),
+(307, 'K8', 'Rasarco Chocolate Food Flavours - 500ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 02:53:55', 0, 1),
+(308, 'K9', 'Rasarco Pineapple Flavour - 500ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 02:54:41', 0, 1),
+(309, 'K11', 'Rasarco Lemon Yellow Color - 28ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 02:55:40', 0, 1),
+(310, 'K12', 'Artificial Cherry Red Loose', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-02 02:57:28', 0, 1),
+(311, 'K13', 'Artificial Cherry Green Loose', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-02 02:58:03', 0, 1),
+(312, 'K14', 'Pointing Color Egg Yellow - 500g ', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-02 02:58:52', 0, 1),
+(313, 'K14A', 'Pointing Color Blood Red - 500g ', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 02:59:49', 0, 1),
+(314, 'K15', 'Plums', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-02 03:00:46', 0, 1),
+(315, 'K16', 'Cashew Nuts', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-02 03:01:06', 0, 1),
+(316, 'K17', 'Drinking Chocolate Powder - 2.5Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:02:44', 0, 1),
+(317, 'K18', 'MD Strawberry Jam - 500g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:03:44', 0, 1),
+(318, 'K19', 'MD Mix Fruit Jam - 500g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:04:51', 0, 1),
+(319, 'K20', 'Maliban Gold Marie - 350g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:05:40', 0, 1),
+(320, 'K21', 'Golden Syrup - 470g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:06:26', 0, 1),
+(321, 'K22', 'MD Pineapple Jam - 500g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:07:11', 0, 1),
+(322, 'K23', 'Dilettante Chocolate Sauce - 900ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:08:15', 0, 1),
+(323, 'K25', 'Chocolate Vermicili - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:09:00', 0, 1),
+(324, 'K26', 'Color Vermicelli - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:09:55', 0, 1),
+(325, 'K27', 'Melon Jam - 5Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:10:45', 0, 1),
+(326, 'K28', 'Dates Loose', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-02 03:11:18', 0, 1),
+(327, 'K29', 'Amanda Vegetable Fat - 15Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:12:08', 0, 1),
+(328, 'K31', 'Millac Gold Whipping - 1L', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-02 03:12:56', 0, 1),
+(329, 'K32', 'Redman Whipping Cream - 1100g', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-02 03:14:46', 0, 1),
+(330, 'K33', 'Decoma White Fondent - 1000g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:15:26', 0, 1),
+(331, 'K34', 'Coco Powder - 1Kg', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-02 03:16:06', 0, 1),
+(332, 'K35', 'Couverture B Cooking Chocolate - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:17:07', 0, 1),
+(333, 'B93', 'Ice Peach Tea - 750ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:19:38', 0, 1),
+(334, 'B92', 'Ice Blueberry Tea - 2L', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:20:33', 0, 1),
+(335, 'B91', 'Watawala', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-02 03:21:00', 0, 1),
+(336, 'B90', 'Coffee Beans 500g Pack (Indulgence)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:22:39', 0, 1),
+(337, 'B89', 'Soda 1L', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:23:09', 0, 1),
+(338, 'B88', 'Coca Cola - 1L', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:23:43', 0, 1),
+(339, 'B87', 'Zesta Green Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:24:30', 0, 1),
+(340, 'B86', 'Sprite Glass Bottle - 300ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:25:34', 0, 1),
+(341, 'B85', 'Lavazza Coffee - 1Kg(ORO)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:26:53', 0, 1),
+(342, 'B84', 'Water Bottle - 1L', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-02 03:27:27', 0, 1),
+(343, 'B83', 'Raththi 3 in 1 - 400g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:28:04', 0, 1),
+(344, 'B82', 'Soda 750ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:28:36', 0, 1),
+(345, 'B81', 'Star Selection Premium - Coffee Been 500g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:29:38', 0, 1),
+(346, 'B60', 'Lavazza eGusto - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:30:35', 0, 1),
+(347, 'B59', 'Sunquick Mix Fruited - 2L', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:31:26', 0, 1),
+(348, 'B56', 'Top Leaf - Black Tea Powder - 500g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:32:17', 0, 1),
+(349, 'B55', 'Top Leaf - Black Tea Powder - 250g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:32:48', 0, 1),
+(350, 'B54', 'Pelawatte Milk Powder - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:33:23', 0, 1),
+(351, 'B53', 'Rockland Red Rum', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:33:55', 0, 1),
+(352, 'B52', 'Top Leaf - Black Tea Powder - 100g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:34:34', 0, 1),
+(353, 'B51', 'Lavazza Gold', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:35:05', 0, 1),
+(354, 'B50', 'Monin Caramel Sauce - 1.89L', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:36:03', 0, 1),
+(355, 'B49', 'Monin Strawberry MixFruit', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:43:03', 0, 1),
+(356, 'B48', 'MONIN CARAMEL', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:43:57', 0, 1),
+(357, 'B47', 'CREAME ESPRESSO', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:44:58', 0, 1),
+(358, 'B46', 'Brown Sugar 100 Packets', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:45:47', 0, 1),
+(359, 'B44', 'Ceylonta Tea Bag', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:46:59', 0, 1),
+(360, 'B43', 'Monin Mint Mojito - 1000ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:47:45', 0, 1),
+(361, 'B42', 'Lakspray - 400g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:48:51', 0, 1),
+(362, 'B35', 'Sprite - 1050ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:52:55', 0, 1),
+(363, 'B32', 'Tonic - 500ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:53:30', 0, 1),
+(364, 'B31', 'MD Artificial Cordial Sherbet - 750ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:54:37', 0, 1),
+(365, 'B1', 'EGB - 500ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:55:03', 0, 1),
+(366, 'B2', 'Coca Cola - 400ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:55:54', 0, 1),
+(367, 'B3', 'Sprite - 400ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:57:01', 0, 1),
+(368, 'B7', 'Soda - 1.5ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:57:55', 0, 1),
+(369, 'B4', 'Soda - 400ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:58:19', 0, 1),
+(370, 'B5', 'EGB - 400ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:58:52', 0, 1),
+(371, 'B6', 'Sprite Pet -  1.5L', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 03:59:31', 0, 1),
+(372, 'B8', 'Water Bottle - 500ml', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-02 03:59:56', 0, 1),
+(373, 'B9', 'Ambewela Fresh Milk - 1000ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:02:49', 0, 1),
+(374, 'B10', 'Nescafe classic soft pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:03:30', 0, 1),
+(375, 'B12', 'Sunquick Orange - 2L', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:04:03', 0, 1),
+(376, 'B13', 'Lakspray milk powder - 1kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:04:48', 0, 1),
+(377, 'B14', 'Raththi 3 in 1 - 200g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:05:12', 0, 1),
+(378, 'B15', 'Lipton Ceylonta Tea Bag (50 Bags) -  100g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:06:22', 0, 1),
+(379, 'B16', 'Lipton Ceylonta Green Tea Bag -  30g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:07:44', 0, 1),
+(380, 'B18', 'Milkmaid - 5.15ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:08:23', 0, 1),
+(381, 'B19', 'Water Can - 19L', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:08:54', 0, 1),
+(382, 'B20', 'Nescafe Premix - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:09:41', 0, 1),
+(383, 'B22', 'Lavazza Coffee - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:10:12', 0, 1),
+(384, 'B23', 'Top Leaf - Black Tea Bag (2gx50) 100g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:11:11', 0, 1),
+(385, 'B24', 'Top Leaf - Black Tea Bag (2gx100) 200g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:11:56', 0, 1),
+(386, 'B25', 'White Sugar 100 packets', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:12:33', 0, 1),
+(387, 'B26', 'High-Mid Tea 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:13:07', 0, 1),
+(388, 'B27', 'Monin Vanilla - 1L', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:13:37', 0, 1),
+(389, 'B28', 'Monin Blue Curacao - 1L', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:14:51', 0, 1),
+(390, 'B29', 'Monin Strawberry - 1L', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:15:29', 0, 1),
+(391, 'B30', 'Monin Hazelnut - 1L', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:16:11', 0, 1),
+(392, 'B17', 'Cream Cheese - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:17:11', 0, 1),
+(395, 'C15', 'Fry Best Frying Fat - 15Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:19:40', 0, 1),
+(397, 'C14', 'Richlife Process Cheese Slices - 10s', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:21:00', 0, 1),
+(398, 'C12', 'Cream Cheese - 2Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:21:59', 0, 1),
+(399, 'C11', 'Meadowlea Fat Spread - 5Kg', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-02 04:23:05', 0, 1),
+(400, 'C2', 'Mozzarella Cheese - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:23:44', 0, 1),
+(401, 'C3', 'Mozzarella Cheese - 500g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:24:18', 0, 1),
+(402, 'C4', 'Pizza Cheese 2Kg (PCs)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:25:04', 0, 1),
+(403, 'C5', 'Astra Margerine - 5Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:25:55', 0, 1),
+(405, 'C6', 'Pelwaththa Butter - 5Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:28:01', 0, 1),
+(406, 'C9', 'Happy Cow Cheese - 120g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:28:42', 0, 1),
+(407, 'C10', 'Anchor cheddar cheese slices', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 04:29:27', 0, 1),
+(408, 'P30', '80ml Transparent Lid Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:06:44', 0, 1),
+(409, 'P29 ', '80ml Transparent Cup Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:07:29', 0, 1),
+(410, 'P28 ', 'Chef Hat', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:08:10', 0, 1),
+(411, 'P27 ', 'Garbage Bag XXL Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:08:52', 0, 1),
+(412, 'P26 ', 'Coffee Cup Black Lid (S)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:09:42', 0, 1),
+(413, 'P25', '80ml Plain White Lid', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:10:38', 0, 1),
+(414, 'P24 ', '80ml Plain Cups White Cups', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:11:07', 0, 1),
+(415, 'P1 ', 'Lunch Box (S)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:11:35', 0, 1),
+(416, 'P2 ', 'Lunch Box (M)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:12:10', 0, 1),
+(417, 'P3', 'Lunch Box (L)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:12:48', 0, 1),
+(418, 'P4 ', 'Lunch Box Plain -S', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:13:26', 0, 1),
+(419, 'P5 ', 'Lunch Box Plain - L', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:14:42', 0, 1),
+(420, 'P6 ', 'Cake 3lb Pack (12*12*4)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:15:33', 0, 1),
+(421, 'P7 ', 'Cake Gateau Box  10 x 10 x 4', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:16:04', 0, 1),
+(422, 'P8 ', 'Cake Box 2LB 11.5 x 8.5 x 4', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:16:37', 0, 1),
+(423, 'P9 ', 'Bento Box 6x6', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:17:17', 0, 1),
+(425, 'P11 ', 'Cake Slice Box Pack (L)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:19:01', 0, 1),
+(426, 'P12 ', 'Cake 1lb (8.5*6*4)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:19:36', 0, 1),
+(427, 'P13 ', 'Cake box (10*10*4)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:20:17', 0, 1),
+(428, 'P14 ', 'Cake Box 2lb (11.5*8.5*4)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:20:57', 0, 1),
+(429, 'P15 ', 'Cake Box 1Lb - 8.5x6x4 Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:21:34', 0, 1),
+(430, 'P16 ', 'Cup Cake 4Pcs Box', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:22:23', 0, 1),
+(431, 'P17 ', 'Cup Cake 6Pcs Box', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:22:54', 0, 1),
+(432, 'P18', 'Cup Cake 9Pcs Box', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:24:59', 0, 1),
+(433, 'P19', 'Cup Cake 12Pcs Box', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:26:00', 0, 1),
+(434, 'P20 ', 'Cup Cake 20Pcs Box', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:28:16', 0, 1),
+(435, 'P21 ', 'Cake Box White - 8x15', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:29:17', 0, 1),
+(436, 'P22 ', 'Cake Box White - 10x10', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:30:10', 0, 1),
+(437, 'P23 ', 'Bento Box - 8x8', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:31:01', 0, 1),
+(438, 'P68 ', 'Garbage Bag XL Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:32:09', 0, 1),
+(439, 'P67 ', 'Garbage Bag M Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:34:05', 0, 1),
+(440, 'P51 ', 'Grocerry Bag (S) 100 Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:35:18', 0, 1),
+(441, 'P52 ', 'Grocerry Bag (L) 100 Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-02 10:35:56', 0, 1),
+(444, 'I4', 'Vanilla Ice Cream - 4l', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-03 10:50:02', 0, 1),
+(445, 'B21', 'Nestea Premix - 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 05:13:10', 0, 1),
+(446, 'P65', 'Brown Paper (M) Size', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 06:30:23', 0, 1),
+(447, 'P54', 'Shopping Bag (M) Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 06:33:37', 0, 1),
+(448, 'P111', 'Ice Coffee Cup (250ml)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 06:33:37', 0, 1),
+(449, 'P66', 'Brown Paper (L)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 06:42:20', 0, 1),
+(450, 'P10', 'Cake Slice Box Pack (S)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 06:42:20', 0, 1),
+(451, 'P112', 'Ice Coffee Bottles', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-09-08 06:42:20', 0, 1),
+(452, 'P122', 'Ice Coffee Straw Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 06:42:20', 0, 1),
+(453, 'P53', 'Shopping Bags(s)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 07:09:54', 0, 1),
+(454, 'P56', 'Shopping Bags(XL)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 07:28:27', 0, 1),
+(455, 'P57', 'Jumbo Shopping Bag (Cake Bag)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 07:28:27', 0, 1),
+(456, 'P58', 'Garbage Bag Pack - S', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 07:28:27', 0, 1),
+(457, 'P59', 'Garbage Bag Pack - L', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 07:28:27', 0, 1),
+(458, 'P60', 'Lunch sheet', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 07:28:27', 0, 1),
+(459, 'P61', 'Bread Cover Bag', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 07:28:27', 0, 1),
+(460, 'P62', 'Piping Bag (s) Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 07:28:27', 0, 1),
+(461, 'P63', 'Piping Bag (L) Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 07:28:27', 0, 1),
+(463, 'P136', 'Wooden Spoon Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 07:28:27', 0, 1),
+(464, 'P135', 'Lava cup', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 07:28:27', 0, 1),
+(465, 'P132', 'Brown Colour Cup Cake Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 07:28:27', 0, 1),
+(466, 'P102', 'Cup Cake Paper - S', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 07:28:27', 0, 1),
+(467, 'P103', 'Cup Cake Paper - M', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 07:28:27', 0, 1),
+(468, 'P104', 'Cup Cake Cup+Lid - L', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 07:28:27', 0, 1),
+(469, 'P105', 'Curry Cup Lid Pack - S', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 07:28:27', 0, 1),
+(470, 'P106', 'Curry Cup Pack - S', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 07:28:27', 0, 1),
+(471, 'P107', 'Curry Cup Lid Pack - L', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 07:28:27', 0, 1),
+(472, 'P108', 'Curry Cup Pack - L', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 07:28:27', 0, 1),
+(473, 'P55', 'Shopping Bags(L)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-08 07:28:27', 0, 1),
+(474, 'P259', 'Cleaning Brush - (Kohu Brush)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-09 06:20:36', 0, 1),
+(475, 'P258', ' Toilet Cleaner', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-09 06:27:24', 0, 1),
+(476, 'P257', ' Glass Cleaner', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-09 06:27:24', 0, 1),
+(479, 'P252', ' Pine Oil', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-09 06:27:24', 0, 1),
+(480, 'P253', ' Hand Wash', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-09 06:27:24', 0, 1),
+(481, 'P254', ' Dish Wash Liquid', 'Other', 'L', 0, 1, 0, 0.00, '2025-09-09 06:27:24', 0, 1),
+(482, 'P255', ' Tile Cleaner', 'Other', 'L', 0, 1, 0, 0.00, '2025-09-09 06:27:24', 0, 1),
+(483, 'P223', ' Candle Box', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-09 06:44:39', 0, 1),
+(484, 'P222', ' Ice Cream Stick Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-09 06:44:39', 0, 1),
+(485, 'P221', ' BBQ Sticks 10\' Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-09 06:44:39', 0, 1),
+(486, 'P201', ' BBQ Picks 6\' Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-09 06:44:39', 0, 1),
+(487, 'P202', ' BBQ Sticks Pack 6\'', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-09 06:44:39', 0, 1),
+(491, 'P206', ' Bill Roll', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-09 06:44:39', 0, 1),
+(493, 'P208', ' Paper Serviette Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-09 06:44:39', 0, 1),
+(495, 'P210', ' Toothpick Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-09 06:44:39', 0, 1),
+(496, 'P211', ' Clean Wrap Roll', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-09 06:44:39', 0, 1),
+(497, 'P212', ' Rubber Gloves Box', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-09 06:44:39', 0, 1),
+(498, 'P213', ' Politine Gloves Box - 100 pieces', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-09 06:44:39', 0, 1),
+(500, 'P215', ' White Papers', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-09 06:44:39', 0, 1),
+(501, 'P216', ' Aluminum Foil', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-09 06:44:39', 0, 1),
+(502, 'P217', ' Baking Paper', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-09 06:44:39', 0, 1),
+(505, 'P220', ' Disposable Gloves Box', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-09 06:44:39', 0, 1),
+(506, 'C110', 'Chocolate Muffin Mix Pack 1Kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-09 07:37:23', 0, 1),
+(507, 'P109', 'Juice Cup Lid Pack\r\n', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-10 03:25:36', 0, 1),
+(508, 'P110', 'Juice Cup Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-10 03:25:36', 0, 1),
+(509, 'P125', 'Juice Straw Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-10 05:09:02', 0, 1),
+(510, 'P123', 'Paper Plates 25nos', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-10 05:46:15', 0, 1),
+(511, 'P124', 'Chili Paste Cup + Lid 100', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-10 08:22:59', 0, 1),
+(512, 'R73', 'Pepper powder - 500g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-10 08:22:59', 0, 1),
+(513, 'M46', 'Dry Fish Keeramin', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-18 11:00:29', 0, 1),
+(514, 'P121', 'Doughnut Cup Pack ', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-20 07:43:05', 0, 1),
+(515, 'S24', 'Kadala', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-23 09:11:34', 0, 1),
+(516, 'S25', 'Kadala parippu', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-23 09:13:21', 0, 1),
+(518, 'M47', 'Prawns (M)', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-23 09:14:00', 0, 1),
+(519, 'M48', 'Fish - Muhudu Kukula', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-23 09:14:29', 0, 1),
+(520, 'V74', 'Thibbatu', 'Other', 'kg', 0, 1, 0, 0.00, '2025-09-25 03:33:10', 0, 1),
+(521, 'P120 ', 'Eclair Box Pack (250g Food Tray)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-30 07:22:49', 0, 1),
+(522, 'P151', 'Cake Board 2LB (11.25*11.25)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-30 11:19:09', 0, 1),
+(523, 'P152', 'Cake Board 1LB (8*5.5)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-30 11:19:09', 0, 1),
+(524, 'P153', 'Round Board L (10*10)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-30 11:19:09', 0, 1),
+(525, 'P154', 'Round Board S (8*8)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-30 11:19:09', 0, 1),
+(526, 'P155', 'Bento Board 6x6', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-30 11:19:09', 0, 1),
+(527, 'P156', 'Cake Board 3lb (12*16)', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-30 11:19:09', 0, 1),
+(528, 'P157', 'Cup Cake 4Pcs Board', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-30 11:19:09', 0, 1),
+(529, 'P158', 'Cup Cake 6Pcs Board', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-30 11:19:09', 0, 1),
+(530, 'P159', 'Cup Cake 9Pcs Board', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-30 11:19:09', 0, 1),
+(531, 'P160', 'Cup Cake 12Pcs Board', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-30 11:19:09', 0, 1),
+(532, 'P161', 'Cup Cake 20Pcs Board', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-30 11:19:09', 0, 1),
+(533, 'P162', 'Customized Box Board', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-30 11:19:09', 0, 1),
+(534, 'P163', 'Cake Board square - 9x9', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-30 11:19:09', 0, 1),
+(535, 'P164', 'Cake Board square - 8x10.25', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-30 11:19:09', 0, 1),
+(536, 'P165', 'Cake Board square - 12x16', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-30 11:19:09', 0, 1),
+(537, 'P116', 'Ice Coffee Paper Cup Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-09-30 11:42:12', 0, 1);
+INSERT INTO `items` (`id`, `item_code`, `name`, `item_type`, `unit`, `vat_applicable`, `auto_add_to_stock`, `reorder_level`, `current_stock`, `created_at`, `deleted`, `status`) VALUES
+(540, 'V75', 'Dabala', 'Other', 'kg', 0, 1, 1, 0.00, '2025-10-16 06:09:22', 0, 1),
+(541, 'P300', 'Petty Cash Item', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-10-17 04:26:15', 0, 1),
+(543, 'P133', 'Craft coffee sleeve cup (250ml) ', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-10-22 06:15:51', 0, 1),
+(544, 'P134', 'Broom feather monara FB-0329', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-10-22 06:38:09', 0, 1),
+(546, 'K37', 'Moss Green Colouring Bottle', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-10-23 04:19:10', 0, 1),
+(549, 'P137', 'Brown Paper (S) Size', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-10-24 09:37:31', 0, 1),
+(550, 'C111', 'Navy Blue Colour', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-10-31 04:37:05', 0, 1),
+(551, 'C112', 'Gold dust', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-10-31 11:26:58', 0, 1),
+(554, 'V76', 'Kos Mallum', 'Other', 'kg', 0, 1, 0, 0.00, '2025-11-03 05:53:10', 0, 1),
+(555, 'P113', 'Ice coffee Bottles White Caps ', 'Other', 'quantity', 1, 1, 0, 0.00, '2025-11-03 05:57:44', 0, 1),
+(556, 'P114', 'Coffee Cup Pack - S', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-11-13 05:31:10', 0, 1),
+(557, 'P117', 'Swiss Roll Packet', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-11-13 05:33:04', 0, 1),
+(558, 'P126', 'Milo Cup', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-11-13 05:44:01', 0, 1),
+(559, 'P127', 'Coffee Cup Pack - L', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-11-13 05:47:21', 0, 1),
+(560, 'P166', 'Wooden Coffee Stirrer', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-11-13 05:48:56', 0, 1),
+(561, 'P167', 'Lunch Box - Transparent ', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-11-13 08:58:05', 0, 1),
+(562, 'P168', 'Lunch Box - Transparent - Lid', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-11-13 08:58:38', 0, 1),
+(563, 'P169', 'Shopping Bag - XXL', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-11-13 09:17:14', 0, 1),
+(565, 'C208', 'Rasarco Chocolate Browns - 500ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-11-14 02:30:09', 0, 1),
+(566, 'C17', 'Dilmah Tea Bag Box', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-11-14 05:15:19', 0, 1),
+(568, 'M49', 'Fish Hurulla', 'Other', 'kg', 0, 1, 0, 0.00, '2025-11-24 05:06:59', 0, 1),
+(569, 'M50', 'Fish - Squid', 'Other', 'kg', 0, 1, 0, 0.00, '2025-11-24 05:07:39', 1, 1),
+(570, 'V77', 'Batana', 'Other', 'kg', 0, 1, 0, 0.00, '2025-11-24 05:09:12', 0, 1),
+(571, 'V80', 'Goraka ', 'Other', 'kg', 0, 1, 0, 0.00, '2025-11-24 05:09:41', 0, 1),
+(572, 'V81', 'Wam Batu', 'Other', 'kg', 0, 1, 0, 0.00, '2025-11-24 05:10:08', 1, 1),
+(573, 'M51', 'Fish - Habaraliya', 'Other', 'kg', 0, 1, 0, 0.00, '2025-11-24 05:13:09', 0, 1),
+(574, 'M235', 'Cake board - 14\"', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-12-09 08:44:59', 0, 1),
+(575, 'P170', 'Soup Cup', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-12-12 10:13:33', 0, 1),
+(576, 'P171', 'Soup Cup - Lid1', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-12-12 10:13:59', 0, 1),
+(577, 'A13', 'High Sugar Yeast', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-12-16 04:30:44', 0, 1),
+(578, 'C113', 'Rasarco White Flavour -500ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-12-16 04:49:36', 0, 1),
+(579, 'C114', 'Tea Powder', 'Other', 'kg', 0, 1, 0, 0.00, '2025-12-17 08:55:51', 0, 1),
+(581, 'K40', 'Prawns Crackers - 100g', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-12-19 04:34:44', 0, 1),
+(585, 'M60', 'Chicken Bacon', 'Other', 'kg', 0, 1, 0, 0.00, '2025-12-22 04:19:00', 0, 1),
+(586, 'K38', 'Ice Peach Tea Concentrate - 2L', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-12-26 03:58:26', 0, 1),
+(587, 'K39', 'Mauri Strawberry Pie Filling', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-12-31 11:07:42', 0, 1),
+(588, 'Z001', 'Konda Kewm', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-12-31 11:10:13', 0, 1),
+(589, 'Z002', 'Asmi', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-12-31 11:10:39', 0, 1),
+(590, 'Z003', 'Mun Kewum', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-12-31 11:11:11', 0, 1),
+(591, 'Z004', 'Kokis', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-12-31 11:11:38', 0, 1),
+(592, 'B94', 'Lemanade', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-12-31 11:22:13', 0, 1),
+(593, 'B95', 'kik cola', 'Other', 'quantity', 0, 1, 0, 0.00, '2025-12-31 11:23:34', 0, 1),
+(594, 'A14', 'Golden Pastry Mix - 12.5KG', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-01-09 03:06:33', 0, 1),
+(595, 'M59', 'Lomassa fish', 'Other', 'kg', 0, 1, 0, 0.00, '2026-01-09 03:41:14', 0, 1),
+(596, 'P214', 'Wooden Fork - 16cm', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-01-12 10:49:12', 0, 1),
+(604, 'P301', '1L PP White Tub and Lid', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-01-12 10:50:45', 0, 1),
+(605, 'V100', 'Rampe leaves', 'Other', 'kg', 0, 1, 0, 0.00, '2026-01-19 03:41:32', 0, 1),
+(607, 'P302', '250ml Paper Cup', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-01-19 08:21:53', 0, 1),
+(608, 'B99', '7 UP MEGA', 'Other', 'L', 0, 1, 0, 0.00, '2026-01-22 05:07:28', 0, 1),
+(614, 'C115', 'BLACK COLOURING BOTTLE 500ML', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-01-22 10:53:20', 0, 1),
+(615, 'C116', 'GOLD BALL', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-01-22 11:00:26', 0, 1),
+(616, 'C117', 'WHITE BALL', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-01-22 11:01:15', 0, 1),
+(617, 'C118', 'COLOUR SUGAR BALL', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-01-22 11:01:49', 0, 1),
+(618, 'C119', 'AMOND POWDER', 'Other', 'kg', 0, 1, 0, 0.00, '2026-01-22 11:02:38', 0, 1),
+(619, 'R74', 'PEPPER POWDER 250g', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-01-23 07:21:54', 0, 1),
+(620, 'D96', 'Sunquick Blackcurrent 350ML', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-01-23 08:32:25', 0, 1),
+(621, 'D97', 'Sunquick Blackcurrent 2L', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-01-23 08:33:55', 0, 1),
+(626, 'P260', 'Curry Bowl with lid 500ml', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-01-23 08:57:52', 0, 1),
+(627, 'P303', 'Mop Cleaner 1L', 'Other', 'L', 0, 1, 0, 0.00, '2026-01-26 07:27:00', 0, 1),
+(628, 'P207', 'Birthday Topper', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-01-30 04:13:41', 0, 1),
+(629, 'P119', 'Cake box -14\'\'', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-01-30 04:31:16', 0, 1),
+(630, 'B100', 'Lavazza Rossa Espresso 1kg', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-02-03 04:26:59', 0, 1),
+(631, 'B101', 'Pepsi 1L', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-02-06 04:31:02', 0, 1),
+(632, 'K55', 'Instant Oats', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-02-12 09:29:06', 0, 1),
+(633, 'K56', 'Corn Flakes', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-02-12 09:30:00', 0, 1),
+(634, 'C120', 'Kelloggs Chocos Duet K Pack 20g', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-02-16 04:56:15', 0, 1),
+(635, 'C121', 'Kelloggs Chocos  K Pack 20g', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-02-16 05:00:18', 0, 1),
+(640, 'F13', 'Strawberry ', 'Other', 'kg', 0, 1, 0, 0.00, '2026-02-16 08:11:20', 0, 1),
+(641, 'S26', 'Mahaduru ', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-02-17 05:05:39', 0, 1),
+(645, 'P130', 'Cookies Bag Pack', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-02-17 08:19:52', 0, 1),
+(646, 'P304', 'Cake Box (Tall) - 10\" ', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-02-18 03:05:47', 0, 1),
+(647, 'P305', 'Cake Box (Tall) - 12\" ', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-02-18 03:06:19', 0, 1),
+(648, 'P306', 'Cake Box (Tall) - 14\" ', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-02-18 03:06:48', 0, 1),
+(649, 'R75', 'Cummin seeds', 'Other', 'kg', 0, 1, 0, 0.00, '2026-02-20 09:49:07', 0, 1),
+(650, 'B102', 'Coca Cola 1.5L', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-02-23 06:15:39', 0, 1),
+(651, 'B96', 'Fresh Milk  1000ml (Suddhi)', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-02-25 09:13:41', 0, 1),
+(652, 'M61', 'Chicken Wings', 'Other', 'kg', 0, 1, 0, 0.00, '2026-03-09 10:51:08', 0, 1),
+(657, 'P180', 'Cup Cake Liner', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-03-11 05:20:01', 0, 1),
+(660, 'P310', ' Salad Cup (500ml)', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-03-12 09:02:13', 0, 1),
+(661, 'R76', 'Curry Powder 250g', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-04-04 05:32:12', 0, 1),
+(662, 'C122', 'Strawberry Cream 140g', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-04-06 06:51:41', 0, 1),
+(663, 'C123', 'Vanilla Cream 140g', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-04-06 06:53:05', 0, 1),
+(664, 'B001', 'Klo Biscuits', 'Other', 'quantity', 0, 1, 0, 0.00, '2026-04-20 09:15:25', 0, 1),
+(665, 'DIE0255', 'dum dum white', 'Other', 'quantity', 0, 1, 1, 0.00, '2026-05-27 06:23:11', 0, 1);
 
 -- --------------------------------------------------------
 
@@ -32542,7 +32553,10 @@ INSERT INTO `payment_history` (`id`, `purchase_id`, `payment_date`, `amount`, `p
 (221, 2144, '2026-05-12', 59600.00, 'CASH', '5471', NULL, 'Initial payment', 5, '2026-05-27 06:45:01'),
 (222, 2145, '2026-05-12', 11040.00, 'CASH', '5472', NULL, 'Initial payment', 5, '2026-05-27 06:46:32'),
 (223, 2146, '2026-05-13', 42000.00, 'CASH', '5475', NULL, 'Initial payment', 5, '2026-05-27 06:47:52'),
-(224, 2147, '2026-05-13', 71180.10, 'CASH', '5476', NULL, 'Initial payment', 5, '2026-05-27 06:54:00');
+(224, 2147, '2026-05-13', 71180.10, 'CASH', '5476', NULL, 'Initial payment', 5, '2026-05-27 06:54:00'),
+(227, 2149, '2026-07-11', 10.00, 'CASH', NULL, NULL, 'verification', 2, '2026-07-11 07:21:21'),
+(228, 2150, '2026-07-13', 310.00, '', NULL, NULL, 'Credit settlement: Settled from available supplier credits', 2, '2026-07-13 02:55:19'),
+(229, 2150, '2026-07-13', 124.00, '', NULL, NULL, 'Credit settlement: Settled from available supplier credits', 2, '2026-07-13 07:07:43');
 
 --
 -- Triggers `payment_history`
@@ -34891,7 +34905,10 @@ INSERT INTO `purchases` (`id`, `invoice_no`, `purchase_date`, `supplier_id`, `bi
 (2145, '000606', '2026-05-12 00:00:00', 33, 11040.00, 11040.00, 0.00, 11040.00, 18.00, 11040.00, 'CASH', '5472', '', 5, 1, NULL, 0.00, 0, 0, 'Paid'),
 (2146, '14633', '2026-05-13 00:00:00', 151, 42000.00, 42000.00, 0.00, 42000.00, 18.00, 42000.00, 'CASH', '5475', '', 5, 1, NULL, 0.00, 0, 0, 'Paid'),
 (2147, '000050', '2026-05-13 00:00:00', 106, 71180.10, 71180.10, 0.00, 71180.10, 18.00, 71180.10, 'CASH', '5476', '', 5, 1, NULL, 0.00, 0, 0, 'Paid'),
-(2148, '123456', '2026-07-10 00:00:00', 50, 290.00, 290.00, 0.00, 290.00, 18.00, 0.00, 'CASH', '123456', '', 2, 1, NULL, 290.00, 0, 1, 'Non-Paid');
+(2148, '123456', '2026-07-10 00:00:00', 50, 290.00, 290.00, 0.00, 290.00, 18.00, 0.00, 'CASH', '123456', '', 2, 1, NULL, 290.00, 0, 1, 'Non-Paid'),
+(2149, '098765', '2026-07-11 00:00:00', 39, 1900.00, 1900.00, 0.00, 1900.00, 18.00, 20.00, 'CASH', '0987', '', 2, 1, NULL, 1880.00, 0, 1, 'Partially Paid'),
+(2150, 'IN-00675', '2026-07-13 00:00:00', 17, 680.00, 680.00, 0.00, 680.00, 18.00, 434.00, 'CASH', '6785', '', 2, 1, NULL, 246.00, 0, 1, 'Partially Paid'),
+(2151, 'inv123123', '2026-07-15 00:00:00', 4, 95000.00, 95000.00, 0.00, 95000.00, 18.00, 0.00, 'CASH', '', '', 2, 1, NULL, 95000.00, 0, 1, 'Non-Paid');
 
 -- --------------------------------------------------------
 
@@ -42198,7 +42215,11 @@ INSERT INTO `purchase_items` (`id`, `purchase_id`, `item_name`, `quantity`, `ret
 (10926, 2147, 'Prawns - L', 6.280, 0.000, 1000.00, 148),
 (10927, 2147, 'Petty Cash Item', 5.000, 0.000, 5.00, 541),
 (10928, 2147, 'Bala Malu', 4.986, 0.000, 1100.00, 131),
-(10929, 2148, 'Eggs', 10.000, 0.000, 29.00, 143);
+(10929, 2148, 'Eggs', 10.000, 0.000, 29.00, 143),
+(10930, 2149, 'Instant Yeast 2 in1 - 500g', 2.000, 0.000, 950.00, 229),
+(10932, 2150, 'Tomato', 1.000, 0.000, 310.00, 73),
+(10933, 2150, 'Carrot', 1.000, 0.000, 370.00, 81),
+(10934, 2151, 'Instant Yeast 2 in1 - 500g', 100.000, 0.000, 950.00, 229);
 
 -- --------------------------------------------------------
 
@@ -42213,6 +42234,13 @@ CREATE TABLE `purchase_payment_allocations` (
   `allocated_amount` decimal(12,2) NOT NULL,
   `created_at` timestamp NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `purchase_payment_allocations`
+--
+
+INSERT INTO `purchase_payment_allocations` (`id`, `payment_history_id`, `purchase_id`, `allocated_amount`, `created_at`) VALUES
+(1, 227, 2149, 10.00, '2026-07-11 07:21:21');
 
 -- --------------------------------------------------------
 
@@ -42237,6 +42265,13 @@ CREATE TABLE `purchase_returns` (
   `created_at` timestamp NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `purchase_returns`
+--
+
+INSERT INTO `purchase_returns` (`id`, `return_number`, `return_date`, `purchase_id`, `supplier_id`, `subtotal`, `vat_amount`, `total_amount`, `settled_amount`, `balance_amount`, `settlement_details`, `remarks`, `returned_by`, `created_at`) VALUES
+(78, 'RTN-20260713-206', '2026-07-13 00:00:00', NULL, 17, 62.00, 0.00, 62.00, 0.00, 62.00, '[]', NULL, 2, '2026-07-13 07:05:41');
+
 -- --------------------------------------------------------
 
 --
@@ -42255,6 +42290,13 @@ CREATE TABLE `purchase_return_credits` (
   `created_at` timestamp NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `purchase_return_credits`
+--
+
+INSERT INTO `purchase_return_credits` (`id`, `credit_number`, `purchase_return_id`, `supplier_id`, `original_amount`, `remaining_credit`, `status`, `credit_date`, `created_at`, `updated_at`) VALUES
+(1, 'CRD-20260713-2100', 78, 17, 62.00, 0.00, 'Fully Used', '2026-07-13', '2026-07-13 07:05:41', '2026-07-13 07:07:43');
 
 -- --------------------------------------------------------
 
@@ -42275,6 +42317,13 @@ CREATE TABLE `purchase_return_items` (
   `total_amount` decimal(10,2) NOT NULL DEFAULT 0.00,
   `created_at` timestamp NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `purchase_return_items`
+--
+
+INSERT INTO `purchase_return_items` (`id`, `return_id`, `purchase_item_id`, `item_id`, `item_name`, `quantity`, `unit_price`, `vat_applicable`, `vat_amount`, `total_amount`, `created_at`) VALUES
+(70, 78, NULL, 73, 'Tomato', 0.200, 310.00, 0, 0.00, 62.00, '2026-07-13 07:05:41');
 
 -- --------------------------------------------------------
 
@@ -42300,7 +42349,9 @@ CREATE TABLE `returns` (
 INSERT INTO `returns` (`id`, `return_number`, `return_date`, `department_id`, `received_by`, `remarks`, `entered_by`, `created_at`) VALUES
 (1, 'RET-FB4434CC', '2025-10-02', 14, 'MAS Intimo', '', 5, '2025-10-24 06:42:24'),
 (2, 'RET-8C1593A0', '2025-10-02', 14, 'Chamal', '', 5, '2025-11-20 03:14:18'),
-(3, 'RET-0591F90A', '2026-02-11', 7, 'Cafe', '', 5, '2026-02-11 04:38:08');
+(3, 'RET-0591F90A', '2026-02-11', 7, 'Cafe', '', 5, '2026-02-11 04:38:08'),
+(4, 'RET-EB1BE481', '2026-07-14', 2, 'Admin', '', 2, '2026-07-14 07:09:16'),
+(5, 'RET-2147558D', '2026-07-14', 2, 'Admin', '', 2, '2026-07-14 07:09:19');
 
 -- --------------------------------------------------------
 
@@ -42329,7 +42380,9 @@ INSERT INTO `return_items` (`id`, `return_id`, `item_id`, `quantity`, `reason`, 
 (5, 3, 158, 1.000, 'Other', '2026-02-11 04:38:08'),
 (6, 3, 159, 1.000, 'Other', '2026-02-11 04:38:08'),
 (7, 3, 160, 2.000, 'Other', '2026-02-11 04:38:08'),
-(8, 3, 156, 1.000, 'Other', '2026-02-11 04:38:08');
+(8, 3, 156, 1.000, 'Other', '2026-02-11 04:38:08'),
+(9, 4, 229, 1.000, 'Excess', '2026-07-14 07:09:16'),
+(10, 5, 229, 1.000, 'Excess', '2026-07-14 07:09:19');
 
 -- --------------------------------------------------------
 
@@ -42385,7 +42438,9 @@ CREATE TABLE `stock_movements` (
 INSERT INTO `stock_movements` (`id`, `item_id`, `quantity`, `movement_type`, `reference_id`, `reference_type`, `reference_number`, `movement_date`, `notes`, `created_at`) VALUES
 (1, 664, 0.000, 'ADJUSTMENT', 664, 'items', NULL, '2026-04-20 00:00:00', 'Auto-created opening balance', '2026-04-20 09:15:25'),
 (2, 665, 0.000, 'ADJUSTMENT', 665, 'items', NULL, '2026-05-27 00:00:00', 'Auto-created opening balance', '2026-05-27 06:23:11'),
-(3, 233, -0.960, 'ADJUSTMENT', 4, 'stock_adjustments', NULL, '2026-06-26 10:14:00', 'error', '2026-06-26 04:44:54');
+(3, 233, -0.960, 'ADJUSTMENT', 4, 'stock_adjustments', NULL, '2026-06-26 10:14:00', 'error', '2026-06-26 04:44:54'),
+(4, 229, 1.000, 'RETURN_FROM_DEPT', 4, 'return', 'RET-EB1BE481', '2026-07-14 12:39:16', 'Return from department: N/A', '2026-07-14 07:09:16'),
+(5, 229, 1.000, 'RETURN_FROM_DEPT', 5, 'return', 'RET-2147558D', '2026-07-14 12:39:19', 'Return from department: N/A', '2026-07-14 07:09:19');
 
 -- --------------------------------------------------------
 
@@ -42598,6 +42653,45 @@ CREATE TABLE `supplier_overpayments` (
   `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `supplier_overpayments`
+--
+
+INSERT INTO `supplier_overpayments` (`id`, `overpayment_number`, `supplier_id`, `payment_date`, `payment_method`, `voucher_number`, `reference_number`, `original_amount`, `remaining_credit`, `status`, `notes`, `created_by`, `updated_by`, `created_at`, `updated_at`) VALUES
+(1, 'ADV-20260713-8725', 17, '2026-07-13', 'CASH', 'AB_0011', NULL, 1000.00, 628.00, 'Partially Used', NULL, 2, 2, '2026-07-13 02:54:46', '2026-07-13 07:07:43');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `supplier_payments`
+--
+
+CREATE TABLE `supplier_payments` (
+  `id` int(11) NOT NULL,
+  `supplier_id` int(11) NOT NULL,
+  `payment_date` date NOT NULL,
+  `payment_method` varchar(50) NOT NULL,
+  `voucher_no` varchar(100) DEFAULT NULL,
+  `cheque_reference_no` varchar(100) DEFAULT NULL,
+  `total_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `created_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `supplier_payment_allocations`
+--
+
+CREATE TABLE `supplier_payment_allocations` (
+  `id` int(11) NOT NULL,
+  `payment_id` int(11) NOT NULL,
+  `invoice_id` int(11) NOT NULL,
+  `allocated_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `created_at` timestamp NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 -- --------------------------------------------------------
 
 --
@@ -42679,7 +42773,8 @@ INSERT INTO `wastages` (`id`, `wastage_note_number`, `date`, `approved_by`, `rea
 (20, 'WN-D1B51881', '2025-10-29', 'Sampath', 'Damaged', '', NULL, 5, '2025-11-18 07:13:34', 0),
 (21, 'WN-DA3D6D08', '2025-11-10', 'Sampath', 'Damaged', '', NULL, 5, '2025-11-18 07:15:15', 0),
 (22, 'WN-A2EACFB2', '2025-10-15', 'Sampath', 'Expired', '', NULL, 5, '2025-11-22 07:32:51', 0),
-(23, 'WN-DC147524', '2025-11-06', 'Sampath', 'Damaged', '', NULL, 5, '2025-11-27 05:25:26', 0);
+(23, 'WN-DC147524', '2025-11-06', 'Sampath', 'Damaged', '', NULL, 5, '2025-11-27 05:25:26', 0),
+(24, 'WN-1F12EF8A', '2026-07-13', 'admin', 'Expired', '', NULL, 2, '2026-07-13 11:19:03', 0);
 
 -- --------------------------------------------------------
 
@@ -42710,7 +42805,8 @@ INSERT INTO `wastage_items` (`id`, `wastage_id`, `item_id`, `quantity`, `estimat
 (11, 20, 9, 1.600, 0.00),
 (12, 21, 79, 1.150, 0.00),
 (13, 22, 167, 2.400, 0.00),
-(14, 23, 337, 2.000, 374.00);
+(14, 23, 337, 2.000, 374.00),
+(15, 24, 233, 1.000, 187.00);
 
 --
 -- Indexes for dumped tables
@@ -43172,6 +43268,22 @@ ALTER TABLE `supplier_overpayments`
   ADD KEY `created_by` (`created_by`);
 
 --
+-- Indexes for table `supplier_payments`
+--
+ALTER TABLE `supplier_payments`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_supplier_payments_supplier` (`supplier_id`),
+  ADD KEY `idx_supplier_payments_date` (`payment_date`);
+
+--
+-- Indexes for table `supplier_payment_allocations`
+--
+ALTER TABLE `supplier_payment_allocations`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_supplier_payment_allocations_payment` (`payment_id`),
+  ADD KEY `idx_supplier_payment_allocations_invoice` (`invoice_id`);
+
+--
 -- Indexes for table `transfer_destinations`
 --
 ALTER TABLE `transfer_destinations`
@@ -43215,7 +43327,7 @@ ALTER TABLE `bank_charges`
 -- AUTO_INCREMENT for table `bank_details`
 --
 ALTER TABLE `bank_details`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT for table `cheque_expenses`
@@ -43245,7 +43357,7 @@ ALTER TABLE `cost_calculation_ingredients`
 -- AUTO_INCREMENT for table `credit_allocations`
 --
 ALTER TABLE `credit_allocations`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT for table `cutlery_assets`
@@ -43389,13 +43501,13 @@ ALTER TABLE `finished_goods_wastage_items`
 -- AUTO_INCREMENT for table `issuances`
 --
 ALTER TABLE `issuances`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3905;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3906;
 
 --
 -- AUTO_INCREMENT for table `issuance_items`
 --
 ALTER TABLE `issuance_items`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=41206;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=41207;
 
 --
 -- AUTO_INCREMENT for table `items`
@@ -43437,7 +43549,7 @@ ALTER TABLE `payees`
 -- AUTO_INCREMENT for table `payment_history`
 --
 ALTER TABLE `payment_history`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=225;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=230;
 
 --
 -- AUTO_INCREMENT for table `petty_cash_balance`
@@ -43467,49 +43579,49 @@ ALTER TABLE `production_cost_calculations`
 -- AUTO_INCREMENT for table `purchases`
 --
 ALTER TABLE `purchases`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2149;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2152;
 
 --
 -- AUTO_INCREMENT for table `purchase_items`
 --
 ALTER TABLE `purchase_items`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10930;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10935;
 
 --
 -- AUTO_INCREMENT for table `purchase_payment_allocations`
 --
 ALTER TABLE `purchase_payment_allocations`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `purchase_returns`
 --
 ALTER TABLE `purchase_returns`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=78;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=79;
 
 --
 -- AUTO_INCREMENT for table `purchase_return_credits`
 --
 ALTER TABLE `purchase_return_credits`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `purchase_return_items`
 --
 ALTER TABLE `purchase_return_items`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=70;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=71;
 
 --
 -- AUTO_INCREMENT for table `returns`
 --
 ALTER TABLE `returns`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT for table `return_items`
 --
 ALTER TABLE `return_items`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
 
 --
 -- AUTO_INCREMENT for table `stock_adjustments`
@@ -43521,7 +43633,7 @@ ALTER TABLE `stock_adjustments`
 -- AUTO_INCREMENT for table `stock_movements`
 --
 ALTER TABLE `stock_movements`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT for table `supplier`
@@ -43533,6 +43645,18 @@ ALTER TABLE `supplier`
 -- AUTO_INCREMENT for table `supplier_overpayments`
 --
 ALTER TABLE `supplier_overpayments`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
+-- AUTO_INCREMENT for table `supplier_payments`
+--
+ALTER TABLE `supplier_payments`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `supplier_payment_allocations`
+--
+ALTER TABLE `supplier_payment_allocations`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
@@ -43551,13 +43675,13 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT for table `wastages`
 --
 ALTER TABLE `wastages`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=24;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=25;
 
 --
 -- AUTO_INCREMENT for table `wastage_items`
 --
 ALTER TABLE `wastage_items`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=15;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
 
 --
 -- Constraints for dumped tables
@@ -43816,89 +43940,3 @@ COMMIT;
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
-
-
--- =============================================
--- PURCHASE PAYMENT ALLOCATIONS TABLE
--- =============================================
-CREATE TABLE IF NOT EXISTS purchase_payment_allocations (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    payment_history_id INT NOT NULL,
-    purchase_id INT NOT NULL,
-    allocated_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (payment_history_id) REFERENCES payment_history(id) ON DELETE CASCADE,
-    FOREIGN KEY (purchase_id) REFERENCES purchases(id) ON DELETE CASCADE,
-    INDEX idx_payment_history (payment_history_id),
-    INDEX idx_purchase (purchase_id)
-);
-
--- =============================================
--- SUPPLIER OVERPAYMENTS TABLE (Advance Payments)
--- =============================================
-CREATE TABLE IF NOT EXISTS supplier_overpayments (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    overpayment_number VARCHAR(50) NOT NULL UNIQUE,
-    supplier_id INT NOT NULL,
-    payment_date DATE NOT NULL,
-    payment_method VARCHAR(50) DEFAULT 'CASH',
-    voucher_number VARCHAR(50),
-    reference_number VARCHAR(50),
-    original_amount DECIMAL(12,2) NOT NULL,
-    remaining_credit DECIMAL(12,2) NOT NULL,
-    status ENUM('Active', 'Partially Used', 'Fully Used') DEFAULT 'Active',
-    notes TEXT,
-    created_by INT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_by INT,
-    updated_at TIMESTAMP NULL,
-    FOREIGN KEY (supplier_id) REFERENCES supplier(id),
-    FOREIGN KEY (created_by) REFERENCES users(id)
-);
-
--- =============================================
--- CREDIT ALLOCATIONS TABLE
--- =============================================
-CREATE TABLE IF NOT EXISTS credit_allocations (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    credit_type ENUM('overpayment', 'return_credit') NOT NULL,
-    overpayment_id INT NULL,
-    return_credit_id INT NULL,
-    purchase_id INT NOT NULL,
-    allocated_amount DECIMAL(12,2) NOT NULL,
-    settlement_date DATE NOT NULL,
-    settled_by INT,
-    notes TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (overpayment_id) REFERENCES supplier_overpayments(id),
-    FOREIGN KEY (purchase_id) REFERENCES purchases(id),
-    FOREIGN KEY (settled_by) REFERENCES users(id)
-);
-
--- =============================================
--- PURCHASE RETURN CREDITS TABLE
--- =============================================
-CREATE TABLE IF NOT EXISTS purchase_return_credits (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    credit_number VARCHAR(50) NOT NULL UNIQUE,
-    purchase_return_id INT NOT NULL,
-    supplier_id INT NOT NULL,
-    original_amount DECIMAL(12,2) NOT NULL,
-    remaining_credit DECIMAL(12,2) NOT NULL,
-    status ENUM('Active', 'Partially Used', 'Fully Used') DEFAULT 'Active',
-    credit_date DATE NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NULL,
-    FOREIGN KEY (purchase_return_id) REFERENCES purchase_returns(id),
-    FOREIGN KEY (supplier_id) REFERENCES supplier(id)
-);
-
-
-ALTER TABLE bank_details
-  ADD COLUMN company ENUM('JH', 'RD', 'RR') NOT NULL DEFAULT 'JH'
-  AFTER current_balance;
-
-
--- Add status column to items table
-ALTER TABLE `items` 
-ADD COLUMN `status` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=Active, 0=Inactive' AFTER `deleted`;

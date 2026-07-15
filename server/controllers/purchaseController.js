@@ -37,6 +37,32 @@ const calculatePaymentState = (paidAmount, totalAmount) => {
   };
 };
 
+const resolveInvoiceTotalAmount = (purchaseRow = {}) => {
+  const parsedTotalWithVat = parseFloat(purchaseRow.total_with_vat) || 0;
+  const parsedBillAmount = parseFloat(purchaseRow.bill_amount) || 0;
+  const parsedSubtotal = parseFloat(purchaseRow.subtotal) || 0;
+  const parsedVatAmount = parseFloat(purchaseRow.vat_amount) || 0;
+
+  if (parsedTotalWithVat > 0) return parsedTotalWithVat;
+  if (parsedBillAmount > 0) return parsedBillAmount;
+  return parsedSubtotal + parsedVatAmount;
+};
+
+const normalizePaymentMethodForHistory = (paymentMethod) => {
+  switch (paymentMethod) {
+    case 'BANK_TRANSFER':
+      return 'BANK_TRANSFER';
+    case 'CREDIT':
+    case 'CHEQUE':
+      return 'CREDIT_CARD';
+    case 'CREDIT_CARD':
+      return 'CREDIT_CARD';
+    case 'CASH':
+    default:
+      return 'CASH';
+  }
+};
+
 // Create new purchase with payment status handling
 const createPurchase = async (req, res) => {
   const { 
@@ -76,7 +102,8 @@ const createPurchase = async (req, res) => {
       });
     }
 
-    const paymentState = calculatePaymentState(paid_amount, total_with_vat);
+    const effectiveInvoiceTotal = parseFloat(total_with_vat) || (parseFloat(subtotal || 0) + parseFloat(vat_amount || 0));
+    const paymentState = calculatePaymentState(paid_amount, effectiveInvoiceTotal);
     const normalizedPaidAmount = paymentState.paid_amount;
     const normalizedBalanceAmount = paymentState.balance_amount;
     const normalizedBalanceStatus = paymentState.balance_status;
@@ -345,7 +372,8 @@ const updatePurchase = async (req, res) => {
       return res.status(400).json({ error: 'No valid user found for purchase audit' });
     }
 
-    const paymentState = calculatePaymentState(paid_amount, total_with_vat);
+    const effectiveInvoiceTotal = parseFloat(total_with_vat) || (parseFloat(subtotal || 0) + parseFloat(vat_amount || 0));
+    const paymentState = calculatePaymentState(paid_amount, effectiveInvoiceTotal);
     const normalizedPaidAmount = paymentState.paid_amount;
     const normalizedBalanceAmount = paymentState.balance_amount;
     const normalizedBalanceStatus = paymentState.balance_status;
@@ -555,18 +583,29 @@ const makePayment = async (req, res) => {
     voucher_number,
     notes,
     created_by,
-    invoice_allocations
+    invoice_allocations,
+    supplier_id
   } = req.body;
 
   const validMethods = ['CASH', 'BANK_TRANSFER', 'CHEQUE', 'CREDIT'];
-  const normalizedAllocations = Array.isArray(invoice_allocations) && invoice_allocations.length > 0
-    ? invoice_allocations
-        .map((allocation) => ({
-          purchase_id: allocation.purchase_id || allocation.id,
-          amount: parseFloat(allocation.amount) || 0
-        }))
-        .filter((allocation) => allocation.purchase_id && allocation.amount > 0)
-    : (id ? [{ purchase_id: id, amount: parseFloat(amount) || 0 }] : []);
+  
+  // Handle allocations properly
+  let normalizedAllocations = [];
+  
+  if (Array.isArray(invoice_allocations) && invoice_allocations.length > 0) {
+    normalizedAllocations = invoice_allocations
+      .map((allocation) => ({
+        purchase_id: allocation.purchase_id || allocation.id,
+        amount: parseFloat(allocation.amount) || 0
+      }))
+      .filter((allocation) => allocation.purchase_id && allocation.amount > 0);
+  } else if (id) {
+    // Single invoice payment (backward compatibility)
+    normalizedAllocations = [{
+      purchase_id: parseInt(id),
+      amount: parseFloat(amount) || 0
+    }];
+  }
 
   if (!payment_date) {
     return res.status(400).json({ error: 'Payment date is required' });
@@ -583,45 +622,56 @@ const makePayment = async (req, res) => {
   try {
     await connection.beginTransaction();
 
-    const totalAllocatedAmount = normalizedAllocations.reduce((sum, allocation) => sum + allocation.amount, 0);
-    if (totalAllocatedAmount <= 0) {
+    const normalizedPaymentAmount = parseFloat(amount) > 0
+      ? parseFloat(amount)
+      : normalizedAllocations.reduce((sum, allocation) => sum + (parseFloat(allocation.amount) || 0), 0);
+
+    if (normalizedPaymentAmount <= 0) {
       await connection.rollback();
       return res.status(400).json({ error: 'Payment amount must be greater than 0' });
     }
 
-    const paymentHistoryPurchaseId = normalizedAllocations[0].purchase_id;
+    const paymentHistoryPurchaseId = normalizedAllocations[0]?.purchase_id || null;
     const resolvedCreatedBy = await resolveUserId(connection, created_by, req.user?.id);
+    const normalizedPaymentMethodForHistory = normalizePaymentMethodForHistory(payment_method);
 
     if (!resolvedCreatedBy) {
       await connection.rollback();
       return res.status(400).json({ error: 'No valid user found for payment audit' });
     }
 
+    // Insert payment history with the actual payment amount entered by the user.
     let paymentResult;
     try {
       [paymentResult] = await connection.query(
         `INSERT INTO payment_history
            (purchase_id, payment_date, amount, payment_method, check_number, voucher_number, notes, created_by)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [paymentHistoryPurchaseId, payment_date, totalAllocatedAmount, payment_method,
+        [paymentHistoryPurchaseId, payment_date, normalizedPaymentAmount, normalizedPaymentMethodForHistory,
          check_number || null, voucher_number || null, notes || null, resolvedCreatedBy]
       );
     } catch (colErr) {
+      console.warn('voucher_number column not found, using fallback:', colErr.message);
       [paymentResult] = await connection.query(
         `INSERT INTO payment_history
            (purchase_id, payment_date, amount, payment_method, check_number, notes, created_by)
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [paymentHistoryPurchaseId, payment_date, totalAllocatedAmount, payment_method,
+        [paymentHistoryPurchaseId, payment_date, normalizedPaymentAmount, normalizedPaymentMethodForHistory,
          check_number || null, notes || null, resolvedCreatedBy]
       );
     }
 
     const paymentHistoryId = paymentResult.insertId;
+    console.log('✅ Payment history inserted with ID:', paymentHistoryId);
 
+    let remainingPaymentAmount = normalizedPaymentAmount;
     let totalApplied = 0;
+    const updatedInvoices = [];
+    let supplierIdForCredit = null;
+
     for (const allocation of normalizedAllocations) {
       const purchaseId = allocation.purchase_id;
-      const amountToApply = allocation.amount;
+      const requestedAmount = Math.max(0, parseFloat(allocation.amount) || 0);
 
       const [purchaseRows] = await connection.query(
         'SELECT * FROM purchases WHERE id = ? FOR UPDATE',
@@ -634,22 +684,53 @@ const makePayment = async (req, res) => {
       }
 
       const currentPurchase = purchaseRows[0];
-      if (amountToApply > parseFloat(currentPurchase.balance_amount) + 0.001) {
-        await connection.rollback();
-        return res.status(400).json({
-          error: `Payment amount for invoice ${currentPurchase.invoice_no} cannot exceed balance of ${currentPurchase.balance_amount}`
-        });
+      if (!supplierIdForCredit && currentPurchase.supplier_id) {
+        supplierIdForCredit = currentPurchase.supplier_id;
       }
 
-      const newPaidAmount = parseFloat(currentPurchase.paid_amount || 0) + amountToApply;
-      const newBalanceAmount = Math.max(0, parseFloat(currentPurchase.total_with_vat || 0) - newPaidAmount);
+      const currentBalance = parseFloat(currentPurchase.balance_amount) || 0;
+      const currentPaid = parseFloat(currentPurchase.paid_amount) || 0;
+      const invoiceTotal = resolveInvoiceTotalAmount(currentPurchase);
+      const currentOutstanding = currentBalance > 0 ? currentBalance : Math.max(0, invoiceTotal - currentPaid);
+
+      const amountToApply = Math.min(requestedAmount, remainingPaymentAmount, currentOutstanding);
+      if (amountToApply <= 0.001) {
+        continue;
+      }
+
+      remainingPaymentAmount = Math.max(0, remainingPaymentAmount - amountToApply);
+
+      console.log(`📊 Purchase ${currentPurchase.invoice_no}:`, {
+        currentBalance,
+        currentPaid,
+        invoiceTotal,
+        currentOutstanding,
+        requestedAmount,
+        amountToApply
+      });
+
+      const newPaidAmount = currentPaid + amountToApply;
+      const newBalanceAmount = Math.max(0, currentOutstanding - amountToApply);
+
       let newPaymentStatus = 'Non-Paid';
-      if (newBalanceAmount <= 0) newPaymentStatus = 'Paid';
-      else if (newPaidAmount > 0) newPaymentStatus = 'Partially Paid';
+      if (newBalanceAmount <= 0.001) {
+        newPaymentStatus = 'Paid';
+      } else if (newPaidAmount > 0) {
+        newPaymentStatus = 'Partially Paid';
+      }
+
+      console.log(`📊 Updated ${currentPurchase.invoice_no}:`, {
+        newPaidAmount,
+        newBalanceAmount,
+        newPaymentStatus
+      });
 
       await connection.query(
         `UPDATE purchases
-           SET paid_amount = ?, balance_amount = ?, balance_status = ?, payment_status = ?
+           SET paid_amount = ?,
+               balance_amount = ?,
+               balance_status = ?,
+               payment_status = ?
          WHERE id = ?`,
         [newPaidAmount, newBalanceAmount, newBalanceAmount > 0 ? 1 : 0, newPaymentStatus, purchaseId]
       );
@@ -661,21 +742,73 @@ const makePayment = async (req, res) => {
       );
 
       totalApplied += amountToApply;
+
+      updatedInvoices.push({
+        purchase_id: purchaseId,
+        invoice_no: currentPurchase.invoice_no,
+        old_balance: currentOutstanding,
+        new_balance: newBalanceAmount,
+        payment_status: newPaymentStatus,
+        applied_amount: amountToApply
+      });
     }
+
+    const excessPaymentAmount = Math.max(0, remainingPaymentAmount);
+    if (excessPaymentAmount > 0.001 && supplierIdForCredit) {
+      const [supplierRows] = await connection.query('SELECT id FROM supplier WHERE id = ? LIMIT 1', [supplierIdForCredit]);
+      if (supplierRows.length === 0) {
+        await connection.rollback();
+        return res.status(404).json({ error: 'Supplier not found for overpayment credit' });
+      }
+
+      const datePart = payment_date.replace(/-/g, '');
+      const rand = Math.floor(Math.random() * 9000) + 1000;
+      const overpayment_number = `ADV-${datePart}-${rand}`;
+
+      await connection.query(
+        `INSERT INTO supplier_overpayments
+           (overpayment_number, supplier_id, payment_date, payment_method,
+            voucher_number, reference_number, original_amount, remaining_credit,
+            status, notes, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Active', ?, ?)`,
+        [
+          overpayment_number,
+          supplierIdForCredit,
+          payment_date,
+          payment_method,
+          voucher_number || null,
+          check_number || null,
+          excessPaymentAmount,
+          excessPaymentAmount,
+          notes || null,
+          resolvedCreatedBy
+        ]
+      );
+    }
+
+    const [verifyPurchase] = await connection.query(
+      `SELECT id, invoice_no, total_with_vat, paid_amount, balance_amount, payment_status
+       FROM purchases WHERE id = ?`,
+      [normalizedAllocations[0]?.purchase_id]
+    );
+
+    console.log('✅ Verification after update:', verifyPurchase[0]);
 
     await connection.commit();
 
     res.json({
       message: 'Payment recorded successfully!',
       payment_id: paymentHistoryId,
-      amount: totalAllocatedAmount,
+      amount: normalizedPaymentAmount,
       applied_amount: totalApplied,
-      invoice_count: normalizedAllocations.length
+      invoice_count: normalizedAllocations.length,
+      updated_invoices: updatedInvoices,
+      verification: verifyPurchase[0]
     });
 
   } catch (error) {
     await connection.rollback();
-    console.error('Error processing payment:', error);
+    console.error('❌ Error processing payment:', error);
     res.status(500).json({ error: 'Server error: ' + error.message });
   } finally {
     connection.release();
@@ -970,6 +1103,9 @@ const addSettlementToReturn = async (req, res) => {
 };
 
 module.exports = {
+  calculatePaymentState,
+  resolveInvoiceTotalAmount,
+  normalizePaymentMethodForHistory,
   createPurchase,
   getAllPurchases,
   getPurchaseById,
