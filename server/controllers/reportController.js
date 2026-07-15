@@ -1,9 +1,8 @@
 const pool = require('../config/db');
 
-// Get stock report for a specific date (auto-add items only)
 const getStockReport = async (req, res) => {
   try {
-    const { date } = req.query;
+    const { date, status } = req.query;
 
     if (!date) {
       return res.status(400).json({ error: 'Date parameter is required' });
@@ -19,6 +18,15 @@ const getStockReport = async (req, res) => {
     prevDate.setDate(prevDate.getDate() - 1);
     const prevDateStr = prevDate.toISOString().split('T')[0];
 
+    // Build status filter condition
+    let statusCondition = '';
+    if (status === 'active') {
+      statusCondition = 'AND i.status = 1';
+    } else if (status === 'inactive') {
+      statusCondition = 'AND i.status = 0';
+    }
+    // 'all' - no filter
+
     const query = `
       SELECT 
         i.id,
@@ -26,6 +34,7 @@ const getStockReport = async (req, res) => {
         i.name AS item_name,
         i.unit,
         i.auto_add_to_stock,
+        i.status,
         COALESCE(prev.closing_balance, 0) + COALESCE(ob_today.opening_balance_today, 0) AS opening_balance,
         COALESCE(purchases.total_purchased, 0) AS total_purchased,
         COALESCE(issues.total_issued, 0) AS total_issued,
@@ -114,6 +123,7 @@ const getStockReport = async (req, res) => {
           WHERE DATE(date) <= ?
           GROUP BY item_id
         ) adjustments ON i2.id = adjustments.item_id
+        WHERE i2.deleted = FALSE
       ) prev ON i.id = prev.item_id
       LEFT JOIN (
         SELECT item_id, SUM(quantity) AS opening_balance_today
@@ -163,8 +173,9 @@ const getStockReport = async (req, res) => {
         WHERE DATE(date) = ?
         GROUP BY item_id
       ) adjustments ON i.id = adjustments.item_id
-      WHERE i.auto_add_to_stock = 1  -- 🔥 AUTO-ADD ITEMS ONLY
+      WHERE i.auto_add_to_stock = 1
         AND i.deleted = FALSE
+        ${statusCondition}
       ORDER BY i.item_code
     `;
 
