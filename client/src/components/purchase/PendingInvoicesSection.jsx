@@ -14,9 +14,7 @@ import {
   faFileInvoice,
   faMoneyBillWave,
   faFilter,
-  faTimes,
-  faPlus,
-  faCreditCard
+  faTimes
 } from '@fortawesome/free-solid-svg-icons';
 import dayjs from 'dayjs';
 import { usePopup } from '../context/PopupContext';
@@ -45,26 +43,45 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState(new Set());
   const [settleInvoice, setSettleInvoice] = useState(null);
 
-  // ── Sync active filter when parent supplier changes ──
+  // Sync active filter when parent supplier changes
   useEffect(() => {
     setActiveFilterId(supplierId || '');
     setSelectedInvoiceIds(new Set());
   }, [supplierId]);
 
-  // ── Fetch ALL outstanding records ──
+  // Fetch ALL outstanding records
   const fetchAllOutstanding = useCallback(async () => {
     setLoading(true);
     try {
+      console.log('🔄 Fetching outstanding records...');
       const { data } = await api.get('/suppliers/outstanding/all');
+      console.log('📊 Outstanding data received:', data);
+      
       const outstandingInvoices = data.OutstandingInvoices || data.invoices || [];
       const advancePayments = data.AdvancePayments || data.advances || [];
       const purchaseReturnCredits = data.PurchaseReturnCredits || data.return_credits || [];
-      setAllInvoices(outstandingInvoices);
+      
+      // Parse amounts to numbers
+      const parsedInvoices = outstandingInvoices.map(inv => ({
+        ...inv,
+        balance_amount: parseFloat(inv.balance_amount) || 0,
+        outstanding_amount: parseFloat(inv.outstanding_amount) || 0,
+        total_with_vat: parseFloat(inv.total_with_vat) || 0,
+        paid_amount: parseFloat(inv.paid_amount) || 0
+      }));
+      
+      setAllInvoices(parsedInvoices);
       setAllAdvances(advancePayments);
       setAllReturnCredits(purchaseReturnCredits);
       setSelectedInvoiceIds(new Set());
+      
+      console.log('✅ Outstanding records updated:', {
+        invoices: parsedInvoices.length,
+        advances: advancePayments.length,
+        credits: purchaseReturnCredits.length
+      });
     } catch (err) {
-      console.error('Error fetching all outstanding records:', err);
+      console.error('❌ Error fetching all outstanding records:', err);
       showPopup('error', 'Failed to load outstanding records');
     } finally {
       setLoading(false);
@@ -77,6 +94,7 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
 
   useEffect(() => {
     const handlePurchasePaymentUpdated = () => {
+      console.log('🔄 Payment update event received, refreshing...');
       fetchAllOutstanding();
     };
 
@@ -86,7 +104,7 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
     };
   }, [fetchAllOutstanding]);
 
-  // ── Build unified flat list ──
+  // Build unified flat list
   const allRecords = useMemo(() => {
     const invoices = allInvoices.map((r) => ({ ...r, _rowType: 'invoice' }));
     const advances = allAdvances.map((r) => ({ ...r, _rowType: 'advance' }));
@@ -94,7 +112,7 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
     return [...invoices, ...advances, ...credits];
   }, [allInvoices, allAdvances, allReturnCredits]);
 
-  // ── Apply filters ──
+  // Apply filters
   const filteredRecords = useMemo(() => {
     const term = supplierSearch.toLowerCase().trim();
     return allRecords.filter((r) => {
@@ -111,7 +129,7 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
       : suppliers.filter((s) => s.name?.toLowerCase().includes(term));
   }, [suppliers, supplierSearch]);
 
-  // ── Summary cards ──
+  // Summary cards
   const summaryStats = useMemo(() => {
     const records = activeFilterId
       ? allRecords.filter((r) => String(r.supplier_id) === String(activeFilterId))
@@ -119,12 +137,12 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
 
     const totalOutstandingInvoices = records
       .filter((r) => r._rowType === 'invoice')
-      .reduce((s, r) => s + r.outstanding_amount, 0);
+      .reduce((s, r) => s + (parseFloat(r.outstanding_amount) || 0), 0);
 
     const totalAvailableCredit = [
       ...records.filter((r) => r._rowType === 'advance'),
       ...records.filter((r) => r._rowType === 'return_credit')
-    ].reduce((s, r) => s + r.outstanding_amount, 0);
+    ].reduce((s, r) => s + (parseFloat(r.outstanding_amount) || 0), 0);
 
     const invoiceCount = records.filter((r) => r._rowType === 'invoice').length;
     const creditCount = records.filter((r) => r._rowType !== 'invoice').length;
@@ -132,7 +150,7 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
     return { totalOutstandingInvoices, totalAvailableCredit, invoiceCount, creditCount };
   }, [allRecords, activeFilterId]);
 
-  // ── Selection helpers ──
+  // Selection helpers
   const selectableInvoices = filteredRecords.filter((r) => r._rowType === 'invoice');
 
   const toggleSelection = (id) => {
@@ -150,7 +168,7 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
     }
   };
 
-  // ── Cross-supplier validation ──
+  // Cross-supplier validation
   const validateSameSupplier = (records, actionName) => {
     const ids = [...new Set(records.map((r) => r.supplier_id))];
     if (ids.length > 1) {
@@ -164,7 +182,7 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
     return true;
   };
 
-  // ── Action handlers ──
+  // Action handlers
   const handlePaySelected = () => {
     const selected = allInvoices.filter((i) => selectedInvoiceIds.has(i.id));
     if (selected.length === 0) {
@@ -197,7 +215,7 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
     setSelectedInvoiceIds(new Set());
   };
 
-  // ── Helpers ──
+  // Helpers
   const formatCurrency = (amount) => {
     const numeric = parseFloat(amount) || 0;
     return `Rs. ${numeric.toFixed(2)}`;
@@ -228,19 +246,31 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
       activeSupplierName
     : activeSupplierName;
 
-  // ── Render ──
   return (
     <div className="pis-container">
-      {/* ── Modals ── */}
+      {/* Modals */}
       <InvoicePaymentModal
         isOpen={showPayModal}
         onClose={() => setShowPayModal(false)}
         supplierName={activeSupplierForModal}
         selectedInvoices={selectedInvoicesList}
-        onSuccess={async () => {
+        onSuccess={async (result) => {
+          console.log('💰 Payment completed:', result);
+          
+          // Close modal first
           setShowPayModal(false);
+          
+          // Wait a moment for database to update
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // Refresh data from server
           await fetchAllOutstanding();
+          
+          // Dispatch event for other components
           window.dispatchEvent(new Event('purchase-payment-updated'));
+          
+          // Clear selection
+          setSelectedInvoiceIds(new Set());
         }}
       />
 
@@ -250,7 +280,7 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
         supplierId={activeFilterId}
         supplierName={activeSupplierName}
         onSuccess={async (responseData) => {
-          // Refresh from server to ensure canonical state
+          console.log('💰 Advance payment completed:', responseData);
           await fetchAllOutstanding();
           window.dispatchEvent(new Event('purchase-payment-updated'));
         }}
@@ -265,6 +295,7 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
         supplierId={settleInvoice?.supplier_id}
         invoice={settleInvoice}
         onSuccess={async () => {
+          console.log('💰 Settlement completed');
           setShowSettleModal(false);
           setSettleInvoice(null);
           await fetchAllOutstanding();
@@ -272,7 +303,7 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
         }}
       />
 
-      {/* ── Section Header ── */}
+      {/* Section Header */}
       <div className="pis-header">
         <h3>
           <FontAwesomeIcon icon={faFileInvoiceDollar} />
@@ -290,7 +321,7 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
         </div>
       </div>
 
-      {/* ── Summary Cards ── */}
+      {/* Summary Cards */}
       <div className="pis-summary-grid">
         <div className="pis-summary-item debt">
           <span>Outstanding Invoices</span>
@@ -310,7 +341,7 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
         </div>
       </div>
 
-      {/* ── Filter Bar ── */}
+      {/* Filter Bar */}
       <div className="pis-filter-bar">
         <div className="pis-filter-group">
           <label htmlFor="pis-supplier-search">
@@ -381,7 +412,7 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
         </div>
       )}
 
-      {/* Cross-supplier warning when invoices from multiple suppliers selected */}
+      {/* Cross-supplier warning */}
       {selectedInvoiceIds.size > 0 &&
         new Set(selectedInvoicesList.map((i) => i.supplier_id)).size > 1 && (
           <div className="pis-cross-supplier-warning">
@@ -393,7 +424,7 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
           </div>
         )}
 
-      {/* ── Unified Table ── */}
+      {/* Unified Table */}
       <div className="pis-table-container">
         <table className="pis-table">
           <thead>
@@ -449,7 +480,6 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
                     key={rowKey}
                     className={`${isSelected ? 'selected' : ''} pis-row-${record._rowType}`}
                   >
-                    {/* Checkbox – only for invoice rows */}
                     <td style={{ textAlign: 'center' }}>
                       {isInvoice ? (
                         <input
@@ -463,12 +493,10 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
                       )}
                     </td>
 
-                    {/* Supplier Name */}
                     <td>
                       <div className="pis-supplier-name">{record.supplier_name}</div>
                     </td>
 
-                    {/* Document Type */}
                     <td>
                       <span className={`pis-doc-badge pis-doc-${record._rowType}`}>
                         <FontAwesomeIcon icon={getDocIcon(record.document_type)} />
@@ -476,12 +504,10 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
                       </span>
                     </td>
 
-                    {/* Document Number */}
                     <td>
                       <div className="pis-invoice-num">{record.document_number}</div>
                     </td>
 
-                    {/* Transaction Date */}
                     <td>
                       <div className="pis-date">
                         {record.transaction_date
@@ -490,21 +516,18 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
                       </div>
                     </td>
 
-                    {/* Outstanding Amount */}
                     <td className="pis-amount">
                       <span className={isInvoice ? 'pis-amount-debt' : 'pis-amount-credit'}>
                         {formatCurrency(record.outstanding_amount)}
                       </span>
                     </td>
 
-                    {/* Status */}
                     <td>
                       <span className={`pis-status-badge pis-status-${(record.status || '').toLowerCase().replace(/\s+/g, '-')}`}>
                         {record.status || 'Active'}
                       </span>
                     </td>
 
-                    {/* Action */}
                     <td className="pis-actions">
                       {isInvoice && (
                         <button
@@ -537,7 +560,7 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
         </button>
       </div>
 
-      {/* ── Available Credits Sub-section ── */}
+      {/* Available Credits Sub-section */}
       <div className="pis-credit-section">
         <div className="pis-credit-header">
           <h4>

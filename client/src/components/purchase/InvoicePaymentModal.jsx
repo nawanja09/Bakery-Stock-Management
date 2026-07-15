@@ -16,12 +16,12 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
   const totalBalance = selectedInvoices.reduce((s, inv) => s + parseFloat(inv.balance_amount || 0), 0);
 
   const [formData, setFormData] = useState({
-    payment_date:   dayjs().format('YYYY-MM-DD'),
+    payment_date: dayjs().format('YYYY-MM-DD'),
     payment_method: 'CASH',
     voucher_number: '',
-    check_number:   '',
-    amount:         totalBalance,
-    notes:          ''
+    check_number: '',
+    amount: totalBalance,
+    notes: ''
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -63,10 +63,10 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
     }
 
     if (!formData.payment_date) return showPopup('error', 'Payment date is required');
-    if (formData.amount <= 0)   return showPopup('error', 'Amount must be greater than 0');
-    if (formData.amount > totalBalance + 0.01) return showPopup('error', `Amount exceeds total balance of Rs. ${totalBalance.toFixed(2)}`);
-    if (formData.payment_method === 'CHEQUE' && !formData.check_number)
+    if (formData.amount <= 0) return showPopup('error', 'Amount must be greater than 0');
+    if (formData.payment_method === 'CHEQUE' && !formData.check_number) {
       return showPopup('error', 'Cheque number is required');
+    }
     if (!currentUser?.id) return showPopup('error', 'Please login again');
 
     setSubmitting(true);
@@ -74,35 +74,45 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
       const payloadAllocations = allocations
         .filter((alloc) => alloc.allocated > 0)
         .map((alloc) => ({
-          id: alloc.id,
           purchase_id: alloc.id,
           amount: alloc.allocated
         }));
 
-      const response = await api.post('/purchases/pay-multiple', {
-        payment_date:   formData.payment_date,
-        amount:         formData.amount,
+      console.log('📤 Sending payment payload:', {
+        payment_date: formData.payment_date,
+        amount: formData.amount,
         payment_method: formData.payment_method,
-        check_number:   formData.check_number || null,
-        voucher_number: formData.voucher_number || null,
-        notes:          formData.notes || null,
-        created_by:     currentUser.id,
         invoice_allocations: payloadAllocations
       });
+
+      const response = await api.post('/purchases/pay-multiple', {
+        payment_date: formData.payment_date,
+        amount: formData.amount,
+        payment_method: formData.payment_method,
+        check_number: formData.check_number || null,
+        voucher_number: formData.voucher_number || null,
+        notes: formData.notes || null,
+        created_by: currentUser.id,
+        invoice_allocations: payloadAllocations
+      });
+
+      console.log('✅ Payment response:', response.data);
+
       showPopup('success', response.data.message || `Payment of Rs. ${formData.amount.toFixed(2)} recorded successfully!`);
       
-      // ✅ Fix: Call onSuccess with the response data
       if (onSuccess) {
-        await onSuccess({ 
-          amount: formData.amount, 
-          allocations, 
-          response: response.data 
+        await onSuccess({
+          success: true,
+          amount: formData.amount,
+          allocations: allocations,
+          response: response.data,
+          updatedInvoices: response.data.updated_invoices || []
         });
       }
       
       onClose();
     } catch (err) {
-      console.error(err);
+      console.error('❌ Payment error:', err);
       showPopup('error', err.response?.data?.error || 'Failed to process payment');
     } finally {
       setSubmitting(false);
@@ -139,7 +149,7 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
             </div>
           </div>
 
-          <form className="ipm-form" onSubmit={handleSubmit} id="ipm-form">
+          <div className="ipm-form" id="ipm-form">
             <div className="ipm-form-group">
               <label>Supplier Name</label>
               <input type="text" value={supplierName || ''} readOnly />
@@ -200,7 +210,6 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
                   onChange={handleChange}
                   min="0.01"
                   step="0.01"
-                  max={totalBalance}
                   required
                 />
                 <button
@@ -211,7 +220,7 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
                   Full Amount
                 </button>
               </div>
-              <span className="ipm-hint">Maximum payable: Rs. {totalBalance.toFixed(2)}</span>
+              <span className="ipm-hint">Any amount above the invoice balance will be stored as supplier credit.</span>
             </div>
 
             <div className="ipm-form-group">
@@ -224,7 +233,7 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
                 placeholder="Add any payment notes..."
               />
             </div>
-          </form>
+          </div>
 
           {selectedInvoices.length > 1 && formData.amount > 0 && (
             <div className="ipm-allocation">
@@ -246,8 +255,8 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
           <button className="ipm-btn-cancel" onClick={onClose} type="button">Cancel</button>
           <button
             className="ipm-btn-submit"
-            type="submit"
-            form="ipm-form"
+            type="button"
+            onClick={handleSubmit}
             disabled={submitting || formData.amount <= 0}
           >
             {submitting

@@ -1,9 +1,9 @@
-// server/routes/purchaseRoutes.js
+// routes/purchaseRoutes.js
 const express = require('express');
 const router = express.Router();
 const purchaseController = require('../controllers/purchaseController');
 const paymentHistoryController = require('../controllers/paymentHistoryController');
-const pool = require('../config/db'); // Add this line to import the database pool
+const pool = require('../config/db');
 
 // Existing routes
 router.post('/', purchaseController.createPurchase);
@@ -16,13 +16,14 @@ router.get('/previous-prices', purchaseController.getPreviousPurchasePrices);
 router.get('/non-paid', purchaseController.getNonPaidPurchases);
 router.get('/pending/:supplierId', purchaseController.getPendingInvoicesBySupplier);
 
+// ✅ FIX: Make sure this route comes BEFORE parameterized routes
+router.post('/pay-multiple', purchaseController.makePayment);
 
-// Add this route for getting purchase details by ID
+// Get purchase details by ID
 router.get('/details/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
-    // Get purchase details with supplier info
     const [purchases] = await pool.query(`
       SELECT 
         p.id,
@@ -56,7 +57,6 @@ router.get('/details/:id', async (req, res) => {
       return res.status(404).json({ error: 'Purchase not found' });
     }
 
-    // Get purchase items with item details
     const [items] = await pool.query(`
       SELECT 
         pi.id,
@@ -72,7 +72,6 @@ router.get('/details/:id', async (req, res) => {
       WHERE pi.purchase_id = ?
     `, [id]);
 
-    // Calculate line totals with VAT if applicable
     const itemsWithVAT = items.map(item => {
       const amount = parseFloat(item.amount) || 0;
       const vatAmount = item.vat_applicable ? amount * 0.18 : 0;
@@ -128,7 +127,6 @@ router.get('/latest-prices', async (req, res) => {
       ORDER BY i.name
     `);
 
-    // Convert to object format for easy lookup
     const priceMap = {};
     rows.forEach(row => {
       if (row.unit_price) {
@@ -148,7 +146,7 @@ router.get('/latest-prices', async (req, res) => {
   }
 });
 
-// Get latest purchase prices for all items
+// Get items latest prices
 router.get('/items/latest-prices', async (req, res) => {
   try {
     const [rows] = await pool.query(`
@@ -193,25 +191,24 @@ router.get('/items/latest-prices', async (req, res) => {
   }
 });
 
-router.post('/pay-multiple', purchaseController.makePayment);
+// Payment routes
 router.post('/:id/pay', purchaseController.makePayment);
 router.get('/:id/payments', purchaseController.getPaymentHistory);
 router.get('/summary', paymentHistoryController.getPaymentSummary);
 router.get('/recent', paymentHistoryController.getRecentPayments);
 router.post('/update-statuses', purchaseController.updatePaymentStatuses);
 
+// Get purchase returns for bill
 router.get('/:id/return', purchaseController.getPurchaseReturnsForBill);
+
+// Get supplier bills from last 3 months
+router.get('/supplier/:supplierId/bills', purchaseController.getSupplierBills);
+
+// Add settlement to existing purchase return
+router.post('/:id/settle', purchaseController.addSettlementToReturn);
 
 // Parameterized routes must come LAST
 router.get('/:id', purchaseController.getPurchaseById);
 router.put('/:id', purchaseController.updatePurchase);
-
-// Get supplier bills from last 3 months (MUST come before parameterized routes)
-router.get('/supplier/:supplierId/bills', purchaseController.getSupplierBills);
-
-// =============================================
-// NEW: Add settlement to existing purchase return
-// =============================================
-router.post('/:id/settle', purchaseController.addSettlementToReturn);
 
 module.exports = router;

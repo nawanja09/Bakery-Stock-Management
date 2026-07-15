@@ -145,7 +145,17 @@ const PurchaseHistory = () => {
         setLoading(false);
       }
     };
+
     fetchData();
+
+    const refreshPurchases = () => {
+      fetchData();
+    };
+
+    window.addEventListener('purchase-payment-updated', refreshPurchases);
+    return () => {
+      window.removeEventListener('purchase-payment-updated', refreshPurchases);
+    };
   }, []);
 
   useEffect(() => {

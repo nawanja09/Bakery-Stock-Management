@@ -423,9 +423,6 @@ const AddPurchase = () => {
       }
       
       showPopup('success', successMessage);
-      setPendingRefreshKey((prev) => prev + 1);
-      window.dispatchEvent(new Event('purchase-payment-updated'));
-      navigate('/purchase/history');
     } catch (error) {
       console.error('Error creating purchase:', error);
       
