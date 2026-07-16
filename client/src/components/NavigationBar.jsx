@@ -291,40 +291,6 @@ const NavigationBar = () => {
                   </ul>
                 </li>
 
-
-                
-                    <li>
-                      <NavLink to="/issuance/history" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                        <span className="icon-container"><FontAwesomeIcon icon={faHistory} /></span>
-                        <span>Issuance History</span>
-                      </NavLink>
-                    </li>
-
-                {/* Wastage */}
-                <li>
-                  <NavLink to="/wastage/history" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                    <span className="icon-container"><FontAwesomeIcon icon={faHistory} /></span>
-                    <span>Wastage History</span>
-                  </NavLink>
-                </li>
-
-                {/* Returns */}
-                <li>
-                  <NavLink to="/returns/history" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                    <span className="icon-container"><FontAwesomeIcon icon={faUndo} /></span>
-                    <span>Department Returns</span>
-                  </NavLink>
-                </li>
-
-                                    
-                    <li>
-                      <NavLink to="/purchase-returns/history" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                        <span className="icon-container"><FontAwesomeIcon icon={faHistory} /></span>
-                        <span>Purchase Return View History</span>
-                      </NavLink>
-                    </li>
-
-
                 {/* Reports */}
                 <li className={`dropdown ${activeDropdown === 'reports' ? 'active' : ''}`}>
                   <div className="dropdown-header" onClick={() => toggleDropdown('reports')}>
@@ -334,16 +300,18 @@ const NavigationBar = () => {
                   </div>
                   <ul className="dropdown-menu">
                     <li><NavLink to="/reports/stock" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faBox} /></span><span>Stock Reports</span></NavLink></li>
+                    <li><NavLink to="/reports/stock/items" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faBox} /></span><span>Item Wise Stock Report</span></NavLink></li>
                     <li><NavLink to="/purchase/history" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faFileInvoice} /></span><span>Purchasing Summary</span></NavLink></li>
                     <li><NavLink to="/reports/purchasing" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faShoppingCart} /></span><span>Purchasing Item Detail</span></NavLink></li>
-                    <li><NavLink to="/reports/wastage" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faTrash} /></span><span>Wastage Report</span></NavLink></li>
-                    <li><NavLink to="/reports/department" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faShareSquare} /></span><span>Issuance Report</span></NavLink></li>
-                    <li><NavLink to="/reports/stock/items" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faBox} /></span><span>Item Wise Stock Report</span></NavLink></li>
+                    <li><NavLink to="/issuance/history" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faHistory} /></span><span>RM Issue Summary</span></NavLink></li>
+                    <li><NavLink to="/reports/department" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faShareSquare} /></span><span>RM Issue Item Detail</span></NavLink></li>
+                    <li><NavLink to="/wastage/history" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faHistory} /></span><span>RM Wastage Summary</span></NavLink></li>
+                    <li><NavLink to="/reports/wastage" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faTrash} /></span><span>RM Wastage Item Detail</span></NavLink></li>
+                    <li><NavLink to="/returns/history" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faUndo} /></span><span>Department Return Summary</span></NavLink></li>
                     <li><NavLink to="/reports/department-return-item-wise" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faShareSquare} /></span><span>Department Return Item Detail</span></NavLink></li>
+                    {/* <li><NavLink to="/purchase-returns/history" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faHistory} /></span><span>Purchase Return Summary</span></NavLink></li> */}
                   </ul>
                 </li>
-
-                
               </>
             )}
           </div>
