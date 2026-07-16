@@ -51,6 +51,9 @@
   background: var(--gray-50);
   padding: var(--space-md);
   transition: padding 0.3s ease;
+  max-width: 1600px;
+  margin: 0 auto;
+  box-sizing: border-box;
 }
 
 /* Tablet and up */
@@ -1049,6 +1052,137 @@
   min-height: 400px;
 }
 
+.search-filters-container {
+  display: grid;
+  /* Date Range | Search | Company | Paid Status | VAT — Date Range gets extra room for its two inputs */
+  grid-template-columns: 1.6fr 1.3fr 1fr 1fr 1fr;
+  align-items: end;
+  gap: 1.25rem 1.5rem;
+  padding: 1.25rem 1.5rem;
+  margin: 0 0 1.25rem;
+  background: white;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.filter-group label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--gray-600);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+}
+
+.filter-group input,
+.filter-group select {
+  width: 100%;
+  height: 42px;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--gray-300);
+  border-radius: var(--radius-md);
+  background: var(--gray-50);
+  color: var(--gray-800);
+  font-size: 0.9rem;
+  line-height: 1.2;
+  box-sizing: border-box;
+}
+
+.filter-group input:focus,
+.filter-group select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.12);
+}
+
+.date-range-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.date-range-group input {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 42px;
+  box-sizing: border-box;
+}
+
+.date-range-separator {
+  flex: 0 0 auto;
+  font-size: 0.8rem;
+  color: var(--gray-500);
+  white-space: nowrap;
+}
+
+/* Combined Invoice No. / Supplier search field */
+.search-input-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.search-input-wrapper .search-input-icon {
+  position: absolute;
+  left: 0.8rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--gray-400);
+  font-size: 0.85rem;
+  pointer-events: none;
+}
+
+.search-input-wrapper input {
+  padding-left: 2.1rem;
+}
+
+/* Tablet: two balanced columns, Date Range spans the full row so its two inputs stay full width */
+@media (max-width: 1024px) {
+  .search-filters-container {
+    grid-template-columns: repeat(2, 1fr);
+    padding: 1rem;
+    gap: 1rem;
+  }
+
+  .filter-group--date-range {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Mobile: everything stacks full width, date inputs stack vertically too */
+@media (max-width: 640px) {
+  .search-filters-container {
+    grid-template-columns: 1fr;
+    padding: 0.9rem;
+    gap: 0.75rem;
+  }
+
+  .filter-group--date-range {
+    grid-column: 1 / -1;
+  }
+
+  .date-range-group {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .date-range-separator {
+    display: none;
+  }
+}
+
 /* Empty State */
 .empty-state-responsive {
   text-align: center;
@@ -1115,13 +1249,15 @@
 
 .data-table-responsive th {
   padding: 1rem;
-  text-align: left;
-  font-weight: 600;
+  text-align: center !important;
+  vertical-align: middle !important;
+  font-weight: 700;
   color: var(--gray-700);
   font-size: 0.813rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   white-space: nowrap;
+  background: linear-gradient(135deg, var(--gray-50) 0%, white 100%);
 }
 
 .sortable-header {
@@ -1144,6 +1280,26 @@
   padding: 1rem;
   border-bottom: 1px solid var(--gray-100);
   color: var(--gray-800);
+  text-align: center !important;
+  vertical-align: middle !important;
+  font-size: 0.92rem;
+}
+
+.data-table-responsive th.text-left,
+.data-table-responsive th.text-right,
+.data-table-responsive th.amount-col,
+.data-table-responsive td.text-left,
+.data-table-responsive td.text-right,
+.data-table-responsive td.amount-col,
+.data-table-responsive .text-left,
+.data-table-responsive .text-right,
+.data-table-responsive .amount-col {
+  text-align: center !important;
+  vertical-align: middle !important;
+}
+
+.data-table-responsive tbody tr:hover td {
+  background-color: #f8fafc;
 }
 
 .data-row {
@@ -1193,6 +1349,10 @@
 .date-cell {
   display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  width: 100%;
   gap: 0.125rem;
 }
 
@@ -1232,11 +1392,11 @@
 }
 
 .amount-col {
-  text-align: right;
+  text-align: center;
 }
 
 .amount-cell {
-  text-align: right;
+  text-align: center;
   font-family: monospace;
 }
 

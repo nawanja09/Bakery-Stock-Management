@@ -105,8 +105,7 @@ const PurchaseHistory = () => {
   const [filteredPurchases, setFilteredPurchases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [companyFilter, setCompanyFilter] = useState('');
-  const [invoiceSearch, setInvoiceSearch] = useState('');
-  const [supplierSearch, setSupplierSearch] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [companies, setCompanies] = useState([]);
@@ -125,8 +124,7 @@ const PurchaseHistory = () => {
   const [quickFilter, setQuickFilter] = useState('all');
   const tableRef = useRef(null);
 
-  const debouncedInvoiceSearch = useDebounce(invoiceSearch, 300);
-  const debouncedSupplierSearch = useDebounce(supplierSearch, 300);
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -186,18 +184,12 @@ const PurchaseHistory = () => {
       });
     }
 
-    if (debouncedInvoiceSearch) {
-      const query = debouncedInvoiceSearch.toLowerCase();
+    if (debouncedSearchQuery) {
+      const query = debouncedSearchQuery.toLowerCase();
       filtered = filtered.filter(purchase => {
         const invoiceNumber = String(purchase.invoice_no || purchase.invoice_number || '');
-        return invoiceNumber.toLowerCase().includes(query);
-      });
-    }
-
-    if (debouncedSupplierSearch) {
-      const query = debouncedSupplierSearch.toLowerCase();
-      filtered = filtered.filter(purchase => {
-        return String(purchase.supplier_name || '').toLowerCase().includes(query);
+        const supplierName = String(purchase.supplier_name || '');
+        return invoiceNumber.toLowerCase().includes(query) || supplierName.toLowerCase().includes(query);
       });
     }
 
@@ -252,7 +244,7 @@ const PurchaseHistory = () => {
     }
 
     setFilteredPurchases(filtered);
-  }, [purchases, debouncedInvoiceSearch, debouncedSupplierSearch, companyFilter, startDate, endDate, statusFilter, vatFilter, sortConfig, quickFilter]);
+  }, [purchases, debouncedSearchQuery, companyFilter, startDate, endDate, statusFilter, vatFilter, sortConfig, quickFilter]);
 
   const handleSort = (key) => {
     setSortConfig({
@@ -323,8 +315,7 @@ const PurchaseHistory = () => {
   };
 
   const clearFilters = () => {
-    setInvoiceSearch('');
-    setSupplierSearch('');
+    setSearchQuery('');
     setCompanyFilter('');
     setStartDate('');
     setEndDate('');
@@ -333,7 +324,7 @@ const PurchaseHistory = () => {
     setQuickFilter('all');
   };
 
-  const hasActiveFilters = invoiceSearch || supplierSearch || companyFilter || startDate || endDate || statusFilter !== 'all' || vatFilter !== 'all' || quickFilter !== 'all';
+  const hasActiveFilters = searchQuery || companyFilter || startDate || endDate || statusFilter !== 'all' || vatFilter !== 'all' || quickFilter !== 'all';
 
   const summary = {
     total_purchases: filteredPurchases.length,
@@ -499,25 +490,30 @@ const PurchaseHistory = () => {
       </header>
 
       {/* Search and Filter Bar */}
-      <div className="search-filters-container" style={{ display: 'flex', flexWrap: 'wrap', gap: '15px', padding: '15px 20px', backgroundColor: '#fff', borderBottom: '1px solid #eee' }}>
-        <div className="filter-group">
-          <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Date Range</label>
-          <div style={{ display: 'flex', gap: '5px' }}>
-            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} style={{ padding: '6px', border: '1px solid #ddd', borderRadius: '4px' }} />
-            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} style={{ padding: '6px', border: '1px solid #ddd', borderRadius: '4px' }} />
+      <div className="search-filters-container">
+        <div className="filter-group filter-group--date-range">
+          <label>Date Range</label>
+          <div className="date-range-group">
+            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+            <span className="date-range-separator">to</span>
+            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
           </div>
         </div>
         <div className="filter-group">
-          <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Invoice No.</label>
-          <input type="text" placeholder="Search Invoice..." value={invoiceSearch} onChange={(e) => setInvoiceSearch(e.target.value)} style={{ padding: '6px', border: '1px solid #ddd', borderRadius: '4px' }} />
+          <label>Search</label>
+          <div className="search-input-wrapper">
+            <FontAwesomeIcon icon={faSearch} className="search-input-icon" />
+            <input
+              type="text"
+              placeholder="Search Invoice No. / Supplier"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
         </div>
         <div className="filter-group">
-          <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Supplier</label>
-          <input type="text" placeholder="Search Supplier..." value={supplierSearch} onChange={(e) => setSupplierSearch(e.target.value)} style={{ padding: '6px', border: '1px solid #ddd', borderRadius: '4px' }} />
-        </div>
-        <div className="filter-group">
-          <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Company</label>
-          <select value={companyFilter} onChange={(e) => setCompanyFilter(e.target.value)} style={{ padding: '6px', border: '1px solid #ddd', borderRadius: '4px' }}>
+          <label>Company</label>
+          <select value={companyFilter} onChange={(e) => setCompanyFilter(e.target.value)}>
             <option value="">All Companies</option>
             {companies.map(company => (
               <option key={company.id} value={company.id}>{company.name}</option>
@@ -525,8 +521,8 @@ const PurchaseHistory = () => {
           </select>
         </div>
         <div className="filter-group">
-          <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Paid Status</label>
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ padding: '6px', border: '1px solid #ddd', borderRadius: '4px' }}>
+          <label>Paid Status</label>
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
             <option value="all">All</option>
             <option value="Paid">Paid</option>
             <option value="Partially Paid">Partially Paid</option>
@@ -534,8 +530,8 @@ const PurchaseHistory = () => {
           </select>
         </div>
         <div className="filter-group">
-          <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>VAT</label>
-          <select value={vatFilter} onChange={(e) => setVatFilter(e.target.value)} style={{ padding: '6px', border: '1px solid #ddd', borderRadius: '4px' }}>
+          <label>VAT</label>
+          <select value={vatFilter} onChange={(e) => setVatFilter(e.target.value)}>
             <option value="all">All</option>
             <option value="with_vat">With VAT</option>
             <option value="without_vat">Without VAT</option>
