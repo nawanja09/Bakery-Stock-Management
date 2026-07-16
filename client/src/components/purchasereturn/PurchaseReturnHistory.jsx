@@ -270,18 +270,9 @@ const PurchaseReturnHistory = () => {
         {/* ROW 1 */}
         <div className="header-row-1">
           <div className="header-left">
-            <h1>
-              Purchase Returns History
-            </h1>
-            <p className="subtitle">
-              View and manage all purchase returns with settlement tracking
-            </p>
-          </div>
-
-          <div className="header-right">
-            <Link to="/purchase-returns/add" className="btn-primary">
-              <FontAwesomeIcon icon={faPlus} style={{ marginRight: '8px' }} /> New Return
-            </Link>
+            <h2>
+              Purchase Returns Summary
+            </h2>
           </div>
         </div>
 
@@ -342,28 +333,6 @@ const PurchaseReturnHistory = () => {
           </div>
         )}
       </div>
-
-      {/* SUMMARY CARDS */}
-      {filteredReturns.length > 0 && (
-        <div className="summary-cards">
-          <div className="summary-card">
-            <div className="summary-label">Total Returns</div>
-            <div className="summary-value">{filteredReturns.length}</div>
-          </div>
-          <div className="summary-card">
-            <div className="summary-label">Total Amount</div>
-            <div className="summary-value">{formatCurrency(filteredReturns.reduce((s, r) => s + r.total_amount, 0))}</div>
-          </div>
-          <div className="summary-card">
-            <div className="summary-label">Total Settled</div>
-            <div className="summary-value success-text">{formatCurrency(filteredReturns.reduce((s, r) => s + (r.settled_amount || 0), 0))}</div>
-          </div>
-          <div className="summary-card">
-            <div className="summary-label">Outstanding Balance</div>
-            <div className="summary-value warning-text">{formatCurrency(filteredReturns.reduce((s, r) => s + (r.balance_amount || 0), 0))}</div>
-          </div>
-        </div>
-      )}
 
       {/* TABLE */}
       <div className="table-container">
