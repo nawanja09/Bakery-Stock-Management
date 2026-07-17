@@ -93,6 +93,7 @@ import EditWastage from './components/wastage/EditWastage';
 import StoresBalance from './components/adjustments/StoresBalance';
 import StoresAdjustments from './components/adjustments/StoresAdjustments';
 import EditAdjustment from './components/adjustments/EditAdjustment';
+import PaymentMethodManagement from './components/adjustments/PaymentMethodManagement';
 
 import DepartmentReturnItemWiseReport from './components/report/DepartmentReturnItemWiseReport';
 
@@ -217,7 +218,7 @@ function App() {
             <Route path="adjustments/stores-balance" element={<StoresBalance />} />
             <Route path="adjustments/stores-adjustments" element={<StoresAdjustments />} />
             <Route path="adjustments/edit/:id" element={<EditAdjustment />} />
-
+            <Route path="adjustments/payment-methods" element={<PaymentMethodManagement />} />
             <Route path="/reports/department-return-item-wise" element={<DepartmentReturnItemWiseReport />} />
           </Route>
 

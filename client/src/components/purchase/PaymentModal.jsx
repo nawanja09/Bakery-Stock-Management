@@ -13,13 +13,14 @@ import {
 import dayjs from 'dayjs';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
+import usePaymentMethods from '../../utils/usePaymentMethods';
 import './PaymentModal.css';
 
 const PaymentModal = ({ purchase, onClose, onPaymentComplete }) => {
   const [formData, setFormData] = useState({
     payment_date: dayjs().format('YYYY-MM-DD'),
     amount: purchase.balance_amount,
-    payment_method: 'CASH',
+    payment_method: '',
     check_number: '',
     notes: ''
   });
@@ -31,6 +32,14 @@ const PaymentModal = ({ purchase, onClose, onPaymentComplete }) => {
   
   const { showPopup } = usePopup();
   const currentUser = JSON.parse(localStorage.getItem('user'));
+  const { paymentMethods, loadingMethods } = usePaymentMethods();
+
+  // Set default payment method once methods are loaded
+  useEffect(() => {
+    if (paymentMethods.length > 0 && !formData.payment_method) {
+      setFormData(prev => ({ ...prev, payment_method: paymentMethods[0].name }));
+    }
+  }, [paymentMethods]);
 
   useEffect(() => {
     fetchPaymentHistory();
@@ -69,7 +78,7 @@ const PaymentModal = ({ purchase, onClose, onPaymentComplete }) => {
       return false;
     }
 
-    if (formData.payment_method === 'CHEQUE' && !formData.check_number) {
+    if (formData.payment_method === 'Cheque' && !formData.check_number) {
       showPopup('error', 'Check number is required for cheque payments');
       return false;
     }
@@ -133,12 +142,11 @@ const PaymentModal = ({ purchase, onClose, onPaymentComplete }) => {
   };
 
   const getPaymentMethodIcon = (method) => {
-    switch(method) {
-      case 'CASH': return faMoneyBillWave;
-      case 'BANK_TRANSFER': return faUniversity;
-      case 'CHEQUE': return faCreditCard;
-      default: return faCreditCard;
-    }
+    const lower = (method || '').toLowerCase();
+    if (lower === 'cash') return faMoneyBillWave;
+    if (lower === 'bank' || lower.includes('transfer')) return faUniversity;
+    if (lower === 'cheque' || lower.includes('check')) return faCreditCard;
+    return faCreditCard;
   };
 
   return (
@@ -211,14 +219,19 @@ const PaymentModal = ({ purchase, onClose, onPaymentComplete }) => {
                 value={formData.payment_method}
                 onChange={handleChange}
                 required
+                disabled={loadingMethods}
               >
-                <option value="CASH">Cash</option>
-                <option value="BANK_TRANSFER">Bank Transfer</option>
-                <option value="CHEQUE">Cheque</option>
+                {loadingMethods ? (
+                  <option value="">Loading…</option>
+                ) : (
+                  paymentMethods.map(m => (
+                    <option key={m.id} value={m.name}>{m.name}</option>
+                  ))
+                )}
               </select>
             </div>
 
-            {formData.payment_method === 'CHEQUE' && (
+            {formData.payment_method === 'Cheque' && (
               <div className="form-group">
                 <label>Cheque Number *</label>
                 <input

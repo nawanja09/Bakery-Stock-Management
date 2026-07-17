@@ -43,4 +43,32 @@ const ensureItemTypeSchema = async () => {
 
 ensureItemTypeSchema();
 
+const ensurePaymentMethodsSchema = async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS payment_methods (
+        id INT NOT NULL AUTO_INCREMENT,
+        name VARCHAR(100) NOT NULL UNIQUE,
+        is_active TINYINT(1) NOT NULL DEFAULT 1,
+        created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    `);
+
+    const defaults = ['Cash', 'Cheque', 'Bank'];
+    for (const name of defaults) {
+      await pool.query(
+        'INSERT INTO payment_methods (name, is_active) SELECT ?, 1 WHERE NOT EXISTS (SELECT 1 FROM payment_methods WHERE name = ?)',
+        [name, name]
+      );
+    }
+    console.log('✅ payment_methods table ready');
+  } catch (error) {
+    console.warn('Payment methods schema check skipped:', error.message);
+  }
+};
+
+ensurePaymentMethodsSchema();
+
 module.exports = pool;

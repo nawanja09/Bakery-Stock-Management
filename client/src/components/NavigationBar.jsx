@@ -192,7 +192,7 @@ const NavigationBar = () => {
             </NavLink>
           </li>
           <li>
-            <NavLink to="/payment-methods" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+            <NavLink to="/adjustments/payment-methods" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
               <span className="icon-container"><FontAwesomeIcon icon={faCreditCard} /></span>
               <span>Payment Methods</span>
             </NavLink>
