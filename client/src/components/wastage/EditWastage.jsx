@@ -24,10 +24,15 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import './EditWastage.css';
 
-const EditWastage = () => {
-  const { id } = useParams();
+// props.embeddedId / props.onSaved / props.onCancel are optional.
+// When absent (standalone route usage via /wastage/edit/:id), behavior is unchanged.
+const EditWastage = ({ embeddedId, onSaved, onCancel } = {}) => {
+  const params = useParams();
+  const id = embeddedId || params.id;
   const navigate = useNavigate();
   const { showPopup } = usePopup();
+  const goBack = () => (onCancel ? onCancel() : navigate('/wastage/history'));
+  const goAfterSave = () => (onSaved ? onSaved() : navigate('/wastage/history'));
 
   const [items, setItems] = useState([]);
   const [filteredItems, setFilteredItems] = useState([]);
@@ -125,7 +130,7 @@ const EditWastage = () => {
           navigate('/login');
         } else if (error.response?.status === 404) {
           showPopup('error', 'Wastage record not found');
-          navigate('/wastage/history');
+          goBack();
         } else {
           showPopup('error', 'Failed to load wastage data');
         }
@@ -302,7 +307,7 @@ const EditWastage = () => {
 
       if (response.status === 200) {
         showPopup('success', `Wastage updated successfully! Note #: ${response.data.wastage_note_number || formData.wastage_note_number}`);
-        navigate('/wastage/history');
+        goAfterSave();
       }
     } catch (error) {
       console.error('Error updating wastage:', error);
@@ -313,7 +318,7 @@ const EditWastage = () => {
         navigate('/login');
       } else if (error.response?.status === 404) {
         showPopup('error', 'Wastage record not found');
-        navigate('/wastage/history');
+        goBack();
       } else {
         const errorMessage = error.response?.data?.error || 'Server error';
         showPopup('error', `Error: ${errorMessage}`);
@@ -344,9 +349,11 @@ const EditWastage = () => {
       {/* Header Section */}
       <div className="erp-page-header">
         <div className="erp-header-left">
-          <button onClick={() => navigate('/wastage/history')} className="erp-back-btn">
-            <FontAwesomeIcon icon={faArrowLeft} />
-          </button>
+          {!embeddedId && (
+            <button onClick={goBack} className="erp-back-btn">
+              <FontAwesomeIcon icon={faArrowLeft} />
+            </button>
+          )}
           <div className="erp-title-group">
             <div className="erp-breadcrumbs">
               <span>Inventory</span>
@@ -648,7 +655,7 @@ const EditWastage = () => {
           <div className="erp-action-bar-content">
             <button
               type="button"
-              onClick={() => navigate('/wastage/history')}
+              onClick={goBack}
               className="erp-btn erp-btn-ghost"
             >
               Cancel

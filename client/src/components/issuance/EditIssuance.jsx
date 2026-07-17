@@ -8,9 +8,15 @@ import Select from 'react-select';
 import { formatNumber } from '../../utils/formatters';
 import { FaTrashAlt } from "react-icons/fa";
 
-const EditIssuance = () => {
-  const { id } = useParams();
+// props.embeddedId / props.onSaved / props.onCancel are optional.
+// When absent (standalone route usage via /issuance/edit/:id), behavior is unchanged:
+// id comes from the URL and Cancel/Save navigate to /issuance/history as before.
+const EditIssuance = ({ embeddedId, onSaved, onCancel } = {}) => {
+  const params = useParams();
+  const id = embeddedId || params.id;
   const navigate = useNavigate();
+  const goBack = () => (onCancel ? onCancel() : navigate('/issuance/history'));
+  const goAfterSave = () => (onSaved ? onSaved() : navigate('/issuance/history'));
   const [departments, setDepartments] = useState([]);
   const [items, setItems] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
@@ -75,7 +81,7 @@ const EditIssuance = () => {
       } catch (error) {
         console.error('Error fetching issuance data:', error);
         showPopup('error', 'Failed to load issuance data');
-        navigate('/issuance/history');
+        goBack();
       } finally {
         setLoading(false);
       }
@@ -182,7 +188,7 @@ const EditIssuance = () => {
     try {
       await api.put(`/issuances/${id}`, payload);
       showPopup('success', 'Issuance updated successfully!');
-      navigate('/issuance/history');
+      goAfterSave();
     } catch (error) {
       console.error('Error updating issuance:', error);
       showPopup('error', 'Server error');
@@ -258,9 +264,11 @@ const EditIssuance = () => {
     <div className="issuance-container">
       <div className="header-with-actions">
         <h2>Edit RM Issue</h2>
-        <button onClick={() => navigate('/issuance/history')} className="btn-secondary">
-          ← Back to History
-        </button>
+        {!embeddedId && (
+          <button onClick={goBack} className="btn-secondary">
+            ← Back to History
+          </button>
+        )}
       </div>
 
       <form onSubmit={handleSubmit}>

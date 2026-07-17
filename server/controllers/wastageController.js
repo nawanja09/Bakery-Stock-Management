@@ -54,9 +54,15 @@ const createWastage = async (req, res) => {
 };
 
 // Get all wastages (excluding soft-deleted) with total loss
+// Supports optional filters (all backward compatible - omit any/all to get original behavior):
+//   reason            - exact match on the wastage reason enum
+//   item_id           - filter to wastages that contain a specific item
+//   startDate/endDate - inclusive date range (YYYY-MM-DD) on date
 const getAllWastages = async (req, res) => {
   try {
-    const [wastages] = await pool.query(`
+    const { reason, item_id, startDate, endDate } = req.query;
+
+    let query = `
       SELECT 
         w.id,
         w.wastage_note_number,
@@ -74,8 +80,29 @@ const getAllWastages = async (req, res) => {
       FROM wastages w
       LEFT JOIN users u ON w.entered_by = u.id
       WHERE COALESCE(w.deleted, 0) = 0
-      ORDER BY w.date DESC
-    `);
+    `;
+    const params = [];
+
+    if (reason) {
+      query += ` AND w.reason = ?`;
+      params.push(reason);
+    }
+
+    if (startDate && endDate) {
+      query += ` AND w.date BETWEEN ? AND ?`;
+      params.push(startDate, endDate);
+    }
+
+    if (item_id) {
+      query += ` AND EXISTS (
+        SELECT 1 FROM wastage_items wi2 WHERE wi2.wastage_id = w.id AND wi2.item_id = ?
+      )`;
+      params.push(item_id);
+    }
+
+    query += ` ORDER BY w.date DESC`;
+
+    const [wastages] = await pool.query(query, params);
 
     // Optionally, also fetch items for each wastage if you want to display them
     // in the history list (though you already fetch them in the modal view)

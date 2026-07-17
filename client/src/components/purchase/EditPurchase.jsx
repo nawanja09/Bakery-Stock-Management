@@ -9,10 +9,15 @@ import { faArrowLeft, faSave, faPlus, faTrash, faMoneyBillWave, faCreditCard, fa
 import dayjs from 'dayjs';
 import './NewPurchase.css';
 
-const EditPurchase = () => {
-  const { id } = useParams();
+// props.embeddedId / props.onSaved / props.onCancel are optional.
+// When absent (standalone route usage via /purchase/edit/:id), behavior is unchanged.
+const EditPurchase = ({ embeddedId, onSaved, onCancel } = {}) => {
+  const params = useParams();
+  const id = embeddedId || params.id;
   const navigate = useNavigate();
   const { showPopup } = usePopup();
+  const goBack = () => (onCancel ? onCancel() : navigate('/purchase/history'));
+  const goAfterSave = () => (onSaved ? onSaved() : navigate('/purchase/history'));
 
   const [suppliers, setSuppliers] = useState([]);
   const [itemsList, setItemsList] = useState([]);
@@ -141,7 +146,7 @@ const EditPurchase = () => {
       } catch (error) {
         console.error('Error fetching purchase data:', error);
         showPopup('error', 'Failed to load purchase data');
-        navigate('/purchase/history');
+        goBack();
       }
     };
 
@@ -484,7 +489,7 @@ const EditPurchase = () => {
       }
       
       showPopup('success', successMessage);
-      navigate('/purchase/history');
+      goAfterSave();
     } catch (error) {
       console.error('Error updating purchase:', error);
       
@@ -556,9 +561,11 @@ const EditPurchase = () => {
     <div className="purchase-form-container">
       <div className="page-header">
         <div className="header-title">
-          <button onClick={() => navigate('/purchase/history')} className="back-button">
-            <FontAwesomeIcon icon={faArrowLeft} />
-          </button>
+          {!embeddedId && (
+            <button onClick={goBack} className="back-button">
+              <FontAwesomeIcon icon={faArrowLeft} />
+            </button>
+          )}
            <h1>Edit RM Purchase Invoice</h1>
         </div>
       </div>
@@ -776,7 +783,7 @@ const EditPurchase = () => {
         </div>
 
         <div className="form-actions">
-          <button type="button" onClick={() => navigate('/purchase/history')} className="btn btn-secondary">
+          <button type="button" onClick={goBack} className="btn btn-secondary">
             Cancel
           </button>
           <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
