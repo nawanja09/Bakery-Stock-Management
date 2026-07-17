@@ -60,9 +60,15 @@ const createIssuance = async (req, res) => {
 };
 
 // Get all issuances with items and quantities
+// Supports optional filters (all backward compatible - omit any/all to get original behavior):
+//   department_id  - filter to a single department
+//   item_id        - filter to issuances that contain a specific item
+//   startDate/endDate - inclusive date range (YYYY-MM-DD) on issuance_date
 const getAllIssuances = async (req, res) => {
   try {
-    const [issuances] = await pool.query(`
+    const { department_id, item_id, startDate, endDate } = req.query;
+
+    let query = `
       SELECT
         i.id,
         i.issuance_date,
@@ -70,6 +76,7 @@ const getAllIssuances = async (req, res) => {
         TIME_FORMAT(i.issuance_date, '%H:%i') AS issuance_time,
         u.email AS issued_by_email,
         d.name AS department_name,
+        i.department_id,
         i.received_by,
         i.remarks,
         i.approved_by,
@@ -77,8 +84,30 @@ const getAllIssuances = async (req, res) => {
       FROM issuances i
       JOIN users u ON i.issued_by = u.id
       JOIN departments d ON i.department_id = d.id
-      ORDER BY i.issuance_date DESC
-    `);
+      WHERE 1=1
+    `;
+    const params = [];
+
+    if (department_id) {
+      query += ` AND i.department_id = ?`;
+      params.push(department_id);
+    }
+
+    if (startDate && endDate) {
+      query += ` AND DATE(i.issuance_date) BETWEEN ? AND ?`;
+      params.push(startDate, endDate);
+    }
+
+    if (item_id) {
+      query += ` AND EXISTS (
+        SELECT 1 FROM issuance_items ii2 WHERE ii2.issuance_id = i.id AND ii2.item_id = ?
+      )`;
+      params.push(item_id);
+    }
+
+    query += ` ORDER BY i.issuance_date DESC`;
+
+    const [issuances] = await pool.query(query, params);
 
     // Get items for each issuance
     for (let issuance of issuances) {
@@ -87,6 +116,7 @@ const getAllIssuances = async (req, res) => {
           it.item_code, 
           it.name AS item_name,
           it.unit,
+          ii.item_id,
           ii.quantity
         FROM issuance_items ii
         JOIN items it ON ii.item_id = it.id

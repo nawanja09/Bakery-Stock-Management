@@ -177,9 +177,16 @@ const createPurchase = async (req, res) => {
 };
 
 // Get all purchases
+// Supports optional filters (all backward compatible - omit any/all to get original behavior):
+//   supplier_id       - filter to a single supplier
+//   invoice_no        - partial match on invoice number
+//   startDate/endDate - inclusive date range (YYYY-MM-DD) on purchase_date
+//   payment_status    - exact match on payment_status enum ('Paid' | 'Partially Paid' | 'Non-Paid')
 const getAllPurchases = async (req, res) => {
   try {
-    const [purchases] = await pool.query(`
+    const { supplier_id, invoice_no, startDate, endDate, payment_status } = req.query;
+
+    let query = `
       SELECT 
         p.id,
         p.invoice_no,
@@ -192,6 +199,7 @@ const getAllPurchases = async (req, res) => {
         p.payment_status,
         p.payment_method,
         p.check_number,
+        p.supplier_id,
         s.name AS supplier_name,
         s.vat_number AS supplier_vat_number,
         c.name AS company_name,
@@ -199,9 +207,33 @@ const getAllPurchases = async (req, res) => {
       FROM purchases p
       JOIN supplier s ON p.supplier_id = s.id
       JOIN company c ON p.company_id = c.id
-      WHERE p.deleted = FALSE OR p.deleted IS NULL
-      ORDER BY p.purchase_date DESC, p.id DESC
-    `);
+      WHERE (p.deleted = FALSE OR p.deleted IS NULL)
+    `;
+    const params = [];
+
+    if (supplier_id) {
+      query += ` AND p.supplier_id = ?`;
+      params.push(supplier_id);
+    }
+
+    if (invoice_no) {
+      query += ` AND p.invoice_no LIKE ?`;
+      params.push(`%${invoice_no}%`);
+    }
+
+    if (startDate && endDate) {
+      query += ` AND DATE(p.purchase_date) BETWEEN ? AND ?`;
+      params.push(startDate, endDate);
+    }
+
+    if (payment_status && payment_status !== 'all') {
+      query += ` AND p.payment_status = ?`;
+      params.push(payment_status);
+    }
+
+    query += ` ORDER BY p.purchase_date DESC, p.id DESC`;
+
+    const [purchases] = await pool.query(query, params);
 
     for (let purchase of purchases) {
       purchase.invoice_no = purchase.invoice_no ? String(purchase.invoice_no) : 'N/A';

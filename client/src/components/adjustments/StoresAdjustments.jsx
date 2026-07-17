@@ -10,6 +10,16 @@ import {
 import api from '../../api';
 import './Adjustments.css';
 import { formatCurrency, formatNumber, formatQuantity } from '../../utils/formatters';
+import InvoiceAdjustmentsTab from './tabs/InvoiceAdjustmentsTab';
+import IssuanceAdjustmentsTab from './tabs/IssuanceAdjustmentsTab';
+import WastageAdjustmentsTab from './tabs/WastageAdjustmentsTab';
+
+const SUMMARY_TABS = [
+  { key: 'Department', label: 'Department Adjustments' },
+  { key: 'Invoice', label: 'Invoice Adjustments' },
+  { key: 'Issuance', label: 'Issuance Adjustments' },
+  { key: 'Wastage', label: 'Wastage Adjustments' },
+];
 
 // Reusable Skeleton Component
 const TableSkeleton = ({ rows = 5, cols = 8 }) => (
@@ -105,6 +115,10 @@ const SummaryCard = ({ label, value, sub, icon, type = 'primary' }) => (
 
 const StoresAdjustments = () => {
   const navigate = useNavigate();
+
+  // Category tabs added on top of the existing Department (stock_adjustments) view.
+  // Defaults to Department so existing behavior is unchanged unless another tab is picked.
+  const [activeTab, setActiveTab] = useState('Department');
 
   // State
   const [adjustments, setAdjustments] = useState([]);
@@ -306,6 +320,28 @@ const StoresAdjustments = () => {
         */}
       </div>
 
+      {/* Category Tabs */}
+      <div className="filter-card" style={{ padding: '8px', marginBottom: '20px' }}>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          {SUMMARY_TABS.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              className={`btn ${activeTab === tab.key ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setActiveTab(tab.key)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {activeTab === 'Invoice' && <InvoiceAdjustmentsTab />}
+      {activeTab === 'Issuance' && <IssuanceAdjustmentsTab />}
+      {activeTab === 'Wastage' && <WastageAdjustmentsTab />}
+
+      {activeTab === 'Department' && (
+      <>
       {/* Summary Cards */}
       <div className="summary-cards">
         <SummaryCard 
@@ -592,6 +628,8 @@ const StoresAdjustments = () => {
             </div>
           </div>
         </div>
+      )}
+      </>
       )}
 
       {/* Modal */}

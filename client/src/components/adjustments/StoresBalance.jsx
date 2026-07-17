@@ -8,6 +8,9 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import api from '../../api';
 import './Adjustments.css';
+import CategoryAdjustmentPanel from './CategoryAdjustmentPanel';
+
+const ADJUSTMENT_CATEGORIES = ['Department', 'Invoice', 'Issuance', 'Wastage'];
 
 // Reusable Modal Component
 const Modal = ({ isOpen, onClose, title, message, type = 'info', onConfirm, confirmText = 'Confirm', cancelText = 'Cancel' }) => {
@@ -55,6 +58,10 @@ const EMPTY_ROW = {
 
 const StoresBalance = () => {
   const navigate = useNavigate();
+
+  // "Select Category of Adjustments" - defaults to Department, which is the
+  // existing Stock Count Details workflow below (unchanged behavior).
+  const [adjustmentCategory, setAdjustmentCategory] = useState('Department');
 
   const [generalInfo, setGeneralInfo] = useState({
     date: new Date().toISOString().slice(0, 16),
@@ -272,15 +279,40 @@ const StoresBalance = () => {
         <div className="adjustments-header-left">
           <h1>RM Adjustment</h1>
         </div>
-        <div className="adjustments-header-actions">
-          <button 
-            type="button" 
-            className="btn btn-secondary" 
-            onClick={clearAllRows}
-            disabled={loading}
+        {adjustmentCategory === 'Department' && (
+          <div className="adjustments-header-actions">
+            <button 
+              type="button" 
+              className="btn btn-secondary" 
+              onClick={clearAllRows}
+              disabled={loading}
+            >
+              <FontAwesomeIcon icon={faTimes} /> Clear All
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Select Category of Adjustments - controls which edit interface loads below,
+          without leaving the RM Adjustments page or creating separate routes. */}
+      <div className="form-section">
+        <div className="form-group" style={{ maxWidth: '360px' }}>
+          <label>
+            <FontAwesomeIcon icon={faFileAlt} /> Select Category of Adjustments
+          </label>
+          <select
+            value={adjustmentCategory}
+            onChange={(e) => setAdjustmentCategory(e.target.value)}
           >
-            <FontAwesomeIcon icon={faTimes} /> Clear All
-          </button>
+            {ADJUSTMENT_CATEGORIES.map((cat) => (
+              <option key={cat} value={cat}>{cat}</option>
+            ))}
+          </select>
+          <span className="help-text">
+            {adjustmentCategory === 'Department'
+              ? 'Stock count adjustment using General Information + Stock Count Details below.'
+              : `Select an existing ${adjustmentCategory.toLowerCase()} record to view and modify.`}
+          </span>
         </div>
       </div>
 
@@ -291,6 +323,11 @@ const StoresBalance = () => {
         </div>
       )}
 
+      {adjustmentCategory !== 'Department' && (
+        <CategoryAdjustmentPanel category={adjustmentCategory} />
+      )}
+
+      {adjustmentCategory === 'Department' && (
       <form className="adjustments-form" onSubmit={handleSubmit}>
         {/* General Information Section */}
         <div className="form-section">
@@ -504,6 +541,7 @@ const StoresBalance = () => {
           </button>
         </div>
       </form>
+      )}
 
       {/* Modal */}
       <Modal
