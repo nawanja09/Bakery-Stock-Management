@@ -47,6 +47,8 @@ const paymentRoutes = require('./routes/paymentRoutes');
 const expenseRoutes = require('./routes/expenseRoutes');
 const payeeRoutes = require('./routes/payeeRoutes');
 const supplierCreditRoutes = require('./routes/supplierCreditRoutes');
+const itemTypeRoutes = require('./routes/itemTypeRoutes');
+const companyRoutes = require('./routes/companyRoutes');
 
 
 const app = express();
@@ -122,6 +124,8 @@ app.use('/api/purchase-returns', purchaseReturnRoutes);
 app.use('/api/purchases', paymentRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/suppliers', supplierCreditRoutes);
+app.use('/api/item-types', itemTypeRoutes);
+app.use('/api/companies', companyRoutes);
 
 // Error handling middleware for file uploads
 app.use((err, req, res, next) => {

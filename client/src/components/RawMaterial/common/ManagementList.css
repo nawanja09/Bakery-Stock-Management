@@ -1,0 +1,177 @@
+/* Shared styling for Raw Material management list pages
+   (RM Type, Department, Companies) */
+
+.rm-mgmt-container {
+  padding: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+  font-family: 'Inter', sans-serif;
+  color: #333;
+}
+
+/* Header */
+.rm-mgmt-header {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.rm-mgmt-header h2 {
+  font-size: 1.8rem;
+  margin: 0;
+  font-weight: 600;
+}
+
+.rm-mgmt-subtitle {
+  margin: 4px 0 0;
+  color: #6c757d;
+  font-size: 0.95rem;
+}
+
+.rm-mgmt-header-top {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.btn-add-rm {
+  align-self: flex-start;
+  background: linear-gradient(90deg, #6722e6, #a98cf7);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-add-rm:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(103, 34, 230, 0.3);
+}
+
+/* Search bar */
+.rm-mgmt-search {
+  position: relative;
+  width: 100%;
+  max-width: 320px;
+}
+
+.rm-mgmt-search svg {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #adb5bd;
+  font-size: 15px;
+}
+
+.rm-mgmt-search input {
+  width: 100%;
+  padding: 10px 12px 10px 36px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  transition: border 0.2s, box-shadow 0.2s;
+  box-sizing: border-box;
+}
+
+.rm-mgmt-search input:focus {
+  outline: none;
+  border-color: #6722e6;
+  box-shadow: 0 0 0 3px rgba(103, 34, 230, 0.1);
+}
+
+/* Table container */
+.rm-mgmt-table-container {
+  overflow-x: auto;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.08);
+  padding: 10px;
+}
+
+/* Table styling */
+.rm-mgmt-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 500px;
+}
+
+.rm-mgmt-table th,
+.rm-mgmt-table td {
+  padding: 14px 12px;
+  text-align: left;
+}
+
+.rm-mgmt-table th {
+  background: #f8f9fa;
+  font-weight: 600;
+  color: #495057;
+  border-bottom: 2px solid #e9ecef;
+}
+
+.rm-mgmt-table td {
+  border-bottom: 1px solid #f1f3f5;
+}
+
+.rm-mgmt-table tbody tr:hover {
+  background-color: #f8f9fa;
+}
+
+.rm-id-cell {
+  font-weight: 600;
+  color: #6722e6;
+}
+
+.rm-name-cell {
+  font-weight: 500;
+}
+
+.rm-date-cell {
+  color: #6c757d;
+}
+
+.rm-count-badge {
+  color: #6c757d;
+  font-weight: 500;
+  font-size: 0.95rem;
+}
+
+/* Loading, error and empty states */
+.rm-mgmt-loading,
+.rm-mgmt-no-data {
+  text-align: center;
+  padding: 40px;
+  font-size: 16px;
+  color: #6c757d;
+}
+
+/* Responsive */
+@media (min-width: 768px) {
+  .rm-mgmt-header-top {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+}
+
+@media (max-width: 576px) {
+  .rm-mgmt-table th,
+  .rm-mgmt-table td {
+    padding: 12px 8px;
+    font-size: 14px;
+  }
+
+  .btn-add-rm {
+    width: 100%;
+    text-align: center;
+  }
+
+  .rm-mgmt-search {
+    max-width: 100%;
+  }
+}
