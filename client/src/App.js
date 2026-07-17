@@ -27,6 +27,10 @@ import WastageReport from './components/report/WastageReport/WastageReport';
 import ItemWiseStockReport from './components/report/StockReportByRangeAndItem';
 import ManageUsers from './components/admin/ManageUsers';
 
+import ItemTypes from './components/RawMaterial/ItemTypes/ItemTypes';
+import Departments from './components/RawMaterial/Departments/Departments';
+import Companies from './components/RawMaterial/Companies/Companies';
+
 import AddFinishedGoodsItem from './components/FinishedGoods/Item Management - FS/AddFinishedGoodsItem';
 import EditFinishedGoodsItem from './components/FinishedGoods/Item Management - FS/EditFinishedGoodsItem';
 import ViewFinishedGoodsItems from './components/FinishedGoods/Item Management - FS/ViewFinishedGoodsItems';
@@ -132,6 +136,9 @@ function App() {
             <Route path="items/add" element={<AddItem />} />
             <Route path="items" element={<ViewItems />} />
             <Route path="items/edit/:id" element={<EditItem />} />
+            <Route path="item-types" element={<ItemTypes />} />
+            <Route path="departments" element={<Departments />} />
+            <Route path="companies" element={<Companies />} />
             <Route path="admin/password" element={<ChangePassword />} />
             <Route path="opening/add" element={<AddOpeningBalance />} />
             <Route path="opening/history" element={<OpeningBalanceHistory />} />
