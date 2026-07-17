@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import Select from 'react-select';
 import './Wastage.css';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
@@ -7,12 +8,8 @@ import api from '../../api';
 const AddWastage = () => {
   const navigate = useNavigate();
   const [items, setItems] = useState([]);
-  const [filteredItems, setFilteredItems] = useState([]);
   const [itemPrices, setItemPrices] = useState({});
-  const [searchTerm, setSearchTerm] = useState('');
-  const [activeSearchIndex, setActiveSearchIndex] = useState(null);
   const { showPopup } = usePopup();
-  const searchInputRefs = useRef({});
 
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -32,7 +29,6 @@ const AddWastage = () => {
         ]);
         
         setItems(itemsRes.data);
-        setFilteredItems(itemsRes.data);
         setItemPrices(pricesRes.data);
         
       } catch (error) {
@@ -42,19 +38,6 @@ const AddWastage = () => {
 
     fetchData();
   }, []);
-
-  // Filter items based on search term
-  useEffect(() => {
-    if (searchTerm.trim() === '') {
-      setFilteredItems(items);
-    } else {
-      const filtered = items.filter(item => 
-        item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.item_code.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-      setFilteredItems(filtered);
-    }
-  }, [searchTerm, items]);
 
   // Auto-calculate estimated loss whenever quantity or unit_price changes
   const calculateEstimatedLoss = (quantity, unitPrice) => {
@@ -93,30 +76,17 @@ const AddWastage = () => {
   };
 
   // Handle item selection from search dropdown
-  const handleItemSelect = (index, itemId) => {
-    handleItemChange(index, 'item_id', itemId);
-    // Clear search term and close dropdown
-    setSearchTerm('');
-    setActiveSearchIndex(null);
-    // Focus back on search input
-    if (searchInputRefs.current[index]) {
-      searchInputRefs.current[index].focus();
-    }
-  };
-
-  // Handle search input change
-  const handleSearchChange = (index, value) => {
-    // If there's a selected item and user types, clear the selection
-    if (formData.items[index].item_id) {
+  const handleItemSelect = (index, selectedOption) => {
+    if (!selectedOption) {
+      handleItemChange(index, 'item_id', '');
       const newItems = [...formData.items];
-      newItems[index].item_id = '';
       newItems[index].unit = '';
       newItems[index].unit_price = 0;
       newItems[index].estimated_loss = 0;
       setFormData({ ...formData, items: newItems });
+      return;
     }
-    setSearchTerm(value);
-    setActiveSearchIndex(index);
+    handleItemChange(index, 'item_id', selectedOption.value);
   };
 
   const calculateTotalLoss = () => {
@@ -177,12 +147,10 @@ const AddWastage = () => {
     }
   };
 
-  // Get display name for selected item
-  const getSelectedItemName = (itemId) => {
-    if (!itemId) return '';
-    const item = items.find(i => String(i.id) === String(itemId));
-    return item ? `${item.name} (${item.item_code})` : '';
-  };
+  const itemOptions = items.map(itm => ({
+    value: itm.id,
+    label: `${itm.name} ${itm.item_code ? `(${itm.item_code})` : ''}`
+  }));
 
   // Get unit price display
   const getUnitPriceDisplay = (itemId) => {
@@ -262,59 +230,23 @@ const AddWastage = () => {
             {formData.items.map((item, index) => (
               <tr key={index}>
                 <td>
-                  <div className="item-search-container">
-                    <input
-                      ref={el => searchInputRefs.current[index] = el}
-                      type="text"
-                      placeholder="Search item by name or code..."
-                      value={item.item_id ? getSelectedItemName(item.item_id) : searchTerm}
-                      onChange={(e) => handleSearchChange(index, e.target.value)}
-                      onFocus={() => {
-                        if (item.item_id) {
-                          setSearchTerm('');
-                          const newItems = [...formData.items];
-                          newItems[index].item_id = '';
-                          newItems[index].unit = '';
-                          newItems[index].unit_price = 0;
-                          newItems[index].estimated_loss = 0;
-                          setFormData({ ...formData, items: newItems });
-                        }
-                        setActiveSearchIndex(index);
-                      }}
-                      onBlur={() => {
-                        // Delay closing dropdown to allow click on dropdown items
-                        setTimeout(() => {
-                          setActiveSearchIndex(null);
-                        }, 200);
-                      }}
-                      className="item-search-input"
-                    />
-                    {activeSearchIndex === index && searchTerm && !item.item_id && (
-                      <div className="search-dropdown">
-                        {filteredItems.length === 0 ? (
-                          <div className="search-no-results">No items found</div>
-                        ) : (
-                          filteredItems.map((itm) => {
-                            const priceData = itemPrices[itm.id];
-                            const price = priceData?.unit_price || 0;
-                            return (
-                              <div
-                                key={itm.id}
-                                className="search-item"
-                                onClick={() => handleItemSelect(index, itm.id)}
-                                onMouseDown={(e) => e.preventDefault()}
-                              >
-                                <span className="search-item-code">{itm.item_code}</span>
-                                <span className="search-item-name">{itm.name}</span>
-                                <span className="search-item-unit">({itm.unit})</span>
-                                <span className="search-item-price">Rs. {price.toFixed(2)}</span>
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
-                    )}
-                  </div>
+                  <Select
+                    options={itemOptions}
+                    value={itemOptions.find(opt => opt.value === item.item_id) || null}
+                    onChange={(selected) => handleItemSelect(index, selected)}
+                    isSearchable
+                    isClearable
+                    placeholder="Select item..."
+                    styles={{
+                      control: (base) => ({
+                        ...base,
+                        minHeight: '38px',
+                        borderColor: '#ced4da'
+                      }),
+                      menuPortal: (base) => ({ ...base, zIndex: 9999 })
+                    }}
+                    menuPortalTarget={document.body}
+                  />
                 </td>
                 <td>
                   <input
