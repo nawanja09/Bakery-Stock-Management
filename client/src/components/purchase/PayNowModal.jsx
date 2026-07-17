@@ -5,15 +5,17 @@ import { faTimes, faPaperPlane, faInfoCircle, faMoneyBillWave, faSpinner } from 
 import dayjs from 'dayjs';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
+import usePaymentMethods from '../../utils/usePaymentMethods';
 import './PayNowModal.css';
 
 const PayNowModal = ({ isOpen, onClose, supplierId, supplierName, onSuccess }) => {
   const { showPopup } = usePopup();
   const currentUser = JSON.parse(localStorage.getItem('user'));
+  const { paymentMethods, loadingMethods } = usePaymentMethods();
 
   const defaultForm = {
     payment_date: dayjs().format('YYYY-MM-DD'),
-    payment_method: 'CASH',
+    payment_method: '',
     voucher_number: '',
     reference_number: '',
     amount: '',
@@ -23,11 +25,19 @@ const PayNowModal = ({ isOpen, onClose, supplierId, supplierName, onSuccess }) =
   const [formData, setFormData] = useState(defaultForm);
   const [submitting, setSubmitting] = useState(false);
 
+  // Set default payment method once methods are loaded
+  useEffect(() => {
+    if (paymentMethods.length > 0 && !formData.payment_method) {
+      setFormData(prev => ({ ...prev, payment_method: paymentMethods[0].name }));
+    }
+  }, [paymentMethods]);
+
   useEffect(() => {
     if (isOpen) {
       setFormData({
         ...defaultForm,
-        payment_date: dayjs().format('YYYY-MM-DD')
+        payment_date: dayjs().format('YYYY-MM-DD'),
+        payment_method: paymentMethods.length > 0 ? paymentMethods[0].name : ''
       });
     }
   }, [isOpen]);
@@ -45,7 +55,7 @@ const PayNowModal = ({ isOpen, onClose, supplierId, supplierName, onSuccess }) =
 
     if (!formData.payment_date) return showPopup('error', 'Payment date is required');
     if (!amt || amt <= 0) return showPopup('error', 'Amount must be greater than 0');
-    if (formData.payment_method === 'CHEQUE' && !formData.reference_number)
+    if (formData.payment_method === 'Cheque' && !formData.reference_number)
       return showPopup('error', 'Cheque number is required');
     if (!currentUser?.id) return showPopup('error', 'Please login again');
 
@@ -125,10 +135,14 @@ const PayNowModal = ({ isOpen, onClose, supplierId, supplierName, onSuccess }) =
               </div>
               <div className="pnm-form-group">
                 <label>Payment Method *</label>
-                <select name="payment_method" value={formData.payment_method} onChange={handleChange} required>
-                  <option value="CASH">Cash</option>
-                  <option value="BANK_TRANSFER">Bank Account</option>
-                  <option value="CHEQUE">Cheque</option>
+                <select name="payment_method" value={formData.payment_method} onChange={handleChange} required disabled={loadingMethods}>
+                  {loadingMethods ? (
+                    <option value="">Loading…</option>
+                  ) : (
+                    paymentMethods.map(m => (
+                      <option key={m.id} value={m.name}>{m.name}</option>
+                    ))
+                  )}
                 </select>
               </div>
             </div>
@@ -145,14 +159,14 @@ const PayNowModal = ({ isOpen, onClose, supplierId, supplierName, onSuccess }) =
                 />
               </div>
               <div className="pnm-form-group">
-                <label>{formData.payment_method === 'CHEQUE' ? 'Cheque Number *' : 'Reference / Cheque No.'}</label>
+                <label>{formData.payment_method === 'Cheque' ? 'Cheque Number *' : 'Reference / Cheque No.'}</label>
                 <input
                   type="text"
                   name="reference_number"
                   value={formData.reference_number}
                   onChange={handleChange}
                   placeholder="Optional"
-                  required={formData.payment_method === 'CHEQUE'}
+                  required={formData.payment_method === 'Cheque'}
                 />
               </div>
             </div>

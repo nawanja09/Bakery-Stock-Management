@@ -7,17 +7,19 @@ import {
 import dayjs from 'dayjs';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
+import usePaymentMethods from '../../utils/usePaymentMethods';
 import './InvoicePaymentModal.css';
 
 const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierName, onSuccess }) => {
   const { showPopup } = usePopup();
   const currentUser = JSON.parse(localStorage.getItem('user'));
+  const { paymentMethods, loadingMethods } = usePaymentMethods();
 
   const totalBalance = selectedInvoices.reduce((s, inv) => s + parseFloat(inv.balance_amount || 0), 0);
 
   const [formData, setFormData] = useState({
     payment_date: dayjs().format('YYYY-MM-DD'),
-    payment_method: 'CASH',
+    payment_method: '',
     voucher_number: '',
     check_number: '',
     amount: totalBalance,
@@ -25,9 +27,20 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
   });
   const [submitting, setSubmitting] = useState(false);
 
+  // Set default payment method once methods are loaded
+  useEffect(() => {
+    if (paymentMethods.length > 0 && !formData.payment_method) {
+      setFormData(prev => ({ ...prev, payment_method: paymentMethods[0].name }));
+    }
+  }, [paymentMethods]);
+
   useEffect(() => {
     if (isOpen) {
-      setFormData(prev => ({ ...prev, amount: totalBalance }));
+      setFormData(prev => ({
+        ...prev,
+        amount: totalBalance,
+        payment_method: paymentMethods.length > 0 ? paymentMethods[0].name : prev.payment_method
+      }));
     }
   }, [isOpen, totalBalance]);
 
@@ -64,7 +77,7 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
 
     if (!formData.payment_date) return showPopup('error', 'Payment date is required');
     if (formData.amount <= 0) return showPopup('error', 'Amount must be greater than 0');
-    if (formData.payment_method === 'CHEQUE' && !formData.check_number) {
+    if (formData.payment_method === 'Cheque' && !formData.check_number) {
       return showPopup('error', 'Cheque number is required');
     }
     if (!currentUser?.id) return showPopup('error', 'Please login again');
@@ -168,10 +181,14 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
               </div>
               <div className="ipm-form-group">
                 <label>Payment Method *</label>
-                <select name="payment_method" value={formData.payment_method} onChange={handleChange} required>
-                  <option value="CASH">Cash</option>
-                  <option value="BANK_TRANSFER">Bank Account</option>
-                  <option value="CHEQUE">Cheque</option>
+                <select name="payment_method" value={formData.payment_method} onChange={handleChange} required disabled={loadingMethods}>
+                  {loadingMethods ? (
+                    <option value="">Loading…</option>
+                  ) : (
+                    paymentMethods.map(m => (
+                      <option key={m.id} value={m.name}>{m.name}</option>
+                    ))
+                  )}
                 </select>
               </div>
             </div>
@@ -188,14 +205,14 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
                 />
               </div>
               <div className="ipm-form-group">
-                <label>{formData.payment_method === 'CHEQUE' ? 'Cheque Number *' : 'Reference / Cheque No.'}</label>
+                <label>{formData.payment_method === 'Cheque' ? 'Cheque Number *' : 'Reference / Cheque No.'}</label>
                 <input
                   type="text"
                   name="check_number"
                   value={formData.check_number}
                   onChange={handleChange}
                   placeholder="Optional"
-                  required={formData.payment_method === 'CHEQUE'}
+                  required={formData.payment_method === 'Cheque'}
                 />
               </div>
             </div>
