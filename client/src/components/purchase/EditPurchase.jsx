@@ -666,15 +666,14 @@ const EditPurchase = ({ embeddedId, onSaved, onCancel } = {}) => {
               </thead>
               <tbody>
                 {formData.items.map((item, index) => {
-                  const selectedOption = item.id ? itemOptions.find(opt => opt.value === item.id) : null;
+                  const selectedOption = item.id ? itemOptions.find(opt => String(opt.value) === String(item.id)) : null;
                   const previousPrice = previousPurchasePrices[item.id] || 0;
-                  
                   return (
                     <tr key={index}>
                       <td>
                         <Select
                           options={itemOptions}
-                          value={selectedOption}
+                          value={itemOptions.find(opt => String(opt.value) === String(item.id)) || null}
                           onChange={(selected) => handleItemSelect(index, selected)}
                           isSearchable
                           isClearable
