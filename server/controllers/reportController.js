@@ -698,7 +698,10 @@ const getPurchasingReport = async (req, res) => {
 */
 
 const getPurchasingReport = async (req, res) => {
-  const { startDate, endDate, companyId } = req.query;
+  // vatOnly=true restricts results to bills from VAT-registered suppliers only.
+  // Used by the VAT Purchasing Report; the general Purchasing report (same
+  // endpoint) omits this flag and keeps showing every supplier as before.
+  const { startDate, endDate, companyId, vatOnly } = req.query;
 
   try {
     // ✅ FIX: Query with payment aggregation from payment_history
@@ -731,18 +734,27 @@ const getPurchasingReport = async (req, res) => {
       LEFT JOIN payment_history ph ON p.id = ph.purchase_id
       WHERE p.purchase_date BETWEEN ? AND ?
         AND (p.deleted = FALSE OR p.deleted IS NULL)
+    `;
+
+    const params = [startDate, endDate];
+
+    // ✅ VAT Purchasing Report: only bills from VAT-registered suppliers
+    if (vatOnly === 'true' || vatOnly === '1') {
+      query += ' AND s.vat_registered = 1';
+    }
+
+    if (companyId) {
+      query += ' AND p.company_id = ?';
+      params.push(companyId);
+    }
+
+    query += `
       GROUP BY 
         p.id, p.invoice_no, p.purchase_date, s.name, s.vat_number, 
         s.vat_registered, p.payment_method, p.total_with_vat, p.bill_amount,
         p.check_number, c.name, p.company_id, p.vat_rate, 
         p.vat_amount, p.subtotal
     `;
-
-    const params = [startDate, endDate];
-    if (companyId) {
-      query += ' AND p.company_id = ?';
-      params.push(companyId);
-    }
     query += ' ORDER BY p.purchase_date DESC';
 
     const [purchases] = await pool.query(query, params);

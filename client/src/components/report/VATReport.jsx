@@ -30,7 +30,8 @@ const VATReport = () => {
   const fetchVATReport = async () => {
     setLoading(true);
     try {
-      const response = await api.get(`/reports/purchasing?startDate=${startDate}&endDate=${endDate}&companyId=${companyFilter}`);
+      // vatOnly=true → only bills from VAT-registered suppliers are returned
+      const response = await api.get(`/reports/purchasing?startDate=${startDate}&endDate=${endDate}&companyId=${companyFilter}&vatOnly=true`);
       const purchases = response.data;
 
       const detailedPurchases = await Promise.all(
