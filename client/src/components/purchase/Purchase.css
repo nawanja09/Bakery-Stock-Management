@@ -4039,11 +4039,11 @@ textarea.form-control {
   cursor: not-allowed;
 }
 
-/* Dropdown text overflow fix */
+/* Prevent selected option text from being clipped */
 select.form-control {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
 }
 
 /* Make dropdown wider on focus/hover */

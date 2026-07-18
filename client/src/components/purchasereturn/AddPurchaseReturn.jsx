@@ -409,7 +409,7 @@ const AddPurchaseReturn = () => {
           </div>
 
           <div className="form-row">
-            <div className="form-group">
+            <div className="form-group form-group-company">
               <label>
                 <FontAwesomeIcon icon={faBuilding} /> Company
               </label>
@@ -424,6 +424,9 @@ const AddPurchaseReturn = () => {
                 ))}
               </select>
             </div>
+            {/* Spacer keeps the Company field pinned to the left column,
+                aligned with the fields above, instead of stretching full-width */}
+            <div className="form-group-spacer" aria-hidden="true" />
           </div>
         </div>
 
@@ -467,7 +470,7 @@ const AddPurchaseReturn = () => {
                   returnItems.map((item, index) => {
                     const { amount, vat, total } = calculateItemValues(item);
                     const selectedOption = item.item_id
-                      ? itemOptions.find(opt => opt.value === item.item_id)
+                      ? itemOptions.find(opt => String(opt.value) === String(item.item_id))
                       : null;
                     const previousPrice = previousPurchasePrices[item.item_id] || 0;
                     const stockLevel = item.current_stock <= 10 ? 'low' : 'good';

@@ -617,7 +617,7 @@ const AddPurchase = () => {
                 </thead>
                 <tbody>
                   {formData.items.map((item, index) => {
-                    const selectedOption = item.id ? itemOptions.find(opt => opt.value === item.id) : null;
+                    const selectedOption = item.id ? itemOptions.find(opt => String(opt.value) === String(item.id)) : null;
                     const previousPrice = previousPurchasePrices[item.id] || 0;
                     
                     return (
@@ -625,7 +625,7 @@ const AddPurchase = () => {
                         <td>
                           <Select
                             options={itemOptions}
-                            value={itemOptions.find(opt => opt.value === item.id) || null}
+                            value={itemOptions.find(opt => String(opt.value) === String(item.id)) || null}
                             onChange={(selected) => handleItemSelect(index, selected)}
                             isSearchable
                             placeholder="Select item..."

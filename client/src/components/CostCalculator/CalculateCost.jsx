@@ -234,7 +234,7 @@ const CalculateCost = () => {
                   <td>
                     <Select
                       options={rawMaterialOptions}
-                      value={rawMaterialOptions.find(opt => opt.value === ingredient.item_id) || null}
+                      value={rawMaterialOptions.find(opt => String(opt.value) === String(ingredient.item_id)) || null}
                       onChange={(selected) => 
                         handleIngredientChange(index, 'item_id', selected?.value)
                       }

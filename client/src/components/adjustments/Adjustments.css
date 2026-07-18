@@ -458,7 +458,7 @@
   text-transform: uppercase;
   letter-spacing: 0.5px;
   padding: var(--spacing-md) var(--spacing-lg);
-  text-align: left;
+  text-align: center;
   border-bottom: 2px solid var(--border);
   white-space: nowrap;
   cursor: pointer;
@@ -484,6 +484,7 @@
   padding: var(--spacing-md) var(--spacing-lg);
   border-bottom: 1px solid var(--border);
   color: var(--text-primary);
+  text-align: center;
   vertical-align: middle;
 }
 

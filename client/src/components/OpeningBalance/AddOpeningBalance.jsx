@@ -84,7 +84,7 @@ const AddOpeningBalance = () => {
           <Select
             id="item_id"
             options={itemOptions}
-            value={itemOptions.find(opt => opt.value === formData.item_id) || null}
+            value={itemOptions.find(opt => String(opt.value) === String(formData.item_id)) || null}
             onChange={(selected) =>
               setFormData(prev => ({ ...prev, item_id: selected.value }))
             }

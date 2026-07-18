@@ -232,7 +232,7 @@ const AddWastage = () => {
                 <td>
                   <Select
                     options={itemOptions}
-                    value={itemOptions.find(opt => opt.value === item.item_id) || null}
+                    value={itemOptions.find(opt => String(opt.value) === String(item.item_id)) || null}
                     onChange={(selected) => handleItemSelect(index, selected)}
                     isSearchable
                     isClearable
