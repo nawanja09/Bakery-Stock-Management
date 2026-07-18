@@ -98,10 +98,24 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
         invoice_allocations: payloadAllocations
       });
 
+      const normalizedPaymentMethod = (() => {
+        const value = String(formData.payment_method || '').trim().toUpperCase();
+        if (value === 'CASH' || value === 'BANK_TRANSFER' || value === 'CHEQUE' || value === 'CREDIT') {
+          return value;
+        }
+        if (value === 'BANK' || value === 'BANK TRANSFER') {
+          return 'BANK_TRANSFER';
+        }
+        if (value === 'CARD' || value === 'CREDIT CARD') {
+          return 'CREDIT';
+        }
+        return value;
+      })();
+
       const response = await api.post('/purchases/pay-multiple', {
         payment_date: formData.payment_date,
         amount: formData.amount,
-        payment_method: formData.payment_method,
+        payment_method: normalizedPaymentMethod,
         check_number: formData.check_number || null,
         voucher_number: formData.voucher_number || null,
         notes: formData.notes || null,

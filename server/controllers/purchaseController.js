@@ -1,5 +1,6 @@
 // controllers/purchaseController.js
 const pool = require('../config/db');
+const { normalizePaymentMethodValue } = require('../utils/paymentMethodUtils');
 
 const resolveUserId = async (connection, ...candidateIds) => {
   for (const candidateId of candidateIds) {
@@ -619,6 +620,7 @@ const makePayment = async (req, res) => {
     supplier_id
   } = req.body;
 
+  const normalizedPaymentMethod = normalizePaymentMethodValue(payment_method);
   const validMethods = ['CASH', 'BANK_TRANSFER', 'CHEQUE', 'CREDIT'];
   
   // Handle allocations properly
@@ -642,7 +644,7 @@ const makePayment = async (req, res) => {
   if (!payment_date) {
     return res.status(400).json({ error: 'Payment date is required' });
   }
-  if (!payment_method || !validMethods.includes(payment_method)) {
+  if (!normalizedPaymentMethod || !validMethods.includes(normalizedPaymentMethod)) {
     return res.status(400).json({ error: 'Payment method is invalid' });
   }
   if (normalizedAllocations.length === 0) {
@@ -665,7 +667,7 @@ const makePayment = async (req, res) => {
 
     const paymentHistoryPurchaseId = normalizedAllocations[0]?.purchase_id || null;
     const resolvedCreatedBy = await resolveUserId(connection, created_by, req.user?.id);
-    const normalizedPaymentMethodForHistory = normalizePaymentMethodForHistory(payment_method);
+    const normalizedPaymentMethodForHistory = normalizePaymentMethodForHistory(normalizedPaymentMethod);
 
     if (!resolvedCreatedBy) {
       await connection.rollback();
@@ -807,7 +809,7 @@ const makePayment = async (req, res) => {
           overpayment_number,
           supplierIdForCredit,
           payment_date,
-          payment_method,
+          normalizedPaymentMethod,
           voucher_number || null,
           check_number || null,
           excessPaymentAmount,
