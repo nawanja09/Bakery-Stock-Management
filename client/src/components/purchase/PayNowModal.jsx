@@ -52,10 +52,23 @@ const PayNowModal = ({ isOpen, onClose, supplierId, supplierName, onSuccess }) =
   const handleSubmit = async e => {
     e.preventDefault();
     const amt = parseFloat(formData.amount);
+    const normalizedPaymentMethod = (() => {
+      const value = String(formData.payment_method || '').trim().toUpperCase();
+      if (value === 'CASH' || value === 'BANK_TRANSFER' || value === 'CHEQUE' || value === 'CREDIT') {
+        return value;
+      }
+      if (value === 'BANK' || value === 'BANK TRANSFER') {
+        return 'BANK_TRANSFER';
+      }
+      if (value === 'CARD' || value === 'CREDIT CARD') {
+        return 'CREDIT';
+      }
+      return value;
+    })();
 
     if (!formData.payment_date) return showPopup('error', 'Payment date is required');
     if (!amt || amt <= 0) return showPopup('error', 'Amount must be greater than 0');
-    if (formData.payment_method === 'Cheque' && !formData.reference_number)
+    if (normalizedPaymentMethod === 'CHEQUE' && !formData.reference_number)
       return showPopup('error', 'Cheque number is required');
     if (!currentUser?.id) return showPopup('error', 'Please login again');
 
@@ -64,7 +77,7 @@ const PayNowModal = ({ isOpen, onClose, supplierId, supplierName, onSuccess }) =
       const response = await api.post('/suppliers/pay-now', {
         supplier_id: supplierId,
         payment_date: formData.payment_date,
-        payment_method: formData.payment_method,
+        payment_method: normalizedPaymentMethod,
         voucher_number: formData.voucher_number || null,
         reference_number: formData.reference_number || null,
         amount: amt,

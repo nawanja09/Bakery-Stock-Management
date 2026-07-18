@@ -1,5 +1,6 @@
 // controllers/supplierCreditController.js
 const pool = require('../config/db');
+const { normalizePaymentMethodValue } = require('../utils/paymentMethodUtils');
 
 const formatNum = (v) => parseFloat(v) || 0;
 const VALID_PAYMENT_METHODS = ['CASH', 'BANK_TRANSFER', 'CHEQUE', 'CREDIT'];
@@ -166,11 +167,13 @@ const createOverpayment = async (req, res) => {
     purchase_id
   } = req.body;
 
+  const normalizedPaymentMethod = normalizePaymentMethodValue(payment_method);
+
   if (!supplier_id) return res.status(400).json({ error: 'Supplier is required' });
   if (!payment_date) return res.status(400).json({ error: 'Payment date is required' });
   if (!amount || parseFloat(amount) <= 0) return res.status(400).json({ error: 'Amount must be greater than 0' });
   if (!created_by) return res.status(400).json({ error: 'Created by is required' });
-  if (!payment_method || !isValidPaymentMethod(payment_method)) {
+  if (!normalizedPaymentMethod || !isValidPaymentMethod(normalizedPaymentMethod)) {
     return res.status(400).json({ error: 'Payment method is invalid' });
   }
 
@@ -195,7 +198,7 @@ const createOverpayment = async (req, res) => {
          status, notes, created_by)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Active', ?, ?)
     `, [
-      overpayment_number, supplier_id, payment_date, payment_method,
+      overpayment_number, supplier_id, payment_date, normalizedPaymentMethod,
       voucher_number || null, reference_number || null,
       parseFloat(amount), parseFloat(amount),
       notes || null, created_by
