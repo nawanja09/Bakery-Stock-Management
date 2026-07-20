@@ -223,14 +223,9 @@ const StockReport = () => {
             </button>
             
             {stockData.length > 0 && (
-              <>
-                <button onClick={downloadPDF} className="btn btn-pdf">
-                  <FontAwesomeIcon icon={faDownload} /> PDF
-                </button>
                 <button onClick={downloadExcel} className="btn btn-excel">
                   <FontAwesomeIcon icon={faFileExcel} /> Excel
                 </button>
-              </>
             )}
           </div>
         </div>
