@@ -41,8 +41,8 @@
 }
 
 .filter-row {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 2fr auto;
     gap: 18px;
     align-items: flex-end;
 }
@@ -50,8 +50,7 @@
 .filter-group {
     display: flex;
     flex-direction: column;
-    min-width: 180px;
-    flex: 1;
+    min-width: 0;
 }
 
 .filter-group label {
@@ -81,7 +80,7 @@
 /* Search */
 
 .search-group {
-    flex: 2;
+    min-width: 0;
 }
 
 .search-input-wrapper {
@@ -348,10 +347,43 @@
 
 /* Responsive */
 
+/* Responsive Design
+   Tiers (viewport width; the 272px sidebar reduces effective content width, hence the
+   breakpoints sit higher than a typical no-sidebar page would need):
+   Large Desktop : > 1600px -> base 5-column grid above (4 fields + actions, one row)
+   Desktop       : 1200–1600px -> same 5 columns, tighter gap
+   Laptop        :  992–1199px -> 3 columns, Search + Actions each span the full row
+   Tablet        :  600–991px  -> single column, everything stacked
+   Mobile        :  < 600px    -> single column, action buttons full width
+*/
+
+@media (max-width: 1600px) {
+    .filter-row {
+        gap: 14px;
+    }
+}
+
+@media (max-width: 1200px) {
+
+    .filter-row {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .search-group,
+    .filter-actions {
+        grid-column: 1 / -1;
+    }
+
+    .filter-actions .btn {
+        flex: 1;
+        justify-content: center;
+    }
+}
+
 @media (max-width: 992px) {
 
     .filter-row {
-        flex-direction: column;
+        grid-template-columns: 1fr;
     }
 
     .filter-group,

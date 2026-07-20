@@ -40,6 +40,7 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0;
 }
 
 .form-group label {
@@ -72,6 +73,7 @@
   gap: 10px;
   align-items: center;
   margin-bottom: 18px;
+  flex-wrap: wrap;
 }
 
 .btn {
@@ -161,15 +163,30 @@
   overflow-x: auto;
 }
 
-@media (max-width: 720px) {
+/* Responsive Design
+   Tiers (viewport width):
+   Large Desktop : > 1600px -> auto-fit grid settles at 4 columns (one row)
+   Desktop       : 1200–1600px -> still 4 columns, tighter gap
+   Laptop        :  900–1199px -> auto-fit settles to 2–3 columns
+   Tablet        :  600–899px  -> explicit 2 columns
+   Mobile        :  < 600px    -> single column, stacked buttons
+*/
+
+@media (max-width: 1600px) {
+  .controls-grid {
+    gap: 14px;
+  }
+}
+
+@media (max-width: 900px) {
+  .controls-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .report-header {
     flex-direction: column;
     align-items: flex-start;
     gap: 6px;
-  }
-
-  .controls-grid {
-    grid-template-columns: 1fr 1fr;
   }
 
   .btn {
@@ -183,7 +200,7 @@
   }
 }
 
-@media (max-width: 480px) {
+@media (max-width: 600px) {
   .controls-grid {
     grid-template-columns: 1fr;
   }
@@ -193,5 +210,3 @@
     align-items: stretch;
   }
 }
-
-

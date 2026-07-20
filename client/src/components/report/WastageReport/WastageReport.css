@@ -83,17 +83,17 @@
 }
 
 .filters-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1.7fr 1fr auto;
   align-items: flex-end;
   gap: 24px;
-  flex-wrap: wrap;
 }
 
 .filter-group {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  min-width: 200px;
+  min-width: 0;
 }
 
 .filter-group label {
@@ -113,13 +113,19 @@
 }
 
 .date-range-group {
-  min-width: 320px;
+  min-width: 0;
 }
 
 .date-range-inputs {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
+}
+
+.date-range-inputs .filter-input {
+  flex: 1 1 110px;
+  min-width: 110px;
 }
 
 .date-separator {
@@ -130,6 +136,8 @@
 
 .filter-input,
 .filter-select {
+  width: 100%;
+  box-sizing: border-box;
   padding: 10px 14px;
   border: 1px solid var(--wr-border);
   border-radius: var(--wr-radius-sm);
@@ -152,7 +160,6 @@
 }
 
 .filter-select {
-  min-width: 220px;
   cursor: pointer;
   appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1 1L6 6L11 1' stroke='%236b7280' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
@@ -162,7 +169,7 @@
 }
 
 .filter-actions {
-  margin-left: auto;
+  min-width: 0;
 }
 
 .btn-clear {
@@ -576,26 +583,78 @@
 
 /* ---------------- Responsive ---------------- */
 
+/* ---------------- Responsive ----------------
+   Tiers (viewport width):
+   Large Desktop : > 1600px -> base 3-column grid above
+   Desktop       : 1200–1600px -> same 3 columns, tighter gap
+   Laptop        : 900–1199px -> 2 columns, actions span full row
+   Tablet        : 600–899px  -> single column, everything stacked
+   Mobile        : < 600px    -> single column, dates stack vertically
+*/
+
+@media (max-width: 1600px) {
+  .filters-row {
+    gap: 18px;
+  }
+}
+
+@media (max-width: 1200px) {
+  .filters-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .filter-actions {
+    grid-column: 1 / -1;
+  }
+}
+
 @media (max-width: 900px) {
   .report-container {
     padding: 20px 16px 40px;
   }
 
   .filters-row {
-    flex-direction: column;
-    align-items: stretch;
+    grid-template-columns: 1fr;
     gap: 16px;
   }
 
   .filter-actions {
-    margin-left: 0;
+    grid-column: auto;
   }
 
   .details-grid {
     grid-template-columns: 1fr;
   }
+}
 
-  .date-range-group {
-    min-width: 100%;
+@media (max-width: 480px) {
+  .filters-section {
+    padding: 16px;
+  }
+
+  .date-range-inputs {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .date-separator {
+    display: none;
+  }
+
+  .filter-input,
+  .filter-select {
+    width: 100%;
+    box-sizing: border-box;
+    min-width: 0;
+  }
+
+  .filter-group {
+    min-width: 0;
+  }
+
+  .btn-clear {
+    width: 100%;
+    justify-content: center;
   }
 }
