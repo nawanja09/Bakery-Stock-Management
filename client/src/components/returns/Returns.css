@@ -559,3 +559,25 @@
   background: #ccc;
   cursor: not-allowed;
 }
+
+/* Department Returns fields — guarantee a 2-column / 2-row grid on tablet
+   and mobile (overrides the generic .form-row single-column collapse above,
+   which other forms still use as-is). Desktop is untouched. */
+@media (max-width: 1023px) {
+  .dept-return-fields {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 15px;
+  }
+
+  .dept-return-fields .form-group.full-width {
+    grid-column: auto !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .dept-return-fields {
+    gap: 12px;
+  }
+}
+

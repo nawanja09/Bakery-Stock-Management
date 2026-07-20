@@ -1593,3 +1593,60 @@
   color: var(--text-muted);
   font-size: 0.85rem;
 }
+
+/* ============================================================= */
+/* Filter Section — final responsive pass (Desktop/Tablet/Mobile) */
+/* Grid with auto-fit/minmax guarantees no horizontal overflow at */
+/* any width; fields reflow onto as many rows as needed instead   */
+/* of being squeezed or clipped.                                  */
+/* ============================================================= */
+.filters-section {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  align-items: stretch;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.filters-section .items-search,
+.filters-section .filter-dropdown {
+  min-width: 0; /* allow grid items to shrink below their content size */
+  width: 100%;
+  flex: none;
+}
+
+.filters-section .items-search input {
+  box-sizing: border-box;
+  width: 100%;
+}
+
+/* Tablet: 768px - 1023px */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .filters-section {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.85rem;
+  }
+
+  .filters-section .items-search {
+    grid-column: 1 / -1;
+  }
+
+  .filters-section .clear-filters {
+    grid-column: 1 / -1;
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* Mobile: <= 767px */
+@media (max-width: 767px) {
+  .filters-section {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .filters-section .clear-filters {
+    width: 100%;
+    justify-content: center;
+  }
+}
