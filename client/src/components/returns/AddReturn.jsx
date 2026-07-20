@@ -176,7 +176,7 @@ const AddReturn = () => {
       </div>
 
       <form onSubmit={handleSubmit}>
-        <div className="form-row">
+        <div className="form-row dept-return-fields">
           <div className="form-group">
             <label>Return Date</label>
             <input
@@ -211,16 +211,16 @@ const AddReturn = () => {
               required
             />
           </div>
-        </div>
 
-        <div className="form-group full-width">
-          <label>Remarks</label>
-          <textarea
-            value={formData.remarks}
-            onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
-            placeholder="Additional notes about the return..."
-            rows="3"
-          />
+          <div className="form-group full-width">
+            <label>Remarks</label>
+            <textarea
+              value={formData.remarks}
+              onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
+              placeholder="Additional notes about the return..."
+              rows="3"
+            />
+          </div>
         </div>
 
         <h3>Returned Items</h3>
