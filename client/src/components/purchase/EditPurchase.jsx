@@ -727,18 +727,18 @@ const EditPurchase = ({ embeddedId, onSaved, onCancel } = {}) => {
                         />
                         {previousPrice > 0 && (
                           <small style={{ display: 'block', fontSize: '11px', color: '#6c757d' }}>
-                            Prev: Rs.{previousPrice}
+                            Prev: {formatCurrency(previousPrice)}
                           </small>
                         )}
                       </td>
-                      <td className="text-right">Rs. {item.amount.toFixed(2)}</td>
+                      <td className="text-right">{formatCurrency(item.amount)}</td>
                       {supplierVatRegistered && (
                         <td className="text-right vat-column">
-                          {item.vat_applicable ? `Rs. ${item.vat.toFixed(2)}` : '-'}
+                          {item.vat_applicable ? formatCurrency(item.vat) : '-'}
                         </td>
                       )}
                       <td className="text-right">
-                        <strong>Rs. {item.lineTotal.toFixed(2)}</strong>
+                        <strong>{formatCurrency(item.lineTotal)}</strong>
                       </td>
                       <td className="text-center action-cell">
                         <button 
@@ -768,15 +768,15 @@ const EditPurchase = ({ embeddedId, onSaved, onCancel } = {}) => {
           <div className="vat-summary">
             <div className="vat-row">
               <span>Subtotal:</span>
-              <span>Rs. {formData.subtotal.toFixed(2)}</span>
+              <span>{formatCurrency(formData.subtotal)}</span>
             </div>
             <div className="vat-row">
               <span>VAT ({VAT_RATE}%):</span>
-              <span>Rs. {formData.vat_amount.toFixed(2)}</span>
+              <span>{formatCurrency(formData.vat_amount)}</span>
             </div>
             <div className="vat-row total">
               <span>Grand Total:</span>
-              <span>Rs. {formData.total_with_vat.toFixed(2)}</span>
+              <span>{formatCurrency(formData.total_with_vat)}</span>
             </div>
           </div>
         </div>
