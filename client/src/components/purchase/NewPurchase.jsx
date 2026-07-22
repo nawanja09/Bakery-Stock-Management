@@ -679,18 +679,18 @@ const AddPurchase = () => {
                           />
                           {previousPrice > 0 && (
                             <small style={{ display: 'block', fontSize: '11px', color: '#6c757d' }}>
-                              Prev: Rs.{previousPrice}
+                              Prev: {formatCurrency(previousPrice)}
                             </small>
                           )}
                         </td>
-                        <td className="text-right">Rs. {item.amount.toFixed(2)}</td>
+                        <td className="text-right">{formatCurrency(item.amount)}</td>
                         {supplierVatRegistered && (
                           <td className="text-right vat-column">
-                            {item.vat_applicable ? `Rs. ${item.vat.toFixed(2)}` : '-'}
+                            {item.vat_applicable ? formatCurrency(item.vat) : '-'}
                           </td>
                         )}
                         <td className="text-right">
-                          <strong>Rs. {item.lineTotal.toFixed(2)}</strong>
+                          <strong>{formatCurrency(item.lineTotal)}</strong>
                         </td>
                         <td className="text-center">
                           <button 
