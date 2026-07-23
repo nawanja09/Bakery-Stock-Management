@@ -49,6 +49,54 @@ const resolveInvoiceTotalAmount = (purchaseRow = {}) => {
   return parsedSubtotal + parsedVatAmount;
 };
 
+// The true amount paid toward a specific invoice is the SUM of what was actually
+// allocated to it (purchase_payment_allocations.allocated_amount), never the raw
+// payment_history.amount, since one payment transaction can be split across several
+// invoices. Legacy rows that predate the allocations table (no allocation rows at
+// all for that payment) fall back to payment_history.amount, since those were
+// always single-invoice, unsplit payments.
+const getActualAllocatedPaidAmount = async (queryable, purchaseId) => {
+  const [rows] = await queryable.query(`
+    SELECT COALESCE(SUM(COALESCE(ppa.allocated_amount, ph.amount)), 0) AS actual_paid_amount
+    FROM payment_history ph
+    LEFT JOIN purchase_payment_allocations ppa
+      ON ppa.payment_history_id = ph.id AND ppa.purchase_id = ?
+    WHERE
+      ppa.purchase_id = ?
+      OR (
+        ph.purchase_id = ?
+        AND NOT EXISTS (
+          SELECT 1 FROM purchase_payment_allocations ppa2 WHERE ppa2.payment_history_id = ph.id
+        )
+      )
+  `, [purchaseId, purchaseId, purchaseId]);
+
+  return parseFloat(rows[0]?.actual_paid_amount) || 0;
+};
+
+// purchases.paid_amount/balance_amount/payment_status are running totals maintained
+// separately from the underlying payment records, so they can drift out of sync
+// (e.g. legacy data from before payments were properly capped/allocated, or a direct
+// edit). This recomputes the correct state from the actual allocated payments and,
+// if it differs from what's stored, heals the purchases row so every page - the
+// Purchasing Summary Report list, the Invoice Details page, and payment calculations
+// that read "current paid amount" - always works from the same correct, real value.
+const reconcilePurchasePaymentState = async (queryable, purchaseId, invoiceTotal, storedPaidAmount) => {
+  const actualAllocatedTotal = await getActualAllocatedPaidAmount(queryable, purchaseId);
+  const reconciledPaidAmount = Math.max(0, Math.min(actualAllocatedTotal, invoiceTotal));
+  const reconciledState = calculatePaymentState(reconciledPaidAmount, invoiceTotal);
+
+  const drifted = Math.abs((parseFloat(storedPaidAmount) || 0) - reconciledPaidAmount) > 0.01;
+  if (drifted) {
+    await queryable.query(
+      `UPDATE purchases SET paid_amount = ?, balance_amount = ?, balance_status = ?, payment_status = ? WHERE id = ?`,
+      [reconciledState.paid_amount, reconciledState.balance_amount, reconciledState.balance_status, reconciledState.payment_status, purchaseId]
+    );
+  }
+
+  return { ...reconciledState, healed: drifted };
+};
+
 const normalizePaymentMethodForHistory = (paymentMethod) => {
   switch (paymentMethod) {
     case 'BANK_TRANSFER':
@@ -104,7 +152,13 @@ const createPurchase = async (req, res) => {
     }
 
     const effectiveInvoiceTotal = parseFloat(total_with_vat) || (parseFloat(subtotal || 0) + parseFloat(vat_amount || 0));
-    const paymentState = calculatePaymentState(paid_amount, effectiveInvoiceTotal);
+    // The amount entered by the user can exceed this invoice's total (an overpayment).
+    // The invoice's own paid_amount must never exceed its own total - any excess is
+    // independent supplier credit, not part of this invoice's Paid Amount.
+    const requestedPaidAmount = parseFloat(paid_amount) || 0;
+    const appliedPaidAmount = Math.max(0, Math.min(requestedPaidAmount, effectiveInvoiceTotal));
+    const excessPaidAmount = Math.max(0, requestedPaidAmount - effectiveInvoiceTotal);
+    const paymentState = calculatePaymentState(appliedPaidAmount, effectiveInvoiceTotal);
     const normalizedPaidAmount = paymentState.paid_amount;
     const normalizedBalanceAmount = paymentState.balance_amount;
     const normalizedBalanceStatus = paymentState.balance_status;
@@ -130,13 +184,58 @@ const createPurchase = async (req, res) => {
     
     const purchaseId = purchaseResult.insertId;
 
-    // If payment was made, record in payment history
+    // If payment was made, record in payment history (amount is always clamped to
+    // this invoice's own total - it is never mixed with the excess/credit amount)
     if (normalizedPaidAmount > 0) {
-      await connection.query(
+      const [initialPaymentResult] = await connection.query(
         `INSERT INTO payment_history 
         (purchase_id, payment_date, amount, payment_method, check_number, notes, created_by)
         VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [purchaseId, purchase_date, normalizedPaidAmount, payment_method, check_number, 'Initial payment', resolvedPreparedBy]
+      );
+
+      // Record the explicit allocation so the Payment History tab's Paid Amount
+      // column always reads the allocated amount directly, rather than relying on
+      // a fallback that could show the raw (possibly larger) entered amount.
+      await connection.query(
+        `INSERT INTO purchase_payment_allocations (payment_history_id, purchase_id, allocated_amount)
+         VALUES (?, ?, ?)`,
+        [initialPaymentResult.insertId, purchaseId, normalizedPaidAmount]
+      );
+    }
+
+    // If the entered amount exceeded this invoice's total, save the excess as an
+    // independent supplier overpayment credit - it must never be added to this
+    // invoice's paid_amount, and becomes available to settle a different invoice later.
+    if (excessPaidAmount > 0.001 && supplier_id) {
+      const validOverpaymentMethods = ['CASH', 'BANK_TRANSFER', 'CHEQUE'];
+      const normalizedExcessMethod = normalizePaymentMethodValue(payment_method);
+      const overpaymentMethod = validOverpaymentMethods.includes(normalizedExcessMethod)
+        ? normalizedExcessMethod
+        : 'CASH';
+      const datePart = (String(purchase_date || '').replace(/[^0-9]/g, '').slice(0, 8))
+        || new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      const rand = Math.floor(Math.random() * 9000) + 1000;
+      const overpayment_number = `ADV-${datePart}-${rand}`;
+
+      await connection.query(
+        `INSERT INTO supplier_overpayments
+           (overpayment_number, supplier_id, payment_date, payment_method,
+            voucher_number, reference_number, original_amount, remaining_credit,
+            status, notes, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Active', ?, ?)`,
+        [
+          overpayment_number,
+          supplier_id,
+          purchase_date,
+          overpaymentMethod,
+          null,
+          check_number || null,
+          excessPaidAmount,
+          excessPaidAmount,
+          'Auto-generated: amount entered at invoice creation exceeded the invoice total',
+          resolvedPreparedBy
+        ]
       );
     }
 
@@ -238,15 +337,41 @@ const getAllPurchases = async (req, res) => {
 
     for (let purchase of purchases) {
       purchase.invoice_no = purchase.invoice_no ? String(purchase.invoice_no) : 'N/A';
-      
+
+      purchase.subtotal = parseFloat(purchase.subtotal) || 0;
+      purchase.vat_amount = parseFloat(purchase.vat_amount) || 0;
+      purchase.total_with_vat = parseFloat(purchase.total_with_vat) || 0;
+
+      // Paid Amount must always reflect what was actually allocated to this invoice
+      // from real payment records - never a stale/drifted stored total - so reconcile
+      // it here the same way the Invoice Details page does.
+      const reconciled = await reconcilePurchasePaymentState(
+        pool,
+        purchase.id,
+        purchase.total_with_vat,
+        purchase.paid_amount
+      );
+      purchase.paid_amount = reconciled.paid_amount;
+      purchase.balance_amount = reconciled.balance_amount;
+      purchase.payment_status = reconciled.payment_status;
+
       const [payments] = await pool.query(
-        `SELECT COUNT(*) as payment_count, COALESCE(SUM(amount), 0) as total_payments
-         FROM payment_history 
-         WHERE purchase_id = ?`,
-        [purchase.id]
+        `SELECT COUNT(*) as payment_count
+         FROM payment_history ph
+         LEFT JOIN purchase_payment_allocations ppa
+           ON ppa.payment_history_id = ph.id AND ppa.purchase_id = ?
+         WHERE
+           ppa.purchase_id = ?
+           OR (
+             ph.purchase_id = ?
+             AND NOT EXISTS (
+               SELECT 1 FROM purchase_payment_allocations ppa2 WHERE ppa2.payment_history_id = ph.id
+             )
+           )`,
+        [purchase.id, purchase.id, purchase.id]
       );
       purchase.payment_count = payments[0]?.payment_count || 0;
-      purchase.total_payments = payments[0]?.total_payments || 0;
+      purchase.total_payments = purchase.paid_amount;
 
       const [returns] = await pool.query(
         `SELECT COALESCE(SUM(pri.total_amount), 0) as total_returns
@@ -256,12 +381,6 @@ const getAllPurchases = async (req, res) => {
         [purchase.id]
       );
       purchase.total_returns = returns[0]?.total_returns || 0;
-      
-      purchase.subtotal = parseFloat(purchase.subtotal) || 0;
-      purchase.vat_amount = parseFloat(purchase.vat_amount) || 0;
-      purchase.total_with_vat = parseFloat(purchase.total_with_vat) || 0;
-      purchase.paid_amount = parseFloat(purchase.paid_amount) || 0;
-      purchase.balance_amount = parseFloat(purchase.balance_amount) || 0;
     }
 
     res.json(purchases);
@@ -313,15 +432,31 @@ const getPurchaseById = async (req, res) => {
       WHERE pi.purchase_id = ?
     `, [id]);
     
+    // A single payment transaction can be split across multiple invoices
+    // (see purchase_payment_allocations), so the amount that belongs to THIS
+    // invoice must come from the allocation row for this purchase_id, not from
+    // payment_history.amount (which is the full transaction amount). Rows that
+    // predate the allocations table, or single-invoice direct payments/credit
+    // settlements that never got an allocation row, fall back to payment_history.amount.
     const [payments] = await pool.query(`
       SELECT 
         ph.*,
-        u.name AS created_by_name
+        u.name AS created_by_name,
+        COALESCE(ppa.allocated_amount, ph.amount) AS paid_amount
       FROM payment_history ph
       JOIN users u ON ph.created_by = u.id
-      WHERE ph.purchase_id = ?
-      ORDER BY ph.payment_date DESC
-    `, [id]);
+      LEFT JOIN purchase_payment_allocations ppa
+        ON ppa.payment_history_id = ph.id AND ppa.purchase_id = ?
+      WHERE
+        ppa.purchase_id = ?
+        OR (
+          ph.purchase_id = ?
+          AND NOT EXISTS (
+            SELECT 1 FROM purchase_payment_allocations ppa2 WHERE ppa2.payment_history_id = ph.id
+          )
+        )
+      ORDER BY ph.payment_date DESC, ph.created_at DESC
+    `, [id, id, id]);
 
     const [returns] = await pool.query(`
       SELECT 
@@ -337,6 +472,19 @@ const getPurchaseById = async (req, res) => {
       WHERE pr.purchase_id = ?
       ORDER BY pr.return_date DESC
     `, [id]);
+
+    // Self-heal: purchases.paid_amount is a running total maintained separately from
+    // the payment_history/purchase_payment_allocations records. If it has drifted out
+    // of sync with what the actual payment records show it should be - e.g. legacy data
+    // from before payments were properly capped/allocated, or a direct DB edit - correct
+    // it here so this page (and every other page that reads purchases.paid_amount, like
+    // the Purchasing Summary Report) always reflects real, allocation-backed payments.
+    const invoiceTotal = parseFloat(purchase[0].total_with_vat) || 0;
+    const reconciled = await reconcilePurchasePaymentState(pool, id, invoiceTotal, purchase[0].paid_amount);
+    purchase[0].paid_amount = reconciled.paid_amount;
+    purchase[0].balance_amount = reconciled.balance_amount;
+    purchase[0].balance_status = reconciled.balance_status;
+    purchase[0].payment_status = reconciled.payment_status;
     
     const purchaseData = {
       ...purchase[0],
@@ -344,7 +492,7 @@ const getPurchaseById = async (req, res) => {
       payments: payments || [],
       returns: returns || [],
       summary: {
-        total_paid: payments.reduce((sum, p) => sum + parseFloat(p.amount), 0),
+        total_paid: payments.reduce((sum, p) => sum + parseFloat(p.paid_amount ?? p.amount), 0),
         total_returns: returns.reduce((sum, r) => sum + parseFloat(r.return_total), 0),
         net_paid: parseFloat(purchase[0].paid_amount),
         net_balance: parseFloat(purchase[0].balance_amount)
@@ -406,7 +554,11 @@ const updatePurchase = async (req, res) => {
     }
 
     const effectiveInvoiceTotal = parseFloat(total_with_vat) || (parseFloat(subtotal || 0) + parseFloat(vat_amount || 0));
-    const paymentState = calculatePaymentState(paid_amount, effectiveInvoiceTotal);
+    // Editing an invoice must never let its paid_amount exceed its own total -
+    // any overpayment has to go through the payment/credit flow instead, which
+    // records the excess separately as supplier credit.
+    const clampedPaidAmount = Math.max(0, Math.min(parseFloat(paid_amount) || 0, effectiveInvoiceTotal));
+    const paymentState = calculatePaymentState(clampedPaidAmount, effectiveInvoiceTotal);
     const normalizedPaidAmount = paymentState.paid_amount;
     const normalizedBalanceAmount = paymentState.balance_amount;
     const normalizedBalanceStatus = paymentState.balance_status;
@@ -722,9 +874,18 @@ const makePayment = async (req, res) => {
         supplierIdForCredit = currentPurchase.supplier_id;
       }
 
-      const currentBalance = parseFloat(currentPurchase.balance_amount) || 0;
-      const currentPaid = parseFloat(currentPurchase.paid_amount) || 0;
       const invoiceTotal = resolveInvoiceTotalAmount(currentPurchase);
+
+      // Never trust the stored paid_amount/balance_amount blindly - reconcile against
+      // the real allocated payment records first. Otherwise a stale/corrupted stored
+      // total (e.g. leftover from old data) can make currentOutstanding compute to 0,
+      // silently redirecting an entire legitimate payment into supplier credit instead
+      // of applying it to the invoice.
+      const reconciledBeforePayment = await reconcilePurchasePaymentState(
+        connection, purchaseId, invoiceTotal, currentPurchase.paid_amount
+      );
+      const currentBalance = reconciledBeforePayment.balance_amount;
+      const currentPaid = reconciledBeforePayment.paid_amount;
       const currentOutstanding = currentBalance > 0 ? currentBalance : Math.max(0, invoiceTotal - currentPaid);
 
       const amountToApply = Math.min(requestedAmount, remainingPaymentAmount, currentOutstanding);
@@ -743,7 +904,7 @@ const makePayment = async (req, res) => {
         amountToApply
       });
 
-      const newPaidAmount = currentPaid + amountToApply;
+      const newPaidAmount = Math.min(currentPaid + amountToApply, invoiceTotal);
       const newBalanceAmount = Math.max(0, currentOutstanding - amountToApply);
 
       let newPaymentStatus = 'Non-Paid';
@@ -857,12 +1018,22 @@ const getPaymentHistory = async (req, res) => {
     const [payments] = await pool.query(`
       SELECT 
         ph.*,
-        u.name AS created_by_name
+        u.name AS created_by_name,
+        COALESCE(ppa.allocated_amount, ph.amount) AS paid_amount
       FROM payment_history ph
       JOIN users u ON ph.created_by = u.id
-      WHERE ph.purchase_id = ?
+      LEFT JOIN purchase_payment_allocations ppa
+        ON ppa.payment_history_id = ph.id AND ppa.purchase_id = ?
+      WHERE
+        ppa.purchase_id = ?
+        OR (
+          ph.purchase_id = ?
+          AND NOT EXISTS (
+            SELECT 1 FROM purchase_payment_allocations ppa2 WHERE ppa2.payment_history_id = ph.id
+          )
+        )
       ORDER BY ph.payment_date DESC, ph.created_at DESC
-    `, [id]);
+    `, [id, id, id]);
 
     res.json(payments);
   } catch (error) {
@@ -1062,24 +1233,35 @@ const addSettlementToReturn = async (req, res) => {
     const settlementDate = settlement_date || purchaseReturn.return_date;
     
     for (const settlement of settlements) {
-      const settlementAmount = parseFloat(settlement.amount) || 0;
-      if (settlementAmount <= 0) continue;
-      
+      const requestedSettlementAmount = parseFloat(settlement.amount) || 0;
+      if (requestedSettlementAmount <= 0) continue;
+
       const [purchase] = await connection.query(
-        `SELECT balance_amount, paid_amount, total_with_vat FROM purchases WHERE id = ?`,
+        `SELECT balance_amount, paid_amount, total_with_vat FROM purchases WHERE id = ? FOR UPDATE`,
         [settlement.purchase_id]
       );
 
       if (purchase.length > 0) {
         const currentBalance = parseFloat(purchase[0].balance_amount) || 0;
         const currentPaid = parseFloat(purchase[0].paid_amount) || 0;
-        
-        const newBalance = currentBalance - settlementAmount;
-        const newPaid = currentPaid + settlementAmount;
+        const invoiceTotal = parseFloat(purchase[0].total_with_vat) || 0;
+
+        // This invoice's own paid_amount must never exceed its own total - clamp the
+        // amount actually applied to whatever is genuinely still outstanding, exactly
+        // like the regular payment and credit-settlement flows do.
+        const currentOutstanding = currentBalance > 0 ? currentBalance : Math.max(0, invoiceTotal - currentPaid);
+        const settlementAmount = Math.min(requestedSettlementAmount, currentOutstanding);
+
+        if (settlementAmount <= 0.001) {
+          continue;
+        }
+
+        const newBalance = Math.max(0, currentBalance - settlementAmount);
+        const newPaid = Math.min(currentPaid + settlementAmount, invoiceTotal);
         const newBalanceStatus = newBalance > 0 ? 1 : 0;
 
         let paymentStatus = 'Non-Paid';
-        if (newPaid >= purchase[0].total_with_vat) {
+        if (newPaid >= invoiceTotal && invoiceTotal > 0) {
           paymentStatus = 'Paid';
         } else if (newPaid > 0) {
           paymentStatus = 'Partially Paid';
@@ -1095,7 +1277,7 @@ const addSettlementToReturn = async (req, res) => {
           [newBalance, newPaid, newBalanceStatus, paymentStatus, settlement.purchase_id]
         );
 
-        await connection.query(
+        const [settlementPaymentResult] = await connection.query(
           `INSERT INTO payment_history 
            (purchase_id, payment_date, amount, payment_method, notes, created_by)
            VALUES (?, ?, ?, ?, ?, ?)`,
@@ -1107,6 +1289,14 @@ const addSettlementToReturn = async (req, res) => {
             notes || `Additional settlement for return #${purchaseReturn.return_number}`,
             settled_by
           ]
+        );
+
+        // Record the explicit allocation so the invoice's Payment History tab shows
+        // only the amount actually allocated to it - never the raw, unclamped figure.
+        await connection.query(
+          `INSERT INTO purchase_payment_allocations (payment_history_id, purchase_id, allocated_amount)
+           VALUES (?, ?, ?)`,
+          [settlementPaymentResult.insertId, settlement.purchase_id, settlementAmount]
         );
       }
     }
