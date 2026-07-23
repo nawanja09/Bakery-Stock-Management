@@ -47,6 +47,7 @@ router.get('/', async (req, res) => {
       SELECT id, name, address, vat_number, vat_registered, city, 
              contact_name, contact_phone, contact_email 
       FROM supplier
+      WHERE is_deleted = 0
       ORDER BY name ASC
     `);
     res.json(rows);
@@ -203,29 +204,25 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// DELETE supplier
+// DELETE supplier (soft delete)
 router.delete('/:id', async (req, res) => {
   const { id } = req.params;
 
   try {
-    // Check if supplier exists and has no related records
-    const [result] = await pool.query('DELETE FROM supplier WHERE id=?', [id]);
-    
+    // Soft delete: mark as inactive/deleted instead of removing the row,
+    // so the record is preserved for history/reference purposes.
+    const [result] = await pool.query(
+      'UPDATE supplier SET is_deleted = 1 WHERE id = ? AND is_deleted = 0',
+      [id]
+    );
+
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'Supplier not found' });
     }
-    
+
     res.json({ message: 'Supplier deleted successfully' });
   } catch (error) {
     console.error('Error deleting supplier:', error);
-    
-    // Check for foreign key constraint violation
-    if (error.code === 'ER_ROW_IS_REFERENCED_2') {
-      return res.status(400).json({ 
-        error: 'Cannot delete supplier because they have existing purchase records' 
-      });
-    }
-    
     res.status(500).json({ error: 'Server error' });
   }
 });

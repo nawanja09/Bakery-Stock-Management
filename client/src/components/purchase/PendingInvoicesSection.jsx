@@ -112,6 +112,17 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
     return [...invoices, ...advances, ...credits];
   }, [allInvoices, allAdvances, allReturnCredits]);
 
+  // Available credit (advance payments + return credits) per supplier - this is what
+  // a "Settle" action actually consumes, so a supplier with none has nothing to settle with.
+  const availableCreditBySupplier = useMemo(() => {
+    const map = {};
+    [...allAdvances, ...allReturnCredits].forEach((r) => {
+      const key = String(r.supplier_id);
+      map[key] = (map[key] || 0) + (parseFloat(r.outstanding_amount) || 0);
+    });
+    return map;
+  }, [allAdvances, allReturnCredits]);
+
   // Apply filters
   const filteredRecords = useMemo(() => {
     const term = supplierSearch.toLowerCase().trim();
@@ -205,6 +216,18 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
   };
 
   const handleSettleClick = (invoice) => {
+    const supplierCredit = availableCreditBySupplier[String(invoice.supplier_id)] || 0;
+    const invoiceBalance = parseFloat(invoice.outstanding_amount) || 0;
+
+    if (invoiceBalance <= 0) {
+      showPopup('warning', 'This invoice has no outstanding balance to settle.');
+      return;
+    }
+    if (supplierCredit <= 0) {
+      showPopup('warning', `${invoice.supplier_name || 'This supplier'} has no available credit to settle with.`);
+      return;
+    }
+
     setSettleInvoice(invoice);
     setShowSettleModal(true);
   };
@@ -529,16 +552,26 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
                     </td>
 
                     <td className="pis-actions">
-                      {isInvoice && (
-                        <button
-                          className="pis-btn-settle"
-                          onClick={() => handleSettleClick(record)}
-                          title="Settle with available credit"
-                          type="button"
-                        >
-                          <FontAwesomeIcon icon={faBalanceScale} /> Settle Now
-                        </button>
-                      )}
+                      {isInvoice && (() => {
+                        const supplierCredit = availableCreditBySupplier[String(record.supplier_id)] || 0;
+                        const invoiceBalance = parseFloat(record.outstanding_amount) || 0;
+                        const canSettle = invoiceBalance > 0 && supplierCredit > 0;
+                        const disabledReason = invoiceBalance <= 0
+                          ? 'This invoice has no outstanding balance'
+                          : 'No available credit for this supplier';
+
+                        return (
+                          <button
+                            className="pis-btn-settle"
+                            onClick={() => handleSettleClick(record)}
+                            disabled={!canSettle}
+                            title={canSettle ? 'Settle with available credit' : disabledReason}
+                            type="button"
+                          >
+                            <FontAwesomeIcon icon={faBalanceScale} /> Settle Now
+                          </button>
+                        );
+                      })()}
                     </td>
                   </tr>
                 );

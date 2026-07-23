@@ -358,6 +358,7 @@ input:checked + .toggle-slider:before {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-align: center;
 }
 
 .supplier-table th {
@@ -365,7 +366,7 @@ input:checked + .toggle-slider:before {
   color: white;
   padding: 15px;
   font-weight: 500;
-  text-align: left;
+  text-align: center;
   font-size: 14px;
 }
 
@@ -423,6 +424,7 @@ input:checked + .toggle-slider:before {
   display: flex;
   gap: 8px;
   flex-wrap: nowrap;
+  justify-content: center;
 }
 
 .supplier-row:hover {
@@ -464,6 +466,7 @@ input:checked + .toggle-slider:before {
 .actions {
   display: flex;
   gap: 8px;
+  justify-content: center;
 }
 
 /* Loading Spinner */
