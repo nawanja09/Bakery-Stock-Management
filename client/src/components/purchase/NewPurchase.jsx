@@ -229,7 +229,7 @@ const AddPurchase = () => {
       balance_status: balanceStatus
     });
 
-    if (field === 'unit_price' && index === formData.items.length - 1 && !autoAddedRow) {
+    if (field === 'quantity' && value > 0 && index === formData.items.length - 1 && !autoAddedRow) {
       addItemRow();
       setAutoAddedRow(true);
     }

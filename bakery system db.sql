@@ -43940,3 +43940,15 @@ COMMIT;
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+
+--------------------------------------------------------------------------------------------------
+
+-- Migration: Add soft-delete support to the supplier table
+-- Run this once against the bakery_system database.
+
+ALTER TABLE `supplier`
+  ADD COLUMN `is_deleted` TINYINT(1) NOT NULL DEFAULT 0 AFTER `vat_registered`;
+
+-- Optional but recommended: speeds up "WHERE is_deleted = 0" filtering
+ALTER TABLE `supplier`
+  ADD INDEX `idx_supplier_is_deleted` (`is_deleted`);
