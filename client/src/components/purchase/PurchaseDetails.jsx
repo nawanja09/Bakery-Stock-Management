@@ -178,6 +178,13 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
   const vatRate = parseFloat(purchase.vat_rate || 18);
   const statusInfo = getPaymentStatusInfo();
 
+  // supplierDetails.vat_registered comes back from the API as a raw integer (0/1),
+  // not a real boolean. Using it directly as the left side of `condition && <jsx>`
+  // is a classic React pitfall: `0 && <jsx>` evaluates to the number 0, and React
+  // renders that as literal "0" text (unlike false/null/undefined, which render
+  // nothing). Normalizing to a real boolean once here prevents that everywhere.
+  const isVatRegisteredSupplier = Boolean(supplierDetails?.vat_registered);
+
   // Calculate total returns
   const totalReturns = (purchase.returns || []).reduce((sum, r) => sum + parseFloat(r.return_total || r.total_amount || 0), 0);
   const netPaidAfterReturns = paidAmount;
@@ -211,7 +218,7 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
               <span className="value">{purchase.supplier_name}</span>
             </div>
 
-            {supplierDetails?.vat_registered && supplierDetails?.vat_number && (
+            {isVatRegisteredSupplier && supplierDetails?.vat_number && (
               <div className="info-row">
                 <span className="label">VAT Number:</span>
                 <span className="value vat-number">{supplierDetails.vat_number}</span>
@@ -254,10 +261,12 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
               <span>Subtotal (Net Amount):</span>
               <span>{formatCurrency(subtotal)}</span>
             </div>
-            <div className="summary-row vat">
-              <span>VAT ({vatRate}%):</span>
-              <span>{formatCurrency(vatAmount)}</span>
-            </div>
+            {isVatRegisteredSupplier && (
+              <div className="summary-row vat">
+                <span>VAT ({vatRate}%):</span>
+                <span>{formatCurrency(vatAmount)}</span>
+              </div>
+            )}
             <div className="summary-row total">
               <span>Grand Total (with VAT):</span>
               <span className="bold">{formatCurrency(totalWithVat)}</span>
@@ -345,7 +354,7 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
               <FontAwesomeIcon icon={faTag} />
               Purchased Items
             </h3>
-            {supplierDetails?.vat_registered && (
+            {isVatRegisteredSupplier && (
               <div className="vat-note">
                 <span className="badge">VAT Registered Supplier</span>
               </div>
@@ -363,7 +372,7 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
                   <th className="text-center">Unit</th>
                   <th className="text-right">Unit Price</th>
                   <th className="text-right">Amount</th>
-                  {supplierDetails?.vat_registered && (
+                  {isVatRegisteredSupplier && (
                     <th className="text-right vat-column">VAT 18%</th>
                   )}
                   <th className="text-right total-column">Line Total</th>
@@ -373,18 +382,19 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
                 {purchase.items && purchase.items.map((item, index) => {
                   const previousPrice = previousPrices[item.item_id] || 0;
                   const amount = parseFloat(item.quantity) * parseFloat(item.unit_price);
-                  const vat = (supplierDetails?.vat_registered && item.vat_applicable) ? 
+                  const isItemVatApplicable = Boolean(item.vat_applicable);
+                  const vat = (isVatRegisteredSupplier && isItemVatApplicable) ?
                     amount * (vatRate / 100) : 0;
                   const lineTotal = amount + vat;
                   const isPriceDifferent = previousPrice > 0 && 
                     parseFloat(item.unit_price) !== previousPrice;
 
                   return (
-                    <tr key={index} className={item.vat_applicable ? 'vat-applicable-row' : ''}>
+                    <tr key={index} className={isItemVatApplicable ? 'vat-applicable-row' : ''}>
                       <td className="text-left">{index + 1}</td>
                       <td className="text-left">
                         <div className="item-name">{item.item_name}</div>
-                        {item.vat_applicable && (
+                        {isItemVatApplicable && (
                           <small className="vat-applicable-badge">VAT Applicable</small>
                         )}
                       </td>
@@ -402,9 +412,9 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
                         )}
                       </td>
                       <td className="text-right">{formatCurrency(amount)}</td>
-                      {supplierDetails?.vat_registered && (
+                      {isVatRegisteredSupplier && (
                         <td className="text-right vat-column">
-                          {item.vat_applicable ? formatCurrency(vat) : '-'}
+                          {isItemVatApplicable ? formatCurrency(vat) : '-'}
                         </td>
                       )}
                       <td className="text-right total-column">
@@ -416,11 +426,11 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan={supplierDetails?.vat_registered ? "6" : "5"} className="text-right">
+                  <td colSpan="6" className="text-right">
                     <strong>Subtotal:</strong>
                   </td>
                   <td className="text-right"><strong>{formatCurrency(subtotal)}</strong></td>
-                  {supplierDetails?.vat_registered && (
+                  {isVatRegisteredSupplier && (
                     <td className="text-right vat-column">
                       <strong>{formatCurrency(vatAmount)}</strong>
                     </td>
@@ -471,6 +481,7 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
                     <th className="text-left">#</th>
                     <th className="text-left">Payment Date</th>
                     <th className="text-right">Amount</th>
+                    <th className="text-right">Paid Amount</th>
                     <th className="text-left">Method</th>
                     <th className="text-left">Reference</th>
                     <th className="text-left">Recorded By</th>
@@ -479,26 +490,34 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {purchase.payments.map((payment, index) => (
-                    <tr key={payment.id}>
-                      <td className="text-left">{index + 1}</td>
-                      <td className="text-left">{formatDate(payment.payment_date)}</td>
-                      <td className="text-right paid-amount">{formatCurrency(payment.amount)}</td>
-                      <td className="text-left">
-                        <span className={`payment-method-badge ${payment.payment_method?.toLowerCase()}`}>
-                          {payment.payment_method?.replace('_', ' ')}
-                        </span>
-                      </td>
-                      <td className="text-left">{payment.check_number || '-'}</td>
-                      <td className="text-left">{payment.created_by_name || '-'}</td>
-                      <td className="text-left">{formatDateTime(payment.created_at)}</td>
-                      <td className="text-left">{payment.notes || '-'}</td>
-                    </tr>
-                  ))}
+                  {purchase.payments.map((payment, index) => {
+                    // Amount is always this invoice's own total (independent, constant value).
+                    // Paid Amount is bound ONLY to the amount actually allocated to this invoice
+                    // from that specific payment record - it is never combined with, or derived
+                    // from, the Invoice Total or the raw payment transaction total.
+                    const allocatedPaidAmount = parseFloat(payment.paid_amount ?? 0);
+                    return (
+                      <tr key={payment.id}>
+                        <td className="text-left">{index + 1}</td>
+                        <td className="text-left">{formatDate(payment.payment_date)}</td>
+                        <td className="text-right">{formatCurrency(totalWithVat)}</td>
+                        <td className="text-right paid-amount">{formatCurrency(allocatedPaidAmount)}</td>
+                        <td className="text-left">
+                          <span className={`payment-method-badge ${payment.payment_method?.toLowerCase()}`}>
+                            {payment.payment_method?.replace('_', ' ')}
+                          </span>
+                        </td>
+                        <td className="text-left">{payment.check_number || '-'}</td>
+                        <td className="text-left">{payment.created_by_name || '-'}</td>
+                        <td className="text-left">{formatDateTime(payment.created_at)}</td>
+                        <td className="text-left">{payment.notes || '-'}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
                 <tfoot>
                   <tr>
-                    <td colSpan="2" className="text-right"><strong>Total:</strong></td>
+                    <td colSpan="3" className="text-right"><strong>Total Paid:</strong></td>
                     <td className="text-right paid-amount"><strong>{formatCurrency(paidAmount)}</strong></td>
                     <td colSpan="5"></td>
                   </tr>
@@ -535,7 +554,9 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
                     <th>Return #</th>
                     <th>Return Date</th>
                     <th className="text-right">Subtotal</th>
-                    <th className="text-right">VAT</th>
+                    {isVatRegisteredSupplier && (
+                      <th className="text-right">VAT</th>
+                    )}
                     <th className="text-right">Total</th>
                     <th className="text-right">Settled</th>
                     <th className="text-right">Balance</th>
@@ -550,7 +571,9 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
                       </td>
                       <td>{formatDate(returnItem.return_date)}</td>
                       <td className="text-right">{formatCurrency(returnItem.subtotal || 0)}</td>
-                      <td className="text-right">{formatCurrency(returnItem.vat_amount || 0)}</td>
+                      {isVatRegisteredSupplier && (
+                        <td className="text-right">{formatCurrency(returnItem.vat_amount || 0)}</td>
+                      )}
                       <td className="text-right returns-amount">{formatCurrency(returnItem.return_total || returnItem.total_amount || 0)}</td>
                       <td className="text-right">{formatCurrency(returnItem.settled_amount || 0)}</td>
                       <td className="text-right due-amount">{formatCurrency(returnItem.balance_amount || 0)}</td>
@@ -559,7 +582,7 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
                 </tbody>
                 <tfoot>
                   <tr>
-                    <td colSpan="5" className="text-right"><strong>Total Returns:</strong></td>
+                    <td colSpan={isVatRegisteredSupplier ? "5" : "4"} className="text-right"><strong>Total Returns:</strong></td>
                     <td className="text-right returns-amount"><strong>-{formatCurrency(totalReturns)}</strong></td>
                     <td colSpan="2"></td>
                   </tr>
