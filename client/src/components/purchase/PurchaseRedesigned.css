@@ -2374,3 +2374,74 @@
   opacity: 0.5 !important;
   cursor: not-allowed !important;
 }
+
+
+/* ═══════════════════════════════════════════════════════════
+   Performance-optimised additions — July 2026
+   ═══════════════════════════════════════════════════════════ */
+
+/* Table row hover — pure CSS replaces hoveredRow React state */
+.data-table-responsive tbody tr.data-row {
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+.data-table-responsive tbody tr.data-row:hover {
+  background-color: #f1f5f9;
+}
+.data-table-responsive tbody tr.data-row.selected {
+  background-color: #eff6ff;
+}
+
+/* Company tag (replaces inline styles in PurchaseTableRow) */
+.company-tag {
+  font-size: 13px;
+  color: #475569;
+  background: #f1f5f9;
+  padding: 2px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+/* ── Pagination ─────────────────────────────────────────── */
+.pagination-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 1.25rem 0 0.5rem;
+}
+
+.pagination-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--gray-300);
+  border-radius: var(--radius-md);
+  background: white;
+  color: var(--gray-700);
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.pagination-btn:hover:not(:disabled) {
+  background: var(--gray-100);
+  border-color: var(--gray-400);
+}
+.pagination-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pagination-info {
+  font-size: 0.875rem;
+  color: var(--gray-600);
+}
+
+/* ── filter-results-summary (ensure it exists) ──────────── */
+.filter-results-summary {
+  font-size: 0.82rem;
+  color: var(--gray-500);
+  margin: 0 0 0.75rem;
+}

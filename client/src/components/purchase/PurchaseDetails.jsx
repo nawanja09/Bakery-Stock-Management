@@ -2,10 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
-  faArrowLeft, 
-  faEdit, 
-  faPrint, 
+import {
+  faArrowLeft,
+  faEdit,
+  faPrint,
   faFilePdf,
   faBuilding,
   faUser,
@@ -33,7 +33,7 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
   const params = useParams();
   const navigate = useNavigate();
   const id = purchaseId || params.id;
-  
+
   const [purchase, setPurchase] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -46,13 +46,13 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        
+
         // Fetch purchase details with payments and returns
         const [purchaseRes, previousPricesRes] = await Promise.all([
           api.get(`/purchases/${id}`),
           api.get('/purchases/previous-prices')
         ]);
-        
+
         const purchaseData = purchaseRes.data;
         setPurchase(purchaseData);
         setPreviousPrices(previousPricesRes.data);
@@ -124,8 +124,8 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
 
   const getPaymentStatusInfo = () => {
     if (!purchase) return { text: 'Unknown', class: 'unknown', icon: faTimesCircle };
-    
-    switch(purchase.payment_status) {
+
+    switch (purchase.payment_status) {
       case 'Paid':
         return { text: 'Fully Paid', class: 'paid', icon: faCheckCircle, color: '#28a745' };
       case 'Partially Paid':
@@ -271,7 +271,7 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
               <span>Grand Total (with VAT):</span>
               <span className="bold">{formatCurrency(totalWithVat)}</span>
             </div>
-            
+
             {/* Returns Section */}
             {totalReturns > 0 && (
               <>
@@ -285,28 +285,28 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
                 </div>
               </>
             )}
-            
+
             <div className="summary-divider"></div>
-            
+
             <div className="summary-row">
               <span>Total Paid:</span>
               <span className="paid">{formatCurrency(paidAmount)}</span>
             </div>
-            
+
             {totalReturns > 0 && (
               <div className="summary-row">
                 <span>Returns Adjusted:</span>
                 <span className="returns-amount">-{formatCurrency(totalReturns)}</span>
               </div>
             )}
-            
+
             <div className={`summary-row due ${dueAmount > 0 ? 'negative' : 'positive'}`}>
               <span>Balance Due:</span>
               <span className={dueAmount > 0 ? 'due-amount' : ''}>
                 {formatCurrency(netBalanceAfterReturns)}
               </span>
             </div>
-            
+
             {dueAmount === 0 && (
               <div className="payment-status paid-fully">
                 <FontAwesomeIcon icon={faCheckCircle} /> Fully Paid
@@ -323,21 +323,21 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
 
       {/* Tabs for Items, Payments, Returns */}
       <div className="tabs-container">
-        <button 
+        <button
           className={`tab-button ${activeTab === 'items' ? 'active' : ''}`}
           onClick={() => setActiveTab('items')}
         >
           <FontAwesomeIcon icon={faTag} />
           Items ({purchase.items?.length || 0})
         </button>
-        <button 
+        <button
           className={`tab-button ${activeTab === 'payments' ? 'active' : ''}`}
           onClick={() => setActiveTab('payments')}
         >
           <FontAwesomeIcon icon={faHistory} />
           Payment History ({purchase.payments?.length || 0})
         </button>
-        <button 
+        <button
           className={`tab-button ${activeTab === 'returns' ? 'active' : ''}`}
           onClick={() => setActiveTab('returns')}
         >
@@ -376,7 +376,7 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
                     <th className="text-right vat-column">VAT 18%</th>
                   )}
                   <th className="text-right total-column">Line Total</th>
-                 </tr>
+                </tr>
               </thead>
               <tbody>
                 {purchase.items && purchase.items.map((item, index) => {
@@ -386,7 +386,7 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
                   const vat = (isVatRegisteredSupplier && isItemVatApplicable) ?
                     amount * (vatRate / 100) : 0;
                   const lineTotal = amount + vat;
-                  const isPriceDifferent = previousPrice > 0 && 
+                  const isPriceDifferent = previousPrice > 0 &&
                     parseFloat(item.unit_price) !== previousPrice;
 
                   return (
