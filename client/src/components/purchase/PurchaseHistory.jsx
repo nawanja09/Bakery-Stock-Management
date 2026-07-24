@@ -33,7 +33,8 @@ import {
   faFileExport,
   faMoneyBillWave,
   faUsers,
-  faStore
+  faStore,
+  faRefresh
 } from '@fortawesome/free-solid-svg-icons';
 import './PurchaseRedesigned.css';
 import api from '../../api';
@@ -490,53 +491,67 @@ const PurchaseHistory = () => {
       </header>
 
       {/* Search and Filter Bar */}
-      <div className="search-filters-container">
-        <div className="filter-group filter-group--date-range">
+      <div className="horizontal-filter-container">
+        <div className="horizontal-filter-item">
           <label>Date Range</label>
-          <div className="date-range-group">
-            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+          <div className="horizontal-date-range">
+            <input type="date" className="horizontal-filter-input" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
             <span className="date-range-separator">to</span>
-            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+            <input type="date" className="horizontal-filter-input" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
           </div>
         </div>
-        <div className="filter-group">
+
+        <div className="horizontal-filter-item">
           <label>Search</label>
-          <div className="search-input-wrapper">
-            <FontAwesomeIcon icon={faSearch} className="search-input-icon" />
+          <div className="horizontal-search-wrapper">
+            <FontAwesomeIcon icon={faSearch} className="search-icon" />
             <input
               type="text"
+              className="horizontal-filter-input"
               placeholder="Search Invoice No. / Supplier"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
         </div>
-        <div className="filter-group">
+
+        <div className="horizontal-filter-item">
           <label>Company</label>
-          <select value={companyFilter} onChange={(e) => setCompanyFilter(e.target.value)}>
+          <select className="horizontal-filter-select" value={companyFilter} onChange={(e) => setCompanyFilter(e.target.value)}>
             <option value="">All Companies</option>
             {companies.map(company => (
               <option key={company.id} value={company.id}>{company.name}</option>
             ))}
           </select>
         </div>
-        <div className="filter-group">
+
+        <div className="horizontal-filter-item">
           <label>Paid Status</label>
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+          <select className="horizontal-filter-select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
             <option value="all">All</option>
             <option value="Paid">Paid</option>
             <option value="Partially Paid">Partially Paid</option>
             <option value="Non-Paid">Non-Paid</option>
           </select>
         </div>
-        <div className="filter-group">
+
+        <div className="horizontal-filter-item">
           <label>VAT</label>
-          <select value={vatFilter} onChange={(e) => setVatFilter(e.target.value)}>
+          <select className="horizontal-filter-select" value={vatFilter} onChange={(e) => setVatFilter(e.target.value)}>
             <option value="all">All</option>
             <option value="with_vat">With VAT</option>
             <option value="without_vat">Without VAT</option>
           </select>
         </div>
+
+        <button
+          type="button"
+          className="horizontal-reset-btn"
+          onClick={clearFilters}
+          disabled={!hasActiveFilters}
+        >
+          <FontAwesomeIcon icon={faRefresh} />
+        </button>
       </div>
 
       {/* Main Content Area */}
