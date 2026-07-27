@@ -1,3 +1,4 @@
+/* DepartmentReturnItemWiseReport.jsx */
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import jsPDF from 'jspdf';
@@ -29,7 +30,7 @@ const DepartmentReturnItemWiseReport = () => {
   
   // Filter states
   const [filters, setFilters] = useState({
-    startDate: format(new Date(new Date().setDate(1)), 'yyyy-MM-dd'), // First day of current month
+    startDate: format(new Date(new Date().setDate(1)), 'yyyy-MM-dd'),
     endDate: format(new Date(), 'yyyy-MM-dd'),
     departmentId: 'all',
     searchTerm: '',
@@ -121,7 +122,6 @@ const DepartmentReturnItemWiseReport = () => {
     const doc = new jsPDF('landscape', 'mm', 'a4');
     const pageWidth = doc.internal.pageSize.getWidth();
     
-    // Header
     doc.setFontSize(18);
     doc.text('Department Return Item Wise Detail Report', pageWidth / 2, 20, { align: 'center' });
     doc.setFontSize(10);
@@ -131,7 +131,6 @@ const DepartmentReturnItemWiseReport = () => {
       doc.text(`Period: ${filters.startDate} to ${filters.endDate}`, pageWidth / 2, 34, { align: 'center' });
     }
     
-    // Table
     const tableData = reportData.map(item => [
       format(new Date(item.return_date), 'yyyy-MM-dd'),
       item.return_number,
@@ -169,7 +168,6 @@ const DepartmentReturnItemWiseReport = () => {
         10: { cellWidth: 30 }
       },
       didDrawPage: function(data) {
-        // Footer
         const pageHeight = doc.internal.pageSize.getHeight();
         doc.setFontSize(8);
         doc.text(
@@ -199,7 +197,6 @@ const DepartmentReturnItemWiseReport = () => {
       'Remarks': item.remarks || ''
     }));
 
-    // Add summary sheet
     const summaryData = [
       { 'Summary': 'Department Return Item Wise Report' },
       {},
@@ -232,18 +229,20 @@ const DepartmentReturnItemWiseReport = () => {
     window.print();
   };
 
-  // Get unique reasons for filter
-  const reasons = ['Excess', 'Damaged', 'Wrong Issue', 'Expired', 'Other'];
-
   return (
     <div className="report-container">
-      {/* Header */}
+      {/* Header with Export Button */}
       <div className="report-header">
-          <h2>Department Return Item Wise Detail</h2>
+        <h2>Department Return Item Wise Detail</h2>
+        {reportData.length > 0 && (
+          <button onClick={exportExcel} className="btn-export-excel">
+            <FontAwesomeIcon icon={faFileExcel} /> Excel
+          </button>
+        )}
       </div>
 
       {/* Filters */}
-      <div className="report-filters">
+      <div className="report-filters dept-return-iw-filters">
         <form onSubmit={handleSearch} className="filters-form">
           <div className="filter-row">
             <div className="filter-group">
@@ -303,21 +302,12 @@ const DepartmentReturnItemWiseReport = () => {
                 <FontAwesomeIcon icon={faSearch} /> Search
               </button>
               <button type="button" className="btn btn-secondary" onClick={clearFilters}>
-                <FontAwesomeIcon icon={faTimes} /> Clear
+                <FontAwesomeIcon icon={faTimes} /> Cancel
               </button>
             </div>
           </div>
         </form>
       </div>
-
-      {/* Export Buttons */}
-      {reportData.length > 0 && (
-        <div className="export-bar">
-          <button onClick={exportExcel} className="btn btn-secondary">
-            <FontAwesomeIcon icon={faFileExcel} /> Excel
-          </button>
-        </div>
-      )}
 
       {/* Report Table */}
       {loading ? (
