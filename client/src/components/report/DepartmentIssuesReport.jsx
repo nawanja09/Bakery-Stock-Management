@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faDownload, faFileExcel, faFilter } from '@fortawesome/free-solid-svg-icons';
+import { faDownload, faFileExcel, faFilter, faCalendarAlt } from '@fortawesome/free-solid-svg-icons';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
@@ -147,16 +147,97 @@ const DepartmentIssuesReport = () => {
     XLSX.writeFile(workbook, `issuance-report-${startDate}-to-${endDate}.xlsx`);
   };
 
+  // Custom styles for react-select - FIXED ALIGNMENT
+  const customSelectStyles = {
+    control: (provided, state) => ({
+      ...provided,
+      minHeight: "44px",
+      height: "44px",
+      border: "1px solid #e2e8f0",
+      borderRadius: "10px",
+      boxShadow: "none",
+      "&:hover": {
+        borderColor: state.isFocused ? "#60a5fa" : "#e2e8f0",
+      },
+      "&:focus-within": {
+        borderColor: "#60a5fa",
+        boxShadow: "0 0 0 4px rgba(96,165,250,0.08)",
+      },
+    }),
+    valueContainer: (provided) => ({
+      ...provided,
+      height: "44px",
+      padding: "0 12px",
+      display: "flex",
+      alignItems: "center",
+    }),
+    indicatorsContainer: (provided) => ({
+      ...provided,
+      height: "44px",
+      display: "flex",
+      alignItems: "center",
+    }),
+    input: (provided) => ({
+      ...provided,
+      margin: 0,
+      padding: 0,
+      height: "auto",
+    }),
+    indicatorSeparator: () => ({
+      display: "none",
+    }),
+    singleValue: (provided) => ({
+      ...provided,
+      margin: 0,
+      padding: 0,
+      lineHeight: "1.4",
+    }),
+    placeholder: (provided) => ({
+      ...provided,
+      margin: 0,
+      padding: 0,
+      lineHeight: "1.4",
+    }),
+    menu: (provided) => ({
+      ...provided,
+      zIndex: 9999,
+    }),
+  };
+
   return (
     <div className="report-container">
       <header className="report-header">
-          <h2>RM Issue Item Detail</h2>
+        <h2>RM Issue Item Detail</h2>
       </header>
 
-      <section className="controls-grid" aria-label="Report filters">
-        <div className="form-group">
+      <div className="filter-row">
+        <div className="filter-group">
           <label>
-            <FontAwesomeIcon icon={faFilter} /> Department
+            <FontAwesomeIcon icon={faCalendarAlt} /> START DATE
+          </label>
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="filter-input"
+          />
+        </div>
+
+        <div className="filter-group">
+          <label>
+            <FontAwesomeIcon icon={faCalendarAlt} /> END DATE
+          </label>
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            className="filter-input"
+          />
+        </div>
+
+        <div className="filter-group">
+          <label>
+            <FontAwesomeIcon icon={faFilter} /> DEPARTMENT
           </label>
           <Select
             value={selectedDepartment === "all" ? { value: "all", label: "All Departments" } : departments.find(d => d.id === Number(selectedDepartment)) && { value: selectedDepartment, label: departments.find(d => d.id === Number(selectedDepartment))?.name }}
@@ -168,12 +249,15 @@ const DepartmentIssuesReport = () => {
                 label: dept.name,
               })),
             ]}
+            styles={customSelectStyles}
+            menuPortalTarget={document.body}
+            menuPosition="fixed"
           />
         </div>
 
-        <div className="form-group">
+        <div className="filter-group">
           <label>
-            <FontAwesomeIcon icon={faFilter} /> Item
+            <FontAwesomeIcon icon={faFilter} /> ITEM SECTION
           </label>
           <Select
             value={selectedItem === "all" ? { value: "all", label: "All Items" } : items.find(i => i.id === Number(selectedItem)) && { value: selectedItem, label: items.find(i => i.id === Number(selectedItem))?.name + ` (${items.find(i => i.id === Number(selectedItem))?.item_code})` }}
@@ -185,57 +269,30 @@ const DepartmentIssuesReport = () => {
                 label: `${item.name} (${item.item_code})`,
               })),
             ]}
+            styles={customSelectStyles}
+            menuPortalTarget={document.body}
+            menuPosition="fixed"
           />
         </div>
 
-        <div className="form-group">
-          <label>Start Date</label>
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-          />
+        <div className="filter-group filter-buttons">
+          <button
+            onClick={generateReport}
+            disabled={loading}
+            className="btn btn-primary"
+          >
+            {loading ? "Generating..." : "Generate"}
+          </button>
+
+          <button
+            onClick={exportExcel}
+            disabled={reportData.length === 0}
+            className="btn btn-secondary"
+          >
+            <FontAwesomeIcon icon={faFileExcel} />
+            <span>Export Excel</span>
+          </button>
         </div>
-
-        <div className="form-group">
-          <label>End Date</label>
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-          />
-        </div>
-  </section>
-
-  <div className="action-buttons" role="toolbar" aria-label="Report actions">
-        <button
-          onClick={generateReport}
-          disabled={loading}
-          className="btn btn-primary"
-          title="Generate report"
-        >
-          {loading ? "Generating..." : "Generate"}
-        </button>
-
-        <button
-          onClick={exportPDF}
-          disabled={reportData.length === 0}
-          className="btn btn-secondary"
-          title="Export as PDF"
-        >
-          <FontAwesomeIcon icon={faDownload} />
-          <span>PDF</span>
-        </button>
-
-        <button
-          onClick={exportExcel}
-          disabled={reportData.length === 0}
-          className="btn btn-secondary"
-          title="Export as Excel"
-        >
-          <FontAwesomeIcon icon={faFileExcel} />
-          <span>Excel</span>
-        </button>
       </div>
 
       {loading ? (
@@ -277,17 +334,9 @@ const DepartmentIssuesReport = () => {
                 ))}
               </tbody>
               <tfoot>
-                <tr
-                  style={{
-                    backgroundColor: "#f8f9fa",
-                    fontWeight: "bold",
-                  }}
-                >
+                <tr style={{ backgroundColor: "#f8f9fa", fontWeight: "bold" }}>
                   <td colSpan={3}></td>
-
                   <td style={{ textAlign: "right" }}>Grand Total:</td>
-
-                  {/* Quantity Column */}
                   <td>
                     {formatNumber(
                       reportData.reduce(
@@ -298,14 +347,8 @@ const DepartmentIssuesReport = () => {
                       3
                     )}
                   </td>
-
-                  {/* Unit */}
                   <td></td>
-
-                  {/* Unit Price */}
                   <td></td>
-
-                  {/* Total Price */}
                   <td>
                     Rs.&nbsp;
                     {formatNumber(
@@ -317,11 +360,7 @@ const DepartmentIssuesReport = () => {
                       2
                     )}
                   </td>
-
-                  {/* Received By */}
                   <td></td>
-
-                  {/* Remarks */}
                   <td></td>
                 </tr>
               </tfoot>
