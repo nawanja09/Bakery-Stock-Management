@@ -31,10 +31,10 @@
 
 /* Compact Controls */
 .controls-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1.6fr 1.8fr;
-  align-items: end;
-  gap: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 24px;
   margin-bottom: 32px;
   padding: 24px;
   background: white;
@@ -49,7 +49,9 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  min-width: 0;
+  flex: 1 1 220px;
+  min-width: 220px;
+  max-width: 100%;
 }
 
 .form-group label {
@@ -58,6 +60,12 @@
   color: #475569;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .form-group input,
@@ -427,21 +435,16 @@
 /* Desktop: content width is already trimmed by the sidebar, so ease the column ratio a touch */
 @media (max-width: 1600px) {
   .controls-row {
-    grid-template-columns: 1fr 1fr 1.5fr 1.6fr;
-    gap: 16px;
+    gap: 20px;
   }
 }
 
 /* Laptop: four columns get too tight once the sidebar is factored in; switch to 2 columns,
    with the item search and action buttons spanning the full row */
 @media (max-width: 1200px) {
-  .controls-row {
-    grid-template-columns: 1fr 1fr;
-  }
-
   .item-search-container,
   .action-buttons-container {
-    grid-column: 1 / -1;
+    flex-basis: 100%;
   }
 }
 
@@ -464,14 +467,18 @@
   }
 
   .controls-row {
-    grid-template-columns: 1fr;
+    flex-direction: column;
     padding: 16px;
-    gap: 14px;
+    gap: 16px;
+  }
+
+  .form-group {
+    min-width: 100%;
   }
 
   .item-search-container,
   .action-buttons-container {
-    grid-column: auto;
+    flex-basis: auto;
   }
 
   .action-buttons-row {
@@ -486,7 +493,6 @@
   .summary-cards {
     grid-template-columns: 1fr;
   }
-
   .table-container {
     overflow-x: auto;
   }
