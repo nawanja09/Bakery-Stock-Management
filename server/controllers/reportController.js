@@ -1122,9 +1122,70 @@ const getDepartmentReturnItemWiseReport = async (req, res) => {
   }
 };
 
+// =============================================
+// RAW MATERIAL - LAST ISSUE DATE ANALYSIS REPORT
+// =============================================
+// Returns every raw material item together with the date on which it was
+// most recently issued (i.e. the latest issuance_date across its
+// issuance_items rows). Items that have never been issued come back with
+// last_issue_date = null.
+//
+// Sorting:
+//   sortOrder = 'ASC'  (default) -> oldest last-issued item first,
+//                                    never-issued items pushed to the bottom
+//   sortOrder = 'DESC'            -> most recently issued item first,
+//                                    never-issued items still pushed to the
+//                                    bottom (so they don't dominate the top)
+const getLastIssueDateReport = async (req, res) => {
+  try {
+    const { status, sortOrder } = req.query;
+
+    let statusCondition = '';
+    if (status === 'active') {
+      statusCondition = 'AND i.status = 1';
+    } else if (status === 'inactive') {
+      statusCondition = 'AND i.status = 0';
+    }
+    // 'all' / omitted -> no filter
+
+    const direction = String(sortOrder).toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
+
+    const query = `
+      SELECT
+        i.id,
+        i.item_code,
+        i.name AS item_name,
+        i.unit,
+        i.status,
+        MAX(iss.issuance_date) AS last_issue_date,
+        DATE_FORMAT(MAX(iss.issuance_date), '%Y-%m-%d') AS last_issue_date_only
+      FROM items i
+      LEFT JOIN issuance_items ii ON ii.item_id = i.id
+      LEFT JOIN issuances iss ON ii.issuance_id = iss.id
+      WHERE i.deleted = FALSE
+        ${statusCondition}
+      GROUP BY i.id, i.item_code, i.name, i.unit, i.status
+      ORDER BY (MAX(iss.issuance_date) IS NULL) ASC, last_issue_date ${direction}, i.item_code ASC
+    `;
+
+    const [rows] = await pool.query(query, []);
+
+    const data = rows.map(row => ({
+      ...row,
+      last_issue_date: row.last_issue_date_only || null
+    }));
+
+    res.json(data);
+  } catch (error) {
+    console.error('Error generating last issue date report:', error);
+    res.status(500).json({ error: 'Server error: ' + error.message });
+  }
+};
+
 module.exports = {
   getStockReport,
   getLatestUnitPrice,
+  getLastIssueDateReport,
   getDepartmentIssuesReport,
   getPurchasingReport,
   getWastageReport,

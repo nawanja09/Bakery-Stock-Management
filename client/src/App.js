@@ -97,6 +97,8 @@ import PaymentMethodManagement from './components/adjustments/PaymentMethodManag
 
 import DepartmentReturnItemWiseReport from './components/report/DepartmentReturnItemWiseReport';
 
+import LastIssueDateReport from './components/Analysis/LastIssueDateReport';
+
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
@@ -220,6 +222,7 @@ function App() {
             <Route path="adjustments/edit/:id" element={<EditAdjustment />} />
             <Route path="adjustments/payment-methods" element={<PaymentMethodManagement />} />
             <Route path="/reports/department-return-item-wise" element={<DepartmentReturnItemWiseReport />} />
+            <Route path="/analysis/last-issued-date" element={<LastIssueDateReport />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/login" replace />} />

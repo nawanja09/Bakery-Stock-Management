@@ -43,7 +43,9 @@ import {
   faShoppingCart,
   faChartBar,
   faTrashAlt,
-  faShareSquare
+  faShareSquare,
+  faMagnifyingGlassChart,
+  faClock
 } from '@fortawesome/free-solid-svg-icons';
 import bakeryLogo from '../images/icon.jpeg';
 import './NavigationBar.css';
@@ -310,6 +312,22 @@ const NavigationBar = () => {
           <li><NavLink to="/reports/wastage" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faTrash} /></span><span>RM Wastage Item Detail</span></NavLink></li>
           <li><NavLink to="/returns/history" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faUndo} /></span><span>Department Return Summary</span></NavLink></li>
           <li><NavLink to="/reports/department-return-item-wise" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faShareSquare} /></span><span>Department Return Item Detail</span></NavLink></li>
+        </ul>
+      </li>
+
+      <li className={`dropdown ${activeDropdown === 'analysis' ? 'active' : ''}`}>
+        <div className="dropdown-header" onClick={() => toggleDropdown('analysis')}>
+          <span className="icon-container"><FontAwesomeIcon icon={faMagnifyingGlassChart} /></span>
+          <span>Analysis</span>
+          <FontAwesomeIcon icon={faChevronDown} className="chevron" />
+        </div>
+        <ul className="dropdown-menu"> 
+          <li>
+            <NavLink to="/analysis/last-issued-date" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <span className="icon-container"><FontAwesomeIcon icon={faClock} /></span>
+              <span>Last Issued Date</span>
+            </NavLink>
+          </li>
         </ul>
       </li>
     </>

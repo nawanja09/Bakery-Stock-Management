@@ -1,0 +1,76 @@
+.report-container {
+  width: 100%;
+}
+
+
+.controls-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 20px;
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  min-width: 220px;
+}
+
+
+.form-group label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 6px;
+}
+
+
+.filter-select,
+.date-input {
+  height: 40px;
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: white;
+  color: #374151;
+  font-size: 14px;
+}
+
+
+.filter-select {
+  min-width: 220px;
+}
+
+
+.action-buttons-container {
+  justify-content: flex-end;
+}
+
+
+.action-buttons-row {
+  display: flex;
+  gap: 10px;
+}
+
+
+.hidden-label {
+  visibility: hidden;
+}
+
+
+@media(max-width:768px){
+
+  .controls-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .form-group,
+  .filter-select {
+    width:100%;
+  }
+
+}
