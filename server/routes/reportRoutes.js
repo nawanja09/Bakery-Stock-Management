@@ -19,4 +19,6 @@ router.get('/purchasing-item-wise', reportController.getPurchasingItemWiseReport
 
 router.get('/department-return-item-wise', reportController.getDepartmentReturnItemWiseReport);
 
+router.get('/last-issue-date', reportController.getLastIssueDateReport);
+
 module.exports = router;
