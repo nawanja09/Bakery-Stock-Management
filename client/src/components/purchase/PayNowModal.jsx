@@ -8,12 +8,13 @@ import api from '../../api';
 import usePaymentMethods from '../../utils/usePaymentMethods';
 import './PayNowModal.css';
 
-const PayNowModal = ({ isOpen, onClose, supplierId, supplierName, onSuccess }) => {
+const PayNowModal = ({ isOpen, onClose, suppliers = [], supplierId, supplierName, onSuccess }) => {
   const { showPopup } = usePopup();
   const currentUser = JSON.parse(localStorage.getItem('user'));
   const { paymentMethods, loadingMethods } = usePaymentMethods();
 
   const defaultForm = {
+    supplier_id: supplierId || '',
     payment_date: dayjs().format('YYYY-MM-DD'),
     payment_method: '',
     voucher_number: '',
@@ -36,6 +37,7 @@ const PayNowModal = ({ isOpen, onClose, supplierId, supplierName, onSuccess }) =
     if (isOpen) {
       setFormData({
         ...defaultForm,
+        supplier_id: supplierId || '',
         payment_date: dayjs().format('YYYY-MM-DD'),
         payment_method: paymentMethods.length > 0 ? paymentMethods[0].name : ''
       });
@@ -66,6 +68,7 @@ const PayNowModal = ({ isOpen, onClose, supplierId, supplierName, onSuccess }) =
       return value;
     })();
 
+    if (!formData.supplier_id) return showPopup('error', 'Please select a supplier');
     if (!formData.payment_date) return showPopup('error', 'Payment date is required');
     if (!amt || amt <= 0) return showPopup('error', 'Amount must be greater than 0');
     if (normalizedPaymentMethod === 'CHEQUE' && !formData.reference_number)
@@ -75,7 +78,7 @@ const PayNowModal = ({ isOpen, onClose, supplierId, supplierName, onSuccess }) =
     setSubmitting(true);
     try {
       const response = await api.post('/suppliers/pay-now', {
-        supplier_id: supplierId,
+        supplier_id: formData.supplier_id,
         payment_date: formData.payment_date,
         payment_method: normalizedPaymentMethod,
         voucher_number: formData.voucher_number || null,
@@ -123,7 +126,6 @@ const PayNowModal = ({ isOpen, onClose, supplierId, supplierName, onSuccess }) =
           <div className="pnm-info-banner">
             <FontAwesomeIcon icon={faInfoCircle} />
             <div>
-              <strong>Supplier: {supplierName}</strong><br/>
               This creates an advance supplier payment that is not tied to any specific invoice. You can allocate this credit to invoices later.
             </div>
           </div>
@@ -131,8 +133,18 @@ const PayNowModal = ({ isOpen, onClose, supplierId, supplierName, onSuccess }) =
           {/* ✅ FIX: Changed from <form> to <div> with an ID and using handleSubmit directly */}
           <div className="pnm-form" id="pnm-form">
             <div className="pnm-form-group">
-              <label>Supplier Name</label>
-              <input type="text" value={supplierName || ''} readOnly />
+              <label>Supplier *</label>
+              <select
+                name="supplier_id"
+                value={formData.supplier_id}
+                onChange={handleChange}
+                required
+              >
+                <option value="">Select supplier</option>
+                {suppliers.map(s => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
             </div>
 
             <div className="pnm-form-row">
@@ -220,7 +232,7 @@ const PayNowModal = ({ isOpen, onClose, supplierId, supplierName, onSuccess }) =
             className="pnm-btn-submit"
             type="button"
             onClick={handleSubmit}  // ✅ Directly call handleSubmit
-            disabled={submitting || !formData.amount || parseFloat(formData.amount) <= 0}
+            disabled={submitting || !formData.supplier_id || !formData.amount || parseFloat(formData.amount) <= 0}
           >
             {submitting
               ? <><FontAwesomeIcon icon={faSpinner} spin /> Processing...</>

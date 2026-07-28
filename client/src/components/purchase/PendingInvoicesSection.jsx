@@ -133,13 +133,6 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
     });
   }, [allRecords, supplierSearch, activeFilterId]);
 
-  const filteredSuppliers = useMemo(() => {
-    const term = supplierSearch.toLowerCase().trim();
-    return !term
-      ? suppliers
-      : suppliers.filter((s) => s.name?.toLowerCase().includes(term));
-  }, [suppliers, supplierSearch]);
-
   // Summary cards
   const summaryStats = useMemo(() => {
     const records = activeFilterId
@@ -205,13 +198,6 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
   };
 
   const handlePayNow = () => {
-    if (!activeFilterId) {
-      showPopup(
-        'warning',
-        'Please filter by a specific supplier before recording an outstanding payment.'
-      );
-      return;
-    }
     setShowPayNowModal(true);
   };
 
@@ -300,8 +286,7 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
       <PayNowModal
         isOpen={showPayNowModal}
         onClose={() => setShowPayNowModal(false)}
-        supplierId={activeFilterId}
-        supplierName={activeSupplierName}
+        suppliers={suppliers}
         onSuccess={async (responseData) => {
           console.log('💰 Advance payment completed:', responseData);
           await fetchAllOutstanding();
@@ -337,7 +322,7 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
             className="pis-btn-pay-now"
             onClick={handlePayNow}
             type="button"
-            title={!activeFilterId ? 'Filter by a supplier first' : 'Record outstanding payment'}
+            title="Record an advance payment"
           >
             <FontAwesomeIcon icon={faPaperPlane} /> Pay Now (Advance Payment)
           </button>
@@ -387,37 +372,6 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
                 title="Clear search"
               >
                 <FontAwesomeIcon icon={faTimes} />
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="pis-filter-group">
-          <label htmlFor="pis-supplier-select">Display Records For</label>
-          <div className="pis-filter-select-wrap">
-            <select
-              id="pis-supplier-select"
-              value={activeFilterId}
-              onChange={(e) => {
-                setActiveFilterId(e.target.value);
-                setSelectedInvoiceIds(new Set());
-              }}
-            >
-              <option value="">— All Suppliers —</option>
-              {filteredSuppliers.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-            {activeFilterId && (
-              <button
-                type="button"
-                className="pis-clear-filter-btn"
-                onClick={handleClearFilter}
-                title="Clear filter"
-              >
-                <FontAwesomeIcon icon={faTimes} /> Clear
               </button>
             )}
           </div>
