@@ -17,6 +17,17 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
 
   const totalBalance = selectedInvoices.reduce((s, inv) => s + parseFloat(inv.balance_amount || 0), 0);
 
+  const uniqueCompanies = [...new Map(
+    selectedInvoices
+      .filter(inv => inv.company_id)
+      .map(inv => [String(inv.company_id), inv.company_name])
+  ).values()];
+  const companyDisplay = uniqueCompanies.length === 0
+    ? '—'
+    : uniqueCompanies.length === 1
+      ? uniqueCompanies[0]
+      : 'Multiple Companies';
+
   const [formData, setFormData] = useState({
     payment_date: dayjs().format('YYYY-MM-DD'),
     payment_method: '',
@@ -177,9 +188,16 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
           </div>
 
           <div className="ipm-form" id="ipm-form">
-            <div className="ipm-form-group">
-              <label>Supplier Name</label>
-              <input type="text" value={supplierName || ''} readOnly />
+            <div className="ipm-form-row">
+              <div className="ipm-form-group">
+                <label>Supplier Name</label>
+                <input type="text" value={supplierName || ''} readOnly />
+              </div>
+
+              <div className="ipm-form-group">
+                <label>Company</label>
+                <input type="text" value={companyDisplay} readOnly />
+              </div>
             </div>
 
             <div className="ipm-form-row">
