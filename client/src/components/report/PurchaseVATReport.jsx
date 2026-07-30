@@ -16,6 +16,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import dayjs from 'dayjs';
 import api from '../../api';
+import { formatNumber } from '../../utils/formatters';
 import './PurchaseVATReport.css';
 
 const PurchaseVATReport = () => {
@@ -267,7 +268,7 @@ const PurchaseVATReport = () => {
           </div>
           <div className="vat-summary-info">
             <span className="vat-summary-label">Total Returns</span>
-            <span className="vat-summary-value">{summary.total_returns}</span>
+            <span className="vat-summary-value">{formatNumber(summary.total_returns)}</span>
           </div>
         </div>
 

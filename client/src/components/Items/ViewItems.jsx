@@ -16,6 +16,7 @@ import './ItemManagement.css';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
 import { ITEM_TYPE_OPTIONS } from './itemTypeOptions';
+import { formatNumber } from '../../utils/formatters';
 
 const ItemsList = () => {
   const [items, setItems] = useState([]);
@@ -317,10 +318,10 @@ const ItemsList = () => {
                       </span>
                     </td>
                     <td>
-                      <span className="current-stock">{item.current_stock || 0}</span>
+                      <span className="current-stock">{formatNumber(item.current_stock || 0)}</span>
                     </td>
                     <td>
-                      <span className="reorder-level">{item.reorder_level}</span>
+                      <span className="reorder-level">{formatNumber(item.reorder_level || 0)}</span>
                     </td>
                     <td>
                       <div className="table-actions">

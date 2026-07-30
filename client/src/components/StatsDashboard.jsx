@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import './StatsDashboard.css';
+import { formatNumber } from '../utils/formatters';
 
 const StatsDashboard = () => {
   const [stats, setStats] = useState(null);
@@ -76,7 +77,7 @@ const StatsDashboard = () => {
             <div className="stat-card-content">
               <div className="stat-card-info">
                 <p className="stat-label">{item.label}</p>
-                <h3 className="stat-value">{item.value}</h3>
+                <h3 className="stat-value">{formatNumber(item.value)}</h3>
               </div>
               <div className="stat-card-icon-wrapper">
                 <span className="stat-icon-large">{item.icon}</span>
