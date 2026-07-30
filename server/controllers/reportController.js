@@ -800,7 +800,7 @@ const getWastageReport = async (req, res) => {
         w.approved_by,
         w.reason,
         w.remarks,
-        u.email AS entered_by
+        u.username AS entered_by
       FROM wastages w
       JOIN users u ON w.entered_by = u.id
       WHERE w.date BETWEEN ? AND ?
@@ -1020,7 +1020,7 @@ const getDepartmentReturnItemWiseReport = async (req, res) => {
         ri.reason AS return_reason,
         r.received_by,
         r.remarks,
-        u.email AS entered_by,
+        u.username AS entered_by,
         r.created_at
       FROM returns r
       JOIN return_items ri ON r.id = ri.return_id

@@ -13,7 +13,7 @@ const ManageUsers = () => {
 
   // Form states
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('user');
 
@@ -35,7 +35,7 @@ const ManageUsers = () => {
   const handleAddUser = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/users', { name, email, password, role });
+      await api.post('/users', { name, username, password, role });
       showPopup('success', 'User added successfully');
       fetchUsers();
       setShowAddModal(false);
@@ -48,7 +48,7 @@ const ManageUsers = () => {
   const handleUpdateUser = async (e) => {
     e.preventDefault();
     try {
-      await api.put(`/users/${currentUser.id}`, { name, email, role });
+      await api.put(`/users/${currentUser.id}`, { name, username, role });
       showPopup('success', 'User updated successfully');
       fetchUsers();
       setShowEditModal(false);
@@ -72,7 +72,7 @@ const ManageUsers = () => {
 
   const resetForm = () => {
     setName('');
-    setEmail('');
+    setUsername('');
     setPassword('');
     setRole('user');
   };
@@ -80,7 +80,7 @@ const ManageUsers = () => {
   const openEditModal = (user) => {
     setCurrentUser(user);
     setName(user.name);
-    setEmail(user.email);
+    setUsername(user.username);
     setRole(user.role);
     setShowEditModal(true);
   };
@@ -102,7 +102,7 @@ const ManageUsers = () => {
         <thead>
           <tr>
             <th>Name</th>
-            <th>Email</th>
+            <th>Username</th>
             <th>Role</th>
             <th>Actions</th>
           </tr>
@@ -111,7 +111,7 @@ const ManageUsers = () => {
           {users.map(user => (
             <tr key={user.id}>
               <td>{user.name}</td>
-              <td>{user.email}</td>
+              <td>{user.username}</td>
               <td>{user.role}</td>
               <td>
                 <button 
@@ -152,11 +152,12 @@ const ManageUsers = () => {
                 />
               </div>
               <div className="form-group">
-                <label>Email:</label>
+                <label>Username:</label>
                 <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  autoComplete="username"
                   required
                 />
               </div>
@@ -180,6 +181,7 @@ const ManageUsers = () => {
                   <option value="manager">Manager</option>
                   <option value="inventory_officer">Inventory Officer</option>
                   <option value="baker">Production Staff</option>
+                  <option value="Store Keeper">Store Keeper</option>
                 </select>
               </div>
               <button type="submit" className="btn-primary">
@@ -209,11 +211,12 @@ const ManageUsers = () => {
                 />
               </div>
               <div className="form-group">
-                <label>Email:</label>
+                <label>Username:</label>
                 <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  autoComplete="username"
                   required
                 />
               </div>
@@ -225,6 +228,7 @@ const ManageUsers = () => {
                 >
                   <option value="user">User</option>
                   <option value="admin">Admin</option>
+                  <option value="Store Keeper">Store Keeper</option>
                 </select>
               </div>
               <button type="submit" className="btn-primary">

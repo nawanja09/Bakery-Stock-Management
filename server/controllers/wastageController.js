@@ -71,7 +71,7 @@ const getAllWastages = async (req, res) => {
         w.reason,
         w.remarks,
         COALESCE(w.deleted, 0) AS deleted,
-        u.email AS entered_by,
+        u.username AS entered_by,
         COALESCE((
           SELECT SUM(wi.estimated_loss) 
           FROM wastage_items wi 
@@ -143,7 +143,7 @@ const getWastageById = async (req, res) => {
   try {
     const [wastage] = await pool.query(`
       SELECT 
-        w.*, u.email AS entered_by
+        w.*, u.username AS entered_by
       FROM wastages w
       JOIN users u ON w.entered_by = u.id
       WHERE w.id = ? AND COALESCE(w.deleted, 0) = 0

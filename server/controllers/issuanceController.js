@@ -74,7 +74,7 @@ const getAllIssuances = async (req, res) => {
         i.issuance_date,
         DATE_FORMAT(i.issuance_date, '%Y-%m-%d') AS issuance_date_only,
         TIME_FORMAT(i.issuance_date, '%H:%i') AS issuance_time,
-        u.email AS issued_by_email,
+        u.username AS issued_by_email,
         d.name AS department_name,
         i.department_id,
         i.received_by,
@@ -143,7 +143,7 @@ const getIssuanceById = async (req, res) => {
         i.*,
         DATE_FORMAT(i.issuance_date, '%Y-%m-%d') AS issuance_date_only,
         TIME_FORMAT(i.issuance_date, '%H:%i') AS issuance_time,
-        u.email AS issued_by_email,
+        u.username AS issued_by_email,
         d.name AS department_name
       FROM issuances i
       JOIN users u ON i.issued_by = u.id
