@@ -84,7 +84,7 @@ const getAllReturns = async (req, res) => {
         d.name AS department_name,
         r.received_by,
         r.remarks,
-        u.email AS entered_by,
+        u.username AS entered_by,
         r.created_at
       FROM returns r
       JOIN departments d ON r.department_id = d.id
@@ -125,7 +125,7 @@ const getReturnById = async (req, res) => {
       SELECT 
         r.*, 
         d.name AS department_name,
-        u.email AS entered_by
+        u.username AS entered_by
       FROM returns r
       JOIN departments d ON r.department_id = d.id
       JOIN users u ON r.entered_by = u.id

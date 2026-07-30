@@ -58,6 +58,18 @@ const NavigationBar = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const sidebarRef = useRef(null);
 
+  // Store Keeper accounts don't get the Adjustments module in the menu.
+  const getUserRole = () => {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      try {
+        return JSON.parse(storedUser).role;
+      } catch (e) { return null; }
+    }
+    return null;
+  };
+  const isStoreKeeper = getUserRole() === 'Store Keeper';
+
   // Determine active module based on current path
   useEffect(() => {
     const path = location.pathname;
@@ -273,27 +285,29 @@ const NavigationBar = () => {
         </NavLink>
       </li>
 
-      <li className={`dropdown ${activeDropdown === 'adjustments' ? 'active' : ''}`}>
-        <div className="dropdown-header" onClick={() => toggleDropdown('adjustments')}>
-          <span className="icon-container"><FontAwesomeIcon icon={faAdjust} /></span>
-          <span>Adjustments</span>
-          <FontAwesomeIcon icon={faChevronDown} className="chevron" />
-        </div>
-        <ul className="dropdown-menu">
-          <li>
-            <NavLink to="/adjustments/stores-balance" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-              <span className="icon-container"><FontAwesomeIcon icon={faWarehouse} /></span>
-              <span>RM Adjustments</span>
-            </NavLink>
-          </li>
-          <li>
-            <NavLink to="/adjustments/stores-adjustments" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-              <span className="icon-container"><FontAwesomeIcon icon={faTools} /></span>
-              <span>Stores Adjustment Summary</span>
-            </NavLink>
-          </li>
-        </ul>
-      </li>
+      {!isStoreKeeper && (
+        <li className={`dropdown ${activeDropdown === 'adjustments' ? 'active' : ''}`}>
+          <div className="dropdown-header" onClick={() => toggleDropdown('adjustments')}>
+            <span className="icon-container"><FontAwesomeIcon icon={faAdjust} /></span>
+            <span>Adjustments</span>
+            <FontAwesomeIcon icon={faChevronDown} className="chevron" />
+          </div>
+          <ul className="dropdown-menu">
+            <li>
+              <NavLink to="/adjustments/stores-balance" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                <span className="icon-container"><FontAwesomeIcon icon={faWarehouse} /></span>
+                <span>RM Adjustments</span>
+              </NavLink>
+            </li>
+            <li>
+              <NavLink to="/adjustments/stores-adjustments" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                <span className="icon-container"><FontAwesomeIcon icon={faTools} /></span>
+                <span>Stores Adjustment Summary</span>
+              </NavLink>
+            </li>
+          </ul>
+        </li>
+      )}
 
       <li className={`dropdown ${activeDropdown === 'reports' ? 'active' : ''}`}>
         <div className="dropdown-header" onClick={() => toggleDropdown('reports')}>

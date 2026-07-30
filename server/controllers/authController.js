@@ -9,32 +9,36 @@ if (!process.env.JWT_SECRET) {
 }
 
 const loginUser = async (req, res) => {
-  const { email, password } = req.body;
-  
+  const { username, password } = req.body;
+
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username and password are required' });
+  }
+
   try {
     const [rows] = await pool.query(
-      'SELECT * FROM users WHERE email = ?', 
-      [email]
+      'SELECT * FROM users WHERE username = ?',
+      [username]
     );
-    
+
     if (rows.length === 0) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
-    
+
     const user = rows[0];
     const match = await bcrypt.compare(password, user.password);
-    
+
     if (match) {
       const token = jwt.sign(
-        { userId: user.id, email: user.email },
+        { userId: user.id, username: user.username, role: user.role },
         process.env.JWT_SECRET,
         { expiresIn: '24h' }
       );
 
-      res.json({ 
-        message: 'Login successful!', 
+      res.json({
+        message: 'Login successful!',
         token,
-        user: { id: user.id, email: user.email, role: user.role }
+        user: { id: user.id, name: user.name, username: user.username, role: user.role }
       });
     } else {
       res.status(401).json({ error: 'Invalid credentials' });
@@ -46,12 +50,12 @@ const loginUser = async (req, res) => {
 };
 
 const changePassword = async (req, res) => {
-  const { currentPassword, newPassword } = req.body;  
+  const { currentPassword, newPassword } = req.body;
   const userId = req.user.userId;
 
   try {
     const [rows] = await pool.query(
-      'SELECT * FROM users WHERE id = ?', 
+      'SELECT * FROM users WHERE id = ?',
       [userId]
     );
     if (rows.length === 0) {
@@ -64,7 +68,7 @@ const changePassword = async (req, res) => {
     }
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     await pool.query(
-      'UPDATE users SET password = ? WHERE id = ?', 
+      'UPDATE users SET password = ? WHERE id = ?',
       [hashedPassword, userId]
     );
 
@@ -76,32 +80,36 @@ const changePassword = async (req, res) => {
 };
 
 const registerUser = async (req, res) => {
-  const { name, email, password } = req.body;
+  const { name, username, password } = req.body;
+
+  if (!name || !username || !password) {
+    return res.status(400).json({ error: 'Name, username and password are required' });
+  }
 
   try {
     const [existing] = await pool.query(
-      'SELECT * FROM users WHERE email = ?', 
-      [email]
+      'SELECT * FROM users WHERE username = ?',
+      [username]
     );
-    
+
     if (existing.length > 0) {
-      return res.status(400).json({ error: 'Email already exists' });
+      return res.status(400).json({ error: 'Username already exists' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const [result] = await pool.query(
-      'INSERT INTO users (name, email, password) VALUES (?, ?, ?)', 
-      [name, email, hashedPassword]
+      'INSERT INTO users (name, username, password) VALUES (?, ?, ?)',
+      [name, username, hashedPassword]
     );
-    
-    res.status(201).json({ 
-      message: 'User registered successfully', 
-      userId: result.insertId 
+
+    res.status(201).json({
+      message: 'User registered successfully',
+      userId: result.insertId
     });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Server error' });
   }
-};  
+};
 
 module.exports = { loginUser, changePassword, registerUser };

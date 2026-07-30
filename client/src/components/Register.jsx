@@ -10,7 +10,7 @@ import api from '../api';
 const Register = () => {
   const [formData, setFormData] = useState({
     name: '',
-    email: '',
+    username: '',
     password: ''
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -60,8 +60,8 @@ const Register = () => {
                 <input type="text" id="name" name="name" value={formData.name} onChange={handleChange} required />
             </div>
             <div className="form-group">
-                <label htmlFor="email">Email :</label>
-                <input type="email" id="email" name="email" value={formData.email} onChange={handleChange} required />
+                <label htmlFor="username">Username :</label>
+                <input type="text" id="username" name="username" value={formData.username} onChange={handleChange} autoComplete="username" required />
             </div>
             <div className="form-group">
                 <label htmlFor="password">Password :</label>

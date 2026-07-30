@@ -106,6 +106,24 @@ const ProtectedRoute = ({ children }) => {
   return token ? children : <Navigate to="/login" replace />;
 };
 
+const getStoredUserRole = () => {
+  try {
+    const storedUser = localStorage.getItem('user');
+    return storedUser ? JSON.parse(storedUser).role : null;
+  } catch (e) {
+    return null;
+  }
+};
+
+// Blocks direct URL navigation into the Adjustments module for Store Keeper
+// accounts (the API itself also rejects these requests server-side).
+const AdjustmentsRoute = ({ children }) => {
+  const token = localStorage.getItem('token');
+  if (!token) return <Navigate to="/login" replace />;
+  if (getStoredUserRole() === 'Store Keeper') return <Navigate to="/dashboard" replace />;
+  return children;
+};
+
 const AuthCheck = () => {
   const token = localStorage.getItem('token');
   return token ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />;
@@ -217,9 +235,9 @@ function App() {
 
             <Route path="wastage/edit/:id" element={<EditWastage />} />
 
-            <Route path="adjustments/stores-balance" element={<StoresBalance />} />
-            <Route path="adjustments/stores-adjustments" element={<StoresAdjustments />} />
-            <Route path="adjustments/edit/:id" element={<EditAdjustment />} />
+            <Route path="adjustments/stores-balance" element={<AdjustmentsRoute><StoresBalance /></AdjustmentsRoute>} />
+            <Route path="adjustments/stores-adjustments" element={<AdjustmentsRoute><StoresAdjustments /></AdjustmentsRoute>} />
+            <Route path="adjustments/edit/:id" element={<AdjustmentsRoute><EditAdjustment /></AdjustmentsRoute>} />
             <Route path="adjustments/payment-methods" element={<PaymentMethodManagement />} />
             <Route path="/reports/department-return-item-wise" element={<DepartmentReturnItemWiseReport />} />
             <Route path="/analysis/last-issued-date" element={<LastIssueDateReport />} />
