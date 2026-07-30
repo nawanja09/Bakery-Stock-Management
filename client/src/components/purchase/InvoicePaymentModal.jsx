@@ -8,6 +8,7 @@ import dayjs from 'dayjs';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
 import usePaymentMethods from '../../utils/usePaymentMethods';
+import { formatCurrency } from '../../utils/formatters';
 import './InvoicePaymentModal.css';
 
 const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierName, onSuccess }) => {
@@ -177,13 +178,13 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
             <div>
               {selectedInvoices.map(inv => (
                 <span key={inv.id} className="ipm-invoice-tag">
-                  {inv.invoice_no} &nbsp;·&nbsp; Rs. {parseFloat(inv.balance_amount).toFixed(2)}
+                  {inv.invoice_no} &nbsp;·&nbsp; {formatCurrency(inv.balance_amount)}
                 </span>
               ))}
             </div>
             <div className="ipm-total-row">
               <span>Total Balance Due</span>
-              <span className="ipm-balance">Rs. {totalBalance.toFixed(2)}</span>
+              <span className="ipm-balance">{formatCurrency(totalBalance)}</span>
             </div>
           </div>
 
@@ -291,9 +292,9 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
                 <div key={a.id} className="ipm-alloc-row">
                   <div>
                     <span className="ipm-alloc-inv">{a.invoice_no}</span>
-                    <span className="ipm-alloc-remaining"> — Balance: Rs. {parseFloat(a.balance_amount).toFixed(2)}</span>
+                    <span className="ipm-alloc-remaining"> — Balance: {formatCurrency(a.balance_amount)}</span>
                   </div>
-                  <span className="ipm-alloc-amt">Rs. {a.allocated.toFixed(2)}</span>
+                  <span className="ipm-alloc-amt">{formatCurrency(a.allocated)}</span>
                 </div>
               ))}
             </div>

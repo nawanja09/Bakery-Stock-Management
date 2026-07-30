@@ -226,8 +226,11 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], comp
 
   // Helpers
   const formatCurrency = (amount) => {
-    const numeric = parseFloat(amount) || 0;
-    return `Rs. ${numeric.toFixed(2)}`;
+    return new Intl.NumberFormat('en-LK', {
+      style: 'currency',
+      currency: 'LKR',
+      minimumFractionDigits: 2
+    }).format(amount).replace('LKR', 'Rs.');
   };
 
   const getDocIcon = (type) => {

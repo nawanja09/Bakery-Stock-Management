@@ -5,6 +5,7 @@ import { faTimes, faBalanceScale, faCheckCircle, faSpinner, faBoxOpen, faWallet 
 import dayjs from 'dayjs';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
+import { formatCurrency } from '../../utils/formatters';
 import './SettleNowModal.css';
 
 const SettleNowModal = ({ isOpen, onClose, invoice, supplierId, onSuccess }) => {
@@ -138,7 +139,7 @@ const SettleNowModal = ({ isOpen, onClose, invoice, supplierId, onSuccess }) => 
             </div>
             <div className="snm-summary-right">
               <span>Current Balance</span>
-              <strong>Rs. {parseFloat(invoice.balance_amount).toFixed(2)}</strong>
+              <strong>{formatCurrency(invoice.balance_amount)}</strong>
             </div>
           </div>
 
@@ -172,8 +173,8 @@ const SettleNowModal = ({ isOpen, onClose, invoice, supplierId, onSuccess }) => 
                           <span className="snm-ci-date">{dayjs(credit.credit_date).format('DD MMM YYYY')}</span>
                         </div>
                         <div className="snm-ci-details">
-                          <span>Original: Rs. {parseFloat(credit.original_amount).toFixed(2)}</span>
-                          <strong>Available: Rs. {parseFloat(credit.remaining_credit).toFixed(2)}</strong>
+                          <span className="sn-avail-amt">Original: {formatCurrency(credit.original_amount)}</span>
+                          <strong>Available: {formatCurrency(credit.remaining_credit)}</strong>
                         </div>
                       </div>
                       
@@ -210,7 +211,7 @@ const SettleNowModal = ({ isOpen, onClose, invoice, supplierId, onSuccess }) => 
         <div className="snm-totals">
           <div className="snm-total-item">
             <span>Invoice Balance</span>
-            <span>Rs. {parseFloat(invoice.balance_amount).toFixed(2)}</span>
+            <span>{formatCurrency(invoice.balance_amount)}</span>
           </div>
           <div className="snm-total-item active">
             <span>Total Settled</span>
