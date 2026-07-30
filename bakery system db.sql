@@ -43952,3 +43952,29 @@ ALTER TABLE `supplier`
 -- Optional but recommended: speeds up "WHERE is_deleted = 0" filtering
 ALTER TABLE `supplier`
   ADD INDEX `idx_supplier_is_deleted` (`is_deleted`);
+
+
+-- Migration: Add Company to Advance Payments (supplier_overpayments)
+-- Date: 2026-07-28
+--
+-- Run this against an EXISTING database that was created before this change.
+-- (A fresh install from `bakery system db.sql` already includes this column.)
+--
+-- Adds a company_id column to supplier_overpayments so every advance payment
+-- can be tied to the company it was recorded under, and surfaced alongside
+-- invoices in the Pending Invoices / Payments screen.
+
+ALTER TABLE `supplier_overpayments`
+  ADD COLUMN `company_id` int(11) DEFAULT NULL AFTER `supplier_id`;
+
+ALTER TABLE `supplier_overpayments`
+  ADD KEY `company_id` (`company_id`);
+
+-- Optional (uncomment if you want a hard referential-integrity guarantee;
+-- the rest of this codebase does not enforce FKs on company_id elsewhere,
+-- e.g. `purchases.company_id`, so this is left as a plain indexed column
+-- by default to match existing conventions):
+--
+-- ALTER TABLE `supplier_overpayments`
+--   ADD CONSTRAINT `fk_supplier_overpayments_company`
+--   FOREIGN KEY (`company_id`) REFERENCES `company` (`id`) ON DELETE SET NULL;

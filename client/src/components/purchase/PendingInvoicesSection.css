@@ -329,6 +329,11 @@
   font-size: 13px;
 }
 
+.pis-company-name {
+  color: #475569;
+  font-size: 13px;
+}
+
 /* Document Type Badges */
 .pis-doc-badge {
   display: inline-flex;

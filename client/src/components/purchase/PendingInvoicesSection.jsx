@@ -25,7 +25,7 @@ import InvoicePaymentModal from './InvoicePaymentModal';
 import PayNowModal from './PayNowModal';
 import SettleNowModal from './SettleNowModal';
 
-const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refreshKey = 0 }) => {
+const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], companies = [], refreshKey = 0 }) => {
   const { showPopup } = usePopup();
 
   const [allInvoices, setAllInvoices] = useState([]);
@@ -287,6 +287,7 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
         isOpen={showPayNowModal}
         onClose={() => setShowPayNowModal(false)}
         suppliers={suppliers}
+        companies={companies}
         onSuccess={async (responseData) => {
           console.log('💰 Advance payment completed:', responseData);
           await fetchAllOutstanding();
@@ -419,6 +420,7 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
                 />
               </th>
               <th>Supplier Name</th>
+              <th>Company</th>
               <th>Document Type</th>
               <th>Document Number</th>
               <th>Transaction Date</th>
@@ -430,14 +432,14 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="8" className="pis-empty">
+                <td colSpan="9" className="pis-empty">
                   <FontAwesomeIcon icon={faSpinner} spin />
                   <p>Loading outstanding records…</p>
                 </td>
               </tr>
             ) : filteredRecords.length === 0 ? (
               <tr>
-                <td colSpan="8" className="pis-empty">
+                <td colSpan="9" className="pis-empty">
                   <FontAwesomeIcon icon={faCheckCircle} style={{ color: '#10b981' }} />
                   <p>
                     {activeFilterId || supplierSearch
@@ -472,6 +474,10 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], refr
 
                     <td>
                       <div className="pis-supplier-name">{record.supplier_name}</div>
+                    </td>
+
+                    <td>
+                      <div className="pis-company-name">{record.company_name || '—'}</div>
                     </td>
 
                     <td>

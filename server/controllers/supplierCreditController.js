@@ -48,6 +48,8 @@ const getSupplierCredits = async (req, res) => {
         'overpayment'        AS credit_type,
         'Advance Payment'    AS source,
         so.overpayment_number AS credit_number,
+        so.company_id        AS company_id,
+        c.name                AS company_name,
         so.payment_date      AS credit_date,
         so.original_amount,
         so.remaining_credit,
@@ -59,6 +61,7 @@ const getSupplierCredits = async (req, res) => {
         so.supplier_id
       FROM supplier_overpayments so
       LEFT JOIN users u ON so.created_by = u.id
+      LEFT JOIN company c ON so.company_id = c.id
       WHERE so.supplier_id = ?
         AND so.status != 'Fully Used'
         AND so.remaining_credit > 0
@@ -157,6 +160,7 @@ const getSupplierOutstanding = async (req, res) => {
 const createOverpayment = async (req, res) => {
   const {
     supplier_id,
+    company_id,
     payment_date,
     payment_method,
     voucher_number,
@@ -170,6 +174,7 @@ const createOverpayment = async (req, res) => {
   const normalizedPaymentMethod = normalizePaymentMethodValue(payment_method);
 
   if (!supplier_id) return res.status(400).json({ error: 'Supplier is required' });
+  if (!company_id) return res.status(400).json({ error: 'Company is required' });
   if (!payment_date) return res.status(400).json({ error: 'Payment date is required' });
   if (!amount || parseFloat(amount) <= 0) return res.status(400).json({ error: 'Amount must be greater than 0' });
   if (!created_by) return res.status(400).json({ error: 'Created by is required' });
@@ -187,18 +192,24 @@ const createOverpayment = async (req, res) => {
       return res.status(404).json({ error: 'Supplier not found' });
     }
 
+    const [companyRows] = await connection.query('SELECT id, name FROM company WHERE id = ? LIMIT 1', [company_id]);
+    if (companyRows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ error: 'Company not found' });
+    }
+
     const datePart = payment_date.replace(/-/g, '');
     const rand = Math.floor(Math.random() * 9000) + 1000;
     const overpayment_number = `ADV-${datePart}-${rand}`;
 
     const [result] = await connection.query(`
       INSERT INTO supplier_overpayments
-        (overpayment_number, supplier_id, payment_date, payment_method,
+        (overpayment_number, supplier_id, company_id, payment_date, payment_method,
          voucher_number, reference_number, original_amount, remaining_credit,
          status, notes, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Active', ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Active', ?, ?)
     `, [
-      overpayment_number, supplier_id, payment_date, normalizedPaymentMethod,
+      overpayment_number, supplier_id, company_id, payment_date, normalizedPaymentMethod,
       voucher_number || null, reference_number || null,
       parseFloat(amount), parseFloat(amount),
       notes || null, created_by
@@ -207,12 +218,14 @@ const createOverpayment = async (req, res) => {
     await connection.commit();
 
     const [[inserted]] = await connection.query(
-      `SELECT so.id, so.overpayment_number, so.supplier_id, s.name AS supplier_name, 
+      `SELECT so.id, so.overpayment_number, so.supplier_id, s.name AS supplier_name,
+              so.company_id, c.name AS company_name,
               so.payment_date, so.payment_method, so.voucher_number, 
               so.reference_number, so.original_amount, so.remaining_credit, 
               so.status, so.notes, so.created_by
        FROM supplier_overpayments so
        JOIN supplier s ON so.supplier_id = s.id
+       LEFT JOIN company c ON so.company_id = c.id
        WHERE so.id = ? LIMIT 1`,
       [result.insertId]
     );
@@ -419,6 +432,8 @@ const getAllOutstandingRecords = async (req, res) => {
         p.id,
         s.id            AS supplier_id,
         s.name          AS supplier_name,
+        p.company_id    AS company_id,
+        c.name          AS company_name,
         'Invoice'       AS document_type,
         p.invoice_no    AS document_number,
         p.purchase_date AS transaction_date,
@@ -427,6 +442,7 @@ const getAllOutstandingRecords = async (req, res) => {
         p.payment_status AS status
       FROM purchases p
       JOIN supplier s ON p.supplier_id = s.id
+      LEFT JOIN company c ON p.company_id = c.id
       WHERE p.balance_amount > 0
         AND (p.deleted = FALSE OR p.deleted IS NULL)
       ORDER BY s.name ASC, p.purchase_date DESC
@@ -437,6 +453,8 @@ const getAllOutstandingRecords = async (req, res) => {
         so.id,
         s.id                    AS supplier_id,
         s.name                  AS supplier_name,
+        so.company_id           AS company_id,
+        c.name                   AS company_name,
         'Advance Payment'       AS document_type,
         so.overpayment_number   AS document_number,
         so.payment_date         AS transaction_date,
@@ -444,6 +462,7 @@ const getAllOutstandingRecords = async (req, res) => {
         so.status
       FROM supplier_overpayments so
       JOIN supplier s ON so.supplier_id = s.id
+      LEFT JOIN company c ON so.company_id = c.id
       WHERE so.status != 'Fully Used'
         AND so.remaining_credit > 0
       ORDER BY s.name ASC, so.payment_date DESC
@@ -454,6 +473,8 @@ const getAllOutstandingRecords = async (req, res) => {
         prc.id,
         s.id                        AS supplier_id,
         s.name                      AS supplier_name,
+        p2.company_id               AS company_id,
+        c.name                       AS company_name,
         'Purchase Return Credit'    AS document_type,
         prc.credit_number           AS document_number,
         prc.credit_date             AS transaction_date,
@@ -461,6 +482,9 @@ const getAllOutstandingRecords = async (req, res) => {
         prc.status
       FROM purchase_return_credits prc
       JOIN supplier s ON prc.supplier_id = s.id
+      JOIN purchase_returns pr ON prc.purchase_return_id = pr.id
+      LEFT JOIN purchases p2 ON pr.purchase_id = p2.id
+      LEFT JOIN company c ON p2.company_id = c.id
       WHERE prc.status != 'Fully Used'
         AND prc.remaining_credit > 0
       ORDER BY s.name ASC, prc.credit_date DESC

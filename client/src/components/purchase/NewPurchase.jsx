@@ -735,6 +735,7 @@ const AddPurchase = () => {
           supplierId={formData.supplier_id}
           supplierName={selectedSupplier?.name || ''}
           suppliers={suppliers}
+          companies={companies}
           refreshKey={pendingRefreshKey}
         />
 

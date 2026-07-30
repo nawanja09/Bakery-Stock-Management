@@ -8,13 +8,14 @@ import api from '../../api';
 import usePaymentMethods from '../../utils/usePaymentMethods';
 import './PayNowModal.css';
 
-const PayNowModal = ({ isOpen, onClose, suppliers = [], supplierId, supplierName, onSuccess }) => {
+const PayNowModal = ({ isOpen, onClose, suppliers = [], companies = [], supplierId, supplierName, onSuccess }) => {
   const { showPopup } = usePopup();
   const currentUser = JSON.parse(localStorage.getItem('user'));
   const { paymentMethods, loadingMethods } = usePaymentMethods();
 
   const defaultForm = {
     supplier_id: supplierId || '',
+    company_id: '',
     payment_date: dayjs().format('YYYY-MM-DD'),
     payment_method: '',
     voucher_number: '',
@@ -38,6 +39,7 @@ const PayNowModal = ({ isOpen, onClose, suppliers = [], supplierId, supplierName
       setFormData({
         ...defaultForm,
         supplier_id: supplierId || '',
+        company_id: '',
         payment_date: dayjs().format('YYYY-MM-DD'),
         payment_method: paymentMethods.length > 0 ? paymentMethods[0].name : ''
       });
@@ -69,6 +71,7 @@ const PayNowModal = ({ isOpen, onClose, suppliers = [], supplierId, supplierName
     })();
 
     if (!formData.supplier_id) return showPopup('error', 'Please select a supplier');
+    if (!formData.company_id) return showPopup('error', 'Please select a company');
     if (!formData.payment_date) return showPopup('error', 'Payment date is required');
     if (!amt || amt <= 0) return showPopup('error', 'Amount must be greater than 0');
     if (normalizedPaymentMethod === 'CHEQUE' && !formData.reference_number)
@@ -79,6 +82,7 @@ const PayNowModal = ({ isOpen, onClose, suppliers = [], supplierId, supplierName
     try {
       const response = await api.post('/suppliers/pay-now', {
         supplier_id: formData.supplier_id,
+        company_id: formData.company_id,
         payment_date: formData.payment_date,
         payment_method: normalizedPaymentMethod,
         voucher_number: formData.voucher_number || null,
@@ -132,19 +136,36 @@ const PayNowModal = ({ isOpen, onClose, suppliers = [], supplierId, supplierName
 
           {/* ✅ FIX: Changed from <form> to <div> with an ID and using handleSubmit directly */}
           <div className="pnm-form" id="pnm-form">
-            <div className="pnm-form-group">
-              <label>Supplier *</label>
-              <select
-                name="supplier_id"
-                value={formData.supplier_id}
-                onChange={handleChange}
-                required
-              >
-                <option value="">Select supplier</option>
-                {suppliers.map(s => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </select>
+            <div className="pnm-form-row">
+              <div className="pnm-form-group">
+                <label>Supplier *</label>
+                <select
+                  name="supplier_id"
+                  value={formData.supplier_id}
+                  onChange={handleChange}
+                  required
+                >
+                  <option value="">Select supplier</option>
+                  {suppliers.map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="pnm-form-group">
+                <label>Company *</label>
+                <select
+                  name="company_id"
+                  value={formData.company_id}
+                  onChange={handleChange}
+                  required
+                >
+                  <option value="">Select company</option>
+                  {companies.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             <div className="pnm-form-row">
@@ -232,7 +253,7 @@ const PayNowModal = ({ isOpen, onClose, suppliers = [], supplierId, supplierName
             className="pnm-btn-submit"
             type="button"
             onClick={handleSubmit}  // ✅ Directly call handleSubmit
-            disabled={submitting || !formData.supplier_id || !formData.amount || parseFloat(formData.amount) <= 0}
+            disabled={submitting || !formData.supplier_id || !formData.company_id || !formData.amount || parseFloat(formData.amount) <= 0}
           >
             {submitting
               ? <><FontAwesomeIcon icon={faSpinner} spin /> Processing...</>
