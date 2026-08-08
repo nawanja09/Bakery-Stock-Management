@@ -186,3 +186,14 @@
   .pnm-footer { flex-direction: column-reverse; }
   .pnm-btn-cancel, .pnm-btn-submit { width: 100%; justify-content: center; }
 }
+
+.pnm-balance-hint {
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #f0f7ff;
+  border: 1px solid #cfe4ff;
+  color: #1a4d8f;
+  font-size: 13px;
+  font-weight: 600;
+}

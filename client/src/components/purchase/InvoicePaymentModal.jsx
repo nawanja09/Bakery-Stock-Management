@@ -8,7 +8,6 @@ import dayjs from 'dayjs';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
 import usePaymentMethods from '../../utils/usePaymentMethods';
-import { formatCurrency } from '../../utils/formatters';
 import './InvoicePaymentModal.css';
 
 const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierName, onSuccess }) => {
@@ -29,15 +28,59 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
       ? uniqueCompanies[0]
       : 'Multiple Companies';
 
+  // For Cash/Bank ledger posting we need a single company id. All selected
+  // invoices are already required to belong to the same supplier; when they
+  // also share a company (the common case) we use it directly - if not, we
+  // fall back to the first invoice's company so the payment still posts.
+  const resolvedCompanyId = selectedInvoices.find(inv => inv.company_id)?.company_id || '';
+
   const [formData, setFormData] = useState({
     payment_date: dayjs().format('YYYY-MM-DD'),
     payment_method: '',
     voucher_number: '',
     check_number: '',
     amount: totalBalance,
-    notes: ''
+    notes: '',
+    bank_id: ''
   });
   const [submitting, setSubmitting] = useState(false);
+  const [bankAccounts, setBankAccounts] = useState([]);
+  const [loadingBanks, setLoadingBanks] = useState(false);
+  const [cashBalance, setCashBalance] = useState(null);
+  const [loadingCashBalance, setLoadingCashBalance] = useState(false);
+
+  const isCashMethod = formData.payment_method === 'Cash';
+  const isBankMethod = formData.payment_method === 'Bank';
+
+  useEffect(() => {
+    if (!isBankMethod || !resolvedCompanyId) {
+      setBankAccounts([]);
+      return;
+    }
+    let cancelled = false;
+    setLoadingBanks(true);
+    api.get('/finance/bank/accounts', { params: { companyId: resolvedCompanyId } })
+      .then(res => { if (!cancelled) setBankAccounts(res.data || []); })
+      .catch(() => { if (!cancelled) setBankAccounts([]); })
+      .finally(() => { if (!cancelled) setLoadingBanks(false); });
+    return () => { cancelled = true; };
+  }, [isBankMethod, resolvedCompanyId]);
+
+  useEffect(() => {
+    if (!isCashMethod || !resolvedCompanyId) {
+      setCashBalance(null);
+      return;
+    }
+    let cancelled = false;
+    setLoadingCashBalance(true);
+    api.get(`/finance/cash/balance/${resolvedCompanyId}`)
+      .then(res => { if (!cancelled) setCashBalance(res.data?.balance ?? 0); })
+      .catch(() => { if (!cancelled) setCashBalance(null); })
+      .finally(() => { if (!cancelled) setLoadingCashBalance(false); });
+    return () => { cancelled = true; };
+  }, [isCashMethod, resolvedCompanyId]);
+
+  const selectedBankAccount = bankAccounts.find(b => String(b.id) === String(formData.bank_id));
 
   // Set default payment method once methods are loaded
   useEffect(() => {
@@ -72,7 +115,13 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
 
   const handleChange = e => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: name === 'amount' ? parseFloat(value) || 0 : value }));
+    setFormData(prev => {
+      const next = { ...prev, [name]: name === 'amount' ? parseFloat(value) || 0 : value };
+      if (name === 'payment_method') {
+        next.bank_id = '';
+      }
+      return next;
+    });
   };
 
   const handleSubmit = async e => {
@@ -91,6 +140,9 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
     if (formData.amount <= 0) return showPopup('error', 'Amount must be greater than 0');
     if (formData.payment_method === 'Cheque' && !formData.check_number) {
       return showPopup('error', 'Cheque number is required');
+    }
+    if (formData.payment_method === 'Bank' && !formData.bank_id) {
+      return showPopup('error', 'Please select a bank account');
     }
     if (!currentUser?.id) return showPopup('error', 'Please login again');
 
@@ -132,7 +184,8 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
         voucher_number: formData.voucher_number || null,
         notes: formData.notes || null,
         created_by: currentUser.id,
-        invoice_allocations: payloadAllocations
+        invoice_allocations: payloadAllocations,
+        bank_id: normalizedPaymentMethod === 'BANK_TRANSFER' ? formData.bank_id : null
       });
 
       console.log('✅ Payment response:', response.data);
@@ -178,13 +231,13 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
             <div>
               {selectedInvoices.map(inv => (
                 <span key={inv.id} className="ipm-invoice-tag">
-                  {inv.invoice_no} &nbsp;·&nbsp; {formatCurrency(inv.balance_amount)}
+                  {inv.invoice_no} &nbsp;·&nbsp; Rs. {parseFloat(inv.balance_amount).toFixed(2)}
                 </span>
               ))}
             </div>
             <div className="ipm-total-row">
               <span>Total Balance Due</span>
-              <span className="ipm-balance">{formatCurrency(totalBalance)}</span>
+              <span className="ipm-balance">Rs. {totalBalance.toFixed(2)}</span>
             </div>
           </div>
 
@@ -273,6 +326,45 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
               <span className="ipm-hint">Any amount above the invoice balance will be stored as supplier credit.</span>
             </div>
 
+            {isBankMethod && (
+              <div className="ipm-form-group">
+                <label>Bank Account *</label>
+                <select
+                  name="bank_id"
+                  value={formData.bank_id}
+                  onChange={handleChange}
+                  required
+                  disabled={!resolvedCompanyId || loadingBanks}
+                >
+                  <option value="">
+                    {!resolvedCompanyId
+                      ? 'No company found for selected invoices'
+                      : loadingBanks ? 'Loading…' : 'Select bank account'}
+                  </option>
+                  {bankAccounts.map(b => (
+                    <option key={b.id} value={b.id}>
+                      {b.bank_name}{b.account_number ? ` — ${b.account_number}` : ''}
+                    </option>
+                  ))}
+                </select>
+                {selectedBankAccount && (
+                  <div className="ipm-balance-hint">
+                    Current Balance: Rs. {parseFloat(selectedBankAccount.current_balance || 0).toFixed(2)}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {isCashMethod && resolvedCompanyId && (
+              <div className="ipm-form-group">
+                <div className="ipm-balance-hint">
+                  {loadingCashBalance
+                    ? 'Loading cash balance…'
+                    : `Cash In Hand Balance: Rs. ${parseFloat(cashBalance || 0).toFixed(2)}`}
+                </div>
+              </div>
+            )}
+
             <div className="ipm-form-group">
               <label>Notes (Optional)</label>
               <textarea
@@ -292,9 +384,9 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
                 <div key={a.id} className="ipm-alloc-row">
                   <div>
                     <span className="ipm-alloc-inv">{a.invoice_no}</span>
-                    <span className="ipm-alloc-remaining"> — Balance: {formatCurrency(a.balance_amount)}</span>
+                    <span className="ipm-alloc-remaining"> — Balance: Rs. {parseFloat(a.balance_amount).toFixed(2)}</span>
                   </div>
-                  <span className="ipm-alloc-amt">{formatCurrency(a.allocated)}</span>
+                  <span className="ipm-alloc-amt">Rs. {a.allocated.toFixed(2)}</span>
                 </div>
               ))}
             </div>

@@ -59,6 +59,7 @@ const OnlineExpenses = () => {
     payment_date: new Date().toISOString().split('T')[0],
     payee_name: '',
     bank_name: '',
+    bank_id: '',
     voucher_number: '',
     reference_number: '',
     expense_type: '',
@@ -235,16 +236,16 @@ const OnlineExpenses = () => {
   };
 
   // Bank dropdown handlers
-  const handleBankSelect = (bankName) => {
-    setPaymentForm(prev => ({ ...prev, bank_name: bankName }));
-    setBankSearchTerm(bankName);
+  const handleBankSelect = (bank) => {
+    setPaymentForm(prev => ({ ...prev, bank_name: bank.bank_name, bank_id: bank.id }));
+    setBankSearchTerm(bank.bank_name);
     setIsBankDropdownOpen(false);
   };
 
   const handleBankSearchChange = (e) => {
     const value = e.target.value;
     setBankSearchTerm(value);
-    setPaymentForm(prev => ({ ...prev, bank_name: value }));
+    setPaymentForm(prev => ({ ...prev, bank_name: value, bank_id: '' }));
     setIsBankDropdownOpen(true);
   };
 
@@ -418,6 +419,7 @@ const OnlineExpenses = () => {
         payment_date: new Date().toISOString().split('T')[0],
         payee_name: '',
         bank_name: '',
+        bank_id: '',
         voucher_number: '',
         reference_number: '',
         expense_type: '',
@@ -466,6 +468,7 @@ const OnlineExpenses = () => {
         payment_date: new Date().toISOString().split('T')[0],
         payee_name: commonPayeeName,
         bank_name: '',
+        bank_id: '',
         voucher_number: '',
         reference_number: '',
         expense_type: firstExpense.expense_type,
@@ -536,6 +539,7 @@ const OnlineExpenses = () => {
         expense_ids: expenseIds,
         payment_date: paymentForm.payment_date,
         bank_name: paymentForm.bank_name,
+        bank_id: paymentForm.bank_id,
         voucher_number: paymentForm.voucher_number,
         reference_number: paymentForm.reference_number || null,
         transfer_amount: transferAmount
@@ -1146,7 +1150,7 @@ const OnlineExpenses = () => {
                               <div
                                 key={bank.id}
                                 className="dropdown-item"
-                                onClick={() => handleBankSelect(bank.bank_name)}
+                                onClick={() => handleBankSelect(bank)}
                               >
                                 <FontAwesomeIcon icon={faBuildingColumns} className="dropdown-icon-sm" />
                                 {bank.bank_name}

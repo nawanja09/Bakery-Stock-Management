@@ -21,11 +21,51 @@ const PayNowModal = ({ isOpen, onClose, suppliers = [], companies = [], supplier
     voucher_number: '',
     reference_number: '',
     amount: '',
-    notes: ''
+    notes: '',
+    bank_id: ''
   };
 
   const [formData, setFormData] = useState(defaultForm);
   const [submitting, setSubmitting] = useState(false);
+  const [bankAccounts, setBankAccounts] = useState([]);
+  const [loadingBanks, setLoadingBanks] = useState(false);
+  const [cashBalance, setCashBalance] = useState(null);
+  const [loadingCashBalance, setLoadingCashBalance] = useState(false);
+
+  const isCashMethod = formData.payment_method === 'Cash';
+  const isBankMethod = formData.payment_method === 'Bank';
+
+  // Load bank accounts for the selected company whenever Payment Method is Bank.
+  useEffect(() => {
+    if (!isBankMethod || !formData.company_id) {
+      setBankAccounts([]);
+      return;
+    }
+    let cancelled = false;
+    setLoadingBanks(true);
+    api.get('/finance/bank/accounts', { params: { companyId: formData.company_id } })
+      .then(res => { if (!cancelled) setBankAccounts(res.data || []); })
+      .catch(() => { if (!cancelled) setBankAccounts([]); })
+      .finally(() => { if (!cancelled) setLoadingBanks(false); });
+    return () => { cancelled = true; };
+  }, [isBankMethod, formData.company_id]);
+
+  // Load the company's Cash In Hand balance whenever Payment Method is Cash.
+  useEffect(() => {
+    if (!isCashMethod || !formData.company_id) {
+      setCashBalance(null);
+      return;
+    }
+    let cancelled = false;
+    setLoadingCashBalance(true);
+    api.get(`/finance/cash/balance/${formData.company_id}`)
+      .then(res => { if (!cancelled) setCashBalance(res.data?.balance ?? 0); })
+      .catch(() => { if (!cancelled) setCashBalance(null); })
+      .finally(() => { if (!cancelled) setLoadingCashBalance(false); });
+    return () => { cancelled = true; };
+  }, [isCashMethod, formData.company_id]);
+
+  const selectedBankAccount = bankAccounts.find(b => String(b.id) === String(formData.bank_id));
 
   // Set default payment method once methods are loaded
   useEffect(() => {
@@ -50,7 +90,13 @@ const PayNowModal = ({ isOpen, onClose, suppliers = [], companies = [], supplier
 
   const handleChange = e => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => {
+      const next = { ...prev, [name]: value };
+      if (name === 'company_id' || name === 'payment_method') {
+        next.bank_id = '';
+      }
+      return next;
+    });
   };
 
   const handleSubmit = async e => {
@@ -76,6 +122,8 @@ const PayNowModal = ({ isOpen, onClose, suppliers = [], companies = [], supplier
     if (!amt || amt <= 0) return showPopup('error', 'Amount must be greater than 0');
     if (normalizedPaymentMethod === 'CHEQUE' && !formData.reference_number)
       return showPopup('error', 'Cheque number is required');
+    if (normalizedPaymentMethod === 'BANK_TRANSFER' && !formData.bank_id)
+      return showPopup('error', 'Please select a bank account');
     if (!currentUser?.id) return showPopup('error', 'Please login again');
 
     setSubmitting(true);
@@ -89,7 +137,8 @@ const PayNowModal = ({ isOpen, onClose, suppliers = [], companies = [], supplier
         reference_number: formData.reference_number || null,
         amount: amt,
         notes: formData.notes || null,
-        created_by: currentUser.id
+        created_by: currentUser.id,
+        bank_id: normalizedPaymentMethod === 'BANK_TRANSFER' ? formData.bank_id : null
       });
 
       showPopup('success', response.data.message || 'Advance payment recorded successfully!');
@@ -233,6 +282,45 @@ const PayNowModal = ({ isOpen, onClose, suppliers = [], companies = [], supplier
                 />
               </div>
             </div>
+
+            {isBankMethod && (
+              <div className="pnm-form-group">
+                <label>Bank Account *</label>
+                <select
+                  name="bank_id"
+                  value={formData.bank_id}
+                  onChange={handleChange}
+                  required
+                  disabled={!formData.company_id || loadingBanks}
+                >
+                  <option value="">
+                    {!formData.company_id
+                      ? 'Select a company first'
+                      : loadingBanks ? 'Loading…' : 'Select bank account'}
+                  </option>
+                  {bankAccounts.map(b => (
+                    <option key={b.id} value={b.id}>
+                      {b.bank_name}{b.account_number ? ` — ${b.account_number}` : ''}
+                    </option>
+                  ))}
+                </select>
+                {selectedBankAccount && (
+                  <div className="pnm-balance-hint">
+                    Current Balance: Rs. {parseFloat(selectedBankAccount.current_balance || 0).toFixed(2)}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {isCashMethod && formData.company_id && (
+              <div className="pnm-form-group">
+                <div className="pnm-balance-hint">
+                  {loadingCashBalance
+                    ? 'Loading cash balance…'
+                    : `Cash In Hand Balance: Rs. ${parseFloat(cashBalance || 0).toFixed(2)}`}
+                </div>
+              </div>
+            )}
 
             <div className="pnm-form-group">
               <label>Notes</label>

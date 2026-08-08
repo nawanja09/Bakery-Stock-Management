@@ -1,6 +1,7 @@
 // controllers/purchaseController.js
 const pool = require('../config/db');
 const { normalizePaymentMethodValue } = require('../utils/paymentMethodUtils');
+const { recordCashTransaction, recordBankTransaction } = require('../utils/financeLedger');
 
 const resolveUserId = async (connection, ...candidateIds) => {
   for (const candidateId of candidateIds) {
@@ -735,6 +736,7 @@ const getPendingInvoicesBySupplier = async (req, res) => {
         p.payment_status,
         p.payment_method,
         p.check_number,
+        p.company_id,
         c.name AS company_name,
         DATEDIFF(CURDATE(), p.purchase_date) AS days_overdue
       FROM purchases p
@@ -769,7 +771,8 @@ const makePayment = async (req, res) => {
     notes,
     created_by,
     invoice_allocations,
-    supplier_id
+    supplier_id,
+    bank_id
   } = req.body;
 
   const normalizedPaymentMethod = normalizePaymentMethodValue(payment_method);
@@ -801,6 +804,9 @@ const makePayment = async (req, res) => {
   }
   if (normalizedAllocations.length === 0) {
     return res.status(400).json({ error: 'At least one invoice allocation is required' });
+  }
+  if (normalizedPaymentMethod === 'BANK_TRANSFER' && !bank_id) {
+    return res.status(400).json({ error: 'Bank account is required for bank payments' });
   }
 
   const connection = await pool.getConnection();
@@ -854,6 +860,8 @@ const makePayment = async (req, res) => {
     let totalApplied = 0;
     const updatedInvoices = [];
     let supplierIdForCredit = null;
+    let companyIdForLedger = null;
+    const invoiceNumbersForLedger = [];
 
     for (const allocation of normalizedAllocations) {
       const purchaseId = allocation.purchase_id;
@@ -873,6 +881,10 @@ const makePayment = async (req, res) => {
       if (!supplierIdForCredit && currentPurchase.supplier_id) {
         supplierIdForCredit = currentPurchase.supplier_id;
       }
+      if (!companyIdForLedger && currentPurchase.company_id) {
+        companyIdForLedger = currentPurchase.company_id;
+      }
+      invoiceNumbersForLedger.push(currentPurchase.invoice_no);
 
       const invoiceTotal = resolveInvoiceTotalAmount(currentPurchase);
 
@@ -989,6 +1001,53 @@ const makePayment = async (req, res) => {
 
     console.log('✅ Verification after update:', verifyPurchase[0]);
 
+    // Post the actual money movement (the full amount paid out, including any
+    // portion that became supplier credit) to the relevant Cash/Bank ledger.
+    // Money going OUT is a Credit under this ledger's convention.
+    let ledgerBalance = null;
+    const invoiceNumberForLedger = invoiceNumbersForLedger.filter(Boolean).join(', ') || null;
+    const ledgerRemark = `Supplier payment${invoiceNumberForLedger ? ` - Invoice ${invoiceNumberForLedger}` : ''}`;
+
+    let supplierNameForLedger = null;
+    const supplierIdForLedger = supplier_id || supplierIdForCredit;
+    if (supplierIdForLedger) {
+      const [supplierRowsForLedger] = await connection.query(
+        'SELECT name FROM supplier WHERE id = ?',
+        [supplierIdForLedger]
+      );
+      supplierNameForLedger = supplierRowsForLedger[0]?.name || null;
+    }
+
+    if (normalizedPaymentMethod === 'CASH' && companyIdForLedger) {
+      ledgerBalance = await recordCashTransaction(connection, {
+        companyId: companyIdForLedger,
+        date: payment_date,
+        remark: ledgerRemark,
+        credit: normalizedPaymentAmount,
+        transactionType: 'RM Purchase Payment',
+        referenceNumber: voucher_number || check_number || null,
+        invoiceNumber: invoiceNumberForLedger,
+        partyName: supplierNameForLedger,
+        referenceType: 'PURCHASE_PAYMENT',
+        referenceId: paymentHistoryId,
+        createdBy: resolvedCreatedBy
+      });
+    } else if (normalizedPaymentMethod === 'BANK_TRANSFER' && bank_id) {
+      ledgerBalance = await recordBankTransaction(connection, {
+        bankId: bank_id,
+        date: payment_date,
+        remark: ledgerRemark,
+        credit: normalizedPaymentAmount,
+        transactionType: 'RM Purchase Payment',
+        referenceNumber: voucher_number || check_number || null,
+        invoiceNumber: invoiceNumberForLedger,
+        partyName: supplierNameForLedger,
+        referenceType: 'PURCHASE_PAYMENT',
+        referenceId: paymentHistoryId,
+        createdBy: resolvedCreatedBy
+      });
+    }
+
     await connection.commit();
 
     res.json({
@@ -998,12 +1057,16 @@ const makePayment = async (req, res) => {
       applied_amount: totalApplied,
       invoice_count: normalizedAllocations.length,
       updated_invoices: updatedInvoices,
-      verification: verifyPurchase[0]
+      verification: verifyPurchase[0],
+      ledger_balance: ledgerBalance
     });
 
   } catch (error) {
     await connection.rollback();
     console.error('❌ Error processing payment:', error);
+    if (error.name === 'InsufficientBalanceError') {
+      return res.status(400).json({ error: error.message });
+    }
     res.status(500).json({ error: 'Server error: ' + error.message });
   } finally {
     connection.release();
