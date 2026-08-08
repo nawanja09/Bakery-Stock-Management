@@ -169,9 +169,8 @@ const ManageUsers = () => {
               <option value="admin">Admin</option>
               <option value="manager">Manager</option>
               <option value="user">User</option>
-              <option value="inventory_officer">Inventory Officer</option>
-              <option value="baker">Production Staff</option>
               <option value="Store Keeper">Store Keeper</option>
+              <option value="Accountant">Accountant</option>
             </select>
           </div>
           
@@ -380,9 +379,8 @@ const ManageUsers = () => {
                     <option value="user">User</option>
                     <option value="admin">Admin</option>
                     <option value="manager">Manager</option>
-                    <option value="inventory_officer">Inventory Officer</option>
-                    <option value="baker">Production Staff</option>
                     <option value="Store Keeper">Store Keeper</option>
+                    <option value="Accountant">Accountant</option>
                   </select>
                 </div>
               </div>
@@ -440,9 +438,8 @@ const ManageUsers = () => {
                     <option value="user">User</option>
                     <option value="admin">Admin</option>
                     <option value="manager">Manager</option>
-                    <option value="inventory_officer">Inventory Officer</option>
-                    <option value="baker">Production Staff</option>
                     <option value="Store Keeper">Store Keeper</option>
+                    <option value="Accountant">Accountant</option>
                   </select>
                 </div>
               </div>

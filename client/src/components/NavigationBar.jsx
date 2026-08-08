@@ -45,7 +45,11 @@ import {
   faTrashAlt,
   faShareSquare,
   faMagnifyingGlassChart,
-  faClock
+  faClock,
+  faWallet,
+  faHandHoldingDollar,
+  faLandmark,
+  faRightLeft
 } from '@fortawesome/free-solid-svg-icons';
 import bakeryLogo from '../images/icon.jpeg';
 import './NavigationBar.css';
@@ -68,7 +72,9 @@ const NavigationBar = () => {
     }
     return null;
   };
-  const isStoreKeeper = getUserRole() === 'Store Keeper';
+  const userRole = getUserRole();
+  const isStoreKeeper = userRole === 'Store Keeper';
+  const canAccessFinance = userRole === 'Admin' || userRole === 'Accountant';
 
   // Determine active module based on current path
   useEffect(() => {
@@ -89,6 +95,8 @@ const NavigationBar = () => {
       setActiveModule('finished');
     } else if (path.startsWith('/expenses')) {
       setActiveModule('expenses');
+    } else if (path.startsWith('/finance')) {
+      setActiveModule('finance');
     } else if (path.startsWith('/cutlery')) {
       setActiveModule('cutlery');
     }
@@ -117,6 +125,9 @@ const NavigationBar = () => {
         break;
       case 'expenses':
         navigate('/expenses/petty-cash');
+        break;
+      case 'finance':
+        navigate('/finance/cash');
         break;
       case 'cutlery':
         navigate('/cutlery/locations');
@@ -305,9 +316,16 @@ const NavigationBar = () => {
                 <span>Stores Adjustment Summary</span>
               </NavLink>
             </li>
+            <li>
+              <NavLink to="/adjustments/inhand" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                <span className="icon-container"><FontAwesomeIcon icon={faHandHoldingDollar} /></span>
+                <span>Inhand (Cash / Cheque)</span>
+              </NavLink>
+            </li>
           </ul>
         </li>
       )}
+
 
       <li className={`dropdown ${activeDropdown === 'reports' ? 'active' : ''}`}>
         <div className="dropdown-header" onClick={() => toggleDropdown('reports')}>
@@ -498,6 +516,41 @@ const NavigationBar = () => {
     </>
   );
 
+  const renderFinanceContent = () => (
+    <>
+      <li>
+        <NavLink to="/finance/cash" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          <span className="icon-container"><FontAwesomeIcon icon={faCashRegister} /></span>
+          <span>Cash Ledger</span>
+        </NavLink>
+      </li>
+      <li>
+        <NavLink to="/finance/cash-receive" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          <span className="icon-container"><FontAwesomeIcon icon={faHandHoldingDollar} /></span>
+          <span>Cash Receive</span>
+        </NavLink>
+      </li>
+      <li>
+        <NavLink to="/finance/bank" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          <span className="icon-container"><FontAwesomeIcon icon={faUniversity} /></span>
+          <span>Bank Ledger</span>
+        </NavLink>
+      </li>
+      <li>
+        <NavLink to="/finance/bank-receive" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          <span className="icon-container"><FontAwesomeIcon icon={faLandmark} /></span>
+          <span>Bank Receive</span>
+        </NavLink>
+      </li>
+      <li>
+        <NavLink to="/finance/transfer" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          <span className="icon-container"><FontAwesomeIcon icon={faRightLeft} /></span>
+          <span>Cash / Bank Transfer</span>
+        </NavLink>
+      </li>
+    </>
+  );
+
   const renderCutleryContent = () => (
     <>
       <li className={`dropdown ${activeDropdown === 'cutlery-management' ? 'active' : ''}`}>
@@ -629,6 +682,28 @@ const NavigationBar = () => {
             <div className="module-content">
               {renderExpensesContent()}
             </div>
+          )}
+
+          {/* Finance Module */}
+          {canAccessFinance && (
+            <>
+              <li>
+                <div 
+                  className={`nav-link module-item ${activeModule === 'finance' ? 'active-module' : ''}`}
+                  onClick={() => handleModuleClick('finance')}
+                >
+                  <span className="icon-container"><FontAwesomeIcon icon={faWallet} /></span>
+                  <span>Finance</span>
+                  {!isCollapsed && <FontAwesomeIcon icon={faChevronDown} className={`chevron ${activeModule === 'finance' ? 'rotated' : ''}`} />}
+                </div>
+              </li>
+
+              {!isCollapsed && activeModule === 'finance' && (
+                <div className="module-content">
+                  {renderFinanceContent()}
+                </div>
+              )}
+            </>
           )}
 
           {/* Cutlery Module */}

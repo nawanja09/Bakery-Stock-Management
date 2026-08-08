@@ -34,6 +34,7 @@ const ChequeExpenses = () => {
   const [isPayeeDropdownOpen, setIsPayeeDropdownOpen] = useState(false);
   const [highlightedPayeeIndex, setHighlightedPayeeIndex] = useState(0);
   const [editingId, setEditingId] = useState(null);
+  const [bankAccounts, setBankAccounts] = useState([]);
   const { showPopup } = usePopup();
   const payeeInputRef = useRef(null);
 
@@ -105,10 +106,21 @@ const ChequeExpenses = () => {
     }
   }, []);
 
+  const fetchBankAccounts = useCallback(async () => {
+    try {
+      const response = await api.get('/finance/bank/accounts/all');
+      setBankAccounts(response.data || []);
+    } catch (error) {
+      console.error('Error fetching bank accounts:', error);
+      setBankAccounts([]);
+    }
+  }, []);
+
   useEffect(() => {
     fetchChequeData();
     fetchPayees();
-  }, [fetchChequeData, fetchPayees]);
+    fetchBankAccounts();
+  }, [fetchChequeData, fetchPayees, fetchBankAccounts]);
 
   useEffect(() => {
     const query = payeeSearch.trim().toLowerCase();
@@ -306,16 +318,21 @@ const ChequeExpenses = () => {
     }
   };
 
-  const handleRealiseCheque = async (chequeId, realiseDate) => {
+  const handleRealiseCheque = async (chequeId, realiseDate, bankId) => {
     if (!realiseDate) {
       showPopup('error', 'Please select realise date');
+      return;
+    }
+    if (!bankId) {
+      showPopup('error', 'Please select a bank account');
       return;
     }
 
     setIsLoading(true);
     try {
       const response = await api.put(`/expenses/cheque/realise/${chequeId}`, {
-        realise_date: realiseDate
+        realise_date: realiseDate,
+        bank_id: bankId
       });
       
       if (response.status === 200) {
@@ -674,6 +691,7 @@ const ChequeExpenses = () => {
                   <th>Amount (LKR)</th>
                   <th>Cheque Realise</th>
                   <th>Realise Date</th>
+                  <th>Bank Account</th>
                   <th>Action</th>
                 </tr>
               </thead>
@@ -711,6 +729,21 @@ const ChequeExpenses = () => {
                           className="realise-date-input"
                         />
                       </td>
+                      <td>
+                        <select
+                          value={cheque.bank_id || ''}
+                          onChange={(e) => handleChequeRealiseChange(cheque.id, 'bank_id', e.target.value)}
+                          className="bank-select-input"
+                          style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc', minWidth: '150px' }}
+                        >
+                          <option value="">Select Bank</option>
+                          {bankAccounts.map(bank => (
+                            <option key={bank.id} value={bank.id}>
+                              {bank.bank_name} - {bank.company}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
                       <td className="action-cell">
                         <button
                           onClick={() => handleEdit(cheque)}
@@ -727,9 +760,9 @@ const ChequeExpenses = () => {
                           <FontAwesomeIcon icon={faTrash} />
                         </button>
                         <button
-                          onClick={() => handleRealiseCheque(cheque.id, cheque.realise_date)}
+                          onClick={() => handleRealiseCheque(cheque.id, cheque.realise_date, cheque.bank_id)}
                           className="save-btn"
-                          disabled={!cheque.realise_date || isLoading}
+                          disabled={!cheque.realise_date || !cheque.bank_id || isLoading}
                         >
                           <FontAwesomeIcon icon={isLoading ? faSpinner : faSave} spin={isLoading} />
                           Save

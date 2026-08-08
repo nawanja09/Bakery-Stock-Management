@@ -51,6 +51,9 @@ const itemTypeRoutes = require('./routes/itemTypeRoutes');
 const companyRoutes = require('./routes/companyRoutes');
 const PaymentMethodManagement = require('./routes/paymentMethodRoutes');
 
+const financeRoutes = require('./routes/financeRoutes');
+const inhandRoutes  = require('./routes/inhandRoutes');
+
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -72,7 +75,7 @@ uploadDirs.forEach(dir => {
 app.use(cors({
   //origin: 'https://stock.ravonbakers.lk',
   origin: 'http://localhost:3000',
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 }));
@@ -128,6 +131,8 @@ app.use('/api/suppliers', supplierCreditRoutes);
 app.use('/api/item-types', itemTypeRoutes);
 app.use('/api/companies', companyRoutes);
 app.use('/api/payment-methods', PaymentMethodManagement);
+app.use('/api/finance', financeRoutes);
+app.use('/api/inhand', inhandRoutes);
 
 // Error handling middleware for file uploads
 app.use((err, req, res, next) => {

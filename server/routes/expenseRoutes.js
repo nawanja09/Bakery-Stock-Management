@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
 const authenticate = require('../middleware/authenticate');
+const { recordCashTransaction, recordBankTransaction } = require('../utils/financeLedger');
 
 // =============================================
 // GET Petty Cash Balance
@@ -123,14 +124,19 @@ router.get('/petty-cash/reimbursements', async (req, res) => {
   try {
     const [rows] = await pool.query(
       `SELECT 
-        id, 
-        reference_number, 
-        DATE_FORMAT(reimbursement_date, '%Y-%m-%d') as date,
-        amount,
-        status,
-        DATE_FORMAT(created_at, '%Y-%m-%d') as created_date
-       FROM petty_cash_reimbursements 
-       ORDER BY created_at DESC 
+        r.id, 
+        r.reference_number, 
+        DATE_FORMAT(r.reimbursement_date, '%Y-%m-%d') as date,
+        r.amount,
+        r.funding_source,
+        r.company_id,
+        r.bank_id,
+        r.status,
+        u.name as created_by_name,
+        DATE_FORMAT(r.created_at, '%Y-%m-%d') as created_date
+       FROM petty_cash_reimbursements r
+       LEFT JOIN users u ON r.created_by = u.id
+       ORDER BY r.created_at DESC 
        LIMIT 100`
     );
     
@@ -290,34 +296,83 @@ router.delete('/petty-cash/voucher/:id', authenticate, async (req, res) => {
 // POST Create Reimbursement
 // =============================================
 router.post('/petty-cash/reimbursement', authenticate, async (req, res) => {
-  const { reference_number, reimbursement_date, amount } = req.body;
+  const { reference_number, reimbursement_date, amount, company_id, funding_source, bank_id } = req.body;
   const userId = req.user.userId;
 
   if (!reference_number || !reimbursement_date || !amount) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
+  if (funding_source && !['CASH', 'BANK'].includes(funding_source)) {
+    return res.status(400).json({ error: 'Funding source must be Cash or Bank' });
+  }
+  if (funding_source === 'CASH' && !company_id) {
+    return res.status(400).json({ error: 'Company is required when funding from Cash' });
+  }
+  if (funding_source === 'BANK' && !bank_id) {
+    return res.status(400).json({ error: 'Bank account is required when funding from Bank' });
+  }
 
+  const connection = await pool.getConnection();
   try {
-    const [result] = await pool.query(
+    await connection.beginTransaction();
+
+    const [result] = await connection.query(
       `INSERT INTO petty_cash_reimbursements 
-       (reference_number, reimbursement_date, amount, created_by, status)
-       VALUES (?, ?, ?, ?, 'Completed')`,
-      [reference_number, reimbursement_date, amount, userId]
+       (reference_number, reimbursement_date, amount, company_id, funding_source, bank_id, created_by, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'Completed')`,
+      [reference_number, reimbursement_date, amount, company_id || null, funding_source || null, bank_id || null, userId]
     );
-    
+
+    // A reimbursement tops up the petty cash float from the company's real
+    // Cash or Bank account - that's the point where money actually leaves
+    // Finance's books. Spending the float later (Vouchers) doesn't touch
+    // Finance again, since this is where that money already left.
+    if (funding_source === 'CASH') {
+      await recordCashTransaction(connection, {
+        companyId: company_id,
+        date: reimbursement_date,
+        remark: `Petty cash reimbursement - ${reference_number}`,
+        credit: parseFloat(amount),
+        transactionType: 'Petty Cash Reimbursement',
+        referenceNumber: reference_number,
+        referenceType: 'PETTY_CASH_REIMBURSEMENT',
+        referenceId: result.insertId,
+        createdBy: userId
+      });
+    } else if (funding_source === 'BANK') {
+      await recordBankTransaction(connection, {
+        bankId: bank_id,
+        date: reimbursement_date,
+        remark: `Petty cash reimbursement - ${reference_number}`,
+        credit: parseFloat(amount),
+        transactionType: 'Petty Cash Reimbursement',
+        referenceNumber: reference_number,
+        referenceType: 'PETTY_CASH_REIMBURSEMENT',
+        referenceId: result.insertId,
+        createdBy: userId
+      });
+    }
+
+    await connection.commit();
     await updatePettyCashBalance();
-    
+
     res.status(201).json({ 
       id: result.insertId, 
       message: 'Reimbursement recorded successfully' 
     });
   } catch (error) {
+    await connection.rollback();
     console.error('Error creating reimbursement:', error);
+    if (error.name === 'InsufficientBalanceError') {
+      return res.status(400).json({ error: error.message });
+    }
     if (error.code === 'ER_DUP_ENTRY') {
       res.status(400).json({ error: 'Reference number already exists' });
     } else {
-      res.status(500).json({ error: 'Failed to record reimbursement' });
+      res.status(500).json({ error: 'Failed to record reimbursement: ' + error.message });
     }
+  } finally {
+    connection.release();
   }
 });
 
@@ -433,14 +488,16 @@ router.get('/cheque/vouchers', async (req, res) => {
 router.get('/cheque/unrealised', async (req, res) => {
   try {
     const [rows] = await pool.query(
-      `SELECT id, DATE_FORMAT(bill_date, '%Y-%m-%d') as date, 
-              bill_number, payee_name, vat_reg_number, expense_type,
-              without_vat_amount, vat_amount, total_bill_amount as amount,
-              description, voucher_number, cheque_number, is_realised,
-              DATE_FORMAT(realise_date, '%Y-%m-%d') as realise_date
-       FROM cheque_expenses 
-       WHERE is_realised = 0
-       ORDER BY bill_date DESC`
+      `SELECT ce.id, DATE_FORMAT(ce.bill_date, '%Y-%m-%d') as date, 
+              ce.bill_number, ce.payee_name, ce.vat_reg_number, ce.expense_type,
+              ce.without_vat_amount, ce.vat_amount, ce.total_bill_amount as amount,
+              ce.description, ce.voucher_number, ce.cheque_number, ce.is_realised,
+              DATE_FORMAT(ce.realise_date, '%Y-%m-%d') as realise_date,
+              ce.company_id, c.name as company_name
+       FROM cheque_expenses ce
+       LEFT JOIN company c ON ce.company_id = c.id
+       WHERE ce.is_realised = 0
+       ORDER BY ce.bill_date DESC`
     );
     res.json(rows || []);
   } catch (error) {
@@ -453,14 +510,17 @@ router.get('/cheque/unrealised', async (req, res) => {
 router.get('/cheque/realised', async (req, res) => {
   try {
     const [rows] = await pool.query(
-      `SELECT id, DATE_FORMAT(bill_date, '%Y-%m-%d') as date, 
-              bill_number, payee_name, vat_reg_number, expense_type,
-              without_vat_amount, vat_amount, total_bill_amount as amount,
-              description, voucher_number, cheque_number, is_realised, 
-              DATE_FORMAT(realise_date, '%Y-%m-%d') as realise_date
-       FROM cheque_expenses 
-       WHERE is_realised = 1
-       ORDER BY realise_date DESC`
+      `SELECT ce.id, DATE_FORMAT(ce.bill_date, '%Y-%m-%d') as date, 
+              ce.bill_number, ce.payee_name, ce.vat_reg_number, ce.expense_type,
+              ce.without_vat_amount, ce.vat_amount, ce.total_bill_amount as amount,
+              ce.description, ce.voucher_number, ce.cheque_number, ce.is_realised, 
+              DATE_FORMAT(ce.realise_date, '%Y-%m-%d') as realise_date,
+              ce.company_id, c.name as company_name, ce.bank_id, bd.bank_name
+       FROM cheque_expenses ce
+       LEFT JOIN company c ON ce.company_id = c.id
+       LEFT JOIN bank_details bd ON ce.bank_id = bd.id
+       WHERE ce.is_realised = 1
+       ORDER BY ce.realise_date DESC`
     );
     res.json(rows || []);
   } catch (error) {
@@ -477,7 +537,8 @@ router.get('/cheque/voucher/:id', async (req, res) => {
       `SELECT id, DATE_FORMAT(bill_date, '%Y-%m-%d') as bill_date, bill_number,
               payee_name, vat_reg_number, expense_type, without_vat_amount,
               vat_amount, total_bill_amount, description, voucher_number,
-              cheque_number, is_realised, DATE_FORMAT(realise_date, '%Y-%m-%d') as realise_date
+              cheque_number, is_realised, DATE_FORMAT(realise_date, '%Y-%m-%d') as realise_date,
+              company_id, bank_id
        FROM cheque_expenses
        WHERE id = ?`,
       [id]
@@ -498,7 +559,7 @@ router.put('/cheque/voucher/:id', authenticate, async (req, res) => {
   const {
     bill_date, bill_number, payee_name, vat_reg_number,
     expense_type, without_vat_amount, vat_amount,
-    total_bill_amount, description
+    total_bill_amount, description, company_id
   } = req.body;
 
   if (!bill_date || !payee_name || !expense_type || !without_vat_amount) {
@@ -508,12 +569,13 @@ router.put('/cheque/voucher/:id', authenticate, async (req, res) => {
   try {
     const [result] = await pool.query(
       `UPDATE cheque_expenses
-       SET bill_date = ?, bill_number = ?, payee_name = ?, vat_reg_number = ?,
+       SET bill_date = ?, company_id = ?, bill_number = ?, payee_name = ?, vat_reg_number = ?,
            expense_type = ?, without_vat_amount = ?, vat_amount = ?,
            total_bill_amount = ?, description = ?
        WHERE id = ?`,
       [
         bill_date,
+        company_id || null,
         bill_number || null,
         payee_name,
         vat_reg_number || null,
@@ -563,7 +625,7 @@ router.post('/cheque/voucher', authenticate, async (req, res) => {
   const { 
     bill_date, bill_number, payee_name, vat_reg_number, 
     expense_type, without_vat_amount, vat_amount, 
-    total_bill_amount, description 
+    total_bill_amount, description, company_id
   } = req.body;
   const userId = req.user.userId;
 
@@ -573,11 +635,11 @@ router.post('/cheque/voucher', authenticate, async (req, res) => {
   try {
     const [result] = await pool.query(
       `INSERT INTO cheque_expenses 
-       (bill_date, bill_number, payee_name, vat_reg_number, expense_type, 
+       (bill_date, company_id, bill_number, payee_name, vat_reg_number, expense_type, 
         without_vat_amount, vat_amount, total_bill_amount, description, 
         voucher_number, cheque_number, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [bill_date, bill_number, payee_name, vat_reg_number, expense_type,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [bill_date, company_id || null, bill_number, payee_name, vat_reg_number, expense_type,
        without_vat_amount, vat_amount, total_bill_amount, description,
        voucher_number, cheque_number, userId]
     );
@@ -597,28 +659,72 @@ router.post('/cheque/voucher', authenticate, async (req, res) => {
 // PUT realise cheque
 router.put('/cheque/realise/:id', authenticate, async (req, res) => {
   const { id } = req.params;
-  const { realise_date } = req.body;
+  const { realise_date, bank_id } = req.body;
+  const userId = req.user.userId;
 
   if (!realise_date) {
     return res.status(400).json({ error: 'Realise date is required' });
   }
+  if (!bank_id) {
+    return res.status(400).json({ error: 'Bank account is required to realise a cheque' });
+  }
 
+  const connection = await pool.getConnection();
   try {
-    const [result] = await pool.query(
-      `UPDATE cheque_expenses 
-       SET is_realised = 1, realise_date = ?
-       WHERE id = ?`,
-      [realise_date, id]
+    await connection.beginTransaction();
+
+    const [chequeRows] = await connection.query(
+      'SELECT id, payee_name, total_bill_amount, cheque_number, is_realised FROM cheque_expenses WHERE id = ? FOR UPDATE',
+      [id]
     );
-    
-    if (result.affectedRows === 0) {
+    if (chequeRows.length === 0) {
+      await connection.rollback();
       return res.status(404).json({ error: 'Cheque not found' });
     }
-    
+    if (chequeRows[0].is_realised) {
+      await connection.rollback();
+      return res.status(400).json({ error: 'This cheque has already been realised' });
+    }
+    const cheque = chequeRows[0];
+
+    const [result] = await connection.query(
+      `UPDATE cheque_expenses 
+       SET is_realised = 1, realise_date = ?, bank_id = ?
+       WHERE id = ?`,
+      [realise_date, bank_id, id]
+    );
+
+    if (result.affectedRows === 0) {
+      await connection.rollback();
+      return res.status(404).json({ error: 'Cheque not found' });
+    }
+
+    // Money leaves the bank account the moment the cheque clears, not when
+    // it was written - so the ledger entry is posted here, at realise time.
+    await recordBankTransaction(connection, {
+      bankId: bank_id,
+      date: realise_date,
+      remark: `Cheque expense - ${cheque.cheque_number}`,
+      credit: parseFloat(cheque.total_bill_amount),
+      transactionType: 'Cheque Expense',
+      referenceNumber: cheque.cheque_number,
+      partyName: cheque.payee_name,
+      referenceType: 'CHEQUE_EXPENSE',
+      referenceId: cheque.id,
+      createdBy: userId
+    });
+
+    await connection.commit();
     res.json({ message: 'Cheque realised successfully' });
   } catch (error) {
+    await connection.rollback();
     console.error('Error realising cheque:', error);
-    res.status(500).json({ error: 'Failed to realise cheque' });
+    if (error.name === 'InsufficientBalanceError') {
+      return res.status(400).json({ error: error.message });
+    }
+    res.status(500).json({ error: 'Failed to realise cheque: ' + error.message });
+  } finally {
+    connection.release();
   }
 });
 
@@ -631,7 +737,7 @@ router.get('/bank-charges', async (req, res) => {
   try {
     const [rows] = await pool.query(
       `SELECT id, DATE_FORMAT(charge_date, '%Y-%m-%d') as date, 
-              bank_name, reference_number, charges_type, description, amount
+              bank_name, bank_id, reference_number, charges_type, description, amount
        FROM bank_charges 
        ORDER BY charge_date DESC, created_at DESC`
     );
@@ -644,28 +750,55 @@ router.get('/bank-charges', async (req, res) => {
 
 // POST create bank charge
 router.post('/bank-charges', authenticate, async (req, res) => {
-  const { date, bank_name, reference_number, charges_type, description, amount } = req.body;
+  const { date, bank_name, bank_id, reference_number, charges_type, description, amount } = req.body;
   const userId = req.user.userId;
 
   if (!date || !bank_name || !charges_type || !amount) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
+  const connection = await pool.getConnection();
   try {
-    const [result] = await pool.query(
+    await connection.beginTransaction();
+
+    const [result] = await connection.query(
       `INSERT INTO bank_charges 
-       (charge_date, bank_name, reference_number, charges_type, description, amount, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [date, bank_name, reference_number || null, charges_type, description || null, amount, userId]
+       (charge_date, bank_name, bank_id, reference_number, charges_type, description, amount, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [date, bank_name, bank_id || null, reference_number || null, charges_type, description || null, amount, userId]
     );
-    
+
+    // Bank charges leave the account immediately - post the ledger entry now,
+    // but only if a real bank account was selected (older/free-text-only
+    // entries without a bank_id are saved without a ledger post).
+    if (bank_id) {
+      await recordBankTransaction(connection, {
+        bankId: bank_id,
+        date,
+        remark: `Bank charge - ${charges_type}`,
+        credit: parseFloat(amount),
+        transactionType: 'Bank Charges',
+        referenceNumber: reference_number || null,
+        referenceType: 'BANK_CHARGE',
+        referenceId: result.insertId,
+        createdBy: userId
+      });
+    }
+
+    await connection.commit();
     res.status(201).json({ 
       id: result.insertId, 
       message: 'Bank charge recorded successfully' 
     });
   } catch (error) {
+    await connection.rollback();
     console.error('Error creating bank charge:', error);
-    res.status(500).json({ error: 'Failed to record bank charge' });
+    if (error.name === 'InsufficientBalanceError') {
+      return res.status(400).json({ error: error.message });
+    }
+    res.status(500).json({ error: 'Failed to record bank charge: ' + error.message });
+  } finally {
+    connection.release();
   }
 });
 
@@ -908,6 +1041,7 @@ router.post('/online/pay', authenticate, async (req, res) => {
     expense_ids, 
     payment_date, 
     bank_name, 
+    bank_id,
     voucher_number, 
     reference_number, 
     transfer_amount 
@@ -929,6 +1063,10 @@ router.post('/online/pay', authenticate, async (req, res) => {
     return res.status(400).json({ error: 'Bank name is required' });
   }
 
+  if (!bank_id) {
+    return res.status(400).json({ error: 'Please select a bank account' });
+  }
+
   // ✅ Voucher number is required
   if (!voucher_number || voucher_number.trim() === '') {
     return res.status(400).json({ error: 'Voucher number is required' });
@@ -947,7 +1085,7 @@ router.post('/online/pay', authenticate, async (req, res) => {
     
     // ✅ Get expenses with their current balance and total amount
     const [expenses] = await connection.query(
-      `SELECT id, balance, total_bill_amount, paid_amount 
+      `SELECT id, balance, total_bill_amount, paid_amount, payee_name, bill_number
        FROM online_expenses 
        WHERE id IN (${placeholders})`,
       expense_ids
@@ -1002,12 +1140,13 @@ router.post('/online/pay', authenticate, async (req, res) => {
       // ✅ Insert payment history
       await connection.query(
         `INSERT INTO online_expense_payments 
-         (expense_id, payment_date, amount, bank_name, voucher_number,
+         (expense_id, payment_date, bank_id, amount, bank_name, voucher_number,
           reference_number, created_by, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'Completed')`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Completed')`,
         [
           expense.id,
           payment_date,
+          bank_id,
           payAmount,
           bank_name,
           voucher_number,
@@ -1026,6 +1165,23 @@ router.post('/online/pay', authenticate, async (req, res) => {
       });
     }
 
+    // One combined ledger entry for the whole payment - it's a single bank
+    // transfer that happens to settle several bills at once.
+    const payeeNames = [...new Set(expenses.map(e => e.payee_name).filter(Boolean))];
+    const billNumbers = expenses.map(e => e.bill_number).filter(Boolean).join(', ');
+    await recordBankTransaction(connection, {
+      bankId: bank_id,
+      date: payment_date,
+      remark: `Online expense payment${billNumbers ? ` - Bill ${billNumbers}` : ''}`,
+      credit: amountToPay,
+      transactionType: 'Online Expense Payment',
+      referenceNumber: voucher_number,
+      invoiceNumber: billNumbers || null,
+      partyName: payeeNames.length === 1 ? payeeNames[0] : (payeeNames.length > 1 ? 'Multiple Payees' : null),
+      referenceType: 'ONLINE_EXPENSE_PAYMENT',
+      createdBy: userId
+    });
+
     await connection.commit();
 
     res.json({
@@ -1038,6 +1194,9 @@ router.post('/online/pay', authenticate, async (req, res) => {
   } catch (error) {
     await connection.rollback();
     console.error('Payment error:', error);
+    if (error.name === 'InsufficientBalanceError') {
+      return res.status(400).json({ error: error.message });
+    }
     res.status(500).json({ error: 'Payment failed: ' + error.message });
   } finally {
     connection.release();
@@ -1142,6 +1301,11 @@ router.post('/banks', authenticate, async (req, res) => {
   }
 
   try {
+    const resolvedOpeningBalance = parseFloat(opening_balance) || 0;
+    const resolvedCurrentBalance = current_balance !== undefined && current_balance !== null
+      ? parseFloat(current_balance)
+      : resolvedOpeningBalance;
+
     const [result] = await pool.query(
       `INSERT INTO bank_details 
        (bank_name, account_number, branch_name, account_type, currency, 
@@ -1153,13 +1317,28 @@ router.post('/banks', authenticate, async (req, res) => {
         branch_name || null,
         account_type || 'Current',
         currency || 'LKR',
-        opening_balance || 0,
-        current_balance || opening_balance || 0,
+        resolvedOpeningBalance,
+        resolvedCurrentBalance,
         company || 'JH',
         notes || null,
         userId
       ]
     );
+
+    // Record the opening balance as the first Finance ledger entry for this
+    // account. bank_details.current_balance is already set above, so this
+    // writes the ledger row directly rather than going through
+    // recordBankTransaction (which would add the opening balance a second
+    // time on top of what was just inserted).
+    if (resolvedOpeningBalance > 0) {
+      const [companyRows] = await pool.query('SELECT id FROM company WHERE name = ? LIMIT 1', [company || 'JH']);
+      await pool.query(
+        `INSERT INTO finance_transactions
+           (account_type, company_id, bank_id, transaction_date, transaction_type, transaction_direction, remark, debit, credit, balance_after, reference_type, created_by)
+         VALUES ('BANK', ?, ?, CURDATE(), 'Opening Balance', 'IN', 'Opening Balance', ?, 0, ?, 'OPENING_BALANCE', ?)`,
+        [companyRows[0]?.id || null, result.insertId, resolvedOpeningBalance, resolvedCurrentBalance, userId]
+      );
+    }
     
     res.status(201).json({ 
       id: result.insertId, 

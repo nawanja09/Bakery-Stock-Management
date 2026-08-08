@@ -1,6 +1,7 @@
 // controllers/supplierCreditController.js
 const pool = require('../config/db');
 const { normalizePaymentMethodValue } = require('../utils/paymentMethodUtils');
+const { recordCashTransaction, recordBankTransaction } = require('../utils/financeLedger');
 
 const formatNum = (v) => parseFloat(v) || 0;
 const VALID_PAYMENT_METHODS = ['CASH', 'BANK_TRANSFER', 'CHEQUE', 'CREDIT'];
@@ -168,7 +169,8 @@ const createOverpayment = async (req, res) => {
     amount,
     notes,
     created_by,
-    purchase_id
+    purchase_id,
+    bank_id
   } = req.body;
 
   const normalizedPaymentMethod = normalizePaymentMethodValue(payment_method);
@@ -180,6 +182,9 @@ const createOverpayment = async (req, res) => {
   if (!created_by) return res.status(400).json({ error: 'Created by is required' });
   if (!normalizedPaymentMethod || !isValidPaymentMethod(normalizedPaymentMethod)) {
     return res.status(400).json({ error: 'Payment method is invalid' });
+  }
+  if (normalizedPaymentMethod === 'BANK_TRANSFER' && !bank_id) {
+    return res.status(400).json({ error: 'Bank account is required for bank payments' });
   }
 
   const connection = await pool.getConnection();
@@ -215,6 +220,39 @@ const createOverpayment = async (req, res) => {
       notes || null, created_by
     ]);
 
+    // Post the advance payment to the relevant Cash/Bank ledger in the same
+    // transaction, so a ledger failure rolls back the advance payment too.
+    // Money going OUT is a Credit under this ledger's convention.
+    let ledgerBalance = null;
+    const ledgerRemark = `Advance payment to supplier "${supplierRows[0].name}" (${overpayment_number})`;
+    if (normalizedPaymentMethod === 'CASH') {
+      ledgerBalance = await recordCashTransaction(connection, {
+        companyId: company_id,
+        date: payment_date,
+        remark: ledgerRemark,
+        credit: parseFloat(amount),
+        transactionType: 'Supplier Advance Payment',
+        referenceNumber: voucher_number || reference_number || null,
+        partyName: supplierRows[0].name,
+        referenceType: 'SUPPLIER_ADVANCE',
+        referenceId: result.insertId,
+        createdBy: created_by
+      });
+    } else if (normalizedPaymentMethod === 'BANK_TRANSFER' && bank_id) {
+      ledgerBalance = await recordBankTransaction(connection, {
+        bankId: bank_id,
+        date: payment_date,
+        remark: ledgerRemark,
+        credit: parseFloat(amount),
+        transactionType: 'Supplier Advance Payment',
+        referenceNumber: voucher_number || reference_number || null,
+        partyName: supplierRows[0].name,
+        referenceType: 'SUPPLIER_ADVANCE',
+        referenceId: result.insertId,
+        createdBy: created_by
+      });
+    }
+
     await connection.commit();
 
     const [[inserted]] = await connection.query(
@@ -235,11 +273,15 @@ const createOverpayment = async (req, res) => {
       overpayment_id: result.insertId,
       overpayment_number,
       amount: parseFloat(amount),
-      overpayment: inserted || null
+      overpayment: inserted || null,
+      ledger_balance: ledgerBalance
     });
   } catch (error) {
     await connection.rollback();
     console.error('Error creating overpayment:', error);
+    if (error.name === 'InsufficientBalanceError') {
+      return res.status(400).json({ error: error.message });
+    }
     res.status(500).json({ error: 'Server error: ' + error.message });
   } finally {
     connection.release();

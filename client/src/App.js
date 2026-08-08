@@ -94,10 +94,17 @@ import StoresBalance from './components/adjustments/StoresBalance';
 import StoresAdjustments from './components/adjustments/StoresAdjustments';
 import EditAdjustment from './components/adjustments/EditAdjustment';
 import PaymentMethodManagement from './components/adjustments/PaymentMethodManagement';
+import InhandAdjustments from './components/adjustments/InhandAdjustments';
 
 import DepartmentReturnItemWiseReport from './components/report/DepartmentReturnItemWiseReport';
 
 import LastIssueDateReport from './components/Analysis/LastIssueDateReport';
+
+import CashLedger from './components/Finance/CashLedger';
+import CashReceive from './components/Finance/CashReceive';
+import BankLedger from './components/Finance/BankLedger';
+import BankReceive from './components/Finance/BankReceive';
+import FundTransfer from './components/Finance/FundTransfer';
 
 import './App.css';
 
@@ -121,6 +128,15 @@ const AdjustmentsRoute = ({ children }) => {
   const token = localStorage.getItem('token');
   if (!token) return <Navigate to="/login" replace />;
   if (getStoredUserRole() === 'Store Keeper') return <Navigate to="/dashboard" replace />;
+  return children;
+};
+
+// Blocks direct URL navigation into the Finance module for non-Admin/Accountant roles
+const FinanceRoute = ({ children }) => {
+  const token = localStorage.getItem('token');
+  if (!token) return <Navigate to="/login" replace />;
+  const role = getStoredUserRole();
+  if (role !== 'Admin' && role !== 'Accountant') return <Navigate to="/dashboard" replace />;
   return children;
 };
 
@@ -231,6 +247,12 @@ function App() {
             <Route path="expenses/bank-charges" element={<BankCharges />} />
             <Route path="expenses/online" element={<OnlineExpenses />} />
             <Route path="expenses/bank-details" element={<BankDetails />} />
+
+            <Route path="finance/cash" element={<FinanceRoute><CashLedger /></FinanceRoute>} />
+            <Route path="finance/cash-receive" element={<FinanceRoute><CashReceive /></FinanceRoute>} />
+            <Route path="finance/bank" element={<FinanceRoute><BankLedger /></FinanceRoute>} />
+            <Route path="finance/bank-receive" element={<FinanceRoute><BankReceive /></FinanceRoute>} />
+            <Route path="finance/transfer" element={<FinanceRoute><FundTransfer /></FinanceRoute>} />
             <Route path="/expenses/payees" element={<Payees />} />
 
             <Route path="wastage/edit/:id" element={<EditWastage />} />
@@ -239,6 +261,7 @@ function App() {
             <Route path="adjustments/stores-adjustments" element={<AdjustmentsRoute><StoresAdjustments /></AdjustmentsRoute>} />
             <Route path="adjustments/edit/:id" element={<AdjustmentsRoute><EditAdjustment /></AdjustmentsRoute>} />
             <Route path="adjustments/payment-methods" element={<PaymentMethodManagement />} />
+            <Route path="adjustments/inhand" element={<AdjustmentsRoute><InhandAdjustments /></AdjustmentsRoute>} />
             <Route path="/reports/department-return-item-wise" element={<DepartmentReturnItemWiseReport />} />
             <Route path="/analysis/last-issued-date" element={<LastIssueDateReport />} />
           </Route>
