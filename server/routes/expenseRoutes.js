@@ -169,8 +169,11 @@ router.post('/petty-cash/voucher', authenticate, async (req, res) => {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
+  const connection = await pool.getConnection();
   try {
-    const [result] = await pool.query(
+    await connection.beginTransaction();
+
+    const [result] = await connection.query(
       `INSERT INTO petty_cash_vouchers 
        (voucher_number, voucher_date, employee_name, payee_name, 
         expense_type, description, vehicle_number, amount, receipt_no, created_by, status)
@@ -188,7 +191,26 @@ router.post('/petty-cash/voucher', authenticate, async (req, res) => {
         userId
       ]
     );
+
+    // Identify the relevant petty cash/cash account
+    const [cashAcc] = await connection.query('SELECT company_id FROM cash_accounts LIMIT 1');
+    const companyId = cashAcc.length > 0 ? cashAcc[0].company_id : 1;
+
+    // Automatically create a Credit Ledger Entry in that Cash Ledger (Expense = Credit to Cash)
+    await recordCashTransaction(connection, {
+      companyId: companyId,
+      date: voucher_date,
+      remark: `Petty Cash Payment - ${expense_type}`,
+      credit: parseFloat(amount),
+      transactionType: 'Petty Cash Payment',
+      referenceNumber: voucher_number,
+      partyName: payee_name,
+      referenceType: 'PETTY_CASH_VOUCHER',
+      referenceId: result.insertId,
+      createdBy: userId
+    });
     
+    await connection.commit();
     await updatePettyCashBalance();
     
     res.status(201).json({ 
@@ -196,12 +218,17 @@ router.post('/petty-cash/voucher', authenticate, async (req, res) => {
       message: 'Voucher created successfully' 
     });
   } catch (error) {
+    await connection.rollback();
     console.error('Error creating voucher:', error);
     if (error.code === 'ER_DUP_ENTRY') {
       res.status(400).json({ error: 'Voucher number already exists' });
+    } else if (error.name === 'InsufficientBalanceError') {
+      res.status(400).json({ error: error.message });
     } else {
       res.status(500).json({ error: 'Failed to create voucher' });
     }
+  } finally {
+    connection.release();
   }
 });
 
@@ -228,8 +255,17 @@ router.put('/petty-cash/voucher/:id', authenticate, async (req, res) => {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
+  const connection = await pool.getConnection();
   try {
-    const [result] = await pool.query(
+    await connection.beginTransaction();
+
+    const [oldRows] = await connection.query('SELECT amount FROM petty_cash_vouchers WHERE id = ? FOR UPDATE', [id]);
+    if (oldRows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ error: 'Voucher not found' });
+    }
+
+    const [result] = await connection.query(
       `UPDATE petty_cash_vouchers 
        SET voucher_number = ?, voucher_date = ?, employee_name = ?, payee_name = ?, 
            expense_type = ?, description = ?, vehicle_number = ?, 
@@ -250,20 +286,49 @@ router.put('/petty-cash/voucher/:id', authenticate, async (req, res) => {
       ]
     );
     
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ error: 'Voucher not found' });
-    }
+    // Sync ledger entry
+    const [finRows] = await connection.query(
+      'SELECT id, credit, company_id FROM finance_transactions WHERE reference_type = "PETTY_CASH_VOUCHER" AND reference_id = ?',
+      [id]
+    );
     
+    if (finRows.length > 0) {
+      const finId = finRows[0].id;
+      const oldCredit = parseFloat(finRows[0].credit) || 0;
+      const newCredit = parseFloat(amount) || 0;
+      const difference = newCredit - oldCredit;
+      
+      if (difference !== 0) {
+        await connection.query(
+          'UPDATE cash_accounts SET current_balance = current_balance - ? WHERE company_id = ?',
+          [difference, finRows[0].company_id]
+        );
+        await connection.query(
+          'UPDATE finance_transactions SET credit = ?, transaction_date = ?, remark = ? WHERE id = ?',
+          [newCredit, voucher_date, `Petty Cash Payment - ${expense_type}`, finId]
+        );
+      } else {
+        await connection.query(
+          'UPDATE finance_transactions SET transaction_date = ?, remark = ? WHERE id = ?',
+          [voucher_date, `Petty Cash Payment - ${expense_type}`, finId]
+        );
+      }
+    }
+
+    await connection.commit();
     await updatePettyCashBalance();
     
     res.json({ message: 'Voucher updated successfully' });
   } catch (error) {
+    await connection.rollback();
     console.error('Error updating voucher:', error);
     if (error.code === 'ER_DUP_ENTRY') {
       res.status(400).json({ error: 'Voucher number already exists' });
     } else {
       res.status(500).json({ error: 'Failed to update voucher' });
     }
+  } finally {
+    connection.release();
   }
 });
 
@@ -273,22 +338,45 @@ router.put('/petty-cash/voucher/:id', authenticate, async (req, res) => {
 router.delete('/petty-cash/voucher/:id', authenticate, async (req, res) => {
   const { id } = req.params;
 
+  const connection = await pool.getConnection();
   try {
-    const [result] = await pool.query(
+    await connection.beginTransaction();
+
+    const [oldRows] = await connection.query('SELECT amount FROM petty_cash_vouchers WHERE id = ? FOR UPDATE', [id]);
+    if (oldRows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ error: 'Voucher not found' });
+    }
+
+    await connection.query(
       'DELETE FROM petty_cash_vouchers WHERE id = ?',
       [id]
     );
 
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ error: 'Voucher not found' });
+    // Revert ledger entry
+    const [finRows] = await connection.query(
+      'SELECT id, credit, company_id FROM finance_transactions WHERE reference_type = "PETTY_CASH_VOUCHER" AND reference_id = ?',
+      [id]
+    );
+    if (finRows.length > 0) {
+      const oldCredit = parseFloat(finRows[0].credit) || 0;
+      await connection.query(
+        'UPDATE cash_accounts SET current_balance = current_balance + ? WHERE company_id = ?',
+        [oldCredit, finRows[0].company_id]
+      );
+      await connection.query('DELETE FROM finance_transactions WHERE id = ?', [finRows[0].id]);
     }
 
+    await connection.commit();
     await updatePettyCashBalance();
 
     res.json({ message: 'Voucher deleted successfully' });
   } catch (error) {
+    await connection.rollback();
     console.error('Error deleting voucher:', error);
     res.status(500).json({ error: 'Failed to delete voucher' });
+  } finally {
+    connection.release();
   }
 });
 
@@ -803,48 +891,123 @@ router.post('/bank-charges', authenticate, async (req, res) => {
 });
 
 // PUT update bank charge
-router.put('/bank-charges/:id', async (req, res) => {
+router.put('/bank-charges/:id', authenticate, async (req, res) => {
   const { id } = req.params;
-  const { date, bank_name, reference_number, charges_type, description, amount } = req.body;
+  const { date, bank_name, bank_id, reference_number, charges_type, description, amount } = req.body;
 
+  const connection = await pool.getConnection();
   try {
-    const [result] = await pool.query(
-      `UPDATE bank_charges 
-       SET charge_date = ?, bank_name = ?, reference_number = ?, 
-           charges_type = ?, description = ?, amount = ?
-       WHERE id = ?`,
-      [date, bank_name, reference_number || null, charges_type, description || null, amount, id]
-    );
-    
-    if (result.affectedRows === 0) {
+    await connection.beginTransaction();
+
+    const [oldRows] = await connection.query('SELECT amount, bank_id FROM bank_charges WHERE id = ? FOR UPDATE', [id]);
+    if (oldRows.length === 0) {
+      await connection.rollback();
       return res.status(404).json({ error: 'Bank charge not found' });
     }
     
+    // The previous bank_id (if not explicitly passed in update, though we should expect it)
+    const oldBankId = oldRows[0].bank_id;
+    const newBankId = bank_id !== undefined ? bank_id : oldBankId;
+
+    const [result] = await connection.query(
+      `UPDATE bank_charges 
+       SET charge_date = ?, bank_name = ?, bank_id = ?, reference_number = ?, 
+           charges_type = ?, description = ?, amount = ?
+       WHERE id = ?`,
+      [date, bank_name, newBankId || null, reference_number || null, charges_type, description || null, amount, id]
+    );
+    
+    if (oldBankId) {
+      // Find the finance transaction
+      const [finRows] = await connection.query(
+        'SELECT id, credit FROM finance_transactions WHERE reference_type = "BANK_CHARGE" AND reference_id = ?',
+        [id]
+      );
+      if (finRows.length > 0) {
+        const finId = finRows[0].id;
+        const oldCredit = parseFloat(finRows[0].credit) || 0;
+        const newCredit = parseFloat(amount) || 0;
+        
+        if (oldBankId === newBankId) {
+          const difference = newCredit - oldCredit;
+          if (difference !== 0) {
+            await connection.query('UPDATE bank_details SET current_balance = current_balance - ? WHERE id = ?', [difference, oldBankId]);
+          }
+          await connection.query(
+            'UPDATE finance_transactions SET credit = ?, transaction_date = ?, remark = ? WHERE id = ?',
+            [newCredit, date, `Bank charge - ${charges_type}`, finId]
+          );
+        } else {
+          // Bank changed - revert old, apply new
+          await connection.query('UPDATE bank_details SET current_balance = current_balance + ? WHERE id = ?', [oldCredit, oldBankId]);
+          await connection.query('UPDATE bank_details SET current_balance = current_balance - ? WHERE id = ?', [newCredit, newBankId]);
+          await connection.query(
+            'UPDATE finance_transactions SET bank_id = ?, credit = ?, transaction_date = ?, remark = ? WHERE id = ?',
+            [newBankId, newCredit, date, `Bank charge - ${charges_type}`, finId]
+          );
+        }
+      }
+    } else if (newBankId) {
+      // Edge case: previously no bank_id, but now one is provided.
+      await recordBankTransaction(connection, {
+        bankId: newBankId,
+        date,
+        remark: `Bank charge - ${charges_type}`,
+        credit: parseFloat(amount),
+        transactionType: 'Bank Charges',
+        referenceNumber: reference_number || null,
+        referenceType: 'BANK_CHARGE',
+        referenceId: id,
+        createdBy: req.user.userId
+      });
+    }
+
+    await connection.commit();
     res.json({ message: 'Bank charge updated successfully' });
   } catch (error) {
+    await connection.rollback();
     console.error('Error updating bank charge:', error);
     res.status(500).json({ error: 'Failed to update bank charge' });
+  } finally {
+    connection.release();
   }
 });
 
 // DELETE bank charge
-router.delete('/bank-charges/:id', async (req, res) => {
+router.delete('/bank-charges/:id', authenticate, async (req, res) => {
   const { id } = req.params;
 
+  const connection = await pool.getConnection();
   try {
-    const [result] = await pool.query(
-      'DELETE FROM bank_charges WHERE id = ?',
-      [id]
-    );
-    
-    if (result.affectedRows === 0) {
+    await connection.beginTransaction();
+
+    const [oldRows] = await connection.query('SELECT amount, bank_id FROM bank_charges WHERE id = ? FOR UPDATE', [id]);
+    if (oldRows.length === 0) {
+      await connection.rollback();
       return res.status(404).json({ error: 'Bank charge not found' });
     }
+
+    await connection.query('DELETE FROM bank_charges WHERE id = ?', [id]);
     
+    if (oldRows[0].bank_id) {
+      const [finRows] = await connection.query(
+        'SELECT id, credit FROM finance_transactions WHERE reference_type = "BANK_CHARGE" AND reference_id = ?', [id]
+      );
+      if (finRows.length > 0) {
+        const oldCredit = parseFloat(finRows[0].credit) || 0;
+        await connection.query('UPDATE bank_details SET current_balance = current_balance + ? WHERE id = ?', [oldCredit, oldRows[0].bank_id]);
+        await connection.query('DELETE FROM finance_transactions WHERE id = ?', [finRows[0].id]);
+      }
+    }
+    
+    await connection.commit();
     res.json({ message: 'Bank charge deleted successfully' });
   } catch (error) {
+    await connection.rollback();
     console.error('Error deleting bank charge:', error);
     res.status(500).json({ error: 'Failed to delete bank charge' });
+  } finally {
+    connection.release();
   }
 });
 
