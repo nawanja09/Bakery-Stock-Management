@@ -280,7 +280,6 @@ const InhandAdjustments = () => {
             <FontAwesomeIcon icon={faMoneyBillWave} className="page-title-icon" />
             Inhand Adjustments
           </h1>
-          <p className="page-subtitle">Record and manage Cash In / Cheque In transactions</p>
         </div>
         <button
           className="btn-primary-action"
@@ -374,7 +373,7 @@ const InhandAdjustments = () => {
                 <th>Date</th>
                 <th>Type</th>
                 <th>Party</th>
-                <th>Account</th>
+                <th>Commpany</th>
                 <th className="text-right">Amount (Rs.)</th>
                 <th>Status</th>
                 <th>Created By</th>
