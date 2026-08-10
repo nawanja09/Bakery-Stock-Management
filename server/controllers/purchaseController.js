@@ -56,21 +56,28 @@ const resolveInvoiceTotalAmount = (purchaseRow = {}) => {
 // invoices. Legacy rows that predate the allocations table (no allocation rows at
 // all for that payment) fall back to payment_history.amount, since those were
 // always single-invoice, unsplit payments.
-const getActualAllocatedPaidAmount = async (queryable, purchaseId) => {
+const getActualAllocatedPaidAmount = async (queryable, purchaseId, excludePaymentId = null) => {
+  const params = [purchaseId, purchaseId, purchaseId];
+  let extraCondition = '';
+  if (excludePaymentId) {
+    extraCondition = ' AND ph.id != ?';
+    params.push(excludePaymentId);
+  }
   const [rows] = await queryable.query(`
     SELECT COALESCE(SUM(COALESCE(ppa.allocated_amount, ph.amount)), 0) AS actual_paid_amount
     FROM payment_history ph
     LEFT JOIN purchase_payment_allocations ppa
       ON ppa.payment_history_id = ph.id AND ppa.purchase_id = ?
     WHERE
-      ppa.purchase_id = ?
+      (ppa.purchase_id = ?
       OR (
         ph.purchase_id = ?
         AND NOT EXISTS (
           SELECT 1 FROM purchase_payment_allocations ppa2 WHERE ppa2.payment_history_id = ph.id
         )
-      )
-  `, [purchaseId, purchaseId, purchaseId]);
+      ))
+      ${extraCondition}
+  `, params);
 
   return parseFloat(rows[0]?.actual_paid_amount) || 0;
 };
@@ -82,8 +89,8 @@ const getActualAllocatedPaidAmount = async (queryable, purchaseId) => {
 // if it differs from what's stored, heals the purchases row so every page - the
 // Purchasing Summary Report list, the Invoice Details page, and payment calculations
 // that read "current paid amount" - always works from the same correct, real value.
-const reconcilePurchasePaymentState = async (queryable, purchaseId, invoiceTotal, storedPaidAmount) => {
-  const actualAllocatedTotal = await getActualAllocatedPaidAmount(queryable, purchaseId);
+const reconcilePurchasePaymentState = async (queryable, purchaseId, invoiceTotal, storedPaidAmount, excludePaymentId = null) => {
+  const actualAllocatedTotal = await getActualAllocatedPaidAmount(queryable, purchaseId, excludePaymentId);
   const reconciledPaidAmount = Math.max(0, Math.min(actualAllocatedTotal, invoiceTotal));
   const reconciledState = calculatePaymentState(reconciledPaidAmount, invoiceTotal);
 
@@ -894,7 +901,7 @@ const makePayment = async (req, res) => {
       // silently redirecting an entire legitimate payment into supplier credit instead
       // of applying it to the invoice.
       const reconciledBeforePayment = await reconcilePurchasePaymentState(
-        connection, purchaseId, invoiceTotal, currentPurchase.paid_amount
+        connection, purchaseId, invoiceTotal, currentPurchase.paid_amount, paymentHistoryId
       );
       const currentBalance = reconciledBeforePayment.balance_amount;
       const currentPaid = reconciledBeforePayment.paid_amount;
