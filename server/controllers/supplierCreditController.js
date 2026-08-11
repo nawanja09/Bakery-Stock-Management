@@ -485,7 +485,8 @@ const getAllOutstandingRecords = async (req, res) => {
       FROM purchases p
       JOIN supplier s ON p.supplier_id = s.id
       LEFT JOIN company c ON p.company_id = c.id
-      WHERE p.balance_amount > 0
+      WHERE p.balance_amount > 0.001
+        AND p.payment_status != 'Paid'
         AND (p.deleted = FALSE OR p.deleted IS NULL)
       ORDER BY s.name ASC, p.purchase_date DESC
     `);
