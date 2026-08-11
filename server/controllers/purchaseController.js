@@ -21,7 +21,7 @@ const resolveUserId = async (connection, ...candidateIds) => {
 const calculatePaymentState = (paidAmount, totalAmount) => {
   const parsedPaidAmount = parseFloat(paidAmount) || 0;
   const parsedTotalAmount = parseFloat(totalAmount) || 0;
-  const balanceAmount = Math.max(0, parsedTotalAmount - parsedPaidAmount);
+  const balanceAmount = parsedTotalAmount - parsedPaidAmount;
   const balanceStatus = balanceAmount > 0 ? 1 : 0;
 
   let paymentStatus = 'Non-Paid';
@@ -91,7 +91,7 @@ const getActualAllocatedPaidAmount = async (queryable, purchaseId, excludePaymen
 // that read "current paid amount" - always works from the same correct, real value.
 const reconcilePurchasePaymentState = async (queryable, purchaseId, invoiceTotal, storedPaidAmount, excludePaymentId = null) => {
   const actualAllocatedTotal = await getActualAllocatedPaidAmount(queryable, purchaseId, excludePaymentId);
-  const reconciledPaidAmount = Math.max(0, Math.min(actualAllocatedTotal, invoiceTotal));
+  const reconciledPaidAmount = Math.max(0, actualAllocatedTotal);
   const reconciledState = calculatePaymentState(reconciledPaidAmount, invoiceTotal);
 
   const drifted = Math.abs((parseFloat(storedPaidAmount) || 0) - reconciledPaidAmount) > 0.01;
@@ -164,8 +164,8 @@ const createPurchase = async (req, res) => {
     // The invoice's own paid_amount must never exceed its own total - any excess is
     // independent supplier credit, not part of this invoice's Paid Amount.
     const requestedPaidAmount = parseFloat(paid_amount) || 0;
-    const appliedPaidAmount = Math.max(0, Math.min(requestedPaidAmount, effectiveInvoiceTotal));
-    const excessPaidAmount = Math.max(0, requestedPaidAmount - effectiveInvoiceTotal);
+    const appliedPaidAmount = requestedPaidAmount;
+    const excessPaidAmount = 0;
     const paymentState = calculatePaymentState(appliedPaidAmount, effectiveInvoiceTotal);
     const normalizedPaidAmount = paymentState.paid_amount;
     const normalizedBalanceAmount = paymentState.balance_amount;
@@ -212,40 +212,7 @@ const createPurchase = async (req, res) => {
       );
     }
 
-    // If the entered amount exceeded this invoice's total, save the excess as an
-    // independent supplier overpayment credit - it must never be added to this
-    // invoice's paid_amount, and becomes available to settle a different invoice later.
-    if (excessPaidAmount > 0.001 && supplier_id) {
-      const validOverpaymentMethods = ['CASH', 'BANK_TRANSFER', 'CHEQUE'];
-      const normalizedExcessMethod = normalizePaymentMethodValue(payment_method);
-      const overpaymentMethod = validOverpaymentMethods.includes(normalizedExcessMethod)
-        ? normalizedExcessMethod
-        : 'CASH';
-      const datePart = (String(purchase_date || '').replace(/[^0-9]/g, '').slice(0, 8))
-        || new Date().toISOString().slice(0, 10).replace(/-/g, '');
-      const rand = Math.floor(Math.random() * 9000) + 1000;
-      const overpayment_number = `ADV-${datePart}-${rand}`;
-
-      await connection.query(
-        `INSERT INTO supplier_overpayments
-           (overpayment_number, supplier_id, payment_date, payment_method,
-            voucher_number, reference_number, original_amount, remaining_credit,
-            status, notes, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Active', ?, ?)`,
-        [
-          overpayment_number,
-          supplier_id,
-          purchase_date,
-          overpaymentMethod,
-          null,
-          check_number || null,
-          excessPaidAmount,
-          excessPaidAmount,
-          'Auto-generated: amount entered at invoice creation exceeded the invoice total',
-          resolvedPreparedBy
-        ]
-      );
-    }
+    // Advance Payments are now handled via a dedicated flow.
 
     // Insert purchase items
     for (const item of items) {
@@ -905,9 +872,9 @@ const makePayment = async (req, res) => {
       );
       const currentBalance = reconciledBeforePayment.balance_amount;
       const currentPaid = reconciledBeforePayment.paid_amount;
-      const currentOutstanding = currentBalance > 0 ? currentBalance : Math.max(0, invoiceTotal - currentPaid);
+      const currentOutstanding = currentBalance;
 
-      const amountToApply = Math.min(requestedAmount, remainingPaymentAmount, currentOutstanding);
+      const amountToApply = Math.min(requestedAmount, remainingPaymentAmount);
       if (amountToApply <= 0.001) {
         continue;
       }
@@ -923,8 +890,8 @@ const makePayment = async (req, res) => {
         amountToApply
       });
 
-      const newPaidAmount = Math.min(currentPaid + amountToApply, invoiceTotal);
-      const newBalanceAmount = Math.max(0, currentOutstanding - amountToApply);
+      const newPaidAmount = currentPaid + amountToApply;
+      const newBalanceAmount = currentOutstanding - amountToApply;
 
       let newPaymentStatus = 'Non-Paid';
       if (newBalanceAmount <= 0.001) {
@@ -967,38 +934,7 @@ const makePayment = async (req, res) => {
       });
     }
 
-    const excessPaymentAmount = Math.max(0, remainingPaymentAmount);
-    if (excessPaymentAmount > 0.001 && supplierIdForCredit) {
-      const [supplierRows] = await connection.query('SELECT id FROM supplier WHERE id = ? LIMIT 1', [supplierIdForCredit]);
-      if (supplierRows.length === 0) {
-        await connection.rollback();
-        return res.status(404).json({ error: 'Supplier not found for overpayment credit' });
-      }
-
-      const datePart = payment_date.replace(/-/g, '');
-      const rand = Math.floor(Math.random() * 9000) + 1000;
-      const overpayment_number = `ADV-${datePart}-${rand}`;
-
-      await connection.query(
-        `INSERT INTO supplier_overpayments
-           (overpayment_number, supplier_id, payment_date, payment_method,
-            voucher_number, reference_number, original_amount, remaining_credit,
-            status, notes, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Active', ?, ?)`,
-        [
-          overpayment_number,
-          supplierIdForCredit,
-          payment_date,
-          normalizedPaymentMethod,
-          voucher_number || null,
-          check_number || null,
-          excessPaymentAmount,
-          excessPaymentAmount,
-          notes || null,
-          resolvedCreatedBy
-        ]
-      );
-    }
+    // Advance Payments are now handled via a dedicated flow.
 
     const [verifyPurchase] = await connection.query(
       `SELECT id, invoice_no, total_with_vat, paid_amount, balance_amount, payment_status
