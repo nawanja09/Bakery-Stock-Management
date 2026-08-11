@@ -86,35 +86,35 @@ const getStockReport = async (req, res) => {
           FROM purchase_items pi
           JOIN purchases p ON pi.purchase_id = p.id
           JOIN items i ON pi.item_id = i.id
-          WHERE p.purchase_date <= ?
+          WHERE DATE(p.purchase_date) <= ? AND (p.deleted = FALSE OR p.deleted IS NULL)
           GROUP BY i.id
         ) purchases ON i2.id = purchases.item_id
         LEFT JOIN (
           SELECT ii.item_id, SUM(ii.quantity) AS total_issued
           FROM issuance_items ii
           JOIN issuances iss ON ii.issuance_id = iss.id
-          WHERE iss.issuance_date <= ?
+          WHERE DATE(iss.issuance_date) <= ?
           GROUP BY ii.item_id
         ) issues ON i2.id = issues.item_id
         LEFT JOIN (
           SELECT wi.item_id, SUM(wi.quantity) AS total_wasted
           FROM wastage_items wi
           JOIN wastages w ON wi.wastage_id = w.id
-          WHERE w.date <= ?
+          WHERE DATE(w.date) <= ?
           GROUP BY wi.item_id
         ) wastage ON i2.id = wastage.item_id
         LEFT JOIN (
           SELECT ri.item_id, SUM(ri.quantity) AS total_returned
           FROM return_items ri
           JOIN returns r ON ri.return_id = r.id
-          WHERE r.return_date <= ?
+          WHERE DATE(r.return_date) <= ?
           GROUP BY ri.item_id
         ) returns ON i2.id = returns.item_id
         LEFT JOIN (
           SELECT pri.item_id, SUM(pri.quantity) AS total_purchase_returned
           FROM purchase_return_items pri
           JOIN purchase_returns pr ON pri.return_id = pr.id
-          WHERE pr.return_date <= ?
+          WHERE DATE(pr.return_date) <= ?
           GROUP BY pri.item_id
         ) purchase_returns ON i2.id = purchase_returns.item_id
         LEFT JOIN (
@@ -128,7 +128,7 @@ const getStockReport = async (req, res) => {
       LEFT JOIN (
         SELECT item_id, SUM(quantity) AS opening_balance_today
         FROM opening_balances
-        WHERE date = ?
+        WHERE DATE(date) = ?
         GROUP BY item_id
       ) ob_today ON i.id = ob_today.item_id
       LEFT JOIN (
@@ -136,7 +136,7 @@ const getStockReport = async (req, res) => {
         FROM purchase_items pi
         JOIN purchases p ON pi.purchase_id = p.id
         JOIN items i ON pi.item_id = i.id
-        WHERE DATE(p.purchase_date) = ?
+        WHERE DATE(p.purchase_date) = ? AND (p.deleted = FALSE OR p.deleted IS NULL)
         GROUP BY i.id
       ) purchases ON i.id = purchases.item_id
       LEFT JOIN (
@@ -150,7 +150,7 @@ const getStockReport = async (req, res) => {
         SELECT wi.item_id, SUM(wi.quantity) AS total_wasted
         FROM wastage_items wi
         JOIN wastages w ON wi.wastage_id = w.id
-        WHERE w.date = ?
+        WHERE DATE(w.date) = ?
         GROUP BY wi.item_id
       ) wastage ON i.id = wastage.item_id
       LEFT JOIN (
@@ -268,7 +268,7 @@ const getStockReportByRangeAndItem = async (req, res) => {
       `SELECT SUM(pi.quantity) AS purchased
        FROM purchase_items pi
        JOIN purchases p ON pi.purchase_id = p.id
-       WHERE pi.item_id = ? AND DATE(p.purchase_date) < ?`,
+       WHERE pi.item_id = ? AND DATE(p.purchase_date) < ? AND (p.deleted = FALSE OR p.deleted IS NULL)`,
       [itemId, startDate]
     );
 
@@ -345,7 +345,7 @@ const getStockReportByRangeAndItem = async (req, res) => {
         `SELECT SUM(pi.quantity) AS purchased
          FROM purchase_items pi
          JOIN purchases p ON pi.purchase_id = p.id
-         WHERE pi.item_id = ? AND DATE(p.purchase_date) = ?`,
+         WHERE pi.item_id = ? AND DATE(p.purchase_date) = ? AND (p.deleted = FALSE OR p.deleted IS NULL)`,
         [itemId, date]
       );
 
@@ -440,6 +440,7 @@ const getDailyPurchaseTransactions = async (req, res) => {
       JOIN supplier s ON p.supplier_id = s.id
       WHERE DATE(p.purchase_date) = ? 
         AND pi.item_id = ?
+        AND (p.deleted = FALSE OR p.deleted IS NULL)
       ORDER BY p.invoice_no
     `, [date, itemId]);
 
