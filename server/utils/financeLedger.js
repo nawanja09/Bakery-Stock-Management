@@ -62,10 +62,6 @@ const recordCashTransaction = async (connection, {
   const creditAmt = parseFloat(credit) || 0;
   const newBalance = currentBalance + debitAmt - creditAmt;
 
-  if (newBalance < 0 && creditAmt > 0) {
-    throw new InsufficientBalanceError('Insufficient cash balance for this transaction.');
-  }
-
   const direction = debitAmt > 0 ? 'IN' : 'OUT';
 
   await connection.query(
@@ -118,7 +114,7 @@ const recordBankTransaction = async (connection, {
 
   const currentBalance = parseFloat(bankRows[0].current_balance);
   const companyName = bankRows[0].company;
-  
+
   // Find the company_id for the bank account's company name
   const [compRows] = await connection.query('SELECT id FROM company WHERE name = ?', [companyName]);
   const companyId = compRows.length ? compRows[0].id : 1; // Default fallback if needed
@@ -126,10 +122,6 @@ const recordBankTransaction = async (connection, {
   const debitAmt = parseFloat(debit) || 0;
   const creditAmt = parseFloat(credit) || 0;
   const newBalance = currentBalance + debitAmt - creditAmt;
-
-  if (newBalance < 0 && creditAmt > 0) {
-    throw new InsufficientBalanceError('Insufficient bank balance for this transaction.');
-  }
 
   const direction = debitAmt > 0 ? 'IN' : 'OUT';
 
