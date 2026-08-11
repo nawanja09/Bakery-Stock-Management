@@ -666,7 +666,8 @@ const getNonPaidPurchases = async (req, res) => {
         JOIN purchase_return_items pri ON pr.id = pri.return_id
         GROUP BY purchase_id
       ) pr ON p.id = pr.purchase_id
-      WHERE p.balance_amount > 0
+      WHERE p.balance_amount > 0.001
+        AND p.payment_status != 'Paid'
         AND p.deleted = FALSE
       ORDER BY 
         CASE 
@@ -716,7 +717,8 @@ const getPendingInvoicesBySupplier = async (req, res) => {
       FROM purchases p
       LEFT JOIN company c ON p.company_id = c.id
       WHERE p.supplier_id = ?
-        AND p.balance_amount > 0
+        AND p.balance_amount > 0.001
+        AND p.payment_status != 'Paid'
         AND (p.deleted = FALSE OR p.deleted IS NULL)
       ORDER BY p.purchase_date ASC
     `, [supplierId]);
