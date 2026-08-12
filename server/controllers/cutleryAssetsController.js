@@ -6,6 +6,7 @@ const getAssets = async (req, res) => {
   try {
     const [rows] = await pool.query(`
       SELECT * FROM cutlery_assets 
+      WHERE COALESCE(status, 1) = 1
       ORDER BY created_at DESC
     `);
     
@@ -87,12 +88,12 @@ const deleteAsset = async (req, res) => {
 
     // Get asset info to delete the image file
     const [asset] = await pool.query(
-      'SELECT image_path FROM cutlery_assets WHERE id = ?',
+      'SELECT image_path FROM cutlery_assets WHERE id = ? AND COALESCE(status, 1) = 1',
       [id]
     );
 
     const [result] = await pool.query(
-      'DELETE FROM cutlery_assets WHERE id = ?',
+      'UPDATE cutlery_assets SET status = 0 WHERE id = ? AND COALESCE(status, 1) = 1',
       [id]
     );
 
@@ -120,7 +121,7 @@ const getAssetById = async (req, res) => {
     const { id } = req.params;
 
     const [rows] = await pool.query(
-      'SELECT * FROM cutlery_assets WHERE id = ?',
+      'SELECT * FROM cutlery_assets WHERE id = ? AND COALESCE(status, 1) = 1',
       [id]
     );
 
@@ -152,7 +153,7 @@ const updateAsset = async (req, res) => {
 
     // Check if asset exists
     const [existingAsset] = await pool.query(
-      'SELECT * FROM cutlery_assets WHERE id = ?',
+      'SELECT * FROM cutlery_assets WHERE id = ? AND COALESCE(status, 1) = 1',
       [id]
     );
 

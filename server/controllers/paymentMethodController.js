@@ -11,7 +11,7 @@ const getAllPaymentMethods = async (req, res) => {
 
     let query = `SELECT id, name, is_active, created_at, updated_at FROM payment_methods`;
     if (!includeInactive) {
-      query += ` WHERE is_active = 1`;
+      query += ` WHERE COALESCE(status, 1) = 1`;
     }
     query += ` ORDER BY name ASC`;
 
@@ -107,7 +107,7 @@ const deletePaymentMethod = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const [existing] = await pool.query('SELECT id, name FROM payment_methods WHERE id = ?', [id]);
+    const [existing] = await pool.query('SELECT id, name FROM payment_methods WHERE id = ? AND COALESCE(status, 1) = 1', [id]);
     if (existing.length === 0) {
       return res.status(404).json({ error: 'Payment method not found' });
     }
@@ -127,7 +127,7 @@ const deletePaymentMethod = async (req, res) => {
       });
     }
 
-    await pool.query('DELETE FROM payment_methods WHERE id = ?', [id]);
+    await pool.query('UPDATE payment_methods SET status = 0, is_active = 0 WHERE id = ? AND COALESCE(status, 1) = 1', [id]);
     res.json({ message: 'Payment method deleted successfully.' });
   } catch (error) {
     console.error('Error deleting payment method:', error);

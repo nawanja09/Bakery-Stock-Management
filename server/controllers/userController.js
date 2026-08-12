@@ -4,7 +4,7 @@ const bcrypt = require('bcrypt');
 // Get all users
 const getUsers = async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT id, name, username, role FROM users');
+    const [rows] = await pool.query('SELECT id, name, username, role FROM users WHERE COALESCE(status, 1) = 1');
     res.json(rows);
   } catch (error) {
     console.error(error);
@@ -107,7 +107,7 @@ const deleteUser = async (req, res) => {
     }
 
     // Delete user
-    await pool.query('DELETE FROM users WHERE id = ?', [id]);
+    await pool.query('UPDATE users SET status = 0 WHERE id = ? AND COALESCE(status, 1) = 1', [id]);
 
     res.json({ message: 'User deleted successfully' });
   } catch (error) {

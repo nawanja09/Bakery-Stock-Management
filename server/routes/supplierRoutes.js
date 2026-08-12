@@ -47,7 +47,7 @@ router.get('/', async (req, res) => {
       SELECT id, name, address, vat_number, vat_registered, city, 
              contact_name, contact_phone, contact_email 
       FROM supplier
-      WHERE is_deleted = 0
+      WHERE COALESCE(status, 1) = 1
       ORDER BY name ASC
     `);
     res.json(rows);
@@ -212,7 +212,7 @@ router.delete('/:id', async (req, res) => {
     // Soft delete: mark as inactive/deleted instead of removing the row,
     // so the record is preserved for history/reference purposes.
     const [result] = await pool.query(
-      'UPDATE supplier SET is_deleted = 1 WHERE id = ? AND is_deleted = 0',
+      'UPDATE supplier SET status = 0 WHERE id = ? AND COALESCE(status, 1) = 1',
       [id]
     );
 

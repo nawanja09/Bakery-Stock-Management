@@ -13,6 +13,7 @@ const getTransfers = async (req, res) => {
       LEFT JOIN cutlery_locations cl_from ON ct.location_from_id = cl_from.id
       LEFT JOIN cutlery_locations cl_to ON ct.location_to_id = cl_to.id
       LEFT JOIN users u ON ct.created_by = u.id
+      WHERE COALESCE(ct.status, 1) = 1
       ORDER BY ct.transfer_date DESC, ct.created_at DESC
     `);
     
@@ -27,7 +28,7 @@ const getTransfers = async (req, res) => {
           ca.asset_id as asset_code
         FROM cutlery_transfer_items cti
         LEFT JOIN cutlery_assets ca ON cti.asset_id = ca.id
-        WHERE cti.transfer_id = ?
+        WHERE cti.transfer_id = ? AND COALESCE(cti.status, 1) = 1
       `, [transfer.id]);
       
       return {
@@ -66,7 +67,7 @@ const getTransferById = async (req, res) => {
       LEFT JOIN cutlery_locations cl_from ON ct.location_from_id = cl_from.id
       LEFT JOIN cutlery_locations cl_to ON ct.location_to_id = cl_to.id
       LEFT JOIN users u ON ct.created_by = u.id
-      WHERE ct.id = ?
+      WHERE ct.id = ? AND COALESCE(ct.status, 1) = 1
     `, [id]);
 
     if (transfer.length === 0) {
@@ -84,7 +85,7 @@ const getTransferById = async (req, res) => {
         ca.asset_id as asset_code
       FROM cutlery_transfer_items cti
       LEFT JOIN cutlery_assets ca ON cti.asset_id = ca.id
-      WHERE cti.transfer_id = ?
+      WHERE cti.transfer_id = ? AND COALESCE(cti.status, 1) = 1
     `, [id]);
 
     res.json({
@@ -276,7 +277,7 @@ const updateTransfer = async (req, res) => {
 
     // Check if transfer exists
     const [existingTransfer] = await connection.query(
-      'SELECT * FROM cutlery_transfers WHERE id = ?',
+      'SELECT * FROM cutlery_transfers WHERE id = ? AND COALESCE(status, 1) = 1',
       [id]
     );
 
@@ -304,8 +305,8 @@ const updateTransfer = async (req, res) => {
       [transfer_date, location_from_id, location_to_id, notes, transferred_by, status, id]
     );
 
-    // Delete existing items
-    await connection.query('DELETE FROM cutlery_transfer_items WHERE transfer_id = ?', [id]);
+    // Soft delete existing items
+    await connection.query('UPDATE cutlery_transfer_items SET status = 0 WHERE transfer_id = ? AND COALESCE(status, 1) = 1', [id]);
 
     // Insert new items
     for (const item of items) {
@@ -372,7 +373,7 @@ const deleteTransfer = async (req, res) => {
     console.log('Deleting transfer ID:', id);
 
     const [result] = await pool.query(
-      'DELETE FROM cutlery_transfers WHERE id = ?',
+      'UPDATE cutlery_transfers SET status = 0 WHERE id = ? AND COALESCE(status, 1) = 1',
       [id]
     );
 
@@ -405,12 +406,14 @@ const getTransferFormData = async (req, res) => {
     const [locations] = await pool.query(`
       SELECT id, location_id, location_name 
       FROM cutlery_locations 
+      WHERE COALESCE(status, 1) = 1
       ORDER BY location_name
     `);
     
     const [assets] = await pool.query(`
       SELECT id, asset_id, asset_name 
       FROM cutlery_assets 
+      WHERE COALESCE(status, 1) = 1
       ORDER BY asset_name
     `);
     

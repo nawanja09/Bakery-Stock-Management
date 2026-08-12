@@ -102,7 +102,7 @@ const getAllItems = async (req, res) => {
            WHERE ri.item_id = i.id),
         0) AS current_stock
       FROM items i
-      WHERE i.deleted = FALSE
+      WHERE COALESCE(i.status, 1) = 1
     `;
     
     if (auto_add_only === 'true') {
@@ -164,7 +164,7 @@ const getItemById = async (req, res) => {
            WHERE ri.item_id = i.id),
         0) AS current_stock
       FROM items i
-      WHERE i.id = ? AND i.deleted = FALSE
+      WHERE i.id = ? AND COALESCE(i.status, 1) = 1
     `, [id]);
     
     if (rows.length === 0) {
@@ -207,7 +207,7 @@ const updateItem = async (req, res) => {
 
     // Update item with status
     const [result] = await connection.query(
-      'UPDATE items SET item_code = ?, name = ?, unit = ?, item_type = ?, vat_applicable = ?, auto_add_to_stock = ?, reorder_level = ?, status = ? WHERE id = ? AND deleted = FALSE',
+      'UPDATE items SET item_code = ?, name = ?, unit = ?, item_type = ?, vat_applicable = ?, auto_add_to_stock = ?, reorder_level = ?, status = ? WHERE id = ? AND COALESCE(status, 1) = 1',
       [item_code, name, unit, item_type || 'Other', vat_applicable || false, auto_add_to_stock !== undefined ? auto_add_to_stock : true, reorder_level, status !== undefined ? status : 1, id]
     );
     
@@ -278,7 +278,7 @@ const deleteItem = async (req, res) => {
 
     // Soft delete
     const [result] = await connection.query(
-      'UPDATE items SET deleted = TRUE WHERE id = ?', 
+      'UPDATE items SET status = 0 WHERE id = ? AND COALESCE(status, 1) = 1', 
       [id]
     );
     
@@ -328,9 +328,8 @@ const getItemsWithoutOpeningBalance = async (req, res) => {
       FROM items i
       LEFT JOIN opening_balances ob ON i.id = ob.item_id
       WHERE ob.item_id IS NULL 
-        AND i.deleted = FALSE
+        AND COALESCE(i.status, 1) = 1
         AND i.auto_add_to_stock = FALSE
-        AND i.status = 1
       ORDER BY i.item_code
     `);
     res.json(rows);

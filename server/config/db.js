@@ -71,6 +71,64 @@ const ensurePaymentMethodsSchema = async () => {
 
 ensurePaymentMethodsSchema();
 
+const ensureSoftDeleteStatusSchema = async () => {
+  try {
+    const alterations = [
+      ['items', "ADD COLUMN IF NOT EXISTS status TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=Active, 0=Deleted (soft delete)'"] ,
+      ['purchases', "ADD COLUMN IF NOT EXISTS status TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=Active, 0=Deleted (soft delete)'"] ,
+      ['wastages', "ADD COLUMN IF NOT EXISTS status TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=Active, 0=Deleted (soft delete)'"] ,
+      ['supplier', "ADD COLUMN IF NOT EXISTS status TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=Active, 0=Deleted (soft delete)'"] ,
+      ['payees', "ADD COLUMN IF NOT EXISTS status TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=Active, 0=Deleted (soft delete)'"] ,
+      ['users', "ADD COLUMN IF NOT EXISTS status TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=Active, 0=Deleted (soft delete)'"] ,
+      ['payment_methods', "ADD COLUMN IF NOT EXISTS status TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=Active, 0=Deleted (soft delete)'"] ,
+      ['cutlery_assets', "ADD COLUMN IF NOT EXISTS status TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=Active, 0=Deleted (soft delete)'"] ,
+      ['cutlery_purchases', "ADD COLUMN IF NOT EXISTS status TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=Active, 0=Deleted (soft delete)'"] ,
+      ['cutlery_transfers', "ADD COLUMN IF NOT EXISTS status TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=Active, 0=Deleted (soft delete)'"] ,
+      ['cutlery_locations', "ADD COLUMN IF NOT EXISTS status TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=Active, 0=Deleted (soft delete)'"] ,
+      ['finished_goods_items', "ADD COLUMN IF NOT EXISTS status TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=Active, 0=Deleted (soft delete)'"] ,
+      ['finished_goods_opening_balances', "ADD COLUMN IF NOT EXISTS status TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=Active, 0=Deleted (soft delete)'"] ,
+      ['finished_goods_sales', "ADD COLUMN IF NOT EXISTS status TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=Active, 0=Deleted (soft delete)'"] ,
+      ['finished_goods_transfers', "ADD COLUMN IF NOT EXISTS status TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=Active, 0=Deleted (soft delete)'"] ,
+      ['finished_goods_wastages', "ADD COLUMN IF NOT EXISTS status TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=Active, 0=Deleted (soft delete)'"] ,
+      ['cutlery_purchase_items', "ADD COLUMN IF NOT EXISTS status TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=Active, 0=Deleted (soft delete)'"] ,
+      ['cutlery_transfer_items', "ADD COLUMN IF NOT EXISTS status TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=Active, 0=Deleted (soft delete)'"] ,
+      ['finished_goods_sale_items', "ADD COLUMN IF NOT EXISTS status TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=Active, 0=Deleted (soft delete)'"] ,
+      ['finished_goods_transfer_items', "ADD COLUMN IF NOT EXISTS status TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=Active, 0=Deleted (soft delete)'"] ,
+      ['finished_goods_wastage_items', "ADD COLUMN IF NOT EXISTS status TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=Active, 0=Deleted (soft delete)'"]
+    ];
+
+    for (const [table, clause] of alterations) {
+      try {
+        await pool.query(`ALTER TABLE ${table} ${clause}`);
+      } catch (error) {
+        // Table may not exist yet, or the server may not support the clause.
+      }
+    }
+
+    const backfills = [
+      'UPDATE items SET status = 0 WHERE deleted = 1',
+      'UPDATE purchases SET status = 0 WHERE deleted = 1',
+      'UPDATE wastages SET status = 0 WHERE deleted = 1',
+      'UPDATE supplier SET status = 0 WHERE is_deleted = 1',
+      'UPDATE payment_methods SET status = 0 WHERE is_active = 0'
+    ];
+
+    for (const sql of backfills) {
+      try {
+        await pool.query(sql);
+      } catch (error) {
+        // Safe to ignore if the column or table doesn't exist yet.
+      }
+    }
+
+    console.log('Soft delete status schema ready');
+  } catch (error) {
+    console.warn('Soft delete status schema check skipped:', error.message);
+  }
+};
+
+ensureSoftDeleteStatusSchema();
+
 // --- Username-based authentication migration -------------------------------
 // Replaces email login with username login:
 //   1. Add `username` column (nullable at first so we can backfill it).
