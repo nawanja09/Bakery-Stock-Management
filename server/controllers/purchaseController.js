@@ -2,6 +2,7 @@
 const pool = require('../config/db');
 const { normalizePaymentMethodValue } = require('../utils/paymentMethodUtils');
 const { recordCashTransaction, recordBankTransaction } = require('../utils/financeLedger');
+const { checkDuplicateReference, DuplicateReferenceError } = require('../services/referenceValidationService');
 
 const resolveUserId = async (connection, ...candidateIds) => {
   for (const candidateId of candidateIds) {
@@ -146,18 +147,8 @@ const createPurchase = async (req, res) => {
   try {
     await connection.beginTransaction();
 
-    // Check duplicate invoice
-    const [existing] = await connection.query(
-      'SELECT id FROM purchases WHERE invoice_no = ?',
-      [invoice_no]
-    );
-
-    if (existing.length > 0) {
-      await connection.rollback();
-      return res.status(400).json({ 
-        error: 'Invoice number already exists. Please use a unique invoice number.' 
-      });
-    }
+    // Check duplicate invoice across all transactions
+    await checkDuplicateReference(connection, invoice_no);
 
     const effectiveInvoiceTotal = parseFloat(total_with_vat) || (parseFloat(subtotal || 0) + parseFloat(vat_amount || 0));
     // The amount entered by the user can exceed this invoice's total (an overpayment).
@@ -239,9 +230,9 @@ const createPurchase = async (req, res) => {
     await connection.rollback();
     console.error('Error creating purchase:', error);
     
-    if (error.code === 'ER_DUP_ENTRY') {
+    if (error.code === 'ER_DUP_ENTRY' || error.name === 'DuplicateReferenceError') {
       return res.status(400).json({ 
-        error: 'Invoice number already exists. Please use a unique invoice number.' 
+        error: error.name === 'DuplicateReferenceError' ? error.message : 'Invoice number already exists. Please use a unique invoice number.' 
       });
     }
     
@@ -509,17 +500,7 @@ const updatePurchase = async (req, res) => {
   try {
     await connection.beginTransaction();
 
-    const [existing] = await connection.query(
-      'SELECT id FROM purchases WHERE invoice_no = ? AND id != ?',
-      [invoice_no, id]
-    );
-
-    if (existing.length > 0) {
-      await connection.rollback();
-      return res.status(400).json({ 
-        error: 'Invoice number already exists. Please use a unique invoice number.' 
-      });
-    }
+    await checkDuplicateReference(connection, invoice_no, { table: 'purchases', id });
 
     const resolvedPreparedBy = await resolveUserId(connection, prepared_by, req.user?.id);
 
@@ -573,9 +554,9 @@ const updatePurchase = async (req, res) => {
     await connection.rollback();
     console.error('Error updating purchase:', error);
     
-    if (error.code === 'ER_DUP_ENTRY') {
+    if (error.code === 'ER_DUP_ENTRY' || error.name === 'DuplicateReferenceError') {
       return res.status(400).json({ 
-        error: 'Invoice number already exists. Please use a unique invoice number.' 
+        error: error.name === 'DuplicateReferenceError' ? error.message : 'Invoice number already exists. Please use a unique invoice number.' 
       });
     }
     
@@ -789,6 +770,10 @@ const makePayment = async (req, res) => {
 
   try {
     await connection.beginTransaction();
+
+    if (voucher_number) {
+      await checkDuplicateReference(connection, voucher_number);
+    }
 
     const normalizedPaymentAmount = parseFloat(amount) > 0
       ? parseFloat(amount)
@@ -1008,7 +993,14 @@ const makePayment = async (req, res) => {
 
   } catch (error) {
     await connection.rollback();
-    console.error('❌ Error processing payment:', error);
+    console.error('Error adding payment:', error);
+    
+    if (error.code === 'ER_DUP_ENTRY' || error.name === 'DuplicateReferenceError') {
+      return res.status(400).json({ 
+        error: error.name === 'DuplicateReferenceError' ? error.message : 'Voucher number already exists. Please use a unique voucher number.' 
+      });
+    }
+
     if (error.name === 'InsufficientBalanceError') {
       return res.status(400).json({ error: error.message });
     }

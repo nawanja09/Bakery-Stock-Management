@@ -6,6 +6,7 @@ const {
   getCashBalance,
   getBankBalance
 } = require('../utils/financeLedger');
+const { checkDuplicateReference, DuplicateReferenceError } = require('../services/referenceValidationService');
 
 const LEDGER_SELECT = `
   SELECT
@@ -96,6 +97,7 @@ const receiveCash = async (req, res) => {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
+    await checkDuplicateReference(connection, reference_number, { includeLedger: true });
     const balance = await recordCashTransaction(connection, {
       companyId: company_id,
       date,
@@ -111,7 +113,7 @@ const receiveCash = async (req, res) => {
   } catch (error) {
     await connection.rollback();
     console.error('Error recording cash receipt:', error);
-    res.status(error.name === 'InsufficientBalanceError' ? 400 : 500).json({ error: error.message });
+    res.status(error.name === 'InsufficientBalanceError' || error.name === 'DuplicateReferenceError' ? 400 : 500).json({ error: error.message });
   } finally {
     connection.release();
   }
@@ -131,7 +133,6 @@ const setCashOpeningBalance = async (req, res) => {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
-
     const [existing] = await connection.query(
       "SELECT id, transaction_type FROM finance_transactions WHERE account_type = 'CASH' AND company_id = ? FOR UPDATE",
       [company_id]
@@ -262,6 +263,7 @@ const receiveBank = async (req, res) => {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
+    await checkDuplicateReference(connection, reference_number, { includeLedger: true });
     const balance = await recordBankTransaction(connection, {
       bankId: bank_id,
       date,
@@ -277,7 +279,7 @@ const receiveBank = async (req, res) => {
   } catch (error) {
     await connection.rollback();
     console.error('Error recording bank receipt:', error);
-    res.status(error.name === 'InsufficientBalanceError' ? 400 : 500).json({ error: error.message });
+    res.status(error.name === 'InsufficientBalanceError' || error.name === 'DuplicateReferenceError' ? 400 : 500).json({ error: error.message });
   } finally {
     connection.release();
   }

@@ -4,6 +4,7 @@ const pool = require('../config/db');
 const authenticate = require('../middleware/authenticate');
 const restrictRoles = require('../middleware/restrictRoles');
 const { recordCashTransaction, recordBankTransaction } = require('../utils/financeLedger');
+const { checkDuplicateReference, DuplicateReferenceError } = require('../services/referenceValidationService');
 
 router.use(authenticate, restrictRoles('Store Keeper', 'Stores'));
 
@@ -176,6 +177,8 @@ router.post('/petty-cash/voucher', authenticate, async (req, res) => {
   try {
     await connection.beginTransaction();
 
+    await checkDuplicateReference(connection, voucher_number);
+
     const [result] = await connection.query(
       `INSERT INTO petty_cash_vouchers 
        (voucher_number, voucher_date, employee_name, payee_name, 
@@ -223,8 +226,8 @@ router.post('/petty-cash/voucher', authenticate, async (req, res) => {
   } catch (error) {
     await connection.rollback();
     console.error('Error creating voucher:', error);
-    if (error.code === 'ER_DUP_ENTRY') {
-      res.status(400).json({ error: 'Voucher number already exists' });
+    if (error.code === 'ER_DUP_ENTRY' || error.name === 'DuplicateReferenceError') {
+      res.status(400).json({ error: error.name === 'DuplicateReferenceError' ? error.message : 'Voucher number already exists' });
     } else if (error.name === 'InsufficientBalanceError') {
       res.status(400).json({ error: error.message });
     } else {
@@ -261,6 +264,8 @@ router.put('/petty-cash/voucher/:id', authenticate, async (req, res) => {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
+
+    await checkDuplicateReference(connection, voucher_number, { table: 'petty_cash_vouchers', id });
 
     const [oldRows] = await connection.query('SELECT amount FROM petty_cash_vouchers WHERE id = ? FOR UPDATE', [id]);
     if (oldRows.length === 0) {
@@ -325,8 +330,8 @@ router.put('/petty-cash/voucher/:id', authenticate, async (req, res) => {
   } catch (error) {
     await connection.rollback();
     console.error('Error updating voucher:', error);
-    if (error.code === 'ER_DUP_ENTRY') {
-      res.status(400).json({ error: 'Voucher number already exists' });
+    if (error.code === 'ER_DUP_ENTRY' || error.name === 'DuplicateReferenceError') {
+      res.status(400).json({ error: error.name === 'DuplicateReferenceError' ? error.message : 'Voucher number already exists' });
     } else {
       res.status(500).json({ error: 'Failed to update voucher' });
     }
@@ -407,6 +412,8 @@ router.post('/petty-cash/reimbursement', authenticate, async (req, res) => {
   try {
     await connection.beginTransaction();
 
+    await checkDuplicateReference(connection, reference_number);
+
     const [result] = await connection.query(
       `INSERT INTO petty_cash_reimbursements 
        (reference_number, reimbursement_date, amount, company_id, funding_source, bank_id, created_by, status)
@@ -454,7 +461,7 @@ router.post('/petty-cash/reimbursement', authenticate, async (req, res) => {
   } catch (error) {
     await connection.rollback();
     console.error('Error creating reimbursement:', error);
-    if (error.name === 'InsufficientBalanceError') {
+    if (error.name === 'DuplicateReferenceError' || error.name === 'InsufficientBalanceError') {
       return res.status(400).json({ error: error.message });
     }
     if (error.code === 'ER_DUP_ENTRY') {
@@ -479,8 +486,11 @@ router.put('/petty-cash/reimbursement/:id', authenticate, async (req, res) => {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
+  const connection = await pool.getConnection();
   try {
-    const [result] = await pool.query(
+    await connection.beginTransaction();
+    await checkDuplicateReference(connection, reference_number, { table: 'petty_cash_reimbursements', id });
+    const [result] = await connection.query(
       `UPDATE petty_cash_reimbursements 
        SET reference_number = ?, reimbursement_date = ?, amount = ?, updated_by = ?
        WHERE id = ?`,
@@ -488,19 +498,23 @@ router.put('/petty-cash/reimbursement/:id', authenticate, async (req, res) => {
     );
     
     if (result.affectedRows === 0) {
+      await connection.rollback();
       return res.status(404).json({ error: 'Reimbursement not found' });
     }
-    
+    await connection.commit();
     await updatePettyCashBalance();
     
     res.json({ message: 'Reimbursement updated successfully' });
   } catch (error) {
+    await connection.rollback();
     console.error('Error updating reimbursement:', error);
-    if (error.code === 'ER_DUP_ENTRY') {
-      res.status(400).json({ error: 'Reference number already exists' });
+    if (error.code === 'ER_DUP_ENTRY' || error.name === 'DuplicateReferenceError') {
+      res.status(400).json({ error: error.name === 'DuplicateReferenceError' ? error.message : 'Duplicate reference number. This number already exists and cannot be used again.' });
     } else {
       res.status(500).json({ error: 'Failed to update reimbursement' });
     }
+  } finally {
+    connection.release();
   }
 });
 
@@ -852,6 +866,8 @@ router.post('/bank-charges', authenticate, async (req, res) => {
   try {
     await connection.beginTransaction();
 
+    await checkDuplicateReference(connection, reference_number);
+
     const [result] = await connection.query(
       `INSERT INTO bank_charges 
        (charge_date, bank_name, bank_id, reference_number, charges_type, description, amount, created_by)
@@ -884,7 +900,7 @@ router.post('/bank-charges', authenticate, async (req, res) => {
   } catch (error) {
     await connection.rollback();
     console.error('Error creating bank charge:', error);
-    if (error.name === 'InsufficientBalanceError') {
+    if (error.name === 'DuplicateReferenceError' || error.name === 'InsufficientBalanceError') {
       return res.status(400).json({ error: error.message });
     }
     res.status(500).json({ error: 'Failed to record bank charge: ' + error.message });
@@ -901,6 +917,8 @@ router.put('/bank-charges/:id', authenticate, async (req, res) => {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
+
+    await checkDuplicateReference(connection, reference_number, { table: 'bank_charges', id });
 
     const [oldRows] = await connection.query('SELECT amount, bank_id FROM bank_charges WHERE id = ? FOR UPDATE', [id]);
     if (oldRows.length === 0) {
@@ -937,16 +955,16 @@ router.put('/bank-charges/:id', authenticate, async (req, res) => {
             await connection.query('UPDATE bank_details SET current_balance = current_balance - ? WHERE id = ?', [difference, oldBankId]);
           }
           await connection.query(
-            'UPDATE finance_transactions SET credit = ?, transaction_date = ?, remark = ? WHERE id = ?',
-            [newCredit, date, `Bank charge - ${charges_type}`, finId]
+            'UPDATE finance_transactions SET credit = ?, transaction_date = ?, remark = ?, reference_number = ? WHERE id = ?',
+            [newCredit, date, `Bank charge - ${charges_type}`, reference_number || null, finId]
           );
         } else {
           // Bank changed - revert old, apply new
           await connection.query('UPDATE bank_details SET current_balance = current_balance + ? WHERE id = ?', [oldCredit, oldBankId]);
           await connection.query('UPDATE bank_details SET current_balance = current_balance - ? WHERE id = ?', [newCredit, newBankId]);
           await connection.query(
-            'UPDATE finance_transactions SET bank_id = ?, credit = ?, transaction_date = ?, remark = ? WHERE id = ?',
-            [newBankId, newCredit, date, `Bank charge - ${charges_type}`, finId]
+            'UPDATE finance_transactions SET bank_id = ?, credit = ?, transaction_date = ?, remark = ?, reference_number = ? WHERE id = ?',
+            [newBankId, newCredit, date, `Bank charge - ${charges_type}`, reference_number || null, finId]
           );
         }
       }
@@ -970,7 +988,7 @@ router.put('/bank-charges/:id', authenticate, async (req, res) => {
   } catch (error) {
     await connection.rollback();
     console.error('Error updating bank charge:', error);
-    res.status(500).json({ error: 'Failed to update bank charge' });
+    res.status(error.name === 'DuplicateReferenceError' ? 400 : 500).json({ error: error.name === 'DuplicateReferenceError' ? error.message : 'Failed to update bank charge' });
   } finally {
     connection.release();
   }
@@ -1247,6 +1265,11 @@ router.post('/online/pay', authenticate, async (req, res) => {
   await connection.beginTransaction();
 
   try {
+    await checkDuplicateReference(connection, voucher_number);
+    if (reference_number && String(reference_number).trim() !== String(voucher_number).trim()) {
+      await checkDuplicateReference(connection, reference_number);
+    }
+
     const placeholders = expense_ids.map(() => '?').join(',');
     
     // ✅ Get expenses with their current balance and total amount
@@ -1360,6 +1383,9 @@ router.post('/online/pay', authenticate, async (req, res) => {
   } catch (error) {
     await connection.rollback();
     console.error('Payment error:', error);
+    if (error.code === 'ER_DUP_ENTRY' || error.name === 'DuplicateReferenceError') {
+      return res.status(400).json({ error: error.name === 'DuplicateReferenceError' ? error.message : 'Voucher number already exists' });
+    }
     if (error.name === 'InsufficientBalanceError') {
       return res.status(400).json({ error: error.message });
     }

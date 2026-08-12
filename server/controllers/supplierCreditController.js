@@ -2,6 +2,7 @@
 const pool = require('../config/db');
 const { normalizePaymentMethodValue } = require('../utils/paymentMethodUtils');
 const { recordCashTransaction, recordBankTransaction } = require('../utils/financeLedger');
+const { checkDuplicateReference, DuplicateReferenceError } = require('../services/referenceValidationService');
 
 const formatNum = (v) => parseFloat(v) || 0;
 const VALID_PAYMENT_METHODS = ['CASH', 'BANK_TRANSFER', 'CHEQUE', 'CREDIT'];
@@ -191,6 +192,9 @@ const createOverpayment = async (req, res) => {
   try {
     await connection.beginTransaction();
 
+    await checkDuplicateReference(connection, voucher_number);
+    await checkDuplicateReference(connection, reference_number);
+
     const [supplierRows] = await connection.query('SELECT id, name FROM supplier WHERE id = ? LIMIT 1', [supplier_id]);
     if (supplierRows.length === 0) {
       await connection.rollback();
@@ -278,6 +282,9 @@ const createOverpayment = async (req, res) => {
     });
   } catch (error) {
     await connection.rollback();
+    if (error.name === 'DuplicateReferenceError') {
+      return res.status(400).json({ error: error.message });
+    }
     console.error('Error creating overpayment:', error);
     if (error.name === 'InsufficientBalanceError') {
       return res.status(400).json({ error: error.message });
