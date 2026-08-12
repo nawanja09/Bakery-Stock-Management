@@ -73,7 +73,7 @@ const NavigationBar = () => {
     return null;
   };
   const userRole = getUserRole();
-  const isStoreKeeper = userRole === 'Store Keeper';
+  const isStoreKeeper = userRole === 'Store Keeper' || userRole === 'Stores';
   const canAccessFinance = userRole === 'Admin' || userRole === 'Accountant';
 
   // Determine active module based on current path
@@ -669,21 +669,25 @@ const NavigationBar = () => {
           )}
 
           {/* Expenses Module */}
-          <li>
-            <div 
-              className={`nav-link module-item ${activeModule === 'expenses' ? 'active-module' : ''}`}
-              onClick={() => handleModuleClick('expenses')}
-            >
-              <span className="icon-container"><FontAwesomeIcon icon={faDollarSign} /></span>
-              <span>Expenses</span>
-              {!isCollapsed && <FontAwesomeIcon icon={faChevronDown} className={`chevron ${activeModule === 'expenses' ? 'rotated' : ''}`} />}
-            </div>
-          </li>
+          {!isStoreKeeper && (
+            <>
+              <li>
+                <div 
+                  className={`nav-link module-item ${activeModule === 'expenses' ? 'active-module' : ''}`}
+                  onClick={() => handleModuleClick('expenses')}
+                >
+                  <span className="icon-container"><FontAwesomeIcon icon={faDollarSign} /></span>
+                  <span>Expenses</span>
+                  {!isCollapsed && <FontAwesomeIcon icon={faChevronDown} className={`chevron ${activeModule === 'expenses' ? 'rotated' : ''}`} />}
+                </div>
+              </li>
 
-          {!isCollapsed && activeModule === 'expenses' && (
-            <div className="module-content">
-              {renderExpensesContent()}
-            </div>
+              {!isCollapsed && activeModule === 'expenses' && (
+                <div className="module-content">
+                  {renderExpensesContent()}
+                </div>
+              )}
+            </>
           )}
 
           {/* Finance Module */}

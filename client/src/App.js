@@ -123,12 +123,17 @@ const getStoredUserRole = () => {
   }
 };
 
+const isRestrictedStoreRole = (role) => {
+  if (!role) return false;
+  return role === 'Store Keeper' || role === 'Stores';
+};
+
 // Blocks direct URL navigation into the Adjustments module for Store Keeper
 // accounts (the API itself also rejects these requests server-side).
 const AdjustmentsRoute = ({ children }) => {
   const token = localStorage.getItem('token');
   if (!token) return <Navigate to="/login" replace />;
-  if (getStoredUserRole() === 'Store Keeper') return <Navigate to="/dashboard" replace />;
+  if (isRestrictedStoreRole(getStoredUserRole())) return <Navigate to="/dashboard" replace />;
   return children;
 };
 
@@ -138,6 +143,14 @@ const FinanceRoute = ({ children }) => {
   if (!token) return <Navigate to="/login" replace />;
   const role = getStoredUserRole();
   if (role !== 'Admin' && role !== 'Accountant') return <Navigate to="/dashboard" replace />;
+  return children;
+};
+
+// Stores users cannot access the Expenses module directly.
+const ExpensesRoute = ({ children }) => {
+  const token = localStorage.getItem('token');
+  if (!token) return <Navigate to="/login" replace />;
+  if (isRestrictedStoreRole(getStoredUserRole())) return <Navigate to="/dashboard" replace />;
   return children;
 };
 
@@ -243,12 +256,12 @@ function App() {
 
             <Route path="purchase/non-paid" element={<NonPaidPurchases />} />
 
-            <Route path="expenses/petty-cash" element={<PettyCash />} />
-            <Route path="expenses/reimbursement" element={<Reimbursement />} />
-            <Route path="expenses/cheque" element={<ChequeExpenses />} />
-            <Route path="expenses/bank-charges" element={<BankCharges />} />
-            <Route path="expenses/online" element={<OnlineExpenses />} />
-            <Route path="expenses/bank-details" element={<BankDetails />} />
+            <Route path="expenses/petty-cash" element={<ExpensesRoute><PettyCash /></ExpensesRoute>} />
+            <Route path="expenses/reimbursement" element={<ExpensesRoute><Reimbursement /></ExpensesRoute>} />
+            <Route path="expenses/cheque" element={<ExpensesRoute><ChequeExpenses /></ExpensesRoute>} />
+            <Route path="expenses/bank-charges" element={<ExpensesRoute><BankCharges /></ExpensesRoute>} />
+            <Route path="expenses/online" element={<ExpensesRoute><OnlineExpenses /></ExpensesRoute>} />
+            <Route path="expenses/bank-details" element={<ExpensesRoute><BankDetails /></ExpensesRoute>} />
 
             <Route path="finance/cash" element={<FinanceRoute><CashLedger /></FinanceRoute>} />
             <Route path="finance/cash-receive" element={<FinanceRoute><CashReceive /></FinanceRoute>} />

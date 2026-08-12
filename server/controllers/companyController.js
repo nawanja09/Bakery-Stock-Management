@@ -61,7 +61,63 @@ const createCompany = async (req, res) => {
   }
 };
 
+const updateCompany = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Company name is required' });
+    }
+
+    const trimmedName = name.trim();
+    const [existing] = await pool.query(
+      'SELECT id FROM company WHERE LOWER(name) = LOWER(?) AND id != ?',
+      [trimmedName, id]
+    );
+
+    if (existing.length > 0) {
+      return res.status(400).json({ error: 'Company already exists' });
+    }
+
+    const [result] = await pool.query(
+      'UPDATE company SET name = ? WHERE id = ?',
+      [trimmedName, id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Company not found' });
+    }
+
+    res.json({ message: 'Company updated successfully' });
+  } catch (error) {
+    console.error('Error updating company:', error);
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({ error: 'Company already exists' });
+    }
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+const deleteCompany = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [result] = await pool.query('DELETE FROM company WHERE id = ?', [id]);
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Company not found' });
+    }
+
+    res.json({ message: 'Company deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting company:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
 module.exports = {
   getAllCompanies,
-  createCompany
+  createCompany,
+  updateCompany,
+  deleteCompany
 };

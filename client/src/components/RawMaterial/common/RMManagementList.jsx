@@ -1,29 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { FiSearch } from 'react-icons/fi';
+import { FiSearch, FiPlus, FiEdit, FiTrash2 } from 'react-icons/fi';
 import api from '../../../api';
 import { usePopup } from '../../context/PopupContext';
 import AddSimpleNameForm from './AddSimpleNameForm';
 import './ManagementList.css';
 
-/**
- * Generic searchable list + "Add" modal page used by the Raw Material
- * management screens (RM Type, Department, Companies). Fetches records
- * from the given API path, renders them in a responsive/searchable table,
- * and lets the user add new records without a full page refresh.
- *
- * Props:
- *  - pageTitle: heading shown at the top, e.g. "RM Type"
- *  - subtitle: optional short description under the heading
- *  - apiPath: REST resource path relative to the API base, e.g. "/item-types"
- *  - nameField: the property on each record to display/search, e.g. "type_name"
- *  - nameColumnLabel: table column header for the name field, e.g. "RM Type Name"
- *  - createPayloadKey: key expected by the POST endpoint, e.g. "type_name"
- *  - addButtonLabel: text on the "Add" button
- *  - formTitle / formFieldLabel / formPlaceholder / formSubmitLabel / formNote:
- *      passed through to AddSimpleNameForm
- *  - searchPlaceholder: placeholder for the search input
- *  - emptyMessage: message shown when there is no data
- */
 const RMManagementList = ({
   pageTitle,
   subtitle,
@@ -43,6 +24,7 @@ const RMManagementList = ({
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [editingRecord, setEditingRecord] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const { showPopup } = usePopup();
 
@@ -69,12 +51,37 @@ const RMManagementList = ({
       const response = await api.post(apiPath, { [createPayloadKey]: value });
       showPopup('success', response.data?.message || `${pageTitle} added successfully`);
       setShowAddForm(false);
-      // Refresh automatically to display the newly added record
       await fetchRecords();
     } catch (err) {
       showPopup('error', err.response?.data?.error || `Failed to add ${pageTitle}`);
-      // keep the modal open so the user can correct and retry
       throw err;
+    }
+  };
+
+  const handleEdit = async (value) => {
+    if (!editingRecord) return;
+
+    try {
+      const response = await api.put(`${apiPath}/${editingRecord.id}`, { [createPayloadKey]: value });
+      showPopup('success', response.data?.message || `${pageTitle} updated successfully`);
+      setEditingRecord(null);
+      await fetchRecords();
+    } catch (err) {
+      showPopup('error', err.response?.data?.error || `Failed to update ${pageTitle}`);
+      throw err;
+    }
+  };
+
+  const handleDelete = async (record) => {
+    const confirmed = window.confirm(`Are you sure you want to delete this ${pageTitle.toLowerCase()}?`);
+    if (!confirmed) return;
+
+    try {
+      const response = await api.delete(`${apiPath}/${record.id}`);
+      showPopup('success', response.data?.message || `${pageTitle} deleted successfully`);
+      await fetchRecords();
+    } catch (err) {
+      showPopup('error', err.response?.data?.error || `Failed to delete ${pageTitle}`);
     }
   };
 
@@ -86,6 +93,8 @@ const RMManagementList = ({
     );
   }, [records, searchTerm, nameField]);
 
+  const closeEditor = () => setEditingRecord(null);
+
   return (
     <div className="rm-mgmt-container">
       <div className="rm-mgmt-header">
@@ -95,7 +104,7 @@ const RMManagementList = ({
             {subtitle && <p className="rm-mgmt-subtitle">{subtitle}</p>}
           </div>
           <button className="btn-add-rm" onClick={() => setShowAddForm(true)}>
-            + {addButtonLabel}
+            <FiPlus size={16} /> {addButtonLabel}
           </button>
         </div>
 
@@ -122,6 +131,19 @@ const RMManagementList = ({
         />
       )}
 
+      {editingRecord && (
+        <AddSimpleNameForm
+          title={`Edit ${pageTitle}`}
+          fieldLabel={formFieldLabel}
+          placeholder={formPlaceholder}
+          submitLabel="Save Changes"
+          note={formNote}
+          onSubmit={(value) => handleEdit(value)}
+          onCancel={closeEditor}
+          initialValue={editingRecord[nameField]}
+        />
+      )}
+
       <div className="rm-mgmt-table-container">
         {loading ? (
           <div className="rm-mgmt-loading">Loading {pageTitle}...</div>
@@ -138,12 +160,36 @@ const RMManagementList = ({
             <thead>
               <tr>
                 <th>{nameColumnLabel}</th>
+                <th>STATUS</th>
+                <th className="rm-action-col">ACTIONS</th>
               </tr>
             </thead>
             <tbody>
               {filteredRecords.map((rec) => (
                 <tr key={rec.id}>
                   <td className="rm-name-cell">{rec[nameField]}</td>
+                  <td className="rm-status-cell">
+                    <span className={`rm-status-badge ${rec.status === 'Inactive' ? 'inactive' : 'active'}`}>
+                      <span className="rm-status-dot"></span>
+                      {rec.status || 'Active'}
+                    </span>
+                  </td>
+                  <td className="rm-action-cell">
+                    <button
+                      type="button"
+                      className="rm-btn-edit"
+                      onClick={() => setEditingRecord(rec)}
+                    >
+                      <FiEdit size={14} /> Edit
+                    </button>
+                    <button
+                      type="button"
+                      className="rm-btn-delete"
+                      onClick={() => handleDelete(rec)}
+                    >
+                      <FiTrash2 size={14} /> Delete
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
