@@ -679,10 +679,6 @@ const PurchaseHistory = () => {
             <option value="without_vat">Without VAT</option>
           </select>
         </div>
-
-        <button type="button" className="horizontal-reset-btn" onClick={clearFilters} disabled={!hasActiveFilters}>
-          <FontAwesomeIcon icon={faSyncAlt} />
-        </button>
       </div>
 
       {/* ── Content ─────────────────────────────────────────────────── */}
