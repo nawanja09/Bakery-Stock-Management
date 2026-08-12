@@ -10,8 +10,11 @@
 // Usage:
 //   router.use(authenticate, restrictRoles('Store Keeper'));
 
+const normalizeRole = (role) => role === 'Stores' ? 'Store Keeper' : role;
+
 const restrictRoles = (...blockedRoles) => (req, res, next) => {
-  if (blockedRoles.includes(req.user?.role)) {
+  const normalizedBlockedRoles = blockedRoles.map(normalizeRole);
+  if (normalizedBlockedRoles.includes(normalizeRole(req.user?.role))) {
     return res.status(403).json({ error: 'You do not have permission to access this module' });
   }
   next();

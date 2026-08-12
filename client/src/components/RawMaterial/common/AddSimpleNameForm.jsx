@@ -21,11 +21,16 @@ const AddSimpleNameForm = ({
   submitLabel,
   note,
   onSubmit,
-  onCancel
+  onCancel,
+  initialValue = ''
 }) => {
-  const [value, setValue] = useState('');
+  const [value, setValue] = useState(initialValue);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  React.useEffect(() => {
+    setValue(initialValue);
+  }, [initialValue]);
 
   const handleChange = (e) => {
     setValue(e.target.value);

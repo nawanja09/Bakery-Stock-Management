@@ -5,9 +5,10 @@ const Companies = () => {
   return (
     <RMManagementList
       pageTitle="Companies"
+      subtitle="Manage your companies"
       apiPath="/companies"
       nameField="name"
-      nameColumnLabel="Company Name"
+      nameColumnLabel="COMPANY"
       createPayloadKey="name"
       addButtonLabel="Add Company"
       formTitle="Add New Company"

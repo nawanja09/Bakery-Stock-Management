@@ -6,7 +6,7 @@ const restrictRoles = require('../middleware/restrictRoles');
 
 // Adjustments module is off-limits to Store Keeper accounts - enforced here
 // so direct API/URL access is blocked, not just the UI menu.
-router.use(authenticate, restrictRoles('Store Keeper'));
+router.use(authenticate, restrictRoles('Store Keeper', 'Stores'));
 
 // Get all adjustments
 router.get('/', adjustmentController.getAdjustments);

@@ -8,7 +8,7 @@ const restrictRoles = require('../middleware/restrictRoles');
 
 // All Inhand routes require authentication and block Store Keepers
 // (same access rule as the existing Adjustments module).
-router.use(authenticate, restrictRoles('Store Keeper'));
+router.use(authenticate, restrictRoles('Store Keeper', 'Stores'));
 
 // ── CRUD ────────────────────────────────────────────────────────────────────
 router.get  ('/',     ctrl.getInhandList);   // paginated list + filters

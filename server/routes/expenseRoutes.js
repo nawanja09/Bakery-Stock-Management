@@ -2,7 +2,10 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
 const authenticate = require('../middleware/authenticate');
+const restrictRoles = require('../middleware/restrictRoles');
 const { recordCashTransaction, recordBankTransaction } = require('../utils/financeLedger');
+
+router.use(authenticate, restrictRoles('Store Keeper', 'Stores'));
 
 // =============================================
 // GET Petty Cash Balance
