@@ -301,7 +301,7 @@ const PurchaseReport = () => {
                   <th onClick={() => handleSort('supplier_name')} className="pr-sortable">
                     Supplier{sortIndicator('supplier_name')}
                   </th>
-                  <th onClick={() => handleSort('total_amount')} className="pr-sortable pr-text-right">
+                  <th onClick={() => handleSort('total_amount')} className="pr-sortable">
                     Total Amount{sortIndicator('total_amount')}
                   </th>
                 </tr>
@@ -313,14 +313,14 @@ const PurchaseReport = () => {
                     <td>{inv.purchase_date ? format(new Date(inv.purchase_date), 'MMM dd, yyyy') : 'N/A'}</td>
                     <td>{inv.company_name}</td>
                     <td>{inv.supplier_name}</td>
-                    <td className="pr-text-right">{formatCurrency(inv.total_amount)}</td>
+                    <td>{formatCurrency(inv.total_amount)}</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan="4" className="pr-text-right"><strong>Grand Total</strong></td>
-                  <td className="pr-text-right"><strong>{formatCurrency(grandTotal)}</strong></td>
+                  <td colSpan="4"><strong>Grand Total</strong></td>
+                  <td><strong>{formatCurrency(grandTotal)}</strong></td>
                 </tr>
               </tfoot>
             </table>
