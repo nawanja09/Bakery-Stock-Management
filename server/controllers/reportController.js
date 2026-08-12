@@ -1183,6 +1183,84 @@ const getLastIssueDateReport = async (req, res) => {
   }
 };
 
+// =============================================
+// Purchase Report (invoice-level listing)
+// =============================================
+// Returns one row per purchase invoice with Invoice Number, Invoice Date,
+// Company, Supplier and Total Amount, plus a serverGrandTotal so the
+// frontend/export always match. Supports optional date range, company and
+// supplier filters, all of which can be combined.
+const getPurchaseReport = async (req, res) => {
+  const { startDate, endDate, companyId, supplierId } = req.query;
+
+  try {
+    let query = `
+      SELECT
+        p.id,
+        p.invoice_no,
+        p.purchase_date,
+        p.company_id,
+        COALESCE(c.name, 'N/A') AS company_name,
+        p.supplier_id,
+        s.name AS supplier_name,
+        CASE
+          WHEN p.total_with_vat IS NOT NULL AND p.total_with_vat > 0 THEN p.total_with_vat
+          WHEN p.bill_amount IS NOT NULL AND p.bill_amount > 0 THEN p.bill_amount
+          ELSE 0
+        END AS total_amount
+      FROM purchases p
+      JOIN supplier s ON p.supplier_id = s.id
+      LEFT JOIN company c ON p.company_id = c.id
+      WHERE (p.deleted = FALSE OR p.deleted IS NULL)
+    `;
+
+    const params = [];
+
+    if (startDate) {
+      query += ' AND p.purchase_date >= ?';
+      params.push(startDate);
+    }
+
+    if (endDate) {
+      // Include the whole end date (purchase_date is a datetime column)
+      query += ' AND p.purchase_date < DATE_ADD(?, INTERVAL 1 DAY)';
+      params.push(endDate);
+    }
+
+    if (companyId) {
+      query += ' AND p.company_id = ?';
+      params.push(companyId);
+    }
+
+    if (supplierId) {
+      query += ' AND p.supplier_id = ?';
+      params.push(supplierId);
+    }
+
+    query += ' ORDER BY p.purchase_date DESC, p.id DESC';
+
+    const [rows] = await pool.query(query, params);
+
+    const invoices = rows.map(row => ({
+      id: row.id,
+      invoice_no: row.invoice_no,
+      purchase_date: row.purchase_date,
+      company_id: row.company_id,
+      company_name: row.company_name,
+      supplier_id: row.supplier_id,
+      supplier_name: row.supplier_name,
+      total_amount: parseFloat(row.total_amount) || 0
+    }));
+
+    const grandTotal = invoices.reduce((sum, inv) => sum + inv.total_amount, 0);
+
+    res.json({ invoices, grandTotal });
+  } catch (error) {
+    console.error('Error generating purchase report:', error);
+    res.status(500).json({ error: 'Server error: ' + error.message });
+  }
+};
+
 module.exports = {
   getStockReport,
   getLatestUnitPrice,
@@ -1198,5 +1276,6 @@ module.exports = {
   getDailyReturnTransactions,
   getPurchasingItemWiseReport,
   getDailyPurchaseReturnTransactions,
-  getDepartmentReturnItemWiseReport
+  getDepartmentReturnItemWiseReport,
+  getPurchaseReport
 };

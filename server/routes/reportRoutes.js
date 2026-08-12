@@ -21,4 +21,7 @@ router.get('/department-return-item-wise', reportController.getDepartmentReturnI
 
 router.get('/last-issue-date', reportController.getLastIssueDateReport);
 
+// Purchase Report: invoice-level listing with date range / company / supplier filters
+router.get('/purchase-report', reportController.getPurchaseReport);
+
 module.exports = router;

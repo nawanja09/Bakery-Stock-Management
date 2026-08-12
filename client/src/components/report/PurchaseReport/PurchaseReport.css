@@ -1,0 +1,331 @@
+/* ============================================================
+   Purchase Report — Styling
+   ============================================================ */
+
+:root {
+  --pr-primary: #4f46e5;
+  --pr-primary-dark: #3730a3;
+  --pr-primary-light: #eef2ff;
+  --pr-success: #16a34a;
+  --pr-danger: #dc2626;
+  --pr-text: #1f2937;
+  --pr-text-muted: #6b7280;
+  --pr-border: #e5e7eb;
+  --pr-bg: #f9fafb;
+  --pr-surface: #ffffff;
+  --pr-radius: 12px;
+  --pr-radius-sm: 8px;
+  --pr-shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);
+  --pr-shadow-md: 0 4px 12px rgba(16, 24, 40, 0.08);
+  --pr-transition: all 0.18s ease;
+}
+
+.pr-container * {
+  box-sizing: border-box;
+}
+
+.pr-container {
+  max-width: 1300px;
+  margin: 0 auto;
+  padding: 28px 32px 60px;
+  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  color: var(--pr-text);
+  background: var(--pr-bg);
+  min-height: 100vh;
+}
+
+/* ---------------- Header ---------------- */
+
+.pr-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--pr-border);
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.pr-header h2 {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--pr-text);
+  position: relative;
+  padding-left: 16px;
+}
+
+.pr-header h2::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 2px;
+  bottom: 2px;
+  width: 5px;
+  border-radius: 4px;
+  background: linear-gradient(180deg, var(--pr-primary), var(--pr-primary-dark));
+}
+
+.pr-actions {
+  display: flex;
+  gap: 10px;
+}
+
+/* ---------------- Filters ---------------- */
+
+.pr-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px;
+  background: var(--pr-surface);
+  border: 1px solid var(--pr-border);
+  border-radius: var(--pr-radius);
+  padding: 20px 24px;
+  margin-bottom: 20px;
+  box-shadow: var(--pr-shadow-sm);
+}
+
+.pr-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 160px;
+}
+
+.pr-field label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--pr-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.pr-input {
+  padding: 10px 12px;
+  border: 1px solid var(--pr-border);
+  border-radius: var(--pr-radius-sm);
+  font-size: 14px;
+  color: var(--pr-text);
+  background: var(--pr-surface);
+  transition: var(--pr-transition);
+  min-height: 42px;
+}
+
+.pr-input:hover {
+  border-color: #adb5bd;
+}
+
+.pr-input:focus {
+  outline: none;
+  border-color: var(--pr-primary);
+  box-shadow: 0 0 0 3px var(--pr-primary-light);
+}
+
+.pr-field-actions {
+  display: flex;
+  gap: 10px;
+  margin-left: auto;
+}
+
+/* ---------------- Buttons ---------------- */
+
+.pr-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 18px;
+  border-radius: var(--pr-radius-sm);
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--pr-transition);
+  white-space: nowrap;
+}
+
+.pr-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.pr-btn-primary {
+  background: var(--pr-primary);
+  color: #fff;
+}
+
+.pr-btn-primary:hover:not(:disabled) {
+  background: var(--pr-primary-dark);
+}
+
+.pr-btn-secondary {
+  background: #fff;
+  color: var(--pr-text);
+  border: 1px solid var(--pr-border);
+}
+
+.pr-btn-secondary:hover:not(:disabled) {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+.pr-btn-excel {
+  background: var(--pr-success);
+  color: #fff;
+}
+
+.pr-btn-excel:hover:not(:disabled) {
+  background: #15803d;
+}
+
+/* ---------------- Error / Loading ---------------- */
+
+.pr-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: var(--pr-danger);
+  padding: 12px 16px;
+  border-radius: var(--pr-radius-sm);
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+.pr-loading {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--pr-text-muted);
+  font-size: 15px;
+  background: var(--pr-surface);
+  border: 1px solid var(--pr-border);
+  border-radius: var(--pr-radius);
+}
+
+/* ---------------- Table ---------------- */
+
+.pr-table-container {
+  background: var(--pr-surface);
+  border: 1px solid var(--pr-border);
+  border-radius: var(--pr-radius);
+  overflow-x: auto;
+  box-shadow: var(--pr-shadow-sm);
+}
+
+.pr-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.pr-table thead th {
+  background: var(--pr-primary-light);
+  color: var(--pr-primary-dark);
+  text-align: left;
+  padding: 13px 16px;
+  font-weight: 700;
+  font-size: 12.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border-bottom: 2px solid var(--pr-border);
+  white-space: nowrap;
+}
+
+.pr-sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.pr-sortable:hover {
+  background: #e0e7ff;
+}
+
+.pr-table tbody td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--pr-border);
+  color: var(--pr-text);
+}
+
+.pr-table tbody tr:hover {
+  background: #fafbff;
+}
+
+.pr-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.pr-table tfoot td {
+  padding: 14px 16px;
+  background: var(--pr-primary-light);
+  border-top: 2px solid var(--pr-primary);
+  font-size: 15px;
+  color: var(--pr-primary-dark);
+}
+
+.pr-text-right {
+  text-align: right;
+}
+
+/* ---------------- Summary bar ---------------- */
+
+.pr-summary-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 4px 0;
+  color: var(--pr-text-muted);
+  font-size: 13.5px;
+}
+
+.pr-summary-total {
+  font-weight: 700;
+  color: var(--pr-primary-dark);
+  font-size: 15px;
+}
+
+/* ---------------- Empty state ---------------- */
+
+.pr-empty-state {
+  text-align: center;
+  padding: 70px 20px;
+  background: var(--pr-surface);
+  border: 1px dashed var(--pr-border);
+  border-radius: var(--pr-radius);
+  color: var(--pr-text-muted);
+}
+
+.pr-empty-icon {
+  font-size: 40px;
+  margin-bottom: 12px;
+}
+
+.pr-empty-state p {
+  margin: 0 0 16px;
+  font-size: 15px;
+}
+
+/* ---------------- Responsive ---------------- */
+
+@media (max-width: 768px) {
+  .pr-container {
+    padding: 18px 16px 40px;
+  }
+
+  .pr-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .pr-field {
+    min-width: 0;
+  }
+
+  .pr-field-actions {
+    margin-left: 0;
+    justify-content: stretch;
+  }
+
+  .pr-field-actions .pr-btn {
+    flex: 1;
+  }
+}
