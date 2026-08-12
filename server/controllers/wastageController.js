@@ -70,7 +70,7 @@ const getAllWastages = async (req, res) => {
         w.approved_by,
         w.reason,
         w.remarks,
-        COALESCE(w.deleted, 0) AS deleted,
+        COALESCE(w.status, 1) AS status,
         u.username AS entered_by,
         COALESCE((
           SELECT SUM(wi.estimated_loss) 
@@ -79,7 +79,7 @@ const getAllWastages = async (req, res) => {
         ), 0) AS total_loss
       FROM wastages w
       LEFT JOIN users u ON w.entered_by = u.id
-      WHERE COALESCE(w.deleted, 0) = 0
+      WHERE COALESCE(w.status, 1) = 1
     `;
     const params = [];
 
@@ -146,7 +146,7 @@ const getWastageById = async (req, res) => {
         w.*, u.username AS entered_by
       FROM wastages w
       JOIN users u ON w.entered_by = u.id
-      WHERE w.id = ? AND COALESCE(w.deleted, 0) = 0
+      WHERE w.id = ? AND COALESCE(w.status, 1) = 1
     `, [id]);
 
     if (wastage.length === 0) {
@@ -185,7 +185,7 @@ const updateWastage = async (req, res) => {
     // Check if wastage exists and is not deleted
     const [existing] = await connection.query(
       `SELECT id, wastage_note_number FROM wastages 
-       WHERE id = ? AND COALESCE(deleted, 0) = 0`,
+       WHERE id = ? AND COALESCE(status, 1) = 1`,
       [id]
     );
 
@@ -248,7 +248,7 @@ const deleteWastage = async (req, res) => {
 
   try {
     const [checkResult] = await pool.query(
-      `SELECT id FROM wastages WHERE id = ? AND COALESCE(deleted, 0) = 0`,
+      `SELECT id FROM wastages WHERE id = ? AND COALESCE(status, 1) = 1`,
       [id]
     );
 
@@ -257,7 +257,7 @@ const deleteWastage = async (req, res) => {
     }
 
     await pool.query(
-      `UPDATE wastages SET deleted = 1 WHERE id = ?`,
+      `UPDATE wastages SET status = 0 WHERE id = ? AND COALESCE(status, 1) = 1`,
       [id]
     );
 

@@ -8,7 +8,7 @@ const router = express.Router();
 router.get('/', async (req, res) => {
   try {
     const [rows] = await pool.query(
-      'SELECT id, payee_name, vat_reg_number FROM payees ORDER BY payee_name ASC'
+      'SELECT id, payee_name, vat_reg_number FROM payees WHERE COALESCE(status, 1) = 1 ORDER BY payee_name ASC'
     );
     res.json(rows || []);
   } catch (error) {
@@ -76,7 +76,10 @@ router.delete('/:id', authenticate, async (req, res) => {
   const { id } = req.params;
 
   try {
-    const [result] = await pool.query('DELETE FROM payees WHERE id = ?', [id]);
+    const [result] = await pool.query(
+      'UPDATE payees SET status = 0 WHERE id = ? AND COALESCE(status, 1) = 1',
+      [id]
+    );
 
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'Payee not found' });

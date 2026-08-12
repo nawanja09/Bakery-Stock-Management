@@ -9,13 +9,14 @@ const getPurchases = async (req, res) => {
         cs.contact_person,
         cs.phone as supplier_phone,
         u.name as created_by_name,
-        (SELECT SUM(total_price) FROM cutlery_purchase_items WHERE purchase_id = cp.id) as calculated_total
+        (SELECT SUM(total_price) FROM cutlery_purchase_items WHERE purchase_id = cp.id AND COALESCE(status, 1) = 1) as calculated_total
       FROM cutlery_purchases cp
       LEFT JOIN cutlery_suppliers cs ON cp.supplier_id = cs.id
       LEFT JOIN users u ON cp.created_by = u.id
+      WHERE COALESCE(cp.status, 1) = 1
       ORDER BY cp.purchase_date DESC, cp.created_at DESC
     `);
-    
+
     res.json(rows);
   } catch (err) {
     console.error('Error fetching purchases:', err);
@@ -40,7 +41,7 @@ const getPurchaseById = async (req, res) => {
       FROM cutlery_purchases cp
       LEFT JOIN cutlery_suppliers cs ON cp.supplier_id = cs.id
       LEFT JOIN users u ON cp.created_by = u.id
-      WHERE cp.id = ?
+      WHERE cp.id = ? AND COALESCE(cp.status, 1) = 1
     `, [id]);
 
     if (purchaseRows.length === 0) {
@@ -59,7 +60,7 @@ const getPurchaseById = async (req, res) => {
         ca.asset_id as asset_code
       FROM cutlery_purchase_items cpi
       LEFT JOIN cutlery_assets ca ON cpi.asset_id = ca.id
-      WHERE cpi.purchase_id = ?
+      WHERE cpi.purchase_id = ? AND COALESCE(cpi.status, 1) = 1
       ORDER BY cpi.id
     `, [id]);
 
@@ -287,15 +288,14 @@ const deletePurchase = async (req, res) => {
       return res.status(404).json({ error: 'Purchase not found' });
     }
 
-    // Delete purchase items (cascade should handle this, but we do it explicitly)
+    // Soft delete purchase items and purchase header
     await connection.query(
-      'DELETE FROM cutlery_purchase_items WHERE purchase_id = ?',
+      'UPDATE cutlery_purchase_items SET status = 0 WHERE purchase_id = ? AND COALESCE(status, 1) = 1',
       [id]
     );
 
-    // Delete purchase
     const [result] = await connection.query(
-      'DELETE FROM cutlery_purchases WHERE id = ?',
+      'UPDATE cutlery_purchases SET status = 0 WHERE id = ? AND COALESCE(status, 1) = 1',
       [id]
     );
 
@@ -327,7 +327,7 @@ const getPurchaseWithItems = async (connection, purchaseId) => {
     FROM cutlery_purchases cp
     LEFT JOIN cutlery_suppliers cs ON cp.supplier_id = cs.id
     LEFT JOIN users u ON cp.created_by = u.id
-    WHERE cp.id = ?
+    WHERE cp.id = ? AND COALESCE(cp.status, 1) = 1
   `, [purchaseId]);
 
   // Get purchase items
@@ -338,7 +338,7 @@ const getPurchaseWithItems = async (connection, purchaseId) => {
       ca.asset_id as asset_code
     FROM cutlery_purchase_items cpi
     LEFT JOIN cutlery_assets ca ON cpi.asset_id = ca.id
-    WHERE cpi.purchase_id = ?
+    WHERE cpi.purchase_id = ? AND COALESCE(cpi.status, 1) = 1
   `, [purchaseId]);
 
   const purchase = purchaseRows[0];
