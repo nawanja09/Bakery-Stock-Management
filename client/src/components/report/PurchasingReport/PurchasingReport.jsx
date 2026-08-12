@@ -357,7 +357,7 @@ const PurchasingReport = () => {
     yOffset += 7;
 
     if (companyFilter) {
-      const companyName = companyFilter === '1' ? 'JH' : companyFilter === '2' ? 'RR' : 'Delights';
+      const companyName = companyFilter === '1' ? 'JH' : companyFilter === '2' ? 'RR' : 'RD';
       doc.text(`Company: ${companyName}`, 15, yOffset);
       yOffset += 7;
     }
@@ -473,7 +473,7 @@ const PurchasingReport = () => {
             <option value="">All Companies</option>
             <option value="1">JH</option>
             <option value="2">RR</option>
-            <option value="3">Delights</option>
+            <option value="3">RD</option>
           </select>
         </div>
 
