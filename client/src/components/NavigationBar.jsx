@@ -25,14 +25,10 @@ import {
   faMapMarkerAlt,
   faExchangeAlt,
   faReply,
-  faFileInvoiceDollar,
-  faMoneyBill1Wave,
   faCashRegister,
   faMoneyCheck,
   faUniversity,
-  faWifi,
   faBuildingColumns,
-  faSave,
   faAdjust,
   faWarehouse,
   faTools,
@@ -492,21 +488,15 @@ const NavigationBar = () => {
         </NavLink>
       </li>
       <li>
-        <NavLink to="/expenses/cheque" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-          <span className="icon-container"><FontAwesomeIcon icon={faMoneyCheck} /></span>
-          <span>Cheque Expenses</span>
-        </NavLink>
-      </li>
-      <li>
         <NavLink to="/expenses/bank-charges" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
           <span className="icon-container"><FontAwesomeIcon icon={faUniversity} /></span>
           <span>Bank Charges</span>
         </NavLink>
       </li>
       <li>
-        <NavLink to="/expenses/online" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-          <span className="icon-container"><FontAwesomeIcon icon={faWifi} /></span>
-          <span>Online Expenses</span>
+        <NavLink to="/expenses/new" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          <span className="icon-container"><FontAwesomeIcon icon={faMoneyCheck} /></span>
+          <span>New Expenses</span>
         </NavLink>
       </li>
       <li>
