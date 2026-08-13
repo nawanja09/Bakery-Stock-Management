@@ -842,7 +842,7 @@ router.get('/bank-charges', async (req, res) => {
   try {
     const [rows] = await pool.query(
       `SELECT id, DATE_FORMAT(charge_date, '%Y-%m-%d') as date, 
-              bank_name, bank_id, reference_number, charges_type, description, amount
+              bank_name, bank_id, reference_number, charges_type, bank_charge_type_id, description, amount
        FROM bank_charges 
        ORDER BY charge_date DESC, created_at DESC`
     );
@@ -855,7 +855,7 @@ router.get('/bank-charges', async (req, res) => {
 
 // POST create bank charge
 router.post('/bank-charges', authenticate, async (req, res) => {
-  const { date, bank_name, bank_id, reference_number, charges_type, description, amount } = req.body;
+  const { date, bank_name, bank_id, reference_number, charges_type, bank_charge_type_id, description, amount } = req.body;
   const userId = req.user.userId;
 
   if (!date || !bank_name || !charges_type || !amount) {
@@ -870,9 +870,9 @@ router.post('/bank-charges', authenticate, async (req, res) => {
 
     const [result] = await connection.query(
       `INSERT INTO bank_charges 
-       (charge_date, bank_name, bank_id, reference_number, charges_type, description, amount, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [date, bank_name, bank_id || null, reference_number || null, charges_type, description || null, amount, userId]
+       (charge_date, bank_name, bank_id, reference_number, charges_type, bank_charge_type_id, description, amount, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [date, bank_name, bank_id || null, reference_number || null, charges_type, bank_charge_type_id || null, description || null, amount, userId]
     );
 
     // Bank charges leave the account immediately - post the ledger entry now,
@@ -912,7 +912,7 @@ router.post('/bank-charges', authenticate, async (req, res) => {
 // PUT update bank charge
 router.put('/bank-charges/:id', authenticate, async (req, res) => {
   const { id } = req.params;
-  const { date, bank_name, bank_id, reference_number, charges_type, description, amount } = req.body;
+  const { date, bank_name, bank_id, reference_number, charges_type, bank_charge_type_id, description, amount } = req.body;
 
   const connection = await pool.getConnection();
   try {
@@ -933,9 +933,9 @@ router.put('/bank-charges/:id', authenticate, async (req, res) => {
     const [result] = await connection.query(
       `UPDATE bank_charges 
        SET charge_date = ?, bank_name = ?, bank_id = ?, reference_number = ?, 
-           charges_type = ?, description = ?, amount = ?
+           charges_type = ?, bank_charge_type_id = ?, description = ?, amount = ?
        WHERE id = ?`,
-      [date, bank_name, newBankId || null, reference_number || null, charges_type, description || null, amount, id]
+      [date, bank_name, newBankId || null, reference_number || null, charges_type, bank_charge_type_id || null, description || null, amount, id]
     );
     
     if (oldBankId) {

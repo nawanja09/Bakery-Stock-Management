@@ -68,6 +68,9 @@ const NewExpenses = () => {
   const [bills, setBills] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [selectedIds, setSelectedIds] = useState([]);
+  // 'pending' shows bills still awaiting payment (original behaviour),
+  // 'paid' shows bills that have already been settled in full.
+  const [viewFilter, setViewFilter] = useState('pending');
 
   // Lookups
   const [payees, setPayees] = useState([]);
@@ -349,8 +352,12 @@ const NewExpenses = () => {
       bill.expense_type?.toLowerCase().includes(q) ||
       bill.vat_reg_number?.toLowerCase().includes(q);
     if (!matchesSearch) return false;
-    return parseFloat(bill.balance || 0) > 0;
+    const isPaid = parseFloat(bill.balance || 0) <= 0;
+    return viewFilter === 'paid' ? isPaid : !isPaid;
   });
+
+  const pendingCount = bills.filter(b => parseFloat(b.balance || 0) > 0).length;
+  const paidCount = bills.filter(b => parseFloat(b.balance || 0) <= 0).length;
 
   const allSelected = filteredBills.length > 0 && filteredBills.every(b => selectedIds.includes(b.id));
 
@@ -567,9 +574,6 @@ const NewExpenses = () => {
                     </div>
                   )}
                 </div>
-                <button type="button" className="action-icon-btn" title="Add new payee" onClick={() => setShowAddPayee(true)}>
-                  <FontAwesomeIcon icon={faPlus} />
-                </button>
               </div>
             </div>
 
@@ -595,9 +599,6 @@ const NewExpenses = () => {
                     <option key={type.id} value={type.id}>{type.name}</option>
                   ))}
                 </select>
-                <button type="button" className="action-icon-btn" title="Add new expense type" onClick={() => setShowAddType(true)}>
-                  <FontAwesomeIcon icon={faPlus} />
-                </button>
               </div>
             </div>
           </div>
@@ -660,6 +661,22 @@ const NewExpenses = () => {
             <FontAwesomeIcon icon={faReceipt} /> Expenses Details
           </h3>
           <div className="table-actions">
+            <div className="expense-view-tabs">
+              <button
+                type="button"
+                className={`expense-view-tab ${viewFilter === 'pending' ? 'active' : ''}`}
+                onClick={() => { setViewFilter('pending'); setSelectedIds([]); }}
+              >
+                Pending ({pendingCount})
+              </button>
+              <button
+                type="button"
+                className={`expense-view-tab ${viewFilter === 'paid' ? 'active' : ''}`}
+                onClick={() => { setViewFilter('paid'); setSelectedIds([]); }}
+              >
+                Paid ({paidCount})
+              </button>
+            </div>
             <div className="search-box">
               <FontAwesomeIcon icon={faSearch} className="search-icon" />
               <input
@@ -678,9 +695,11 @@ const NewExpenses = () => {
           <table className="online-table">
             <thead>
               <tr>
-                <th style={{ width: '40px' }}>
-                  <input type="checkbox" checked={allSelected} onChange={handleSelectAll} className="select-checkbox" />
-                </th>
+                {viewFilter === 'pending' && (
+                  <th style={{ width: '40px' }}>
+                    <input type="checkbox" checked={allSelected} onChange={handleSelectAll} className="select-checkbox" />
+                  </th>
+                )}
                 <th>Bill Date</th>
                 <th>Bill Number</th>
                 <th>Payee Name</th>
@@ -689,69 +708,89 @@ const NewExpenses = () => {
                 <th>VAT Amount</th>
                 <th>Total Bill Amount</th>
                 <th>Balance</th>
+                <th>Status</th>
                 <th>Description</th>
-                <th>Action</th>
+                {viewFilter === 'pending' && <th>Action</th>}
               </tr>
             </thead>
             <tbody>
               {isFetching ? (
                 <tr><td colSpan="11" className="loading-row"><FontAwesomeIcon icon={faSpinner} spin /> Loading expenses...</td></tr>
               ) : filteredBills.length > 0 ? (
-                filteredBills.map(bill => (
-                  <tr key={bill.id}>
-                    <td>
-                      <input type="checkbox" checked={selectedIds.includes(bill.id)} onChange={() => handleSelectOne(bill.id)} className="select-checkbox" />
-                    </td>
-                    <td className="date-cell">{bill.bill_date}</td>
-                    <td className="bill-number-cell">{bill.bill_number || '-'}</td>
-                    <td className="payee-cell">{bill.payee_name}</td>
-                    <td className="vat-cell">{bill.vat_reg_number || '-'}</td>
-                    <td className="amount-cell">{formatCurrency(bill.without_vat_amount)}</td>
-                    <td className="amount-cell">{formatCurrency(bill.vat_amount)}</td>
-                    <td className="amount-cell total">{formatCurrency(bill.total_bill_amount)}</td>
-                    <td className="balance-cell">
-                      <span className={parseFloat(bill.balance) > 0 ? 'balance-positive' : 'balance-zero'}>
-                        {formatCurrency(bill.balance)}
-                      </span>
-                    </td>
-                    <td className="description-cell">{bill.description || '-'}</td>
-                    <td className="action-cell">
-                      <button onClick={() => handleEdit(bill)} className="edit-btn" title="Edit"><FontAwesomeIcon icon={faEdit} /></button>
-                      <button onClick={() => handleDelete(bill.id)} className="delete-btn" title="Delete"><FontAwesomeIcon icon={faTrash} /></button>
-                    </td>
-                  </tr>
-                ))
+                filteredBills.map(bill => {
+                  const isPaid = parseFloat(bill.balance || 0) <= 0;
+                  return (
+                    <tr key={bill.id}>
+                      {viewFilter === 'pending' && (
+                        <td>
+                          <input type="checkbox" checked={selectedIds.includes(bill.id)} onChange={() => handleSelectOne(bill.id)} className="select-checkbox" />
+                        </td>
+                      )}
+                      <td className="date-cell">{bill.bill_date}</td>
+                      <td className="bill-number-cell">{bill.bill_number || '-'}</td>
+                      <td className="payee-cell">{bill.payee_name}</td>
+                      <td className="vat-cell">{bill.vat_reg_number || '-'}</td>
+                      <td className="amount-cell">{formatCurrency(bill.without_vat_amount)}</td>
+                      <td className="amount-cell">{formatCurrency(bill.vat_amount)}</td>
+                      <td className="amount-cell total">{formatCurrency(bill.total_bill_amount)}</td>
+                      <td className="balance-cell">
+                        <span className={parseFloat(bill.balance) > 0 ? 'balance-positive' : 'balance-zero'}>
+                          {formatCurrency(bill.balance)}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`payment-status-badge ${isPaid ? 'paid' : 'pending'}`}>
+                          <span className="status-dot"></span>
+                          {bill.payment_status || (isPaid ? 'Paid' : 'Pending')}
+                        </span>
+                      </td>
+                      <td className="description-cell">{bill.description || '-'}</td>
+                      {viewFilter === 'pending' && (
+                        <td className="action-cell">
+                          <button onClick={() => handleEdit(bill)} className="edit-btn" title="Edit"><FontAwesomeIcon icon={faEdit} /></button>
+                          <button onClick={() => handleDelete(bill.id)} className="delete-btn" title="Delete"><FontAwesomeIcon icon={faTrash} /></button>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })
               ) : (
-                <tr><td colSpan="11" className="empty-row">No pending expense bills found</td></tr>
+                <tr>
+                  <td colSpan="11" className="empty-row">
+                    {viewFilter === 'paid' ? 'No paid expense bills found' : 'No pending expense bills found'}
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
         </div>
 
-        <div className="payment-action-bar">
-          <div className="selected-info">
-            {selectedIds.length > 0 ? (
-              <>
-                <span className="selected-count">
-                  <FontAwesomeIcon icon={faCheckCircle} /> {selectedIds.length} bill(s) selected
-                  <span className="selected-total"> | Total: {formatCurrency(totalSelectedBalance)}</span>
-                </span>
-                {selectedPayeeNames.length === 1 ? (
-                  <span className="payee-status valid">✓ Payee: <strong>{selectedPayeeNames[0]}</strong></span>
-                ) : selectedPayeeNames.length > 1 ? (
-                  <span className="payee-status invalid">
-                    <FontAwesomeIcon icon={faExclamationTriangle} /> Multiple payees selected ({selectedPayeeNames.join(', ')})
+        {viewFilter === 'pending' && (
+          <div className="payment-action-bar">
+            <div className="selected-info">
+              {selectedIds.length > 0 ? (
+                <>
+                  <span className="selected-count">
+                    <FontAwesomeIcon icon={faCheckCircle} /> {selectedIds.length} bill(s) selected
+                    <span className="selected-total"> | Total: {formatCurrency(totalSelectedBalance)}</span>
                   </span>
-                ) : null}
-              </>
-            ) : (
-              <span className="selected-count"><FontAwesomeIcon icon={faReceipt} /> Select bill(s) to pay</span>
-            )}
+                  {selectedPayeeNames.length === 1 ? (
+                    <span className="payee-status valid">✓ Payee: <strong>{selectedPayeeNames[0]}</strong></span>
+                  ) : selectedPayeeNames.length > 1 ? (
+                    <span className="payee-status invalid">
+                      <FontAwesomeIcon icon={faExclamationTriangle} /> Multiple payees selected ({selectedPayeeNames.join(', ')})
+                    </span>
+                  ) : null}
+                </>
+              ) : (
+                <span className="selected-count"><FontAwesomeIcon icon={faReceipt} /> Select bill(s) to pay</span>
+              )}
+            </div>
+            <button className="btn-pay" onClick={handleOpenPaymentModal} disabled={isLoading}>
+              <FontAwesomeIcon icon={faMoneyBillWave} /> Pay
+            </button>
           </div>
-          <button className="btn-pay" onClick={handleOpenPaymentModal} disabled={isLoading}>
-            <FontAwesomeIcon icon={faMoneyBillWave} /> Pay
-          </button>
-        </div>
+        )}
       </div>
 
       {/* Payment Details Modal */}
@@ -792,7 +831,7 @@ const NewExpenses = () => {
                       onChange={handlePaymentTypeChange} className="payment-input" required
                     >
                       <option value="">Select Payment Type</option>
-                      {paymentTypes.map(pt => (
+                      {paymentTypes.filter(pt => pt.name.toLowerCase() !== 'cash').map(pt => (
                         <option key={pt.id} value={pt.id}>{pt.name}</option>
                       ))}
                     </select>

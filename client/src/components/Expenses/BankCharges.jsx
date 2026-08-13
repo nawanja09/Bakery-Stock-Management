@@ -42,31 +42,28 @@ const BankCharges = () => {
     bank_name: '',
     reference_number: '',
     charges_type: '',
+    bank_charge_type_id: '',
     description: '',
     amount: ''
   });
 
-  const chargesTypes = [
-    'Cheque Books Charges',
-    'Online Payment Charges',
-    'Bank Draft Charges',
-    'Service Charges',
-    'Annual Fees',
-    'Transaction Charges',
-    'SMS Alert Charges',
-    'ATM Withdrawal Charges',
-    'Overdraft Interest',
-    'Loan Processing Fee',
-    'Foreign Transaction Fee',
-    'Account Maintenance Fee',
-    'Statement Charges',
-    'Other Charges'
-  ];
+  const [chargesTypes, setChargesTypes] = useState([]);
 
   // Fetch banks on component mount
   useEffect(() => {
     fetchBanks();
+    fetchChargesTypes();
   }, []);
+
+  const fetchChargesTypes = async () => {
+    try {
+      const response = await api.get('/bank-charges-types');
+      setChargesTypes(response.data || []);
+    } catch (error) {
+      console.error('Error fetching bank charge types:', error);
+      showPopup('error', 'Failed to load bank charge types from server');
+    }
+  };
 
   // Fetch bank charges on component mount
   useEffect(() => {
@@ -183,6 +180,7 @@ const BankCharges = () => {
       bank_name: charge.bank_name,
       reference_number: charge.reference_number || '',
       charges_type: charge.charges_type,
+      bank_charge_type_id: charge.bank_charge_type_id || '',
       description: charge.description || '',
       amount: charge.amount.toString()
     });
@@ -265,6 +263,7 @@ const BankCharges = () => {
       bank_name: '',
       reference_number: '',
       charges_type: '',
+      bank_charge_type_id: '',
       description: '',
       amount: ''
     });
@@ -405,15 +404,22 @@ const BankCharges = () => {
             <div className="form-group">
               <label>Charges Type <span className="required">*</span></label>
               <select
-                name="charges_type"
-                value={formData.charges_type}
-                onChange={handleChange}
+                name="bank_charge_type_id"
+                value={formData.bank_charge_type_id}
+                onChange={(e) => {
+                  const selectedType = chargesTypes.find(t => t.id.toString() === e.target.value);
+                  setFormData(prev => ({
+                    ...prev,
+                    bank_charge_type_id: e.target.value,
+                    charges_type: selectedType ? selectedType.type_name : ''
+                  }));
+                }}
                 required
                 className="form-select"
               >
                 <option value="">Select Charges Type</option>
                 {chargesTypes.map(type => (
-                  <option key={type} value={type}>{type}</option>
+                  <option key={type.id} value={type.id}>{type.type_name}</option>
                 ))}
               </select>
             </div>
@@ -467,6 +473,7 @@ const BankCharges = () => {
                   bank_name: '',
                   reference_number: '',
                   charges_type: '',
+                  bank_charge_type_id: '',
                   description: '',
                   amount: ''
                 });

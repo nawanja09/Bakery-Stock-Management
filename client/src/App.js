@@ -31,6 +31,9 @@ import ManageUsers from './components/admin/ManageUsers';
 import ItemTypes from './components/RawMaterial/ItemTypes/ItemTypes';
 import Departments from './components/RawMaterial/Departments/Departments';
 import Companies from './components/RawMaterial/Companies/Companies';
+import ExpenseTypeManagement from './components/RawMaterial/ExpenseTypes/ExpenseTypeManagement';
+import ExpensePayeeManagement from './components/RawMaterial/ExpensePayees/ExpensePayeeManagement';
+import BankChargesTypeManagement from './components/RawMaterial/BankChargesType/BankChargesTypeManagement';
 
 import AddFinishedGoodsItem from './components/FinishedGoods/Item Management - FS/AddFinishedGoodsItem';
 import EditFinishedGoodsItem from './components/FinishedGoods/Item Management - FS/EditFinishedGoodsItem';
@@ -190,6 +193,9 @@ function App() {
             <Route path="item-types" element={<ItemTypes />} />
             <Route path="departments" element={<Departments />} />
             <Route path="companies" element={<Companies />} />
+            <Route path="expense-types-management" element={<ExpenseTypeManagement />} />
+            <Route path="expense-payees-management" element={<ExpensePayeeManagement />} />
+            <Route path="bank-charges-type-management" element={<BankChargesTypeManagement />} />
             <Route path="admin/password" element={<ChangePassword />} />
             <Route path="opening/add" element={<AddOpeningBalance />} />
             <Route path="opening/history" element={<OpeningBalanceHistory />} />
@@ -267,8 +273,6 @@ function App() {
             <Route path="finance/bank" element={<FinanceRoute><BankLedger /></FinanceRoute>} />
             <Route path="finance/bank-receive" element={<FinanceRoute><BankReceive /></FinanceRoute>} />
             <Route path="finance/transfer" element={<FinanceRoute><FundTransfer /></FinanceRoute>} />
-            <Route path="/expenses/payees" element={<Payees />} />
-
             <Route path="wastage/edit/:id" element={<EditWastage />} />
 
             <Route path="adjustments/stores-balance" element={<AdjustmentsRoute><StoresBalance /></AdjustmentsRoute>} />

@@ -309,7 +309,7 @@ const PettyCash = () => {
   return (
     <div className="expenses-container">
       <div className="expenses-header">
-        <h1 className="expenses-title"><FontAwesomeIcon icon={faMoneyBillWave} className="title-icon" /> Petty Cash Management</h1>
+        <h1 className="expenses-title"><FontAwesomeIcon icon={faMoneyBillWave} className="title-icon" /> Petty Cash Expenses</h1>
       </div>
 
       <div className="balance-card">
