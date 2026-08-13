@@ -341,4 +341,40 @@ const ensureExpenseFinanceLinkSchema = async () => {
 
 ensureExpenseFinanceLinkSchema();
 
+const ensureBankChargesTypeSchema = async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS bank_charges_types (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        type_name VARCHAR(100) NOT NULL,
+        status TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=Active, 0=Deleted',
+        created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uniq_bank_charges_type_name (type_name)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+    `);
+
+    const defaults = ['Service Charge', 'Cheque Return', 'Overdraft Interest', 'Other'];
+    for (const name of defaults) {
+      await pool.query(
+        'INSERT IGNORE INTO bank_charges_types (type_name) VALUES (?)',
+        [name]
+      );
+    }
+
+    try {
+      await pool.query("ALTER TABLE bank_charges ADD COLUMN bank_charge_type_id INT NULL AFTER charges_type");
+    } catch (e) { }
+
+    try {
+      await pool.query("ALTER TABLE bank_charges ADD CONSTRAINT fk_bank_charges_type FOREIGN KEY (bank_charge_type_id) REFERENCES bank_charges_types(id)");
+    } catch (e) { }
+
+    console.log('Bank Charges Type schema ready');
+  } catch (error) {
+    console.warn('Bank Charges Type schema check skipped:', error.message);
+  }
+};
+
+ensureBankChargesTypeSchema();
+
 module.exports = pool;

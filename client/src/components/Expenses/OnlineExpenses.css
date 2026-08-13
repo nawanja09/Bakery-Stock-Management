@@ -375,6 +375,66 @@
   color: #28a745;
 }
 
+/* Expense view tabs (Pending / Paid) */
+.expense-view-tabs {
+  display: inline-flex;
+  background: #f1f2f6;
+  border-radius: 8px;
+  padding: 4px;
+  gap: 4px;
+}
+
+.expense-view-tab {
+  border: none;
+  background: transparent;
+  padding: 7px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #6c757d;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.expense-view-tab:hover {
+  color: #2c3e50;
+}
+
+.expense-view-tab.active {
+  background: #ffffff;
+  color: #6d22e6;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.payment-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.payment-status-badge.paid {
+  background: #e6f7ec;
+  color: #28a745;
+}
+
+.payment-status-badge.pending {
+  background: #fdecea;
+  color: #dc3545;
+}
+
+.payment-status-badge .status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
 .description-cell {
   max-width: 150px;
   overflow: hidden;

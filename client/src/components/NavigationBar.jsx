@@ -45,7 +45,9 @@ import {
   faWallet,
   faHandHoldingDollar,
   faLandmark,
-  faRightLeft
+  faRightLeft,
+  faFileInvoiceDollar,
+  faIdCard
 } from '@fortawesome/free-solid-svg-icons';
 import bakeryLogo from '../images/icon.jpeg';
 import './NavigationBar.css';
@@ -86,7 +88,8 @@ const NavigationBar = () => {
                path.startsWith('/reports/wastage') || path.startsWith('/reports/vat') ||
                path.startsWith('/purchase-returns') || path.startsWith('/opening') ||
                path.startsWith('/departments') || path.startsWith('/companies') ||
-               path.startsWith('/payment-methods') || path.startsWith('/item-types')) {
+               path.startsWith('/payment-methods') || path.startsWith('/item-types') ||
+               path.startsWith('/expense-types-management') || path.startsWith('/expense-payees-management')) {
       setActiveModule('raw');
     } else if (path.startsWith('/finished-goods') || path.startsWith('/cost-calculator')) {
       setActiveModule('finished');
@@ -223,6 +226,24 @@ const NavigationBar = () => {
             <NavLink to="/expenses/bank-details" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
               <span className="icon-container"><FontAwesomeIcon icon={faBuildingColumns} /></span>
               <span>Bank Details</span>
+            </NavLink>
+          </li>
+          <li>
+            <NavLink to="/expense-types-management" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <span className="icon-container"><FontAwesomeIcon icon={faFileInvoiceDollar} /></span>
+              <span>Expenses Type Management</span>
+            </NavLink>
+          </li>
+          <li>
+            <NavLink to="/expense-payees-management" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <span className="icon-container"><FontAwesomeIcon icon={faIdCard} /></span>
+              <span>Expenses Payee Management</span>
+            </NavLink>
+          </li>
+          <li>
+            <NavLink to="/bank-charges-type-management" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <span className="icon-container"><FontAwesomeIcon icon={faUniversity} /></span>
+              <span>Bank Charges Type Management</span>
             </NavLink>
           </li>
         </ul>
@@ -497,12 +518,6 @@ const NavigationBar = () => {
         <NavLink to="/expenses/new" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
           <span className="icon-container"><FontAwesomeIcon icon={faMoneyCheck} /></span>
           <span>New Expenses</span>
-        </NavLink>
-      </li>
-      <li>
-        <NavLink to="/expenses/payees" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-          <span className="icon-container"><FontAwesomeIcon icon={faUsers} /></span>
-          <span>Payees</span>
         </NavLink>
       </li>
     </>

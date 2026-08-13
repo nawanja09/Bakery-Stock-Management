@@ -126,11 +126,14 @@ app.use('/api/cutlery-purchases', cutleryPurchasesRoutes);
 app.use('/api/cutlery-damages', cutleryDamagesRoutes);
 app.use('/api/cutlery-reports', cutleryStockReportRoutes);
 
+const bankChargesTypeRoutes = require('./routes/bankChargesTypeRoutes');
+
 app.use('/api/purchase-returns', purchaseReturnRoutes);
 app.use('/api/purchases', paymentRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/new-expenses', newExpenseRoutes);
 app.use('/api/expense-types', expenseTypeRoutes);
+app.use('/api/bank-charges-types', bankChargesTypeRoutes);
 app.use('/api/suppliers', supplierCreditRoutes);
 app.use('/api/item-types', itemTypeRoutes);
 app.use('/api/companies', companyRoutes);
