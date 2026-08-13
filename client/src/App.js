@@ -83,9 +83,9 @@ import NonPaidPurchases from './components/purchase/NonPaidPurchases';
 
 import PettyCash from './components/Expenses/PettyCash';
 import Reimbursement from './components/Expenses/Reimbursement';
-import ChequeExpenses from './components/Expenses/ChequeExpenses';
+import NewExpenses from './components/Expenses/NewExpenses';
 import BankCharges from './components/Expenses/BankCharges';
-import OnlineExpenses from './components/Expenses/OnlineExpenses';
+
 import BankDetails from './components/Expenses/BankDetails';
 import Payees from './components/Expenses/Payees';
 
@@ -258,9 +258,8 @@ function App() {
 
             <Route path="expenses/petty-cash" element={<ExpensesRoute><PettyCash /></ExpensesRoute>} />
             <Route path="expenses/reimbursement" element={<ExpensesRoute><Reimbursement /></ExpensesRoute>} />
-            <Route path="expenses/cheque" element={<ExpensesRoute><ChequeExpenses /></ExpensesRoute>} />
             <Route path="expenses/bank-charges" element={<ExpensesRoute><BankCharges /></ExpensesRoute>} />
-            <Route path="expenses/online" element={<ExpensesRoute><OnlineExpenses /></ExpensesRoute>} />
+            <Route path="expenses/new" element={<ExpensesRoute><NewExpenses /></ExpensesRoute>} />
             <Route path="expenses/bank-details" element={<ExpensesRoute><BankDetails /></ExpensesRoute>} />
 
             <Route path="finance/cash" element={<FinanceRoute><CashLedger /></FinanceRoute>} />
