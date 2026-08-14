@@ -101,9 +101,6 @@ const ReceiveTypeManagement = () => {
         <div className="rm-mgmt-header-top">
           <div>
             <h2>Cash / Bank Receive Types</h2>
-            <p className="rm-mgmt-subtitle">
-              Manage receive types shown in the Cash Receive and Bank Receive dropdowns
-            </p>
           </div>
           <button className="btn-add-rm" onClick={() => { setShowAddForm(true); setEditingRecord(null); }}>
             <FiPlus size={16} /> Add Receive Type

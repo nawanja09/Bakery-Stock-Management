@@ -246,6 +246,12 @@ const NavigationBar = () => {
               <span>Bank Charges Type Management</span>
             </NavLink>
           </li>
+          <li>
+            <NavLink to="/finance/receive-types" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <span className="icon-container"><FontAwesomeIcon icon={faCashRegister} /></span>
+              <span>Receive Types</span>
+            </NavLink>
+          </li>
         </ul>
       </li>
 
