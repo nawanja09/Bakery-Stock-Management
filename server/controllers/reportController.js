@@ -1261,6 +1261,138 @@ const getPurchaseReport = async (req, res) => {
   }
 };
 
+// =============================================
+// Expenses Report: unified Petty Cash + Other (New Expenses) listing
+// with Company / Date Range / Payee / Type filters.
+//
+// NOTE on "Company": neither `expenses` nor `petty_cash_vouchers` stores
+// a company_id directly. For "Other" expenses, company is resolved from
+// the payment side - expense_payment_allocations -> expense_payments ->
+// finance_transactions.company_id (set for every posted payment, cash
+// or bank). This means unpaid "Other" bills have no company yet and
+// won't match a specific Company filter. Petty Cash vouchers spend from
+// a shared float with no per-company attribution at all, so Petty Cash
+// rows are simply excluded whenever a Company filter is applied.
+// =============================================
+const getExpensesReport = async (req, res) => {
+  const { startDate, endDate, companyId, payeeId, type } = req.query;
+
+  try {
+    const normalizedType = (type || 'all').toLowerCase();
+    const includeOther = normalizedType === 'other' || normalizedType === 'all';
+    const includePettyCash = normalizedType === 'petty_cash' || normalizedType === 'all';
+
+    // Resolve the selected payee's name once, so Petty Cash (which only
+    // stores a free-text payee_name) can be filtered the same way as
+    // Other (which has a real payee_id FK).
+    let payeeName = null;
+    if (payeeId) {
+      const [payeeRows] = await pool.query('SELECT payee_name FROM payees WHERE id = ?', [payeeId]);
+      payeeName = payeeRows.length ? payeeRows[0].payee_name : null;
+    }
+
+    let results = [];
+
+    if (includeOther) {
+      let otherQuery = `
+        SELECT o.*, comp.name AS company_name
+        FROM (
+          SELECT
+            e.id,
+            'Other' AS type,
+            e.bill_date AS date,
+            COALESCE(p.payee_name, e.payee_name) AS payee_name,
+            e.expense_type,
+            e.bill_number AS reference,
+            e.total_bill_amount AS amount,
+            e.payment_status AS status,
+            (
+              SELECT ft.company_id
+              FROM expense_payment_allocations epa
+              JOIN finance_transactions ft
+                ON ft.reference_type = 'EXPENSE_PAYMENT' AND ft.reference_id = epa.payment_id
+              WHERE epa.expense_id = e.id
+              ORDER BY ft.id DESC
+              LIMIT 1
+            ) AS company_id
+          FROM expenses e
+          LEFT JOIN payees p ON e.payee_id = p.id
+          WHERE e.is_deleted = 0
+          ${startDate ? 'AND e.bill_date >= ?' : ''}
+          ${endDate ? 'AND e.bill_date < DATE_ADD(?, INTERVAL 1 DAY)' : ''}
+          ${payeeId ? 'AND e.payee_id = ?' : ''}
+        ) o
+        LEFT JOIN company comp ON comp.id = o.company_id
+      `;
+      const otherParams = [];
+      if (startDate) otherParams.push(startDate);
+      if (endDate) otherParams.push(endDate);
+      if (payeeId) otherParams.push(payeeId);
+
+      if (companyId) {
+        otherQuery += ' WHERE o.company_id = ?';
+        otherParams.push(companyId);
+      }
+
+      const [otherRows] = await pool.query(otherQuery, otherParams);
+      results = results.concat(otherRows);
+    }
+
+    // A Company filter can never match a Petty Cash row (no company
+    // attribution exists for them), so skip the query entirely.
+    if (includePettyCash && !companyId) {
+      let pettyQuery = `
+        SELECT
+          pv.id,
+          'Petty Cash' AS type,
+          pv.voucher_date AS date,
+          pv.payee_name AS payee_name,
+          pv.expense_type,
+          pv.voucher_number AS reference,
+          pv.amount,
+          pv.status,
+          NULL AS company_id,
+          NULL AS company_name
+        FROM petty_cash_vouchers pv
+        WHERE 1 = 1
+        ${startDate ? 'AND pv.voucher_date >= ?' : ''}
+        ${endDate ? 'AND pv.voucher_date < DATE_ADD(?, INTERVAL 1 DAY)' : ''}
+        ${payeeId ? 'AND pv.payee_name = ?' : ''}
+      `;
+      const pettyParams = [];
+      if (startDate) pettyParams.push(startDate);
+      if (endDate) pettyParams.push(endDate);
+      if (payeeId) pettyParams.push(payeeName || '\0__no_match__\0');
+
+      const [pettyRows] = await pool.query(pettyQuery, pettyParams);
+      results = results.concat(pettyRows);
+    }
+
+    results.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    const expenses = results.map(row => ({
+      id: row.id,
+      type: row.type,
+      date: row.date,
+      payee_name: row.payee_name,
+      expense_type: row.expense_type,
+      reference: row.reference,
+      company_name: row.company_name || null,
+      amount: parseFloat(row.amount) || 0,
+      status: row.status
+    }));
+
+    const grandTotal = expenses.reduce((sum, e) => sum + e.amount, 0);
+    const pettyCashTotal = expenses.filter(e => e.type === 'Petty Cash').reduce((sum, e) => sum + e.amount, 0);
+    const otherTotal = expenses.filter(e => e.type === 'Other').reduce((sum, e) => sum + e.amount, 0);
+
+    res.json({ expenses, grandTotal, pettyCashTotal, otherTotal });
+  } catch (error) {
+    console.error('Error generating expenses report:', error);
+    res.status(500).json({ error: 'Server error: ' + error.message });
+  }
+};
+
 module.exports = {
   getStockReport,
   getLatestUnitPrice,
@@ -1277,5 +1409,6 @@ module.exports = {
   getPurchasingItemWiseReport,
   getDailyPurchaseReturnTransactions,
   getDepartmentReturnItemWiseReport,
-  getPurchaseReport
+  getPurchaseReport,
+  getExpensesReport
 };

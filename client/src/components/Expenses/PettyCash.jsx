@@ -43,8 +43,17 @@ const PettyCash = () => {
   const [reimbursementForm, setReimbursementForm] = useState({
     date: new Date().toISOString().split('T')[0],
     reference_number: '',
-    amount: ''
+    amount: '',
+    cash_book: ''
   });
+
+  // Cash Book = which real Cash (company) or Bank account funds the
+  // reimbursement. Combined into one dropdown, value format:
+  // "CASH:<company_id>".
+  const [companies, setCompanies] = useState([]);
+  const cashBookOptions = [
+    ...companies.map(c => ({ value: `CASH:${c.id}`, label: `${c.name} - Cash` }))
+  ];
 
   const expenseTypes = [
     'Travel', 'Stationery', 'Refreshments', 'Transport', 'Vehicle Maintenance',
@@ -112,6 +121,30 @@ const PettyCash = () => {
   }, []);
 
   useEffect(() => { fetchPettyCashData(); }, [fetchPettyCashData]);
+
+  // Load Cash Book dropdown sources (companies for Cash) once.
+  useEffect(() => {
+    const loadCashBookOptions = async () => {
+      try {
+        const [companiesRes] = await Promise.all([
+          api.get('/purchases/companies'),
+        ]);
+        const companiesData = companiesRes.data || [];
+        setCompanies(companiesData);
+
+        // JH is the default cash book.
+        const jh = companiesData.find(c => (c.name || '').toUpperCase() === 'JH');
+        if (jh) {
+          setReimbursementForm(prev => (
+            prev.cash_book ? prev : { ...prev, cash_book: `CASH:${jh.id}` }
+          ));
+        }
+      } catch (error) {
+        console.error('Error loading cash book options:', error);
+      }
+    };
+    loadCashBookOptions();
+  }, []);
   useEffect(() => {
     if (activeTab === 'voucher') fetchVoucherSuggestion();
     else if (activeTab === 'reimbursement') fetchReferenceSuggestion();
@@ -214,6 +247,10 @@ const PettyCash = () => {
       showPopup('error', 'Reference number and valid amount are required');
       return;
     }
+    if (!isEditingReimbursement && !reimbursementForm.cash_book) {
+      showPopup('error', 'Please select a cash book');
+      return;
+    }
     setIsLoading(true);
     try {
       const payload = {
@@ -221,6 +258,15 @@ const PettyCash = () => {
         reimbursement_date: reimbursementForm.date,
         amount: parseFloat(reimbursementForm.amount)
       };
+
+      // Cash book only applies at creation time - this is the moment the
+      // money actually leaves the selected Cash or Bank account.
+      if (!isEditingReimbursement) {
+        const [fundingSource, accountId] = reimbursementForm.cash_book.split(':');
+        payload.funding_source = fundingSource;
+        if (fundingSource === 'CASH') payload.company_id = accountId;
+      }
+
       let response;
       if (isEditingReimbursement) {
         response = await api.put(`/expenses/petty-cash/reimbursement/${editingReimbursementId}`, payload);
@@ -231,7 +277,13 @@ const PettyCash = () => {
         showPopup('success', isEditingReimbursement ? 'Reimbursement updated successfully!' : 'Reimbursement recorded successfully!');
         setIsEditingReimbursement(false);
         setEditingReimbursementId(null);
-        setReimbursementForm({ date: new Date().toISOString().split('T')[0], reference_number: '', amount: '' });
+        const jh = companies.find(c => (c.name || '').toUpperCase() === 'JH');
+        setReimbursementForm({
+          date: new Date().toISOString().split('T')[0],
+          reference_number: '',
+          amount: '',
+          cash_book: jh ? `CASH:${jh.id}` : ''
+        });
         await fetchPettyCashData();
         await fetchReferenceSuggestion();
       } else showPopup('error', response.data.error || 'Failed to save reimbursement');
@@ -243,10 +295,13 @@ const PettyCash = () => {
   const handleEditReimbursement = (reimbursement) => {
     setIsEditingReimbursement(true);
     setEditingReimbursementId(reimbursement.id);
+    const cashBook = reimbursement.funding_source === 'CASH' ? `CASH:${reimbursement.company_id}`
+      : '';
     setReimbursementForm({
       date: reimbursement.reimbursement_date || reimbursement.date,
       reference_number: reimbursement.reference_number,
-      amount: reimbursement.amount.toString()
+      amount: reimbursement.amount.toString(),
+      cash_book: cashBook
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -254,7 +309,13 @@ const PettyCash = () => {
   const handleCancelEditReimbursement = () => {
     setIsEditingReimbursement(false);
     setEditingReimbursementId(null);
-    setReimbursementForm({ date: new Date().toISOString().split('T')[0], reference_number: '', amount: '' });
+    const jh = companies.find(c => (c.name || '').toUpperCase() === 'JH');
+    setReimbursementForm({
+      date: new Date().toISOString().split('T')[0],
+      reference_number: '',
+      amount: '',
+      cash_book: jh ? `CASH:${jh.id}` : ''
+    });
     fetchReferenceSuggestion();
   };
 
@@ -417,10 +478,31 @@ const PettyCash = () => {
                 <div className="form-group"><label>Date <span className="required">*</span></label><input type="date" name="date" value={reimbursementForm.date} onChange={handleReimbursementChange} required className="form-input" /></div>
                 <div className="form-group"><label>Reference Number <span className="required">*</span></label><div className="input-with-button"><input type="text" name="reference_number" value={reimbursementForm.reference_number} onChange={handleReimbursementChange} required className="form-input" placeholder="Enter reference number" /></div></div>
               </div>
-              <div className="form-row"><div className="form-group left-align"><label>Amount (LKR) <span className="required">*</span></label><input type="number" name="amount" value={reimbursementForm.amount} onChange={handleReimbursementChange} required min="0.01" step="0.01" className="form-input amount-input" placeholder="0.00" /></div></div>
+              <div className="form-row">
+                <div className="form-group left-align"><label>Amount (LKR) <span className="required">*</span></label><input type="number" name="amount" value={reimbursementForm.amount} onChange={handleReimbursementChange} required min="0.01" step="0.01" className="form-input amount-input" placeholder="0.00" /></div>
+                <div className="form-group">
+                  <label>Cash Book {!isEditingReimbursement && <span className="required">*</span>}</label>
+                  {isEditingReimbursement ? (
+                    <input
+                      type="text"
+                      className="form-input"
+                      disabled
+                      value={cashBookOptions.find(o => o.value === reimbursementForm.cash_book)?.label || 'Not recorded'}
+                    />
+                  ) : (
+                    <select name="cash_book" value={reimbursementForm.cash_book} onChange={handleReimbursementChange} required className="form-select">
+                      <option value="">Select Cash Book</option>
+                      {cashBookOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
+                  )}
+                </div>
+              </div>
               <div className="form-actions">
                 {isEditingReimbursement && <button type="button" onClick={handleCancelEditReimbursement} className="btn-secondary" disabled={isLoading}><FontAwesomeIcon icon={faTimes} /> Cancel</button>}
-                <button type="button" onClick={() => setReimbursementForm({ date: new Date().toISOString().split('T')[0], reference_number: '', amount: '' })} className="btn-secondary" disabled={isLoading}><FontAwesomeIcon icon={faTimes} /> Clear</button>
+                <button type="button" onClick={() => {
+                  const jh = companies.find(c => (c.name || '').toUpperCase() === 'JH');
+                  setReimbursementForm({ date: new Date().toISOString().split('T')[0], reference_number: '', amount: '', cash_book: jh ? `CASH:${jh.id}` : '' });
+                }} className="btn-secondary" disabled={isLoading}><FontAwesomeIcon icon={faTimes} /> Clear</button>
                 <button type="submit" className="btn-primary" disabled={isLoading}><FontAwesomeIcon icon={isLoading ? faSpinner : faSave} spin={isLoading} /> {isLoading ? 'Submitting...' : (isEditingReimbursement ? 'Update Reimbursement' : 'Submit Reimbursement')}</button>
               </div>
             </form>
@@ -429,8 +511,8 @@ const PettyCash = () => {
           <div className="history-section">
             <div className="history-header"><h3>Reimbursement Details</h3><div className="history-actions"><button className="icon-btn" onClick={fetchPettyCashData}><FontAwesomeIcon icon={faSync} /></button></div></div>
             <div className="table-container">
-              <table className="data-table"><thead><tr><th>Date</th><th>Reference Number</th><th>Amount (LKR)</th><th>Status</th><th>Actions</th></tr></thead><tbody>
-                {isFetching ? <tr><td colSpan="5" className="loading-row"><FontAwesomeIcon icon={faSpinner} spin /> Loading reimbursements...</td></tr> : reimbursements.length > 0 ? reimbursements.map(r => (<tr key={r.id}><td>{formatDate(r.reimbursement_date || r.date)}</td><td className="reference-number">{r.reference_number}</td><td className="amount-cell">{formatCurrency(r.amount)}</td><td><span className={`status-badge status-${(r.status || 'Completed').toLowerCase()}`}>{r.status || 'Completed'}</span></td><td><div className="action-buttons"><button className="action-btn view-btn" title="View Details" onClick={() => handleViewReimbursement(r)}><FontAwesomeIcon icon={faEye} /></button><button className="action-btn edit-btn" title="Edit Reimbursement" onClick={() => handleEditReimbursement(r)}><FontAwesomeIcon icon={faEdit} /></button></div></td></tr>)) : <tr><td colSpan="5" className="empty-row">No reimbursements found</td></tr>}
+              <table className="data-table"><thead><tr><th>Date</th><th>Reference Number</th><th>Cash Book</th><th>Amount (LKR)</th><th>Status</th><th>Actions</th></tr></thead><tbody>
+                {isFetching ? <tr><td colSpan="6" className="loading-row"><FontAwesomeIcon icon={faSpinner} spin /> Loading reimbursements...</td></tr> : reimbursements.length > 0 ? reimbursements.map(r => (<tr key={r.id}><td>{formatDate(r.reimbursement_date || r.date)}</td><td className="reference-number">{r.reference_number}</td><td>{r.company_name || '-'}</td><td className="amount-cell">{formatCurrency(r.amount)}</td><td><span className={`status-badge status-${(r.status || 'Completed').toLowerCase()}`}>{r.status || 'Completed'}</span></td><td><div className="action-buttons"><button className="action-btn view-btn" title="View Details" onClick={() => handleViewReimbursement(r)}><FontAwesomeIcon icon={faEye} /></button><button className="action-btn edit-btn" title="Edit Reimbursement" onClick={() => handleEditReimbursement(r)}><FontAwesomeIcon icon={faEdit} /></button></div></td></tr>)) : <tr><td colSpan="6" className="empty-row">No reimbursements found</td></tr>}
               </tbody></table>
             </div>
           </div>
@@ -448,6 +530,7 @@ const PettyCash = () => {
             <div className="modal-body">
               <div className="detail-row"><strong>Reference Number:</strong> {selectedReimbursement.reference_number}</div>
               <div className="detail-row"><strong>Date:</strong> {formatDate(selectedReimbursement.reimbursement_date || selectedReimbursement.date)}</div>
+              <div className="detail-row"><strong>Cash Book:</strong> {selectedReimbursement.company_name || 'Not recorded'}</div>
               <div className="detail-row"><strong>Amount:</strong> {formatCurrency(selectedReimbursement.amount)}</div>
               <div className="detail-row"><strong>Status:</strong> <span className={`status-badge status-${(selectedReimbursement.status || 'Completed').toLowerCase()}`}>{selectedReimbursement.status || 'Completed'}</span></div>
               <div className="detail-row"><strong>Created Date:</strong> {selectedReimbursement.created_date || '-'}</div>
