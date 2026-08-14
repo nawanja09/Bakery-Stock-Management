@@ -25,8 +25,40 @@ const Reimbursement = () => {
   const [reimbursementForm, setReimbursementForm] = useState({
     date: new Date().toISOString().split('T')[0],
     reference_number: '',
-    amount: ''
+    amount: '',
+    cash_book: ''
   });
+
+  // Cash Book = which real Cash (company) or Bank account funds the
+  // reimbursement. Combined into one dropdown, value format:
+  // "CASH:<company_id>" or "BANK:<bank_id>". JH is the default.
+  const [companies, setCompanies] = useState([]);
+  const [banks, setBanks] = useState([]);
+  const cashBookOptions = [
+    ...companies.map(c => ({ value: `CASH:${c.id}`, label: `${c.name} - Cash` })),
+    ...banks.map(b => ({ value: `BANK:${b.id}`, label: b.bank_name }))
+  ];
+
+  useEffect(() => {
+    const loadCashBookOptions = async () => {
+      try {
+        const [companiesRes, banksRes] = await Promise.all([
+          api.get('/purchases/companies'),
+          api.get('/expenses/banks')
+        ]);
+        const companiesData = companiesRes.data || [];
+        setCompanies(companiesData);
+        setBanks(banksRes.data || []);
+        const jh = companiesData.find(c => (c.name || '').toUpperCase() === 'JH');
+        if (jh) {
+          setReimbursementForm(prev => (prev.cash_book ? prev : { ...prev, cash_book: `CASH:${jh.id}` }));
+        }
+      } catch (error) {
+        console.error('Error loading cash book options:', error);
+      }
+    };
+    loadCashBookOptions();
+  }, []);
 
   // Generate reference number for reimbursement
   const generateReferenceNumber = useCallback(async () => {
@@ -101,13 +133,20 @@ const Reimbursement = () => {
       showPopup('error', 'Valid amount is required');
       return;
     }
+    if (!reimbursementForm.cash_book) {
+      showPopup('error', 'Please select a cash book');
+      return;
+    }
 
     setIsLoading(true);
     try {
+      const [fundingSource, accountId] = reimbursementForm.cash_book.split(':');
       const payload = {
         reference_number: reimbursementForm.reference_number,
         reimbursement_date: reimbursementForm.date,
-        amount: parseFloat(reimbursementForm.amount)
+        amount: parseFloat(reimbursementForm.amount),
+        funding_source: fundingSource,
+        ...(fundingSource === 'CASH' ? { company_id: accountId } : { bank_id: accountId })
       };
 
       await api.post('/expenses/petty-cash/reimbursement', payload);
@@ -115,10 +154,12 @@ const Reimbursement = () => {
       showPopup('success', 'Reimbursement recorded successfully');
 
       // Reset form
+      const jh = companies.find(c => (c.name || '').toUpperCase() === 'JH');
       setReimbursementForm({
         date: new Date().toISOString().split('T')[0],
         reference_number: '',
-        amount: ''
+        amount: '',
+        cash_book: jh ? `CASH:${jh.id}` : ''
       });
 
       // Refresh data
@@ -205,6 +246,20 @@ const Reimbursement = () => {
                   required
                 />
               </div>
+              <div className="form-group">
+                <label htmlFor="cash_book">Cash Book *</label>
+                <select
+                  id="cash_book"
+                  name="cash_book"
+                  value={reimbursementForm.cash_book}
+                  onChange={handleReimbursementChange}
+                  required
+                >
+                  <option value="">Select Cash Book</option>
+                  {cashBookOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+                <small style={{ color: '#6c757d', display: 'block', marginTop: '4px' }}>This will deduct the entered amount from the selected Cash Book and add it to the Petty Cash balance. JH is selected by default.</small>
+              </div>
             </div>
 
             <div className="form-actions">
@@ -247,6 +302,7 @@ const Reimbursement = () => {
                 <tr>
                   <th>Reference Number</th>
                   <th>Date</th>
+                  <th>Cash Book</th>
                   <th>Amount</th>
                   <th>Status</th>
                   <th>Created By</th>
@@ -255,13 +311,14 @@ const Reimbursement = () => {
               <tbody>
                 {reimbursements.length === 0 ? (
                   <tr>
-                    <td colSpan="5" className="no-data">No reimbursements recorded yet</td>
+                    <td colSpan="6" className="no-data">No reimbursements recorded yet</td>
                   </tr>
                 ) : (
                   reimbursements.map((reimbursement) => (
                     <tr key={reimbursement.id}>
                       <td>{reimbursement.reference_number}</td>
                       <td>{reimbursement.date}</td>
+                      <td>{reimbursement.company_name || reimbursement.bank_name || '-'}</td>
                       <td>Rs. {parseFloat(reimbursement.amount).toLocaleString()}</td>
                       <td>
                         <span className={`status-badge ${reimbursement.status?.toLowerCase()}`}>

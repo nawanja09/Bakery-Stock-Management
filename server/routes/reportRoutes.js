@@ -24,4 +24,7 @@ router.get('/last-issue-date', reportController.getLastIssueDateReport);
 // Purchase Report: invoice-level listing with date range / company / supplier filters
 router.get('/purchase-report', reportController.getPurchaseReport);
 
+// Expenses Report: unified Petty Cash + Other expenses with company / date range / payee / type filters
+router.get('/expenses-report', reportController.getExpensesReport);
+
 module.exports = router;

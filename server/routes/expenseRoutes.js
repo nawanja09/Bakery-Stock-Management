@@ -24,8 +24,8 @@ router.get('/petty-cash/balance', async (req, res) => {
     const totalVouchers = parseFloat(voucherRows[0].total) || 0;
 
     const balance = totalReimbursements - totalVouchers;
-    
-    res.json({ 
+
+    res.json({
       balance,
       totalReimbursements,
       totalVouchers
@@ -44,9 +44,9 @@ router.get('/petty-cash/next-voucher-number', async (req, res) => {
     const [rows] = await pool.query(
       "SELECT voucher_number FROM petty_cash_vouchers ORDER BY id DESC LIMIT 1"
     );
-    
+
     let nextNumber = 'PC-001';
-    
+
     if (rows.length > 0 && rows[0].voucher_number) {
       const lastNumber = rows[0].voucher_number;
       const match = lastNumber.match(/\d+$/);
@@ -55,7 +55,7 @@ router.get('/petty-cash/next-voucher-number', async (req, res) => {
         nextNumber = `PC-${String(num).padStart(3, '0')}`;
       }
     }
-    
+
     res.json({ voucher_number: nextNumber });
   } catch (error) {
     console.error('Error generating voucher number:', error);
@@ -71,9 +71,9 @@ router.get('/petty-cash/next-reference-number', async (req, res) => {
     const [rows] = await pool.query(
       "SELECT reference_number FROM petty_cash_reimbursements ORDER BY id DESC LIMIT 1"
     );
-    
+
     let nextNumber = 'REF-001';
-    
+
     if (rows.length > 0 && rows[0].reference_number) {
       const lastNumber = rows[0].reference_number;
       const match = lastNumber.match(/\d+$/);
@@ -82,7 +82,7 @@ router.get('/petty-cash/next-reference-number', async (req, res) => {
         nextNumber = `REF-${String(num).padStart(3, '0')}`;
       }
     }
-    
+
     res.json({ reference_number: nextNumber });
   } catch (error) {
     console.error('Error generating reference number:', error);
@@ -113,7 +113,7 @@ router.get('/petty-cash/vouchers', async (req, res) => {
        ORDER BY created_at DESC 
        LIMIT 100`
     );
-    
+
     res.json(rows || []);
   } catch (error) {
     console.error('Error fetching vouchers:', error);
@@ -135,15 +135,19 @@ router.get('/petty-cash/reimbursements', async (req, res) => {
         r.funding_source,
         r.company_id,
         r.bank_id,
+        comp.name as company_name,
+        bank.bank_name as bank_name,
         r.status,
         u.name as created_by_name,
         DATE_FORMAT(r.created_at, '%Y-%m-%d') as created_date
        FROM petty_cash_reimbursements r
        LEFT JOIN users u ON r.created_by = u.id
+       LEFT JOIN company comp ON r.company_id = comp.id
+       LEFT JOIN bank_details bank ON r.bank_id = bank.id
        ORDER BY r.created_at DESC 
        LIMIT 100`
     );
-    
+
     res.json(rows || []);
   } catch (error) {
     console.error('Error fetching reimbursements:', error);
@@ -155,18 +159,18 @@ router.get('/petty-cash/reimbursements', async (req, res) => {
 // POST Create Voucher
 // =============================================
 router.post('/petty-cash/voucher', authenticate, async (req, res) => {
-  const { 
-    voucher_number, 
-    voucher_date, 
-    employee_name, 
-    payee_name, 
-    expense_type, 
-    description, 
-    vehicle_number, 
+  const {
+    voucher_number,
+    voucher_date,
+    employee_name,
+    payee_name,
+    expense_type,
+    description,
+    vehicle_number,
     amount,
     receipt_no
   } = req.body;
-  
+
   const userId = req.user.userId;
 
   if (!voucher_number || !voucher_date || !payee_name || !expense_type || !amount) {
@@ -185,13 +189,13 @@ router.post('/petty-cash/voucher', authenticate, async (req, res) => {
         expense_type, description, vehicle_number, amount, receipt_no, created_by, status)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending')`,
       [
-        voucher_number, 
-        voucher_date, 
-        employee_name || null, 
-        payee_name, 
-        expense_type, 
-        description || null, 
-        vehicle_number || null, 
+        voucher_number,
+        voucher_date,
+        employee_name || null,
+        payee_name,
+        expense_type,
+        description || null,
+        vehicle_number || null,
         amount,
         receipt_no || null,
         userId
@@ -215,13 +219,13 @@ router.post('/petty-cash/voucher', authenticate, async (req, res) => {
       referenceId: result.insertId,
       createdBy: userId
     });
-    
+
     await connection.commit();
     await updatePettyCashBalance();
-    
-    res.status(201).json({ 
-      id: result.insertId, 
-      message: 'Voucher created successfully' 
+
+    res.status(201).json({
+      id: result.insertId,
+      message: 'Voucher created successfully'
     });
   } catch (error) {
     await connection.rollback();
@@ -243,18 +247,18 @@ router.post('/petty-cash/voucher', authenticate, async (req, res) => {
 // =============================================
 router.put('/petty-cash/voucher/:id', authenticate, async (req, res) => {
   const { id } = req.params;
-  const { 
+  const {
     voucher_number,
-    voucher_date, 
-    employee_name, 
-    payee_name, 
-    expense_type, 
-    description, 
-    vehicle_number, 
+    voucher_date,
+    employee_name,
+    payee_name,
+    expense_type,
+    description,
+    vehicle_number,
     amount,
     receipt_no
   } = req.body;
-  
+
   const userId = req.user.userId;
 
   if (!voucher_number || !voucher_date || !payee_name || !expense_type || !amount) {
@@ -281,31 +285,31 @@ router.put('/petty-cash/voucher/:id', authenticate, async (req, res) => {
        WHERE id = ?`,
       [
         voucher_number,
-        voucher_date, 
-        employee_name || null, 
-        payee_name, 
-        expense_type, 
-        description || null, 
-        vehicle_number || null, 
-        amount, 
+        voucher_date,
+        employee_name || null,
+        payee_name,
+        expense_type,
+        description || null,
+        vehicle_number || null,
+        amount,
         receipt_no || null,
         userId,
         id
       ]
     );
-    
+
     // Sync ledger entry
     const [finRows] = await connection.query(
       'SELECT id, credit, company_id FROM finance_transactions WHERE reference_type = "PETTY_CASH_VOUCHER" AND reference_id = ?',
       [id]
     );
-    
+
     if (finRows.length > 0) {
       const finId = finRows[0].id;
       const oldCredit = parseFloat(finRows[0].credit) || 0;
       const newCredit = parseFloat(amount) || 0;
       const difference = newCredit - oldCredit;
-      
+
       if (difference !== 0) {
         await connection.query(
           'UPDATE cash_accounts SET current_balance = current_balance - ? WHERE company_id = ?',
@@ -325,7 +329,7 @@ router.put('/petty-cash/voucher/:id', authenticate, async (req, res) => {
 
     await connection.commit();
     await updatePettyCashBalance();
-    
+
     res.json({ message: 'Voucher updated successfully' });
   } catch (error) {
     await connection.rollback();
@@ -454,9 +458,9 @@ router.post('/petty-cash/reimbursement', authenticate, async (req, res) => {
     await connection.commit();
     await updatePettyCashBalance();
 
-    res.status(201).json({ 
-      id: result.insertId, 
-      message: 'Reimbursement recorded successfully' 
+    res.status(201).json({
+      id: result.insertId,
+      message: 'Reimbursement recorded successfully'
     });
   } catch (error) {
     await connection.rollback();
@@ -496,14 +500,14 @@ router.put('/petty-cash/reimbursement/:id', authenticate, async (req, res) => {
        WHERE id = ?`,
       [reference_number, reimbursement_date, amount, userId, id]
     );
-    
+
     if (result.affectedRows === 0) {
       await connection.rollback();
       return res.status(404).json({ error: 'Reimbursement not found' });
     }
     await connection.commit();
     await updatePettyCashBalance();
-    
+
     res.json({ message: 'Reimbursement updated successfully' });
   } catch (error) {
     await connection.rollback();
@@ -526,11 +530,11 @@ async function updatePettyCashBalance() {
     const [voucherTotal] = await pool.query(
       `SELECT COALESCE(SUM(amount), 0) as total FROM petty_cash_vouchers`
     );
-    
+
     const [reimbursementTotal] = await pool.query(
       `SELECT COALESCE(SUM(amount), 0) as total FROM petty_cash_reimbursements`
     );
-    
+
     const [todayVoucherTotal] = await pool.query(
       `SELECT COALESCE(SUM(amount), 0) as total 
        FROM petty_cash_vouchers 
@@ -546,7 +550,7 @@ async function updatePettyCashBalance() {
     const totalVouchers = parseFloat(voucherTotal[0].total);
     const totalReimbursements = parseFloat(reimbursementTotal[0].total);
     const currentBalance = totalReimbursements - totalVouchers;
-    
+
     const todayVouchers = parseFloat(todayVoucherTotal[0].total);
     const todayReimbursements = parseFloat(todayReimbursementTotal[0].total);
     const openingBalance = currentBalance - todayReimbursements + todayVouchers;
@@ -562,7 +566,7 @@ async function updatePettyCashBalance() {
        closing_balance = VALUES(closing_balance)`,
       [openingBalance, todayVouchers, todayReimbursements, currentBalance]
     );
-    
+
   } catch (error) {
     console.error('Error updating petty cash balance table:', error);
   }
@@ -727,9 +731,9 @@ router.delete('/cheque/voucher/:id', authenticate, async (req, res) => {
 
 // POST create cheque voucher
 router.post('/cheque/voucher', authenticate, async (req, res) => {
-  const { 
-    bill_date, bill_number, payee_name, vat_reg_number, 
-    expense_type, without_vat_amount, vat_amount, 
+  const {
+    bill_date, bill_number, payee_name, vat_reg_number,
+    expense_type, without_vat_amount, vat_amount,
     total_bill_amount, description, company_id
   } = req.body;
   const userId = req.user.userId;
@@ -745,12 +749,12 @@ router.post('/cheque/voucher', authenticate, async (req, res) => {
         voucher_number, cheque_number, created_by)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [bill_date, company_id || null, bill_number, payee_name, vat_reg_number, expense_type,
-       without_vat_amount, vat_amount, total_bill_amount, description,
-       voucher_number, cheque_number, userId]
+        without_vat_amount, vat_amount, total_bill_amount, description,
+        voucher_number, cheque_number, userId]
     );
-    
-    res.status(201).json({ 
-      id: result.insertId, 
+
+    res.status(201).json({
+      id: result.insertId,
       message: 'Cheque expense voucher created successfully',
       voucher_number,
       cheque_number
@@ -893,9 +897,9 @@ router.post('/bank-charges', authenticate, async (req, res) => {
     }
 
     await connection.commit();
-    res.status(201).json({ 
-      id: result.insertId, 
-      message: 'Bank charge recorded successfully' 
+    res.status(201).json({
+      id: result.insertId,
+      message: 'Bank charge recorded successfully'
     });
   } catch (error) {
     await connection.rollback();
@@ -925,7 +929,7 @@ router.put('/bank-charges/:id', authenticate, async (req, res) => {
       await connection.rollback();
       return res.status(404).json({ error: 'Bank charge not found' });
     }
-    
+
     // The previous bank_id (if not explicitly passed in update, though we should expect it)
     const oldBankId = oldRows[0].bank_id;
     const newBankId = bank_id !== undefined ? bank_id : oldBankId;
@@ -937,7 +941,7 @@ router.put('/bank-charges/:id', authenticate, async (req, res) => {
        WHERE id = ?`,
       [date, bank_name, newBankId || null, reference_number || null, charges_type, bank_charge_type_id || null, description || null, amount, id]
     );
-    
+
     if (oldBankId) {
       // Find the finance transaction
       const [finRows] = await connection.query(
@@ -948,7 +952,7 @@ router.put('/bank-charges/:id', authenticate, async (req, res) => {
         const finId = finRows[0].id;
         const oldCredit = parseFloat(finRows[0].credit) || 0;
         const newCredit = parseFloat(amount) || 0;
-        
+
         if (oldBankId === newBankId) {
           const difference = newCredit - oldCredit;
           if (difference !== 0) {
@@ -1009,7 +1013,7 @@ router.delete('/bank-charges/:id', authenticate, async (req, res) => {
     }
 
     await connection.query('DELETE FROM bank_charges WHERE id = ?', [id]);
-    
+
     if (oldRows[0].bank_id) {
       const [finRows] = await connection.query(
         'SELECT id, credit FROM finance_transactions WHERE reference_type = "BANK_CHARGE" AND reference_id = ?', [id]
@@ -1020,7 +1024,7 @@ router.delete('/bank-charges/:id', authenticate, async (req, res) => {
         await connection.query('DELETE FROM finance_transactions WHERE id = ?', [finRows[0].id]);
       }
     }
-    
+
     await connection.commit();
     res.json({ message: 'Bank charge deleted successfully' });
   } catch (error) {
@@ -1057,18 +1061,18 @@ router.get('/online', async (req, res) => {
 
 // POST create online expense - ✅ FIXED: balance = total_bill_amount
 router.post('/online', authenticate, async (req, res) => {
-  const { 
-    bill_date, 
-    bill_number, 
-    payee_name, 
-    vat_reg_number, 
-    expense_type, 
-    without_vat_amount, 
-    vat_amount, 
-    total_bill_amount, 
-    description 
+  const {
+    bill_date,
+    bill_number,
+    payee_name,
+    vat_reg_number,
+    expense_type,
+    without_vat_amount,
+    vat_amount,
+    total_bill_amount,
+    description
   } = req.body;
-  
+
   const userId = req.user.userId;
 
   if (!bill_date || !payee_name || !expense_type || !without_vat_amount) {
@@ -1083,22 +1087,22 @@ router.post('/online', authenticate, async (req, res) => {
         description, created_by, payment_status, paid_amount)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', 0)`,
       [
-        bill_date, 
-        bill_number || null, 
-        payee_name, 
-        vat_reg_number || null, 
+        bill_date,
+        bill_number || null,
+        payee_name,
+        vat_reg_number || null,
         expense_type,
-        without_vat_amount, 
-        vat_amount || 0, 
-        total_bill_amount, 
+        without_vat_amount,
+        vat_amount || 0,
+        total_bill_amount,
         total_bill_amount,  // ✅ FIXED: balance = total_bill_amount
-        description || null, 
+        description || null,
         userId
       ]
     );
-    
-    res.status(201).json({ 
-      id: result.insertId, 
+
+    res.status(201).json({
+      id: result.insertId,
       message: 'Online expense recorded successfully',
       balance: total_bill_amount
     });
@@ -1111,16 +1115,16 @@ router.post('/online', authenticate, async (req, res) => {
 // PUT update online expense - ✅ FIXED: update balance properly
 router.put('/online/:id', authenticate, async (req, res) => {
   const { id } = req.params;
-  const { 
-    bill_date, 
-    bill_number, 
-    payee_name, 
-    vat_reg_number, 
-    expense_type, 
-    without_vat_amount, 
-    vat_amount, 
-    total_bill_amount, 
-    description 
+  const {
+    bill_date,
+    bill_number,
+    payee_name,
+    vat_reg_number,
+    expense_type,
+    without_vat_amount,
+    vat_amount,
+    total_bill_amount,
+    description
   } = req.body;
 
   if (!bill_date || !payee_name || !expense_type || !without_vat_amount) {
@@ -1161,26 +1165,26 @@ router.put('/online/:id', authenticate, async (req, res) => {
            description = ?
        WHERE id = ?`,
       [
-        bill_date, 
-        bill_number || null, 
-        payee_name, 
-        vat_reg_number || null, 
-        expense_type, 
-        without_vat_amount, 
-        vat_amount || 0, 
-        total_bill_amount, 
+        bill_date,
+        bill_number || null,
+        payee_name,
+        vat_reg_number || null,
+        expense_type,
+        without_vat_amount,
+        vat_amount || 0,
+        total_bill_amount,
         newBalance,
         newBalance <= 0 ? 'Paid' : (paidAmount > 0 ? 'Partially Paid' : 'Pending'),
-        description || null, 
+        description || null,
         id
       ]
     );
-    
+
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'Online expense not found' });
     }
-    
-    res.json({ 
+
+    res.json({
       message: 'Online expense updated successfully',
       balance: newBalance
     });
@@ -1205,11 +1209,11 @@ router.delete('/online/:id', authenticate, async (req, res) => {
       'DELETE FROM online_expenses WHERE id = ?',
       [id]
     );
-    
+
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'Online expense not found' });
     }
-    
+
     res.json({ message: 'Online expense deleted successfully' });
   } catch (error) {
     console.error('Error deleting online expense:', error);
@@ -1221,16 +1225,16 @@ router.delete('/online/:id', authenticate, async (req, res) => {
 // POST Pay Online Expenses - ✅ FIXED
 // =============================================
 router.post('/online/pay', authenticate, async (req, res) => {
-  const { 
-    expense_ids, 
-    payment_date, 
-    bank_name, 
+  const {
+    expense_ids,
+    payment_date,
+    bank_name,
     bank_id,
-    voucher_number, 
-    reference_number, 
-    transfer_amount 
+    voucher_number,
+    reference_number,
+    transfer_amount
   } = req.body;
-  
+
   const userId = req.user.userId;
 
   // ✅ Validate required fields
@@ -1271,7 +1275,7 @@ router.post('/online/pay', authenticate, async (req, res) => {
     }
 
     const placeholders = expense_ids.map(() => '?').join(',');
-    
+
     // ✅ Get expenses with their current balance and total amount
     const [expenses] = await connection.query(
       `SELECT id, balance, total_bill_amount, paid_amount, payee_name, bill_number
@@ -1287,12 +1291,12 @@ router.post('/online/pay', authenticate, async (req, res) => {
 
     // ✅ Calculate total balance of ALL selected expenses
     const totalBalance = expenses.reduce((sum, exp) => sum + parseFloat(exp.balance || 0), 0);
-    
+
     // ✅ Check if transfer amount exceeds total balance
     if (amountToPay > totalBalance) {
       await connection.rollback();
-      return res.status(400).json({ 
-        error: `Transfer amount (${amountToPay}) exceeds total balance (${totalBalance})` 
+      return res.status(400).json({
+        error: `Transfer amount (${amountToPay}) exceeds total balance (${totalBalance})`
       });
     }
 
@@ -1460,11 +1464,11 @@ router.get('/banks/:id', async (req, res) => {
       'SELECT * FROM bank_details WHERE id = ?',
       [id]
     );
-    
+
     if (rows.length === 0) {
       return res.status(404).json({ error: 'Bank not found' });
     }
-    
+
     res.json(rows[0]);
   } catch (error) {
     console.error('Error fetching bank:', error);
@@ -1485,7 +1489,7 @@ router.post('/banks', authenticate, async (req, res) => {
     company,
     notes
   } = req.body;
-  
+
   const userId = req.user.userId;
 
   if (!bank_name) {
@@ -1531,10 +1535,10 @@ router.post('/banks', authenticate, async (req, res) => {
         [companyRows[0]?.id || null, result.insertId, resolvedOpeningBalance, resolvedCurrentBalance, userId]
       );
     }
-    
-    res.status(201).json({ 
-      id: result.insertId, 
-      message: 'Bank added successfully' 
+
+    res.status(201).json({
+      id: result.insertId,
+      message: 'Bank added successfully'
     });
   } catch (error) {
     console.error('Error creating bank:', error);
@@ -1586,11 +1590,11 @@ router.put('/banks/:id', authenticate, async (req, res) => {
         id
       ]
     );
-    
+
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'Bank not found' });
     }
-    
+
     res.json({ message: 'Bank updated successfully' });
   } catch (error) {
     console.error('Error updating bank:', error);
@@ -1610,11 +1614,11 @@ router.delete('/banks/:id', authenticate, async (req, res) => {
       'UPDATE bank_details SET status = "Inactive" WHERE id = ?',
       [id]
     );
-    
+
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'Bank not found' });
     }
-    
+
     res.json({ message: 'Bank deleted successfully' });
   } catch (error) {
     console.error('Error deleting bank:', error);
