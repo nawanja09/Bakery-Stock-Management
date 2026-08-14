@@ -561,6 +561,12 @@ const NavigationBar = () => {
           <span>Cash / Bank Transfer</span>
         </NavLink>
       </li>
+      <li>
+        <NavLink to="/finance/bank-transfer" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          <span className="icon-container"><FontAwesomeIcon icon={faRightLeft} /></span>
+          <span>Bank to Bank Transfer</span>
+        </NavLink>
+      </li>
     </>
   );
 

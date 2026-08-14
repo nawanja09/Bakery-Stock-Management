@@ -26,38 +26,30 @@ const Reimbursement = () => {
     date: new Date().toISOString().split('T')[0],
     reference_number: '',
     amount: '',
-    cash_book: ''
+    company_id: ''
   });
 
-  // Cash Book = which real Cash (company) or Bank account funds the
-  // reimbursement. Combined into one dropdown, value format:
-  // "CASH:<company_id>" or "BANK:<bank_id>". JH is the default.
+  // Cash Book = a Company's Cash account. Every company has exactly one,
+  // so this list is Companies only - Bank accounts are never valid for
+  // Petty Cash. JH is the default.
   const [companies, setCompanies] = useState([]);
-  const [banks, setBanks] = useState([]);
-  const cashBookOptions = [
-    ...companies.map(c => ({ value: `CASH:${c.id}`, label: `${c.name} - Cash` })),
-    ...banks.map(b => ({ value: `BANK:${b.id}`, label: b.bank_name }))
-  ];
+  const cashBookOptions = companies.map(c => ({ value: String(c.id), label: `${c.name} - Cash Book` }));
 
   useEffect(() => {
-    const loadCashBookOptions = async () => {
+    const loadCompanies = async () => {
       try {
-        const [companiesRes, banksRes] = await Promise.all([
-          api.get('/purchases/companies'),
-          api.get('/expenses/banks')
-        ]);
-        const companiesData = companiesRes.data || [];
+        const res = await api.get('/purchases/companies');
+        const companiesData = res.data || [];
         setCompanies(companiesData);
-        setBanks(banksRes.data || []);
         const jh = companiesData.find(c => (c.name || '').toUpperCase() === 'JH');
         if (jh) {
-          setReimbursementForm(prev => (prev.cash_book ? prev : { ...prev, cash_book: `CASH:${jh.id}` }));
+          setReimbursementForm(prev => (prev.company_id ? prev : { ...prev, company_id: String(jh.id) }));
         }
       } catch (error) {
-        console.error('Error loading cash book options:', error);
+        console.error('Error loading companies:', error);
       }
     };
-    loadCashBookOptions();
+    loadCompanies();
   }, []);
 
   // Generate reference number for reimbursement
@@ -133,20 +125,18 @@ const Reimbursement = () => {
       showPopup('error', 'Valid amount is required');
       return;
     }
-    if (!reimbursementForm.cash_book) {
-      showPopup('error', 'Please select a cash book');
+    if (!reimbursementForm.company_id) {
+      showPopup('error', 'Please select a Cash Book');
       return;
     }
 
     setIsLoading(true);
     try {
-      const [fundingSource, accountId] = reimbursementForm.cash_book.split(':');
       const payload = {
         reference_number: reimbursementForm.reference_number,
         reimbursement_date: reimbursementForm.date,
         amount: parseFloat(reimbursementForm.amount),
-        funding_source: fundingSource,
-        ...(fundingSource === 'CASH' ? { company_id: accountId } : { bank_id: accountId })
+        company_id: reimbursementForm.company_id
       };
 
       await api.post('/expenses/petty-cash/reimbursement', payload);
@@ -159,7 +149,7 @@ const Reimbursement = () => {
         date: new Date().toISOString().split('T')[0],
         reference_number: '',
         amount: '',
-        cash_book: jh ? `CASH:${jh.id}` : ''
+        company_id: jh ? String(jh.id) : ''
       });
 
       // Refresh data
@@ -247,18 +237,17 @@ const Reimbursement = () => {
                 />
               </div>
               <div className="form-group">
-                <label htmlFor="cash_book">Cash Book *</label>
+                <label htmlFor="company_id">Cash Book *</label>
                 <select
-                  id="cash_book"
-                  name="cash_book"
-                  value={reimbursementForm.cash_book}
+                  id="company_id"
+                  name="company_id"
+                  value={reimbursementForm.company_id}
                   onChange={handleReimbursementChange}
                   required
                 >
                   <option value="">Select Cash Book</option>
                   {cashBookOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
-                <small style={{ color: '#6c757d', display: 'block', marginTop: '4px' }}>This will deduct the entered amount from the selected Cash Book and add it to the Petty Cash balance. JH is selected by default.</small>
               </div>
             </div>
 

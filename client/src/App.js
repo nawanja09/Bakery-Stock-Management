@@ -111,6 +111,8 @@ import BankLedger from './components/Finance/BankLedger';
 import BankReceive from './components/Finance/BankReceive';
 import FundTransfer from './components/Finance/FundTransfer';
 
+import BankTransfer from './components/Finance/BankTransfer';
+
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
@@ -284,6 +286,7 @@ function App() {
             <Route path="adjustments/inhand" element={<AdjustmentsRoute><InhandAdjustments /></AdjustmentsRoute>} />
             <Route path="/reports/department-return-item-wise" element={<DepartmentReturnItemWiseReport />} />
             <Route path="/analysis/last-issued-date" element={<LastIssueDateReport />} />
+            <Route path="/finance/bank-transfer" element={<FinanceRoute><BankTransfer /></FinanceRoute>} />
           </Route>
 
           <Route path="*" element={<Navigate to="/login" replace />} />
