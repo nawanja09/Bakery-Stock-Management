@@ -1,5 +1,5 @@
 // src/components/finance/CashLedger.jsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faMoneyBillWave, faSpinner, faFilter, faFlagCheckered } from '@fortawesome/free-solid-svg-icons';
 import api from '../../api';
@@ -34,6 +34,13 @@ const CashLedger = () => {
   const [openingDate, setOpeningDate] = useState(new Date().toISOString().slice(0, 10));
   const [savingOpening, setSavingOpening] = useState(false);
   const [openingMessage, setOpeningMessage] = useState(null);
+
+  // Column resizing state
+  const [remarkWidth, setRemarkWidth] = useState(200);
+  const [isResizing, setIsResizing] = useState(false);
+  const tableRef = useRef(null);
+  const startXRef = useRef(0);
+  const startWidthRef = useRef(0);
 
   useEffect(() => {
     api.get('/purchases/companies')
@@ -103,6 +110,29 @@ const CashLedger = () => {
     }
   };
 
+  // Column resizing handlers
+  const handleResizeStart = (e) => {
+    e.preventDefault();
+    setIsResizing(true);
+    startXRef.current = e.clientX;
+    startWidthRef.current = remarkWidth;
+    document.addEventListener('mousemove', handleResizeMove);
+    document.addEventListener('mouseup', handleResizeEnd);
+  };
+
+  const handleResizeMove = (e) => {
+    if (!isResizing) return;
+    const diff = e.clientX - startXRef.current;
+    const newWidth = Math.min(500, Math.max(120, startWidthRef.current + diff));
+    setRemarkWidth(newWidth);
+  };
+
+  const handleResizeEnd = () => {
+    setIsResizing(false);
+    document.removeEventListener('mousemove', handleResizeMove);
+    document.removeEventListener('mouseup', handleResizeEnd);
+  };
+
   const fmt = (v) => parseFloat(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const fmtDebit = (v) => {
@@ -164,7 +194,7 @@ const CashLedger = () => {
         </select>
       </div>
 
-      <div className="fl-table-wrapper">
+      <div className="fl-table-wrapper" ref={tableRef}>
         {loading ? (
           <div className="fl-loading"><FontAwesomeIcon icon={faSpinner} spin /> Loading…</div>
         ) : (
@@ -176,7 +206,17 @@ const CashLedger = () => {
                 <th>Transaction Type</th>
                 <th>Reference</th>
                 <th>Party</th>
-                <th>Remark</th>
+                <th 
+                  className="fl-remark-header"
+                  style={{ width: `${remarkWidth}px`, minWidth: '120px', maxWidth: '500px' }}
+                >
+                  <span className="fl-remark-label">Remark</span>
+                  <div 
+                    className="fl-remark-resizer"
+                    onMouseDown={handleResizeStart}
+                    title="Drag to resize"
+                  />
+                </th>
                 <th className="fl-num">Debit</th>
                 <th className="fl-num">Credit</th>
                 <th className="fl-num">Balance</th>
@@ -205,7 +245,12 @@ const CashLedger = () => {
                     </td>
                     <td>{t.reference_number || t.invoice_number || '—'}</td>
                     <td>{t.party_name || '—'}</td>
-                    <td>{t.remark || '—'}</td>
+                    <td 
+                      className="fl-remark-cell"
+                      style={{ width: `${remarkWidth}px`, minWidth: '120px', maxWidth: '500px' }}
+                    >
+                      <span className="fl-remark-text">{t.remark || '—'}</span>
+                    </td>
                     <td className="fl-num">{fmtDebit(t.debit)}</td>
                     <td className="fl-num">{fmtCredit(t.credit)}</td>
                     <td className="fl-num fl-balance-cell">{fmt(t.balance)}</td>
