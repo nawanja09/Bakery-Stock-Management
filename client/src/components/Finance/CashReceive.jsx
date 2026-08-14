@@ -5,11 +5,10 @@ import { faHandHoldingDollar, faSpinner, faCheckCircle } from '@fortawesome/free
 import api from '../../api';
 import './FinanceForm.css';
 
-const RECEIVE_TYPES = ['Customer Payment', 'Owner Capital', 'Other Income', 'Adjustment'];
-
 const CashReceive = () => {
   const currentUser = JSON.parse(localStorage.getItem('user') || 'null');
   const [companies, setCompanies] = useState([]);
+  const [receiveTypes, setReceiveTypes] = useState([]);
   const [balance, setBalance] = useState(null);
   const [loadingBalance, setLoadingBalance] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -32,6 +31,12 @@ const CashReceive = () => {
         if (list.length > 0) setFormData(prev => ({ ...prev, company_id: String(list[0].id) }));
       })
       .catch(() => setCompanies([]));
+  }, []);
+
+  useEffect(() => {
+    api.get('/receive-types')
+      .then(res => setReceiveTypes(Array.isArray(res.data) ? res.data : []))
+      .catch(() => setReceiveTypes([]));
   }, []);
 
   useEffect(() => {
@@ -124,7 +129,9 @@ const CashReceive = () => {
           <label>Receive Type *</label>
           <select name="receive_type" value={formData.receive_type} onChange={handleChange} required>
             <option value="">Select type</option>
-            {RECEIVE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+            {receiveTypes.map(type => (
+              <option key={type.id} value={type.type_name}>{type.type_name}</option>
+            ))}
           </select>
         </div>
 

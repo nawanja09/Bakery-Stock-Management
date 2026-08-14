@@ -112,6 +112,7 @@ import BankReceive from './components/Finance/BankReceive';
 import FundTransfer from './components/Finance/FundTransfer';
 
 import BankTransfer from './components/Finance/BankTransfer';
+import ReceiveTypeManagement from './components/Finance/ReceiveTypeManagement';
 
 import './App.css';
 
@@ -287,6 +288,8 @@ function App() {
             <Route path="/reports/department-return-item-wise" element={<DepartmentReturnItemWiseReport />} />
             <Route path="/analysis/last-issued-date" element={<LastIssueDateReport />} />
             <Route path="/finance/bank-transfer" element={<FinanceRoute><BankTransfer /></FinanceRoute>} />
+            <Route path="/finance/receive-types" element={<FinanceRoute><ReceiveTypeManagement /></FinanceRoute>} />
+
           </Route>
 
           <Route path="*" element={<Navigate to="/login" replace />} />
