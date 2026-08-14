@@ -279,6 +279,35 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
               </div>
             </div>
 
+            {isBankMethod && (
+              <div className="ipm-form-group">
+                <label>Bank Account *</label>
+                <select
+                  name="bank_id"
+                  value={formData.bank_id}
+                  onChange={handleChange}
+                  required
+                  disabled={!resolvedCompanyId || loadingBanks}
+                >
+                  <option value="">
+                    {!resolvedCompanyId
+                      ? 'No company found for selected invoices'
+                      : loadingBanks ? 'Loading…' : 'Select bank account'}
+                  </option>
+                  {bankAccounts.map(b => (
+                    <option key={b.id} value={b.id}>
+                      {b.bank_name}{b.account_number ? ` — ${b.account_number}` : ''}
+                    </option>
+                  ))}
+                </select>
+                {selectedBankAccount && (
+                  <div className="ipm-balance-hint">
+                    Current Balance: Rs. {parseFloat(selectedBankAccount.current_balance || 0).toFixed(2)}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="ipm-form-row">
               <div className="ipm-form-group">
                 <label>Voucher Number</label>
@@ -325,35 +354,6 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
               </div>
               <span className="ipm-hint">Any amount above the invoice balance will be stored as supplier credit.</span>
             </div>
-
-            {isBankMethod && (
-              <div className="ipm-form-group">
-                <label>Bank Account *</label>
-                <select
-                  name="bank_id"
-                  value={formData.bank_id}
-                  onChange={handleChange}
-                  required
-                  disabled={!resolvedCompanyId || loadingBanks}
-                >
-                  <option value="">
-                    {!resolvedCompanyId
-                      ? 'No company found for selected invoices'
-                      : loadingBanks ? 'Loading…' : 'Select bank account'}
-                  </option>
-                  {bankAccounts.map(b => (
-                    <option key={b.id} value={b.id}>
-                      {b.bank_name}{b.account_number ? ` — ${b.account_number}` : ''}
-                    </option>
-                  ))}
-                </select>
-                {selectedBankAccount && (
-                  <div className="ipm-balance-hint">
-                    Current Balance: Rs. {parseFloat(selectedBankAccount.current_balance || 0).toFixed(2)}
-                  </div>
-                )}
-              </div>
-            )}
 
             {isCashMethod && resolvedCompanyId && (
               <div className="ipm-form-group">
