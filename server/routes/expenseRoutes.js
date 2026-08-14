@@ -24,8 +24,8 @@ router.get('/petty-cash/balance', async (req, res) => {
     const totalVouchers = parseFloat(voucherRows[0].total) || 0;
 
     const balance = totalReimbursements - totalVouchers;
-
-    res.json({
+    
+    res.json({ 
       balance,
       totalReimbursements,
       totalVouchers
@@ -44,9 +44,9 @@ router.get('/petty-cash/next-voucher-number', async (req, res) => {
     const [rows] = await pool.query(
       "SELECT voucher_number FROM petty_cash_vouchers ORDER BY id DESC LIMIT 1"
     );
-
+    
     let nextNumber = 'PC-001';
-
+    
     if (rows.length > 0 && rows[0].voucher_number) {
       const lastNumber = rows[0].voucher_number;
       const match = lastNumber.match(/\d+$/);
@@ -55,7 +55,7 @@ router.get('/petty-cash/next-voucher-number', async (req, res) => {
         nextNumber = `PC-${String(num).padStart(3, '0')}`;
       }
     }
-
+    
     res.json({ voucher_number: nextNumber });
   } catch (error) {
     console.error('Error generating voucher number:', error);
@@ -71,9 +71,9 @@ router.get('/petty-cash/next-reference-number', async (req, res) => {
     const [rows] = await pool.query(
       "SELECT reference_number FROM petty_cash_reimbursements ORDER BY id DESC LIMIT 1"
     );
-
+    
     let nextNumber = 'REF-001';
-
+    
     if (rows.length > 0 && rows[0].reference_number) {
       const lastNumber = rows[0].reference_number;
       const match = lastNumber.match(/\d+$/);
@@ -82,7 +82,7 @@ router.get('/petty-cash/next-reference-number', async (req, res) => {
         nextNumber = `REF-${String(num).padStart(3, '0')}`;
       }
     }
-
+    
     res.json({ reference_number: nextNumber });
   } catch (error) {
     console.error('Error generating reference number:', error);
@@ -97,23 +97,26 @@ router.get('/petty-cash/vouchers', async (req, res) => {
   try {
     const [rows] = await pool.query(
       `SELECT 
-        id, 
-        voucher_number, 
-        DATE_FORMAT(voucher_date, '%Y-%m-%d') as date,
-        employee_name, 
-        payee_name as payee, 
-        expense_type, 
-        description, 
-        vehicle_number, 
-        amount,
-        receipt_no,
-        status,
-        DATE_FORMAT(created_at, '%Y-%m-%d') as created_date
-       FROM petty_cash_vouchers 
-       ORDER BY created_at DESC 
+        v.id, 
+        v.voucher_number, 
+        DATE_FORMAT(v.voucher_date, '%Y-%m-%d') as date,
+        v.employee_name, 
+        v.payee_name as payee, 
+        v.expense_type, 
+        v.description, 
+        v.vehicle_number, 
+        v.amount,
+        v.receipt_no,
+        v.status,
+        v.company_id,
+        comp.name as company_name,
+        DATE_FORMAT(v.created_at, '%Y-%m-%d') as created_date
+       FROM petty_cash_vouchers v
+       LEFT JOIN company comp ON v.company_id = comp.id
+       ORDER BY v.created_at DESC 
        LIMIT 100`
     );
-
+    
     res.json(rows || []);
   } catch (error) {
     console.error('Error fetching vouchers:', error);
@@ -147,7 +150,7 @@ router.get('/petty-cash/reimbursements', async (req, res) => {
        ORDER BY r.created_at DESC 
        LIMIT 100`
     );
-
+    
     res.json(rows || []);
   } catch (error) {
     console.error('Error fetching reimbursements:', error);
@@ -159,22 +162,28 @@ router.get('/petty-cash/reimbursements', async (req, res) => {
 // POST Create Voucher
 // =============================================
 router.post('/petty-cash/voucher', authenticate, async (req, res) => {
-  const {
-    voucher_number,
-    voucher_date,
-    employee_name,
-    payee_name,
-    expense_type,
-    description,
-    vehicle_number,
+  const { 
+    voucher_number, 
+    voucher_date, 
+    employee_name, 
+    payee_name, 
+    expense_type, 
+    description, 
+    vehicle_number, 
     amount,
-    receipt_no
+    receipt_no,
+    company_id
   } = req.body;
-
+  
   const userId = req.user.userId;
 
   if (!voucher_number || !voucher_date || !payee_name || !expense_type || !amount) {
     return res.status(400).json({ error: 'Missing required fields' });
+  }
+  // Every voucher spends a specific Company's Cash Book - required so the
+  // ledger deduction always hits the right company's cash, never a bank.
+  if (!company_id) {
+    return res.status(400).json({ error: 'Company (Cash Book) is required' });
   }
 
   const connection = await pool.getConnection();
@@ -183,32 +192,42 @@ router.post('/petty-cash/voucher', authenticate, async (req, res) => {
 
     await checkDuplicateReference(connection, voucher_number);
 
+    // The selected Company's Cash Book must actually exist as a valid
+    // Cash account - this is what keeps Company and Cash Book consistent
+    // and guarantees a Bank account can never be used here.
+    const [cashAccRows] = await connection.query(
+      'SELECT company_id FROM cash_accounts WHERE company_id = ?',
+      [company_id]
+    );
+    if (cashAccRows.length === 0) {
+      await connection.rollback();
+      return res.status(400).json({ error: 'Selected Company has no valid Cash Book' });
+    }
+
     const [result] = await connection.query(
       `INSERT INTO petty_cash_vouchers 
-       (voucher_number, voucher_date, employee_name, payee_name, 
+       (voucher_number, voucher_date, employee_name, payee_name, company_id,
         expense_type, description, vehicle_number, amount, receipt_no, created_by, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending')`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending')`,
       [
-        voucher_number,
-        voucher_date,
-        employee_name || null,
-        payee_name,
-        expense_type,
-        description || null,
-        vehicle_number || null,
+        voucher_number, 
+        voucher_date, 
+        employee_name || null, 
+        payee_name, 
+        company_id,
+        expense_type, 
+        description || null, 
+        vehicle_number || null, 
         amount,
         receipt_no || null,
         userId
       ]
     );
 
-    // Identify the relevant petty cash/cash account
-    const [cashAcc] = await connection.query('SELECT company_id FROM cash_accounts LIMIT 1');
-    const companyId = cashAcc.length > 0 ? cashAcc[0].company_id : 1;
-
-    // Automatically create a Credit Ledger Entry in that Cash Ledger (Expense = Credit to Cash)
+    // Automatically create a Credit Ledger Entry in that Company's Cash
+    // Ledger (Expense = Credit to Cash) - always Cash, never Bank.
     await recordCashTransaction(connection, {
-      companyId: companyId,
+      companyId: company_id,
       date: voucher_date,
       remark: `Petty Cash Payment - ${expense_type}`,
       credit: parseFloat(amount),
@@ -219,13 +238,13 @@ router.post('/petty-cash/voucher', authenticate, async (req, res) => {
       referenceId: result.insertId,
       createdBy: userId
     });
-
+    
     await connection.commit();
     await updatePettyCashBalance();
-
-    res.status(201).json({
-      id: result.insertId,
-      message: 'Voucher created successfully'
+    
+    res.status(201).json({ 
+      id: result.insertId, 
+      message: 'Voucher created successfully' 
     });
   } catch (error) {
     await connection.rollback();
@@ -247,18 +266,18 @@ router.post('/petty-cash/voucher', authenticate, async (req, res) => {
 // =============================================
 router.put('/petty-cash/voucher/:id', authenticate, async (req, res) => {
   const { id } = req.params;
-  const {
+  const { 
     voucher_number,
-    voucher_date,
-    employee_name,
-    payee_name,
-    expense_type,
-    description,
-    vehicle_number,
+    voucher_date, 
+    employee_name, 
+    payee_name, 
+    expense_type, 
+    description, 
+    vehicle_number, 
     amount,
     receipt_no
   } = req.body;
-
+  
   const userId = req.user.userId;
 
   if (!voucher_number || !voucher_date || !payee_name || !expense_type || !amount) {
@@ -285,31 +304,31 @@ router.put('/petty-cash/voucher/:id', authenticate, async (req, res) => {
        WHERE id = ?`,
       [
         voucher_number,
-        voucher_date,
-        employee_name || null,
-        payee_name,
-        expense_type,
-        description || null,
-        vehicle_number || null,
-        amount,
+        voucher_date, 
+        employee_name || null, 
+        payee_name, 
+        expense_type, 
+        description || null, 
+        vehicle_number || null, 
+        amount, 
         receipt_no || null,
         userId,
         id
       ]
     );
-
+    
     // Sync ledger entry
     const [finRows] = await connection.query(
       'SELECT id, credit, company_id FROM finance_transactions WHERE reference_type = "PETTY_CASH_VOUCHER" AND reference_id = ?',
       [id]
     );
-
+    
     if (finRows.length > 0) {
       const finId = finRows[0].id;
       const oldCredit = parseFloat(finRows[0].credit) || 0;
       const newCredit = parseFloat(amount) || 0;
       const difference = newCredit - oldCredit;
-
+      
       if (difference !== 0) {
         await connection.query(
           'UPDATE cash_accounts SET current_balance = current_balance - ? WHERE company_id = ?',
@@ -329,7 +348,7 @@ router.put('/petty-cash/voucher/:id', authenticate, async (req, res) => {
 
     await connection.commit();
     await updatePettyCashBalance();
-
+    
     res.json({ message: 'Voucher updated successfully' });
   } catch (error) {
     await connection.rollback();
@@ -396,21 +415,18 @@ router.delete('/petty-cash/voucher/:id', authenticate, async (req, res) => {
 // POST Create Reimbursement
 // =============================================
 router.post('/petty-cash/reimbursement', authenticate, async (req, res) => {
-  const { reference_number, reimbursement_date, amount, company_id, funding_source, bank_id } = req.body;
+  const { reference_number, reimbursement_date, amount, company_id } = req.body;
   const userId = req.user.userId;
 
   if (!reference_number || !reimbursement_date || !amount) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
-  if (funding_source && !['CASH', 'BANK'].includes(funding_source)) {
-    return res.status(400).json({ error: 'Funding source must be Cash or Bank' });
+  // Petty Cash is Cash-only: reimbursement must always come from a real
+  // Cash Book (a company's cash_accounts row), never a Bank account.
+  if (!company_id) {
+    return res.status(400).json({ error: 'Cash Book (Company) is required for reimbursement' });
   }
-  if (funding_source === 'CASH' && !company_id) {
-    return res.status(400).json({ error: 'Company is required when funding from Cash' });
-  }
-  if (funding_source === 'BANK' && !bank_id) {
-    return res.status(400).json({ error: 'Bank account is required when funding from Bank' });
-  }
+  const funding_source = 'CASH';
 
   const connection = await pool.getConnection();
   try {
@@ -418,49 +434,45 @@ router.post('/petty-cash/reimbursement', authenticate, async (req, res) => {
 
     await checkDuplicateReference(connection, reference_number);
 
+    // Confirm the selected Cash Book (Company) is a real, valid company -
+    // and by construction it can only ever be a Cash Book, never a Bank.
+    const [companyRows] = await connection.query('SELECT id, name FROM company WHERE id = ?', [company_id]);
+    if (companyRows.length === 0) {
+      await connection.rollback();
+      return res.status(400).json({ error: 'Selected Cash Book is not a valid company' });
+    }
+
     const [result] = await connection.query(
       `INSERT INTO petty_cash_reimbursements 
        (reference_number, reimbursement_date, amount, company_id, funding_source, bank_id, created_by, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'Completed')`,
-      [reference_number, reimbursement_date, amount, company_id || null, funding_source || null, bank_id || null, userId]
+       VALUES (?, ?, ?, ?, ?, NULL, ?, 'Completed')`,
+      [reference_number, reimbursement_date, amount, company_id, funding_source, userId]
     );
 
     // A reimbursement tops up the petty cash float from the company's real
-    // Cash or Bank account - that's the point where money actually leaves
-    // Finance's books. Spending the float later (Vouchers) doesn't touch
-    // Finance again, since this is where that money already left.
-    if (funding_source === 'CASH') {
-      await recordCashTransaction(connection, {
-        companyId: company_id,
-        date: reimbursement_date,
-        remark: `Petty cash reimbursement - ${reference_number}`,
-        credit: parseFloat(amount),
-        transactionType: 'Petty Cash Reimbursement',
-        referenceNumber: reference_number,
-        referenceType: 'PETTY_CASH_REIMBURSEMENT',
-        referenceId: result.insertId,
-        createdBy: userId
-      });
-    } else if (funding_source === 'BANK') {
-      await recordBankTransaction(connection, {
-        bankId: bank_id,
-        date: reimbursement_date,
-        remark: `Petty cash reimbursement - ${reference_number}`,
-        credit: parseFloat(amount),
-        transactionType: 'Petty Cash Reimbursement',
-        referenceNumber: reference_number,
-        referenceType: 'PETTY_CASH_REIMBURSEMENT',
-        referenceId: result.insertId,
-        createdBy: userId
-      });
-    }
+    // Cash Book - that's the point where money actually leaves Finance's
+    // books. Spending the float later (Vouchers) doesn't touch Finance
+    // again, since this is where that money already left. The selected
+    // Cash Book and Company stay consistent throughout: both resolve to
+    // the same company_id, from validation through to the ledger post.
+    await recordCashTransaction(connection, {
+      companyId: company_id,
+      date: reimbursement_date,
+      remark: `Petty cash reimbursement - ${reference_number}`,
+      credit: parseFloat(amount),
+      transactionType: 'Petty Cash Reimbursement',
+      referenceNumber: reference_number,
+      referenceType: 'PETTY_CASH_REIMBURSEMENT',
+      referenceId: result.insertId,
+      createdBy: userId
+    });
 
     await connection.commit();
     await updatePettyCashBalance();
 
-    res.status(201).json({
-      id: result.insertId,
-      message: 'Reimbursement recorded successfully'
+    res.status(201).json({ 
+      id: result.insertId, 
+      message: 'Reimbursement recorded successfully' 
     });
   } catch (error) {
     await connection.rollback();
@@ -500,14 +512,14 @@ router.put('/petty-cash/reimbursement/:id', authenticate, async (req, res) => {
        WHERE id = ?`,
       [reference_number, reimbursement_date, amount, userId, id]
     );
-
+    
     if (result.affectedRows === 0) {
       await connection.rollback();
       return res.status(404).json({ error: 'Reimbursement not found' });
     }
     await connection.commit();
     await updatePettyCashBalance();
-
+    
     res.json({ message: 'Reimbursement updated successfully' });
   } catch (error) {
     await connection.rollback();
@@ -530,11 +542,11 @@ async function updatePettyCashBalance() {
     const [voucherTotal] = await pool.query(
       `SELECT COALESCE(SUM(amount), 0) as total FROM petty_cash_vouchers`
     );
-
+    
     const [reimbursementTotal] = await pool.query(
       `SELECT COALESCE(SUM(amount), 0) as total FROM petty_cash_reimbursements`
     );
-
+    
     const [todayVoucherTotal] = await pool.query(
       `SELECT COALESCE(SUM(amount), 0) as total 
        FROM petty_cash_vouchers 
@@ -550,7 +562,7 @@ async function updatePettyCashBalance() {
     const totalVouchers = parseFloat(voucherTotal[0].total);
     const totalReimbursements = parseFloat(reimbursementTotal[0].total);
     const currentBalance = totalReimbursements - totalVouchers;
-
+    
     const todayVouchers = parseFloat(todayVoucherTotal[0].total);
     const todayReimbursements = parseFloat(todayReimbursementTotal[0].total);
     const openingBalance = currentBalance - todayReimbursements + todayVouchers;
@@ -566,7 +578,7 @@ async function updatePettyCashBalance() {
        closing_balance = VALUES(closing_balance)`,
       [openingBalance, todayVouchers, todayReimbursements, currentBalance]
     );
-
+    
   } catch (error) {
     console.error('Error updating petty cash balance table:', error);
   }
@@ -731,9 +743,9 @@ router.delete('/cheque/voucher/:id', authenticate, async (req, res) => {
 
 // POST create cheque voucher
 router.post('/cheque/voucher', authenticate, async (req, res) => {
-  const {
-    bill_date, bill_number, payee_name, vat_reg_number,
-    expense_type, without_vat_amount, vat_amount,
+  const { 
+    bill_date, bill_number, payee_name, vat_reg_number, 
+    expense_type, without_vat_amount, vat_amount, 
     total_bill_amount, description, company_id
   } = req.body;
   const userId = req.user.userId;
@@ -749,12 +761,12 @@ router.post('/cheque/voucher', authenticate, async (req, res) => {
         voucher_number, cheque_number, created_by)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [bill_date, company_id || null, bill_number, payee_name, vat_reg_number, expense_type,
-        without_vat_amount, vat_amount, total_bill_amount, description,
-        voucher_number, cheque_number, userId]
+       without_vat_amount, vat_amount, total_bill_amount, description,
+       voucher_number, cheque_number, userId]
     );
-
-    res.status(201).json({
-      id: result.insertId,
+    
+    res.status(201).json({ 
+      id: result.insertId, 
       message: 'Cheque expense voucher created successfully',
       voucher_number,
       cheque_number
@@ -897,9 +909,9 @@ router.post('/bank-charges', authenticate, async (req, res) => {
     }
 
     await connection.commit();
-    res.status(201).json({
-      id: result.insertId,
-      message: 'Bank charge recorded successfully'
+    res.status(201).json({ 
+      id: result.insertId, 
+      message: 'Bank charge recorded successfully' 
     });
   } catch (error) {
     await connection.rollback();
@@ -929,7 +941,7 @@ router.put('/bank-charges/:id', authenticate, async (req, res) => {
       await connection.rollback();
       return res.status(404).json({ error: 'Bank charge not found' });
     }
-
+    
     // The previous bank_id (if not explicitly passed in update, though we should expect it)
     const oldBankId = oldRows[0].bank_id;
     const newBankId = bank_id !== undefined ? bank_id : oldBankId;
@@ -941,7 +953,7 @@ router.put('/bank-charges/:id', authenticate, async (req, res) => {
        WHERE id = ?`,
       [date, bank_name, newBankId || null, reference_number || null, charges_type, bank_charge_type_id || null, description || null, amount, id]
     );
-
+    
     if (oldBankId) {
       // Find the finance transaction
       const [finRows] = await connection.query(
@@ -952,7 +964,7 @@ router.put('/bank-charges/:id', authenticate, async (req, res) => {
         const finId = finRows[0].id;
         const oldCredit = parseFloat(finRows[0].credit) || 0;
         const newCredit = parseFloat(amount) || 0;
-
+        
         if (oldBankId === newBankId) {
           const difference = newCredit - oldCredit;
           if (difference !== 0) {
@@ -1013,7 +1025,7 @@ router.delete('/bank-charges/:id', authenticate, async (req, res) => {
     }
 
     await connection.query('DELETE FROM bank_charges WHERE id = ?', [id]);
-
+    
     if (oldRows[0].bank_id) {
       const [finRows] = await connection.query(
         'SELECT id, credit FROM finance_transactions WHERE reference_type = "BANK_CHARGE" AND reference_id = ?', [id]
@@ -1024,7 +1036,7 @@ router.delete('/bank-charges/:id', authenticate, async (req, res) => {
         await connection.query('DELETE FROM finance_transactions WHERE id = ?', [finRows[0].id]);
       }
     }
-
+    
     await connection.commit();
     res.json({ message: 'Bank charge deleted successfully' });
   } catch (error) {
@@ -1061,18 +1073,18 @@ router.get('/online', async (req, res) => {
 
 // POST create online expense - ✅ FIXED: balance = total_bill_amount
 router.post('/online', authenticate, async (req, res) => {
-  const {
-    bill_date,
-    bill_number,
-    payee_name,
-    vat_reg_number,
-    expense_type,
-    without_vat_amount,
-    vat_amount,
-    total_bill_amount,
-    description
+  const { 
+    bill_date, 
+    bill_number, 
+    payee_name, 
+    vat_reg_number, 
+    expense_type, 
+    without_vat_amount, 
+    vat_amount, 
+    total_bill_amount, 
+    description 
   } = req.body;
-
+  
   const userId = req.user.userId;
 
   if (!bill_date || !payee_name || !expense_type || !without_vat_amount) {
@@ -1087,22 +1099,22 @@ router.post('/online', authenticate, async (req, res) => {
         description, created_by, payment_status, paid_amount)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', 0)`,
       [
-        bill_date,
-        bill_number || null,
-        payee_name,
-        vat_reg_number || null,
+        bill_date, 
+        bill_number || null, 
+        payee_name, 
+        vat_reg_number || null, 
         expense_type,
-        without_vat_amount,
-        vat_amount || 0,
-        total_bill_amount,
+        without_vat_amount, 
+        vat_amount || 0, 
+        total_bill_amount, 
         total_bill_amount,  // ✅ FIXED: balance = total_bill_amount
-        description || null,
+        description || null, 
         userId
       ]
     );
-
-    res.status(201).json({
-      id: result.insertId,
+    
+    res.status(201).json({ 
+      id: result.insertId, 
       message: 'Online expense recorded successfully',
       balance: total_bill_amount
     });
@@ -1115,16 +1127,16 @@ router.post('/online', authenticate, async (req, res) => {
 // PUT update online expense - ✅ FIXED: update balance properly
 router.put('/online/:id', authenticate, async (req, res) => {
   const { id } = req.params;
-  const {
-    bill_date,
-    bill_number,
-    payee_name,
-    vat_reg_number,
-    expense_type,
-    without_vat_amount,
-    vat_amount,
-    total_bill_amount,
-    description
+  const { 
+    bill_date, 
+    bill_number, 
+    payee_name, 
+    vat_reg_number, 
+    expense_type, 
+    without_vat_amount, 
+    vat_amount, 
+    total_bill_amount, 
+    description 
   } = req.body;
 
   if (!bill_date || !payee_name || !expense_type || !without_vat_amount) {
@@ -1165,26 +1177,26 @@ router.put('/online/:id', authenticate, async (req, res) => {
            description = ?
        WHERE id = ?`,
       [
-        bill_date,
-        bill_number || null,
-        payee_name,
-        vat_reg_number || null,
-        expense_type,
-        without_vat_amount,
-        vat_amount || 0,
-        total_bill_amount,
+        bill_date, 
+        bill_number || null, 
+        payee_name, 
+        vat_reg_number || null, 
+        expense_type, 
+        without_vat_amount, 
+        vat_amount || 0, 
+        total_bill_amount, 
         newBalance,
         newBalance <= 0 ? 'Paid' : (paidAmount > 0 ? 'Partially Paid' : 'Pending'),
-        description || null,
+        description || null, 
         id
       ]
     );
-
+    
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'Online expense not found' });
     }
-
-    res.json({
+    
+    res.json({ 
       message: 'Online expense updated successfully',
       balance: newBalance
     });
@@ -1209,11 +1221,11 @@ router.delete('/online/:id', authenticate, async (req, res) => {
       'DELETE FROM online_expenses WHERE id = ?',
       [id]
     );
-
+    
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'Online expense not found' });
     }
-
+    
     res.json({ message: 'Online expense deleted successfully' });
   } catch (error) {
     console.error('Error deleting online expense:', error);
@@ -1225,16 +1237,16 @@ router.delete('/online/:id', authenticate, async (req, res) => {
 // POST Pay Online Expenses - ✅ FIXED
 // =============================================
 router.post('/online/pay', authenticate, async (req, res) => {
-  const {
-    expense_ids,
-    payment_date,
-    bank_name,
+  const { 
+    expense_ids, 
+    payment_date, 
+    bank_name, 
     bank_id,
-    voucher_number,
-    reference_number,
-    transfer_amount
+    voucher_number, 
+    reference_number, 
+    transfer_amount 
   } = req.body;
-
+  
   const userId = req.user.userId;
 
   // ✅ Validate required fields
@@ -1275,7 +1287,7 @@ router.post('/online/pay', authenticate, async (req, res) => {
     }
 
     const placeholders = expense_ids.map(() => '?').join(',');
-
+    
     // ✅ Get expenses with their current balance and total amount
     const [expenses] = await connection.query(
       `SELECT id, balance, total_bill_amount, paid_amount, payee_name, bill_number
@@ -1291,12 +1303,12 @@ router.post('/online/pay', authenticate, async (req, res) => {
 
     // ✅ Calculate total balance of ALL selected expenses
     const totalBalance = expenses.reduce((sum, exp) => sum + parseFloat(exp.balance || 0), 0);
-
+    
     // ✅ Check if transfer amount exceeds total balance
     if (amountToPay > totalBalance) {
       await connection.rollback();
-      return res.status(400).json({
-        error: `Transfer amount (${amountToPay}) exceeds total balance (${totalBalance})`
+      return res.status(400).json({ 
+        error: `Transfer amount (${amountToPay}) exceeds total balance (${totalBalance})` 
       });
     }
 
@@ -1464,11 +1476,11 @@ router.get('/banks/:id', async (req, res) => {
       'SELECT * FROM bank_details WHERE id = ?',
       [id]
     );
-
+    
     if (rows.length === 0) {
       return res.status(404).json({ error: 'Bank not found' });
     }
-
+    
     res.json(rows[0]);
   } catch (error) {
     console.error('Error fetching bank:', error);
@@ -1489,7 +1501,7 @@ router.post('/banks', authenticate, async (req, res) => {
     company,
     notes
   } = req.body;
-
+  
   const userId = req.user.userId;
 
   if (!bank_name) {
@@ -1535,10 +1547,10 @@ router.post('/banks', authenticate, async (req, res) => {
         [companyRows[0]?.id || null, result.insertId, resolvedOpeningBalance, resolvedCurrentBalance, userId]
       );
     }
-
-    res.status(201).json({
-      id: result.insertId,
-      message: 'Bank added successfully'
+    
+    res.status(201).json({ 
+      id: result.insertId, 
+      message: 'Bank added successfully' 
     });
   } catch (error) {
     console.error('Error creating bank:', error);
@@ -1590,11 +1602,11 @@ router.put('/banks/:id', authenticate, async (req, res) => {
         id
       ]
     );
-
+    
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'Bank not found' });
     }
-
+    
     res.json({ message: 'Bank updated successfully' });
   } catch (error) {
     console.error('Error updating bank:', error);
@@ -1614,11 +1626,11 @@ router.delete('/banks/:id', authenticate, async (req, res) => {
       'UPDATE bank_details SET status = "Inactive" WHERE id = ?',
       [id]
     );
-
+    
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'Bank not found' });
     }
-
+    
     res.json({ message: 'Bank deleted successfully' });
   } catch (error) {
     console.error('Error deleting bank:', error);

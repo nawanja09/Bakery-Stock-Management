@@ -323,7 +323,11 @@ const ensureExpenseFinanceLinkSchema = async () => {
     ["online_expense_payments", "ADD COLUMN IF NOT EXISTS bank_id INT NULL AFTER company_id"],
     ["petty_cash_reimbursements", "ADD COLUMN IF NOT EXISTS company_id INT NULL AFTER reimbursement_date"],
     ["petty_cash_reimbursements", "ADD COLUMN IF NOT EXISTS funding_source ENUM('CASH','BANK') NULL AFTER company_id"],
-    ["petty_cash_reimbursements", "ADD COLUMN IF NOT EXISTS bank_id INT NULL AFTER funding_source"]
+    ["petty_cash_reimbursements", "ADD COLUMN IF NOT EXISTS bank_id INT NULL AFTER funding_source"],
+    // Petty Cash is Cash-only end-to-end, so vouchers only ever need a
+    // company_id (identifying which company's Cash Book was spent) -
+    // never a bank_id.
+    ["petty_cash_vouchers", "ADD COLUMN IF NOT EXISTS company_id INT NULL AFTER employee_name"]
   ];
 
   for (const [table, clause] of alterations) {

@@ -34,4 +34,7 @@ router.post('/bank/receive', financeOnly, financeController.receiveBank);
 // Cash <-> Bank transfer - Finance module page
 router.post('/transfer', financeOnly, financeController.transferFunds);
 
+// Bank-to-Bank transfer - Finance module page
+router.post('/bank/transfer', financeOnly, financeController.bankToBankTransfer);
+
 module.exports = router;

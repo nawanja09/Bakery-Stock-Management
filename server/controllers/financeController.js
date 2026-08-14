@@ -368,6 +368,76 @@ const transferFunds = async (req, res) => {
   }
 };
 
+// ------------------------------------------------- Bank-to-Bank Transfer ---
+
+// POST /api/finance/bank/transfer - Bank-to-Bank Transfer
+// Moves money between two company bank accounts without affecting income/expense.
+const bankToBankTransfer = async (req, res) => {
+  const { from_bank_id, to_bank_id, amount, date, reference_number, remark, created_by } = req.body;
+
+  if (!from_bank_id) return res.status(400).json({ error: 'From bank account is required' });
+  if (!to_bank_id) return res.status(400).json({ error: 'To bank account is required' });
+  if (String(from_bank_id) === String(to_bank_id))
+    return res.status(400).json({ error: 'From and To bank accounts must be different' });
+  if (!date) return res.status(400).json({ error: 'Transfer date is required' });
+  if (!amount || parseFloat(amount) <= 0)
+    return res.status(400).json({ error: 'Transfer amount must be greater than 0' });
+  if (!created_by) return res.status(400).json({ error: 'Created by is required' });
+
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    if (reference_number) {
+      await checkDuplicateReference(connection, reference_number, { includeLedger: true });
+    }
+
+    const transferAmount = parseFloat(amount);
+    const ref = reference_number || null;
+    const note = remark || null;
+
+    // Deduct from source bank (credit = money out)
+    const fromBalance = await recordBankTransaction(connection, {
+      bankId: from_bank_id,
+      date,
+      remark: note || 'Bank to Bank Transfer',
+      credit: transferAmount,
+      transactionType: 'Bank Transfer',
+      referenceNumber: ref,
+      referenceType: 'BANK_TO_BANK_TRANSFER',
+      createdBy: created_by
+    });
+
+    // Add to destination bank (debit = money in)
+    const toBalance = await recordBankTransaction(connection, {
+      bankId: to_bank_id,
+      date,
+      remark: note || 'Bank to Bank Transfer',
+      debit: transferAmount,
+      transactionType: 'Bank Transfer',
+      referenceNumber: ref,
+      referenceType: 'BANK_TO_BANK_TRANSFER',
+      createdBy: created_by
+    });
+
+    await connection.commit();
+    res.status(201).json({
+      message: 'Bank-to-Bank transfer completed successfully!',
+      from_balance: fromBalance,
+      to_balance: toBalance
+    });
+  } catch (error) {
+    await connection.rollback();
+    console.error('Error processing bank-to-bank transfer:', error);
+    res.status(
+      error.name === 'InsufficientBalanceError' || error.name === 'DuplicateReferenceError'
+        ? 400
+        : 500
+    ).json({ error: error.message });
+  } finally {
+    connection.release();
+  }
+};
+
 module.exports = {
   getCashBalanceForCompany,
   getCashLedger,
@@ -378,5 +448,6 @@ module.exports = {
   getBankAccounts,
   getAllBankAccounts,
   receiveBank,
-  transferFunds
+  transferFunds,
+  bankToBankTransfer
 };

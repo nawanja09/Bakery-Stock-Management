@@ -1265,14 +1265,14 @@ const getPurchaseReport = async (req, res) => {
 // Expenses Report: unified Petty Cash + Other (New Expenses) listing
 // with Company / Date Range / Payee / Type filters.
 //
-// NOTE on "Company": neither `expenses` nor `petty_cash_vouchers` stores
-// a company_id directly. For "Other" expenses, company is resolved from
-// the payment side - expense_payment_allocations -> expense_payments ->
-// finance_transactions.company_id (set for every posted payment, cash
-// or bank). This means unpaid "Other" bills have no company yet and
-// won't match a specific Company filter. Petty Cash vouchers spend from
-// a shared float with no per-company attribution at all, so Petty Cash
-// rows are simply excluded whenever a Company filter is applied.
+// NOTE on "Company": `expenses` (Other) still doesn't store a company_id
+// directly, so its company is resolved from the payment side -
+// expense_payment_allocations -> expense_payments -> finance_transactions
+// .company_id (set for every posted payment, cash or bank). This means
+// unpaid "Other" bills have no company yet and won't match a specific
+// Company filter. Petty Cash vouchers DO store company_id directly
+// (every voucher records which company's Cash Book paid for it), so the
+// Company filter applies to them normally.
 // =============================================
 const getExpensesReport = async (req, res) => {
   const { startDate, endDate, companyId, payeeId, type } = req.query;
@@ -1338,9 +1338,7 @@ const getExpensesReport = async (req, res) => {
       results = results.concat(otherRows);
     }
 
-    // A Company filter can never match a Petty Cash row (no company
-    // attribution exists for them), so skip the query entirely.
-    if (includePettyCash && !companyId) {
+    if (includePettyCash) {
       let pettyQuery = `
         SELECT
           pv.id,
@@ -1351,18 +1349,21 @@ const getExpensesReport = async (req, res) => {
           pv.voucher_number AS reference,
           pv.amount,
           pv.status,
-          NULL AS company_id,
-          NULL AS company_name
+          pv.company_id,
+          comp.name AS company_name
         FROM petty_cash_vouchers pv
+        LEFT JOIN company comp ON comp.id = pv.company_id
         WHERE 1 = 1
         ${startDate ? 'AND pv.voucher_date >= ?' : ''}
         ${endDate ? 'AND pv.voucher_date < DATE_ADD(?, INTERVAL 1 DAY)' : ''}
         ${payeeId ? 'AND pv.payee_name = ?' : ''}
+        ${companyId ? 'AND pv.company_id = ?' : ''}
       `;
       const pettyParams = [];
       if (startDate) pettyParams.push(startDate);
       if (endDate) pettyParams.push(endDate);
       if (payeeId) pettyParams.push(payeeName || '\0__no_match__\0');
+      if (companyId) pettyParams.push(companyId);
 
       const [pettyRows] = await pool.query(pettyQuery, pettyParams);
       results = results.concat(pettyRows);

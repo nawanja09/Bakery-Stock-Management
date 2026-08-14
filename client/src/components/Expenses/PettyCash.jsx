@@ -37,29 +37,27 @@ const PettyCash = () => {
     description: '',
     vehicle_number: '',
     amount: '',
-    receipt_no: ''
+    receipt_no: '',
+    company_id: ''
   });
 
   const [reimbursementForm, setReimbursementForm] = useState({
     date: new Date().toISOString().split('T')[0],
     reference_number: '',
     amount: '',
-    cash_book: ''
+    company_id: ''
   });
 
-  // Cash Book = which real Cash (company) or Bank account funds the
-  // reimbursement. Combined into one dropdown, value format:
-  // "CASH:<company_id>".
+  // Cash Book = a Company's Cash account. Every company has exactly one,
+  // so "select a Cash Book" and "select a Company" are the same choice -
+  // Bank accounts are intentionally never offered here (Petty Cash is
+  // Cash-only), so this list is Companies only.
   const [companies, setCompanies] = useState([]);
-  const cashBookOptions = [
-    ...companies.map(c => ({ value: `CASH:${c.id}`, label: `${c.name} - Cash` }))
-  ];
+  const cashBookOptions = companies.map(c => ({ value: String(c.id), label: `${c.name} - Cash Book` }));
 
-  const expenseTypes = [
-    'Travel', 'Stationery', 'Refreshments', 'Transport', 'Vehicle Maintenance',
-    'Office Supplies', 'Miscellaneous', 'Staff Welfare', 'Cleaning', 'Repairs',
-    'Utilities', 'Entertainment'
-  ];
+  const [payees, setPayees] = useState([]);
+
+  const [expenseTypes, setExpenseTypes] = useState([]);
 
   // Helper to get user role directly from localStorage (fallback)
   const getUserRole = () => {
@@ -122,28 +120,55 @@ const PettyCash = () => {
 
   useEffect(() => { fetchPettyCashData(); }, [fetchPettyCashData]);
 
-  // Load Cash Book dropdown sources (companies for Cash) once.
+  // Load Cash Book dropdown source (Companies only - Petty Cash never
+  // touches a Bank account) and default both forms to JH.
   useEffect(() => {
-    const loadCashBookOptions = async () => {
+    const loadCompanies = async () => {
       try {
-        const [companiesRes] = await Promise.all([
-          api.get('/purchases/companies'),
-        ]);
-        const companiesData = companiesRes.data || [];
+        const res = await api.get('/purchases/companies');
+        const companiesData = res.data || [];
         setCompanies(companiesData);
 
-        // JH is the default cash book.
+        // JH is the default Cash Book.
         const jh = companiesData.find(c => (c.name || '').toUpperCase() === 'JH');
         if (jh) {
-          setReimbursementForm(prev => (
-            prev.cash_book ? prev : { ...prev, cash_book: `CASH:${jh.id}` }
-          ));
+          setReimbursementForm(prev => (prev.company_id ? prev : { ...prev, company_id: String(jh.id) }));
+          setVoucherForm(prev => (prev.company_id ? prev : { ...prev, company_id: String(jh.id) }));
         }
       } catch (error) {
-        console.error('Error loading cash book options:', error);
+        console.error('Error loading companies:', error);
       }
     };
-    loadCashBookOptions();
+    loadCompanies();
+  }, []);
+
+  // Load the active Payees list (Payees table) so Payee Name is always
+  // selected from real, managed payees rather than typed free-text.
+  useEffect(() => {
+    const loadPayees = async () => {
+      try {
+        const res = await api.get('/payees');
+        setPayees((res.data || []).slice().sort((a, b) => (a.payee_name || '').localeCompare(b.payee_name || '')));
+      } catch (error) {
+        console.error('Error loading payees:', error);
+      }
+    };
+    loadPayees();
+  }, []);
+
+  // Load the real, managed list of expense accounts (Expenses Type
+  // Management) so a voucher is posted to a real expense account,
+  // same list used by the New Expenses module.
+  useEffect(() => {
+    const loadExpenseTypes = async () => {
+      try {
+        const res = await api.get('/expense-types');
+        setExpenseTypes(res.data || []);
+      } catch (error) {
+        console.error('Error loading expense types:', error);
+      }
+    };
+    loadExpenseTypes();
   }, []);
   useEffect(() => {
     if (activeTab === 'voucher') fetchVoucherSuggestion();
@@ -172,7 +197,8 @@ const PettyCash = () => {
       description: voucher.description || '',
       vehicle_number: voucher.vehicle_number || '',
       amount: voucher.amount,
-      receipt_no: voucher.receipt_no || ''
+      receipt_no: voucher.receipt_no || '',
+      company_id: voucher.company_id ? String(voucher.company_id) : ''
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -180,10 +206,12 @@ const PettyCash = () => {
   const handleCancelEdit = () => {
     setIsEditing(false);
     setEditingId(null);
+    const jh = companies.find(c => (c.name || '').toUpperCase() === 'JH');
     setVoucherForm({
       date: new Date().toISOString().split('T')[0],
       voucher_number: '', employee_name: '', payee_name: '', expense_type: '',
-      description: '', vehicle_number: '', amount: '', receipt_no: ''
+      description: '', vehicle_number: '', amount: '', receipt_no: '',
+      company_id: jh ? String(jh.id) : ''
     });
     fetchVoucherSuggestion();
   };
@@ -214,6 +242,10 @@ const PettyCash = () => {
       showPopup('error', 'Please fill all required fields with valid amount');
       return;
     }
+    if (!isEditing && !voucherForm.company_id) {
+      showPopup('error', 'Please select which Company\'s Cash Book this voucher is paid from');
+      return;
+    }
     setIsLoading(true);
     try {
       const payload = {
@@ -227,6 +259,11 @@ const PettyCash = () => {
         amount: parseFloat(voucherForm.amount),
         receipt_no: voucherForm.receipt_no || null
       };
+      // Company (Cash Book) only applies at creation time - this is the
+      // moment the money actually leaves that company's cash account.
+      if (!isEditing) {
+        payload.company_id = voucherForm.company_id;
+      }
       let response;
       if (isEditing) response = await api.put(`/expenses/petty-cash/voucher/${editingId}`, payload);
       else response = await api.post('/expenses/petty-cash/voucher', payload);
@@ -247,8 +284,8 @@ const PettyCash = () => {
       showPopup('error', 'Reference number and valid amount are required');
       return;
     }
-    if (!isEditingReimbursement && !reimbursementForm.cash_book) {
-      showPopup('error', 'Please select a cash book');
+    if (!isEditingReimbursement && !reimbursementForm.company_id) {
+      showPopup('error', 'Please select a Cash Book');
       return;
     }
     setIsLoading(true);
@@ -259,12 +296,11 @@ const PettyCash = () => {
         amount: parseFloat(reimbursementForm.amount)
       };
 
-      // Cash book only applies at creation time - this is the moment the
-      // money actually leaves the selected Cash or Bank account.
+      // Cash Book only applies at creation time - this is the moment the
+      // money actually leaves the selected company's Cash Book. Bank
+      // accounts are never valid here, so the value is always a company id.
       if (!isEditingReimbursement) {
-        const [fundingSource, accountId] = reimbursementForm.cash_book.split(':');
-        payload.funding_source = fundingSource;
-        if (fundingSource === 'CASH') payload.company_id = accountId;
+        payload.company_id = reimbursementForm.company_id;
       }
 
       let response;
@@ -282,7 +318,7 @@ const PettyCash = () => {
           date: new Date().toISOString().split('T')[0],
           reference_number: '',
           amount: '',
-          cash_book: jh ? `CASH:${jh.id}` : ''
+          company_id: jh ? String(jh.id) : ''
         });
         await fetchPettyCashData();
         await fetchReferenceSuggestion();
@@ -295,13 +331,11 @@ const PettyCash = () => {
   const handleEditReimbursement = (reimbursement) => {
     setIsEditingReimbursement(true);
     setEditingReimbursementId(reimbursement.id);
-    const cashBook = reimbursement.funding_source === 'CASH' ? `CASH:${reimbursement.company_id}`
-      : '';
     setReimbursementForm({
       date: reimbursement.reimbursement_date || reimbursement.date,
       reference_number: reimbursement.reference_number,
       amount: reimbursement.amount.toString(),
-      cash_book: cashBook
+      company_id: reimbursement.company_id ? String(reimbursement.company_id) : ''
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -314,7 +348,7 @@ const PettyCash = () => {
       date: new Date().toISOString().split('T')[0],
       reference_number: '',
       amount: '',
-      cash_book: jh ? `CASH:${jh.id}` : ''
+      company_id: jh ? String(jh.id) : ''
     });
     fetchReferenceSuggestion();
   };
@@ -350,8 +384,8 @@ const PettyCash = () => {
 
   const handleExportVouchers = () => {
     if (!vouchers.length) { showPopup('error', 'No voucher data to export'); return; }
-    const headers = ['Date', 'Voucher No.', 'Payee', 'Expense Type', 'Receipt No.', 'Amount (LKR)'];
-    const rows = vouchers.map(v => [formatDate(v.voucher_date || v.date), v.voucher_number, v.payee_name || v.payee, v.expense_type, v.receipt_no || '-', v.amount]);
+    const headers = ['Date', 'Voucher No.', 'Payee', 'Expense Type', 'Company', 'Receipt No.', 'Amount (LKR)'];
+    const rows = vouchers.map(v => [formatDate(v.voucher_date || v.date), v.voucher_number, v.payee_name || v.payee, v.expense_type, v.company_name || '-', v.receipt_no || '-', v.amount]);
     const csvContent = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -406,20 +440,53 @@ const PettyCash = () => {
                 <div className="form-group"><label>Voucher Number <span className="required">*</span></label><div className="input-with-button"><input type="text" name="voucher_number" value={voucherForm.voucher_number} onChange={handleVoucherChange} required className="form-input" placeholder="Enter voucher number" /></div></div>
               </div>
               <div className="form-row">
+                <div className="form-group">
+                  <label>Company (Cash Book) {!isEditing && <span className="required">*</span>}</label>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      className="form-input"
+                      disabled
+                      value={cashBookOptions.find(o => o.value === voucherForm.company_id)?.label || 'Not recorded'}
+                    />
+                  ) : (
+                    <select name="company_id" value={voucherForm.company_id} onChange={handleVoucherChange} required className="form-select">
+                      <option value="">Select Company</option>
+                      {cashBookOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
+                  )}
+                </div>
                 <div className="form-group"><label>Employee Name</label><input type="text" name="employee_name" value={voucherForm.employee_name} onChange={handleVoucherChange} className="form-input" placeholder="Optional" /></div>
-                <div className="form-group"><label>Payee Name <span className="required">*</span></label><input type="text" name="payee_name" value={voucherForm.payee_name} onChange={handleVoucherChange} required className="form-input" placeholder="Enter payee name" /></div>
               </div>
               <div className="form-row">
-                <div className="form-group"><label>Expenses Type <span className="required">*</span></label><select name="expense_type" value={voucherForm.expense_type} onChange={handleVoucherChange} required className="form-select"><option value="">Select Expense Type</option>{expenseTypes.map(type => <option key={type} value={type}>{type}</option>)}</select></div>
+                <div className="form-group">
+                  <label>Payee Name <span className="required">*</span></label>
+                  <select name="payee_name" value={voucherForm.payee_name} onChange={handleVoucherChange} required className="form-select">
+                    <option value="">Select Payee</option>
+                    {payees.map(p => <option key={p.id} value={p.payee_name}>{p.payee_name}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Expenses Type <span className="required">*</span></label>
+                  <select name="expense_type" value={voucherForm.expense_type} onChange={handleVoucherChange} required className="form-select">
+                    <option value="">Select Expense Type</option>
+                    {expenseTypes.map(type => <option key={type.id} value={type.name}>{type.name}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="form-row">
                 <div className="form-group"><label>Vehicle Number</label><input type="text" name="vehicle_number" value={voucherForm.vehicle_number} onChange={handleVoucherChange} className="form-input" placeholder="If applicable" /></div>
-              </div>
-              <div className="form-group full-width"><label>Description</label><textarea name="description" value={voucherForm.description} onChange={handleVoucherChange} className="form-textarea" rows="3" placeholder="Optional" /></div>
-              <div className="form-row">
-                <div className="form-group"><label>Amount (LKR) <span className="required">*</span></label><input type="number" name="amount" value={voucherForm.amount} onChange={handleVoucherChange} required min="0.01" step="0.01" className="form-input amount-input" placeholder="0.00" /></div>
                 <div className="form-group"><label>Receipt Number</label><input type="text" name="receipt_no" value={voucherForm.receipt_no} onChange={handleVoucherChange} className="form-input" placeholder="Optional" /></div>
               </div>
+              <div className="form-row">
+                <div className="form-group"><label>Amount (LKR) <span className="required">*</span></label><input type="number" name="amount" value={voucherForm.amount} onChange={handleVoucherChange} required min="0.01" step="0.01" className="form-input amount-input" placeholder="0.00" /></div>
+                <div className="form-group full-width"><label>Description</label><textarea name="description" value={voucherForm.description} onChange={handleVoucherChange} className="form-textarea" rows="3" placeholder="Optional" /></div>
+              </div>
               <div className="form-actions">
-                <button type="button" onClick={isEditing ? handleCancelEdit : () => setVoucherForm({ date: new Date().toISOString().split('T')[0], voucher_number: '', employee_name: '', payee_name: '', expense_type: '', description: '', vehicle_number: '', amount: '', receipt_no: '' })} className="btn-secondary" disabled={isLoading}><FontAwesomeIcon icon={faTimes} /> {isEditing ? 'Cancel' : 'Clear'}</button>
+                <button type="button" onClick={isEditing ? handleCancelEdit : () => {
+                  const jh = companies.find(c => (c.name || '').toUpperCase() === 'JH');
+                  setVoucherForm({ date: new Date().toISOString().split('T')[0], voucher_number: '', employee_name: '', payee_name: '', expense_type: '', description: '', vehicle_number: '', amount: '', receipt_no: '', company_id: jh ? String(jh.id) : '' });
+                }} className="btn-secondary" disabled={isLoading}><FontAwesomeIcon icon={faTimes} /> {isEditing ? 'Cancel' : 'Clear'}</button>
                 <button type="submit" className="btn-primary" disabled={isLoading}><FontAwesomeIcon icon={isLoading ? faSpinner : faSave} spin={isLoading} /> {isLoading ? (isEditing ? 'Updating...' : 'Submitting...') : (isEditing ? 'Update Voucher' : 'Submit Voucher')}</button>
               </div>
             </form>
@@ -430,11 +497,11 @@ const PettyCash = () => {
             <div className="table-container" id="vouchers-table-container">
               <table className="data-table">
                 <thead>
-                  <tr><th>Date</th><th>Voucher No.</th><th>Payee</th><th>Expense Type</th><th>Receipt No.</th><th>Amount (LKR)</th><th>Actions</th></tr>
+                  <tr><th>Date</th><th>Voucher No.</th><th>Payee</th><th>Expense Type</th><th>Company</th><th>Receipt No.</th><th>Amount (LKR)</th><th>Actions</th></tr>
                 </thead>
                 <tbody>
                   {isFetching ? (
-                    <tr><td colSpan="7" className="loading-row"><FontAwesomeIcon icon={faSpinner} spin /> Loading vouchers...</td></tr>
+                    <tr><td colSpan="8" className="loading-row"><FontAwesomeIcon icon={faSpinner} spin /> Loading vouchers...</td></tr>
                   ) : vouchers.length > 0 ? (
                     vouchers.map(v => (
                       <tr key={v.id}>
@@ -442,6 +509,7 @@ const PettyCash = () => {
                         <td className="voucher-number">{v.voucher_number}</td>
                         <td>{v.payee_name || v.payee}</td>
                         <td>{v.expense_type}</td>
+                        <td>{v.company_name || '-'}</td>
                         <td className="receipt-no">{v.receipt_no || '-'}</td>
                         <td className="amount-cell">{formatCurrency(v.amount)}</td>
                         <td>
@@ -459,7 +527,7 @@ const PettyCash = () => {
                       </tr>
                     ))
                   ) : (
-                    <tr><td colSpan="7" className="empty-row">No vouchers found</td></tr>
+                    <tr><td colSpan="8" className="empty-row">No vouchers found</td></tr>
                   )}
                 </tbody>
               </table>
@@ -487,13 +555,18 @@ const PettyCash = () => {
                       type="text"
                       className="form-input"
                       disabled
-                      value={cashBookOptions.find(o => o.value === reimbursementForm.cash_book)?.label || 'Not recorded'}
+                      value={cashBookOptions.find(o => o.value === reimbursementForm.company_id)?.label || 'Not recorded'}
                     />
                   ) : (
-                    <select name="cash_book" value={reimbursementForm.cash_book} onChange={handleReimbursementChange} required className="form-select">
+                    <select name="company_id" value={reimbursementForm.company_id} onChange={handleReimbursementChange} required className="form-select">
                       <option value="">Select Cash Book</option>
                       {cashBookOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                     </select>
+                  )}
+                  {reimbursementForm.company_id && (
+                    <small style={{ color: '#495057', display: 'block', marginTop: '4px' }}>
+                      Company: <strong>{companies.find(c => String(c.id) === reimbursementForm.company_id)?.name || '-'}</strong>
+                    </small>
                   )}
                 </div>
               </div>
@@ -501,7 +574,7 @@ const PettyCash = () => {
                 {isEditingReimbursement && <button type="button" onClick={handleCancelEditReimbursement} className="btn-secondary" disabled={isLoading}><FontAwesomeIcon icon={faTimes} /> Cancel</button>}
                 <button type="button" onClick={() => {
                   const jh = companies.find(c => (c.name || '').toUpperCase() === 'JH');
-                  setReimbursementForm({ date: new Date().toISOString().split('T')[0], reference_number: '', amount: '', cash_book: jh ? `CASH:${jh.id}` : '' });
+                  setReimbursementForm({ date: new Date().toISOString().split('T')[0], reference_number: '', amount: '', company_id: jh ? String(jh.id) : '' });
                 }} className="btn-secondary" disabled={isLoading}><FontAwesomeIcon icon={faTimes} /> Clear</button>
                 <button type="submit" className="btn-primary" disabled={isLoading}><FontAwesomeIcon icon={isLoading ? faSpinner : faSave} spin={isLoading} /> {isLoading ? 'Submitting...' : (isEditingReimbursement ? 'Update Reimbursement' : 'Submit Reimbursement')}</button>
               </div>
@@ -512,7 +585,7 @@ const PettyCash = () => {
             <div className="history-header"><h3>Reimbursement Details</h3><div className="history-actions"><button className="icon-btn" onClick={fetchPettyCashData}><FontAwesomeIcon icon={faSync} /></button></div></div>
             <div className="table-container">
               <table className="data-table"><thead><tr><th>Date</th><th>Reference Number</th><th>Cash Book</th><th>Amount (LKR)</th><th>Status</th><th>Actions</th></tr></thead><tbody>
-                {isFetching ? <tr><td colSpan="6" className="loading-row"><FontAwesomeIcon icon={faSpinner} spin /> Loading reimbursements...</td></tr> : reimbursements.length > 0 ? reimbursements.map(r => (<tr key={r.id}><td>{formatDate(r.reimbursement_date || r.date)}</td><td className="reference-number">{r.reference_number}</td><td>{r.company_name || '-'}</td><td className="amount-cell">{formatCurrency(r.amount)}</td><td><span className={`status-badge status-${(r.status || 'Completed').toLowerCase()}`}>{r.status || 'Completed'}</span></td><td><div className="action-buttons"><button className="action-btn view-btn" title="View Details" onClick={() => handleViewReimbursement(r)}><FontAwesomeIcon icon={faEye} /></button><button className="action-btn edit-btn" title="Edit Reimbursement" onClick={() => handleEditReimbursement(r)}><FontAwesomeIcon icon={faEdit} /></button></div></td></tr>)) : <tr><td colSpan="6" className="empty-row">No reimbursements found</td></tr>}
+                {isFetching ? <tr><td colSpan="6" className="loading-row"><FontAwesomeIcon icon={faSpinner} spin /> Loading reimbursements...</td></tr> : reimbursements.length > 0 ? reimbursements.map(r => (<tr key={r.id}><td>{formatDate(r.reimbursement_date || r.date)}</td><td className="reference-number">{r.reference_number}</td><td>{r.company_name || r.bank_name || '-'}</td><td className="amount-cell">{formatCurrency(r.amount)}</td><td><span className={`status-badge status-${(r.status || 'Completed').toLowerCase()}`}>{r.status || 'Completed'}</span></td><td><div className="action-buttons"><button className="action-btn view-btn" title="View Details" onClick={() => handleViewReimbursement(r)}><FontAwesomeIcon icon={faEye} /></button><button className="action-btn edit-btn" title="Edit Reimbursement" onClick={() => handleEditReimbursement(r)}><FontAwesomeIcon icon={faEdit} /></button></div></td></tr>)) : <tr><td colSpan="6" className="empty-row">No reimbursements found</td></tr>}
               </tbody></table>
             </div>
           </div>
@@ -530,7 +603,7 @@ const PettyCash = () => {
             <div className="modal-body">
               <div className="detail-row"><strong>Reference Number:</strong> {selectedReimbursement.reference_number}</div>
               <div className="detail-row"><strong>Date:</strong> {formatDate(selectedReimbursement.reimbursement_date || selectedReimbursement.date)}</div>
-              <div className="detail-row"><strong>Cash Book:</strong> {selectedReimbursement.company_name || 'Not recorded'}</div>
+              <div className="detail-row"><strong>Cash Book:</strong> {selectedReimbursement.company_name || selectedReimbursement.bank_name || 'Not recorded'}</div>
               <div className="detail-row"><strong>Amount:</strong> {formatCurrency(selectedReimbursement.amount)}</div>
               <div className="detail-row"><strong>Status:</strong> <span className={`status-badge status-${(selectedReimbursement.status || 'Completed').toLowerCase()}`}>{selectedReimbursement.status || 'Completed'}</span></div>
               <div className="detail-row"><strong>Created Date:</strong> {selectedReimbursement.created_date || '-'}</div>

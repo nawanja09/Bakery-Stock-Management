@@ -310,12 +310,6 @@ const ExpensesReport = () => {
         </div>
       </div>
 
-      {companyId && (type === 'all' || type === 'petty_cash') && (
-        <div className="er-note">
-          Note: Petty Cash vouchers are spent from a shared float and aren't tied to a company, so they're excluded while a Company filter is active.
-        </div>
-      )}
-
       {error && <div className="er-error">{error}</div>}
 
       {/* Results */}
