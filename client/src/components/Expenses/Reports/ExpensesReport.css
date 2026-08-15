@@ -364,6 +364,11 @@
   color: var(--er-primary-dark);
 }
 
+.er-type-badge.er-type-bank {
+  background: #ecfdf5;
+  color: #047857;
+}
+
 .er-summary-bar {
   display: flex;
   justify-content: space-between;

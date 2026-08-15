@@ -1262,17 +1262,8 @@ const getPurchaseReport = async (req, res) => {
 };
 
 // =============================================
-// Expenses Report: unified Petty Cash + Other (New Expenses) listing
+// Expenses Report: unified Petty Cash + Other (New Expenses) + Bank Charges listing
 // with Company / Date Range / Payee / Type filters.
-//
-// NOTE on "Company": `expenses` (Other) still doesn't store a company_id
-// directly, so its company is resolved from the payment side -
-// expense_payment_allocations -> expense_payments -> finance_transactions
-// .company_id (set for every posted payment, cash or bank). This means
-// unpaid "Other" bills have no company yet and won't match a specific
-// Company filter. Petty Cash vouchers DO store company_id directly
-// (every voucher records which company's Cash Book paid for it), so the
-// Company filter applies to them normally.
 // =============================================
 const getExpensesReport = async (req, res) => {
   const { startDate, endDate, companyId, payeeId, type } = req.query;
@@ -1281,6 +1272,7 @@ const getExpensesReport = async (req, res) => {
     const normalizedType = (type || 'all').toLowerCase();
     const includeOther = normalizedType === 'other' || normalizedType === 'all';
     const includePettyCash = normalizedType === 'petty_cash' || normalizedType === 'all';
+    const includeBankCharges = normalizedType === 'bank_charges' || normalizedType === 'all';
 
     // Resolve the selected payee's name once, so Petty Cash (which only
     // stores a free-text payee_name) can be filtered the same way as
@@ -1306,7 +1298,7 @@ const getExpensesReport = async (req, res) => {
             e.bill_number AS reference,
             e.total_bill_amount AS amount,
             e.payment_status AS status,
-            (
+            COALESCE(e.company_id, (
               SELECT ft.company_id
               FROM expense_payment_allocations epa
               JOIN finance_transactions ft
@@ -1314,7 +1306,7 @@ const getExpensesReport = async (req, res) => {
               WHERE epa.expense_id = e.id
               ORDER BY ft.id DESC
               LIMIT 1
-            ) AS company_id
+            )) AS company_id
           FROM expenses e
           LEFT JOIN payees p ON e.payee_id = p.id
           WHERE e.is_deleted = 0
@@ -1369,6 +1361,35 @@ const getExpensesReport = async (req, res) => {
       results = results.concat(pettyRows);
     }
 
+    if (includeBankCharges && !payeeId) {
+      const bankChargesQuery = `
+        SELECT
+          bc.id,
+          'Bank Charges' AS type,
+          bc.charge_date AS date,
+          bc.bank_name AS payee_name,
+          bc.charges_type AS expense_type,
+          bc.reference_number AS reference,
+          bc.amount,
+          'Recorded' AS status,
+          bc.company_id,
+          comp.name AS company_name
+        FROM bank_charges bc
+        LEFT JOIN company comp ON comp.id = bc.company_id
+        WHERE 1 = 1
+        ${startDate ? 'AND bc.charge_date >= ?' : ''}
+        ${endDate ? 'AND bc.charge_date < DATE_ADD(?, INTERVAL 1 DAY)' : ''}
+        ${companyId ? 'AND bc.company_id = ?' : ''}
+      `;
+      const bankChargesParams = [];
+      if (startDate) bankChargesParams.push(startDate);
+      if (endDate) bankChargesParams.push(endDate);
+      if (companyId) bankChargesParams.push(companyId);
+
+      const [bankChargeRows] = await pool.query(bankChargesQuery, bankChargesParams);
+      results = results.concat(bankChargeRows);
+    }
+
     results.sort((a, b) => new Date(b.date) - new Date(a.date));
 
     const expenses = results.map(row => ({
@@ -1386,8 +1407,9 @@ const getExpensesReport = async (req, res) => {
     const grandTotal = expenses.reduce((sum, e) => sum + e.amount, 0);
     const pettyCashTotal = expenses.filter(e => e.type === 'Petty Cash').reduce((sum, e) => sum + e.amount, 0);
     const otherTotal = expenses.filter(e => e.type === 'Other').reduce((sum, e) => sum + e.amount, 0);
+    const bankChargesTotal = expenses.filter(e => e.type === 'Bank Charges').reduce((sum, e) => sum + e.amount, 0);
 
-    res.json({ expenses, grandTotal, pettyCashTotal, otherTotal });
+    res.json({ expenses, grandTotal, pettyCashTotal, otherTotal, bankChargesTotal });
   } catch (error) {
     console.error('Error generating expenses report:', error);
     res.status(500).json({ error: 'Server error: ' + error.message });
