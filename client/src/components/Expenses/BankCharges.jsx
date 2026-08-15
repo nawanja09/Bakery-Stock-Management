@@ -1,6 +1,5 @@
 // src/components/Expenses/BankCharges.jsx
-import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faSave, 
@@ -14,9 +13,7 @@ import {
   faSync,
   faSpinner,
   faBuildingColumns,
-  faUniversity,
-  faChevronDown,
-  faChevronUp
+  faUniversity
 } from '@fortawesome/free-solid-svg-icons';
 import './BankCharges.css';
 import { usePopup } from '../context/PopupContext';
@@ -27,19 +24,17 @@ const BankCharges = () => {
   const [isFetching, setIsFetching] = useState(false);
   const [isFetchingBanks, setIsFetchingBanks] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [bankSearchTerm, setBankSearchTerm] = useState('');
   const [bankCharges, setBankCharges] = useState([]);
   const [banks, setBanks] = useState([]);
-  const [filteredBanks, setFilteredBanks] = useState([]);
   const [editingId, setEditingId] = useState(null);
-  const [isBankDropdownOpen, setIsBankDropdownOpen] = useState(false);
   const { showPopup } = usePopup();
-  const navigate = useNavigate();
 
   // Form State
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
+    company_id: '',
     bank_name: '',
+    bank_id: '',
     reference_number: '',
     charges_type: '',
     bank_charge_type_id: '',
@@ -48,11 +43,13 @@ const BankCharges = () => {
   });
 
   const [chargesTypes, setChargesTypes] = useState([]);
+  const [companies, setCompanies] = useState([]);
 
   // Fetch banks on component mount
   useEffect(() => {
     fetchBanks();
     fetchChargesTypes();
+    fetchCompanies();
   }, []);
 
   const fetchChargesTypes = async () => {
@@ -65,30 +62,32 @@ const BankCharges = () => {
     }
   };
 
+  const fetchCompanies = async () => {
+    try {
+      const response = await api.get('/companies');
+      setCompanies(response.data || []);
+    } catch (error) {
+      console.error('Error fetching companies:', error);
+      showPopup('error', 'Failed to load companies from server');
+    }
+  };
+
   // Fetch bank charges on component mount
   useEffect(() => {
     fetchBankCharges();
   }, []);
 
-  // Filter banks based on search term
-  useEffect(() => {
-    if (bankSearchTerm.trim() === '') {
-      setFilteredBanks(banks);
-    } else {
-      const filtered = banks.filter(bank =>
-        bank.bank_name.toLowerCase().includes(bankSearchTerm.toLowerCase())
-      );
-      setFilteredBanks(filtered);
+  const fetchBanks = async (companyId) => {
+    if (!companyId) {
+      setBanks([]);
+      return;
     }
-  }, [bankSearchTerm, banks]);
 
-  const fetchBanks = async () => {
     setIsFetchingBanks(true);
     try {
-      const response = await api.get('/expenses/banks');
+      const response = await api.get('/expenses/banks', { params: { company_id: companyId } });
       const banksData = response.data || [];
       setBanks(banksData);
-      setFilteredBanks(banksData);
     } catch (error) {
       console.error('Error fetching banks:', error);
       showPopup('error', 'Failed to load banks from server');
@@ -112,20 +111,26 @@ const BankCharges = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    if (name === 'company_id') {
+      setFormData(prev => ({ ...prev, company_id: value, bank_name: '', bank_id: '' }));
+      fetchBanks(value);
+      return;
+    }
+    if (name === 'bank_name') {
+      setFormData(prev => ({ ...prev, bank_name: value, bank_id: '' }));
+      return;
+    }
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleBankSelect = (bankName) => {
-    setFormData(prev => ({ ...prev, bank_name: bankName }));
-    setBankSearchTerm(bankName);
-    setIsBankDropdownOpen(false);
-  };
+  const bankNames = [...new Set(banks.map(bank => bank.bank_name))];
+  const bankAccounts = banks.filter(bank => bank.bank_name === formData.bank_name);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     
     // Validation
-    if (!formData.date || !formData.bank_name || !formData.charges_type || !formData.amount) {
+    if (!formData.date || !formData.company_id || !formData.bank_name || !formData.bank_id || !formData.charges_type || !formData.amount) {
       showPopup('error', 'Please fill all required fields');
       return;
     }
@@ -139,9 +144,12 @@ const BankCharges = () => {
     try {
       const payload = {
         date: formData.date,
+        company_id: formData.company_id,
         bank_name: formData.bank_name,
+        bank_id: formData.bank_id || null,
         reference_number: formData.reference_number || null,
         charges_type: formData.charges_type,
+        bank_charge_type_id: formData.bank_charge_type_id || null,
         description: formData.description || null,
         amount: parseFloat(formData.amount)
       };
@@ -154,13 +162,14 @@ const BankCharges = () => {
         // Reset form
         setFormData({
           date: new Date().toISOString().split('T')[0],
+          company_id: '',
           bank_name: '',
+          bank_id: '',
           reference_number: '',
           charges_type: '',
           description: '',
           amount: ''
         });
-        setBankSearchTerm('');
         
         // Refresh data
         await fetchBankCharges();
@@ -177,15 +186,16 @@ const BankCharges = () => {
     setEditingId(charge.id);
     setFormData({
       date: charge.date,
+      company_id: charge.company_id || '',
       bank_name: charge.bank_name,
+      bank_id: charge.bank_id || '',
       reference_number: charge.reference_number || '',
       charges_type: charge.charges_type,
       bank_charge_type_id: charge.bank_charge_type_id || '',
       description: charge.description || '',
       amount: charge.amount.toString()
     });
-    setBankSearchTerm(charge.bank_name);
-    setIsBankDropdownOpen(false);
+    fetchBanks(charge.company_id);
     // Scroll to form
     document.querySelector('.form-card')?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -193,7 +203,7 @@ const BankCharges = () => {
   const handleUpdate = async (e) => {
     e.preventDefault();
     
-    if (!formData.date || !formData.bank_name || !formData.charges_type || !formData.amount) {
+    if (!formData.date || !formData.company_id || !formData.bank_name || !formData.bank_id || !formData.charges_type || !formData.amount) {
       showPopup('error', 'Please fill all required fields');
       return;
     }
@@ -202,9 +212,12 @@ const BankCharges = () => {
     try {
       const payload = {
         date: formData.date,
+        company_id: formData.company_id,
         bank_name: formData.bank_name,
+        bank_id: formData.bank_id || null,
         reference_number: formData.reference_number || null,
         charges_type: formData.charges_type,
+        bank_charge_type_id: formData.bank_charge_type_id || null,
         description: formData.description || null,
         amount: parseFloat(formData.amount)
       };
@@ -217,13 +230,14 @@ const BankCharges = () => {
         // Reset form and editing state
         setFormData({
           date: new Date().toISOString().split('T')[0],
+          company_id: '',
           bank_name: '',
+          bank_id: '',
           reference_number: '',
           charges_type: '',
           description: '',
           amount: ''
         });
-        setBankSearchTerm('');
         setEditingId(null);
         
         // Refresh data
@@ -260,15 +274,16 @@ const BankCharges = () => {
     setEditingId(null);
     setFormData({
       date: new Date().toISOString().split('T')[0],
+      company_id: '',
       bank_name: '',
+      bank_id: '',
       reference_number: '',
       charges_type: '',
       bank_charge_type_id: '',
       description: '',
       amount: ''
     });
-    setBankSearchTerm('');
-    setIsBankDropdownOpen(false);
+    setBanks([]);
   };
 
   const formatCurrency = (amount) => {
@@ -317,74 +332,29 @@ const BankCharges = () => {
                 className="form-input"
               />
             </div>
+            <div className="form-group">
+              <label>Company <span className="required">*</span></label>
+              <select name="company_id" value={formData.company_id} onChange={handleChange} required className="form-select">
+                <option value="">Select Company</option>
+                {companies.map(company => (
+                  <option key={company.id} value={company.id}>{company.name}</option>
+                ))}
+              </select>
+            </div>
             
             <div className="form-group">
-              <label>Bank <span className="required">*</span></label>
-              <div className="custom-select-container">
-                <div 
-                  className="custom-select-trigger"
-                  onClick={() => setIsBankDropdownOpen(!isBankDropdownOpen)}
-                >
-                  <input
-                    type="text"
-                    placeholder="Search or select bank..."
-                    value={bankSearchTerm}
-                    onChange={(e) => {
-                      setBankSearchTerm(e.target.value);
-                      setIsBankDropdownOpen(true);
-                    }}
-                    onFocus={() => setIsBankDropdownOpen(true)}
-                    className="custom-select-input"
-                    autoComplete="off"
-                  />
-                  <FontAwesomeIcon 
-                    icon={isBankDropdownOpen ? faChevronUp : faChevronDown} 
-                    className="dropdown-icon"
-                  />
-                </div>
-                
-                {isBankDropdownOpen && (
-                  <div className="custom-select-dropdown">
-                    {isFetchingBanks ? (
-                      <div className="dropdown-loading">
-                        <FontAwesomeIcon icon={faSpinner} spin /> Loading banks...
-                      </div>
-                    ) : filteredBanks.length > 0 ? (
-                      filteredBanks.map(bank => (
-                        <div
-                          key={bank.id}
-                          className="dropdown-item"
-                          onClick={() => handleBankSelect(bank.bank_name)}
-                        >
-                          {bank.bank_name}
-                        </div>
-                      ))
-                    ) : (
-                      <div className="dropdown-empty">
-                        {banks.length === 0 ? (
-                          <>
-                            <span>No banks available. </span>
-                            <button 
-                              type="button"
-                              className="add-bank-link"
-                              onClick={() => navigate('/expenses/bank-details')}
-                            >
-                              Add bank details first?
-                            </button>
-                          </>
-                        ) : (
-                          'No matching banks found'
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-              {formData.bank_name && (
-                <small className="selected-bank-info">
-                  Selected: <strong>{formData.bank_name}</strong>
-                </small>
-              )}
+              <label>Bank Name <span className="required">*</span></label>
+              <select name="bank_name" value={formData.bank_name} onChange={handleChange} required disabled={!formData.company_id || isFetchingBanks} className="form-select">
+                <option value="">{!formData.company_id ? 'Select a company first' : isFetchingBanks ? 'Loading banks...' : bankNames.length === 0 ? 'No banks available for this company' : 'Select Bank Name'}</option>
+                {bankNames.map(bankName => <option key={bankName} value={bankName}>{bankName}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Bank Account <span className="required">*</span></label>
+              <select name="bank_id" value={formData.bank_id} onChange={handleChange} required disabled={!formData.bank_name} className="form-select">
+                <option value="">{!formData.bank_name ? 'Select a bank first' : bankAccounts.length === 0 ? 'No accounts available for this bank' : 'Select Bank Account'}</option>
+                {bankAccounts.map(bank => <option key={bank.id} value={bank.id}>{bank.account_number || `Account #${bank.id}`}</option>)}
+              </select>
             </div>
           </div>
 
@@ -425,19 +395,7 @@ const BankCharges = () => {
             </div>
           </div>
 
-          <div className="form-group full-width">
-            <label>Description</label>
-            <textarea
-              name="description"
-              value={formData.description}
-              onChange={handleChange}
-              className="form-textarea"
-              rows="2"
-              placeholder="Enter description (optional)"
-            />
-          </div>
-
-          <div className="form-row">
+            <div className="form-row">
             <div className="form-group">
               <label>Amount (LKR) <span className="required">*</span></label>
               <input
@@ -452,6 +410,17 @@ const BankCharges = () => {
                 placeholder="0.00"
               />
             </div>
+            <div className="form-group">
+            <label>Description</label>
+            <textarea
+              name="description"
+              value={formData.description}
+              onChange={handleChange}
+              className="form-textarea"
+              rows="2"
+              placeholder="Enter description (optional)"
+            />
+          </div>
           </div>
 
           <div className="form-actions">
@@ -470,15 +439,16 @@ const BankCharges = () => {
               onClick={() => {
                 setFormData({
                   date: new Date().toISOString().split('T')[0],
+                  company_id: '',
                   bank_name: '',
+                  bank_id: '',
                   reference_number: '',
                   charges_type: '',
                   bank_charge_type_id: '',
                   description: '',
                   amount: ''
                 });
-                setBankSearchTerm('');
-                setIsBankDropdownOpen(false);
+                setBanks([]);
                 if (editingId) setEditingId(null);
               }}
               className="btn-secondary"
@@ -534,10 +504,10 @@ const BankCharges = () => {
               Refresh
             </button>
             <button 
-              onClick={fetchBanks}
+              onClick={() => fetchBanks(formData.company_id)}
               className="refresh-btn"
               disabled={isFetchingBanks}
-              title="Refresh Bank List"
+              title="Refresh Company Bank List"
             >
               <FontAwesomeIcon icon={faBuildingColumns} />
               Refresh Banks
@@ -557,6 +527,7 @@ const BankCharges = () => {
               <tr>
                 <th>Date</th>
                 <th>Bank Name</th>
+                <th>Company</th>
                 <th>Reference Number</th>
                 <th>Charges Type</th>
                 <th>Description</th>
@@ -567,7 +538,7 @@ const BankCharges = () => {
             <tbody>
               {isFetching ? (
                 <tr>
-                  <td colSpan="7" className="loading-row">
+                  <td colSpan="8" className="loading-row">
                     <FontAwesomeIcon icon={faSpinner} spin /> Loading bank charges...
                   </td>
                 </tr>
@@ -576,6 +547,7 @@ const BankCharges = () => {
                   <tr key={charge.id}>
                     <td className="date-cell">{charge.date}</td>
                     <td className="bank-cell">{charge.bank_name}</td>
+                    <td>{charge.company_name || '-'}</td>
                     <td className="reference-cell">{charge.reference_number || '-'}</td>
                     <td>{charge.charges_type}</td>
                     <td className="description-cell">{charge.description || '-'}</td>
@@ -600,7 +572,7 @@ const BankCharges = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="7" className="empty-row">No bank charges found</td>
+                  <td colSpan="8" className="empty-row">No bank charges found</td>
                 </tr>
               )}
             </tbody>

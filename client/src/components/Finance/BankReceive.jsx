@@ -4,12 +4,13 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faLandmark, faSpinner, faCheckCircle } from '@fortawesome/free-solid-svg-icons';
 import api from '../../api';
 import './FinanceForm.css';
+import ReceiveTypeManagement from './ReceiveTypeManagement';
 
-const RECEIVE_TYPES = ['Customer Payment', 'Owner Capital', 'Other Income', 'Adjustment'];
 
 const BankReceive = () => {
   const currentUser = JSON.parse(localStorage.getItem('user') || 'null');
   const [companies, setCompanies] = useState([]);
+  const [receiveTypes, setReceiveTypes] = useState([]);
   const [bankAccounts, setBankAccounts] = useState([]);
   const [loadingBanks, setLoadingBanks] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -144,7 +145,7 @@ const BankReceive = () => {
           <label>Receive Type *</label>
           <select name="receive_type" value={formData.receive_type} onChange={handleChange} required>
             <option value="">Select type</option>
-            {RECEIVE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+            {receiveTypes.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
         </div>
 

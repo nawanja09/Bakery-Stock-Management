@@ -853,14 +853,27 @@ router.put('/cheque/realise/:id', authenticate, async (req, res) => {
 // BANK CHARGES ROUTES
 // =============================================
 
+const getCompanyBankAccount = async (connection, companyId, bankName, bankId) => {
+  const [rows] = await connection.query(
+    `SELECT bd.id
+     FROM bank_details bd
+     INNER JOIN company c ON LOWER(TRIM(c.name)) = LOWER(TRIM(bd.company))
+     WHERE bd.id = ? AND bd.bank_name = ? AND c.id = ? AND bd.status = 'Active'`,
+    [bankId, bankName, companyId]
+  );
+  return rows[0] || null;
+};
+
 // GET all bank charges
 router.get('/bank-charges', async (req, res) => {
   try {
     const [rows] = await pool.query(
-      `SELECT id, DATE_FORMAT(charge_date, '%Y-%m-%d') as date, 
-              bank_name, bank_id, reference_number, charges_type, bank_charge_type_id, description, amount
-       FROM bank_charges 
-       ORDER BY charge_date DESC, created_at DESC`
+      `SELECT bc.id, DATE_FORMAT(bc.charge_date, '%Y-%m-%d') as date,
+              bc.bank_name, bc.bank_id, bc.reference_number, bc.charges_type, bc.bank_charge_type_id,
+              bc.description, bc.amount, bc.company_id, c.name AS company_name
+       FROM bank_charges bc
+       LEFT JOIN company c ON c.id = bc.company_id
+       ORDER BY bc.charge_date DESC, bc.created_at DESC`
     );
     res.json(rows || []);
   } catch (error) {
@@ -871,10 +884,10 @@ router.get('/bank-charges', async (req, res) => {
 
 // POST create bank charge
 router.post('/bank-charges', authenticate, async (req, res) => {
-  const { date, bank_name, bank_id, reference_number, charges_type, bank_charge_type_id, description, amount } = req.body;
+  const { date, bank_name, bank_id, reference_number, charges_type, bank_charge_type_id, description, amount, company_id } = req.body;
   const userId = req.user.userId;
 
-  if (!date || !bank_name || !charges_type || !amount) {
+  if (!date || !bank_name || !bank_id || !charges_type || !amount || !company_id) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
@@ -882,13 +895,25 @@ router.post('/bank-charges', authenticate, async (req, res) => {
   try {
     await connection.beginTransaction();
 
+    const [companies] = await connection.query('SELECT id FROM company WHERE id = ?', [company_id]);
+    if (companies.length === 0) {
+      await connection.rollback();
+      return res.status(400).json({ error: 'Selected company was not found' });
+    }
+
+    const bankAccount = await getCompanyBankAccount(connection, company_id, bank_name, bank_id);
+    if (!bankAccount) {
+      await connection.rollback();
+      return res.status(400).json({ error: 'Selected bank account does not belong to the selected company and bank' });
+    }
+
     await checkDuplicateReference(connection, reference_number);
 
     const [result] = await connection.query(
       `INSERT INTO bank_charges 
-       (charge_date, bank_name, bank_id, reference_number, charges_type, bank_charge_type_id, description, amount, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [date, bank_name, bank_id || null, reference_number || null, charges_type, bank_charge_type_id || null, description || null, amount, userId]
+       (charge_date, bank_name, bank_id, reference_number, charges_type, bank_charge_type_id, description, amount, company_id, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [date, bank_name, bank_id || null, reference_number || null, charges_type, bank_charge_type_id || null, description || null, amount, company_id, userId]
     );
 
     // Bank charges leave the account immediately - post the ledger entry now,
@@ -928,11 +953,27 @@ router.post('/bank-charges', authenticate, async (req, res) => {
 // PUT update bank charge
 router.put('/bank-charges/:id', authenticate, async (req, res) => {
   const { id } = req.params;
-  const { date, bank_name, bank_id, reference_number, charges_type, bank_charge_type_id, description, amount } = req.body;
+  const { date, bank_name, bank_id, reference_number, charges_type, bank_charge_type_id, description, amount, company_id } = req.body;
+
+  if (!date || !bank_name || !bank_id || !charges_type || !amount || !company_id) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
 
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
+
+    const [companies] = await connection.query('SELECT id FROM company WHERE id = ?', [company_id]);
+    if (companies.length === 0) {
+      await connection.rollback();
+      return res.status(400).json({ error: 'Selected company was not found' });
+    }
+
+    const bankAccount = await getCompanyBankAccount(connection, company_id, bank_name, bank_id);
+    if (!bankAccount) {
+      await connection.rollback();
+      return res.status(400).json({ error: 'Selected bank account does not belong to the selected company and bank' });
+    }
 
     await checkDuplicateReference(connection, reference_number, { table: 'bank_charges', id });
 
@@ -942,16 +983,16 @@ router.put('/bank-charges/:id', authenticate, async (req, res) => {
       return res.status(404).json({ error: 'Bank charge not found' });
     }
     
-    // The previous bank_id (if not explicitly passed in update, though we should expect it)
+    // The selected account has already been verified for this company and bank.
     const oldBankId = oldRows[0].bank_id;
-    const newBankId = bank_id !== undefined ? bank_id : oldBankId;
+    const newBankId = bank_id;
 
     const [result] = await connection.query(
       `UPDATE bank_charges 
        SET charge_date = ?, bank_name = ?, bank_id = ?, reference_number = ?, 
-           charges_type = ?, bank_charge_type_id = ?, description = ?, amount = ?
+           charges_type = ?, bank_charge_type_id = ?, description = ?, amount = ?, company_id = ?
        WHERE id = ?`,
-      [date, bank_name, newBankId || null, reference_number || null, charges_type, bank_charge_type_id || null, description || null, amount, id]
+      [date, bank_name, newBankId || null, reference_number || null, charges_type, bank_charge_type_id || null, description || null, amount, company_id, id]
     );
     
     if (oldBankId) {
@@ -1438,12 +1479,18 @@ router.get('/online/:id/payments', async (req, res) => {
 // GET all banks (for dropdown) - active only
 router.get('/banks', async (req, res) => {
   try {
-    const [rows] = await pool.query(
-      `SELECT id, bank_name 
-       FROM bank_details 
-       WHERE status = 'Active'
-       ORDER BY bank_name ASC`
-    );
+    const { company_id } = req.query;
+    const query = company_id
+      ? `SELECT bd.id, bd.bank_name, bd.account_number
+         FROM bank_details bd
+         INNER JOIN company c ON LOWER(TRIM(c.name)) = LOWER(TRIM(bd.company))
+         WHERE bd.status = 'Active' AND c.id = ?
+         ORDER BY bd.bank_name ASC, bd.account_number ASC`
+      : `SELECT id, bank_name, account_number
+         FROM bank_details
+         WHERE status = 'Active'
+         ORDER BY bank_name ASC, account_number ASC`;
+    const [rows] = await pool.query(query, company_id ? [company_id] : []);
     res.json(rows || []);
   } catch (error) {
     console.error('Error fetching banks:', error);
