@@ -771,6 +771,50 @@ const makePayment = async (req, res) => {
   try {
     await connection.beginTransaction();
 
+    // Supplier + Company restriction: every invoice in this payment must
+    // belong to the same supplier AND the same company - a supplier can
+    // have invoices spread across multiple companies, so these are two
+    // separate checks, not one. This must be enforced here, not just in
+    // the UI, since a direct API call could otherwise bypass the
+    // frontend's selection lock.
+    const purchaseIds = normalizedAllocations.map((a) => a.purchase_id);
+    const [invoiceCheckRows] = await connection.query(
+      `SELECT id, invoice_no, supplier_id, company_id, balance_amount, payment_status
+       FROM purchases WHERE id IN (${purchaseIds.map(() => '?').join(',')})`,
+      purchaseIds
+    );
+
+    if (invoiceCheckRows.length !== purchaseIds.length) {
+      await connection.rollback();
+      return res.status(404).json({ error: 'One or more selected invoices could not be found' });
+    }
+
+    const uniqueSupplierIds = [...new Set(invoiceCheckRows.map((r) => r.supplier_id))];
+    if (uniqueSupplierIds.length > 1) {
+      await connection.rollback();
+      return res.status(400).json({
+        error: 'You cannot make one payment for invoices belonging to different suppliers or companies. Please select invoices from the same supplier/company.'
+      });
+    }
+
+    const uniqueCompanyIds = [...new Set(invoiceCheckRows.map((r) => String(r.company_id || '')))];
+    if (uniqueCompanyIds.length > 1) {
+      await connection.rollback();
+      return res.status(400).json({
+        error: 'You can only make a payment for one company at a time. Please deselect the current company invoices before selecting invoices from another company.'
+      });
+    }
+
+    const alreadyPaidInvoice = invoiceCheckRows.find(
+      (r) => r.payment_status === 'Paid' || parseFloat(r.balance_amount) <= 0
+    );
+    if (alreadyPaidInvoice) {
+      await connection.rollback();
+      return res.status(400).json({
+        error: `Invoice ${alreadyPaidInvoice.invoice_no} is already fully paid and cannot be selected for payment.`
+      });
+    }
+
     if (voucher_number) {
       await checkDuplicateReference(connection, voucher_number);
     }
