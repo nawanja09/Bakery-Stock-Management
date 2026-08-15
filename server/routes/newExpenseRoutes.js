@@ -28,14 +28,15 @@ router.use(authenticate, restrictRoles('Store Keeper', 'Stores'));
 router.get('/', async (req, res) => {
   try {
     const [rows] = await pool.query(
-      `SELECT id, DATE_FORMAT(bill_date, '%Y-%m-%d') as bill_date, bill_number,
+      `SELECT e.id, DATE_FORMAT(e.bill_date, '%Y-%m-%d') as bill_date, e.bill_number,
               payee_id, payee_name, vat_reg_number, expense_type_id, expense_type,
               without_vat_amount, vat_amount, total_bill_amount, paid_amount,
-              balance, description, payment_status,
-              DATE_FORMAT(created_at, '%Y-%m-%d') as created_date
-       FROM expenses
-       WHERE is_deleted = 0
-       ORDER BY bill_date DESC, created_at DESC`
+              balance, description, payment_status, e.company_id, c.name AS company_name,
+              DATE_FORMAT(e.created_at, '%Y-%m-%d') as created_date
+       FROM expenses e
+       LEFT JOIN company c ON c.id = e.company_id
+       WHERE e.is_deleted = 0
+       ORDER BY e.bill_date DESC, e.created_at DESC`
     );
     res.json(rows || []);
   } catch (error) {
@@ -51,13 +52,13 @@ router.post('/', async (req, res) => {
   const {
     bill_date, bill_number, payee_id, payee_name, vat_reg_number,
     expense_type_id, expense_type, without_vat_amount, vat_amount,
-    total_bill_amount, description
+    total_bill_amount, description, company_id
   } = req.body;
 
   const userId = req.user.userId;
 
-  if (!bill_date || !payee_name || !expense_type) {
-    return res.status(400).json({ error: 'Bill date, payee and expense type are required' });
+  if (!bill_date || !payee_name || !expense_type || !company_id) {
+    return res.status(400).json({ error: 'Bill date, payee, expense type and company are required' });
   }
 
   const withoutVat = parseFloat(without_vat_amount) || 0;
@@ -71,16 +72,21 @@ router.post('/', async (req, res) => {
   }
 
   try {
+    const [companies] = await pool.query('SELECT id FROM company WHERE id = ?', [company_id]);
+    if (companies.length === 0) {
+      return res.status(400).json({ error: 'Selected company was not found' });
+    }
+
     const [result] = await pool.query(
       `INSERT INTO expenses
        (bill_date, bill_number, payee_id, payee_name, vat_reg_number,
         expense_type_id, expense_type, without_vat_amount, vat_amount,
-        total_bill_amount, paid_amount, balance, description, created_by, payment_status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, 'Pending')`,
+        total_bill_amount, paid_amount, balance, description, company_id, created_by, payment_status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, 'Pending')`,
       [
         bill_date, bill_number || null, payee_id || null, payee_name,
         vat_reg_number || null, expense_type_id || null, expense_type,
-        withoutVat, vat, totalBill, totalBill, description || null, userId
+        withoutVat, vat, totalBill, totalBill, description || null, company_id, userId
       ]
     );
 
@@ -99,14 +105,19 @@ router.put('/:id', async (req, res) => {
   const {
     bill_date, bill_number, payee_id, payee_name, vat_reg_number,
     expense_type_id, expense_type, without_vat_amount, vat_amount,
-    total_bill_amount, description
+    total_bill_amount, description, company_id
   } = req.body;
 
-  if (!bill_date || !payee_name || !expense_type) {
-    return res.status(400).json({ error: 'Bill date, payee and expense type are required' });
+  if (!bill_date || !payee_name || !expense_type || !company_id) {
+    return res.status(400).json({ error: 'Bill date, payee, expense type and company are required' });
   }
 
   try {
+    const [companies] = await pool.query('SELECT id FROM company WHERE id = ?', [company_id]);
+    if (companies.length === 0) {
+      return res.status(400).json({ error: 'Selected company was not found' });
+    }
+
     const [existingRows] = await pool.query(
       'SELECT paid_amount FROM expenses WHERE id = ? AND is_deleted = 0',
       [id]
@@ -128,12 +139,12 @@ router.put('/:id', async (req, res) => {
       `UPDATE expenses
        SET bill_date = ?, bill_number = ?, payee_id = ?, payee_name = ?, vat_reg_number = ?,
            expense_type_id = ?, expense_type = ?, without_vat_amount = ?, vat_amount = ?,
-           total_bill_amount = ?, balance = ?, description = ?
+           total_bill_amount = ?, balance = ?, description = ?, company_id = ?
        WHERE id = ?`,
       [
         bill_date, bill_number || null, payee_id || null, payee_name, vat_reg_number || null,
         expense_type_id || null, expense_type, withoutVat, vat, totalBill, totalBill,
-        description || null, id
+        description || null, company_id, id
       ]
     );
 
@@ -262,7 +273,7 @@ router.post('/pay', async (req, res) => {
 
     const placeholders = expense_ids.map(() => '?').join(',');
     const [bills] = await connection.query(
-      `SELECT id, balance, total_bill_amount, paid_amount, payee_id, payee_name, bill_number
+      `SELECT id, balance, total_bill_amount, paid_amount, payee_id, payee_name, bill_number, company_id
        FROM expenses
        WHERE id IN (${placeholders}) AND is_deleted = 0 FOR UPDATE`,
       expense_ids
@@ -277,6 +288,12 @@ router.post('/pay', async (req, res) => {
     if (distinctPayees.length > 1) {
       await connection.rollback();
       return res.status(400).json({ error: 'All selected bills must belong to the same payee' });
+    }
+
+    const distinctCompanies = [...new Set(bills.map(b => b.company_id).filter(Boolean))];
+    if (distinctCompanies.length > 1 || (distinctCompanies.length === 1 && bills.some(b => !b.company_id))) {
+      await connection.rollback();
+      return res.status(400).json({ error: 'All selected bills must belong to the same company' });
     }
 
     const totalBillAmount = bills.reduce((sum, b) => sum + parseFloat(b.balance || 0), 0);
@@ -345,10 +362,13 @@ router.post('/pay', async (req, res) => {
         createdBy: userId
       });
     } else {
-      // Cash payment - fall back to the first configured cash account,
-      // same convention used by the Petty Cash module.
-      const [cashAcc] = await connection.query('SELECT company_id FROM cash_accounts LIMIT 1');
-      const companyId = cashAcc.length > 0 ? cashAcc[0].company_id : 1;
+      // Use the selected bill company. Historical bills without a company retain
+      // the previous behaviour of using the first configured cash account.
+      let companyId = distinctCompanies[0];
+      if (!companyId) {
+        const [cashAcc] = await connection.query('SELECT company_id FROM cash_accounts LIMIT 1');
+        companyId = cashAcc[0]?.company_id;
+      }
       await recordCashTransaction(connection, {
         companyId,
         date: payment_date,

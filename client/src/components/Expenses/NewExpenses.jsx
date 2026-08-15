@@ -33,6 +33,7 @@ import api from '../../api';
 const emptyBillForm = {
   bill_date: new Date().toISOString().split('T')[0],
   bill_number: '',
+  company_id: '',
   payee_id: '',
   payee_name: '',
   vat_reg_number: '',
@@ -77,6 +78,7 @@ const NewExpenses = () => {
   const [expenseTypes, setExpenseTypes] = useState([]);
   const [paymentTypes, setPaymentTypes] = useState([]);
   const [banks, setBanks] = useState([]);
+  const [companies, setCompanies] = useState([]);
 
   // Payee dropdown (bill form)
   const [payeeSearch, setPayeeSearch] = useState('');
@@ -153,13 +155,24 @@ const NewExpenses = () => {
     }
   }, []);
 
+  const fetchCompanies = useCallback(async () => {
+    try {
+      const response = await api.get('/companies');
+      setCompanies(response.data || []);
+    } catch (error) {
+      console.error('Error fetching companies:', error);
+      showPopup('error', 'Failed to load companies');
+    }
+  }, [showPopup]);
+
   useEffect(() => {
     fetchBills();
     fetchPayees();
     fetchExpenseTypes();
     fetchPaymentTypes();
     fetchBanks();
-  }, [fetchBills, fetchPayees, fetchExpenseTypes, fetchPaymentTypes, fetchBanks]);
+    fetchCompanies();
+  }, [fetchBills, fetchPayees, fetchExpenseTypes, fetchPaymentTypes, fetchBanks, fetchCompanies]);
 
   useEffect(() => {
     const query = payeeSearch.trim().toLowerCase();
@@ -267,7 +280,7 @@ const NewExpenses = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!formData.bill_date || !formData.payee_name || !formData.expense_type) {
+    if (!formData.bill_date || !formData.company_id || !formData.payee_name || !formData.expense_type) {
       showPopup('error', 'Please fill all required fields');
       return;
     }
@@ -281,6 +294,7 @@ const NewExpenses = () => {
       const payload = {
         bill_date: formData.bill_date,
         bill_number: formData.bill_number || null,
+        company_id: formData.company_id,
         payee_id: formData.payee_id || null,
         payee_name: formData.payee_name,
         vat_reg_number: formData.vat_reg_number || null,
@@ -315,6 +329,7 @@ const NewExpenses = () => {
     setFormData({
       bill_date: bill.bill_date,
       bill_number: bill.bill_number || '',
+      company_id: bill.company_id || '',
       payee_id: bill.payee_id || '',
       payee_name: bill.payee_name,
       vat_reg_number: bill.vat_reg_number || '',
@@ -540,6 +555,15 @@ const NewExpenses = () => {
 
           <div className="form-row">
             <div className="form-group">
+              <label>Company <span className="required">*</span></label>
+              <select name="company_id" value={formData.company_id} onChange={handleChange} required className="form-select">
+                <option value="">Select Company</option>
+                {companies.map(company => (
+                  <option key={company.id} value={company.id}>{company.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
               <label>Payee Name <span className="required">*</span></label>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
                 <div className="payee-dropdown-wrapper" style={{ flex: 1 }}>
@@ -576,7 +600,9 @@ const NewExpenses = () => {
                 </div>
               </div>
             </div>
+          </div>
 
+          <div className="form-row">
             <div className="form-group">
               <label>VAT Reg Number</label>
               <input
@@ -584,9 +610,6 @@ const NewExpenses = () => {
                 readOnly className="form-input" placeholder="Auto-filled from payee"
               />
             </div>
-          </div>
-
-          <div className="form-row">
             <div className="form-group">
               <label>Expenses Type <span className="required">*</span></label>
               <div style={{ display: 'flex', gap: '8px' }}>
@@ -620,6 +643,9 @@ const NewExpenses = () => {
                 className="form-input amount-input" placeholder="0.00"
               />
             </div>
+          </div>
+
+          <div className="form-row">
             <div className="form-group">
               <label>Total Bill Amount</label>
               <input
@@ -703,6 +729,7 @@ const NewExpenses = () => {
                 <th>Bill Date</th>
                 <th>Bill Number</th>
                 <th>Payee Name</th>
+                <th>Company</th>
                 <th>VAT Reg No</th>
                 <th>Without VAT Amount</th>
                 <th>VAT Amount</th>
@@ -715,7 +742,7 @@ const NewExpenses = () => {
             </thead>
             <tbody>
               {isFetching ? (
-                <tr><td colSpan="11" className="loading-row"><FontAwesomeIcon icon={faSpinner} spin /> Loading expenses...</td></tr>
+                <tr><td colSpan="12" className="loading-row"><FontAwesomeIcon icon={faSpinner} spin /> Loading expenses...</td></tr>
               ) : filteredBills.length > 0 ? (
                 filteredBills.map(bill => {
                   const isPaid = parseFloat(bill.balance || 0) <= 0;
@@ -729,6 +756,7 @@ const NewExpenses = () => {
                       <td className="date-cell">{bill.bill_date}</td>
                       <td className="bill-number-cell">{bill.bill_number || '-'}</td>
                       <td className="payee-cell">{bill.payee_name}</td>
+                      <td>{bill.company_name || '-'}</td>
                       <td className="vat-cell">{bill.vat_reg_number || '-'}</td>
                       <td className="amount-cell">{formatCurrency(bill.without_vat_amount)}</td>
                       <td className="amount-cell">{formatCurrency(bill.vat_amount)}</td>
@@ -756,7 +784,7 @@ const NewExpenses = () => {
                 })
               ) : (
                 <tr>
-                  <td colSpan="11" className="empty-row">
+                  <td colSpan="12" className="empty-row">
                     {viewFilter === 'paid' ? 'No paid expense bills found' : 'No pending expense bills found'}
                   </td>
                 </tr>

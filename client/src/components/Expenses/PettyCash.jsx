@@ -440,25 +440,7 @@ const PettyCash = () => {
                 <div className="form-group"><label>Voucher Number <span className="required">*</span></label><div className="input-with-button"><input type="text" name="voucher_number" value={voucherForm.voucher_number} onChange={handleVoucherChange} required className="form-input" placeholder="Enter voucher number" /></div></div>
               </div>
               <div className="form-row">
-                <div className="form-group">
-                  <label>Company (Cash Book) {!isEditing && <span className="required">*</span>}</label>
-                  {isEditing ? (
-                    <input
-                      type="text"
-                      className="form-input"
-                      disabled
-                      value={cashBookOptions.find(o => o.value === voucherForm.company_id)?.label || 'Not recorded'}
-                    />
-                  ) : (
-                    <select name="company_id" value={voucherForm.company_id} onChange={handleVoucherChange} required className="form-select">
-                      <option value="">Select Company</option>
-                      {cashBookOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                    </select>
-                  )}
-                </div>
                 <div className="form-group"><label>Employee Name</label><input type="text" name="employee_name" value={voucherForm.employee_name} onChange={handleVoucherChange} className="form-input" placeholder="Optional" /></div>
-              </div>
-              <div className="form-row">
                 <div className="form-group">
                   <label>Payee Name <span className="required">*</span></label>
                   <select name="payee_name" value={voucherForm.payee_name} onChange={handleVoucherChange} required className="form-select">
@@ -466,6 +448,8 @@ const PettyCash = () => {
                     {payees.map(p => <option key={p.id} value={p.payee_name}>{p.payee_name}</option>)}
                   </select>
                 </div>
+              </div>
+              <div className="form-row">
                 <div className="form-group">
                   <label>Expenses Type <span className="required">*</span></label>
                   <select name="expense_type" value={voucherForm.expense_type} onChange={handleVoucherChange} required className="form-select">
@@ -473,13 +457,13 @@ const PettyCash = () => {
                     {expenseTypes.map(type => <option key={type.id} value={type.name}>{type.name}</option>)}
                   </select>
                 </div>
-              </div>
-              <div className="form-row">
                 <div className="form-group"><label>Vehicle Number</label><input type="text" name="vehicle_number" value={voucherForm.vehicle_number} onChange={handleVoucherChange} className="form-input" placeholder="If applicable" /></div>
-                <div className="form-group"><label>Receipt Number</label><input type="text" name="receipt_no" value={voucherForm.receipt_no} onChange={handleVoucherChange} className="form-input" placeholder="Optional" /></div>
               </div>
               <div className="form-row">
+                <div className="form-group"><label>Receipt Number</label><input type="text" name="receipt_no" value={voucherForm.receipt_no} onChange={handleVoucherChange} className="form-input" placeholder="Optional" /></div>
                 <div className="form-group"><label>Amount (LKR) <span className="required">*</span></label><input type="number" name="amount" value={voucherForm.amount} onChange={handleVoucherChange} required min="0.01" step="0.01" className="form-input amount-input" placeholder="0.00" /></div>
+              </div>
+              <div className="form-row">
                 <div className="form-group full-width"><label>Description</label><textarea name="description" value={voucherForm.description} onChange={handleVoucherChange} className="form-textarea" rows="3" placeholder="Optional" /></div>
               </div>
               <div className="form-actions">
