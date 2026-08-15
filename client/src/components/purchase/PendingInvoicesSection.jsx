@@ -10,7 +10,6 @@ import {
   faSearch,
   faReceipt,
   faWallet,
-  faExclamationTriangle,
   faFileInvoice,
   faMoneyBillWave,
   faFilter,
@@ -155,9 +154,41 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], comp
   }, [allRecords, activeFilterId]);
 
   // Selection helpers
-  const selectableInvoices = filteredRecords.filter((r) => r._rowType === 'invoice');
+  const selectedInvoicesList = allInvoices.filter((i) => selectedInvoiceIds.has(i.id));
 
-  const toggleSelection = (id) => {
+  // Once one invoice is selected, its supplier AND company lock the rest
+  // of the selection - invoices from any other supplier, or from the
+  // same supplier but a different company, become unselectable until the
+  // selection is cleared. (Supplier + Company = one payment group.)
+  const lockedSupplierId = selectedInvoicesList.length > 0
+    ? String(selectedInvoicesList[0].supplier_id)
+    : null;
+  const lockedCompanyId = selectedInvoicesList.length > 0
+    ? String(selectedInvoicesList[0].company_id || '')
+    : null;
+
+  const selectableInvoices = filteredRecords.filter(
+    (r) =>
+      r._rowType === 'invoice' &&
+      (!lockedSupplierId || String(r.supplier_id) === lockedSupplierId) &&
+      (!lockedCompanyId || String(r.company_id || '') === lockedCompanyId)
+  );
+
+  const toggleSelection = (id, record) => {
+    // Block selecting a different company's invoice outright, with a
+    // clear explanation, instead of silently allowing then rejecting later.
+    if (
+      record &&
+      !selectedInvoiceIds.has(id) &&
+      lockedCompanyId &&
+      String(record.company_id || '') !== lockedCompanyId
+    ) {
+      showPopup(
+        'error',
+        'You can only make a payment for one company at a time. Please deselect the current company invoices before selecting invoices from another company.'
+      );
+      return;
+    }
     const next = new Set(selectedInvoiceIds);
     if (next.has(id)) next.delete(id);
     else next.add(id);
@@ -172,14 +203,22 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], comp
     }
   };
 
-  // Cross-supplier validation
+  // Cross-supplier / cross-company validation
   const validateSameSupplier = (records, actionName) => {
-    const ids = [...new Set(records.map((r) => r.supplier_id))];
-    if (ids.length > 1) {
+    const supplierIds = [...new Set(records.map((r) => r.supplier_id))];
+    if (supplierIds.length > 1) {
       showPopup(
         'error',
         `Cannot ${actionName}: selected records belong to different suppliers. ` +
           'Please select records from the same supplier only.'
+      );
+      return false;
+    }
+    const companyIds = [...new Set(records.map((r) => String(r.company_id || '')))];
+    if (companyIds.length > 1) {
+      showPopup(
+        'error',
+        'You can only make a payment for one company at a time. Please deselect the current company invoices before selecting invoices from another company.'
       );
       return false;
     }
@@ -248,7 +287,6 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], comp
     ? supplierName || suppliers.find((s) => String(s.id) === String(activeFilterId))?.name || ''
     : '';
 
-  const selectedInvoicesList = allInvoices.filter((i) => selectedInvoiceIds.has(i.id));
   const selectedTotal = useMemo(() =>
     selectedInvoicesList.reduce((sum, invoice) => sum + parseFloat(invoice.balance_amount || 0), 0),
     [selectedInvoicesList]
@@ -393,17 +431,16 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], comp
         </div>
       )}
 
-      {/* Cross-supplier warning */}
-      {selectedInvoiceIds.size > 0 &&
-        new Set(selectedInvoicesList.map((i) => i.supplier_id)).size > 1 && (
-          <div className="pis-cross-supplier-warning">
-            <FontAwesomeIcon icon={faExclamationTriangle} />
-            <span>
-              Selected invoices belong to <strong>different suppliers</strong>. Please select
-              invoices from the same supplier only before paying.
-            </span>
-          </div>
-        )}
+      {/* Supplier + Company lock notice - shown once a selection has
+          locked the payment to a single supplier/company pair */}
+      {lockedSupplierId && (
+        <div className="pis-active-filter-notice">
+          <FontAwesomeIcon icon={faFilter} />
+          Payment locked to <strong>{selectedInvoicesList[0]?.supplier_name}</strong>
+          {selectedInvoicesList[0]?.company_name ? <> / <strong>{selectedInvoicesList[0].company_name}</strong></> : ''}
+          . Invoices from other suppliers or other companies are disabled until you clear this selection.
+        </div>
+      )}
 
       {/* Unified Table */}
       <div className="pis-table-container">
@@ -457,10 +494,14 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], comp
                 const isSelected = isInvoice && selectedInvoiceIds.has(record.id);
                 const rowKey = `${record._rowType}-${record.id}`;
 
+                const isSupplierLockedOut = isInvoice && !isSelected && lockedSupplierId && String(record.supplier_id) !== lockedSupplierId;
+                const isCompanyLockedOut = isInvoice && !isSelected && !isSupplierLockedOut && lockedCompanyId && String(record.company_id || '') !== lockedCompanyId;
+                const isDisabledByLock = isSupplierLockedOut || isCompanyLockedOut;
+
                 return (
                   <tr
                     key={rowKey}
-                    className={`${isSelected ? 'selected' : ''} pis-row-${record._rowType}`}
+                    className={`${isSelected ? 'selected' : ''} ${isDisabledByLock ? 'pis-row-locked-out' : ''} pis-row-${record._rowType}`}
                   >
                     <td style={{ textAlign: 'center' }}>
                       {isInvoice ? (
@@ -468,7 +509,15 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], comp
                           type="checkbox"
                           className="pis-checkbox"
                           checked={isSelected}
-                          onChange={() => toggleSelection(record.id)}
+                          disabled={isSupplierLockedOut}
+                          title={
+                            isSupplierLockedOut
+                              ? 'Belongs to a different supplier than your current selection - clear the selection first to pay this invoice.'
+                              : isCompanyLockedOut
+                                ? 'Belongs to a different company for this supplier - deselect the current company\'s invoices first to pay this one instead.'
+                                : undefined
+                          }
+                          onChange={() => toggleSelection(record.id, record)}
                         />
                       ) : (
                         <span className="pis-no-check" title="Credits cannot be directly paid" />

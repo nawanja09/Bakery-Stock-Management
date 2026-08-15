@@ -136,6 +136,13 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
       );
     }
 
+    if (uniqueCompanies.length > 1) {
+      return showPopup(
+        'error',
+        'You can only make a payment for one company at a time. Please deselect the current company invoices before selecting invoices from another company.'
+      );
+    }
+
     if (!formData.payment_date) return showPopup('error', 'Payment date is required');
     if (formData.amount <= 0) return showPopup('error', 'Amount must be greater than 0');
     if (formData.payment_method === 'Cheque' && !formData.check_number) {
@@ -279,35 +286,6 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
               </div>
             </div>
 
-            {isBankMethod && (
-              <div className="ipm-form-group">
-                <label>Bank Account *</label>
-                <select
-                  name="bank_id"
-                  value={formData.bank_id}
-                  onChange={handleChange}
-                  required
-                  disabled={!resolvedCompanyId || loadingBanks}
-                >
-                  <option value="">
-                    {!resolvedCompanyId
-                      ? 'No company found for selected invoices'
-                      : loadingBanks ? 'Loading…' : 'Select bank account'}
-                  </option>
-                  {bankAccounts.map(b => (
-                    <option key={b.id} value={b.id}>
-                      {b.bank_name}{b.account_number ? ` — ${b.account_number}` : ''}
-                    </option>
-                  ))}
-                </select>
-                {selectedBankAccount && (
-                  <div className="ipm-balance-hint">
-                    Current Balance: Rs. {parseFloat(selectedBankAccount.current_balance || 0).toFixed(2)}
-                  </div>
-                )}
-              </div>
-            )}
-
             <div className="ipm-form-row">
               <div className="ipm-form-group">
                 <label>Voucher Number</label>
@@ -354,6 +332,35 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
               </div>
               <span className="ipm-hint">Any amount above the invoice balance will be stored as supplier credit.</span>
             </div>
+
+            {isBankMethod && (
+              <div className="ipm-form-group">
+                <label>Bank Account *</label>
+                <select
+                  name="bank_id"
+                  value={formData.bank_id}
+                  onChange={handleChange}
+                  required
+                  disabled={!resolvedCompanyId || loadingBanks}
+                >
+                  <option value="">
+                    {!resolvedCompanyId
+                      ? 'No company found for selected invoices'
+                      : loadingBanks ? 'Loading…' : 'Select bank account'}
+                  </option>
+                  {bankAccounts.map(b => (
+                    <option key={b.id} value={b.id}>
+                      {b.bank_name}{b.account_number ? ` — ${b.account_number}` : ''}
+                    </option>
+                  ))}
+                </select>
+                {selectedBankAccount && (
+                  <div className="ipm-balance-hint">
+                    Current Balance: Rs. {parseFloat(selectedBankAccount.current_balance || 0).toFixed(2)}
+                  </div>
+                )}
+              </div>
+            )}
 
             {isCashMethod && resolvedCompanyId && (
               <div className="ipm-form-group">

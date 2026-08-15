@@ -536,3 +536,11 @@
   .pis-filter-select-wrap { flex-direction: column; align-items: stretch; }
   .pis-credit-legend  { flex-direction: column; }
 }
+/* Rows disabled because they belong to a different supplier than the
+   currently locked selection (Supplier-Specific Payment restriction). */
+.pis-row-locked-out {
+  opacity: 0.45;
+}
+.pis-row-locked-out td {
+  cursor: not-allowed;
+}
