@@ -2,7 +2,7 @@ const pool = require('../config/db');
 
 const getStockReport = async (req, res) => {
   try {
-    const { date, status } = req.query;
+    const { date } = req.query;
 
     if (!date) {
       return res.status(400).json({ error: 'Date parameter is required' });
@@ -18,15 +18,6 @@ const getStockReport = async (req, res) => {
     prevDate.setDate(prevDate.getDate() - 1);
     const prevDateStr = prevDate.toISOString().split('T')[0];
 
-    // Build status filter condition
-    let statusCondition = '';
-    if (status === 'active') {
-      statusCondition = 'AND i.status = 1';
-    } else if (status === 'inactive') {
-      statusCondition = 'AND i.status = 0';
-    }
-    // 'all' - no filter
-
     const query = `
       SELECT 
         i.id,
@@ -34,7 +25,6 @@ const getStockReport = async (req, res) => {
         i.name AS item_name,
         i.unit,
         i.auto_add_to_stock,
-        i.status,
         COALESCE(prev.closing_balance, 0) + COALESCE(ob_today.opening_balance_today, 0) AS opening_balance,
         COALESCE(purchases.total_purchased, 0) AS total_purchased,
         COALESCE(issues.total_issued, 0) AS total_issued,
@@ -124,6 +114,7 @@ const getStockReport = async (req, res) => {
           GROUP BY item_id
         ) adjustments ON i2.id = adjustments.item_id
         WHERE i2.deleted = FALSE
+          AND i2.is_active = TRUE
       ) prev ON i.id = prev.item_id
       LEFT JOIN (
         SELECT item_id, SUM(quantity) AS opening_balance_today
@@ -175,7 +166,7 @@ const getStockReport = async (req, res) => {
       ) adjustments ON i.id = adjustments.item_id
       WHERE i.auto_add_to_stock = 1
         AND i.deleted = FALSE
-        ${statusCondition}
+        AND i.is_active = TRUE
       ORDER BY i.item_code
     `;
 
@@ -1139,15 +1130,7 @@ const getDepartmentReturnItemWiseReport = async (req, res) => {
 //                                    bottom (so they don't dominate the top)
 const getLastIssueDateReport = async (req, res) => {
   try {
-    const { status, sortOrder } = req.query;
-
-    let statusCondition = '';
-    if (status === 'active') {
-      statusCondition = 'AND i.status = 1';
-    } else if (status === 'inactive') {
-      statusCondition = 'AND i.status = 0';
-    }
-    // 'all' / omitted -> no filter
+    const { sortOrder } = req.query;
 
     const direction = String(sortOrder).toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
 
@@ -1157,15 +1140,13 @@ const getLastIssueDateReport = async (req, res) => {
         i.item_code,
         i.name AS item_name,
         i.unit,
-        i.status,
         MAX(iss.issuance_date) AS last_issue_date,
         DATE_FORMAT(MAX(iss.issuance_date), '%Y-%m-%d') AS last_issue_date_only
       FROM items i
       LEFT JOIN issuance_items ii ON ii.item_id = i.id
       LEFT JOIN issuances iss ON ii.issuance_id = iss.id
       WHERE i.deleted = FALSE
-        ${statusCondition}
-      GROUP BY i.id, i.item_code, i.name, i.unit, i.status
+      GROUP BY i.id, i.item_code, i.name, i.unit
       ORDER BY (MAX(iss.issuance_date) IS NULL) ASC, last_issue_date ${direction}, i.item_code ASC
     `;
 

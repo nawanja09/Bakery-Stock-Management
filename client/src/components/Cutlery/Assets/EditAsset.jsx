@@ -14,6 +14,7 @@ const EditAsset = () => {
     image: null
   });
   const [imagePreview, setImagePreview] = useState(null);
+  const [imageError, setImageError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
   const fileInputRef = useRef(null);
@@ -35,6 +36,7 @@ const EditAsset = () => {
         image: null
       });
       setImagePreview(assetData.image_url);
+      setImageError(false);
     } catch (err) {
       console.error('Error fetching asset:', err);
       showPopup('error', 'Failed to load asset');
@@ -62,7 +64,10 @@ const EditAsset = () => {
       }
       setFormData(prev => ({ ...prev, image: file }));
       const reader = new FileReader();
-      reader.onload = (e) => setImagePreview(e.target.result);
+      reader.onload = (e) => {
+        setImagePreview(e.target.result);
+        setImageError(false);
+      };
       reader.readAsDataURL(file);
     }
   };
@@ -70,6 +75,7 @@ const EditAsset = () => {
   const handleRemoveImage = () => {
     setFormData(prev => ({ ...prev, image: null }));
     setImagePreview(asset?.image_url || null);
+    setImageError(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -145,9 +151,9 @@ const EditAsset = () => {
                 className="file-input"
                 disabled={submitting}
               />
-              {imagePreview ? (
+              {imagePreview && !imageError ? (
                 <div className="image-preview">
-                  <img src={imagePreview} alt="Preview" />
+                  <img src={imagePreview} alt="Preview" onError={() => setImageError(true)} />
                   <button
                     type="button"
                     className="btn-remove-image"

@@ -17,14 +17,20 @@ api.interceptors.request.use(config => {
   return config;
 });
 
-// Handle 401 errors globally
+// Handle 401 errors globally — token expired or invalid
 api.interceptors.response.use(
   response => response,
   error => {
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      window.location.href = '/login';
+      // Encode the current page so Login can redirect back after re-authentication.
+      const currentPath = window.location.pathname + window.location.search;
+      const redirectTo =
+        currentPath && currentPath !== '/login'
+          ? `/login?redirect=${encodeURIComponent(currentPath)}`
+          : '/login';
+      window.location.href = redirectTo;
     }
     return Promise.reject(error);
   }

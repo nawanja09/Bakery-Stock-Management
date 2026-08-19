@@ -78,6 +78,9 @@ ALTER TABLE `finished_goods_ingredients`
 ALTER TABLE `finished_goods_items`
   ADD COLUMN IF NOT EXISTS `status` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=Active, 0=Deleted (soft delete)';
 
+ALTER TABLE `items`
+  ADD COLUMN IF NOT EXISTS `is_active` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=Active, 0=Inactive';
+
 ALTER TABLE `finished_goods_opening_balances`
   ADD COLUMN IF NOT EXISTS `status` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=Active, 0=Deleted (soft delete)';
 
@@ -113,9 +116,6 @@ ALTER TABLE `issuances`
 
 ALTER TABLE `item_types`
   ADD COLUMN IF NOT EXISTS `status` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=Active, 0=Deleted (soft delete)';
-
-ALTER TABLE `items`
-  ADD COLUMN IF NOT EXISTS `record_status` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=Active, 0=Deleted (soft delete)';
 
 ALTER TABLE `online_expense_payments`
   ADD COLUMN IF NOT EXISTS `record_status` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=Active, 0=Deleted (soft delete)';
@@ -203,7 +203,6 @@ ALTER TABLE `wastages`
 -- reflects current data immediately.
 -- ---------------------------------------------------------------------
 
-UPDATE `items` SET `record_status` = 0 WHERE `deleted` = 1;
 UPDATE `purchases` SET `status` = 0 WHERE `deleted` = 1;
 UPDATE `wastages` SET `status` = 0 WHERE `deleted` = 1;
 UPDATE `supplier` SET `status` = 0 WHERE `is_deleted` = 1;

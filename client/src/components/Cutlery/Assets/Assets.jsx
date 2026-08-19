@@ -7,6 +7,16 @@ import './Assets.css';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faEye, faPen, faTrash } from '@fortawesome/free-solid-svg-icons';
 
+const FallbackImage = ({ src, alt }) => {
+  const [error, setError] = useState(false);
+  
+  if (!src || error) {
+    return <div className="image-placeholder">🍴</div>;
+  }
+  
+  return <img src={src} alt={alt} onError={() => setError(true)} />;
+};
+
 const Assets = () => {
   const [assets, setAssets] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -91,11 +101,7 @@ const Assets = () => {
                 className="asset-image"
                 onClick={() => navigate(`/cutlery/assets/view/${asset.id}`)}
               >
-                {asset.image_url ? (
-                  <img src={asset.image_url} alt={asset.asset_name} />
-                ) : (
-                  <div className="image-placeholder">🍴</div>
-                )}
+                <FallbackImage src={asset.image_url} alt={asset.asset_name} />
               </div>
 
               <div className="asset-body">

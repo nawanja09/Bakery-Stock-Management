@@ -273,6 +273,8 @@ const getItemsWithStock = async (req, res) => {
           ), 0
         ) AS current_stock
       FROM items i
+      WHERE i.deleted = FALSE
+        AND i.is_active = TRUE
       ORDER BY i.name
     `);
     

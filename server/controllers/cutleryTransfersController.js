@@ -13,7 +13,7 @@ const getTransfers = async (req, res) => {
       LEFT JOIN cutlery_locations cl_from ON ct.location_from_id = cl_from.id
       LEFT JOIN cutlery_locations cl_to ON ct.location_to_id = cl_to.id
       LEFT JOIN users u ON ct.created_by = u.id
-      WHERE COALESCE(ct.status, 1) = 1
+      WHERE COALESCE(ct.is_deleted, 1) = 1
       ORDER BY ct.transfer_date DESC, ct.created_at DESC
     `);
     
@@ -67,7 +67,7 @@ const getTransferById = async (req, res) => {
       LEFT JOIN cutlery_locations cl_from ON ct.location_from_id = cl_from.id
       LEFT JOIN cutlery_locations cl_to ON ct.location_to_id = cl_to.id
       LEFT JOIN users u ON ct.created_by = u.id
-      WHERE ct.id = ? AND COALESCE(ct.status, 1) = 1
+      WHERE ct.id = ? AND COALESCE(ct.is_deleted, 1) = 1
     `, [id]);
 
     if (transfer.length === 0) {
@@ -277,7 +277,7 @@ const updateTransfer = async (req, res) => {
 
     // Check if transfer exists
     const [existingTransfer] = await connection.query(
-      'SELECT * FROM cutlery_transfers WHERE id = ? AND COALESCE(status, 1) = 1',
+      'SELECT * FROM cutlery_transfers WHERE id = ? AND COALESCE(is_deleted, 1) = 1',
       [id]
     );
 
@@ -373,7 +373,7 @@ const deleteTransfer = async (req, res) => {
     console.log('Deleting transfer ID:', id);
 
     const [result] = await pool.query(
-      'UPDATE cutlery_transfers SET status = 0 WHERE id = ? AND COALESCE(status, 1) = 1',
+      'UPDATE cutlery_transfers SET is_deleted = 0 WHERE id = ? AND COALESCE(is_deleted, 1) = 1',
       [id]
     );
 

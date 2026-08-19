@@ -8,6 +8,7 @@ router.get('/without-opening', itemController.getItemsWithoutOpeningBalance);
 router.post('/', itemController.createItem);
 router.get('/:id', itemController.getItemById);
 router.put('/:id', itemController.updateItem);
+router.patch('/:id/status', itemController.updateItemStatus);
 router.delete('/:id', itemController.deleteItem);
 
 module.exports = router;
