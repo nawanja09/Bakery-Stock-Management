@@ -4,26 +4,17 @@ const pool = require('../config/db');
 // CREATE ITEM with Auto-Add functionality
 // =============================================
 const createItem = async (req, res) => {
-  const { 
-    item_code, 
-    name, 
-    unit, 
-    item_type, 
-    vat_applicable, 
-    auto_add_to_stock, 
-    reorder_level,
-    status // Add status
-  } = req.body;
+  const { item_code, name, unit, item_type, vat_applicable, auto_add_to_stock, reorder_level } = req.body;
 
   const connection = await pool.getConnection();
   
   try {
     await connection.beginTransaction();
 
-    // Insert item with status
+    // Insert item
     const [result] = await connection.query(
-      'INSERT INTO items (item_code, name, unit, item_type, vat_applicable, auto_add_to_stock, reorder_level, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [item_code, name, unit, item_type || 'Other', vat_applicable || false, auto_add_to_stock !== undefined ? auto_add_to_stock : true, reorder_level, status !== undefined ? status : 1]
+      'INSERT INTO items (item_code, name, unit, item_type, vat_applicable, auto_add_to_stock, reorder_level) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [item_code, name, unit, item_type || 'Other', vat_applicable || false, auto_add_to_stock !== undefined ? auto_add_to_stock : true, reorder_level]
     );
 
     // Auto-add to stock if enabled (default is true)
@@ -69,7 +60,7 @@ const createItem = async (req, res) => {
 // =============================================
 const getAllItems = async (req, res) => {
   try {
-    const { auto_add_only, status } = req.query;
+    const { auto_add_only, include_inactive } = req.query;
     
     let query = `
       SELECT 
@@ -81,7 +72,7 @@ const getAllItems = async (req, res) => {
         i.vat_applicable,
         i.auto_add_to_stock,
         i.reorder_level,
-        i.status,
+        i.is_active,
         COALESCE(
           (SELECT COALESCE(SUM(quantity), 0) FROM opening_balances WHERE item_id = i.id) +
           (SELECT COALESCE(SUM(pi.quantity), 0) 
@@ -102,18 +93,15 @@ const getAllItems = async (req, res) => {
            WHERE ri.item_id = i.id),
         0) AS current_stock
       FROM items i
-      WHERE COALESCE(i.status, 1) = 1
+      WHERE i.deleted = FALSE
     `;
+
+    if (include_inactive !== 'true') {
+      query += ' AND i.is_active = TRUE';
+    }
     
     if (auto_add_only === 'true') {
       query += ' AND i.auto_add_to_stock = 1';
-    }
-    
-    // Add status filter
-    if (status === 'active') {
-      query += ' AND i.status = 1';
-    } else if (status === 'inactive') {
-      query += ' AND i.status = 0';
     }
     
     query += ' ORDER BY i.item_code';
@@ -143,7 +131,7 @@ const getItemById = async (req, res) => {
         i.vat_applicable,
         i.auto_add_to_stock,
         i.reorder_level,
-        i.status,
+        i.is_active,
         COALESCE(
           (SELECT COALESCE(SUM(quantity), 0) FROM opening_balances WHERE item_id = i.id) +
           (SELECT COALESCE(SUM(pi.quantity), 0) 
@@ -164,7 +152,7 @@ const getItemById = async (req, res) => {
            WHERE ri.item_id = i.id),
         0) AS current_stock
       FROM items i
-      WHERE i.id = ? AND COALESCE(i.status, 1) = 1
+      WHERE i.id = ? AND i.deleted = FALSE
     `, [id]);
     
     if (rows.length === 0) {
@@ -183,16 +171,7 @@ const getItemById = async (req, res) => {
 // =============================================
 const updateItem = async (req, res) => {
   const { id } = req.params;
-  const { 
-    item_code, 
-    name, 
-    unit, 
-    item_type, 
-    vat_applicable, 
-    auto_add_to_stock, 
-    reorder_level,
-    status // Add status
-  } = req.body;
+  const { item_code, name, unit, item_type, vat_applicable, auto_add_to_stock, reorder_level } = req.body;
 
   const connection = await pool.getConnection();
   
@@ -205,10 +184,10 @@ const updateItem = async (req, res) => {
       [id]
     );
 
-    // Update item with status
+    // Update item
     const [result] = await connection.query(
-      'UPDATE items SET item_code = ?, name = ?, unit = ?, item_type = ?, vat_applicable = ?, auto_add_to_stock = ?, reorder_level = ?, status = ? WHERE id = ? AND COALESCE(status, 1) = 1',
-      [item_code, name, unit, item_type || 'Other', vat_applicable || false, auto_add_to_stock !== undefined ? auto_add_to_stock : true, reorder_level, status !== undefined ? status : 1, id]
+      'UPDATE items SET item_code = ?, name = ?, unit = ?, item_type = ?, vat_applicable = ?, auto_add_to_stock = ?, reorder_level = ? WHERE id = ? AND deleted = FALSE',
+      [item_code, name, unit, item_type || 'Other', vat_applicable || false, auto_add_to_stock !== undefined ? auto_add_to_stock : true, reorder_level, id]
     );
     
     if (result.affectedRows === 0) {
@@ -278,7 +257,7 @@ const deleteItem = async (req, res) => {
 
     // Soft delete
     const [result] = await connection.query(
-      'UPDATE items SET status = 0 WHERE id = ? AND COALESCE(status, 1) = 1', 
+      'UPDATE items SET deleted = TRUE WHERE id = ?', 
       [id]
     );
     
@@ -319,6 +298,37 @@ const deleteItem = async (req, res) => {
 };
 
 // =============================================
+// SET ITEM ACTIVE/INACTIVE (separate from delete)
+// =============================================
+const updateItemStatus = async (req, res) => {
+  const { id } = req.params;
+  const { is_active } = req.body;
+
+  if (typeof is_active !== 'boolean') {
+    return res.status(400).json({ error: 'is_active must be a boolean' });
+  }
+
+  try {
+    const [result] = await pool.query(
+      'UPDATE items SET is_active = ? WHERE id = ? AND deleted = FALSE',
+      [is_active, id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+
+    res.json({
+      message: `Item ${is_active ? 'activated' : 'deactivated'} successfully`,
+      is_active
+    });
+  } catch (error) {
+    console.error('Error updating item status:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+// =============================================
 // GET ITEMS WITHOUT OPENING BALANCE (Manual items only)
 // =============================================
 const getItemsWithoutOpeningBalance = async (req, res) => {
@@ -328,7 +338,7 @@ const getItemsWithoutOpeningBalance = async (req, res) => {
       FROM items i
       LEFT JOIN opening_balances ob ON i.id = ob.item_id
       WHERE ob.item_id IS NULL 
-        AND COALESCE(i.status, 1) = 1
+        AND i.deleted = FALSE
         AND i.auto_add_to_stock = FALSE
       ORDER BY i.item_code
     `);
@@ -345,5 +355,6 @@ module.exports = {
   getItemById,
   updateItem,
   deleteItem,
+  updateItemStatus,
   getItemsWithoutOpeningBalance
 };

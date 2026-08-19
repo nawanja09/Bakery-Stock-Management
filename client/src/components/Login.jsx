@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import bakeryLogo from '../images/icon.jpeg';
 import { usePopup } from './context/PopupContext';
 import { Link } from 'react-router-dom';
@@ -13,7 +13,16 @@ const Login = () => {
   });
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const { showPopup } = usePopup();
+
+  // Redirect to the page the user tried to access before being sent to login.
+  // Priority: React Router state (navigation guard) → ?redirect query param (token expiry) → /dashboard.
+  const searchParams = new URLSearchParams(location.search);
+  const from =
+    location.state?.from?.pathname ||
+    searchParams.get('redirect') ||
+    '/dashboard';
 
   const handleChange = (e) => {
     setFormData({
@@ -36,13 +45,16 @@ const Login = () => {
         localStorage.setItem('user', JSON.stringify(data.user));
         showPopup('success', 'Login successful!');
         setTimeout(() => {
-          navigate('/dashboard');
+          navigate(from, { replace: true });
         }, 1500);
       } else {
         showPopup('error', data.error || 'Login failed');
       }
     } catch (error) {
-      showPopup('error', 'Network error. Please try again.');
+      const message =
+        error.response?.data?.error ||
+        'Network error. Please try again.';
+      showPopup('error', message);
     } finally {
       setIsLoading(false);
     }

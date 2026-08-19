@@ -74,8 +74,8 @@ ensurePaymentMethodsSchema();
 const ensureSoftDeleteStatusSchema = async () => {
   try {
     const alterations = [
-      ['items', "ADD COLUMN IF NOT EXISTS status TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=Active, 0=Deleted (soft delete)'"] ,
       ['purchases', "ADD COLUMN IF NOT EXISTS status TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=Active, 0=Deleted (soft delete)'"] ,
+      ['items', "ADD COLUMN IF NOT EXISTS is_active TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=Active, 0=Inactive'"] ,
       ['wastages', "ADD COLUMN IF NOT EXISTS status TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=Active, 0=Deleted (soft delete)'"] ,
       ['supplier', "ADD COLUMN IF NOT EXISTS status TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=Active, 0=Deleted (soft delete)'"] ,
       ['payees', "ADD COLUMN IF NOT EXISTS status TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=Active, 0=Deleted (soft delete)'"] ,
@@ -106,7 +106,6 @@ const ensureSoftDeleteStatusSchema = async () => {
     }
 
     const backfills = [
-      'UPDATE items SET status = 0 WHERE deleted = 1',
       'UPDATE purchases SET status = 0 WHERE deleted = 1',
       'UPDATE wastages SET status = 0 WHERE deleted = 1',
       'UPDATE supplier SET status = 0 WHERE is_deleted = 1',

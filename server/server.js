@@ -57,6 +57,10 @@ const financeRoutes = require('./routes/financeRoutes');
 const inhandRoutes  = require('./routes/inhandRoutes');
 const receiveTypeRoutes = require('./routes/receiveTypeRoutes');
 
+// NEW, independent module - FG (Finished Goods) Production.
+// Kept completely separate from the existing finished-goods-* routes above.
+const fgProductionRoutes = require('./routes/fgProductionRoutes');
+
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -138,6 +142,10 @@ app.use('/api/bank-charges-types', bankChargesTypeRoutes);
 app.use('/api/suppliers', supplierCreditRoutes);
 app.use('/api/item-types', itemTypeRoutes);
 app.use('/api/companies', companyRoutes);
+
+// NEW, independent module - FG (Finished Goods) Production.
+// Does not reuse or alter any existing Finished Goods routes/tables.
+app.use('/api/fg-production', fgProductionRoutes);
 app.use('/api/payment-methods', PaymentMethodManagement);
 app.use('/api/finance', financeRoutes);
 app.use('/api/inhand', inhandRoutes);

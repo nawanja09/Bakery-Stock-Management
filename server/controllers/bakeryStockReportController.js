@@ -26,6 +26,8 @@ const getBakeryStockReport = async (req, res) => {
       JOIN departments d ON iss.department_id = d.id
       WHERE DATE(iss.issuance_date) = ?
         AND (d.name LIKE '%Bakery%' OR d.name LIKE '%Kitchen%' OR d.name LIKE '%Production%' OR d.name = 'Bakery')
+        AND i.deleted = FALSE
+        AND i.is_active = TRUE
       ORDER BY i.item_code
     `, [prevDateStr]);
 

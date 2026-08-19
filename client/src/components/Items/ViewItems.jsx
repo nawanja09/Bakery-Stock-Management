@@ -9,8 +9,8 @@ import {
   faTimes,
   faCheck,
   faBan,
-  faInfoCircle,
-  faCircle
+  faToggleOn,
+  faToggleOff
 } from '@fortawesome/free-solid-svg-icons';
 import './ItemManagement.css';
 import { usePopup } from '../context/PopupContext';
@@ -26,7 +26,7 @@ const ItemsList = () => {
   const [filterVat, setFilterVat] = useState('all');
   const [filterAutoAdd, setFilterAutoAdd] = useState('all');
   const [filterItemType, setFilterItemType] = useState('all');
-  const [filterStatus, setFilterStatus] = useState('all'); // Add status filter
+  const [filterStatus, setFilterStatus] = useState('active'); // 'all' | 'active' | 'inactive'
   const { showPopup } = usePopup();
   const navigate = useNavigate();
 
@@ -38,10 +38,11 @@ const ItemsList = () => {
     filterItems();
   }, [searchTerm, filterVat, filterAutoAdd, filterItemType, filterStatus, items]);
 
+  // Fetch ALL non-deleted items (active + inactive) so admin can manage them
   const fetchItems = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/items');
+      const response = await api.get('/items?include_inactive=true');
       setItems(response.data);
       setFilteredItems(response.data);
     } catch (error) {
@@ -54,6 +55,13 @@ const ItemsList = () => {
 
   const filterItems = () => {
     let filtered = [...items];
+
+    // Apply status filter
+    if (filterStatus === 'active') {
+      filtered = filtered.filter(item => item.is_active);
+    } else if (filterStatus === 'inactive') {
+      filtered = filtered.filter(item => !item.is_active);
+    }
 
     // Apply search filter
     if (searchTerm) {
@@ -84,19 +92,38 @@ const ItemsList = () => {
       filtered = filtered.filter(item => (item.item_type || 'Other') === filterItemType);
     }
 
-    // Apply Status filter
-    if (filterStatus !== 'all') {
-      const statusValue = filterStatus === 'active' ? 1 : 0;
-      filtered = filtered.filter(item => item.status === statusValue);
-    }
-
     setFilteredItems(filtered);
   };
 
-  const handleDelete = async (id, itemName) => {
-    if (!window.confirm(`Are you sure you want to delete "${itemName}"?`)) {
-      return;
+  // Toggle active/inactive status for an item
+  const handleToggleStatus = async (item) => {
+    const newStatus = !item.is_active;
+    const action = newStatus ? 'activate' : 'deactivate';
+
+    if (!window.confirm(
+      `Are you sure you want to ${action} "${item.name}"?\n\n` +
+      (newStatus
+        ? 'The item will reappear in all dropdowns and the Stock Report.'
+        : 'The item will be hidden from all dropdowns and the Stock Report, but its data will be preserved.')
+    )) return;
+
+    try {
+      await api.patch(`/items/${item.id}/status`, { is_active: newStatus });
+      showPopup('success', `Item ${newStatus ? 'activated' : 'deactivated'} successfully!`);
+      fetchItems();
+    } catch (error) {
+      console.error('Error toggling item status:', error);
+      showPopup('error', 'Failed to update item status');
     }
+  };
+
+  // Soft-delete the item (sets deleted = TRUE in DB, removes from all views)
+  const handleDelete = async (id, itemName) => {
+    if (!window.confirm(
+      `Are you sure you want to DELETE "${itemName}"?\n\n` +
+      'This will permanently remove it from all views (dropdowns, reports, and this list).\n' +
+      'The record will remain in the database as deleted.'
+    )) return;
 
     try {
       await api.delete(`/items/${id}`);
@@ -117,8 +144,10 @@ const ItemsList = () => {
     setFilterVat('all');
     setFilterAutoAdd('all');
     setFilterItemType('all');
-    setFilterStatus('all');
+    setFilterStatus('active');
   };
+
+  const hasActiveFilters = searchTerm || filterVat !== 'all' || filterAutoAdd !== 'all' || filterItemType !== 'all' || filterStatus !== 'active';
 
   if (loading) {
     return (
@@ -130,6 +159,9 @@ const ItemsList = () => {
       </div>
     );
   }
+
+  const activeCount = items.filter(i => i.is_active).length;
+  const inactiveCount = items.filter(i => !i.is_active).length;
 
   return (
     <div className="items-table-container">
@@ -165,6 +197,19 @@ const ItemsList = () => {
               <FontAwesomeIcon icon={faTimes} />
             </button>
           )}
+        </div>
+
+        {/* Status Filter — Active / Inactive / All */}
+        <div className="filter-dropdown">
+          <select 
+            value={filterStatus} 
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="minimal-select filter-select"
+          >
+            <option value="active">Active Only</option>
+            <option value="inactive">Inactive Only</option>
+            <option value="all">All Statuses</option>
+          </select>
         </div>
 
         <div className="filter-dropdown">
@@ -205,20 +250,7 @@ const ItemsList = () => {
           </select>
         </div>
 
-        {/* Status Filter Dropdown */}
-        <div className="filter-dropdown">
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            className="minimal-select filter-select"
-          >
-            <option value="all">All Status</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </select>
-        </div>
-
-        {(searchTerm || filterVat !== 'all' || filterAutoAdd !== 'all' || filterItemType !== 'all' || filterStatus !== 'all') && (
+        {hasActiveFilters && (
           <button 
             onClick={clearSearch}
             className="minimal-button minimal-button-secondary clear-filters"
@@ -233,16 +265,16 @@ const ItemsList = () => {
           <div className="empty-state-icon">📦</div>
           <h3>No Items Found</h3>
           <p>
-            {searchTerm || filterVat !== 'all' || filterAutoAdd !== 'all' || filterItemType !== 'all' || filterStatus !== 'all'
+            {hasActiveFilters
               ? "No items match your search criteria. Try adjusting your filters." 
               : "Get started by adding your first item."}
           </p>
-          {(searchTerm || filterVat !== 'all' || filterAutoAdd !== 'all' || filterItemType !== 'all' || filterStatus !== 'all') && (
+          {hasActiveFilters && (
             <button onClick={clearSearch} className="minimal-button minimal-button-secondary">
               Clear All Filters
             </button>
           )}
-          {!searchTerm && filterVat === 'all' && filterAutoAdd === 'all' && filterItemType === 'all' && filterStatus === 'all' && (
+          {!hasActiveFilters && (
             <button 
               onClick={() => navigate('/items/add')} 
               className="minimal-button minimal-button-primary"
@@ -262,9 +294,9 @@ const ItemsList = () => {
                   <th>Item Name</th>
                   <th>Unit</th>
                   <th>Item Type</th>
+                  <th>Status</th>
                   <th>VAT Status</th>
                   <th>Auto-Add to Stock</th>
-                  <th>Status</th>
                   <th>Current Stock</th>
                   <th>Reorder Level</th>
                   <th>Actions</th>
@@ -272,7 +304,7 @@ const ItemsList = () => {
               </thead>
               <tbody>
                 {filteredItems.map(item => (
-                  <tr key={item.id}>
+                  <tr key={item.id} style={!item.is_active ? { opacity: 0.6 } : {}}>
                     <td>
                       <span className="item-code-badge">{item.item_code}</span>
                     </td>
@@ -284,6 +316,21 @@ const ItemsList = () => {
                     </td>
                     <td>
                       <span className="unit-badge">{item.item_type || 'Other'}</span>
+                    </td>
+                    {/* Active / Inactive status badge */}
+                    <td>
+                      <span
+                        className={`auto-add-badge ${item.is_active ? 'enabled' : 'disabled'}`}
+                        title={item.is_active
+                          ? 'Active — visible in dropdowns and reports'
+                          : 'Inactive — hidden from dropdowns and reports'}
+                      >
+                        <FontAwesomeIcon 
+                          icon={item.is_active ? faCheck : faBan} 
+                          style={{ fontSize: '0.7rem', marginRight: '4px' }} 
+                        />
+                        {item.is_active ? 'Active' : 'Inactive'}
+                      </span>
                     </td>
                     <td>
                       <span className={`vat-status-badge ${item.vat_applicable ? 'applicable' : 'not-applicable'}`}>
@@ -305,19 +352,6 @@ const ItemsList = () => {
                       )}
                     </td>
                     <td>
-                      <span className={`status-badge ${item.status === 1 ? 'active' : 'inactive'}`}>
-                        <FontAwesomeIcon 
-                          icon={faCircle} 
-                          style={{ 
-                            fontSize: '0.6rem', 
-                            marginRight: '4px',
-                            color: item.status === 1 ? '#28a745' : '#dc3545'
-                          }} 
-                        />
-                        {item.status === 1 ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td>
                       <span className="current-stock">{formatNumber(item.current_stock || 0)}</span>
                     </td>
                     <td>
@@ -333,10 +367,26 @@ const ItemsList = () => {
                         >
                           <FontAwesomeIcon icon={faEdit} />
                         </button>
+
+                        {/* Toggle Active / Inactive */}
+                        <button 
+                          onClick={() => handleToggleStatus(item)}
+                          className={`btn-icon ${item.is_active ? 'delete' : 'edit'}`}
+                          title={item.is_active ? 'Deactivate item (hide from dropdowns & reports)' : 'Activate item (restore to dropdowns & reports)'}
+                          aria-label={item.is_active ? `Deactivate ${item.name}` : `Activate ${item.name}`}
+                          style={item.is_active
+                            ? { background: '#fff3e0', color: '#e65100', border: '1px solid #ffcc80' }
+                            : { background: '#e8f5e9', color: '#2e7d32', border: '1px solid #a5d6a7' }
+                          }
+                        >
+                          <FontAwesomeIcon icon={item.is_active ? faToggleOff : faToggleOn} />
+                        </button>
+
+                        {/* Soft-Delete */}
                         <button 
                           onClick={() => handleDelete(item.id, item.name)} 
                           className="btn-icon delete"
-                          title="Delete item"
+                          title="Delete item (removes from all views permanently)"
                           aria-label={`Delete ${item.name}`}
                         >
                           <FontAwesomeIcon icon={faTrash} />
@@ -359,11 +409,16 @@ const ItemsList = () => {
                   (filtered from {items.length} total)
                 </span>
               )}
+              <span className="stat-item" style={{ color: '#2e7d32' }}>
+                <strong>{activeCount}</strong> Active
+              </span>
+              {inactiveCount > 0 && (
+                <span className="stat-item" style={{ color: '#e65100' }}>
+                  <strong>{inactiveCount}</strong> Inactive
+                </span>
+              )}
               <span className="stat-item">
                 <strong>{items.filter(i => i.auto_add_to_stock).length}</strong> Auto-Add
-              </span>
-              <span className="stat-item">
-                <strong>{items.filter(i => i.status === 1).length}</strong> Active
               </span>
             </div>
             <div className="table-export">

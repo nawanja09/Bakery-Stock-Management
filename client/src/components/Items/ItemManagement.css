@@ -905,28 +905,6 @@
   color: var(--color-danger-dark);
 }
 
-/* Item Status Badge (Active / Inactive) */
-.status-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.28rem 0.7rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  border-radius: var(--radius-full);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-
-.status-badge.active {
-  background: var(--color-success-light);
-  color: var(--color-success-dark);
-}
-
-.status-badge.inactive {
-  background: var(--color-danger-light);
-  color: var(--color-danger-dark);
-}
-
 /* Reorder Level */
 .reorder-level {
   font-weight: 600;

@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import AddPurchase from './components/purchase/NewPurchase';
@@ -114,11 +114,27 @@ import FundTransfer from './components/Finance/FundTransfer';
 import BankTransfer from './components/Finance/BankTransfer';
 import ReceiveTypeManagement from './components/Finance/ReceiveTypeManagement';
 
+import FGRecipes from './components/FGProduction/Recipes';
+import FGRecipeReport from './components/FGProduction/FGRecipesReports';
+
 import './App.css';
+
+const RootRedirect = () => {
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+  return <Navigate to="/login" replace />;
+};
 
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('token');
-  return token ? children : <Navigate to="/login" replace />;
+  const location = useLocation();
+  
+  // Always redirect root ("/") to login, regardless of auth status
+  if (location.pathname === '/') {
+    return <RootRedirect />;
+  }
+
+  return token ? children : <Navigate to="/login" state={{ from: location }} replace />;
 };
 
 const getStoredUserRole = () => {
@@ -139,7 +155,8 @@ const isRestrictedStoreRole = (role) => {
 // accounts (the API itself also rejects these requests server-side).
 const AdjustmentsRoute = ({ children }) => {
   const token = localStorage.getItem('token');
-  if (!token) return <Navigate to="/login" replace />;
+  const location = useLocation();
+  if (!token) return <Navigate to="/login" state={{ from: location }} replace />;
   if (isRestrictedStoreRole(getStoredUserRole())) return <Navigate to="/dashboard" replace />;
   return children;
 };
@@ -147,7 +164,8 @@ const AdjustmentsRoute = ({ children }) => {
 // Blocks direct URL navigation into the Finance module for non-Admin/Accountant roles
 const FinanceRoute = ({ children }) => {
   const token = localStorage.getItem('token');
-  if (!token) return <Navigate to="/login" replace />;
+  const location = useLocation();
+  if (!token) return <Navigate to="/login" state={{ from: location }} replace />;
   const role = getStoredUserRole();
   if (role !== 'Admin' && role !== 'Accountant') return <Navigate to="/dashboard" replace />;
   return children;
@@ -156,7 +174,8 @@ const FinanceRoute = ({ children }) => {
 // Stores users cannot access the Expenses module directly.
 const ExpensesRoute = ({ children }) => {
   const token = localStorage.getItem('token');
-  if (!token) return <Navigate to="/login" replace />;
+  const location = useLocation();
+  if (!token) return <Navigate to="/login" state={{ from: location }} replace />;
   if (isRestrictedStoreRole(getStoredUserRole())) return <Navigate to="/dashboard" replace />;
   return children;
 };
@@ -166,13 +185,25 @@ const AuthCheck = () => {
   return token ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />;
 };
 
+// Prevents already-logged-in users from accessing /login or /register.
+const PublicOnlyRoute = ({ children }) => {
+  const token = localStorage.getItem('token');
+  const location = useLocation();
+  if (token) {
+    const searchParams = new URLSearchParams(location.search);
+    const redirectTo = searchParams.get('redirect') || '/dashboard';
+    return <Navigate to={redirectTo} replace />;
+  }
+  return children;
+};
+
 function App() {
   return (
     <BrowserRouter>
       <div className="app">
         <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path='/register' element={<Register />} />
+          <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
+          <Route path='/register' element={<PublicOnlyRoute><Register /></PublicOnlyRoute>} />
           <Route path="/auth-check" element={<AuthCheck />} />
 
           {/* Protected Routes */}  
@@ -289,6 +320,9 @@ function App() {
             <Route path="/analysis/last-issued-date" element={<LastIssueDateReport />} />
             <Route path="/finance/bank-transfer" element={<FinanceRoute><BankTransfer /></FinanceRoute>} />
             <Route path="/finance/receive-types" element={<FinanceRoute><ReceiveTypeManagement /></FinanceRoute>} />
+
+            <Route path="/fg-production/recipes" element={<FGRecipes />} />
+            <Route path="/fg-production/reports" element={<FGRecipeReport />} />
 
           </Route>
 

@@ -9,9 +9,7 @@ import {
   faDownload, 
   faFileExcel, 
   faCalendar, 
-  faFilter,
-  faSync,
-  faCircle
+  faSync
 } from '@fortawesome/free-solid-svg-icons';
 import './StockReport.css';
 import api from '../../api';
@@ -22,17 +20,11 @@ const StockReport = () => {
   const [stockData, setStockData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [itemPrices, setItemPrices] = useState({});
-  const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'active', 'inactive'
 
   const fetchStockReport = async () => {
     setLoading(true);
     try {
-      const response = await api.get(`/reports/stock`, {
-        params: { 
-          date: selectedDate,
-          status: statusFilter 
-        }
-      });
+      const response = await api.get(`/reports/stock`, { params: { date: selectedDate } });
       const stockData = response.data;
       setStockData(stockData);
 
@@ -100,10 +92,6 @@ const StockReport = () => {
     doc.setFontSize(16);
     doc.text(`Stock Report - ${dateStr}`, 15, 15);
     
-    const statusLabel = statusFilter === 'all' ? 'All Statuses' : statusFilter === 'active' ? 'Active Only' : 'Inactive Only';
-    doc.setFontSize(10);
-    doc.text(`Filter: ${statusLabel}`, 15, 22);
-    
     const tableData = stockData.map(item => [
       item.item_code,
       item.item_name,
@@ -116,8 +104,7 @@ const StockReport = () => {
       formatNumber(item.total_purchase_returned || 0, 2, 2),
       formatNumber(item.total_adjusted || 0, 2, 2),
       formatNumber(item.closing_balance, 2, 2),
-      formatCurrency(calculateValue(item)),
-      item.status === 1 ? 'Active' : 'Inactive'
+      formatCurrency(calculateValue(item))
     ]);
     
     const headers = [
@@ -132,8 +119,7 @@ const StockReport = () => {
       'Purchase Return',
       'Stock Adjustments',
       'Closing',
-      'Value (Rs.)',
-      'Status'
+      'Value (Rs.)'
     ];
     
     autoTable(doc, {
@@ -160,19 +146,13 @@ const StockReport = () => {
       'Purchase Return': Number(item.total_purchase_returned || 0),
       'Stock Adjustments': Number(item.total_adjusted || 0),
       'Closing Balance': Number(item.closing_balance),
-      'Value (Rs.)': Number(calculateValue(item)),
-      'Status': item.status === 1 ? 'Active' : 'Inactive'
+      'Value (Rs.)': Number(calculateValue(item))
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(worksheetData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Stock Report');
     XLSX.writeFile(workbook, `stock-report-${selectedDate}.xlsx`);
-  };
-
-  // Get status badge class
-  const getStatusBadge = (status) => {
-    return status === 1 ? 'status-badge active' : 'status-badge inactive';
   };
 
   return (
@@ -193,21 +173,6 @@ const StockReport = () => {
             max={format(new Date(), 'yyyy-MM-dd')}
             className="date-input"
           />
-        </div>
-
-        <div className="form-group">
-          <label>
-            <FontAwesomeIcon icon={faFilter} /> Item Status
-          </label>
-          <select 
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="filter-select"
-          >
-            <option value="all">All Statuses</option>
-            <option value="active">Active Only</option>
-            <option value="inactive">Inactive Only</option>
-          </select>
         </div>
 
         <div className="form-group action-buttons-container">
@@ -251,7 +216,6 @@ const StockReport = () => {
                   <th>Stock Adjustments</th>
                   <th>Closing</th>
                   <th>Value (Rs.)</th>
-                  <th>Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -275,29 +239,15 @@ const StockReport = () => {
                     <td style={{ fontWeight: 'bold', color: '#2e7d32' }}>
                       {formatCurrency(calculateValue(item))}
                     </td>
-                    <td>
-                      <span className={getStatusBadge(item.status)}>
-                        <FontAwesomeIcon 
-                          icon={faCircle} 
-                          style={{ 
-                            fontSize: '0.6rem', 
-                            marginRight: '4px',
-                            color: item.status === 1 ? '#28a745' : '#dc3545'
-                          }} 
-                        />
-                        {item.status === 1 ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr>
                   <td colSpan="11" style={{ fontWeight: 'bold' }}>Total Value (Rs.)</td>
-                  <td style={{ fontWeight: 'bold', color: '#2e7d32' }}>
+                  <td colSpan="2" style={{ fontWeight: 'bold', color: '#2e7d32' }}>
                     {formatCurrency(calculateTotal())}
                   </td>
-                  <td></td>
                 </tr>
               </tfoot>
             </table>
@@ -307,9 +257,6 @@ const StockReport = () => {
         <div className="empty-state">
           <div className="empty-state-icon">📊</div>
           <p>Select a date and generate the report to view stock data.</p>
-          <p style={{ fontSize: '0.9em', color: '#6c757d' }}>
-            {statusFilter !== 'all' && 'Note: Filtering by status may show fewer results.'}
-          </p>
         </div>
       )}
     </div>

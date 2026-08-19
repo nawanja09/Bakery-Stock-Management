@@ -99,11 +99,14 @@ const NavigationBar = () => {
       setActiveModule('finance');
     } else if (path.startsWith('/cutlery')) {
       setActiveModule('cutlery');
+    } else if (path.startsWith('/fg-production')) {
+      setActiveModule('fg-production');
     }
   }, [location.pathname]);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
     navigate('/login');
   };
 
@@ -131,6 +134,9 @@ const NavigationBar = () => {
         break;
       case 'cutlery':
         navigate('/cutlery/locations');
+        break;
+      case 'fg-production':
+        navigate('/fg-production/recipes');
         break;
       default:
         break;
@@ -172,6 +178,10 @@ const NavigationBar = () => {
         return renderExpensesContent();
       case 'cutlery':
         return renderCutleryContent();
+      case 'finance':
+        return renderFinanceContent();
+      case 'fg-production':
+        return renderFGProductionContent();
       default:
         return null;
     }
@@ -630,6 +640,23 @@ const NavigationBar = () => {
     </>
   );
 
+  const renderFGProductionContent = () => (
+    <>
+          <li>
+            <NavLink to="/fg-production/recipes" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <span className="icon-container"><FontAwesomeIcon icon={faClipboardList} /></span>
+              <span>Recipes</span>
+            </NavLink>
+          </li>
+          <li>
+            <NavLink to="/fg-production/reports" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <span className="icon-container"><FontAwesomeIcon icon={faChartBar} /></span>
+              <span>FG Recipes Reports</span>
+            </NavLink>
+          </li>
+    </>
+  );
+
   return (
     <div className={`sidebar ${isCollapsed ? 'collapsed' : ''}`} ref={sidebarRef}>
       <div className="toggle-button" onClick={toggleSidebar}>
@@ -752,6 +779,25 @@ const NavigationBar = () => {
               {renderCutleryContent()}
             </div>
           )}
+
+          {/*FG Production Module */}
+          <li>
+            <div 
+              className={`nav-link module-item ${activeModule === 'fg-production' ? 'active-module' : ''}`}
+              onClick={() => handleModuleClick('fg-production')}
+            >
+              <span className="icon-container"><FontAwesomeIcon icon={faClipboardList} /></span>
+              <span>FG Production</span>
+              {!isCollapsed && <FontAwesomeIcon icon={faChevronDown} className={`chevron ${activeModule === 'fg-production' ? 'rotated' : ''}`} />}
+            </div>
+          </li>
+
+          {!isCollapsed && activeModule === 'fg-production' && (
+            <div className="module-content">
+              {renderFGProductionContent()}
+            </div>
+          )}
+          
 
           <div className="section-separator"></div>
 

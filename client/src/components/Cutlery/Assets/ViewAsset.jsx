@@ -9,9 +9,11 @@ const ViewAsset = () => {
   const navigate = useNavigate();
   const [asset, setAsset] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [imageError, setImageError] = useState(false);
   const { showPopup } = usePopup();
 
   useEffect(() => {
+    setImageError(false);
     fetchAsset();
   }, [id]);
 
@@ -59,15 +61,12 @@ const ViewAsset = () => {
 
       <div className="asset-details">
         <div className="asset-image-section">
-          {asset.image_url ? (
+          {asset.image_url && !imageError ? (
             <div className="asset-image-large">
               <img 
                 src={asset.image_url} 
                 alt={asset.asset_name}
-                onError={(e) => {
-                  e.target.src = '/images/cutlery-placeholder.png';
-                  e.target.onerror = null;
-                }}
+                onError={() => setImageError(true)}
               />
             </div>
           ) : (
