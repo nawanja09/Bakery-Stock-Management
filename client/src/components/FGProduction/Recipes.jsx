@@ -25,7 +25,7 @@ import { usePopup } from '../context/PopupContext';
 import api from '../../api';
 import './FGProduction.css';
 
-const ALLOWED_FG_DEPARTMENTS = ['Bakery', 'Cake', 'Pastry', 'Restaurant', 'Savoury', 'Savory'];
+const ALLOWED_FG_DEPARTMENTS = ['Bakery', 'Cake', 'Pastry', 'Restaurant', 'Savory'];
 
 const emptyRecipeForm = { rm_item_id: '', quantity: '', last_price: '' };
 
@@ -34,12 +34,6 @@ const emptyRecipeForm = { rm_item_id: '', quantity: '', last_price: '' };
 // a formula constant, not a recipe quantity or RM price, so it's fine to
 // keep it as a named constant here.
 const UTILITY_COST_RATE = 0.7;
-
-// Trims trailing zeros for a clean display value (500 instead of 500.000)
-const formatQty = (num) => {
-  const rounded = Math.round((Number(num) || 0) * 1000) / 1000;
-  return rounded.toString();
-};
 
 const formatCurrency = (value) =>
   `Rs. ${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
