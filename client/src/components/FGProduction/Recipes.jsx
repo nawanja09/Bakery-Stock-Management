@@ -6,6 +6,13 @@
 // "Item Management - FS" pages. FG Item Name / Department entered here
 // belong only to this new module's own fg_production table - they are
 // never auto-populated from the existing Finished Goods records.
+//
+// FG Items are no longer created/managed inside BSMS. The Ravon Bakers
+// POS system is the source of truth - the "FG Item Name" field below is
+// a dropdown loaded from GET /fg-production/items (which the BSMS
+// backend proxies from the Ravon POS `/api/items-list` API). Selecting
+// an item stores its POS `external_item_id`; `fg_item_name` is kept only
+// as a display/cache value. See server/services/ravonPosService.js.
 // -----------------------------------------------------------------------
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -21,6 +28,21 @@ import './FGProduction.css';
 const ALLOWED_FG_DEPARTMENTS = ['Bakery', 'Cake', 'Pastry', 'Restaurant', 'Savoury', 'Savory'];
 
 const emptyRecipeForm = { rm_item_id: '', quantity: '', last_price: '' };
+
+// Utility cost is a fixed business rule (70% of Total RM Cost) used to
+// approximate overheads like gas/electricity in the per-piece cost. It is
+// a formula constant, not a recipe quantity or RM price, so it's fine to
+// keep it as a named constant here.
+const UTILITY_COST_RATE = 0.7;
+
+// Trims trailing zeros for a clean display value (500 instead of 500.000)
+const formatQty = (num) => {
+  const rounded = Math.round((Number(num) || 0) * 1000) / 1000;
+  return rounded.toString();
+};
+
+const formatCurrency = (value) =>
+  `Rs. ${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 const Recipes = () => {
   const { showPopup } = usePopup();
@@ -39,10 +61,18 @@ const Recipes = () => {
   // New / edit FG details form
   const [showFgForm, setShowFgForm] = useState(false);
   const [fgFormMode, setFgFormMode] = useState('create'); // 'create' | 'edit'
-  const [fgFormName, setFgFormName] = useState('');
+  const [fgFormItem, setFgFormItem] = useState(null); // { value: external_item_id, label: fg_item_name }
   const [fgFormDepartment, setFgFormDepartment] = useState(null);
   const [fgFormOutputQuantity, setFgFormOutputQuantity] = useState('');
   const [savingFg, setSavingFg] = useState(false);
+
+  // FG Items sourced from the Ravon POS API (external master)
+  const [posItems, setPosItems] = useState([]);
+  const [posItemsLoading, setPosItemsLoading] = useState(true);
+  const [posItemsError, setPosItemsError] = useState(null);
+  // True when editing a record whose stored external_item_id can no longer
+  // be found in the current Ravon POS list (item removed/deactivated there)
+  const [editingItemUnavailable, setEditingItemUnavailable] = useState(false);
 
   // Recipes belonging to the selected FG Production item
   const [recipes, setRecipes] = useState([]);
@@ -73,8 +103,28 @@ const Recipes = () => {
     }
   }, [showPopup]);
 
+  // Loads the FG Item list from the BSMS backend, which in turn proxies
+  // the Ravon POS `/api/items-list` API (see server/services/ravonPosService.js).
+  const fetchPosItems = useCallback(async () => {
+    try {
+      setPosItemsLoading(true);
+      setPosItemsError(null);
+      const res = await api.get('/fg-production/items');
+      setPosItems(res.data || []);
+    } catch (err) {
+      console.error(err);
+      setPosItems([]);
+      setPosItemsError(
+        err.response?.data?.error || 'Unable to load FG Items. Please try again.'
+      );
+    } finally {
+      setPosItemsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchFgList();
+    fetchPosItems();
     (async () => {
       try {
         const [deptRes, itemsRes] = await Promise.all([
@@ -95,7 +145,7 @@ const Recipes = () => {
         console.warn('Could not preload previous prices', err);
       }
     })();
-  }, [fetchFgList, showPopup]);
+  }, [fetchFgList, fetchPosItems, showPopup]);
 
   const fetchRecipes = useCallback(async (fgId) => {
     if (!fgId) {
@@ -122,36 +172,63 @@ const Recipes = () => {
   // FG Details (create / edit)
   // ---------------------------------------------------------------------
   const departmentOptions = departments.map(d => ({ value: d.id, label: d.name }));
+  const posItemOptions = posItems.map(i => ({ value: i.external_item_id, label: i.fg_item_name }));
   const fgOptions = fgList
     .filter(f => f.fg_item_name.toLowerCase().includes(fgSearch.toLowerCase()))
     .map(f => ({ value: f.id, label: `${f.fg_item_name}${f.department_name ? ' — ' + f.department_name : ''}` }));
 
   const openCreateFgForm = () => {
     setFgFormMode('create');
-    setFgFormName('');
+    setFgFormItem(null);
     setFgFormDepartment(null);
     setFgFormOutputQuantity('');
+    setEditingItemUnavailable(false);
     setShowFgForm(true);
+    if (!posItemsLoading && posItems.length === 0 && !posItemsError) fetchPosItems();
   };
 
   const openEditFgForm = () => {
     if (!selectedFg) return;
     setFgFormMode('edit');
-    setFgFormName(selectedFg.fg_item_name);
     setFgFormOutputQuantity(selectedFg.recipe_output_quantity || '');
     setFgFormDepartment(
       selectedFg.department_id
         ? { value: selectedFg.department_id, label: selectedFg.department_name }
         : null
     );
+
+    const matchingPosItem = posItemOptions.find(
+      o => String(o.value) === String(selectedFg.external_item_id)
+    );
+    if (matchingPosItem) {
+      setFgFormItem(matchingPosItem);
+      setEditingItemUnavailable(false);
+    } else {
+      // Stored item is either from before the Ravon POS integration
+      // (no external_item_id yet) or no longer exists in the current POS
+      // list - show its cached name without silently replacing it.
+      setFgFormItem(
+        selectedFg.external_item_id || selectedFg.fg_item_name
+          ? { value: selectedFg.external_item_id || '', label: selectedFg.fg_item_name }
+          : null
+      );
+      setEditingItemUnavailable(true);
+    }
     setShowFgForm(true);
   };
 
   const closeFgForm = () => setShowFgForm(false);
 
+  const handleFgFormItemChange = (opt) => {
+    setFgFormItem(opt);
+    // Once the user picks a fresh item from the live list, it's no longer
+    // the "unavailable" cached one.
+    setEditingItemUnavailable(false);
+  };
+
   const submitFgForm = async () => {
-    if (!fgFormName.trim()) {
-      showPopup('error', 'FG Item Name is required');
+    if (!fgFormItem || !fgFormItem.value) {
+      showPopup('error', 'Please select an FG Item from the list');
       return;
     }
     if (!fgFormDepartment) {
@@ -166,21 +243,19 @@ const Recipes = () => {
 
     setSavingFg(true);
     try {
+      const payload = {
+        external_item_id: fgFormItem.value,
+        fg_item_name: fgFormItem.label,
+        department_id: fgFormDepartment.value,
+        recipe_output_quantity: outputQty
+      };
       if (fgFormMode === 'create') {
-        const res = await api.post('/fg-production', {
-          fg_item_name: fgFormName.trim(),
-          department_id: fgFormDepartment.value,
-          recipe_output_quantity: outputQty
-        });
+        const res = await api.post('/fg-production', payload);
         showPopup('success', 'FG Production item created successfully');
         await fetchFgList();
         setSelectedFgId(res.data.id);
       } else {
-        await api.put(`/fg-production/${selectedFg.id}`, {
-          fg_item_name: fgFormName.trim(),
-          department_id: fgFormDepartment.value,
-          recipe_output_quantity: outputQty
-        });
+        await api.put(`/fg-production/${selectedFg.id}`, payload);
         showPopup('success', 'FG Production item updated successfully');
         await fetchFgList();
       }
@@ -213,8 +288,7 @@ const Recipes = () => {
   // ---------------------------------------------------------------------
   const rawMaterialOptions = rawMaterials.map(rm => ({
     value: rm.id,
-    label: `${rm.name} (${rm.item_code})`,
-    unit: rm.unit
+    label: `${rm.name} (${rm.item_code})`
   }));
 
   const openAddRecipeModal = () => {
@@ -256,7 +330,7 @@ const Recipes = () => {
       return;
     }
     if (!Number.isFinite(qty) || qty <= 0) {
-      showPopup('error', 'Quantity must be greater than 0');
+      showPopup('error', 'Recipe Quantity must be greater than 0');
       return;
     }
     if (!Number.isFinite(price) || price < 0) {
@@ -266,19 +340,16 @@ const Recipes = () => {
 
     setSavingRecipe(true);
     try {
+      const payload = {
+        rm_item_id: recipeForm.rm_item_id,
+        quantity: qty,
+        last_price: price
+      };
       if (recipeModalMode === 'add') {
-        await api.post(`/fg-production/${selectedFg.id}/recipes`, {
-          rm_item_id: recipeForm.rm_item_id,
-          quantity: qty,
-          last_price: price
-        });
+        await api.post(`/fg-production/${selectedFg.id}/recipes`, payload);
         showPopup('success', 'Recipe item added successfully');
       } else {
-        await api.put(`/fg-production/recipes/${editingRecipeId}`, {
-          rm_item_id: recipeForm.rm_item_id,
-          quantity: qty,
-          last_price: price
-        });
+        await api.put(`/fg-production/recipes/${editingRecipeId}`, payload);
         showPopup('success', 'Recipe item updated successfully');
       }
       setRecipeModalOpen(false);
@@ -305,13 +376,21 @@ const Recipes = () => {
     }
   };
 
-  const totalRmCost = recipes.reduce(
-    (sum, r) => sum + (parseFloat(r.quantity) || 0) * (parseFloat(r.last_price) || 0),
-    0
-  );
+  // Recipe Ingredients → Total RM Cost → Utility Cost (70%) →
+  // Total Production Cost → RM Cost Per Piece.
+  // The recipe endpoint returns the authoritative per-line cost as
+  // `line_cost` (quantity * last_price). Normalize database decimal strings
+  // here before summing so null/empty values cannot turn the total into NaN.
+  const totalRmCost = recipes.reduce((sum, recipe) => {
+    const lineCost = Number.parseFloat(recipe.line_cost);
+    return sum + (Number.isFinite(lineCost) ? lineCost : 0);
+  }, 0);
+  const utilityCost = totalRmCost * UTILITY_COST_RATE;
+  const totalProductionCost = totalRmCost + utilityCost;
 
   const recipeOutputQuantity = parseFloat(selectedFg?.recipe_output_quantity) || 0;
-  const rmCostPerPiece = recipeOutputQuantity > 0 ? totalRmCost / recipeOutputQuantity : 0;
+  // Prevent division by zero when Recipe Output Quantity is 0 or empty.
+  const rmCostPerPiece = recipeOutputQuantity > 0 ? totalProductionCost / recipeOutputQuantity : 0;
 
   // ---------------------------------------------------------------------
   // Render
@@ -325,7 +404,7 @@ const Recipes = () => {
           </h1>
         </div>
         <button className="fgprod-btn-primary" onClick={openCreateFgForm}>
-          <FontAwesomeIcon icon={faPlus} /> New FG Item
+          <FontAwesomeIcon icon={faPlus} /> New FG Production
         </button>
       </div>
 
@@ -404,10 +483,11 @@ const Recipes = () => {
                 <table className="fgprod-table">
                   <thead>
                     <tr>
-                      <th>RM Item Name</th>
+                      <th>Ingredient</th>
+                      <th className="fgprod-num">Unit</th>
                       <th className="fgprod-num">Quantity</th>
                       <th className="fgprod-num">Last Price</th>
-                      <th className="fgprod-num">Line Cost</th>
+                      <th className="fgprod-num">RM Cost</th>
                       <th style={{ width: '80px' }}></th>
                     </tr>
                   </thead>
@@ -415,11 +495,10 @@ const Recipes = () => {
                     {recipes.map(r => (
                       <tr key={r.id}>
                         <td className="fgprod-bold" style={{ color: 'var(--fgprod-text)' }}>{r.rm_item_name}</td>
-                        <td className="fgprod-num" style={{ fontWeight: 500 }}>{parseFloat(r.quantity).toFixed(3)}</td>
+                        <td className="fgprod-num">{r.rm_unit}</td>
+                        <td className="fgprod-num">{r.quantity}</td>
                         <td className="fgprod-num">Rs. {parseFloat(r.last_price).toFixed(2)}</td>
-                        <td className="fgprod-num fgprod-bold" style={{ color: 'var(--fgprod-primary)' }}>
-                          Rs. {(parseFloat(r.quantity) * parseFloat(r.last_price)).toFixed(2)}
-                        </td>
+                        <td className="fgprod-num">Rs. {parseFloat(r.line_cost).toFixed(2)}</td>
                         <td>
                           <div className="fgprod-actions">
                             <button className="fgprod-icon-btn" onClick={() => openEditRecipeModal(r)} title="Edit">
@@ -435,16 +514,56 @@ const Recipes = () => {
                   </tbody>
                 </table>
                 <div className="fgprod-cost-summary" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <h4 style={{ margin: '0 0 0.25rem', fontSize: '0.95rem', color: 'var(--fgprod-text)' }}>
+                    Final RM Costing
+                  </h4>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Total RM Cost ({parseFloat(selectedFg.recipe_output_quantity || 0).toFixed(0)} Pieces):</span>
-                    <span className="fgprod-cost-value">Rs. {totalRmCost.toFixed(2)}</span>
+                    <span>Total RM Cost:</span>
+                    <span className="fgprod-cost-value">{formatCurrency(totalRmCost)}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>RM Cost Per Piece:</span>
+                    <span>Utility Cost (70%):</span>
+                    <span className="fgprod-cost-value">{formatCurrency(utilityCost)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed var(--fgprod-border, #e5e7eb)', paddingTop: '0.5rem' }}>
+                    <span style={{ fontWeight: 600 }}>Total Cost Including Utility:</span>
+                    <span className="fgprod-cost-value" style={{ fontWeight: 600 }}>{formatCurrency(totalProductionCost)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Recipe Output Quantity:</span>
                     <span className="fgprod-cost-value">
-                      {recipeOutputQuantity > 0 ? `Rs. ${rmCostPerPiece.toFixed(2)}` : 'N/A'}
+                      {recipeOutputQuantity > 0 ? `${recipeOutputQuantity.toFixed(0)} Pieces` : 'Not set'}
                     </span>
                   </div>
+
+                  {recipeOutputQuantity > 0 ? (
+                    <div
+                      style={{
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        marginTop: '0.25rem', padding: '0.75rem 1rem', borderRadius: '10px',
+                        background: 'var(--fgprod-primary-subtle, #eef2ff)',
+                        border: '1px solid var(--fgprod-primary, #4f46e5)'
+                      }}
+                    >
+                      <span style={{ fontWeight: 700, fontSize: '1rem' }}>RM Cost Per Piece</span>
+                      <span className="fgprod-cost-value" style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--fgprod-primary)' }}>
+                        {formatCurrency(rmCostPerPiece)} / Piece
+                      </span>
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        marginTop: '0.25rem', padding: '0.75rem 1rem', borderRadius: '10px',
+                        background: '#fff7ed', border: '1px solid #f59e0b'
+                      }}
+                    >
+                      <span style={{ fontWeight: 700 }}>RM Cost Per Piece</span>
+                      <span style={{ fontSize: '0.85rem', color: '#b45309', fontWeight: 600, textAlign: 'right' }}>
+                        Set a Recipe Output Quantity greater than 0 to calculate this.
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             </>
@@ -465,13 +584,40 @@ const Recipes = () => {
             <div className="fgprod-modal-body">
               <div className="fgprod-form-group">
                 <label>FG Item Name *</label>
-                <input
-                  type="text"
-                  className="fgprod-input"
-                  value={fgFormName}
-                  onChange={(e) => setFgFormName(e.target.value)}
-                  placeholder="e.g. Chocolate Cake"
+                <Select
+                  classNamePrefix="react-select"
+                  options={posItemOptions}
+                  value={fgFormItem}
+                  onChange={handleFgFormItemChange}
+                  isLoading={posItemsLoading}
+                  isDisabled={posItemsLoading && posItems.length === 0}
+                  isClearable
+                  isSearchable
+                  placeholder={posItemsLoading ? 'Loading FG Items...' : 'Select FG Item...'}
+                  noOptionsMessage={() =>
+                    posItemsError
+                      ? 'Unable to load FG Items. Please try again.'
+                      : 'No FG Items are available.'
+                  }
                 />
+                {posItemsError && (
+                  <div style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <span style={{ fontSize: '0.85rem', color: '#c0392b' }}>{posItemsError}</span>
+                    <button
+                      type="button"
+                      className="fgprod-btn-secondary"
+                      style={{ padding: '0.25rem 0.6rem', fontSize: '0.8rem' }}
+                      onClick={fetchPosItems}
+                    >
+                      Retry
+                    </button>
+                  </div>
+                )}
+                {!posItemsError && editingItemUnavailable && fgFormItem && (
+                  <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: '#b8860b' }}>
+                    This FG Item is no longer available in Ravon POS. Keeping "{fgFormItem.label}" unless you select a different item.
+                  </div>
+                )}
               </div>
               <div className="fgprod-form-group">
                 <label>Department *</label>
@@ -528,6 +674,7 @@ const Recipes = () => {
                   placeholder="Select raw material..."
                 />
               </div>
+
               <div className="fgprod-form-grid">
                 <div className="fgprod-form-group">
                   <label>Quantity *</label>
@@ -554,6 +701,7 @@ const Recipes = () => {
                   />
                 </div>
               </div>
+
             </div>
             <div className="fgprod-modal-footer">
               <button className="fgprod-btn-secondary" onClick={closeRecipeModal}>Cancel</button>

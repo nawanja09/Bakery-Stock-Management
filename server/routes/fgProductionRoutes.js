@@ -14,6 +14,10 @@ const fgProductionController = require('../controllers/fgProductionController');
 // Reports
 router.get('/reports/recipes', fgProductionController.getRecipesReport);
 
+// Ravon POS integration - FG Item dropdown source (must be declared before
+// the '/:id' routes below so 'items' isn't captured as an :id param)
+router.get('/items', fgProductionController.getPosItems);
+
 // FG Production (header)
 router.get('/', fgProductionController.getAllFgProduction);
 router.post('/', fgProductionController.createFgProduction);

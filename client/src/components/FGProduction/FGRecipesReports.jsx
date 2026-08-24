@@ -144,6 +144,7 @@ const FGRecipesReports = () => {
                   <th className="fgprod-num">RM Recipes Count</th>
                   <th className="fgprod-num">RM Cost</th>
                   <th className="fgprod-num">Cost Per Piece</th>
+                  <th className="fgprod-num">Selling Price</th>
                 </tr>
               </thead>
               <tbody>
@@ -159,6 +160,11 @@ const FGRecipesReports = () => {
                     <td className="fgprod-num fgprod-bold" style={{ color: 'var(--fgprod-primary)' }}>
                       {parseFloat(row.recipe_output_quantity || 0) > 0
                         ? `Rs. ${(parseFloat(row.rm_cost) / parseFloat(row.recipe_output_quantity)).toFixed(2)}`
+                        : 'N/A'}
+                    </td>
+                    <td className="fgprod-num fgprod-bold" style={{ color: 'var(--fgprod-primary)' }}>
+                      {row.selling_price !== null && row.selling_price !== undefined
+                        ? `Rs. ${parseFloat(row.selling_price).toFixed(2)}`
                         : 'N/A'}
                     </td>
                   </tr>

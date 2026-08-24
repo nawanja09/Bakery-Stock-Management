@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
-  faPlus, 
-  faEdit, 
-  faTrash, 
-  faSearch, 
+import {
+  faPlus,
+  faEdit,
+  faTrash,
+  faSearch,
   faTimes,
   faCheck,
   faBan,
@@ -168,8 +168,8 @@ const ItemsList = () => {
       <div className="items-table-header">
         <h2 className="items-table-title">Items Management</h2>
         <div className="items-table-actions">
-          <button 
-            onClick={() => navigate('/items/add')} 
+          <button
+            onClick={() => navigate('/items/add')}
             className="minimal-button minimal-button-primary"
           >
             <FontAwesomeIcon icon={faPlus} className="button-icon" />
@@ -189,7 +189,7 @@ const ItemsList = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
           {searchTerm && (
-            <button 
+            <button
               className="clear-search"
               onClick={() => setSearchTerm('')}
               aria-label="Clear search"
@@ -201,8 +201,8 @@ const ItemsList = () => {
 
         {/* Status Filter — Active / Inactive / All */}
         <div className="filter-dropdown">
-          <select 
-            value={filterStatus} 
+          <select
+            value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
             className="minimal-select filter-select"
           >
@@ -213,8 +213,8 @@ const ItemsList = () => {
         </div>
 
         <div className="filter-dropdown">
-          <select 
-            value={filterVat} 
+          <select
+            value={filterVat}
             onChange={(e) => setFilterVat(e.target.value)}
             className="minimal-select filter-select"
           >
@@ -226,8 +226,8 @@ const ItemsList = () => {
 
         {/* Auto-Add Filter Dropdown */}
         <div className="filter-dropdown">
-          <select 
-            value={filterAutoAdd} 
+          <select
+            value={filterAutoAdd}
             onChange={(e) => setFilterAutoAdd(e.target.value)}
             className="minimal-select filter-select"
           >
@@ -251,7 +251,7 @@ const ItemsList = () => {
         </div>
 
         {hasActiveFilters && (
-          <button 
+          <button
             onClick={clearSearch}
             className="minimal-button minimal-button-secondary clear-filters"
           >
@@ -266,7 +266,7 @@ const ItemsList = () => {
           <h3>No Items Found</h3>
           <p>
             {hasActiveFilters
-              ? "No items match your search criteria. Try adjusting your filters." 
+              ? "No items match your search criteria. Try adjusting your filters."
               : "Get started by adding your first item."}
           </p>
           {hasActiveFilters && (
@@ -275,8 +275,8 @@ const ItemsList = () => {
             </button>
           )}
           {!hasActiveFilters && (
-            <button 
-              onClick={() => navigate('/items/add')} 
+            <button
+              onClick={() => navigate('/items/add')}
               className="minimal-button minimal-button-primary"
             >
               <FontAwesomeIcon icon={faPlus} className="button-icon" />
@@ -325,9 +325,9 @@ const ItemsList = () => {
                           ? 'Active — visible in dropdowns and reports'
                           : 'Inactive — hidden from dropdowns and reports'}
                       >
-                        <FontAwesomeIcon 
-                          icon={item.is_active ? faCheck : faBan} 
-                          style={{ fontSize: '0.7rem', marginRight: '4px' }} 
+                        <FontAwesomeIcon
+                          icon={item.is_active ? faCheck : faBan}
+                          style={{ fontSize: '0.7rem', marginRight: '4px' }}
                         />
                         {item.is_active ? 'Active' : 'Inactive'}
                       </span>
@@ -339,9 +339,9 @@ const ItemsList = () => {
                     </td>
                     <td>
                       <span className={`auto-add-badge ${item.auto_add_to_stock ? 'enabled' : 'disabled'}`}>
-                        <FontAwesomeIcon 
-                          icon={item.auto_add_to_stock ? faCheck : faBan} 
-                          style={{ fontSize: '0.7rem', marginRight: '4px' }} 
+                        <FontAwesomeIcon
+                          icon={item.auto_add_to_stock ? faCheck : faBan}
+                          style={{ fontSize: '0.7rem', marginRight: '4px' }}
                         />
                         {item.auto_add_to_stock ? 'Enabled' : 'Disabled'}
                       </span>
@@ -359,8 +359,8 @@ const ItemsList = () => {
                     </td>
                     <td>
                       <div className="table-actions">
-                        <button 
-                          onClick={() => handleEdit(item.id)} 
+                        <button
+                          onClick={() => handleEdit(item.id)}
                           className="btn-icon edit"
                           title="Edit item"
                           aria-label={`Edit ${item.name}`}
@@ -369,7 +369,7 @@ const ItemsList = () => {
                         </button>
 
                         {/* Toggle Active / Inactive */}
-                        <button 
+                        <button
                           onClick={() => handleToggleStatus(item)}
                           className={`btn-icon ${item.is_active ? 'delete' : 'edit'}`}
                           title={item.is_active ? 'Deactivate item (hide from dropdowns & reports)' : 'Activate item (restore to dropdowns & reports)'}
@@ -383,8 +383,8 @@ const ItemsList = () => {
                         </button>
 
                         {/* Soft-Delete */}
-                        <button 
-                          onClick={() => handleDelete(item.id, item.name)} 
+                        <button
+                          onClick={() => handleDelete(item.id, item.name)}
                           className="btn-icon delete"
                           title="Delete item (removes from all views permanently)"
                           aria-label={`Delete ${item.name}`}
