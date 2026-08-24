@@ -23,7 +23,7 @@ const AddItem = () => {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    
+
     if (type === 'checkbox') {
       setFormData(prev => ({ ...prev, [name]: checked }));
     } else {
@@ -34,7 +34,7 @@ const AddItem = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-    
+
     try {
       const payload = {
         item_code: formData.item_code,
@@ -76,15 +76,15 @@ const AddItem = () => {
       <div className="minimal-card">
         <div className="minimal-header">
           <h2 className="minimal-title">Add New Item</h2>
-          <button 
-            onClick={() => navigate('/items')} 
+          <button
+            onClick={() => navigate('/items')}
             className="minimal-icon-button"
             aria-label="Close"
           >
             <FontAwesomeIcon icon={faTimes} />
           </button>
         </div>
-        
+
         <form onSubmit={handleSubmit} className="minimal-form">
           <div className="form-grid">
             <div className="minimal-form-group">
@@ -98,8 +98,8 @@ const AddItem = () => {
                 className="minimal-input"
                 placeholder="e.g., ITM001"
               />
-            </div>        
-            
+            </div>
+
             <div className="minimal-form-group">
               <label className="minimal-label">Item Name <span className="required-star">*</span></label>
               <input
@@ -200,7 +200,7 @@ const AddItem = () => {
               </div>
             </label>
             <span className="minimal-helper-text">
-              {formData.auto_add_to_stock 
+              {formData.auto_add_to_stock
                 ? "✅ Item will be automatically added to stock when purchased. Opening balance will be created automatically."
                 : "⚠️ Item will NOT be automatically added to stock. You must manually add opening balance."}
             </span>
@@ -218,17 +218,17 @@ const AddItem = () => {
           )}
 
           <div className="minimal-form-actions">
-            <button 
-              type="button" 
-              onClick={() => navigate('/items')} 
+            <button
+              type="button"
+              onClick={() => navigate('/items')}
               className="minimal-button minimal-button-secondary"
               disabled={isLoading}
             >
               Cancel
             </button>
-            <button 
-              type="submit" 
-              className="minimal-button minimal-button-primary" 
+            <button
+              type="submit"
+              className="minimal-button minimal-button-primary"
               disabled={isLoading}
             >
               <FontAwesomeIcon icon={faSave} className="button-icon" />

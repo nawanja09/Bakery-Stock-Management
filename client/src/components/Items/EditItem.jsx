@@ -11,7 +11,7 @@ const EditItem = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { showPopup } = usePopup();
-  
+
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
@@ -33,7 +33,7 @@ const EditItem = () => {
       setLoading(true);
       const response = await api.get(`/items/${id}`);
       const item = response.data;
-      
+
       setFormData({
         item_code: item.item_code || '',
         item_name: item.name || '',
@@ -54,7 +54,7 @@ const EditItem = () => {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    
+
     if (type === 'checkbox') {
       setFormData(prev => ({ ...prev, [name]: checked }));
     } else {
@@ -64,24 +64,24 @@ const EditItem = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!formData.item_code.trim()) {
       showPopup('error', 'Item code is required');
       return;
     }
-    
+
     if (!formData.item_name.trim()) {
       showPopup('error', 'Item name is required');
       return;
     }
-    
+
     if (!formData.reorder_level || parseFloat(formData.reorder_level) < 0) {
       showPopup('error', 'Valid reorder level is required');
       return;
     }
 
     setIsSubmitting(true);
-    
+
     try {
       const payload = {
         item_code: formData.item_code,
@@ -101,7 +101,7 @@ const EditItem = () => {
       }
     } catch (error) {
       console.error('Error updating item:', error);
-      
+
       if (error.response?.status === 400) {
         showPopup('error', error.response.data.error || 'Invalid data');
       } else if (error.response?.status === 404) {
@@ -129,8 +129,8 @@ const EditItem = () => {
     <div className="minimal-container">
       <div className="minimal-card">
         <div className="minimal-header">
-          <button 
-            onClick={() => navigate('/items')} 
+          <button
+            onClick={() => navigate('/items')}
             className="minimal-icon-button back-button"
             aria-label="Go back"
           >
@@ -139,7 +139,7 @@ const EditItem = () => {
           <h2 className="minimal-title">Edit Item</h2>
           <div className="header-spacer"></div>
         </div>
-        
+
         <form onSubmit={handleSubmit} className="minimal-form">
           <div className="form-grid">
             <div className="minimal-form-group">
@@ -154,8 +154,8 @@ const EditItem = () => {
                 placeholder="Enter unique item code"
               />
               <span className="minimal-helper-text">Unique identifier for the item</span>
-            </div>        
-            
+            </div>
+
             <div className="minimal-form-group">
               <label className="minimal-label">Item Name <span className="required-star">*</span></label>
               <input
@@ -259,8 +259,8 @@ const EditItem = () => {
                 </div>
               </label>
               <span className="minimal-helper-text">
-                {formData.auto_add_to_stock 
-                  ? "Item will be automatically added to stock" 
+                {formData.auto_add_to_stock
+                  ? "Item will be automatically added to stock"
                   : "Item will NOT be automatically added to stock"}
               </span>
             </div>
@@ -289,17 +289,17 @@ const EditItem = () => {
           </div>
 
           <div className="minimal-form-actions">
-            <button 
-              type="button" 
-              onClick={() => navigate('/items')} 
+            <button
+              type="button"
+              onClick={() => navigate('/items')}
               className="minimal-button minimal-button-secondary"
               disabled={isSubmitting}
             >
               Cancel
             </button>
-            <button 
-              type="submit" 
-              className="minimal-button minimal-button-primary" 
+            <button
+              type="submit"
+              className="minimal-button minimal-button-primary"
               disabled={isSubmitting}
             >
               <FontAwesomeIcon icon={faSave} className="button-icon" />

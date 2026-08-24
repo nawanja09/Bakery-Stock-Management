@@ -7,7 +7,7 @@ const createItem = async (req, res) => {
   const { item_code, name, unit, item_type, vat_applicable, auto_add_to_stock, reorder_level } = req.body;
 
   const connection = await pool.getConnection();
-  
+
   try {
     await connection.beginTransaction();
 
@@ -34,7 +34,7 @@ const createItem = async (req, res) => {
     }
 
     await connection.commit();
-    
+
     res.status(201).json({
       id: result.insertId,
       message: 'Item added successfully',
@@ -44,11 +44,11 @@ const createItem = async (req, res) => {
   } catch (error) {
     await connection.rollback();
     console.error('Error adding item:', error);
-    
+
     if (error.code === 'ER_DUP_ENTRY') {
       return res.status(400).json({ error: 'Item code already exists' });
     }
-    
+
     res.status(500).json({ error: 'Server error' });
   } finally {
     connection.release();
@@ -61,7 +61,7 @@ const createItem = async (req, res) => {
 const getAllItems = async (req, res) => {
   try {
     const { auto_add_only, include_inactive } = req.query;
-    
+
     let query = `
       SELECT 
         i.id, 
@@ -99,13 +99,13 @@ const getAllItems = async (req, res) => {
     if (include_inactive !== 'true') {
       query += ' AND i.is_active = TRUE';
     }
-    
+
     if (auto_add_only === 'true') {
       query += ' AND i.auto_add_to_stock = 1';
     }
-    
+
     query += ' ORDER BY i.item_code';
-    
+
     const [rows] = await pool.query(query);
     res.json(rows);
   } catch (error) {
@@ -154,11 +154,11 @@ const getItemById = async (req, res) => {
       FROM items i
       WHERE i.id = ? AND i.deleted = FALSE
     `, [id]);
-    
+
     if (rows.length === 0) {
       return res.status(404).json({ error: 'Item not found' });
     }
-    
+
     res.json(rows[0]);
   } catch (error) {
     console.error('Error fetching item:', error);
@@ -174,7 +174,7 @@ const updateItem = async (req, res) => {
   const { item_code, name, unit, item_type, vat_applicable, auto_add_to_stock, reorder_level } = req.body;
 
   const connection = await pool.getConnection();
-  
+
   try {
     await connection.beginTransaction();
 
@@ -189,7 +189,7 @@ const updateItem = async (req, res) => {
       'UPDATE items SET item_code = ?, name = ?, unit = ?, item_type = ?, vat_applicable = ?, auto_add_to_stock = ?, reorder_level = ? WHERE id = ? AND deleted = FALSE',
       [item_code, name, unit, item_type || 'Other', vat_applicable || false, auto_add_to_stock !== undefined ? auto_add_to_stock : true, reorder_level, id]
     );
-    
+
     if (result.affectedRows === 0) {
       await connection.rollback();
       return res.status(404).json({ error: 'Item not found' });
@@ -218,8 +218,8 @@ const updateItem = async (req, res) => {
     }
 
     await connection.commit();
-    
-    res.json({ 
+
+    res.json({
       message: 'Item updated successfully',
       auto_add_status: auto_add_to_stock ? 'enabled' : 'disabled'
     });
@@ -227,11 +227,11 @@ const updateItem = async (req, res) => {
   } catch (error) {
     await connection.rollback();
     console.error('Error updating item:', error);
-    
+
     if (error.code === 'ER_DUP_ENTRY') {
       return res.status(400).json({ error: 'Item code already exists' });
     }
-    
+
     res.status(500).json({ error: 'Server error' });
   } finally {
     connection.release();
@@ -245,7 +245,7 @@ const deleteItem = async (req, res) => {
   const { id } = req.params;
 
   const connection = await pool.getConnection();
-  
+
   try {
     await connection.beginTransaction();
 
@@ -257,10 +257,10 @@ const deleteItem = async (req, res) => {
 
     // Soft delete
     const [result] = await connection.query(
-      'UPDATE items SET deleted = TRUE WHERE id = ?', 
+      'UPDATE items SET deleted = TRUE WHERE id = ?',
       [id]
     );
-    
+
     if (result.affectedRows === 0) {
       await connection.rollback();
       return res.status(404).json({ error: 'Item not found' });
@@ -282,8 +282,8 @@ const deleteItem = async (req, res) => {
     }
 
     await connection.commit();
-    
-    res.json({ 
+
+    res.json({
       message: 'Item deleted successfully',
       note: itemData[0]?.auto_add_to_stock ? 'Stock balance has been reset to 0' : undefined
     });
