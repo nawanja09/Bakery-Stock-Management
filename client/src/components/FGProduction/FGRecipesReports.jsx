@@ -13,6 +13,7 @@ import Select from 'react-select';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
 import './FGProduction.css';
+import { UTILITY_COST_RATE } from './fgProductionConstants';
 
 const ALLOWED_FG_DEPARTMENTS = ['Bakery', 'Cake', 'Pastry', 'Restaurant', 'Savory'];
 
@@ -53,9 +54,38 @@ const FGRecipesReports = () => {
 
   const departmentOptions = departments.map(d => ({ value: d.id, label: d.name }));
 
-  const filteredRows = rows.filter(r =>
-    r.fg_item_name.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredRows = rows
+    .filter(r => r.fg_item_name.toLowerCase().includes(search.toLowerCase()))
+    .map(r => {
+      const outputQty = parseFloat(r.recipe_output_quantity) || 0;
+      const rmCost = parseFloat(r.rm_cost) || 0;
+
+      // Utility Cost = RM Cost × 70%
+      const utilityCost = rmCost * UTILITY_COST_RATE;
+      // Total Production Cost = RM Cost + Utility Cost
+      const totalProductionCost = rmCost + utilityCost;
+      // Production Cost Per Piece = Total Production Cost ÷ Recipe Output Quantity
+      const productionCostPerPiece = outputQty > 0 ? totalProductionCost / outputQty : null;
+
+      const rmCostPerPiece = outputQty > 0 ? rmCost / outputQty : null;
+      const sellingPrice = r.selling_price !== null && r.selling_price !== undefined
+        ? parseFloat(r.selling_price)
+        : null;
+      const grossProfitPerPiece = (sellingPrice !== null && productionCostPerPiece !== null)
+        ? sellingPrice - productionCostPerPiece
+        : null;
+      const grossMarginPct = (grossProfitPerPiece !== null && sellingPrice > 0)
+        ? (grossProfitPerPiece / sellingPrice) * 100
+        : null;
+
+      return {
+        ...r,
+        rmCostPerPiece,
+        productionCostPerPiece,
+        grossProfitPerPiece,
+        grossMarginPct
+      };
+    });
 
   const grandTotalCost = filteredRows.reduce((sum, r) => sum + (parseFloat(r.rm_cost) || 0), 0);
   const totalActiveRmRecipes = filteredRows.reduce((sum, r) => sum + (parseInt(r.rm_recipes_count) || 0), 0);
@@ -135,36 +165,72 @@ const FGRecipesReports = () => {
           </div>
         ) : (
           <div className="fgprod-table-wrapper">
-            <table className="fgprod-table">
+            <table className="fgprod-table fgprod-recipes-report-table">
+              <colgroup>
+                <col className="fgprod-recipes-col-item" />
+                <col className="fgprod-recipes-col-department" />
+                <col className="fgprod-recipes-col-output" />
+                <col className="fgprod-recipes-col-recipes" />
+                <col className="fgprod-recipes-col-cost-batch" />
+                <col className="fgprod-recipes-col-cost-piece" />
+                <col className="fgprod-recipes-col-production" />
+                <col className="fgprod-recipes-col-selling" />
+                <col className="fgprod-recipes-col-profit" />
+                <col className="fgprod-recipes-col-margin" />
+              </colgroup>
               <thead>
                 <tr>
                   <th>FG Item Name</th>
                   <th>Department</th>
-                  <th className="fgprod-num">Output (Pieces)</th>
-                  <th className="fgprod-num">RM Recipes Count</th>
-                  <th className="fgprod-num">RM Cost</th>
-                  <th className="fgprod-num">Cost Per Piece</th>
-                  <th className="fgprod-num">Selling Price</th>
+                  <th className="fgprod-report-center">Output (Pcs)</th>
+                  <th className="fgprod-report-center">RM Recipes</th>
+                  <th className="fgprod-report-currency">RM Cost</th>
+                  <th className="fgprod-report-currency">RM Cost for Piece</th>
+                  <th className="fgprod-report-currency">Production Cost for Piece</th>
+                  <th className="fgprod-report-currency">Selling Price</th>
+                  <th className="fgprod-report-currency">Gross Profit / Piece</th>
+                  <th className="fgprod-report-center">Gross Margin %</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredRows.map(row => (
                   <tr key={row.id}>
-                    <td className="fgprod-bold" style={{ color: 'var(--fgprod-text)' }}>{row.fg_item_name}</td>
+                    <td className="fgprod-bold" title={row.fg_item_name} style={{ color: 'var(--fgprod-text)' }}>{row.fg_item_name}</td>
                     <td>{row.department_name || '-'}</td>
-                    <td className="fgprod-num">{parseFloat(row.recipe_output_quantity || 0).toFixed(0)}</td>
-                    <td className="fgprod-num" style={{ fontWeight: 500 }}>{row.rm_recipes_count}</td>
-                    <td className="fgprod-num fgprod-bold" style={{ color: 'var(--fgprod-primary)' }}>
+                    <td className="fgprod-report-center">{parseFloat(row.recipe_output_quantity || 0).toFixed(0)}</td>
+                    <td className="fgprod-report-center" style={{ fontWeight: 500 }}>{row.rm_recipes_count}</td>
+                    <td className="fgprod-report-currency fgprod-bold" style={{ color: 'var(--fgprod-primary)' }}>
                       Rs. {parseFloat(row.rm_cost).toFixed(2)}
                     </td>
-                    <td className="fgprod-num fgprod-bold" style={{ color: 'var(--fgprod-primary)' }}>
-                      {parseFloat(row.recipe_output_quantity || 0) > 0
-                        ? `Rs. ${(parseFloat(row.rm_cost) / parseFloat(row.recipe_output_quantity)).toFixed(2)}`
+                    <td className="fgprod-report-currency fgprod-bold" style={{ color: 'var(--fgprod-primary)' }}>
+                      {row.rmCostPerPiece !== null
+                        ? `Rs. ${row.rmCostPerPiece.toFixed(2)}`
                         : 'N/A'}
                     </td>
-                    <td className="fgprod-num fgprod-bold" style={{ color: 'var(--fgprod-primary)' }}>
+                    <td className="fgprod-report-currency fgprod-bold" style={{ color: 'var(--fgprod-primary)' }}>
+                      {row.productionCostPerPiece !== null
+                        ? `Rs. ${row.productionCostPerPiece.toFixed(2)}`
+                        : 'N/A'}
+                    </td>
+                    <td className="fgprod-report-currency fgprod-bold" style={{ color: 'var(--fgprod-primary)' }}>
                       {row.selling_price !== null && row.selling_price !== undefined
                         ? `Rs. ${parseFloat(row.selling_price).toFixed(2)}`
+                        : 'N/A'}
+                    </td>
+                    <td
+                      className="fgprod-report-currency fgprod-bold"
+                      style={{ color: row.grossProfitPerPiece === null ? 'inherit' : (row.grossProfitPerPiece >= 0 ? '#1a9c4b' : '#d32f2f') }}
+                    >
+                      {row.grossProfitPerPiece !== null
+                        ? `Rs. ${row.grossProfitPerPiece.toFixed(2)}`
+                        : 'N/A'}
+                    </td>
+                    <td
+                      className="fgprod-report-center fgprod-bold"
+                      style={{ color: row.grossMarginPct === null ? 'inherit' : (row.grossMarginPct >= 0 ? '#1a9c4b' : '#d32f2f') }}
+                    >
+                      {row.grossMarginPct !== null
+                        ? `${row.grossMarginPct.toFixed(1)}%`
                         : 'N/A'}
                     </td>
                   </tr>

@@ -286,6 +286,7 @@
 /* ── Tables ── */
 .fgprod-table-wrapper {
   overflow-x: auto;
+  width: 100%;
   border: 1px solid var(--fgprod-border);
   border-radius: var(--fgprod-radius-md);
   box-shadow: var(--fgprod-shadow-sm);
@@ -336,6 +337,116 @@
 
 .fgprod-table tbody tr:nth-of-type(even):hover {
   background: #f8fafc;
+}
+
+.fgprod-recipes-report-table {
+  min-width: 1465px;
+  table-layout: auto;
+}
+
+.fgprod-recipes-report-table th,
+.fgprod-recipes-report-table td {
+  box-sizing: border-box;
+}
+
+.fgprod-recipes-report-table tbody td {
+  height: 56px;
+}
+
+.fgprod-recipes-report-table .fgprod-recipes-col-item {
+  width: 220px;
+  min-width: 220px;
+}
+
+.fgprod-recipes-report-table .fgprod-recipes-col-department {
+  width: 140px;
+  min-width: 140px;
+}
+
+.fgprod-recipes-report-table .fgprod-recipes-col-output,
+.fgprod-recipes-report-table .fgprod-recipes-col-recipes {
+  width: 110px;
+  min-width: 110px;
+}
+
+.fgprod-recipes-report-table .fgprod-recipes-col-cost-batch,
+.fgprod-recipes-report-table .fgprod-recipes-col-cost-piece {
+  width: 145px;
+  min-width: 145px;
+}
+
+.fgprod-recipes-report-table .fgprod-recipes-col-production {
+  width: 170px;
+  min-width: 170px;
+}
+
+.fgprod-recipes-report-table .fgprod-recipes-col-selling {
+  width: 135px;
+  min-width: 135px;
+}
+
+.fgprod-recipes-report-table .fgprod-recipes-col-profit {
+  width: 165px;
+  min-width: 165px;
+}
+
+.fgprod-recipes-report-table .fgprod-recipes-col-margin {
+  width: 125px;
+  min-width: 125px;
+}
+
+.fgprod-recipes-report-table .fgprod-report-center {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.fgprod-recipes-report-table .fgprod-report-currency {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.fgprod-recipes-report-table th:first-child,
+.fgprod-recipes-report-table td:first-child,
+.fgprod-recipes-report-table th:nth-child(2),
+.fgprod-recipes-report-table td:nth-child(2) {
+  position: sticky;
+  z-index: 2;
+  background: var(--fgprod-surface);
+}
+
+.fgprod-recipes-report-table th:first-child,
+.fgprod-recipes-report-table td:first-child {
+  left: 0;
+}
+
+.fgprod-recipes-report-table th:nth-child(2),
+.fgprod-recipes-report-table td:nth-child(2) {
+  left: 220px;
+}
+
+.fgprod-recipes-report-table thead th:first-child,
+.fgprod-recipes-report-table thead th:nth-child(2) {
+  z-index: 3;
+  background: #f8fafc;
+}
+
+.fgprod-recipes-report-table tbody tr:nth-of-type(even) td:first-child,
+.fgprod-recipes-report-table tbody tr:nth-of-type(even) td:nth-child(2) {
+  background: #fafbfd;
+}
+
+.fgprod-recipes-report-table tbody tr:hover td:first-child,
+.fgprod-recipes-report-table tbody tr:hover td:nth-child(2),
+.fgprod-recipes-report-table tbody tr:nth-of-type(even):hover td:first-child,
+.fgprod-recipes-report-table tbody tr:nth-of-type(even):hover td:nth-child(2) {
+  background: #f8fafc;
+}
+
+.fgprod-recipes-report-table td:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .fgprod-num {
