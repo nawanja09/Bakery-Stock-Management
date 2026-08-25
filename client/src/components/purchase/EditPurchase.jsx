@@ -547,6 +547,10 @@ const EditPurchase = ({ embeddedId, onSaved, onCancel } = {}) => {
   };
 
   const paymentInfo = getPaymentStatusInfo();
+  const fullTotal = formData.items.reduce(
+    (total, item) => total + (parseFloat(item.lineTotal) || 0),
+    0
+  );
 
   if (loading) {
     return (
@@ -755,6 +759,17 @@ const EditPurchase = ({ embeddedId, onSaved, onCancel } = {}) => {
                   );
                 })}
               </tbody>
+                <tfoot>
+                  <tr className="full-total-row">
+                    <td colSpan={supplierVatRegistered ? 6 : 5} className="text-right">
+                      <strong>Full Total:</strong>
+                    </td>
+                    <td className="text-right full-total-value">
+                      <strong>{formatCurrency(fullTotal)}</strong>
+                    </td>
+                    <td></td>
+                  </tr>
+                </tfoot>
             </table>
           </div>
 
