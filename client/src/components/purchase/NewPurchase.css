@@ -249,6 +249,24 @@
   font-variant-numeric: tabular-nums;
 }
 
+.items-table tfoot .full-total-row td {
+  padding: 14px 16px;
+  background: #f8fafd;
+  border-top: 2px solid #e8edf4 !important;
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.items-table tfoot .full-total-row td:first-child {
+  padding-left: 20px;
+}
+
+.items-table tfoot .full-total-value {
+  color: #4f7eb3;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
 /* VAT column background - subtle */
 .items-table .vat-column {
   background-color: #faf5ff;
