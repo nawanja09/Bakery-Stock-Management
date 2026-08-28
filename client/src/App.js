@@ -134,7 +134,8 @@ const ProtectedRoute = ({ children }) => {
     return <RootRedirect />;
   }
 
-  return token ? children : <Navigate to="/login" state={{ from: location }} replace />;
+  if (!token) return <Navigate to="/login" state={{ from: location }} replace />;
+  return children;
 };
 
 const getStoredUserRole = () => {
@@ -151,13 +152,16 @@ const isRestrictedStoreRole = (role) => {
   return role === 'Store Keeper' || role === 'Stores';
 };
 
-// Blocks direct URL navigation into the Adjustments module for Store Keeper
+const isViewOnlyRole = (role) => role === 'View Only';
+
+// Blocks direct URL navigation into the Adjustments module for restricted users
 // accounts (the API itself also rejects these requests server-side).
 const AdjustmentsRoute = ({ children }) => {
   const token = localStorage.getItem('token');
   const location = useLocation();
   if (!token) return <Navigate to="/login" state={{ from: location }} replace />;
-  if (isRestrictedStoreRole(getStoredUserRole())) return <Navigate to="/dashboard" replace />;
+  const role = getStoredUserRole();
+  if (isRestrictedStoreRole(role) || isViewOnlyRole(role)) return <Navigate to="/dashboard" replace />;
   return children;
 };
 
@@ -167,7 +171,7 @@ const FinanceRoute = ({ children }) => {
   const location = useLocation();
   if (!token) return <Navigate to="/login" state={{ from: location }} replace />;
   const role = getStoredUserRole();
-  if (role !== 'Admin' && role !== 'Accountant') return <Navigate to="/dashboard" replace />;
+  if (role !== 'Admin' && role !== 'Accountant' && !isViewOnlyRole(role)) return <Navigate to="/dashboard" replace />;
   return children;
 };
 
@@ -314,7 +318,7 @@ function App() {
             <Route path="adjustments/stores-balance" element={<AdjustmentsRoute><StoresBalance /></AdjustmentsRoute>} />
             <Route path="adjustments/stores-adjustments" element={<AdjustmentsRoute><StoresAdjustments /></AdjustmentsRoute>} />
             <Route path="adjustments/edit/:id" element={<AdjustmentsRoute><EditAdjustment /></AdjustmentsRoute>} />
-            <Route path="adjustments/payment-methods" element={<PaymentMethodManagement />} />
+            <Route path="adjustments/payment-methods" element={<AdjustmentsRoute><PaymentMethodManagement /></AdjustmentsRoute>} />
             <Route path="adjustments/inhand" element={<AdjustmentsRoute><InhandAdjustments /></AdjustmentsRoute>} />
             <Route path="/reports/department-return-item-wise" element={<DepartmentReturnItemWiseReport />} />
             <Route path="/analysis/last-issued-date" element={<LastIssueDateReport />} />

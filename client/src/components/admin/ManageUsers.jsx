@@ -31,7 +31,7 @@ const ManageUsers = () => {
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('user');
+  const [role, setRole] = useState('User');
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -114,7 +114,7 @@ const ManageUsers = () => {
     setName('');
     setUsername('');
     setPassword('');
-    setRole('user');
+    setRole('User');
   };
 
   const openEditModal = (user) => {
@@ -166,11 +166,12 @@ const ManageUsers = () => {
               onChange={(e) => setRoleFilter(e.target.value)}
             >
               <option value="">All Roles</option>
-              <option value="admin">Admin</option>
-              <option value="manager">Manager</option>
-              <option value="user">User</option>
+              <option value="Admin">Admin</option>
+              <option value="Manager">Manager</option>
+              <option value="User">User</option>
               <option value="Store Keeper">Store Keeper</option>
               <option value="Accountant">Accountant</option>
+              <option value="View Only">View Only</option>
             </select>
           </div>
           

@@ -56,6 +56,7 @@ const PaymentMethodManagement = require('./routes/paymentMethodRoutes');
 const financeRoutes = require('./routes/financeRoutes');
 const inhandRoutes  = require('./routes/inhandRoutes');
 const receiveTypeRoutes = require('./routes/receiveTypeRoutes');
+const readOnly = require('./middleware/readOnly');
 
 // NEW, independent module - FG (Finished Goods) Production.
 // Kept completely separate from the existing finished-goods-* routes above.
@@ -93,6 +94,7 @@ app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.use('/api', authRoutes);
+app.use('/api', readOnly);
 app.use('/api/purchases', purchaseRoutes);
 app.use('/api/suppliers', supplierRoutes);
 app.use('/api/payees', payeeRoutes);
