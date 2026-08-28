@@ -100,6 +100,7 @@
 
 .fgprod-card:hover {
   box-shadow: var(--fgprod-shadow-lg);
+  border-color: var(--fgprod-border-hover);
 }
 
 .fgprod-card-title {
@@ -216,6 +217,7 @@
 
 .fgprod-item-name-dropdown {
   width: 500px;
+  max-width: 100%;
 }
 
 .fgprod-dept-tag {
@@ -283,10 +285,150 @@
   cursor: not-allowed;
 }
 
+/* ── Quantity + unit dropdown (unit conversion validation) ── */
+.fgprod-input-with-unit {
+  display: flex;
+  align-items: stretch;
+}
+
+.fgprod-input-with-unit .fgprod-input {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.fgprod-unit-select {
+  min-width: 76px;
+  padding: 0 0.6rem;
+  background: #f1f5f9;
+  color: var(--fgprod-secondary);
+  font-weight: 600;
+  font-size: 0.85rem;
+  border: 1px solid var(--fgprod-border);
+  border-left: none;
+  border-top-right-radius: var(--fgprod-radius-md);
+  border-bottom-right-radius: var(--fgprod-radius-md);
+  cursor: pointer;
+  transition: var(--fgprod-transition);
+}
+
+.fgprod-unit-select:hover:not(:disabled) {
+  background: var(--fgprod-primary-light);
+  color: var(--fgprod-primary);
+}
+
+.fgprod-unit-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.fgprod-unit-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 52px;
+  padding: 0 0.75rem;
+  background: #f1f5f9;
+  color: var(--fgprod-secondary);
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-transform: lowercase;
+  border: 1px solid var(--fgprod-border);
+  border-left: none;
+  border-top-right-radius: var(--fgprod-radius-md);
+  border-bottom-right-radius: var(--fgprod-radius-md);
+  white-space: nowrap;
+}
+
+.fgprod-field-hint {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.78rem;
+  color: var(--fgprod-text-muted);
+}
+
+/* ── Misc layout helpers used on the Recipes page ── */
+.fgprod-field-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  display: block;
+  margin-bottom: 0.4rem;
+  color: var(--fgprod-text);
+}
+
+.fgprod-detail-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.fgprod-detail-meta {
+  margin-top: 1rem;
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.fgprod-detail-meta-text {
+  font-size: 0.9rem;
+  color: var(--fgprod-text);
+}
+
+.fgprod-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.fgprod-section-header .fgprod-card-title {
+  margin: 0;
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.fgprod-form-group--spaced {
+  margin-top: 1rem;
+}
+
+.fgprod-btn-small {
+  padding: 0.25rem 0.6rem;
+  font-size: 0.8rem;
+}
+
+.fgprod-pos-error-row {
+  margin-top: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.fgprod-pos-error-text {
+  font-size: 0.85rem;
+  color: var(--fgprod-danger-hover);
+}
+
+.fgprod-pos-warning-text {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: #b45309;
+}
+
+.fgprod-line-cost-preview {
+  margin-top: 0.25rem;
+  padding: 0.65rem 0.9rem;
+  background: var(--fgprod-primary-light);
+  color: var(--fgprod-primary);
+  border-radius: var(--fgprod-radius-md);
+  font-size: 0.85rem;
+}
+
 /* ── Tables ── */
 .fgprod-table-wrapper {
   overflow-x: auto;
-  width: 100%;
   border: 1px solid var(--fgprod-border);
   border-radius: var(--fgprod-radius-md);
   box-shadow: var(--fgprod-shadow-sm);
@@ -331,6 +473,18 @@
   background: #f8fafc;
 }
 
+.fgprod-table tbody tr:hover .fgprod-actions {
+  opacity: 1;
+}
+
+.fgprod-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  opacity: 0.85;
+  transition: var(--fgprod-transition);
+}
+
 .fgprod-table tbody tr:nth-of-type(even) {
   background: #fafbfd;
 }
@@ -339,150 +493,260 @@
   background: #f8fafc;
 }
 
-.fgprod-recipes-report-table {
-  min-width: 1465px;
-  table-layout: auto;
-}
-
-.fgprod-recipes-report-table th,
-.fgprod-recipes-report-table td {
-  box-sizing: border-box;
-}
-
-.fgprod-recipes-report-table tbody td {
-  height: 56px;
-}
-
-.fgprod-recipes-report-table .fgprod-recipes-col-item {
-  width: 220px;
-  min-width: 220px;
-}
-
-.fgprod-recipes-report-table .fgprod-recipes-col-department {
-  width: 140px;
-  min-width: 140px;
-}
-
-.fgprod-recipes-report-table .fgprod-recipes-col-output,
-.fgprod-recipes-report-table .fgprod-recipes-col-recipes {
-  width: 110px;
-  min-width: 110px;
-}
-
-.fgprod-recipes-report-table .fgprod-recipes-col-cost-batch,
-.fgprod-recipes-report-table .fgprod-recipes-col-cost-piece {
-  width: 145px;
-  min-width: 145px;
-}
-
-.fgprod-recipes-report-table .fgprod-recipes-col-production {
-  width: 170px;
-  min-width: 170px;
-}
-
-.fgprod-recipes-report-table .fgprod-recipes-col-selling {
-  width: 135px;
-  min-width: 135px;
-}
-
-.fgprod-recipes-report-table .fgprod-recipes-col-profit {
-  width: 165px;
-  min-width: 165px;
-}
-
-.fgprod-recipes-report-table .fgprod-recipes-col-margin {
-  width: 125px;
-  min-width: 125px;
-}
-
-.fgprod-recipes-report-table .fgprod-report-center {
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-}
-
-.fgprod-recipes-report-table .fgprod-report-currency {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.fgprod-recipes-report-table th:first-child,
-.fgprod-recipes-report-table td:first-child,
-.fgprod-recipes-report-table th:nth-child(2),
-.fgprod-recipes-report-table td:nth-child(2) {
-  position: sticky;
-  z-index: 2;
-  background: var(--fgprod-surface);
-}
-
-.fgprod-recipes-report-table th:first-child,
-.fgprod-recipes-report-table td:first-child {
-  left: 0;
-}
-
-.fgprod-recipes-report-table th:nth-child(2),
-.fgprod-recipes-report-table td:nth-child(2) {
-  left: 220px;
-}
-
-.fgprod-recipes-report-table thead th:first-child,
-.fgprod-recipes-report-table thead th:nth-child(2) {
-  z-index: 3;
-  background: #f8fafc;
-}
-
-.fgprod-recipes-report-table tbody tr:nth-of-type(even) td:first-child,
-.fgprod-recipes-report-table tbody tr:nth-of-type(even) td:nth-child(2) {
-  background: #fafbfd;
-}
-
-.fgprod-recipes-report-table tbody tr:hover td:first-child,
-.fgprod-recipes-report-table tbody tr:hover td:nth-child(2),
-.fgprod-recipes-report-table tbody tr:nth-of-type(even):hover td:first-child,
-.fgprod-recipes-report-table tbody tr:nth-of-type(even):hover td:nth-child(2) {
-  background: #f8fafc;
-}
-
-.fgprod-recipes-report-table td:first-child {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .fgprod-num {
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+.fgprod-table th.fgprod-actions-col {
+  width: 80px;
 }
 
 .fgprod-bold {
   font-weight: 600;
 }
 
-.fgprod-actions {
-  display: flex;
-  gap: 0.5rem;
-  justify-content: flex-end;
+/* ── FG Recipes Reports table: fixed column widths, alignment, sticky ID columns ── */
+.fgprod-reports-table-wrapper {
+  overflow-x: auto;
+  border: 1px solid var(--fgprod-border);
+  border-radius: var(--fgprod-radius-md);
+  box-shadow: var(--fgprod-shadow-sm);
+  background: var(--fgprod-surface);
+  width: 100%;
 }
 
-/* ── Cost Summary Row ── */
-.fgprod-cost-summary {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  padding: 1.25rem;
+.fgprod-reports-table {
+  width: 100%;
+  min-width: 1465px; /* sum of all column widths so columns never get squeezed */
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.9rem;
+  text-align: left;
+  table-layout: fixed; /* honored strictly because every column has an explicit <col> width below */
+}
+
+.fgprod-reports-table thead th {
+  background: #f8fafc;
+  padding: 0.9rem 1rem;
+  font-weight: 600;
+  color: var(--fgprod-secondary);
+  border-bottom: 1px solid var(--fgprod-border);
+  white-space: nowrap;
+  letter-spacing: 0.025em;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+.fgprod-reports-table tbody td {
+  padding: 0 1rem;
+  height: 56px;
+  min-height: 56px;
+  border-bottom: 1px solid var(--fgprod-border);
+  color: var(--fgprod-text);
+  vertical-align: middle;
+}
+
+.fgprod-reports-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.fgprod-reports-table tbody tr {
+  transition: var(--fgprod-transition);
+}
+
+.fgprod-reports-table tbody tr:hover td {
+  background: #f8fafc;
+}
+
+.fgprod-reports-table tbody tr:nth-of-type(even) td {
+  background: #fafbfd;
+}
+
+.fgprod-reports-table tbody tr:nth-of-type(even):hover td {
+  background: #f8fafc;
+}
+
+/* Text columns */
+.fgprod-reports-table .col-text {
+  text-align: left;
+}
+
+/* Numeric (count) columns */
+.fgprod-reports-table .col-count {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Currency columns */
+.fgprod-reports-table .col-currency {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Percentage column */
+.fgprod-reports-table .col-percent {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* FG Item Name: most prominent identification column, truncates with tooltip */
+.fgprod-reports-table .col-fg-name {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Sticky identification columns (FG Item Name + Department) while scrolling horizontally */
+.fgprod-reports-table th.sticky-col,
+.fgprod-reports-table td.sticky-col {
+  position: sticky;
+  z-index: 2;
+  background: var(--fgprod-surface);
+}
+
+.fgprod-reports-table th.sticky-col {
+  z-index: 3;
+  background: #f8fafc;
+}
+
+.fgprod-reports-table tbody tr:hover td.sticky-col {
+  background: #f8fafc;
+}
+
+.fgprod-reports-table tbody tr:nth-of-type(even) td.sticky-col {
+  background: #fafbfd;
+}
+
+.fgprod-reports-table tbody tr:nth-of-type(even):hover td.sticky-col {
+  background: #f8fafc;
+}
+
+.fgprod-reports-table .sticky-col-name {
+  left: 0;
+  box-shadow: 1px 0 0 0 var(--fgprod-border);
+}
+
+.fgprod-reports-table .sticky-col-dept {
+  left: 220px; /* must match FG Item Name column width */
+  box-shadow: 1px 0 0 0 var(--fgprod-border);
+}
+
+@media (max-width: 768px) {
+  .fgprod-reports-table th.sticky-col,
+  .fgprod-reports-table td.sticky-col {
+    position: static;
+    box-shadow: none;
+  }
+}
+
+/* ── Recipe Costing Panel (Final RM Costing summary on the Recipes page) ── */
+.fgprod-costing-panel {
+  padding: 1.5rem;
   background: #f8fafc;
   border-top: 1px solid var(--fgprod-border);
   border-radius: 0 0 var(--fgprod-radius-md) var(--fgprod-radius-md);
-  font-weight: 600;
-  font-size: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
 }
 
-.fgprod-cost-summary .fgprod-cost-value {
-  font-size: 1.15rem;
-  color: var(--fgprod-primary);
+.fgprod-costing-title {
+  margin: 0 0 0.25rem;
+  font-size: 0.95rem;
   font-weight: 700;
-  margin-left: 0.5rem;
+  color: var(--fgprod-text);
+}
+
+.fgprod-costing-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  font-size: 0.9rem;
+  color: var(--fgprod-secondary);
+}
+
+.fgprod-costing-row .fgprod-cost-value {
+  font-size: 0.95rem;
+  color: var(--fgprod-text);
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
+}
+
+.fgprod-costing-row--total {
+  border-top: 1px dashed var(--fgprod-border-hover);
+  padding-top: 0.65rem;
+  margin-top: 0.15rem;
+}
+
+.fgprod-costing-row--total span:first-child {
+  font-weight: 600;
+  color: var(--fgprod-text);
+}
+
+.fgprod-costing-row--total .fgprod-cost-value {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.fgprod-costing-highlight {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+  padding: 0.9rem 1.1rem;
+  border-radius: var(--fgprod-radius-md);
+  background: var(--fgprod-primary-light);
+  border: 1px solid rgba(30, 58, 138, 0.25);
+  box-shadow: var(--fgprod-shadow-sm);
+}
+
+.fgprod-costing-highlight-label {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--fgprod-text);
+}
+
+.fgprod-costing-highlight-value {
+  font-weight: 800;
+  font-size: 1.3rem;
+  color: var(--fgprod-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.fgprod-costing-highlight.fgprod-costing-highlight--warn {
+  background: #fff7ed;
+  border-color: rgba(245, 158, 11, 0.4);
+}
+
+.fgprod-costing-highlight--warn .fgprod-costing-highlight-value {
+  font-size: 0.85rem;
+  color: #b45309;
+  font-weight: 600;
+  text-align: right;
+}
+
+@media (max-width: 640px) {
+  .fgprod-costing-panel {
+    padding: 1.1rem;
+  }
+
+  .fgprod-costing-highlight {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .fgprod-costing-highlight-value {
+    font-size: 1.15rem;
+  }
 }
 
 /* ── Summary Cards Grid (Reports) ── */
