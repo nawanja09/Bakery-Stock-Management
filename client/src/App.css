@@ -279,47 +279,6 @@ textarea {
 
 /* Component-specific responsive adjustments */
 @media (max-width: 768px) {
-  /* Navigation sidebar becomes compact */
-  .sidebar {
-    width: 70px;
-  }
-  
-  .logo span,
-  .nav-menu span,
-  .logout-btn span {
-    display: none;
-  }
-  
-  .logo-container {
-    padding: 0.5rem 0;
-  }
-  
-  .nav-menu .icon,
-  .dropdown-header .icon {
-    margin-right: 0;
-    font-size: 1.3rem;
-  }
-  
-  .dropdown-header .chevron {
-    display: none;
-  }
-  
-  .dropdown-menu {
-    position: absolute;
-    left: 70px;
-    width: 200px;
-    box-shadow: 3px 3px 10px rgba(0, 0, 0, 0.1);
-    z-index: 100;
-  }
-  
-  .dropdown-menu a {
-    padding-left: 1.5rem;
-  }
-  
-  .dropdown-menu .icon-container {
-    left: 0.5rem;
-  }
-  
   /* Dashboard adjustments */
   .dashboard-header {
     flex-direction: column;

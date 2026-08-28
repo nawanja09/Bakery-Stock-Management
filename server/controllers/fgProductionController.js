@@ -28,6 +28,7 @@
 // ----------------------------------------------------------------------
 
 const pool = require('../config/db');
+
 const {
   fetchRavonPosItems,
   findRavonPosItem,
@@ -35,6 +36,7 @@ const {
   RavonPosUnavailableError,
   RavonPosResponseError
 } = require('../services/ravonPosService');
+const { isValidUnit, areCompatibleUnits, convertQuantity } = require('../utils/unitConversion');
 
 // =============================================
 // Helpers
@@ -81,13 +83,16 @@ const posErrorResponse = (error) => {
   return { status: 500, error: 'Unable to load FG Items right now. Please try again.' };
 };
 
-const validateRecipeInput = ({ rm_item_id, quantity, last_price }) => {
+const validateRecipeInput = ({ rm_item_id, quantity, recipe_unit, last_price }) => {
   if (!rm_item_id) {
     return 'RM Item is required';
   }
   const qty = toNumber(quantity, NaN);
   if (!Number.isFinite(qty) || qty <= 0) {
     return 'Quantity must be greater than 0';
+  }
+  if (!recipe_unit || !isValidUnit(recipe_unit)) {
+    return 'A valid unit must be selected for the recipe quantity';
   }
   const price = toNumber(last_price, NaN);
   if (!Number.isFinite(price) || price < 0) {
@@ -321,6 +326,8 @@ const getRecipesForFg = async (req, res) => {
          r.quantity,
          r.last_price,
          (r.quantity * r.last_price) AS line_cost,
+         r.purchase_quantity,
+         r.purchase_unit,
          r.status,
          r.created_at,
          r.updated_at
@@ -341,9 +348,9 @@ const getRecipesForFg = async (req, res) => {
 // POST /api/fg-production/:id/recipes
 const addRecipe = async (req, res) => {
   const { id } = req.params; // fg_production_id
-  const { rm_item_id, quantity, last_price } = req.body;
+  const { rm_item_id, quantity, recipe_unit, last_price } = req.body;
 
-  const validationError = validateRecipeInput({ rm_item_id, quantity, last_price });
+  const validationError = validateRecipeInput({ rm_item_id, quantity, recipe_unit, last_price });
   if (validationError) {
     return res.status(400).json({ error: validationError });
   }
@@ -369,11 +376,39 @@ const addRecipe = async (req, res) => {
       return res.status(409).json({ error: 'This Raw Material is already added to this FG recipe' });
     }
 
+    // Unit conversion validation: last_price is priced against the RM
+    // item's own base unit (items.unit). The person may enter the
+    // quantity in any compatible unit (e.g. g instead of kg) - it is
+    // converted to the base unit here, server-side, before being stored
+    // and before it is ever multiplied by last_price for costing. This is
+    // the authoritative conversion; the frontend preview is UX only.
+    const [itemRows] = await pool.query(
+      `SELECT unit FROM items WHERE id = ?`,
+      [rm_item_id]
+    );
+    if (itemRows.length === 0) {
+      return res.status(404).json({ error: 'Raw Material item not found' });
+    }
+    const baseUnit = itemRows[0].unit;
+
+    if (!areCompatibleUnits(recipe_unit, baseUnit)) {
+      return res.status(400).json({
+        error: `Cannot use unit "${recipe_unit}" for this Raw Material - it is stocked in "${baseUnit}" and only compatible units can be used`
+      });
+    }
+
+    let normalizedQuantity;
+    try {
+      normalizedQuantity = convertQuantity(toNumber(quantity), recipe_unit, baseUnit);
+    } catch (conversionError) {
+      return res.status(400).json({ error: conversionError.message });
+    }
+
     const [result] = await pool.query(
       `INSERT INTO fg_production_recipes
-        (fg_production_id, rm_item_id, quantity, last_price, status)
-       VALUES (?, ?, ?, ?, 1)`,
-      [id, rm_item_id, toNumber(quantity), toNumber(last_price)]
+        (fg_production_id, rm_item_id, quantity, recipe_unit, last_price, purchase_quantity, purchase_unit, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
+      [id, rm_item_id, normalizedQuantity, recipe_unit, toNumber(last_price), normalizedQuantity, baseUnit]
     );
 
     res.status(201).json({
@@ -389,9 +424,9 @@ const addRecipe = async (req, res) => {
 // PUT /api/fg-production/recipes/:recipeId
 const updateRecipe = async (req, res) => {
   const { recipeId } = req.params;
-  const { rm_item_id, quantity, last_price } = req.body;
+  const { rm_item_id, quantity, recipe_unit, last_price } = req.body;
 
-  const validationError = validateRecipeInput({ rm_item_id, quantity, last_price });
+  const validationError = validateRecipeInput({ rm_item_id, quantity, recipe_unit, last_price });
   if (validationError) {
     return res.status(400).json({ error: validationError });
   }
@@ -417,16 +452,40 @@ const updateRecipe = async (req, res) => {
       return res.status(409).json({ error: 'This Raw Material is already added to this FG recipe' });
     }
 
+    // Same unit conversion validation as addRecipe - see comment there.
+    const [itemRows] = await pool.query(
+      `SELECT unit FROM items WHERE id = ?`,
+      [rm_item_id]
+    );
+    if (itemRows.length === 0) {
+      return res.status(404).json({ error: 'Raw Material item not found' });
+    }
+    const baseUnit = itemRows[0].unit;
+
+    if (!areCompatibleUnits(recipe_unit, baseUnit)) {
+      return res.status(400).json({
+        error: `Cannot use unit "${recipe_unit}" for this Raw Material - it is stocked in "${baseUnit}" and only compatible units can be used`
+      });
+    }
+
+    let normalizedQuantity;
+    try {
+      normalizedQuantity = convertQuantity(toNumber(quantity), recipe_unit, baseUnit);
+    } catch (conversionError) {
+      return res.status(400).json({ error: conversionError.message });
+    }
+
     const [result] = await pool.query(
       `UPDATE fg_production_recipes
-        SET rm_item_id = ?, quantity = ?, last_price = ?
+        SET rm_item_id = ?, quantity = ?, recipe_unit = ?, last_price = ?, purchase_quantity = ?, purchase_unit = ?
        WHERE id = ? AND status = 1`,
-            [rm_item_id, toNumber(quantity), toNumber(last_price), recipeId]
+      [rm_item_id, normalizedQuantity, recipe_unit, toNumber(last_price), normalizedQuantity, baseUnit, recipeId]
     );
 
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'Recipe item not found' });
     }
+
 
     res.json({ message: 'Recipe item updated successfully' });
   } catch (error) {

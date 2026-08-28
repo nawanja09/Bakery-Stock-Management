@@ -58,6 +58,7 @@ const NavigationBar = () => {
   const [activeModule, setActiveModule] = useState(null);
   const [activeDropdown, setActiveDropdown] = useState(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
   const sidebarRef = useRef(null);
 
   // Store Keeper accounts don't get the Adjustments module in the menu.
@@ -144,6 +145,11 @@ const NavigationBar = () => {
   };
 
   const toggleSidebar = () => {
+    if (window.innerWidth <= 640) {
+      setIsMobileOpen((isOpen) => !isOpen);
+      return;
+    }
+
     setIsCollapsed(!isCollapsed);
     if (!isCollapsed) {
       setActiveDropdown(null);
@@ -658,10 +664,10 @@ const NavigationBar = () => {
   );
 
   return (
-    <div className={`sidebar ${isCollapsed ? 'collapsed' : ''}`} ref={sidebarRef}>
-      <div className="toggle-button" onClick={toggleSidebar}>
+    <div className={`sidebar ${isCollapsed ? 'collapsed' : ''} ${isMobileOpen ? 'mobile-open' : ''}`} ref={sidebarRef}>
+      <button className="toggle-button" onClick={toggleSidebar} aria-label="Toggle navigation">
         <FontAwesomeIcon icon={faBars} />
-      </div>
+      </button>
 
       <div className="logo-container">
         <img src={bakeryLogo} alt="Bakery Logo" className="logo-image" />

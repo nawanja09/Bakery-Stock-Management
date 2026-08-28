@@ -24,16 +24,12 @@ import Select from 'react-select';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
 import './FGProduction.css';
+import { UTILITY_COST_RATE } from './fgProductionConstants';
+import { getCompatibleUnits, convertQuantity, areCompatibleUnits } from './unitConversion';
 
 const ALLOWED_FG_DEPARTMENTS = ['Bakery', 'Cake', 'Pastry', 'Restaurant', 'Savory'];
 
-const emptyRecipeForm = { rm_item_id: '', quantity: '', last_price: '' };
-
-// Utility cost is a fixed business rule (70% of Total RM Cost) used to
-// approximate overheads like gas/electricity in the per-piece cost. It is
-// a formula constant, not a recipe quantity or RM price, so it's fine to
-// keep it as a named constant here.
-const UTILITY_COST_RATE = 0.7;
+const emptyRecipeForm = { rm_item_id: '', quantity: '', last_price: '', recipe_unit: '', base_unit: '' };
 
 const formatCurrency = (value) =>
   `Rs. ${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -294,10 +290,25 @@ const Recipes = () => {
 
   const openEditRecipeModal = (recipe) => {
     setRecipeModalMode('edit');
+    const rmItem = rawMaterials.find(rm => String(rm.id) === String(recipe.rm_item_id));
+    // recipe.quantity stored on the backend is always normalized into the
+    // RM item's base unit (see fgProductionController.addRecipe/updateRecipe).
+    // Convert it back into whatever unit was originally entered so editing
+    // shows the number the person actually typed, not the normalized one.
+    const baseUnit = rmItem?.unit || '';
+    const enteredUnit = recipe.recipe_unit || baseUnit;
+    const displayQuantity = (baseUnit && enteredUnit)
+      ? convertQuantity(parseFloat(recipe.quantity), baseUnit, enteredUnit)
+      : recipe.quantity;
+
     setRecipeForm({
       rm_item_id: recipe.rm_item_id,
-      quantity: recipe.quantity,
-      last_price: recipe.last_price
+      quantity: displayQuantity !== null && displayQuantity !== undefined
+        ? String(Number(displayQuantity.toFixed(4)))
+        : recipe.quantity,
+      last_price: recipe.last_price,
+      recipe_unit: enteredUnit,
+      base_unit: baseUnit
     });
     setEditingRecipeId(recipe.id);
     setRecipeModalOpen(true);
@@ -308,11 +319,36 @@ const Recipes = () => {
   const handleRecipeRmChange = (selected) => {
     const rmId = selected?.value || '';
     const suggestedPrice = previousPrices[rmId];
+    const rmItem = rawMaterials.find(rm => String(rm.id) === String(rmId));
+    const baseUnit = rmItem?.unit || '';
     setRecipeForm(prev => ({
       ...prev,
       rm_item_id: rmId,
-      last_price: prev.last_price || (suggestedPrice != null ? suggestedPrice : prev.last_price)
+      // Default the entry unit to the item's own base unit; the person can
+      // switch to any compatible unit via the dropdown below (see
+      // handleRecipeUnitChange). last_price is always priced per base_unit.
+      base_unit: baseUnit,
+      recipe_unit: baseUnit,
+      quantity: '', // reset - previous quantity was in a different item's unit context
+      last_price: suggestedPrice != null ? suggestedPrice : prev.last_price
     }));
+  };
+
+  // Called when the person switches the unit they're entering the
+  // quantity in (e.g. kg -> g). Converts the already-typed number so the
+  // physical quantity stays the same instead of being silently reinterpreted.
+  const handleRecipeUnitChange = (newUnit) => {
+    setRecipeForm(prev => {
+      const qty = parseFloat(prev.quantity);
+      let newQuantity = prev.quantity;
+      if (Number.isFinite(qty) && prev.recipe_unit) {
+        const converted = convertQuantity(qty, prev.recipe_unit, newUnit);
+        if (converted !== null) {
+          newQuantity = String(Number(converted.toFixed(4)));
+        }
+      }
+      return { ...prev, recipe_unit: newUnit, quantity: newQuantity };
+    });
   };
 
   const submitRecipeForm = async () => {
@@ -321,6 +357,14 @@ const Recipes = () => {
 
     if (!recipeForm.rm_item_id) {
       showPopup('error', 'Please select a Raw Material item');
+      return;
+    }
+    if (!recipeForm.recipe_unit || !recipeForm.base_unit) {
+      showPopup('error', 'Unable to determine unit for the selected Raw Material. Please re-select it.');
+      return;
+    }
+    if (!areCompatibleUnits(recipeForm.recipe_unit, recipeForm.base_unit)) {
+      showPopup('error', `"${recipeForm.recipe_unit}" cannot be used for an item stocked in "${recipeForm.base_unit}"`);
       return;
     }
     if (!Number.isFinite(qty) || qty <= 0) {
@@ -337,6 +381,10 @@ const Recipes = () => {
       const payload = {
         rm_item_id: recipeForm.rm_item_id,
         quantity: qty,
+        // Quantity is sent exactly as entered, in recipe_unit - the server
+        // converts it to the RM item's base unit before storing/costing
+        // (see addRecipe/updateRecipe + server/utils/unitConversion.js).
+        recipe_unit: recipeForm.recipe_unit,
         last_price: price
       };
       if (recipeModalMode === 'add') {
@@ -408,7 +456,7 @@ const Recipes = () => {
 
         <div className="fgprod-picker-row">
           <div className="fgprod-select-wrap">
-            <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: '0.4rem', color: 'var(--fgprod-text)' }}>
+            <label className="fgprod-field-label">
               FG Item Name
             </label>
             <Select
@@ -426,7 +474,7 @@ const Recipes = () => {
           </div>
 
           {selectedFg && (
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <div className="fgprod-detail-actions">
               <button className="fgprod-btn-secondary" onClick={openEditFgForm}>
                 <FontAwesomeIcon icon={faEdit} /> Edit
               </button>
@@ -438,9 +486,9 @@ const Recipes = () => {
         </div>
 
         {selectedFg && (
-          <div style={{ marginTop: '1rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          <div className="fgprod-detail-meta">
             <span className="fgprod-dept-tag">{selectedFg.department_name || 'No Department'}</span>
-            <span style={{ fontSize: '0.9rem', color: 'var(--fgprod-text)' }}>
+            <span className="fgprod-detail-meta-text">
               Recipe Output: {parseFloat(selectedFg.recipe_output_quantity || 1).toFixed(0)} Pieces
             </span>
           </div>
@@ -450,8 +498,8 @@ const Recipes = () => {
       {/* Recipes table */}
       {selectedFg && (
         <div className="fgprod-card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', gap: '1rem', flexWrap: 'wrap' }}>
-            <h3 className="fgprod-card-title" style={{ margin: 0, borderBottom: 'none', paddingBottom: 0 }}>
+          <div className="fgprod-section-header">
+            <h3 className="fgprod-card-title">
               Recipe Items for "{selectedFg.fg_item_name}"
             </h3>
             <button className="fgprod-btn-primary" onClick={openAddRecipeModal}>
@@ -467,7 +515,7 @@ const Recipes = () => {
           ) : recipes.length === 0 ? (
             <div className="fgprod-empty">
               <FontAwesomeIcon icon={faBoxOpen} size="3x" />
-              <button className="fgprod-btn-primary" style={{ marginTop: '0.5rem' }} onClick={openAddRecipeModal}>
+              <button className="fgprod-btn-primary" onClick={openAddRecipeModal}>
                 <FontAwesomeIcon icon={faPlus} /> Add RM Recipe
               </button>
             </div>
@@ -482,13 +530,13 @@ const Recipes = () => {
                       <th className="fgprod-num">Quantity</th>
                       <th className="fgprod-num">Last Price</th>
                       <th className="fgprod-num">RM Cost</th>
-                      <th style={{ width: '80px' }}></th>
+                      <th className="fgprod-actions-col"></th>
                     </tr>
                   </thead>
                   <tbody>
                     {recipes.map(r => (
                       <tr key={r.id}>
-                        <td className="fgprod-bold" style={{ color: 'var(--fgprod-text)' }}>{r.rm_item_name}</td>
+                        <td className="fgprod-bold">{r.rm_item_name}</td>
                         <td className="fgprod-num">{r.rm_unit}</td>
                         <td className="fgprod-num">{r.quantity}</td>
                         <td className="fgprod-num">Rs. {parseFloat(r.last_price).toFixed(2)}</td>
@@ -507,23 +555,21 @@ const Recipes = () => {
                     ))}
                   </tbody>
                 </table>
-                <div className="fgprod-cost-summary" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <h4 style={{ margin: '0 0 0.25rem', fontSize: '0.95rem', color: 'var(--fgprod-text)' }}>
-                    Final RM Costing
-                  </h4>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <div className="fgprod-costing-panel">
+                  <h4 className="fgprod-costing-title">Final RM Costing</h4>
+                  <div className="fgprod-costing-row">
                     <span>Total RM Cost:</span>
                     <span className="fgprod-cost-value">{formatCurrency(totalRmCost)}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <div className="fgprod-costing-row">
                     <span>Utility Cost (70%):</span>
                     <span className="fgprod-cost-value">{formatCurrency(utilityCost)}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed var(--fgprod-border, #e5e7eb)', paddingTop: '0.5rem' }}>
-                    <span style={{ fontWeight: 600 }}>Total Cost Including Utility:</span>
-                    <span className="fgprod-cost-value" style={{ fontWeight: 600 }}>{formatCurrency(totalProductionCost)}</span>
+                  <div className="fgprod-costing-row fgprod-costing-row--total">
+                    <span>Total Cost Including Utility:</span>
+                    <span className="fgprod-cost-value">{formatCurrency(totalProductionCost)}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <div className="fgprod-costing-row">
                     <span>Recipe Output Quantity:</span>
                     <span className="fgprod-cost-value">
                       {recipeOutputQuantity > 0 ? `${recipeOutputQuantity.toFixed(0)} Pieces` : 'Not set'}
@@ -531,29 +577,16 @@ const Recipes = () => {
                   </div>
 
                   {recipeOutputQuantity > 0 ? (
-                    <div
-                      style={{
-                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                        marginTop: '0.25rem', padding: '0.75rem 1rem', borderRadius: '10px',
-                        background: 'var(--fgprod-primary-subtle, #eef2ff)',
-                        border: '1px solid var(--fgprod-primary, #4f46e5)'
-                      }}
-                    >
-                      <span style={{ fontWeight: 700, fontSize: '1rem' }}>RM Cost Per Piece</span>
-                      <span className="fgprod-cost-value" style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--fgprod-primary)' }}>
+                    <div className="fgprod-costing-highlight">
+                      <span className="fgprod-costing-highlight-label">RM Cost Per Piece</span>
+                      <span className="fgprod-costing-highlight-value">
                         {formatCurrency(rmCostPerPiece)} / Piece
                       </span>
                     </div>
                   ) : (
-                    <div
-                      style={{
-                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                        marginTop: '0.25rem', padding: '0.75rem 1rem', borderRadius: '10px',
-                        background: '#fff7ed', border: '1px solid #f59e0b'
-                      }}
-                    >
-                      <span style={{ fontWeight: 700 }}>RM Cost Per Piece</span>
-                      <span style={{ fontSize: '0.85rem', color: '#b45309', fontWeight: 600, textAlign: 'right' }}>
+                    <div className="fgprod-costing-highlight fgprod-costing-highlight--warn">
+                      <span className="fgprod-costing-highlight-label">RM Cost Per Piece</span>
+                      <span className="fgprod-costing-highlight-value">
                         Set a Recipe Output Quantity greater than 0 to calculate this.
                       </span>
                     </div>
@@ -595,12 +628,11 @@ const Recipes = () => {
                   }
                 />
                 {posItemsError && (
-                  <div style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <span style={{ fontSize: '0.85rem', color: '#c0392b' }}>{posItemsError}</span>
+                  <div className="fgprod-pos-error-row">
+                    <span className="fgprod-pos-error-text">{posItemsError}</span>
                     <button
                       type="button"
-                      className="fgprod-btn-secondary"
-                      style={{ padding: '0.25rem 0.6rem', fontSize: '0.8rem' }}
+                      className="fgprod-btn-secondary fgprod-btn-small"
                       onClick={fetchPosItems}
                     >
                       Retry
@@ -608,7 +640,7 @@ const Recipes = () => {
                   </div>
                 )}
                 {!posItemsError && editingItemUnavailable && fgFormItem && (
-                  <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: '#b8860b' }}>
+                  <div className="fgprod-pos-warning-text">
                     This FG Item is no longer available in Ravon POS. Keeping "{fgFormItem.label}" unless you select a different item.
                   </div>
                 )}
@@ -623,7 +655,7 @@ const Recipes = () => {
                   placeholder="Select department..."
                 />
               </div>
-              <div className="fgprod-form-group" style={{ marginTop: '1rem' }}>
+              <div className="fgprod-form-group fgprod-form-group--spaced">
                 <label>Recipe Output Quantity (Pieces) *</label>
                 <input
                   type="number"
@@ -672,18 +704,47 @@ const Recipes = () => {
               <div className="fgprod-form-grid">
                 <div className="fgprod-form-group">
                   <label>Quantity *</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.001"
-                    className="fgprod-input"
-                    value={recipeForm.quantity}
-                    onChange={(e) => setRecipeForm(prev => ({ ...prev, quantity: e.target.value }))}
-                    placeholder="0.000"
-                  />
+                  <div className="fgprod-input-with-unit">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.001"
+                      className="fgprod-input"
+                      value={recipeForm.quantity}
+                      onChange={(e) => setRecipeForm(prev => ({ ...prev, quantity: e.target.value }))}
+                      placeholder="0.000"
+                      disabled={!recipeForm.rm_item_id}
+                    />
+                    <select
+                      className="fgprod-unit-select"
+                      value={recipeForm.recipe_unit}
+                      onChange={(e) => handleRecipeUnitChange(e.target.value)}
+                      disabled={!recipeForm.base_unit}
+                    >
+                      {getCompatibleUnits(recipeForm.base_unit).map(u => (
+                        <option key={u} value={u}>{u}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {!recipeForm.rm_item_id ? (
+                    <span className="fgprod-field-hint">Select an RM item first to set the unit</span>
+                  ) : (
+                    (() => {
+                      const qtyNum = parseFloat(recipeForm.quantity);
+                      const normalized = Number.isFinite(qtyNum)
+                        ? convertQuantity(qtyNum, recipeForm.recipe_unit, recipeForm.base_unit)
+                        : null;
+                      if (normalized === null || recipeForm.recipe_unit === recipeForm.base_unit) return null;
+                      return (
+                        <span className="fgprod-field-hint">
+                          = {normalized.toFixed(4)} {recipeForm.base_unit} (stocked/priced unit)
+                        </span>
+                      );
+                    })()
+                  )}
                 </div>
                 <div className="fgprod-form-group">
-                  <label>Last Price *</label>
+                  <label>Last Price * {recipeForm.base_unit ? `(per ${recipeForm.base_unit})` : ''}</label>
                   <input
                     type="number"
                     min="0"
@@ -695,6 +756,23 @@ const Recipes = () => {
                   />
                 </div>
               </div>
+
+              {recipeForm.rm_item_id && (() => {
+                const qtyNum = parseFloat(recipeForm.quantity);
+                const priceNum = parseFloat(recipeForm.last_price);
+                const normalized = Number.isFinite(qtyNum)
+                  ? convertQuantity(qtyNum, recipeForm.recipe_unit, recipeForm.base_unit)
+                  : null;
+                const lineCostPreview = (normalized !== null && Number.isFinite(priceNum))
+                  ? normalized * priceNum
+                  : null;
+                if (lineCostPreview === null) return null;
+                return (
+                  <div className="fgprod-line-cost-preview">
+                    Estimated Line Cost: <strong>{formatCurrency(lineCostPreview)}</strong>
+                  </div>
+                );
+              })()}
 
             </div>
             <div className="fgprod-modal-footer">
