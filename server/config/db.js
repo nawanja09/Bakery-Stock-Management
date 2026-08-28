@@ -182,7 +182,7 @@ const ensureUsernameAuthSchema = async () => {
     // 4. Extend role enum (existing values/order preserved, only appending).
     await pool.query(`
       ALTER TABLE users MODIFY COLUMN role
-      ENUM('Admin','Staff','Manager','User','Store Keeper','Accountant')
+      ENUM('Admin','Staff','Manager','User','Store Keeper','Accountant','View Only')
       NOT NULL DEFAULT 'Staff'
     `);
 
@@ -193,7 +193,8 @@ const ensureUsernameAuthSchema = async () => {
     const seedUsers = [
       { name: 'Admin', username: 'admin', password: 'Admin123', role: 'Admin' },
       { name: 'Store Keeper', username: 'stores', password: 'password', role: 'Store Keeper' },
-      { name: 'Accountant', username: 'accountant', password: 'password', role: 'Accountant' }
+      { name: 'Accountant', username: 'accountant', password: 'password', role: 'Accountant' },
+      { name: 'QB', username: 'QB', password: 'password', role: 'View Only' }
     ];
 
     for (const seed of seedUsers) {
@@ -234,6 +235,7 @@ const ensureFinanceSchema = async () => {
         id INT NOT NULL AUTO_INCREMENT,
         company_id INT NOT NULL,
         current_balance DECIMAL(14,2) NOT NULL DEFAULT 0,
+        status TINYINT(1) NOT NULL DEFAULT 1,
         created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (id),
         UNIQUE KEY company_id (company_id)
@@ -259,6 +261,7 @@ const ensureFinanceSchema = async () => {
         reference_type VARCHAR(50) NULL,
         reference_id INT NULL,
         created_by INT NULL,
+        status TINYINT(1) NOT NULL DEFAULT 1,
         created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (id),
         KEY idx_cash_lookup (account_type, company_id, transaction_date),
@@ -282,6 +285,34 @@ const ensureFinanceSchema = async () => {
         // Column already present on some MySQL/MariaDB versions that don't
         // support IF NOT EXISTS here - safe to ignore.
       }
+    }
+
+    for (const clause of [
+      "ADD COLUMN IF NOT EXISTS status TINYINT(1) NOT NULL DEFAULT 1 AFTER current_balance"
+    ]) {
+      try {
+        await pool.query(`ALTER TABLE cash_accounts ${clause}`);
+      } catch (colErr) {
+        // Column already present on some MySQL/MariaDB versions.
+      }
+    }
+
+    for (const clause of [
+      "ADD COLUMN IF NOT EXISTS status TINYINT(1) NOT NULL DEFAULT 1 AFTER created_by"
+    ]) {
+      try {
+        await pool.query(`ALTER TABLE finance_transactions ${clause}`);
+      } catch (colErr) {
+        // Column already present on some MySQL/MariaDB versions.
+      }
+    }
+
+    try {
+      await pool.query(
+        "ALTER TABLE bank_details ADD COLUMN IF NOT EXISTS record_status TINYINT(1) NOT NULL DEFAULT 1"
+      );
+    } catch (colErr) {
+      // Column already present on some MySQL/MariaDB versions.
     }
 
     // Seed a zero-balance cash account for every existing company.

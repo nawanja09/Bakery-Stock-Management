@@ -12,7 +12,7 @@ class InsufficientBalanceError extends Error {
  */
 const getCashBalance = async (companyId) => {
   const [rows] = await pool.query(
-    'SELECT current_balance FROM cash_accounts WHERE company_id = ?',
+    'SELECT current_balance FROM cash_accounts WHERE company_id = ? AND status = 1',
     [companyId]
   );
   return rows.length ? parseFloat(rows[0].current_balance) : 0;
@@ -23,7 +23,7 @@ const getCashBalance = async (companyId) => {
  */
 const getBankBalance = async (bankId) => {
   const [rows] = await pool.query(
-    'SELECT current_balance FROM bank_details WHERE id = ?',
+    'SELECT current_balance FROM bank_details WHERE id = ? AND record_status = 1',
     [bankId]
   );
   return rows.length ? parseFloat(rows[0].current_balance) : 0;
@@ -49,7 +49,7 @@ const recordCashTransaction = async (connection, {
 }) => {
   // Lock the cash_accounts row for this company
   const [cashRows] = await connection.query(
-    'SELECT current_balance FROM cash_accounts WHERE company_id = ? FOR UPDATE',
+    'SELECT current_balance FROM cash_accounts WHERE company_id = ? AND status = 1 FOR UPDATE',
     [companyId]
   );
 
@@ -104,7 +104,7 @@ const recordBankTransaction = async (connection, {
 }) => {
   // Lock the bank_details row
   const [bankRows] = await connection.query(
-    'SELECT current_balance, company FROM bank_details WHERE id = ? FOR UPDATE',
+    'SELECT current_balance, company FROM bank_details WHERE id = ? AND record_status = 1 FOR UPDATE',
     [bankId]
   );
 

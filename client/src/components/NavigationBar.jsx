@@ -73,6 +73,7 @@ const NavigationBar = () => {
   };
   const userRole = getUserRole();
   const isStoreKeeper = userRole === 'Store Keeper' || userRole === 'Stores';
+  const isViewOnly = userRole === 'View Only';
   const canAccessFinance = userRole === 'Admin' || userRole === 'Accountant';
 
   // Determine active module based on current path
@@ -336,7 +337,7 @@ const NavigationBar = () => {
         </NavLink>
       </li>
 
-      {!isStoreKeeper && (
+      {!isStoreKeeper && !isViewOnly && (
         <li className={`dropdown ${activeDropdown === 'adjustments' ? 'active' : ''}`}>
           <div className="dropdown-header" onClick={() => toggleDropdown('adjustments')}>
             <span className="icon-container"><FontAwesomeIcon icon={faAdjust} /></span>

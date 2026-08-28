@@ -21,6 +21,12 @@ api.interceptors.request.use(config => {
 api.interceptors.response.use(
   response => response,
   error => {
+    if (
+      error.response?.status === 403 &&
+      error.response?.data?.error === 'You have view-only access. You do not have permission to edit or delete this information.'
+    ) {
+      window.alert(error.response.data.error);
+    }
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');

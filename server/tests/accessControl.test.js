@@ -6,6 +6,7 @@ const departmentController = require('../controllers/departmentController');
 const companyController = require('../controllers/companyController');
 const restrictRoles = require('../middleware/restrictRoles');
 const requireRoles = require('../middleware/requireRoles');
+const readOnly = require('../middleware/readOnly');
 
 test('master-data controllers expose update and delete handlers', () => {
   assert.equal(typeof itemTypeController.updateItemType, 'function');
@@ -60,4 +61,25 @@ test('requireRoles only allows the listed roles', () => {
     allowedCalled = true;
   });
   assert.equal(allowedCalled, true);
+});
+
+test('readOnly blocks view-only mutations with the standard warning', () => {
+  const token = require('jsonwebtoken').sign(
+    { role: 'View Only' },
+    process.env.JWT_SECRET || 'test-secret'
+  );
+  const previousSecret = process.env.JWT_SECRET;
+  process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret';
+  let response = null;
+  readOnly(
+    { method: 'DELETE', headers: { authorization: `Bearer ${token}` } },
+    { status(code) { response = { status: code }; return { json(body) { response.body = body; } }; } },
+    () => { response = { passed: true }; }
+  );
+  process.env.JWT_SECRET = previousSecret;
+
+  assert.deepEqual(response, {
+    status: 403,
+    body: { error: 'You have view-only access. You do not have permission to edit or delete this information.' }
+  });
 });

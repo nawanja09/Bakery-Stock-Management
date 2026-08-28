@@ -25,6 +25,7 @@ const LEDGER_SELECT = `
     ft.created_at
   FROM finance_transactions ft
   LEFT JOIN users u ON ft.created_by = u.id
+  WHERE ft.status = 1
 `;
 
 // Build the WHERE clause + params for the optional ledger filters shared by
@@ -70,7 +71,7 @@ const getCashLedger = async (req, res) => {
     const { companyId } = req.params;
     const { clauses, params } = buildLedgerFilters(req.query);
 
-    let query = `${LEDGER_SELECT} WHERE ft.account_type = 'CASH' AND ft.company_id = ?`;
+    let query = `${LEDGER_SELECT} AND ft.account_type = 'CASH' AND ft.company_id = ?`;
     const allParams = [companyId, ...params];
     if (clauses.length) query += ` AND ${clauses.join(' AND ')}`;
     query += ' ORDER BY ft.transaction_date ASC, ft.id ASC';
@@ -134,7 +135,7 @@ const setCashOpeningBalance = async (req, res) => {
   try {
     await connection.beginTransaction();
     const [existing] = await connection.query(
-      "SELECT id, transaction_type FROM finance_transactions WHERE account_type = 'CASH' AND company_id = ? FOR UPDATE",
+      "SELECT id, transaction_type FROM finance_transactions WHERE status = 1 AND account_type = 'CASH' AND company_id = ? FOR UPDATE",
       [company_id]
     );
 
@@ -148,7 +149,7 @@ const setCashOpeningBalance = async (req, res) => {
     // If the only existing entry is a prior opening balance, remove it (and
     // its effect on the running balance) before re-inserting the new one.
     if (existing.length === 1) {
-      await connection.query('DELETE FROM finance_transactions WHERE id = ?', [existing[0].id]);
+      await connection.query('UPDATE finance_transactions SET status = 0 WHERE id = ?', [existing[0].id]);
       await connection.query('UPDATE cash_accounts SET current_balance = 0 WHERE company_id = ?', [company_id]);
     }
 
@@ -191,13 +192,13 @@ const getBankLedger = async (req, res) => {
   try {
     const { bankId } = req.params;
     const [bankRows] = await pool.query(
-      'SELECT id, bank_name, account_number, company, current_balance FROM bank_details WHERE id = ?',
+      'SELECT id, bank_name, account_number, company, current_balance FROM bank_details WHERE id = ? AND record_status = 1',
       [bankId]
     );
     if (bankRows.length === 0) return res.status(404).json({ error: 'Bank account not found' });
 
     const { clauses, params } = buildLedgerFilters(req.query);
-    let query = `${LEDGER_SELECT} WHERE ft.account_type = 'BANK' AND ft.bank_id = ?`;
+    let query = `${LEDGER_SELECT} AND ft.account_type = 'BANK' AND ft.bank_id = ?`;
     const allParams = [bankId, ...params];
     if (clauses.length) query += ` AND ${clauses.join(' AND ')}`;
     query += ' ORDER BY ft.transaction_date ASC, ft.id ASC';
@@ -216,7 +217,7 @@ const getBankAccounts = async (req, res) => {
   try {
     const { companyId } = req.query;
     let query = `SELECT id, bank_name, account_number, branch_name, company, current_balance
-                 FROM bank_details WHERE status = 'Active'`;
+           FROM bank_details WHERE status = 'Active' AND record_status = 1`;
     const params = [];
 
     if (companyId) {
@@ -241,7 +242,7 @@ const getAllBankAccounts = async (req, res) => {
   try {
     const [rows] = await pool.query(
       `SELECT id, bank_name, account_number, company, current_balance
-       FROM bank_details WHERE status = 'Active' ORDER BY company ASC, bank_name ASC`
+        FROM bank_details WHERE status = 'Active' AND record_status = 1 ORDER BY company ASC, bank_name ASC`
     );
     res.json(rows);
   } catch (error) {
