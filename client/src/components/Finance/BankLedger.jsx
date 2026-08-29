@@ -1,5 +1,5 @@
 // src/components/finance/BankLedger.jsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faUniversity, faSpinner, faFilter } from '@fortawesome/free-solid-svg-icons';
 import api from '../../api';
@@ -66,6 +66,14 @@ const BankLedger = () => {
     setFilters(prev => ({ ...prev, [name]: value }));
   };
 
+  const totals = useMemo(() => transactions.reduce((acc, transaction) => {
+    const debit = parseFloat(transaction?.debit || 0);
+    const credit = parseFloat(transaction?.credit || 0);
+    acc.debit += debit;
+    acc.credit += credit;
+    return acc;
+  }, { debit: 0, credit: 0 }), [transactions]);
+
   const fmt = (v) => parseFloat(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const fmtDebit = (v) => {
@@ -102,6 +110,17 @@ const BankLedger = () => {
           <strong>Rs. {fmt(bank.current_balance)}</strong>
         </div>
       )}
+
+      <div className="fl-summary-grid">
+        <div className="fl-summary-card fl-summary-card-debit">
+          <span className="fl-summary-label">Total Debit</span>
+          <strong className="fl-summary-value fl-debit-amount">Rs. {fmt(totals.debit)}</strong>
+        </div>
+        <div className="fl-summary-card fl-summary-card-credit">
+          <span className="fl-summary-label">Total Credit</span>
+          <strong className="fl-summary-value fl-credit-amount">Rs. {fmt(totals.credit)}</strong>
+        </div>
+      </div>
 
       <div className="fl-filters">
         <input type="date" name="dateFrom" value={filters.dateFrom} onChange={handleFilterChange} title="Date From" />
