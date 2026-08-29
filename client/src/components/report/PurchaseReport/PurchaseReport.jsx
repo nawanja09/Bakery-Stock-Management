@@ -325,10 +325,6 @@ const PurchaseReport = () => {
               </tfoot>
             </table>
           </div>
-          <div className="pr-summary-bar">
-            <span>{sortedInvoices.length} invoice{sortedInvoices.length !== 1 ? 's' : ''}</span>
-            <span className="pr-summary-total">Grand Total: {formatCurrency(grandTotal)}</span>
-          </div>
         </>
       ) : (
         <div className="pr-empty-state">

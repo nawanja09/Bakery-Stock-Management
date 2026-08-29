@@ -696,12 +696,6 @@ const PurchaseHistory = () => {
           </div>
         ) : (
           <>
-            {/* Result count */}
-            <p className="filter-results-summary">
-              Showing {pagedPurchases.length} of {filteredPurchases.length} record{filteredPurchases.length !== 1 ? 's' : ''}
-              {hasActiveFilters && ' (filtered)'}
-            </p>
-
             {/*
               Both table and cards are kept in the DOM — only CSS display toggles.
               This avoids a full unmount/mount cycle when switching layouts.
