@@ -1131,8 +1131,18 @@ const getDepartmentReturnItemWiseReport = async (req, res) => {
 const getLastIssueDateReport = async (req, res) => {
   try {
     const { sortOrder } = req.query;
+    const requestedStatus = String(req.query.status || '').toLowerCase();
+    const statusFilter = ['active', 'inactive'].includes(requestedStatus)
+      ? requestedStatus
+      : 'all';
 
     const direction = String(sortOrder).toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
+    const statusCondition =
+      statusFilter === 'active'
+        ? ' AND i.is_active = TRUE'
+        : statusFilter === 'inactive'
+          ? ' AND i.is_active = FALSE'
+          : '';
 
     const query = `
       SELECT
@@ -1140,13 +1150,15 @@ const getLastIssueDateReport = async (req, res) => {
         i.item_code,
         i.name AS item_name,
         i.unit,
+        i.is_active AS status,
         MAX(iss.issuance_date) AS last_issue_date,
         DATE_FORMAT(MAX(iss.issuance_date), '%Y-%m-%d') AS last_issue_date_only
       FROM items i
       LEFT JOIN issuance_items ii ON ii.item_id = i.id
       LEFT JOIN issuances iss ON ii.issuance_id = iss.id
       WHERE i.deleted = FALSE
-      GROUP BY i.id, i.item_code, i.name, i.unit
+        ${statusCondition}
+      GROUP BY i.id, i.item_code, i.name, i.unit, i.is_active
       ORDER BY (MAX(iss.issuance_date) IS NULL) ASC, last_issue_date ${direction}, i.item_code ASC
     `;
 
