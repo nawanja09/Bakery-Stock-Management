@@ -66,6 +66,10 @@ const buildLedgerFilters = (query) => {
     clauses.push('ft.transaction_type = ?');
     params.push(query.transactionType);
   }
+  if (query.direction) {
+    clauses.push('ft.transaction_direction = ?');
+    params.push(String(query.direction).toUpperCase());
+  }
   return { clauses, params };
 };
 
@@ -223,7 +227,8 @@ const getBankLedger = async (req, res) => {
 
     const [rows] = await pool.query(query, allParams);
     const transactions = calculateRunningBalances(rows);
-    res.json({ bank: bankRows[0], transactions });
+    const currentBalance = await getBankBalance(bankId);
+    res.json({ bank: { ...bankRows[0], current_balance: currentBalance }, transactions });
   } catch (error) {
     console.error('Error fetching bank ledger:', error);
     res.status(500).json({ error: 'Failed to fetch bank ledger' });

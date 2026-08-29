@@ -37,6 +37,12 @@ const BankReceive = () => {
   }, []);
 
   useEffect(() => {
+    api.get('/receive-types')
+      .then(res => setReceiveTypes(Array.isArray(res.data) ? res.data : []))
+      .catch(() => setReceiveTypes([]));
+  }, []);
+
+  useEffect(() => {
     if (!formData.company_id) { setBankAccounts([]); return; }
     let cancelled = false;
     setLoadingBanks(true);
@@ -145,7 +151,9 @@ const BankReceive = () => {
           <label>Receive Type *</label>
           <select name="receive_type" value={formData.receive_type} onChange={handleChange} required>
             <option value="">Select type</option>
-            {receiveTypes.map(t => <option key={t} value={t}>{t}</option>)}
+            {receiveTypes.map(type => (
+              <option key={type.id} value={type.type_name}>{type.type_name}</option>
+            ))}
           </select>
         </div>
 

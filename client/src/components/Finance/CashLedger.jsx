@@ -26,7 +26,7 @@ const CashLedger = () => {
   const [balance, setBalance] = useState(0);
   const [loading, setLoading] = useState(false);
 
-  const [filters, setFilters] = useState({ dateFrom: '', dateTo: '', referenceNumber: '', transactionType: '' });
+  const [filters, setFilters] = useState({ dateFrom: '', dateTo: '', referenceNumber: '', transactionType: '', direction: '' });
 
   // Opening balance setup (only offered while the ledger is empty)
   const [showOpeningForm, setShowOpeningForm] = useState(false);
@@ -60,6 +60,7 @@ const CashLedger = () => {
     if (filters.dateTo) params.dateTo = filters.dateTo;
     if (filters.referenceNumber) params.referenceNumber = filters.referenceNumber;
     if (filters.transactionType) params.transactionType = filters.transactionType;
+    if (filters.direction) params.direction = filters.direction;
 
     api.get(`/finance/cash/ledger/${companyId}`, { params })
       .then(res => {
@@ -185,12 +186,16 @@ const CashLedger = () => {
       )}
 
       <div className="fl-filters">
-        <FontAwesomeIcon icon={faFilter} className="fl-filter-icon" />
         <input type="date" name="dateFrom" value={filters.dateFrom} onChange={handleFilterChange} title="Date From" />
         <input type="date" name="dateTo" value={filters.dateTo} onChange={handleFilterChange} title="Date To" />
         <input type="text" name="referenceNumber" value={filters.referenceNumber} onChange={handleFilterChange} placeholder="Reference / Invoice No" />
         <select name="transactionType" value={filters.transactionType} onChange={handleFilterChange}>
           {TRANSACTION_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+        </select>
+        <select name="direction" value={filters.direction} onChange={handleFilterChange}>
+          <option value="">All</option>
+          <option value="IN">IN</option>
+          <option value="OUT">OUT</option>
         </select>
       </div>
 

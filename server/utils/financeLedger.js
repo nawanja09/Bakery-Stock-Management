@@ -8,25 +8,37 @@ class InsufficientBalanceError extends Error {
 }
 
 /**
- * Gets the current balance for a cash account (by companyId).
+ * Gets the current balance for a cash account from the ledger itself.
+ * This keeps the displayed Cash In Hand value aligned with the posted
+ * finance_transactions rows, includingreversals and chronological cash ins/outs.
  */
 const getCashBalance = async (companyId) => {
   const [rows] = await pool.query(
-    'SELECT current_balance FROM cash_accounts WHERE company_id = ? AND status = 1',
+    `SELECT COALESCE(SUM(CAST(debit AS DECIMAL(14,2)) - CAST(credit AS DECIMAL(14,2))), 0) AS balance
+     FROM finance_transactions
+     WHERE account_type = 'CASH' AND company_id = ? AND status = 1`,
     [companyId]
   );
-  return rows.length ? parseFloat(rows[0].current_balance) : 0;
+
+  const balance = Number.parseFloat(rows[0]?.balance ?? 0) || 0;
+  return Number(balance.toFixed(2));
 };
 
 /**
- * Gets the current balance for a bank account (by bankId).
+ * Gets the current balance for a bank account from the ledger itself.
+ * This keeps the selected account's current balance aligned with the posted
+ * finance_transactions rows and any reversals, instead of a stale cached value.
  */
 const getBankBalance = async (bankId) => {
   const [rows] = await pool.query(
-    'SELECT current_balance FROM bank_details WHERE id = ? AND record_status = 1',
+    `SELECT COALESCE(SUM(CAST(debit AS DECIMAL(14,2)) - CAST(credit AS DECIMAL(14,2))), 0) AS balance
+     FROM finance_transactions
+     WHERE account_type = 'BANK' AND bank_id = ? AND status = 1`,
     [bankId]
   );
-  return rows.length ? parseFloat(rows[0].current_balance) : 0;
+
+  const balance = Number.parseFloat(rows[0]?.balance ?? 0) || 0;
+  return Number(balance.toFixed(2));
 };
 
 /**
@@ -47,20 +59,17 @@ const recordCashTransaction = async (connection, {
   referenceId = null,
   createdBy
 }) => {
-  // Lock the cash_accounts row for this company
-  const [cashRows] = await connection.query(
-    'SELECT current_balance FROM cash_accounts WHERE company_id = ? AND status = 1 FOR UPDATE',
+  const [balanceRows] = await connection.query(
+    `SELECT COALESCE(SUM(CAST(debit AS DECIMAL(14,2)) - CAST(credit AS DECIMAL(14,2))), 0) AS current_balance
+     FROM finance_transactions
+     WHERE account_type = 'CASH' AND company_id = ? AND status = 1 FOR UPDATE`,
     [companyId]
   );
 
-  if (cashRows.length === 0) {
-    throw new Error('Cash account not found for this company. Please set an opening balance first.');
-  }
-
-  const currentBalance = parseFloat(cashRows[0].current_balance);
+  const currentBalance = Number.parseFloat(balanceRows[0]?.current_balance ?? 0) || 0;
   const debitAmt = parseFloat(debit) || 0;
   const creditAmt = parseFloat(credit) || 0;
-  const newBalance = currentBalance + debitAmt - creditAmt;
+  const newBalance = Number((currentBalance + debitAmt - creditAmt).toFixed(2));
 
   const direction = debitAmt > 0 ? 'IN' : 'OUT';
 
@@ -102,9 +111,8 @@ const recordBankTransaction = async (connection, {
   referenceId = null,
   createdBy
 }) => {
-  // Lock the bank_details row
   const [bankRows] = await connection.query(
-    'SELECT current_balance, company FROM bank_details WHERE id = ? AND record_status = 1 FOR UPDATE',
+    'SELECT company FROM bank_details WHERE id = ? AND record_status = 1 FOR UPDATE',
     [bankId]
   );
 
@@ -112,16 +120,22 @@ const recordBankTransaction = async (connection, {
     throw new Error('Bank account not found.');
   }
 
-  const currentBalance = parseFloat(bankRows[0].current_balance);
+  const [balanceRows] = await connection.query(
+    `SELECT COALESCE(SUM(CAST(debit AS DECIMAL(14,2)) - CAST(credit AS DECIMAL(14,2))), 0) AS current_balance
+     FROM finance_transactions
+     WHERE account_type = 'BANK' AND bank_id = ? AND status = 1 FOR UPDATE`,
+    [bankId]
+  );
+
+  const currentBalance = Number.parseFloat(balanceRows[0]?.current_balance ?? 0) || 0;
   const companyName = bankRows[0].company;
 
-  // Find the company_id for the bank account's company name
   const [compRows] = await connection.query('SELECT id FROM company WHERE name = ?', [companyName]);
-  const companyId = compRows.length ? compRows[0].id : 1; // Default fallback if needed
+  const companyId = compRows.length ? compRows[0].id : 1;
 
   const debitAmt = parseFloat(debit) || 0;
   const creditAmt = parseFloat(credit) || 0;
-  const newBalance = currentBalance + debitAmt - creditAmt;
+  const newBalance = Number((currentBalance + debitAmt - creditAmt).toFixed(2));
 
   const direction = debitAmt > 0 ? 'IN' : 'OUT';
 
