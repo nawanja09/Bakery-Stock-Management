@@ -81,13 +81,17 @@ const NavigationBar = () => {
     const path = location.pathname;
     if (path.startsWith('/dashboard')) {
       setActiveModule(null);
+    } else if (path.startsWith('/adjustments')) {
+      setActiveModule('adjustments');
+    } else if (path.startsWith('/reports/vat') || path.startsWith('/reports/purchase-vat')) {
+      setActiveModule('vat');
     } else if (path.startsWith('/items') || path.startsWith('/suppliers') || 
                path.startsWith('/purchase') || path.startsWith('/issuance') || 
                path.startsWith('/wastage') || path.startsWith('/returns') || 
-               path.startsWith('/adjustments') || path.startsWith('/reports/stock') ||
+               path.startsWith('/reports/stock') ||
                path.startsWith('/reports/department') || path.startsWith('/reports/purchasing') ||
                path.startsWith('/reports/purchase-report') ||
-               path.startsWith('/reports/wastage') || path.startsWith('/reports/vat') ||
+               path.startsWith('/reports/wastage') || 
                path.startsWith('/purchase-returns') || path.startsWith('/opening') ||
                path.startsWith('/departments') || path.startsWith('/companies') ||
                path.startsWith('/payment-methods') || path.startsWith('/item-types') ||
@@ -140,6 +144,12 @@ const NavigationBar = () => {
       case 'fg-production':
         navigate('/fg-production/recipes');
         break;
+      case 'adjustments':
+        navigate('/adjustments/stores-balance');
+        break;
+      case 'vat':
+        navigate('/reports/vat');
+        break;
       default:
         break;
     }
@@ -189,6 +199,10 @@ const NavigationBar = () => {
         return renderFinanceContent();
       case 'fg-production':
         return renderFGProductionContent();
+      case 'adjustments':
+        return renderAdjustmentsContent();
+      case 'vat':
+        return renderVATContent();
       default:
         return null;
     }
@@ -294,28 +308,6 @@ const NavigationBar = () => {
         </ul>
       </li>
 
-      <li className={`dropdown ${activeDropdown === 'vat' ? 'active' : ''}`}>
-        <div className="dropdown-header" onClick={() => toggleDropdown('vat')}>
-          <span className="icon-container"><FontAwesomeIcon icon={faCalculator} /></span>
-          <span>VAT</span>
-          <FontAwesomeIcon icon={faChevronDown} className="chevron" />
-        </div>
-        <ul className="dropdown-menu">
-          <li>
-            <NavLink to="/reports/vat" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-              <span className="icon-container"><FontAwesomeIcon icon={faCalculator} /></span>
-              <span>VAT Purchasing Report</span>
-            </NavLink>
-          </li>
-          <li>
-            <NavLink to="/reports/purchase-vat" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-              <span className="icon-container"><FontAwesomeIcon icon={faCalculator} /></span>
-              <span>VAT Purchasing Return Report</span>
-            </NavLink>
-          </li>
-        </ul>
-      </li>
-
       <li>
         <NavLink to="/issuance/issue" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
           <span className="icon-container"><FontAwesomeIcon icon={faTruckLoading} /></span>
@@ -337,35 +329,7 @@ const NavigationBar = () => {
         </NavLink>
       </li>
 
-      {!isStoreKeeper && !isViewOnly && (
-        <li className={`dropdown ${activeDropdown === 'adjustments' ? 'active' : ''}`}>
-          <div className="dropdown-header" onClick={() => toggleDropdown('adjustments')}>
-            <span className="icon-container"><FontAwesomeIcon icon={faAdjust} /></span>
-            <span>Adjustments</span>
-            <FontAwesomeIcon icon={faChevronDown} className="chevron" />
-          </div>
-          <ul className="dropdown-menu">
-            <li>
-              <NavLink to="/adjustments/stores-balance" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                <span className="icon-container"><FontAwesomeIcon icon={faWarehouse} /></span>
-                <span>RM Adjustments</span>
-              </NavLink>
-            </li>
-            <li>
-              <NavLink to="/adjustments/stores-adjustments" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                <span className="icon-container"><FontAwesomeIcon icon={faTools} /></span>
-                <span>Stores Adjustment Summary</span>
-              </NavLink>
-            </li>
-            <li>
-              <NavLink to="/adjustments/inhand" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                <span className="icon-container"><FontAwesomeIcon icon={faHandHoldingDollar} /></span>
-                <span>Inhand (Cash / Cheque)</span>
-              </NavLink>
-            </li>
-          </ul>
-        </li>
-      )}
+
 
 
       <li className={`dropdown ${activeDropdown === 'reports' ? 'active' : ''}`}>
@@ -664,6 +628,46 @@ const NavigationBar = () => {
     </>
   );
 
+  const renderAdjustmentsContent = () => (
+    <>
+      <li>
+        <NavLink to="/adjustments/stores-balance" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          <span className="icon-container"><FontAwesomeIcon icon={faWarehouse} /></span>
+          <span>RM Adjustments</span>
+        </NavLink>
+      </li>
+      <li>
+        <NavLink to="/adjustments/stores-adjustments" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          <span className="icon-container"><FontAwesomeIcon icon={faTools} /></span>
+          <span>Stores Adjustment Summary</span>
+        </NavLink>
+      </li>
+      <li>
+        <NavLink to="/adjustments/inhand" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          <span className="icon-container"><FontAwesomeIcon icon={faHandHoldingDollar} /></span>
+          <span>Inhand (Cash / Cheque)</span>
+        </NavLink>
+      </li>
+    </>
+  );
+
+  const renderVATContent = () => (
+    <>
+      <li>
+        <NavLink to="/reports/vat" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          <span className="icon-container"><FontAwesomeIcon icon={faCalculator} /></span>
+          <span>VAT Purchasing Report</span>
+        </NavLink>
+      </li>
+      <li>
+        <NavLink to="/reports/purchase-vat" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          <span className="icon-container"><FontAwesomeIcon icon={faCalculator} /></span>
+          <span>VAT Purchasing Return Report</span>
+        </NavLink>
+      </li>
+    </>
+  );
+
   return (
     <div className={`sidebar ${isCollapsed ? 'collapsed' : ''} ${isMobileOpen ? 'mobile-open' : ''}`} ref={sidebarRef}>
       <button className="toggle-button" onClick={toggleSidebar} aria-label="Toggle navigation">
@@ -802,6 +806,46 @@ const NavigationBar = () => {
           {!isCollapsed && activeModule === 'fg-production' && (
             <div className="module-content">
               {renderFGProductionContent()}
+            </div>
+          )}
+
+          {/* Adjustments Module */}
+          {!isStoreKeeper && !isViewOnly && (
+            <>
+              <li>
+                <div 
+                  className={`nav-link module-item ${activeModule === 'adjustments' ? 'active-module' : ''}`}
+                  onClick={() => handleModuleClick('adjustments')}
+                >
+                  <span className="icon-container"><FontAwesomeIcon icon={faAdjust} /></span>
+                  <span>Adjustments</span>
+                  {!isCollapsed && <FontAwesomeIcon icon={faChevronDown} className={`chevron ${activeModule === 'adjustments' ? 'rotated' : ''}`} />}
+                </div>
+              </li>
+
+              {!isCollapsed && activeModule === 'adjustments' && (
+                <div className="module-content">
+                  {renderAdjustmentsContent()}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* VAT Module */}
+          <li>
+            <div 
+              className={`nav-link module-item ${activeModule === 'vat' ? 'active-module' : ''}`}
+              onClick={() => handleModuleClick('vat')}
+            >
+              <span className="icon-container"><FontAwesomeIcon icon={faCalculator} /></span>
+              <span>VAT</span>
+              {!isCollapsed && <FontAwesomeIcon icon={faChevronDown} className={`chevron ${activeModule === 'vat' ? 'rotated' : ''}`} />}
+            </div>
+          </li>
+
+          {!isCollapsed && activeModule === 'vat' && (
+            <div className="module-content">
+              {renderVATContent()}
             </div>
           )}
           
