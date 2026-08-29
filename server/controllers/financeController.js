@@ -28,6 +28,23 @@ const LEDGER_SELECT = `
   WHERE ft.status = 1
 `;
 
+const normalizeLedgerAmount = (value) => Number.parseFloat(value ?? 0) || 0;
+
+const calculateRunningBalances = (rows = []) => {
+  let previousBalance = 0;
+
+  return rows.map((row) => {
+    const debit = normalizeLedgerAmount(row.debit);
+    const credit = normalizeLedgerAmount(row.credit);
+    previousBalance = Number((previousBalance + debit - credit).toFixed(2));
+
+    return {
+      ...row,
+      balance: previousBalance
+    };
+  });
+};
+
 // Build the WHERE clause + params for the optional ledger filters shared by
 // both Cash and Bank ledgers (dateFrom, dateTo, referenceNumber, transactionType).
 const buildLedgerFilters = (query) => {
@@ -74,11 +91,12 @@ const getCashLedger = async (req, res) => {
     let query = `${LEDGER_SELECT} AND ft.account_type = 'CASH' AND ft.company_id = ?`;
     const allParams = [companyId, ...params];
     if (clauses.length) query += ` AND ${clauses.join(' AND ')}`;
-    query += ' ORDER BY ft.transaction_date ASC, ft.id ASC';
+    query += ' ORDER BY ft.transaction_date ASC, ft.created_at ASC, ft.id ASC';
 
     const [rows] = await pool.query(query, allParams);
     const balance = await getCashBalance(companyId);
-    res.json({ transactions: rows, current_balance: balance });
+    const transactions = calculateRunningBalances(rows);
+    res.json({ transactions, current_balance: balance });
   } catch (error) {
     console.error('Error fetching cash ledger:', error);
     res.status(500).json({ error: 'Failed to fetch cash ledger' });
@@ -201,10 +219,11 @@ const getBankLedger = async (req, res) => {
     let query = `${LEDGER_SELECT} AND ft.account_type = 'BANK' AND ft.bank_id = ?`;
     const allParams = [bankId, ...params];
     if (clauses.length) query += ` AND ${clauses.join(' AND ')}`;
-    query += ' ORDER BY ft.transaction_date ASC, ft.id ASC';
+    query += ' ORDER BY ft.transaction_date ASC, ft.created_at ASC, ft.id ASC';
 
     const [rows] = await pool.query(query, allParams);
-    res.json({ bank: bankRows[0], transactions: rows });
+    const transactions = calculateRunningBalances(rows);
+    res.json({ bank: bankRows[0], transactions });
   } catch (error) {
     console.error('Error fetching bank ledger:', error);
     res.status(500).json({ error: 'Failed to fetch bank ledger' });
