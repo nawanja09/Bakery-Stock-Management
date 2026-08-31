@@ -423,6 +423,9 @@ const ensureFgProductionExternalItemSchema = async () => {
       "ALTER TABLE fg_production ADD COLUMN IF NOT EXISTS external_item_id VARCHAR(64) NULL COMMENT 'Ravon POS item ID - source of truth for FG Items' AFTER fg_item_name"
     );
     await pool.query(
+      "ALTER TABLE fg_production ADD COLUMN IF NOT EXISTS utility_cost_percentage DECIMAL(5,2) NOT NULL DEFAULT 70 AFTER recipe_output_quantity"
+    );
+    await pool.query(
       'ALTER TABLE fg_production ADD INDEX IF NOT EXISTS idx_fg_production_external_item_id (external_item_id)'
     );
     console.log('✅ fg_production.external_item_id schema ready');

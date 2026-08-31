@@ -910,6 +910,30 @@ select.table-input {
   appearance: auto;
 }
 
+.stock-item-select {
+  min-width: 200px;
+}
+
+.stock-item-select__control {
+  min-height: 40px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+}
+
+.stock-item-select__control--is-focused {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.12) !important;
+}
+
+.stock-item-select__menu {
+  z-index: 20;
+}
+
+.stock-item-select__option {
+  font-size: var(--font-size-sm);
+}
+
 textarea.table-input {
   min-width: 160px;
   resize: vertical;
@@ -1911,4 +1935,4 @@ textarea.table-input {
   .ih-form-row,
   .ih-detail-grid { grid-template-columns: 1fr; }
   .ih-drawer      { width: 100vw; }
-}
+}

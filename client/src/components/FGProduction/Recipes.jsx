@@ -54,6 +54,7 @@ const Recipes = () => {
   const [fgFormItem, setFgFormItem] = useState(null); // { value: external_item_id, label: fg_item_name }
   const [fgFormDepartment, setFgFormDepartment] = useState(null);
   const [fgFormOutputQuantity, setFgFormOutputQuantity] = useState('');
+  const [fgFormUtilityPercentage, setFgFormUtilityPercentage] = useState('70');
   const [savingFg, setSavingFg] = useState(false);
 
   // FG Items sourced from the Ravon POS API (external master)
@@ -172,6 +173,7 @@ const Recipes = () => {
     setFgFormItem(null);
     setFgFormDepartment(null);
     setFgFormOutputQuantity('');
+    setFgFormUtilityPercentage('70');
     setEditingItemUnavailable(false);
     setShowFgForm(true);
     if (!posItemsLoading && posItems.length === 0 && !posItemsError) fetchPosItems();
@@ -181,6 +183,7 @@ const Recipes = () => {
     if (!selectedFg) return;
     setFgFormMode('edit');
     setFgFormOutputQuantity(selectedFg.recipe_output_quantity || '');
+    setFgFormUtilityPercentage(selectedFg.utility_cost_percentage ?? '70');
     setFgFormDepartment(
       selectedFg.department_id
         ? { value: selectedFg.department_id, label: selectedFg.department_name }
@@ -230,6 +233,11 @@ const Recipes = () => {
       showPopup('error', 'Recipe Output Quantity must be greater than 0');
       return;
     }
+    const utilityPercentage = Number(fgFormUtilityPercentage);
+    if (String(fgFormUtilityPercentage).trim() === '' || !Number.isFinite(utilityPercentage) || utilityPercentage < 0 || utilityPercentage > 100) {
+      showPopup('error', 'FG Utility Cost percentage must be between 0 and 100');
+      return;
+    }
 
     setSavingFg(true);
     try {
@@ -237,7 +245,8 @@ const Recipes = () => {
         external_item_id: fgFormItem.value,
         fg_item_name: fgFormItem.label,
         department_id: fgFormDepartment.value,
-        recipe_output_quantity: outputQty
+        recipe_output_quantity: outputQty,
+        utility_cost_percentage: utilityPercentage
       };
       if (fgFormMode === 'create') {
         const res = await api.post('/fg-production', payload);
@@ -427,7 +436,11 @@ const Recipes = () => {
     const lineCost = Number.parseFloat(recipe.line_cost);
     return sum + (Number.isFinite(lineCost) ? lineCost : 0);
   }, 0);
-  const utilityCost = totalRmCost * UTILITY_COST_RATE;
+  const utilityCostPercentage = Number.parseFloat(selectedFg?.utility_cost_percentage);
+  const configuredUtilityPercentage = Number.isFinite(utilityCostPercentage)
+    ? utilityCostPercentage
+    : UTILITY_COST_RATE * 100;
+  const utilityCost = totalRmCost * (configuredUtilityPercentage / 100);
   const totalProductionCost = totalRmCost + utilityCost;
 
   const recipeOutputQuantity = parseFloat(selectedFg?.recipe_output_quantity) || 0;
@@ -562,7 +575,7 @@ const Recipes = () => {
                     <span className="fgprod-cost-value">{formatCurrency(totalRmCost)}</span>
                   </div>
                   <div className="fgprod-costing-row">
-                    <span>Utility Cost (70%):</span>
+                    <span>Utility Cost ({configuredUtilityPercentage.toFixed(2)}%):</span>
                     <span className="fgprod-cost-value">{formatCurrency(utilityCost)}</span>
                   </div>
                   <div className="fgprod-costing-row fgprod-costing-row--total">
@@ -666,6 +679,20 @@ const Recipes = () => {
                   onChange={(e) => setFgFormOutputQuantity(e.target.value)}
                   placeholder="e.g. 100"
                 />
+              </div>
+              <div className="fgprod-form-group fgprod-form-group--spaced">
+                <label>FG Utility Cost (%) *</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  className="fgprod-input"
+                  value={fgFormUtilityPercentage}
+                  onChange={(e) => setFgFormUtilityPercentage(e.target.value)}
+                  placeholder="e.g. 70"
+                />
+                <span className="fgprod-field-help">Enter a percentage from 0 to 100.</span>
               </div>
             </div>
             <div className="fgprod-modal-footer">

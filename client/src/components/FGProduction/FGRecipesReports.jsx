@@ -60,8 +60,12 @@ const FGRecipesReports = () => {
       const outputQty = parseFloat(r.recipe_output_quantity) || 0;
       const rmCost = parseFloat(r.rm_cost) || 0;
 
-      // Utility Cost = RM Cost × 70%
-      const utilityCost = rmCost * UTILITY_COST_RATE;
+      const utilityPercentage = Number.parseFloat(r.utility_cost_percentage);
+      const configuredUtilityPercentage = Number.isFinite(utilityPercentage)
+        ? utilityPercentage
+        : UTILITY_COST_RATE * 100;
+      // Utility Cost = RM Cost × configured utility percentage
+      const utilityCost = rmCost * (configuredUtilityPercentage / 100);
       // Total Production Cost = RM Cost + Utility Cost
       const totalProductionCost = rmCost + utilityCost;
       // Production Cost Per Piece = Total Production Cost ÷ Recipe Output Quantity
