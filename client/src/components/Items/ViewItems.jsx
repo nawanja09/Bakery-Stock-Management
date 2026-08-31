@@ -18,7 +18,7 @@ import api from '../../api';
 import { ITEM_TYPE_OPTIONS } from './itemTypeOptions';
 import { formatNumber } from '../../utils/formatters';
 
-const ItemsList = () => {
+const ViewItems = () => {
   const [items, setItems] = useState([]);
   const [filteredItems, setFilteredItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -433,4 +433,4 @@ const ItemsList = () => {
   );
 };
 
-export default ItemsList;
+export default ViewItems;

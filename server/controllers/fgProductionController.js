@@ -47,7 +47,7 @@ const toNumber = (val, fallback = 0) => {
   return Number.isFinite(n) ? n : fallback;
 };
 
-const validateFgProductionInput = ({ external_item_id, fg_item_name, department_id, recipe_output_quantity }) => {
+const validateFgProductionInput = ({ external_item_id, fg_item_name, department_id, recipe_output_quantity, utility_cost_percentage }) => {
   if (!external_item_id || !String(external_item_id).trim()) {
     return 'FG Item is required - please select an item from the Ravon POS list';
   }
@@ -60,6 +60,10 @@ const validateFgProductionInput = ({ external_item_id, fg_item_name, department_
   const outputQty = toNumber(recipe_output_quantity, NaN);
   if (!Number.isFinite(outputQty) || outputQty <= 0) {
     return 'Recipe Output Quantity must be greater than 0';
+  }
+  const utilityPercentage = Number(utility_cost_percentage);
+  if (!Number.isFinite(utilityPercentage) || utilityPercentage < 0 || utilityPercentage > 100) {
+    return 'FG Utility Cost percentage must be between 0 and 100';
   }
   return null;
 };
@@ -134,6 +138,7 @@ const getAllFgProduction = async (req, res) => {
         fp.department_id,
         d.name AS department_name,
         fp.recipe_output_quantity,
+        fp.utility_cost_percentage,
         fp.status,
         fp.created_at,
         fp.updated_at,
@@ -158,6 +163,7 @@ const getFgProductionById = async (req, res) => {
     const [rows] = await pool.query(
       `SELECT fp.id, fp.fg_item_name, fp.external_item_id, fp.department_id, d.name AS department_name,
               fp.recipe_output_quantity, fp.status, fp.created_at, fp.updated_at
+              , fp.utility_cost_percentage
        FROM fg_production fp
        LEFT JOIN departments d ON d.id = fp.department_id
        WHERE fp.id = ? AND fp.status = 1`,
@@ -178,8 +184,9 @@ const getFgProductionById = async (req, res) => {
 // POST /api/fg-production
 const createFgProduction = async (req, res) => {
   const { external_item_id, fg_item_name, department_id, recipe_output_quantity } = req.body;
+  const utility_cost_percentage = req.body.utility_cost_percentage ?? 70;
 
-  const validationError = validateFgProductionInput({ external_item_id, fg_item_name, department_id, recipe_output_quantity });
+  const validationError = validateFgProductionInput({ external_item_id, fg_item_name, department_id, recipe_output_quantity, utility_cost_percentage });
   if (validationError) {
     return res.status(400).json({ error: validationError });
   }
@@ -200,9 +207,9 @@ const createFgProduction = async (req, res) => {
 
   try {
     const [result] = await pool.query(
-      `INSERT INTO fg_production (fg_item_name, external_item_id, department_id, recipe_output_quantity, status)
-       VALUES (?, ?, ?, ?, 1)`,
-      [posItem.fg_item_name, posItem.external_item_id, department_id, toNumber(recipe_output_quantity)]
+      `INSERT INTO fg_production (fg_item_name, external_item_id, department_id, recipe_output_quantity, utility_cost_percentage, status)
+       VALUES (?, ?, ?, ?, ?, 1)`,
+      [posItem.fg_item_name, posItem.external_item_id, department_id, toNumber(recipe_output_quantity), toNumber(utility_cost_percentage, 70)]
     );
 
     res.status(201).json({
@@ -219,8 +226,9 @@ const createFgProduction = async (req, res) => {
 const updateFgProduction = async (req, res) => {
   const { id } = req.params;
   const { external_item_id, fg_item_name, department_id, recipe_output_quantity } = req.body;
+  const utility_cost_percentage = req.body.utility_cost_percentage ?? 70;
 
-  const validationError = validateFgProductionInput({ external_item_id, fg_item_name, department_id, recipe_output_quantity });
+  const validationError = validateFgProductionInput({ external_item_id, fg_item_name, department_id, recipe_output_quantity, utility_cost_percentage });
   if (validationError) {
     return res.status(400).json({ error: validationError });
   }
@@ -258,9 +266,9 @@ const updateFgProduction = async (req, res) => {
 
     const [result] = await pool.query(
       `UPDATE fg_production
-       SET fg_item_name = ?, external_item_id = ?, department_id = ?, recipe_output_quantity = ?
+      SET fg_item_name = ?, external_item_id = ?, department_id = ?, recipe_output_quantity = ?, utility_cost_percentage = ?
        WHERE id = ? AND status = 1`,
-      [resolvedName, external_item_id, department_id, toNumber(recipe_output_quantity), id]
+          [resolvedName, external_item_id, department_id, toNumber(recipe_output_quantity), toNumber(utility_cost_percentage, 70), id]
     );
 
     if (result.affectedRows === 0) {
@@ -546,7 +554,8 @@ const getRecipesReport = async (req, res) => {
          fp.external_item_id,
          fp.department_id,
          d.name AS department_name,
-         fp.recipe_output_quantity
+         fp.recipe_output_quantity,
+         fp.utility_cost_percentage
        FROM fg_production fp
        LEFT JOIN departments d ON d.id = fp.department_id
        ${whereSql}

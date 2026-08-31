@@ -6,6 +6,7 @@ import {
   faExclamationCircle, faPlus, faTrash, faTimes,
   faCheckCircle, faInfoCircle
 } from '@fortawesome/free-solid-svg-icons';
+import Select from 'react-select';
 import api from '../../api';
 import './Adjustments.css';
 import CategoryAdjustmentPanel from './CategoryAdjustmentPanel';
@@ -71,6 +72,7 @@ const StoresBalance = () => {
 
   const [rows, setRows] = useState([{ ...EMPTY_ROW }]);
   const [items, setItems] = useState([]);
+  const [itemsLoading, setItemsLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ text: '', type: '' });
   const [modalConfig, setModalConfig] = useState({ isOpen: false });
@@ -82,13 +84,25 @@ const StoresBalance = () => {
 
   const fetchItems = async () => {
     try {
+      setItemsLoading(true);
       const response = await api.get('/items?auto_add_only=true');
       setItems(response.data);
     } catch (error) {
       console.error('Error fetching items:', error);
       showMessage('Error fetching items. Please try again.', 'error');
+    } finally {
+      setItemsLoading(false);
     }
   };
+
+  const itemOptions = items.map((item) => ({
+    value: item.id,
+    label: `${item.item_code} - ${item.name} (${item.unit})`,
+    itemName: String(item.name || '')
+  }));
+
+  const filterItemOption = (candidate, inputValue) =>
+    candidate.data.itemName.toLowerCase().includes(inputValue.trim().toLowerCase());
 
   const updateRow = (index, updates) => {
     setRows((prev) => prev.map((row, i) => (i === index ? { ...row, ...updates } : row)));
@@ -391,7 +405,7 @@ const StoresBalance = () => {
               <thead>
                 <tr>
                   <th style={{ width: '40px' }}>#</th>
-                  <th style={{ minWidth: '200px' }}>Select Item <span className="required">*</span></th>
+                  <th style={{ minWidth: '200px' }}>Select Item Name<span className="required">*</span></th>
                   <th style={{ minWidth: '120px' }}>System Qty</th>
                   <th style={{ minWidth: '150px' }}>Actual Qty <span className="required">*</span></th>
                   <th style={{ minWidth: '120px' }}>Variance</th>
@@ -411,20 +425,26 @@ const StoresBalance = () => {
                     <tr key={index}>
                       <td className="row-number">{index + 1}</td>
                       <td>
-                        <select
-                          value={row.item_id}
-                          onChange={(e) => handleItemChange(index, e)}
+                        <Select
+                          className="stock-item-select"
+                          classNamePrefix="stock-item-select"
+                          options={itemOptions}
+                          value={itemOptions.find((option) => String(option.value) === String(row.item_id)) || null}
+                          onChange={(option) => handleItemChange(index, { target: { value: option?.value || '' } })}
+                          filterOption={filterItemOption}
+                          isSearchable
+                          isClearable
+                          isLoading={itemsLoading}
+                          isDisabled={loading}
+                          menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                          styles={{
+                            menuPortal: (base) => ({ ...base, zIndex: 9999 })
+                          }}
+                          placeholder="Search raw material name..."
+                          noOptionsMessage={() => 'No matching raw materials'}
                           required
-                          className="table-input"
-                          disabled={loading}
                         >
-                          <option value="">-- Choose an Item --</option>
-                          {items.map(item => (
-                            <option key={item.id} value={item.id}>
-                              {item.item_code} - {item.name} ({item.unit})
-                            </option>
-                          ))}
-                        </select>
+                        </Select>
                       </td>
                       <td>
                         <input
