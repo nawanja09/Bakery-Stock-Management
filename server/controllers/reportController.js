@@ -765,9 +765,63 @@ const getPurchasingReport = async (req, res) => {
           WHERE pi.purchase_id = ?
         `, [purchase.id]);
         
-        return { ...purchase, items };
+        return {
+          ...purchase,
+          items,
+          source: 'purchase',
+          description: 'Purchases'
+        };
       })
     );
+
+    if (vatOnly === 'true' || vatOnly === '1') {
+      const expenseParams = [startDate, endDate];
+      let expenseQuery = `
+        SELECT
+          e.id,
+          e.bill_date AS purchase_date,
+          e.bill_number AS invoice_no,
+          e.payee_name AS supplier_name,
+          e.vat_reg_number AS supplier_vat_number,
+          e.expense_type AS expense_type,
+          e.without_vat_amount AS net_amount,
+          e.vat_amount AS vat_amount,
+          e.total_bill_amount AS bill_amount,
+          e.company_id,
+          c.name AS company_name
+        FROM expenses e
+        LEFT JOIN company c ON c.id = e.company_id
+        WHERE e.is_deleted = 0
+          AND e.vat_amount > 0
+          AND e.bill_date BETWEEN ? AND ?
+      `;
+
+      if (companyId) {
+        expenseQuery += ' AND e.company_id = ?';
+        expenseParams.push(companyId);
+      }
+
+      expenseQuery += ' ORDER BY e.bill_date DESC, e.id DESC';
+
+      const [expenseRows] = await pool.query(expenseQuery, expenseParams);
+
+      const expenseEntries = expenseRows.map((expense) => ({
+        ...expense,
+        id: `expense-${expense.id}`,
+        source: 'expense',
+        description: 'Expense',
+        purchase_date: expense.purchase_date,
+        invoice_no: expense.invoice_no || `EXP-${expense.id}`,
+        supplier_name: expense.supplier_name || 'Expense',
+        supplier_vat_number: expense.supplier_vat_number || '—',
+        net_amount: parseFloat(expense.net_amount) || 0,
+        vat_amount: parseFloat(expense.vat_amount) || 0,
+        bill_amount: parseFloat(expense.bill_amount) || 0,
+        items: []
+      }));
+
+      return res.json([...purchasesWithItems, ...expenseEntries]);
+    }
 
     res.json(purchasesWithItems);
   } catch (error) {
