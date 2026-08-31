@@ -12,13 +12,12 @@ const VATReport = () => {
   const [reportData, setReportData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [companyFilter, setCompanyFilter] = useState('');
+  const [descriptionFilter, setDescriptionFilter] = useState('all');
   const [vatFilter, setVatFilter] = useState('all');
-  
-  // State for modal
+
   const [selectedPurchaseId, setSelectedPurchaseId] = useState(null);
   const [showModal, setShowModal] = useState(false);
 
-  // Format date to MM/DD/YYYY (with 4-digit year)
   const formatDateMMDDYYYY = (dateString) => {
     const date = new Date(dateString);
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -30,23 +29,52 @@ const VATReport = () => {
   const fetchVATReport = async () => {
     setLoading(true);
     try {
-      // vatOnly=true → only bills from VAT-registered suppliers are returned
       const response = await api.get(`/reports/purchasing?startDate=${startDate}&endDate=${endDate}&companyId=${companyFilter}&vatOnly=true`);
-      const purchases = response.data;
+      const reportRows = Array.isArray(response.data) ? response.data : [];
 
       const detailedPurchases = await Promise.all(
-        purchases.map(async (purchase) => {
-          try {
-            const detailResponse = await api.get(`/purchases/${purchase.id}`);
-            return detailResponse.data;
-          } catch (error) {
-            console.error(`Error fetching details for purchase ${purchase.id}:`, error);
-            return { ...purchase, items: [] };
-          }
-        })
+        reportRows
+          .filter((row) => row.source !== 'expense')
+          .map(async (purchase) => {
+            try {
+              const detailResponse = await api.get(`/purchases/${purchase.id}`);
+              return {
+                ...detailResponse.data,
+                source: 'purchase',
+                description: 'Purchases',
+                purchaseId: detailResponse.data.id
+              };
+            } catch (error) {
+              console.error(`Error fetching details for purchase ${purchase.id}:`, error);
+              return {
+                ...purchase,
+                items: [],
+                source: 'purchase',
+                description: 'Purchases',
+                purchaseId: purchase.id
+              };
+            }
+          })
       );
 
-      setReportData(detailedPurchases);
+      const expenseRows = reportRows
+        .filter((row) => row.source === 'expense')
+        .map((expense) => ({
+          ...expense,
+          id: expense.id,
+          purchaseId: expense.id,
+          invoiceDate: expense.purchase_date,
+          invoiceNo: expense.invoice_no,
+          supplierTIN: expense.supplier_vat_number || '—',
+          supplierName: expense.supplier_name,
+          netAmount: parseFloat(expense.net_amount || 0),
+          vatAmount: parseFloat(expense.vat_amount || 0),
+          disallowableVATAmount: 0,
+          description: 'Expense',
+          isExpense: true
+        }));
+
+      setReportData([...detailedPurchases, ...expenseRows]);
     } catch (error) {
       console.error('Error fetching VAT report:', error);
       alert('Failed to fetch VAT report');
@@ -55,87 +83,99 @@ const VATReport = () => {
     }
   };
 
-  /* Handle VAT filter change */
   const handleVatFilterChange = (e) => {
     setVatFilter(e.target.value);
   };
 
-  // Handle row click to open modal
+  const handleDescriptionFilterChange = (e) => {
+    setDescriptionFilter(e.target.value);
+  };
+
   const handleRowClick = (purchaseId) => {
     setSelectedPurchaseId(purchaseId);
     setShowModal(true);
   };
 
-  // Close modal
   const handleCloseModal = () => {
     setShowModal(false);
     setSelectedPurchaseId(null);
   };
 
-  // Process data for VAT report - Group by invoice
   const processVATData = () => {
     const vatData = [];
     const invoiceMap = new Map();
 
-    reportData.forEach(purchase => {
-      // Check if we already have this invoice
-      if (invoiceMap.has(purchase.id)) {
+    reportData.forEach((entry) => {
+      const invoiceKey = entry.source === 'expense' ? `expense-${entry.id}` : entry.id;
+      if (invoiceMap.has(invoiceKey)) {
         return;
       }
 
       let totalNetAmount = 0;
       let totalVATAmount = 0;
       let totalDisallowableVAT = 0;
+      let invoiceDate = entry.purchase_date || entry.invoiceDate || entry.bill_date;
+      let invoiceNo = entry.invoice_no || entry.bill_number || entry.invoiceNo || 'N/A';
+      let supplierTIN = entry.supplier_vat_number || entry.supplierTIN || '—';
+      let supplierName = entry.supplier_name || entry.supplierName || 'Expense';
+      let description = entry.description || (entry.source === 'expense' ? 'Expense' : 'Purchases');
+      let purchaseId = entry.purchaseId || entry.id;
 
-      if (purchase.items && purchase.items.length > 0) {
-        purchase.items.forEach(item => {
-          const amount = parseFloat(item.quantity) * parseFloat(item.unit_price);
+      if (entry.source === 'expense') {
+        totalNetAmount = parseFloat(entry.netAmount || entry.net_amount || 0);
+        totalVATAmount = parseFloat(entry.vatAmount || entry.vat_amount || 0);
+        totalDisallowableVAT = 0;
+      } else if (entry.items && entry.items.length > 0) {
+        entry.items.forEach((item) => {
+          const amount = parseFloat(item.quantity || 0) * parseFloat(item.unit_price || 0);
           const vatAmount = amount * 0.18;
           const vatApplicable = item.vat_applicable !== undefined ? item.vat_applicable : true;
-          
+
           totalNetAmount += amount;
-          
-          // Check if VAT is applicable for this item
+
           if (vatApplicable) {
             totalVATAmount += vatAmount;
           } else {
-            // If VAT is not applicable for this item, add to disallowable VAT
             totalDisallowableVAT += vatAmount;
           }
         });
       } else {
-        // Handle case where items might be in a different structure
-        const netAmount = parseFloat(purchase.bill_amount || 0) - parseFloat(purchase.vat_amount || 0);
-        const vatAmount = parseFloat(purchase.vat_amount || 0);
+        const netAmount = parseFloat(entry.bill_amount || 0) - parseFloat(entry.vat_amount || 0);
+        const vatAmount = parseFloat(entry.vat_amount || 0);
         totalNetAmount = netAmount;
         totalVATAmount = vatAmount;
         totalDisallowableVAT = 0;
       }
 
       const invoiceData = {
-        purchaseId: purchase.id,
-        invoiceDate: purchase.purchase_date,
-        invoiceNo: purchase.invoice_no,
-        supplierTIN: purchase.supplier_vat_number || '—',
-        supplierName: purchase.supplier_name,
+        purchaseId,
+        invoiceDate,
+        invoiceNo,
+        supplierTIN,
+        supplierName,
+        description,
         netAmount: totalNetAmount,
         vatAmount: totalVATAmount,
-        disallowableVATAmount: totalDisallowableVAT
+        disallowableVATAmount: totalDisallowableVAT,
+        isExpense: entry.source === 'expense'
       };
 
-      invoiceMap.set(purchase.id, invoiceData);
+      invoiceMap.set(invoiceKey, invoiceData);
       vatData.push(invoiceData);
     });
 
-    // VAT FILTER APPLY
     let filteredData = vatData;
 
+    if (descriptionFilter !== 'all') {
+      filteredData = filteredData.filter((item) => item.description === descriptionFilter);
+    }
+
     if (vatFilter === 'yes') {
-      filteredData = vatData.filter(item => item.vatAmount > 0);
+      filteredData = filteredData.filter((item) => item.vatAmount > 0);
     }
 
     if (vatFilter === 'no') {
-      filteredData = vatData.filter(item => item.vatAmount === 0);
+      filteredData = filteredData.filter((item) => item.vatAmount === 0);
     }
 
     return filteredData;
@@ -143,7 +183,7 @@ const VATReport = () => {
 
   const downloadExcel = () => {
     const vatData = processVATData();
-    
+
     if (vatData.length === 0) {
       alert('No data to export. Please generate the report first.');
       return;
@@ -152,21 +192,21 @@ const VATReport = () => {
     const worksheetData = [];
 
     worksheetData.push([
-      'Invoice Date (MM/DD/YYYY)',
       'Invoice No',
       'Supplier TIN Number',
       'Name of Supplier',
+      'Description',
       'Net Amount (Rs.)',
       'VAT Amount (18%) (Rs.)',
       'Disallowable VAT Amount (Rs.)'
     ]);
 
-    vatData.forEach(item => {
+    vatData.forEach((item) => {
       worksheetData.push([
-        formatDateMMDDYYYY(item.invoiceDate),
         item.invoiceNo,
         item.supplierTIN,
         item.supplierName,
+        item.description,
         formatNumber(item.netAmount, 2, 2),
         formatNumber(item.vatAmount, 2, 2),
         formatNumber(item.disallowableVATAmount, 2, 2)
@@ -178,7 +218,7 @@ const VATReport = () => {
     const totalNetAmount = vatData.reduce((sum, item) => sum + item.netAmount, 0);
     const totalVATAmount = vatData.reduce((sum, item) => sum + item.vatAmount, 0);
     const totalDisallowableVAT = vatData.reduce((sum, item) => sum + item.disallowableVATAmount, 0);
-    
+
     worksheetData.push([
       'TOTAL',
       '',
@@ -193,12 +233,12 @@ const VATReport = () => {
 
     worksheet['!cols'] = [
       { wch: 18 },
-      { wch: 20 },
-      { wch: 20 },
-      { wch: 30 },
-      { wch: 15 },
-      { wch: 15 },
-      { wch: 18 }
+      { wch: 22 },
+      { wch: 28 },
+      { wch: 18 },
+      { wch: 18 },
+      { wch: 18 },
+      { wch: 24 }
     ];
 
     const workbook = XLSX.utils.book_new();
@@ -208,7 +248,6 @@ const VATReport = () => {
   };
 
   const vatData = processVATData();
-
   const totalNetAmount = vatData.reduce((sum, item) => sum + item.netAmount, 0);
   const totalVATAmount = vatData.reduce((sum, item) => sum + item.vatAmount, 0);
   const totalDisallowableVAT = vatData.reduce((sum, item) => sum + item.disallowableVATAmount, 0);
@@ -227,8 +266,8 @@ const VATReport = () => {
       <div className="controls-section">
         <div className="control-group">
           <label>Start Date</label>
-          <input 
-            type="date" 
+          <input
+            type="date"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
             max={endDate}
@@ -238,8 +277,8 @@ const VATReport = () => {
 
         <div className="control-group">
           <label>End Date</label>
-          <input 
-            type="date" 
+          <input
+            type="date"
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
             min={startDate}
@@ -262,7 +301,33 @@ const VATReport = () => {
           </select>
         </div>
 
-        <button 
+        <div className="control-group">
+          <label>Description</label>
+          <select
+            value={descriptionFilter}
+            onChange={handleDescriptionFilterChange}
+            className="control-input"
+          >
+            <option value="all">All</option>
+            <option value="Purchases">Purchases</option>
+            <option value="Expense">Expense</option>
+          </select>
+        </div>
+
+        <div className="control-group">
+          <label>VAT</label>
+          <select
+            value={vatFilter}
+            onChange={handleVatFilterChange}
+            className="control-input"
+          >
+            <option value="all">All</option>
+            <option value="yes">Has VAT</option>
+            <option value="no">No VAT</option>
+          </select>
+        </div>
+
+        <button
           onClick={fetchVATReport}
           disabled={loading}
           className="btn btn-primary"
@@ -287,12 +352,21 @@ const VATReport = () => {
         <>
           <div className="table-container">
             <table className="vat-report-table">
+              <colgroup>
+                <col style={{ width: '140px' }} />
+                <col style={{ width: '180px' }} />
+                <col style={{ width: '200px' }} />
+                <col style={{ width: '150px' }} />
+                <col style={{ width: '180px' }} />
+                <col style={{ width: '180px' }} />
+                <col style={{ width: '220px' }} />
+              </colgroup>
               <thead>
                 <tr>
-                  <th>Invoice Date</th>
-                  <th>Invoice No</th>
-                  <th>Supplier TIN Number</th>
-                  <th>Name of Supplier</th>
+                  <th className="text-left">Invoice No</th>
+                  <th className="text-left">Supplier TIN Number</th>
+                  <th className="text-left">Name of Supplier</th>
+                  <th className="text-left">Description</th>
                   <th className="amount-col">Net Amount (Rs.)</th>
                   <th className="amount-col">VAT Amount (18%) (Rs.)</th>
                   <th className="amount-col">Disallowable VAT Amount (Rs.)</th>
@@ -300,16 +374,16 @@ const VATReport = () => {
               </thead>
               <tbody>
                 {vatData.map((item, index) => (
-                  <tr 
+                  <tr
                     key={`${item.invoiceNo}-${index}`}
-                    onClick={() => handleRowClick(item.purchaseId)}
-                    className="clickable-row"
-                    title="Click to view full purchase details"
+                    onClick={item.isExpense ? undefined : () => handleRowClick(item.purchaseId)}
+                    className={item.isExpense ? '' : 'clickable-row'}
+                    title={item.isExpense ? '' : 'Click to view full purchase details'}
                   >
-                    <td>{formatDateMMDDYYYY(item.invoiceDate)}</td>
-                    <td>{item.invoiceNo}</td>
-                    <td>{item.supplierTIN}</td>
-                    <td>{item.supplierName}</td>
+                    <td className="text-left">{item.invoiceNo}</td>
+                    <td className="text-left">{item.supplierTIN}</td>
+                    <td className="text-left">{item.supplierName}</td>
+                    <td className="text-left">{item.description}</td>
                     <td className="amount-col">{formatNumber(item.netAmount, 2, 2)}</td>
                     <td className="amount-col vat-amount">{formatNumber(item.vatAmount, 2, 2)}</td>
                     <td className="amount-col disallowable-vat-amount">{formatNumber(item.disallowableVATAmount, 2, 2)}</td>
@@ -355,11 +429,10 @@ const VATReport = () => {
         </div>
       )}
 
-      {/* Modal for Purchase Details */}
       {showModal && selectedPurchaseId && (
-        <PurchaseDetailsModal 
-          purchaseId={selectedPurchaseId} 
-          onClose={handleCloseModal} 
+        <PurchaseDetailsModal
+          purchaseId={selectedPurchaseId}
+          onClose={handleCloseModal}
         />
       )}
     </div>
