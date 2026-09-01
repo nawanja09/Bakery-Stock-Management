@@ -12,7 +12,7 @@
   flex: 1;
   min-width: 0;
   overflow-y: auto;
-  padding: var(--spacing-8);
+  padding: clamp(1rem, 1.5vw, 2rem);
   background: var(--bg-main);
   transition: padding var(--transition-base);
   display: flex;
@@ -21,7 +21,8 @@
 
 /* Content width constraint */
 .main-content > .container {
-  width: min(var(--max-content-width), calc(100% - 1rem));
+  width: min(100%, 1800px);
+  max-width: calc(100% - 1rem);
   margin: 0 auto;
 }
 
@@ -38,6 +39,42 @@
 /* ============================================================
    RESPONSIVE
    ============================================================ */
+@media (min-width: 1280px) and (max-width: 1439px) {
+  .main-content {
+    padding: clamp(1rem, 1.25vw, 1.5rem) clamp(1.2rem, 2vw, 1.8rem);
+  }
+
+  .main-content > .container {
+    width: min(100%, 1500px);
+  }
+}
+
+@media (min-width: 1440px) and (max-width: 1919px) {
+  .main-content {
+    padding: clamp(1.25rem, 1.6vw, 2rem) clamp(1.5rem, 2vw, 2.5rem);
+  }
+
+  .main-content > .container {
+    width: min(100%, 1700px);
+  }
+}
+
+@media (min-width: 1920px) {
+  .main-content {
+    padding: clamp(1.5rem, 1.8vw, 2.25rem) clamp(2rem, 2.2vw, 3rem);
+  }
+
+  .main-content > .container {
+    width: min(100%, 1800px);
+  }
+}
+
+@media (min-width: 2560px) {
+  .main-content > .container {
+    width: min(100%, 2000px);
+  }
+}
+
 @media (max-width: 900px) {
   .layout-container {
     flex-direction: column;
@@ -51,17 +88,5 @@
 @media (max-width: 640px) {
   .main-content {
     padding: var(--spacing-4) var(--spacing-3);
-  }
-}
-
-@media (min-width: 1440px) {
-  .main-content {
-    padding: var(--spacing-8) var(--spacing-10);
-  }
-}
-
-@media (min-width: 1920px) {
-  .main-content {
-    padding: var(--spacing-10) var(--spacing-12);
   }
 }

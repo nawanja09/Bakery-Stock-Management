@@ -23,6 +23,24 @@
   width: 100%;
 }
 
+.form-layout,
+.form-grid,
+.form-row,
+.multi-column-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(1rem, 1.5vw, 1.5rem);
+}
+
+@media (max-width: 1024px) {
+  .form-layout,
+  .form-grid,
+  .form-row,
+  .multi-column-form {
+   grid-template-columns: 1fr;
+  }
+}
+
 input,
 select,
 textarea {
