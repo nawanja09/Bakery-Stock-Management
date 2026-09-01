@@ -89,8 +89,33 @@ textarea:focus-visible {
 
 /* ── Base layout tokens ── */
 .container {
-  width: min(1360px, calc(100% - 2rem));
+  width: min(100%, calc(100% - 1.5rem));
+  max-width: 1800px;
   margin: 0 auto;
+}
+
+@media (min-width: 1280px) and (max-width: 1439px) {
+  .container {
+   width: min(100%, 1500px);
+  }
+}
+
+@media (min-width: 1440px) and (max-width: 1919px) {
+  .container {
+   width: min(100%, 1700px);
+  }
+}
+
+@media (min-width: 1920px) {
+  .container {
+   width: min(100%, 1800px);
+  }
+}
+
+@media (min-width: 2560px) {
+  .container {
+   width: min(100%, 2000px);
+  }
 }
 
 .page-shell {
@@ -133,7 +158,7 @@ textarea:focus-visible {
 }
 
 .page-title {
-  font-size: clamp(1.35rem, 2vw, 1.75rem);
+  font-size: clamp(1.5rem, 1.5vw, 2rem);
 }
 
 .page-subtitle,
