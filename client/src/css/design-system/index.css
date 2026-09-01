@@ -1,0 +1,30 @@
+/* ============================================================
+   DESIGN SYSTEM INDEX
+   Bakery Stock Management System
+   ============================================================
+   
+   This file imports all design system CSS files in order.
+   Include this file in your main index.css or app entry point.
+*/
+
+/* 1. Variables & Reset */
+@import './variables.css';
+@import './reset.css';
+
+/* 2. Typography */
+@import './typography.css';
+
+/* 3. Layout & Structure */
+@import './layout.css';
+@import './sidebar.css';
+
+/* 4. Components */
+@import './forms.css';
+@import './buttons.css';
+@import './tables.css';
+@import './badges.css';
+@import './modals.css';
+@import './cards-pagination.css';
+
+/* 5. Responsive & Utilities */
+@import './responsive.css';
