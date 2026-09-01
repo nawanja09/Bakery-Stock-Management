@@ -50,7 +50,22 @@ const calculateDateRangeBalance = ({ closingBalance = 0, creditAfterDate = 0, de
   const base = safeNumber(closingBalance);
   const credits = safeNumber(creditAfterDate);
   const debits = safeNumber(debitAfterDate);
-  return Number((base + credits - debits).toFixed(2));
+  return Number((base + debits - credits).toFixed(2));
+};
+
+const calculateRunningBalances = (rows = [], openingBalance = 0) => {
+  let previousBalance = safeNumber(openingBalance);
+
+  return rows.map((row) => {
+    const debit = safeNumber(row.debit);
+    const credit = safeNumber(row.credit);
+    previousBalance = Number((previousBalance + debit - credit).toFixed(2));
+
+    return {
+      ...row,
+      balance: previousBalance
+    };
+  });
 };
 
 /**
@@ -175,6 +190,7 @@ module.exports = {
   getCashBalance,
   getBankBalance,
   calculateDateRangeBalance,
+  calculateRunningBalances,
   recordCashTransaction,
   recordBankTransaction
 };

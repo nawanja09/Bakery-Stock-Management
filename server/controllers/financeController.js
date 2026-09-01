@@ -5,7 +5,8 @@ const {
   recordBankTransaction,
   getCashBalance,
   getBankBalance,
-  calculateDateRangeBalance
+  calculateDateRangeBalance,
+  calculateRunningBalances
 } = require('../utils/financeLedger');
 const { checkDuplicateReference, DuplicateReferenceError } = require('../services/referenceValidationService');
 
@@ -31,19 +32,28 @@ const LEDGER_SELECT = `
 
 const normalizeLedgerAmount = (value) => Number.parseFloat(value ?? 0) || 0;
 
-const calculateRunningBalances = (rows = []) => {
-  let previousBalance = 0;
+const getOpeningBalanceBeforeDate = async ({ accountType, companyId, bankId, dateFrom }) => {
+  if (!dateFrom) return 0;
 
-  return rows.map((row) => {
-    const debit = normalizeLedgerAmount(row.debit);
-    const credit = normalizeLedgerAmount(row.credit);
-    previousBalance = Number((previousBalance + debit - credit).toFixed(2));
+  let query = `
+    SELECT COALESCE(SUM(CAST(debit AS DECIMAL(14,2)) - CAST(credit AS DECIMAL(14,2))), 0) AS opening_balance
+    FROM finance_transactions
+    WHERE account_type = ?
+      AND status = 1
+      AND transaction_date < ?
+  `;
 
-    return {
-      ...row,
-      balance: previousBalance
-    };
-  });
+  const params = [accountType, dateFrom];
+  if (accountType === 'CASH') {
+    query += ' AND company_id = ?';
+    params.push(companyId);
+  } else {
+    query += ' AND bank_id = ?';
+    params.push(bankId);
+  }
+
+  const [rows] = await pool.query(query, params);
+  return Number(parseFloat(rows[0]?.opening_balance ?? 0).toFixed(2)) || 0;
 };
 
 // Build the WHERE clause + params for the optional ledger filters shared by
@@ -99,6 +109,9 @@ const getCashLedger = async (req, res) => {
     query += ' ORDER BY ft.transaction_date ASC, ft.created_at ASC, ft.id ASC';
 
     const [rows] = await pool.query(query, allParams);
+    const openingBalance = await getOpeningBalanceBeforeDate({ accountType: 'CASH', companyId, dateFrom: req.query.dateFrom });
+    const transactions = calculateRunningBalances(rows, openingBalance);
+
     let currentBalance = await getCashBalance(companyId);
 
     if (req.query.dateTo) {
@@ -123,7 +136,6 @@ const getCashLedger = async (req, res) => {
       currentBalance = calculateDateRangeBalance({ closingBalance, creditAfterDate, debitAfterDate });
     }
 
-    const transactions = calculateRunningBalances(rows);
     res.json({ transactions, current_balance: currentBalance });
   } catch (error) {
     console.error('Error fetching cash ledger:', error);
@@ -250,7 +262,8 @@ const getBankLedger = async (req, res) => {
     query += ' ORDER BY ft.transaction_date ASC, ft.created_at ASC, ft.id ASC';
 
     const [rows] = await pool.query(query, allParams);
-    const transactions = calculateRunningBalances(rows);
+    const openingBalance = await getOpeningBalanceBeforeDate({ accountType: 'BANK', companyId: null, bankId, dateFrom: req.query.dateFrom });
+    const transactions = calculateRunningBalances(rows, openingBalance);
     let currentBalance = await getBankBalance(bankId);
 
     if (req.query.dateTo) {
