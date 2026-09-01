@@ -41,6 +41,18 @@ const getBankBalance = async (bankId) => {
   return Number(balance.toFixed(2));
 };
 
+const safeNumber = (value) => {
+  const parsed = Number.parseFloat(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const calculateDateRangeBalance = ({ closingBalance = 0, creditAfterDate = 0, debitAfterDate = 0 }) => {
+  const base = safeNumber(closingBalance);
+  const credits = safeNumber(creditAfterDate);
+  const debits = safeNumber(debitAfterDate);
+  return Number((base + credits - debits).toFixed(2));
+};
+
 /**
  * Records a cash transaction and updates the running balance.
  * Requires an active transaction connection.
@@ -162,6 +174,7 @@ const recordBankTransaction = async (connection, {
 module.exports = {
   getCashBalance,
   getBankBalance,
+  calculateDateRangeBalance,
   recordCashTransaction,
   recordBankTransaction
 };

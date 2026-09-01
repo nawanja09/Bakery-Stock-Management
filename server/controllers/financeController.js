@@ -4,7 +4,8 @@ const {
   recordCashTransaction,
   recordBankTransaction,
   getCashBalance,
-  getBankBalance
+  getBankBalance,
+  calculateDateRangeBalance
 } = require('../utils/financeLedger');
 const { checkDuplicateReference, DuplicateReferenceError } = require('../services/referenceValidationService');
 
@@ -98,9 +99,32 @@ const getCashLedger = async (req, res) => {
     query += ' ORDER BY ft.transaction_date ASC, ft.created_at ASC, ft.id ASC';
 
     const [rows] = await pool.query(query, allParams);
-    const balance = await getCashBalance(companyId);
+    let currentBalance = await getCashBalance(companyId);
+
+    if (req.query.dateTo) {
+      const [closingRows] = await pool.query(
+        `SELECT COALESCE(SUM(CAST(debit AS DECIMAL(14,2)) - CAST(credit AS DECIMAL(14,2))), 0) AS closing_balance
+         FROM finance_transactions
+         WHERE account_type = 'CASH' AND company_id = ? AND status = 1 AND transaction_date <= ?`,
+        [companyId, req.query.dateTo]
+      );
+      const [afterRows] = await pool.query(
+        `SELECT
+           COALESCE(SUM(CAST(credit AS DECIMAL(14,2))), 0) AS credit_after_date,
+           COALESCE(SUM(CAST(debit AS DECIMAL(14,2))), 0) AS debit_after_date
+         FROM finance_transactions
+         WHERE account_type = 'CASH' AND company_id = ? AND status = 1 AND transaction_date > ?`,
+        [companyId, req.query.dateTo]
+      );
+
+      const closingBalance = Number.parseFloat(closingRows[0]?.closing_balance ?? 0) || 0;
+      const creditAfterDate = Number.parseFloat(afterRows[0]?.credit_after_date ?? 0) || 0;
+      const debitAfterDate = Number.parseFloat(afterRows[0]?.debit_after_date ?? 0) || 0;
+      currentBalance = calculateDateRangeBalance({ closingBalance, creditAfterDate, debitAfterDate });
+    }
+
     const transactions = calculateRunningBalances(rows);
-    res.json({ transactions, current_balance: balance });
+    res.json({ transactions, current_balance: currentBalance });
   } catch (error) {
     console.error('Error fetching cash ledger:', error);
     res.status(500).json({ error: 'Failed to fetch cash ledger' });
@@ -227,7 +251,30 @@ const getBankLedger = async (req, res) => {
 
     const [rows] = await pool.query(query, allParams);
     const transactions = calculateRunningBalances(rows);
-    const currentBalance = await getBankBalance(bankId);
+    let currentBalance = await getBankBalance(bankId);
+
+    if (req.query.dateTo) {
+      const [closingRows] = await pool.query(
+        `SELECT COALESCE(SUM(CAST(debit AS DECIMAL(14,2)) - CAST(credit AS DECIMAL(14,2))), 0) AS closing_balance
+         FROM finance_transactions
+         WHERE account_type = 'BANK' AND bank_id = ? AND status = 1 AND transaction_date <= ?`,
+        [bankId, req.query.dateTo]
+      );
+      const [afterRows] = await pool.query(
+        `SELECT
+           COALESCE(SUM(CAST(credit AS DECIMAL(14,2))), 0) AS credit_after_date,
+           COALESCE(SUM(CAST(debit AS DECIMAL(14,2))), 0) AS debit_after_date
+         FROM finance_transactions
+         WHERE account_type = 'BANK' AND bank_id = ? AND status = 1 AND transaction_date > ?`,
+        [bankId, req.query.dateTo]
+      );
+
+      const closingBalance = Number.parseFloat(closingRows[0]?.closing_balance ?? 0) || 0;
+      const creditAfterDate = Number.parseFloat(afterRows[0]?.credit_after_date ?? 0) || 0;
+      const debitAfterDate = Number.parseFloat(afterRows[0]?.debit_after_date ?? 0) || 0;
+      currentBalance = calculateDateRangeBalance({ closingBalance, creditAfterDate, debitAfterDate });
+    }
+
     res.json({ bank: { ...bankRows[0], current_balance: currentBalance }, transactions });
   } catch (error) {
     console.error('Error fetching bank ledger:', error);

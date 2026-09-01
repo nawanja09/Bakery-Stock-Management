@@ -82,6 +82,7 @@ uploadDirs.forEach(dir => {
 
 app.use(cors({
   //origin: 'https://stock.ravonbakers.lk',
+  //origin: 'https://cjtradingcompany.lk',
   origin: 'http://localhost:3000',
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],

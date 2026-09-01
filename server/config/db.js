@@ -330,6 +330,34 @@ const ensureFinanceSchema = async () => {
 
 ensureFinanceSchema();
 
+const ensureAutoIncrementPrimaryKeys = async () => {
+  const repairTables = [
+    'purchases',
+    'purchase_items',
+    'payment_history',
+    'purchase_payment_allocations',
+    'purchase_return_credits'
+  ];
+
+  for (const table of repairTables) {
+    try {
+      await pool.query(`ALTER TABLE ${table} MODIFY COLUMN id INT NOT NULL AUTO_INCREMENT`);
+    } catch (error) {
+      // Some legacy installs may already have the correct schema, or the table
+      // may not exist yet on a fresh setup. Ignore those cases and continue.
+      try {
+        await pool.query(`ALTER TABLE ${table} ADD PRIMARY KEY (id)`);
+      } catch (_) {
+        // Safe to ignore when the table is absent or already keyed.
+      }
+    }
+  }
+
+  console.log('Purchase/ledger ID schema repair check complete');
+};
+
+ensureAutoIncrementPrimaryKeys();
+
 // --- Connect the Expenses modules to Finance -------------------------------
 // Adds the columns each expense table needs to post a Cash/Bank ledger entry:
 //   - company_id: which company's Cash In Hand this expense belongs to
