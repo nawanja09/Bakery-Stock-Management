@@ -1,6 +1,6 @@
 // src/components/purchase/NonPaidPurchases.jsx
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faMoneyBillWave, 
@@ -24,6 +24,7 @@ import PaymentModal from './PaymentModal';
 import './Purchase.css';
 
 const NonPaidPurchases = () => {
+  const location = useLocation();
   const [purchases, setPurchases] = useState([]);
   const [filteredPurchases, setFilteredPurchases] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -164,7 +165,7 @@ const NonPaidPurchases = () => {
           </h1>
           <p className="subtitle">Bills with pending payments (Balance &gt; 0)</p>
         </div>
-        <Link to="/purchase/new" className="btn btn-primary">
+        <Link to="/purchase/new" state={{ backgroundLocation: location }} className="btn btn-primary">
           <FontAwesomeIcon icon={faFileInvoice} />
           <span>New Purchase</span>
         </Link>
@@ -339,7 +340,7 @@ const NonPaidPurchases = () => {
                       )}
                     </td>
                     <td className="actions-cell text-center">
-                      <Link to={`/purchase/${purchase.id}`} className="action-btn view" title="View Details">
+                      <Link to={`/purchase/${purchase.id}`} state={{ backgroundLocation: location }} className="action-btn view" title="View Details">
                         <FontAwesomeIcon icon={faEye} />
                       </Link>
                       <button 

@@ -3,16 +3,16 @@
    ============================================================ */
 
 :root {
-  --er-primary: #4f46e5;
-  --er-primary-dark: #3730a3;
-  --er-primary-light: #eef2ff;
-  --er-success: #16a34a;
-  --er-danger: #dc2626;
-  --er-text: #1f2937;
-  --er-text-muted: #6b7280;
-  --er-border: #e5e7eb;
-  --er-bg: #f9fafb;
-  --er-surface: #ffffff;
+  --er-primary: var(--color-primary);
+  --er-primary-dark: var(--color-primary-dark);
+  --er-primary-light: var(--color-primary-light);
+  --er-success: var(--color-success);
+  --er-danger: var(--color-danger);
+  --er-text: var(--color-text);
+  --er-text-muted: var(--color-text-secondary);
+  --er-border: var(--color-border);
+  --er-bg: var(--color-background);
+  --er-surface: var(--color-surface);
   --er-radius: 12px;
   --er-radius-sm: 8px;
   --er-shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);

@@ -143,10 +143,9 @@ const ReturnsHistory = () => {
   if (loading) return <div className="loading">Loading...</div>;
 
   return (
-    <div className="returns-container">
+    <div className="returns-container erp-department-return-summary">
       <div className="header-with-actions">
         <h2 style={{ margin: 0 }}>Department Return Summary</h2>
-        <Link to="/returns/add" className="btn-primary">+ New Return</Link>
       </div>
 
       {/* Filter Section */}
@@ -186,7 +185,7 @@ const ReturnsHistory = () => {
 
       {/* Table */}
       <div className="table-responsive">
-        <table className="returns-table styled-table">
+        <table className="returns-table styled-table" style={{ width: "100%" }}>
           <thead>
             <tr>
               <th>Ref No.</th>

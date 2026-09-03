@@ -43,7 +43,10 @@ const Login = () => {
         // Store token without quotes
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
-        showPopup('success', 'Login successful!');
+        showPopup('success', 'You have successfully logged into your account.', {
+          title: 'Login Successful',
+          confirmText: 'OK'
+        });
         setTimeout(() => {
           navigate(from, { replace: true });
         }, 1500);

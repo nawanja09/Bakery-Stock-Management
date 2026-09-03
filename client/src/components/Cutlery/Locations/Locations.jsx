@@ -51,19 +51,22 @@ const Locations = () => {
     }
   };
 
-  if (loading) return <div className="loading">Loading locations...</div>;
+  if (loading) return <div style={{ padding: 'var(--spacing-2xl)', textAlign: 'center', color: 'var(--color-text-secondary)' }}>Loading locations...</div>;
 
   return (
-    <div className="locations-container">
-      <div className="locations-header">
-        <h2>Cutlery Locations</h2>
+    <div className="page-container">
+      <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+        <div>
+          <h2 style={{ margin: 0 }}>Cutlery Locations</h2>
+          <p style={{ margin: '4px 0 0', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>Manage storage and service locations</p>
+        </div>
         <button 
-          className="btn-add-location"
+          className="btn btn-primary"
           onClick={() => setShowAddForm(true)}
         >
           + Add Location
         </button>
-      </div>
+      </header>
 
       {showAddForm && (
         <AddLocationForm
@@ -72,43 +75,42 @@ const Locations = () => {
         />
       )}
 
-      <div className="locations-table-container">
+      <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
         {locations.length === 0 ? (
-          <div className="no-data">
+          <div style={{ textAlign: 'center', padding: 'var(--spacing-3xl)', color: 'var(--color-text-secondary)' }}>
             <p>No locations found. Add your first location to get started.</p>
           </div>
         ) : (
-          <table className="locations-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Name</th>
-                <th>Created</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {locations.map(loc => (
-                <tr key={loc.id}>
-                  <td className="location-id">{loc.location_id}</td>
-                  <td className="location-name">{loc.location_name}</td>
-                  <td className="created-date">
-                    {new Date(loc.created_at).toLocaleDateString()}
-                  </td>
-                  <td className="actions">
-                    <button
-                      className="btn-delete"
-                      onClick={() => handleDeleteLocation(loc.id, loc.location_name)}
-                      title="Delete Location"
-                    >
-                      <FiTrash2 />
-                    </button>
-                    {/* Add more action buttons here if needed */}
-                  </td>
+          <div style={{ overflowX: 'auto' }}>
+            <table className="report-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Name</th>
+                  <th>Created</th>
+                  <th>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {locations.map(loc => (
+                  <tr key={loc.id}>
+                    <td>{loc.location_id}</td>
+                    <td><strong>{loc.location_name}</strong></td>
+                    <td>{new Date(loc.created_at).toLocaleDateString()}</td>
+                    <td>
+                      <button
+                        className="btn-icon delete"
+                        onClick={() => handleDeleteLocation(loc.id, loc.location_name)}
+                        title="Delete Location"
+                      >
+                        <FiTrash2 />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>

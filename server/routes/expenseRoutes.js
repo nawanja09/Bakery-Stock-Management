@@ -5,6 +5,7 @@ const authenticate = require('../middleware/authenticate');
 const restrictRoles = require('../middleware/restrictRoles');
 const { recordCashTransaction, recordBankTransaction } = require('../utils/financeLedger');
 const { checkDuplicateReference, DuplicateReferenceError } = require('../services/referenceValidationService');
+const { getActiveBankAccounts } = require('../services/bankAccountService');
 
 router.use(authenticate, restrictRoles('Store Keeper', 'Stores'));
 
@@ -1479,19 +1480,7 @@ router.get('/online/:id/payments', async (req, res) => {
 // GET all banks (for dropdown) - active only
 router.get('/banks', async (req, res) => {
   try {
-    const { company_id } = req.query;
-    const query = company_id
-      ? `SELECT bd.id, bd.bank_name, bd.account_number
-         FROM bank_details bd
-         INNER JOIN company c ON LOWER(TRIM(c.name)) = LOWER(TRIM(bd.company))
-         WHERE bd.status = 'Active' AND c.id = ?
-         ORDER BY bd.bank_name ASC, bd.account_number ASC`
-      : `SELECT id, bank_name, account_number
-         FROM bank_details
-         WHERE status = 'Active'
-         ORDER BY bank_name ASC, account_number ASC`;
-    const [rows] = await pool.query(query, company_id ? [company_id] : []);
-    res.json(rows || []);
+    res.json(await getActiveBankAccounts(req.query.company_id || null));
   } catch (error) {
     console.error('Error fetching banks:', error);
     res.status(500).json({ error: 'Failed to fetch banks' });

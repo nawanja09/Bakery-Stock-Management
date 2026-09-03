@@ -58,36 +58,38 @@ const AddSimpleNameForm = ({
   };
 
   return (
-    <div className="rm-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel(); }}>
-      <div className="rm-form-container">
-        <div className="rm-form-header">
-          <h3>{title}</h3>
-          <button type="button" className="rm-close-btn" onClick={onCancel} aria-label="Close">
+    <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel(); }}>
+      <div className="modal-content" style={{ width: '400px', maxWidth: '90%' }}>
+        <div className="modal-header">
+          <h2>{title}</h2>
+          <button type="button" className="modal-close" onClick={onCancel} aria-label="Close">
             ×
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="rm-form-body" noValidate>
-          <label htmlFor="rm-simple-name" className="rm-input-label">
-            {fieldLabel}
-          </label>
-          <input
-            type="text"
-            id="rm-simple-name"
-            name="rm-simple-name"
-            value={value}
-            onChange={handleChange}
-            placeholder={placeholder}
-            autoFocus
-            className={`rm-input-field ${error ? 'rm-input-error' : ''}`}
-          />
-          {error && <span className="rm-field-error">{error}</span>}
-          {note && <small className="rm-input-note">{note}</small>}
+        <form onSubmit={handleSubmit} noValidate>
+          <div className="modal-body">
+            <label htmlFor="rm-simple-name">
+              {fieldLabel}
+            </label>
+            <input
+              type="text"
+              id="rm-simple-name"
+              name="rm-simple-name"
+              value={value}
+              onChange={handleChange}
+              placeholder={placeholder}
+              autoFocus
+              style={{ borderColor: error ? 'var(--color-danger)' : undefined }}
+            />
+            {error && <span className="text-danger" style={{ fontSize: 'var(--font-size-xs)', marginTop: '4px', display: 'block' }}>{error}</span>}
+            {note && <small className="text-muted" style={{ display: 'block', marginTop: '4px' }}>{note}</small>}
+          </div>
 
-          <div className="rm-form-actions">
+          <div className="modal-footer">
             <button
               type="button"
-              className="rm-btn rm-cancel"
+              className="btn btn-secondary"
               onClick={onCancel}
               disabled={submitting}
             >
@@ -95,7 +97,7 @@ const AddSimpleNameForm = ({
             </button>
             <button
               type="submit"
-              className="rm-btn rm-submit"
+              className="btn btn-primary"
               disabled={submitting || !value.trim()}
             >
               {submitting ? 'Saving...' : submitLabel}

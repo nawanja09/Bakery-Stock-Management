@@ -562,7 +562,7 @@ const EditPurchase = ({ embeddedId, onSaved, onCancel } = {}) => {
   }
 
   return (
-    <div className="purchase-form-container">
+    <div className="purchase-form-container erp-purchase-page">
       <div className="page-header">
         <div className="header-title">
           {!embeddedId && (

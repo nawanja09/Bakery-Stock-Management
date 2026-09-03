@@ -1,0 +1,414 @@
+:root {
+  --erp-blue: #2D6CDF;
+  --erp-blue-dark: #1A4FA3;
+  --erp-page: #F0F4F8;
+  --erp-surface: #FFFFFF;
+  --erp-text: #0F172A;
+  --erp-muted: #64748B;
+  --erp-border: #E2E8F0;
+  --erp-soft-blue: #EEF4FF;
+  --erp-radius: 10px;
+  --erp-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+}
+
+.erp-purchase-page,
+.erp-return-page,
+.erp-summary-page,
+.item-management-page,
+.erp-purchase-details {
+  color: var(--erp-text);
+}
+
+.erp-purchase-page,
+.erp-return-page,
+.erp-summary-page,
+.item-management-page,
+.erp-purchase-details {
+  width: 100%;
+  max-width: 1680px;
+  margin: 0 auto;
+  padding: 24px 32px 40px;
+}
+
+.erp-purchase-page > .page-header,
+.erp-return-page > .page-header,
+.erp-summary-page .responsive-header,
+.item-management-page .page-header,
+.erp-purchase-details > .page-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 14px;
+  min-height: 46px;
+  margin-bottom: 8px;
+  text-align: left;
+}
+
+.erp-purchase-page .page-header h1,
+.erp-return-page .page-header h1,
+.erp-summary-page .responsive-header h2,
+.item-management-page .page-header h2,
+.erp-purchase-details .page-header h1 {
+  margin: 0;
+  color: var(--erp-text);
+  font-size: 26px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.erp-purchase-page .purchase-form,
+.erp-purchase-page .form-section,
+.erp-return-page .return-form,
+.erp-return-page .form-card,
+.item-management-page .item-management-card,
+.erp-purchase-details .detail-card,
+.erp-purchase-details .items-card,
+.erp-purchase-details .remarks-card {
+  background: var(--erp-surface);
+  border: 1px solid var(--erp-border);
+  border-radius: var(--erp-radius);
+  box-shadow: var(--erp-shadow);
+}
+
+.erp-purchase-page .purchase-form,
+.erp-return-page .return-form {
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.erp-purchase-page .form-section,
+.erp-return-page .form-card {
+  padding: 22px 24px;
+  margin-bottom: 18px;
+}
+
+.erp-purchase-page .section-header,
+.erp-return-page .section-header,
+.erp-purchase-page .form-section > h3,
+.erp-return-page .form-card > h2 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--erp-border);
+  color: var(--erp-text);
+}
+
+.erp-purchase-page .section-header h2,
+.erp-return-page .section-header h2,
+.erp-purchase-page .form-section > h3,
+.erp-return-page .form-card > h2 {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.erp-purchase-page .form-grid,
+.erp-return-page .form-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.erp-return-page .form-row {
+  margin-bottom: 16px;
+}
+
+.erp-purchase-page .form-group,
+.erp-return-page .form-group,
+.item-management-page .minimal-form-group {
+  min-width: 0;
+}
+
+.erp-purchase-page .form-group label,
+.erp-return-page .form-group label,
+.item-management-page .minimal-label {
+  color: var(--erp-text);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.erp-purchase-page .form-control,
+.erp-purchase-page input,
+.erp-purchase-page select,
+.erp-return-page input,
+.erp-return-page select,
+.item-management-page .minimal-input,
+.item-management-page .minimal-select {
+  min-height: 40px;
+  border: 1px solid var(--erp-border);
+  border-radius: 7px;
+  background: var(--erp-surface);
+  color: var(--erp-text);
+}
+
+.erp-purchase-page .items-table-container,
+.erp-return-page .items-table-container,
+.erp-purchase-details .table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--erp-border);
+  border-radius: 8px;
+}
+
+.erp-purchase-page .items-table,
+.erp-return-page .items-table,
+.erp-purchase-details .items-details-table,
+.erp-purchase-details .payment-history-table,
+.erp-purchase-details .returns-history-table {
+  min-width: 980px;
+}
+
+.erp-purchase-page .items-table th,
+.erp-return-page .items-table th,
+.erp-purchase-details .items-details-table th,
+.erp-purchase-details .payment-history-table th,
+.erp-purchase-details .returns-history-table th {
+  padding: 13px 14px;
+  background: var(--erp-blue);
+  color: #fff;
+  border-bottom: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.erp-purchase-page .items-table td,
+.erp-return-page .items-table td,
+.erp-purchase-details .items-details-table td,
+.erp-purchase-details .payment-history-table td,
+.erp-purchase-details .returns-history-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--erp-border);
+  vertical-align: middle;
+}
+
+.erp-purchase-page .form-actions,
+.erp-return-page .form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 4px 0 8px;
+}
+
+.erp-purchase-page .vat-summary,
+.erp-return-page .summary-section {
+  width: min(100%, 440px);
+  margin: 18px 0 0 auto;
+  padding: 16px 18px;
+  border: 1px solid var(--erp-border);
+  border-radius: 8px;
+  background: var(--erp-soft-blue);
+}
+
+.item-management-page .item-management-card {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 24px 28px;
+}
+
+.item-management-page .form-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.item-management-page .minimal-toggle-group,
+.item-management-page .toggle-column {
+  padding: 16px;
+  border: 1px solid var(--erp-border);
+  border-radius: 8px;
+  background: #FAFCFF;
+}
+
+.item-management-page .toggle-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.item-management-page .minimal-info-box {
+  margin-top: 18px;
+  border: 1px solid var(--erp-border);
+  border-radius: 8px;
+  background: var(--erp-soft-blue);
+}
+
+.erp-summary-page {
+  max-width: 1760px;
+}
+
+.erp-summary-page .horizontal-filter-container {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: nowrap;
+  width: 100%;
+  padding: 16px 18px;
+  background: var(--erp-surface);
+  border: 1px solid var(--erp-border);
+  border-radius: var(--erp-radius);
+  box-shadow: var(--erp-shadow);
+  overflow-x: auto;
+}
+
+.erp-summary-page .horizontal-filter-item {
+  flex: 0 1 190px;
+  min-width: 160px;
+}
+
+.erp-summary-page .horizontal-filter-item:nth-child(2) {
+  flex-basis: 280px;
+}
+
+.erp-summary-page .horizontal-filter-input,
+.erp-summary-page .horizontal-filter-select {
+  min-height: 40px;
+  border-color: var(--erp-border);
+  border-radius: 7px;
+}
+
+.erp-summary-page .table-container-responsive {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--erp-border);
+  border-radius: var(--erp-radius);
+  background: var(--erp-surface);
+}
+
+.erp-summary-page .data-table-responsive {
+  min-width: 1280px;
+}
+
+.erp-summary-page .data-table-responsive th {
+  padding: 13px 14px;
+  background: var(--erp-blue);
+  color: #fff;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.erp-summary-page .data-table-responsive td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--erp-border);
+}
+
+.erp-purchase-details .payment-status-banner {
+  border: 1px solid var(--erp-border);
+  border-radius: var(--erp-radius);
+  box-shadow: var(--erp-shadow);
+}
+
+.erp-purchase-details .details-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(360px, 0.9fr);
+  gap: 18px;
+}
+
+.erp-purchase-details .detail-card,
+.erp-purchase-details .items-card,
+.erp-purchase-details .remarks-card {
+  padding: 20px 22px;
+}
+
+.erp-purchase-details .tabs-container {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--erp-border);
+  border-radius: 8px;
+  background: var(--erp-surface);
+}
+
+.erp-purchase-details .tab-button {
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 6px;
+  color: var(--erp-muted);
+}
+
+.erp-purchase-details .tab-button.active {
+  background: var(--erp-soft-blue);
+  color: var(--erp-blue-dark);
+}
+
+.erp-transaction-modal {
+  width: min(1100px, 100%);
+  max-width: 1100px;
+  border-radius: 12px;
+}
+
+.erp-transaction-modal .modern-modal-body {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  padding: 22px;
+}
+
+.erp-transaction-modal .modal-section {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--erp-border);
+  border-radius: 8px;
+  background: var(--erp-surface);
+}
+
+@media (max-width: 1100px) {
+  .erp-purchase-page,
+  .erp-return-page,
+  .erp-summary-page,
+  .item-management-page,
+  .erp-purchase-details {
+    padding: 20px;
+  }
+
+  .erp-purchase-page .form-grid,
+  .erp-return-page .form-row,
+  .item-management-page .form-grid,
+  .erp-purchase-details .details-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .erp-purchase-page,
+  .erp-return-page,
+  .erp-summary-page,
+  .item-management-page,
+  .erp-purchase-details {
+    padding: 16px 12px 28px;
+  }
+
+  .erp-purchase-page .form-grid,
+  .erp-return-page .form-row,
+  .item-management-page .form-grid,
+  .item-management-page .toggle-row,
+  .erp-purchase-details .details-grid,
+  .erp-transaction-modal .modern-modal-body {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-purchase-page .form-section,
+  .erp-return-page .form-card,
+  .item-management-page .item-management-card,
+  .erp-purchase-details .detail-card,
+  .erp-purchase-details .items-card {
+    padding: 16px;
+  }
+
+  .erp-purchase-page .form-actions,
+  .erp-return-page .form-actions {
+    justify-content: stretch;
+  }
+
+  .erp-purchase-page .form-actions .btn,
+  .erp-return-page .form-actions .btn {
+    flex: 1;
+  }
+}

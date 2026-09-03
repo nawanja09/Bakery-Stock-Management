@@ -1,0 +1,418 @@
+/* ============================================================================
+   FINANCE & EXPENSES MODULE - Comprehensive Styles
+   Covers: Finance Ledgers, Expenses, Bank Charges, etc.
+   ============================================================================ */
+
+@import '../../css/page-design-system.css';
+
+/* ============================================================================
+   FINANCE LEDGER
+   ============================================================================ */
+
+.finance-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xl);
+}
+
+.finance-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-lg);
+  flex-wrap: wrap;
+}
+
+.finance-title {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+}
+
+.finance-summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: var(--spacing-lg);
+}
+
+.finance-card {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  box-shadow: var(--shadow-sm);
+  position: relative;
+  overflow: hidden;
+}
+
+.finance-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--color-primary), var(--color-secondary));
+}
+
+.finance-card-label {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.finance-card-value {
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-sm);
+}
+
+.finance-card-currency {
+  font-size: var(--font-size-lg);
+  color: var(--color-text-secondary);
+}
+
+.finance-card-change {
+  font-size: var(--font-size-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.finance-card-change.positive {
+  color: var(--color-success);
+}
+
+.finance-card-change.negative {
+  color: var(--color-error);
+}
+
+/* ============================================================================
+   FINANCE FORM
+   ============================================================================ */
+
+.finance-form {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-2xl);
+}
+
+.finance-form-section {
+  margin-bottom: var(--spacing-2xl);
+}
+
+.finance-form-section-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  margin-bottom: var(--spacing-lg);
+  padding-bottom: var(--spacing-md);
+  border-bottom: 2px solid var(--color-primary-light);
+}
+
+.finance-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: var(--spacing-xl);
+}
+
+.finance-amount-input {
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  font-family: var(--font-family-mono);
+}
+
+.finance-amount-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-light);
+}
+
+/* ============================================================================
+   TRANSACTION TABLE
+   ============================================================================ */
+
+.transaction-table {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.transaction-row {
+  display: flex;
+  align-items: center;
+  padding: var(--spacing-lg) var(--spacing-xl);
+  border-bottom: 1px solid var(--color-border-light);
+  transition: background-color var(--transition-fast);
+}
+
+.transaction-row:hover {
+  background-color: var(--color-bg-tertiary);
+}
+
+.transaction-row:last-child {
+  border-bottom: none;
+}
+
+.transaction-date {
+  flex: 0.15;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+}
+
+.transaction-description {
+  flex: 0.3;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.transaction-description-title {
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.transaction-description-subtitle {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+}
+
+.transaction-reference {
+  flex: 0.15;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.transaction-type {
+  flex: 0.15;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background-color: var(--color-primary-light);
+  color: var(--color-primary-dark);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.transaction-type.credit {
+  background-color: var(--color-success-light);
+  color: #065f46;
+}
+
+.transaction-type.debit {
+  background-color: var(--color-error-light);
+  color: #7f1d1d;
+}
+
+.transaction-amount {
+  flex: 0.15;
+  text-align: right;
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-base);
+  font-family: var(--font-family-mono);
+  color: var(--color-text-primary);
+}
+
+.transaction-amount.credit {
+  color: var(--color-success);
+}
+
+.transaction-amount.debit {
+  color: var(--color-error);
+}
+
+.transaction-balance {
+  flex: 0.1;
+  text-align: right;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+/* ============================================================================
+   EXPENSES FORM
+   ============================================================================ */
+
+.expenses-form {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-2xl);
+}
+
+.expense-category-selector {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+}
+
+.expense-category-option {
+  padding: var(--spacing-md);
+  border: 2px solid var(--color-border);
+  background-color: var(--color-bg);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.expense-category-option:hover {
+  border-color: var(--color-primary);
+  background-color: var(--color-primary-light);
+}
+
+.expense-category-option.selected {
+  border-color: var(--color-primary);
+  background-color: var(--color-primary-light);
+  color: var(--color-primary-dark);
+  font-weight: var(--font-weight-semibold);
+}
+
+.expense-category-icon {
+  font-size: var(--font-size-2xl);
+}
+
+.expense-category-name {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* ============================================================================
+   BANK TRANSFER
+   ============================================================================ */
+
+.bank-transfer-form {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-2xl);
+}
+
+.bank-transfer-section {
+  margin-bottom: var(--spacing-2xl);
+  padding: var(--spacing-lg);
+  background-color: var(--color-bg-secondary);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border-light);
+}
+
+.bank-transfer-section-title {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-bold);
+  margin-bottom: var(--spacing-lg);
+  color: var(--color-text-primary);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.bank-transfer-section-icon {
+  width: 36px;
+  height: 36px;
+  background-color: var(--color-primary-light);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-primary);
+  font-size: var(--font-size-lg);
+}
+
+.bank-transfer-arrow {
+  text-align: center;
+  font-size: var(--font-size-xl);
+  color: var(--color-primary);
+  margin: var(--spacing-lg) 0;
+}
+
+/* ============================================================================
+   RESPONSIVE FINANCE
+   ============================================================================ */
+
+@media (max-width: 1024px) {
+  .finance-summary-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .finance-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .finance-summary-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .finance-form,
+  .expenses-form,
+  .bank-transfer-form {
+    padding: var(--spacing-lg);
+  }
+
+  .transaction-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-md);
+  }
+
+  .transaction-date,
+  .transaction-description,
+  .transaction-reference,
+  .transaction-type,
+  .transaction-amount,
+  .transaction-balance {
+    flex: 1;
+    width: 100%;
+  }
+
+  .transaction-amount {
+    text-align: left;
+  }
+
+  .transaction-balance {
+    text-align: left;
+  }
+
+  .expense-category-selector {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .bank-transfer-section {
+    padding: var(--spacing-md);
+  }
+}
+
+@media (max-width: 480px) {
+  .finance-card-value {
+    font-size: var(--font-size-2xl);
+  }
+
+  .expense-category-selector {
+    grid-template-columns: 1fr;
+  }
+
+  .transaction-row {
+    padding: var(--spacing-md);
+  }
+}

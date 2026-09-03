@@ -1,0 +1,293 @@
+@import '../common/FormStyles.css';
+@import '../Items/ItemManagement.css';
+
+
+/* UI Redesign Updates - ERP Design System */
+.page-header h1, .header-with-actions h2 {
+  text-align: left;
+  color: #2D6CDF;
+  font-weight: 600;
+  margin-bottom: 24px;
+}
+
+.form-section, .purchase-form {
+  background-color: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  border: 1px solid #e5e7eb;
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.table-responsive, .items-table-container {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.styled-table, .items-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.styled-table th, .items-table th {
+  background-color: #f3f4f6;
+  color: #374151;
+  font-weight: 600;
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.styled-table td, .items-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #e5e7eb;
+  color: #4b5563;
+}
+
+.styled-table tbody tr:hover, .items-table tbody tr:hover {
+  background-color: #f9fafb;
+}
+
+.filters-bar {
+  background-color: #ffffff;
+  border-radius: 12px;
+  padding: 16px 24px;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  border: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.filters-bar label {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.filter-input, .form-control {
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 8px 12px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.filter-input:focus, .form-control:focus {
+  border-color: #2D6CDF;
+  box-shadow: 0 0 0 3px rgba(45, 108, 223, 0.2);
+}
+
+.btn-primary, .btn-save {
+  background-color: #2D6CDF;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-primary:hover, .btn-save:hover {
+  background-color: #1e40af;
+}
+
+/* Fix table text alignment */
+.text-right { text-align: right !important; }
+.text-center { text-align: center !important; }
+.text-left { text-align: left !important; }
+
+
+/* Common Summary Section Styles */
+.summary-section, .totals-content {
+  background-color: #f9fafb;
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 16px;
+  border: 1px solid #e5e7eb;
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  color: #4b5563;
+  font-size: 16px;
+}
+
+.summary-row.grand-total, .summary-row.total {
+  font-size: 18px;
+  font-weight: bold;
+  color: #111827;
+  border-top: 1px solid #d1d5db;
+  margin-top: 8px;
+  padding-top: 12px;
+}
+
+.summary-row.grand-total span:last-child {
+  color: #2D6CDF;
+}
+
+/* Action Buttons */
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.btn-secondary {
+  background-color: #ffffff;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+  background-color: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+/* Department Return Summary */
+.erp-department-return-summary {
+  width: 100%;
+  max-width: 1760px;
+  margin: 0 auto;
+  padding: 24px 32px 40px;
+  color: #334155;
+}
+
+.erp-department-return-summary > .header-with-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 48px;
+  margin-bottom: 4px;
+}
+
+.erp-department-return-summary > .header-with-actions h2 {
+  margin: 0;
+  color: #0F172A;
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.erp-department-return-summary .filters-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  margin-bottom: 18px;
+  padding: 16px 18px;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  background: #FFFFFF;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+}
+
+.erp-department-return-summary .filters-bar label {
+  display: flex;
+  flex: 0 1 200px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 5px;
+  min-width: 160px;
+  color: #0F172A;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.erp-department-return-summary .filters-bar .filter-input {
+  width: 100%;
+  height: 40px;
+  padding: 0 10px;
+  border: 1px solid #E2E8F0;
+  border-radius: 7px;
+  color: #0F172A;
+  background: #FFFFFF;
+}
+
+.erp-department-return-summary > .table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  background: #FFFFFF;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+}
+
+.erp-department-return-summary .returns-table {
+  min-width: 760px;
+}
+
+.erp-department-return-summary .returns-table th {
+  padding: 13px 14px;
+  border-bottom: 0;
+  background: #2D6CDF;
+  color: #FFFFFF;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.erp-department-return-summary .returns-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #E2E8F0;
+  color: #334155;
+  vertical-align: middle;
+}
+
+.erp-department-return-summary .returns-table .actions-column {
+  text-align: right;
+}
+
+.erp-department-return-summary .modal-content {
+  width: min(1080px, calc(100vw - 32px));
+  max-width: 1080px;
+  max-height: 90vh;
+  overflow-y: auto;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  background: #FFFFFF;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.2);
+}
+
+.erp-department-return-summary .return-details {
+  padding: 22px 24px;
+}
+
+.erp-department-return-summary .return-details .header-with-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #E2E8F0;
+}
+
+@media (max-width: 700px) {
+  .erp-department-return-summary {
+    padding: 16px 12px 28px;
+  }
+
+  .erp-department-return-summary .filters-bar {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+
+  .erp-department-return-summary .filters-bar label {
+    flex-basis: 100%;
+  }
+}

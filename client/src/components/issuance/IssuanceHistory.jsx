@@ -207,30 +207,32 @@ const IssuanceHistory = () => {
       </div>
 
       {/* Filter Section - Single Line */}
-      <div className="filters-bar single-line">
-        <label>
+      <div className="filters-bar single-line" style={{ display: "flex", gap: "16px", alignItems: "center", marginBottom: "20px" }}>
+        <label style={{ margin: 0 }}>
           From:
           <input
             type="date"
             value={fromDate}
             onChange={(e) => setFromDate(e.target.value)}
             className="filter-input"
+            style={{ marginLeft: "8px" }}
           />
         </label>
-        <label>
+        <label style={{ margin: 0 }}>
           To:
           <input
             type="date"
             value={toDate}
             onChange={(e) => setToDate(e.target.value)}
             className="filter-input"
+            style={{ marginLeft: "8px" }}
           />
         </label>
       </div>
 
       {/* Table */}
-      <div className="table-responsive">
-        <table className="issuance-table styled-table">
+      <div className="table-responsive" style={{ width: "100%" }}>
+        <table className="issuance-table styled-table" style={{ width: "100%" }}>
           <thead>
             <tr>
               <th>ID</th>

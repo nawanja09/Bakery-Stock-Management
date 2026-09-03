@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faPlus,
@@ -29,6 +29,7 @@ const ViewItems = () => {
   const [filterStatus, setFilterStatus] = useState('active'); // 'all' | 'active' | 'inactive'
   const { showPopup } = usePopup();
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     fetchItems();
@@ -136,7 +137,7 @@ const ViewItems = () => {
   };
 
   const handleEdit = (id) => {
-    navigate(`/items/edit/${id}`);
+    navigate(`/items/edit/${id}`, { state: { backgroundLocation: location } });
   };
 
   const clearSearch = () => {
@@ -151,10 +152,10 @@ const ViewItems = () => {
 
   if (loading) {
     return (
-      <div className="minimal-container">
-        <div className="minimal-card loading-card">
-          <div className="minimal-spinner"></div>
-          <p className="loading-text">Loading items...</p>
+      <div className="page-container">
+        <div className="loading-state">
+          <div className="loading-spinner"></div>
+          <p>Loading items...</p>
         </div>
       </div>
     );
@@ -164,34 +165,39 @@ const ViewItems = () => {
   const inactiveCount = items.filter(i => !i.is_active).length;
 
   return (
-    <div className="items-table-container">
-      <div className="items-table-header">
-        <h2 className="items-table-title">Items Management</h2>
-        <div className="items-table-actions">
+    <div className="page-container">
+      <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <h2 style={{ textAlign: 'left', margin: 0 }}>Items Management</h2>
+          <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>Manage all inventory items and materials</p>
+        </div>
+        <div className="page-actions">
           <button
-            onClick={() => navigate('/items/add')}
-            className="minimal-button minimal-button-primary"
+            onClick={() => navigate('/items/add', { state: { backgroundLocation: location } })}
+            className="btn btn-primary"
           >
-            <FontAwesomeIcon icon={faPlus} className="button-icon" />
-            Add New Item
+            <FontAwesomeIcon icon={faPlus} className="button-icon" /> Add New Item
           </button>
         </div>
-      </div>
+      </header>
 
       {/* Filters Section */}
       <div className="filters-section">
-        <div className="items-search">
-          <FontAwesomeIcon icon={faSearch} className="search-icon" />
+        <div className="report-filter-group" style={{ flex: '1 1 250px', position: 'relative' }}>
+          <FontAwesomeIcon icon={faSearch} style={{ position: 'absolute', left: '10px', top: '35px', color: 'var(--color-text-tertiary)' }} />
+          <label className="report-filter-label">Search</label>
           <input
             type="text"
             placeholder="Search by name or code..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            className="report-filter-input"
+            style={{ paddingLeft: '30px' }}
           />
           {searchTerm && (
             <button
-              className="clear-search"
               onClick={() => setSearchTerm('')}
+              style={{ position: 'absolute', right: '10px', top: '35px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-tertiary)' }}
               aria-label="Clear search"
             >
               <FontAwesomeIcon icon={faTimes} />
@@ -200,11 +206,12 @@ const ViewItems = () => {
         </div>
 
         {/* Status Filter — Active / Inactive / All */}
-        <div className="filter-dropdown">
+        <div className="report-filter-group">
+          <label className="report-filter-label">Status</label>
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="minimal-select filter-select"
+            className="report-filter-select"
           >
             <option value="active">Active Only</option>
             <option value="inactive">Inactive Only</option>
@@ -212,11 +219,12 @@ const ViewItems = () => {
           </select>
         </div>
 
-        <div className="filter-dropdown">
+        <div className="report-filter-group">
+          <label className="report-filter-label">VAT</label>
           <select
             value={filterVat}
             onChange={(e) => setFilterVat(e.target.value)}
-            className="minimal-select filter-select"
+            className="report-filter-select"
           >
             <option value="all">All VAT Status</option>
             <option value="yes">VAT Applicable</option>
@@ -225,11 +233,12 @@ const ViewItems = () => {
         </div>
 
         {/* Auto-Add Filter Dropdown */}
-        <div className="filter-dropdown">
+        <div className="report-filter-group">
+          <label className="report-filter-label">Auto-Add</label>
           <select
             value={filterAutoAdd}
             onChange={(e) => setFilterAutoAdd(e.target.value)}
-            className="minimal-select filter-select"
+            className="report-filter-select"
           >
             <option value="all">All Auto-Add Status</option>
             <option value="yes">Auto-Add Enabled</option>
@@ -237,11 +246,12 @@ const ViewItems = () => {
           </select>
         </div>
 
-        <div className="filter-dropdown">
+        <div className="report-filter-group">
+          <label className="report-filter-label">Item Type</label>
           <select
             value={filterItemType}
             onChange={(e) => setFilterItemType(e.target.value)}
-            className="minimal-select filter-select"
+            className="report-filter-select"
           >
             <option value="all">All Item Types</option>
             {ITEM_TYPE_OPTIONS.map((type) => (
@@ -251,12 +261,14 @@ const ViewItems = () => {
         </div>
 
         {hasActiveFilters && (
-          <button
-            onClick={clearSearch}
-            className="minimal-button minimal-button-secondary clear-filters"
-          >
-            Clear Filters
-          </button>
+          <div className="report-filter-actions">
+            <button
+              onClick={clearSearch}
+              className="btn btn-secondary"
+            >
+              Clear Filters
+            </button>
+          </div>
         )}
       </div>
 
@@ -270,14 +282,14 @@ const ViewItems = () => {
               : "Get started by adding your first item."}
           </p>
           {hasActiveFilters && (
-            <button onClick={clearSearch} className="minimal-button minimal-button-secondary">
+            <button onClick={clearSearch} className="btn btn-secondary">
               Clear All Filters
             </button>
           )}
           {!hasActiveFilters && (
             <button
-              onClick={() => navigate('/items/add')}
-              className="minimal-button minimal-button-primary"
+              onClick={() => navigate('/items/add', { state: { backgroundLocation: location } })}
+              className="btn btn-primary"
             >
               <FontAwesomeIcon icon={faPlus} className="button-icon" />
               Add Your First Item
@@ -286,8 +298,9 @@ const ViewItems = () => {
         </div>
       ) : (
         <>
-          <div className="minimal-table">
-            <table>
+          <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
+            <div style={{ overflowX: 'auto' }}>
+            <table className="report-table">
               <thead>
                 <tr>
                   <th>Item Code</th>
@@ -297,30 +310,30 @@ const ViewItems = () => {
                   <th>Status</th>
                   <th>VAT Status</th>
                   <th>Auto-Add to Stock</th>
-                  <th>Current Stock</th>
-                  <th>Reorder Level</th>
-                  <th>Actions</th>
+                  <th className="text-right">Current Stock</th>
+                  <th className="text-right">Reorder Level</th>
+                  <th className="text-center">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredItems.map(item => (
                   <tr key={item.id} style={!item.is_active ? { opacity: 0.6 } : {}}>
                     <td>
-                      <span className="item-code-badge">{item.item_code}</span>
-                    </td>
-                    <td className="item-name-cell">
-                      <span className="item-name">{item.name}</span>
+                      <span className="badge badge-neutral">{item.item_code}</span>
                     </td>
                     <td>
-                      <span className="unit-badge">{item.unit}</span>
+                      <span style={{ fontWeight: '500' }}>{item.name}</span>
                     </td>
                     <td>
-                      <span className="unit-badge">{item.item_type || 'Other'}</span>
+                      <span className="badge badge-neutral">{item.unit}</span>
+                    </td>
+                    <td>
+                      <span className="badge badge-neutral">{item.item_type || 'Other'}</span>
                     </td>
                     {/* Active / Inactive status badge */}
                     <td>
                       <span
-                        className={`auto-add-badge ${item.is_active ? 'enabled' : 'disabled'}`}
+                        className={`badge ${item.is_active ? 'badge-success' : 'badge-danger'}`}
                         title={item.is_active
                           ? 'Active — visible in dropdowns and reports'
                           : 'Inactive — hidden from dropdowns and reports'}
@@ -333,12 +346,12 @@ const ViewItems = () => {
                       </span>
                     </td>
                     <td>
-                      <span className={`vat-status-badge ${item.vat_applicable ? 'applicable' : 'not-applicable'}`}>
+                      <span className={`badge ${item.vat_applicable ? 'badge-success' : 'badge-neutral'}`}>
                         {item.vat_applicable ? 'VAT Applicable' : 'VAT Not Applicable'}
                       </span>
                     </td>
                     <td>
-                      <span className={`auto-add-badge ${item.auto_add_to_stock ? 'enabled' : 'disabled'}`}>
+                      <span className={`badge ${item.auto_add_to_stock ? 'badge-success' : 'badge-neutral'}`}>
                         <FontAwesomeIcon
                           icon={item.auto_add_to_stock ? faCheck : faBan}
                           style={{ fontSize: '0.7rem', marginRight: '4px' }}
@@ -351,17 +364,17 @@ const ViewItems = () => {
                         </small>
                       )}
                     </td>
-                    <td>
-                      <span className="current-stock">{formatNumber(item.current_stock || 0)}</span>
+                    <td className="report-table-value-numeric">
+                      <span>{formatNumber(item.current_stock || 0)}</span>
                     </td>
-                    <td>
-                      <span className="reorder-level">{formatNumber(item.reorder_level || 0)}</span>
+                    <td className="report-table-value-numeric">
+                      <span>{formatNumber(item.reorder_level || 0)}</span>
                     </td>
-                    <td>
-                      <div className="table-actions">
+                    <td className="text-center">
+                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
                         <button
                           onClick={() => handleEdit(item.id)}
-                          className="btn-icon edit"
+                          className="btn btn-secondary btn-sm"
                           title="Edit item"
                           aria-label={`Edit ${item.name}`}
                         >
@@ -371,13 +384,9 @@ const ViewItems = () => {
                         {/* Toggle Active / Inactive */}
                         <button
                           onClick={() => handleToggleStatus(item)}
-                          className={`btn-icon ${item.is_active ? 'delete' : 'edit'}`}
+                          className={`btn btn-sm ${item.is_active ? 'btn-danger' : 'btn-success'}`}
                           title={item.is_active ? 'Deactivate item (hide from dropdowns & reports)' : 'Activate item (restore to dropdowns & reports)'}
                           aria-label={item.is_active ? `Deactivate ${item.name}` : `Activate ${item.name}`}
-                          style={item.is_active
-                            ? { background: '#fff3e0', color: '#e65100', border: '1px solid #ffcc80' }
-                            : { background: '#e8f5e9', color: '#2e7d32', border: '1px solid #a5d6a7' }
-                          }
                         >
                           <FontAwesomeIcon icon={item.is_active ? faToggleOff : faToggleOn} />
                         </button>
@@ -385,7 +394,7 @@ const ViewItems = () => {
                         {/* Soft-Delete */}
                         <button
                           onClick={() => handleDelete(item.id, item.name)}
-                          className="btn-icon delete"
+                          className="btn btn-danger btn-sm"
                           title="Delete item (removes from all views permanently)"
                           aria-label={`Delete ${item.name}`}
                         >
@@ -398,31 +407,32 @@ const ViewItems = () => {
               </tbody>
             </table>
           </div>
+          </div>
 
-          <div className="table-footer">
-            <div className="table-stats">
-              <span className="stat-item">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'var(--spacing-md)' }}>
+            <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
+              <span style={{ marginRight: '15px' }}>
                 <strong>{filteredItems.length}</strong> items displayed
               </span>
               {filteredItems.length !== items.length && (
-                <span className="stat-item text-muted">
+                <span style={{ marginRight: '15px' }}>
                   (filtered from {items.length} total)
                 </span>
               )}
-              <span className="stat-item" style={{ color: '#2e7d32' }}>
+              <span style={{ color: '#2e7d32', marginRight: '15px' }}>
                 <strong>{activeCount}</strong> Active
               </span>
               {inactiveCount > 0 && (
-                <span className="stat-item" style={{ color: '#e65100' }}>
+                <span style={{ color: '#e65100', marginRight: '15px' }}>
                   <strong>{inactiveCount}</strong> Inactive
                 </span>
               )}
-              <span className="stat-item">
+              <span>
                 <strong>{items.filter(i => i.auto_add_to_stock).length}</strong> Auto-Add
               </span>
             </div>
-            <div className="table-export">
-              <button className="minimal-button minimal-button-secondary" disabled>
+            <div>
+              <button className="btn btn-secondary" disabled>
                 Export List
               </button>
             </div>

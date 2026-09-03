@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faSearch, faCalendarAlt, faBox, faFileAlt, faChevronLeft, 
@@ -115,6 +115,7 @@ const SummaryCard = ({ label, value, sub, icon, type = 'primary' }) => (
 
 const StoresAdjustments = () => {
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Category tabs added on top of the existing Department (stock_adjustments) view.
   // Defaults to Department so existing behavior is unchanged unless another tab is picked.
@@ -304,24 +305,17 @@ const StoresAdjustments = () => {
   }, [adjustments]);
 
   return (
-    <div className="adjustments-container">
+    <div className="page-container">
       {/* Header */}
-      <div className="adjustments-header">
-        <div className="adjustments-header-left">
-          <h1>Stores Adjustment Summary</h1>
+      <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+        <div>
+          <h2 style={{ margin: 0 }}>Stores Adjustment Summary</h2>
+          <p style={{ margin: '4px 0 0', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>View and manage stores adjustment records</p>
         </div>
-        {/*
-        <div className="adjustments-header-actions">
-          <button className="btn btn-primary" onClick={() => navigate('/adjustments/stores-balance')}>
-            <FontAwesomeIcon icon={faPlus} /> New Adjustment
-          </button>
-          
-        </div>
-        */}
-      </div>
+      </header>
 
       {/* Category Tabs */}
-      <div className="filter-card" style={{ padding: '8px', marginBottom: '20px' }}>
+      <div className="card" style={{ padding: 'var(--spacing-md)', marginBottom: 'var(--spacing-lg)' }}>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           {SUMMARY_TABS.map((tab) => (
             <button
@@ -343,7 +337,7 @@ const StoresAdjustments = () => {
       {activeTab === 'Department' && (
       <>
       {/* Summary Cards */}
-      <div className="summary-cards">
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--spacing-lg)', marginBottom: 'var(--spacing-lg)' }}>
         <SummaryCard 
           label="Total Adjustments" 
           value={stats.total} 
@@ -371,9 +365,9 @@ const StoresAdjustments = () => {
       </div>
 
       {/* Filter Section */}
-      <div className="filter-card">
-        <div className="filter-header">
-          <h4><FontAwesomeIcon icon={faFilter} /> Filter Adjustments</h4>
+      <div className="card" style={{ padding: 'var(--spacing-lg)', marginBottom: 'var(--spacing-lg)' }}>
+        <div className="filter-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)', paddingBottom: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)' }}>
+          <h4 style={{ margin: 0 }}><FontAwesomeIcon icon={faFilter} style={{ marginRight: '8px' }} /> Filter Adjustments</h4>
           <button className="filter-toggle" onClick={() => setShowFilters(!showFilters)}>
             {showFilters ? <FontAwesomeIcon icon={faTimes} /> : <FontAwesomeIcon icon={faSearch} />}
             {showFilters ? ' Hide Filters' : ' Show Filters'}
@@ -381,7 +375,7 @@ const StoresAdjustments = () => {
         </div>
         
         {showFilters && (
-          <form onSubmit={handleSearch} className="filter-form">
+          <form onSubmit={handleSearch} className="filter-form adjustment-filter-form">
             <div className="filter-group">
               <label><FontAwesomeIcon icon={faSearch} /> Search</label>
               <input
@@ -422,12 +416,11 @@ const StoresAdjustments = () => {
         )}
       </div>
 
-      {/* Data Table */}
-      <div className="data-card">
-        <div className="data-card-header">
-          <h3>Adjustment Records</h3>
+      <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
+          <h3 style={{ margin: 0, fontSize: 'var(--font-size-lg)' }}>Adjustment Records</h3>
           <div className="data-card-actions">
-            <span className="pagination-entries">
+            <span className="pagination-entries" style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
               {formatNumber(adjustments.length)} entries found
             </span>
           </div>
@@ -437,8 +430,8 @@ const StoresAdjustments = () => {
           <TableSkeleton rows={5} cols={8} />
         ) : (
           <>
-            <div className="table-responsive">
-              <table className="adjustments-table">
+            <div style={{ overflowX: 'auto' }}>
+              <table className="report-table">
                 <thead>
                   <tr>
                     <th onClick={() => handleSort('date')} className={sortField === 'date' ? 'active' : ''}>
@@ -506,7 +499,7 @@ const StoresAdjustments = () => {
                                 className="btn btn-sm btn-secondary" 
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  navigate(`/adjustments/edit/${adj.id}`);
+                                  navigate(`/adjustments/edit/${adj.id}`, { state: { backgroundLocation: location } });
                                 }}
                                 title="Edit"
                               >

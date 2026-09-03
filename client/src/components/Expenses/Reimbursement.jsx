@@ -163,29 +163,38 @@ const Reimbursement = () => {
   };
 
   return (
-    <div className="petty-cash-container">
-      <div className="petty-cash-header">
-        <h2>
-          <FontAwesomeIcon icon={faMoneyBillWave} className="header-icon" />
-          Petty Cash Reimbursement
-        </h2>
-        <div className="balance-display">
-          <span className="balance-label">Current Balance:</span>
-          <span className="balance-amount">Rs. {balance.toLocaleString()}</span>
+    <div className="page-container">
+      <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <h2 style={{ textAlign: 'left', margin: 0 }}>
+            <FontAwesomeIcon icon={faMoneyBillWave} style={{ marginRight: '8px' }} />
+            Petty Cash Reimbursement
+          </h2>
+          <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
+            Record and manage petty cash reimbursements
+          </p>
+        </div>
+      </header>
+
+      <div className="card" style={{ display: 'flex', alignItems: 'center', padding: 'var(--spacing-lg)', gap: 'var(--spacing-xl)', marginBottom: 'var(--spacing-md)' }}>
+        <div style={{ fontSize: '48px', color: 'var(--color-primary)', opacity: 0.8 }}><FontAwesomeIcon icon={faMoneyBillWave} /></div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', fontWeight: 'var(--font-weight-medium)' }}>Current Balance</div>
+          <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'var(--color-text-primary)', margin: 'var(--spacing-xs) 0' }}>Rs. {balance.toLocaleString()}</div>
         </div>
       </div>
 
-      <div className="petty-cash-content">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-2xl)' }}>
         {/* Reimbursement Form */}
-        <div className="form-section">
-          <div className="form-header">
-            <h3>
-              <FontAwesomeIcon icon={faReceipt} className="form-icon" />
+        <div className="card form-container" style={{ padding: 'var(--spacing-lg)' }}>
+          <div className="form-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
+            <div>
+              <FontAwesomeIcon icon={faReceipt} style={{ marginRight: '8px' }} />
               Record Reimbursement
-            </h3>
+            </div>
             <button
               type="button"
-              className="refresh-btn"
+              className="btn btn-secondary"
               onClick={fetchReimbursementData}
               disabled={isFetching}
             >
@@ -194,8 +203,8 @@ const Reimbursement = () => {
             </button>
           </div>
 
-          <form onSubmit={handleReimbursementSubmit} className="petty-cash-form">
-            <div className="form-row">
+          <form onSubmit={handleReimbursementSubmit}>
+            <div className="form-grid two-col">
               <div className="form-group">
                 <label htmlFor="date">Date *</label>
                 <input
@@ -221,7 +230,7 @@ const Reimbursement = () => {
                 />
               </div>
             </div>
-            <div className="form-row">
+            <div className="form-grid two-col">
               <div className="form-group">
                 <label htmlFor="amount">Amount (Rs.) *</label>
                 <input
@@ -253,40 +262,39 @@ const Reimbursement = () => {
 
             <div className="form-actions">
               <button
-                type="submit"
-                className="submit-btn"
-                disabled={isLoading}
-              >
-                <FontAwesomeIcon icon={isLoading ? faSpinner : faSave} spin={isLoading} />
-                {isLoading ? 'Recording...' : 'Record Reimbursement'}
-              </button>
-              <button
                 type="button"
-                className="cancel-btn"
+                className="btn btn-secondary"
                 onClick={() => setReimbursementForm({
                   date: new Date().toISOString().split('T')[0],
                   reference_number: '',
                   amount: ''
                 })}
               >
-                <FontAwesomeIcon icon={faTimes} />
-                Clear
+                <FontAwesomeIcon icon={faTimes} /> Clear
+              </button>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={isLoading}
+              >
+                <FontAwesomeIcon icon={isLoading ? faSpinner : faSave} spin={isLoading} />
+                {isLoading ? 'Recording...' : 'Record Reimbursement'}
               </button>
             </div>
           </form>
         </div>
 
         {/* Reimbursements History */}
-        <div className="history-section">
-          <div className="history-header">
-            <h3>
-              <FontAwesomeIcon icon={faHistory} className="history-icon" />
+        <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
+          <div className="form-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
+            <div>
+              <FontAwesomeIcon icon={faHistory} style={{ marginRight: '8px' }} />
               Reimbursement History
-            </h3>
+            </div>
           </div>
 
-          <div className="table-container">
-            <table className="petty-cash-table">
+          <div style={{ overflowX: 'auto' }}>
+            <table className="report-table">
               <thead>
                 <tr>
                   <th>Reference Number</th>

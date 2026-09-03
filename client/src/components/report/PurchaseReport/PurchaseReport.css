@@ -1,0 +1,4 @@
+@import '../Report.css';
+
+.purchase-report-filter-bar { width: 100%; }
+.purchase-report-filter-bar .report-filter-group { min-width: 150px; }

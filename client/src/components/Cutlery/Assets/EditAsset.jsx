@@ -111,16 +111,20 @@ const EditAsset = () => {
   if (!asset) return <div className="error">Asset not found</div>;
 
   return (
-    <div className="edit-asset-wrapper">
-      <div className="edit-asset-header">
-        <button className="btn-back" onClick={handleCancel}>← Back</button>
-        <h2>Edit Asset</h2>
-        <div style={{ width: '50px' }}></div>
-      </div>
+    <div className="page-container">
+      <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+        <div>
+          <h2 style={{ margin: 0 }}>Edit Asset</h2>
+          <p style={{ margin: '4px 0 0', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>Edit cutlery asset information</p>
+        </div>
+        <div>
+          <button className="btn btn-secondary" onClick={handleCancel}>← Back</button>
+        </div>
+      </header>
 
       <form onSubmit={handleSubmit} className="edit-asset-form">
-        <div className="form-card">
-          <h3>Basic Info</h3>
+        <div className="card" style={{ padding: 'var(--spacing-lg)', marginBottom: 'var(--spacing-lg)' }}>
+          <h3 style={{ marginBottom: 'var(--spacing-md)' }}>Basic Info</h3>
           <div className="form-group">
             <label>Asset ID</label>
             <input type="text" value={asset.asset_id} disabled className="disabled-input"/>
@@ -138,8 +142,8 @@ const EditAsset = () => {
           </div>
         </div>
 
-        <div className="form-card">
-          <h3>Asset Image</h3>
+        <div className="card" style={{ padding: 'var(--spacing-lg)', marginBottom: 'var(--spacing-lg)' }}>
+          <h3 style={{ marginBottom: 'var(--spacing-md)' }}>Asset Image</h3>
           <div className="form-group">
             <label>Current / New Image</label>
             <div className="image-upload" onClick={triggerFileInput}>

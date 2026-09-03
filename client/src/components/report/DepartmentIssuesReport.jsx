@@ -147,99 +147,45 @@ const DepartmentIssuesReport = () => {
     XLSX.writeFile(workbook, `issuance-report-${startDate}-to-${endDate}.xlsx`);
   };
 
-  // Custom styles for react-select - FIXED ALIGNMENT
-  const customSelectStyles = {
-    control: (provided, state) => ({
-      ...provided,
-      minHeight: "44px",
-      height: "44px",
-      border: "1px solid #e2e8f0",
-      borderRadius: "10px",
-      boxShadow: "none",
-      "&:hover": {
-        borderColor: state.isFocused ? "#60a5fa" : "#e2e8f0",
-      },
-      "&:focus-within": {
-        borderColor: "#60a5fa",
-        boxShadow: "0 0 0 4px rgba(96,165,250,0.08)",
-      },
-    }),
-    valueContainer: (provided) => ({
-      ...provided,
-      height: "44px",
-      padding: "0 12px",
-      display: "flex",
-      alignItems: "center",
-    }),
-    indicatorsContainer: (provided) => ({
-      ...provided,
-      height: "44px",
-      display: "flex",
-      alignItems: "center",
-    }),
-    input: (provided) => ({
-      ...provided,
-      margin: 0,
-      padding: 0,
-      height: "auto",
-    }),
-    indicatorSeparator: () => ({
-      display: "none",
-    }),
-    singleValue: (provided) => ({
-      ...provided,
-      margin: 0,
-      padding: 0,
-      lineHeight: "1.4",
-    }),
-    placeholder: (provided) => ({
-      ...provided,
-      margin: 0,
-      padding: 0,
-      lineHeight: "1.4",
-    }),
-    menu: (provided) => ({
-      ...provided,
-      zIndex: 9999,
-    }),
-  };
-
   return (
-    <div className="report-container">
-      <header className="report-header">
-        <h2>RM Issue Item Detail</h2>
+    <div className="page-container">
+      <header className="page-header" style={{ display: 'flex', alignItems: 'flex-start', flexDirection: 'column', gap: '4px' }}>
+        <h2 style={{ textAlign: 'left', margin: 0 }}>RM Issue Item Detail</h2>
+        <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>Track and manage raw material issued to departments.</p>
       </header>
 
-      <div className="filter-row">
-        <div className="filter-group">
-          <label>
+      <div className="filters-section report-filter-bar">
+        <div className="report-filter-group">
+          <label className="report-filter-label">
             <FontAwesomeIcon icon={faCalendarAlt} /> START DATE
           </label>
           <input
             type="date"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
-            className="filter-input"
+            className="report-filter-input"
           />
         </div>
 
-        <div className="filter-group">
-          <label>
+        <div className="report-filter-group">
+          <label className="report-filter-label">
             <FontAwesomeIcon icon={faCalendarAlt} /> END DATE
           </label>
           <input
             type="date"
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
-            className="filter-input"
+            className="report-filter-input"
           />
         </div>
 
-        <div className="filter-group">
-          <label>
+        <div className="report-filter-group">
+          <label className="report-filter-label">
             <FontAwesomeIcon icon={faFilter} /> DEPARTMENT
           </label>
           <Select
+            className="react-select-container"
+            classNamePrefix="react-select"
             value={selectedDepartment === "all" ? { value: "all", label: "All Departments" } : departments.find(d => d.id === Number(selectedDepartment)) && { value: selectedDepartment, label: departments.find(d => d.id === Number(selectedDepartment))?.name }}
             onChange={(option) => setSelectedDepartment(option.value)}
             options={[
@@ -249,17 +195,18 @@ const DepartmentIssuesReport = () => {
                 label: dept.name,
               })),
             ]}
-            styles={customSelectStyles}
             menuPortalTarget={document.body}
             menuPosition="fixed"
           />
         </div>
 
-        <div className="filter-group">
-          <label>
+        <div className="report-filter-group">
+          <label className="report-filter-label">
             <FontAwesomeIcon icon={faFilter} /> ITEM SECTION
           </label>
           <Select
+            className="react-select-container"
+            classNamePrefix="react-select"
             value={selectedItem === "all" ? { value: "all", label: "All Items" } : items.find(i => i.id === Number(selectedItem)) && { value: selectedItem, label: items.find(i => i.id === Number(selectedItem))?.name + ` (${items.find(i => i.id === Number(selectedItem))?.item_code})` }}
             onChange={(option) => setSelectedItem(option.value)}
             options={[
@@ -269,13 +216,12 @@ const DepartmentIssuesReport = () => {
                 label: `${item.name} (${item.item_code})`,
               })),
             ]}
-            styles={customSelectStyles}
             menuPortalTarget={document.body}
             menuPosition="fixed"
           />
         </div>
 
-        <div className="filter-group filter-buttons">
+        <div className="report-filter-actions">
           <button
             onClick={generateReport}
             disabled={loading}
@@ -298,7 +244,7 @@ const DepartmentIssuesReport = () => {
       {loading ? (
         <div className="loading">Loading report data...</div>
       ) : reportData.length > 0 ? (
-        <div className="report-summary">
+        <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
           <div style={{ overflowX: 'auto' }}>
             <table className="report-table">
               <thead>

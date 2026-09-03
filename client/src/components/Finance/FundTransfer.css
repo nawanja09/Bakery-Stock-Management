@@ -1,0 +1,66 @@
+/* Shared finance transfer surface used by Cash / Bank and Bank to Bank. */
+.erp-fund-transfer-page,
+.erp-bank-transfer-page {
+	width: 100%;
+	max-width: 1560px;
+	margin: 0 auto;
+	padding: 28px 32px 40px;
+}
+
+.erp-fund-transfer-page .page-header,
+.erp-bank-transfer-page .page-header { margin-bottom: 4px; text-align: left; }
+.erp-fund-transfer-page .page-header h2,
+.erp-bank-transfer-page .page-header h2 { font-size: 25px; text-align: left; }
+.erp-fund-transfer-page .page-header > div,
+.erp-bank-transfer-page .page-header > div { justify-content: flex-start; }
+
+.ft-layout { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(290px, .75fr); gap: 20px; align-items: start; }
+.ft-form-card, .ft-summary-panel { border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-surface); box-shadow: var(--shadow-card); }
+.ft-form-card { padding: 24px; }
+.ft-section { margin-bottom: 20px; }
+.ft-label, .ft-account-header { color: var(--color-text-primary); font-size: var(--font-size-sm); font-weight: 700; }
+.ft-required { color: var(--color-danger); }
+.ft-direction-toggle { display: flex; gap: 8px; margin-top: 7px; }
+.ft-direction-btn { flex: 1; min-height: 42px; padding: 0 14px; border: 1px solid var(--color-border); border-radius: 6px; background: #f8fafc; color: var(--color-text-secondary); font-weight: 700; }
+.ft-direction-btn.active { border-color: var(--color-primary); background: var(--color-primary-light); color: var(--color-primary-dark); }
+.ft-accounts-row { display: grid; grid-template-columns: minmax(0, 1fr) 42px minmax(0, 1fr); gap: 12px; align-items: center; }
+.ft-account-box { min-width: 0; padding: 16px; border: 1px solid var(--color-border); border-radius: 8px; background: #f8fafc; }
+.ft-account-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.ft-account-header svg { color: var(--color-primary); }
+.ft-account-badge { display: inline-block; padding: 4px 7px; border-radius: 4px; background: var(--color-primary-light); color: var(--color-primary-dark); font-size: var(--font-size-xs); }
+.ft-account-balance { margin-top: 12px; color: var(--color-text-secondary); font-size: var(--font-size-sm); }
+.ft-account-balance strong { color: var(--color-heading); font-variant-numeric: tabular-nums; }
+.ft-flow-arrow { display: flex; justify-content: center; color: var(--color-primary); font-size: 18px; }
+.ft-row-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.ft-input, .ft-select, .ft-textarea { width: 100%; margin-top: 6px; }
+.ft-textarea { min-height: 80px; padding: 10px 12px; }
+.form-actions { display: flex; justify-content: flex-end; padding-top: 4px; }
+.ft-message { display: flex; gap: 10px; align-items: flex-start; margin: 14px 0; padding: 12px 14px; border-radius: 7px; font-size: var(--font-size-sm); }
+.ft-message-error { border: 1px solid rgba(220,38,38,.2); background: var(--color-danger-light); color: var(--color-danger-dark); }
+.ft-message-success { border: 1px solid rgba(5,150,105,.2); background: var(--color-success-light); color: var(--color-success-dark); }
+.ft-summary-header { display: flex; align-items: center; gap: 9px; padding: 16px 18px; border-radius: 9px 9px 0 0; background: var(--color-primary); color: #fff; font-weight: 700; }
+.ft-summary-body { padding: 18px; }
+.ft-summary-row { display: flex; justify-content: space-between; gap: 14px; padding: 11px 0; border-bottom: 1px solid var(--color-border); font-size: var(--font-size-sm); }
+.ft-summary-lbl { color: var(--color-text-secondary); }
+.ft-summary-val { max-width: 62%; color: var(--color-heading); font-weight: 600; text-align: right; overflow-wrap: anywhere; }
+.ft-summary-amount { align-items: center; margin-top: 4px; }
+.ft-summary-val-big { color: var(--color-primary-dark); font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.ft-summary-divider { height: 1px; margin: 16px 0; background: var(--color-border); }
+.ft-ledger-title { margin-bottom: 10px; color: var(--color-heading); font-size: var(--font-size-sm); font-weight: 700; }
+.ft-ledger-row { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; font-size: var(--font-size-xs); }
+.ft-ledger-account { color: var(--color-text-secondary); overflow-wrap: anywhere; }
+.ft-ledger-credit { color: var(--color-danger); font-weight: 700; }
+.ft-ledger-debit { color: var(--color-success); font-weight: 700; }
+
+@media (max-width: 1100px) {
+	.erp-fund-transfer-page, .erp-bank-transfer-page { padding: 24px 20px 32px; }
+	.ft-layout { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+	.erp-fund-transfer-page, .erp-bank-transfer-page { padding: 18px 12px 28px; }
+	.ft-form-card { padding: 16px; }
+	.ft-accounts-row, .ft-row-2 { grid-template-columns: 1fr; }
+	.ft-flow-arrow { transform: rotate(90deg); }
+	.ft-direction-toggle { flex-direction: column; }
+}

@@ -184,143 +184,110 @@ const PurchaseVATReport = () => {
   }
 
   return (
-    <div className="vat-report-container">
+    <div className="page-container">
       {/* Header Section */}
-      <div className="vat-header">
-        <div className="vat-header-content">
-          <div className="vat-title-section">
-            <div className="vat-icon-wrapper">
-              <FontAwesomeIcon icon={faUndo} className="vat-header-icon" />
-            </div>
-            <div>
-              <h1>Purchase Returns VAT Report</h1>
-              <p>Tax Credit Notes from VAT Registered Suppliers</p>
-            </div>
-          </div>
-          <div className="vat-header-actions">
-            <button onClick={resetFilters} className="vat-btn-outline">
-              <FontAwesomeIcon icon={faUndo} /> Reset
-            </button>
-          </div>
+      <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <h2 style={{ textAlign: 'left', margin: 0 }}>Purchase Returns VAT Report</h2>
+          <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>Tax Credit Notes from VAT Registered Suppliers</p>
         </div>
-      </div>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button onClick={resetFilters} className="btn btn-secondary">
+            <FontAwesomeIcon icon={faUndo} /> Reset Filters
+          </button>
+          <button onClick={handleExcel} className="btn btn-success">
+            <FontAwesomeIcon icon={faFileExcel} /> Excel
+          </button>
+          <button onClick={handlePDF} className="btn btn-secondary">
+            <FontAwesomeIcon icon={faFilePdf} /> PDF
+          </button>
+          <button onClick={handlePrint} className="btn btn-secondary">
+            <FontAwesomeIcon icon={faPrint} /> Print
+          </button>
+        </div>
+      </header>
 
       {/* Filter Section */}
-      <div className="vat-filters-card">
-        <div className="vat-filters-grid">
-          <div className="vat-filter-group">
-            <label>
-              <FontAwesomeIcon icon={faCalendar} />
-              From Date
+      <div className="filters-section card report-filter-bar vat-report-filter">
+          <div className="report-filter-group">
+            <label className="report-filter-label">
+              <FontAwesomeIcon icon={faCalendar} /> From Date
             </label>
             <input
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="vat-filter-input"
+              className="report-filter-input"
             />
           </div>
 
-          <div className="vat-filter-group">
-            <label>
-              <FontAwesomeIcon icon={faCalendar} />
-              To Date
+          <div className="report-filter-group">
+            <label className="report-filter-label">
+              <FontAwesomeIcon icon={faCalendar} /> To Date
             </label>
             <input
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="vat-filter-input"
+              className="report-filter-input"
             />
           </div>
 
-          <div className="vat-filter-group vat-search-group">
-            <label>
-              <FontAwesomeIcon icon={faSearch} />
-              Search
+          <div className="report-filter-group" style={{ flex: '1 1 200px' }}>
+            <label className="report-filter-label">
+              <FontAwesomeIcon icon={faSearch} /> Search
             </label>
-            <div className="vat-search-wrapper">
-              <FontAwesomeIcon icon={faSearch} className="vat-search-icon" />
+            <div className="items-search" style={{ padding: 0 }}>
               <input
                 type="text"
                 placeholder="Supplier, TIN, Invoice..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="vat-filter-input vat-search-input"
+                className="report-filter-input"
+                style={{ border: 'none', height: '100%' }}
               />
             </div>
           </div>
 
-          <div className="vat-filter-group vat-filter-action">
-            <label>&nbsp;</label>
-            <button onClick={fetchVATReturns} className="vat-btn-primary">
+          <div className="report-filter-actions">
+            <button onClick={fetchVATReturns} className="btn btn-primary">
               <FontAwesomeIcon icon={faFilter} /> Generate
             </button>
           </div>
         </div>
-      </div>
 
       {/* Summary Cards */}
-      <div className="vat-summary-grid">
-        <div className="vat-summary-card vat-card-returns">
-          <div className="vat-summary-icon">
-            <span>📋</span>
-          </div>
-          <div className="vat-summary-info">
-            <span className="vat-summary-label">Total Returns</span>
-            <span className="vat-summary-value">{formatNumber(summary.total_returns)}</span>
-          </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--spacing-lg)' }}>
+        <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
+          <div className="report-summary-label">Total Returns</div>
+          <div className="report-summary-value">{formatNumber(summary.total_returns)}</div>
         </div>
 
-        <div className="vat-summary-card vat-card-value">
-          <div className="vat-summary-icon">
-            <span>💰</span>
-          </div>
-          <div className="vat-summary-info">
-            <span className="vat-summary-label">Return Value</span>
-            <span className="vat-summary-value">{formatCurrency(summary.total_return_value)}</span>
-          </div>
+        <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
+          <div className="report-summary-label">Return Value</div>
+          <div className="report-summary-value">{formatCurrency(summary.total_return_value)}</div>
         </div>
 
-        <div className="vat-summary-card vat-card-vat">
-          <div className="vat-summary-icon">
-            <span>🧾</span>
-          </div>
-          <div className="vat-summary-info">
-            <span className="vat-summary-label">VAT Credit</span>
-            <span className="vat-summary-value vat-highlight">{formatCurrency(summary.total_vat_credit)}</span>
-          </div>
+        <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
+          <div className="report-summary-label">VAT Credit</div>
+          <div className="report-summary-value text-primary">{formatCurrency(summary.total_vat_credit)}</div>
         </div>
       </div>
 
-      {/* Action Buttons */}
-      <div className="vat-action-bar">
-        <button onClick={handleExcel} className="vat-btn-excel">
-          <FontAwesomeIcon icon={faFileExcel} />
-          <span>Excel</span>
-        </button>
-        <button onClick={handlePDF} className="vat-btn-pdf">
-          <FontAwesomeIcon icon={faFilePdf} />
-          <span>PDF</span>
-        </button>
-        <button onClick={handlePrint} className="vat-btn-print">
-          <FontAwesomeIcon icon={faPrint} />
-          <span>Print</span>
-        </button>
-      </div>
+
 
       {/* Warning Banner */}
       {filteredReturns.length > 0 && !filteredReturns[0]?.invoice_no && (
-        <div className="vat-warning-banner">
-          <FontAwesomeIcon icon={faExclamationTriangle} />
+        <div style={{ padding: 'var(--spacing-md)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--spacing-md)', backgroundColor: '#fff3cd', color: '#856404' }}>
+          <FontAwesomeIcon icon={faExclamationTriangle} style={{ marginRight: '8px' }} />
           <span>Invoice numbers not available in data. Please verify backend API response.</span>
         </div>
       )}
 
       {/* Table Section */}
-      <div className="vat-table-wrapper">
-        <div className="vat-table-container">
-          <table className="vat-data-table">
+      <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
+        <div style={{ overflowX: 'auto' }}>
+          <table className="report-table">
             <thead>
               <tr>
                 <th>#</th>
@@ -347,25 +314,25 @@ const PurchaseVATReport = () => {
               ) : (
                 currentItems.map((ret, idx) => (
                   <tr key={idx}>
-                    <td data-label="#">{indexOfFirstItem + idx + 1}</td>
-                    <td data-label="TIN No">
-                      <span className="vat-tin-badge">{ret.tin_no || '-'}</span>
+                    <td>{indexOfFirstItem + idx + 1}</td>
+                    <td>
+                      <span className="badge badge-neutral">{ret.tin_no || '-'}</span>
                     </td>
-                    <td data-label="Invoice Date" className="vat-date-cell">
+                    <td>
                       {ret.invoice_date ? formatDate(ret.invoice_date) : '-'}
                     </td>
-                    <td data-label="Invoice No" className="vat-invoice-cell">{getInvoiceNo(ret)}</td>
-                    <td data-label="Tax Credit">
-                      <span className="vat-credit-badge">{ret.tax_credit || 'Credit'}</span>
+                    <td>{getInvoiceNo(ret)}</td>
+                    <td>
+                      <span className="badge badge-primary">{ret.tax_credit || 'Credit'}</span>
                     </td>
-                    <td data-label="Credit Date" className="vat-date-cell">
+                    <td>
                       {ret.date_of_tax_credit ? formatDate(ret.date_of_tax_credit) : '-'}
                     </td>
-                    <td data-label="Credit No">
-                      <span className="vat-credit-no">{ret.tax_credit_no || '-'}</span>
+                    <td>
+                      <span className="badge badge-neutral">{ret.tax_credit_no || '-'}</span>
                     </td>
-                    <td data-label="Credit Note Value" className="vat-amount-cell">{formatCurrency(ret.value_of_return)}</td>
-                    <td data-label="VAT Amount" className="vat-amount-cell vat-primary-amount">{formatCurrency(ret.vat_amount)}</td>
+                    <td className="report-table-value-numeric">{formatCurrency(ret.value_of_return)}</td>
+                    <td className="report-table-value-numeric text-primary">{formatCurrency(ret.vat_amount)}</td>
                   </tr>
                 ))
               )}

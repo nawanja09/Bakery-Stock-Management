@@ -253,46 +253,51 @@ const VATReport = () => {
   const totalDisallowableVAT = vatData.reduce((sum, item) => sum + item.disallowableVATAmount, 0);
 
   return (
-    <div className="vat-report-container">
-      <div className="report-header">
-        <h2>VAT Purchasing Report</h2>
+    <div className="page-container">
+      <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <h2 style={{ textAlign: 'left', margin: 0 }}>VAT Purchasing Report</h2>
+          <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>View all your VAT purchasing records</p>
+        </div>
         {vatData.length > 0 && (
-          <button onClick={downloadExcel} className="btn btn-success">
-            <span>📊</span> Export to Excel
-          </button>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button onClick={downloadExcel} className="btn btn-success">
+              <span>📊</span> Export to Excel
+            </button>
+          </div>
         )}
-      </div>
+      </header>
 
-      <div className="controls-section">
-        <div className="control-group">
-          <label>Start Date</label>
+      <div className="filters-section card" style={{ display: 'flex', gap: 'var(--spacing-lg)', padding: 'var(--spacing-md)', marginBottom: 'var(--spacing-lg)', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+        <div className="report-filter-group">
+          <label className="report-filter-label">Start Date</label>
           <input
             type="date"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
             max={endDate}
-            className="control-input"
+            className="report-filter-input"
           />
         </div>
 
-        <div className="control-group">
-          <label>End Date</label>
+        <div className="report-filter-group">
+          <label className="report-filter-label">End Date</label>
           <input
             type="date"
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
             min={startDate}
             max={format(new Date(), 'yyyy-MM-dd')}
-            className="control-input"
+            className="report-filter-input"
           />
         </div>
 
-        <div className="control-group">
-          <label>Company</label>
+        <div className="report-filter-group">
+          <label className="report-filter-label">Company</label>
           <select
             value={companyFilter}
             onChange={(e) => setCompanyFilter(e.target.value)}
-            className="control-input"
+            className="report-filter-select"
           >
             <option value="">All Companies</option>
             <option value="1">JH</option>
@@ -301,12 +306,12 @@ const VATReport = () => {
           </select>
         </div>
 
-        <div className="control-group">
-          <label>Description</label>
+        <div className="report-filter-group">
+          <label className="report-filter-label">Description</label>
           <select
             value={descriptionFilter}
             onChange={handleDescriptionFilterChange}
-            className="control-input"
+            className="report-filter-select"
           >
             <option value="all">All</option>
             <option value="Purchases">Purchases</option>
@@ -314,12 +319,12 @@ const VATReport = () => {
           </select>
         </div>
 
-        <div className="control-group">
-          <label>VAT</label>
+        <div className="report-filter-group">
+          <label className="report-filter-label">VAT</label>
           <select
             value={vatFilter}
             onChange={handleVatFilterChange}
-            className="control-input"
+            className="report-filter-select"
           >
             <option value="all">All</option>
             <option value="yes">Has VAT</option>
@@ -327,31 +332,34 @@ const VATReport = () => {
           </select>
         </div>
 
-        <button
-          onClick={fetchVATReport}
-          disabled={loading}
-          className="btn btn-primary"
-        >
-          {loading ? (
-            <>
-              <div className="loading-spinner"></div>
-              Generating...
-            </>
-          ) : (
-            'Generate VAT Report'
-          )}
-        </button>
+        <div className="report-filter-actions">
+          <button
+            onClick={fetchVATReport}
+            disabled={loading}
+            className="btn btn-primary"
+          >
+            {loading ? (
+              <>
+                <div className="loading-spinner"></div>
+                Generating...
+              </>
+            ) : (
+              'Generate VAT Report'
+            )}
+          </button>
+        </div>
       </div>
 
       {loading ? (
-        <div className="loading-overlay">
+        <div className="loading-state">
           <div className="loading-spinner"></div>
           Loading VAT report data...
         </div>
       ) : vatData.length > 0 ? (
         <>
-          <div className="table-container">
-            <table className="vat-report-table">
+          <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
+            <div style={{ overflowX: 'auto' }}>
+            <table className="report-table">
               <colgroup>
                 <col style={{ width: '140px' }} />
                 <col style={{ width: '180px' }} />
@@ -367,9 +375,9 @@ const VATReport = () => {
                   <th className="text-left">Supplier TIN Number</th>
                   <th className="text-left">Name of Supplier</th>
                   <th className="text-left">Description</th>
-                  <th className="amount-col">Net Amount (Rs.)</th>
-                  <th className="amount-col">VAT Amount (18%) (Rs.)</th>
-                  <th className="amount-col">Disallowable VAT Amount (Rs.)</th>
+                  <th className="text-right">Net Amount (Rs.)</th>
+                  <th className="text-right">VAT Amount (18%) (Rs.)</th>
+                  <th className="text-right">Disallowable VAT Amount (Rs.)</th>
                 </tr>
               </thead>
               <tbody>
@@ -384,47 +392,47 @@ const VATReport = () => {
                     <td className="text-left">{item.supplierTIN}</td>
                     <td className="text-left">{item.supplierName}</td>
                     <td className="text-left">{item.description}</td>
-                    <td className="amount-col">{formatNumber(item.netAmount, 2, 2)}</td>
-                    <td className="amount-col vat-amount">{formatNumber(item.vatAmount, 2, 2)}</td>
-                    <td className="amount-col disallowable-vat-amount">{formatNumber(item.disallowableVATAmount, 2, 2)}</td>
+                    <td className="report-table-value-numeric">{formatNumber(item.netAmount, 2, 2)}</td>
+                    <td className="report-table-value-numeric text-primary">{formatNumber(item.vatAmount, 2, 2)}</td>
+                    <td className="report-table-value-numeric text-danger">{formatNumber(item.disallowableVATAmount, 2, 2)}</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr>
                   <td colSpan="4" className="text-right"><strong>TOTAL</strong></td>
-                  <td className="amount-col"><strong>{formatNumber(totalNetAmount, 2, 2)}</strong></td>
-                  <td className="amount-col vat-amount"><strong>{formatNumber(totalVATAmount, 2, 2)}</strong></td>
-                  <td className="amount-col disallowable-vat-amount"><strong>{formatNumber(totalDisallowableVAT, 2, 2)}</strong></td>
+                  <td className="report-table-value-numeric"><strong>{formatNumber(totalNetAmount, 2, 2)}</strong></td>
+                  <td className="report-table-value-numeric text-primary"><strong>{formatNumber(totalVATAmount, 2, 2)}</strong></td>
+                  <td className="report-table-value-numeric text-danger"><strong>{formatNumber(totalDisallowableVAT, 2, 2)}</strong></td>
                 </tr>
               </tfoot>
             </table>
           </div>
+          </div>
 
-          <div className="report-summary">
-            <div className="summary-card">
-              <h3>Summary</h3>
-              <div className="summary-column">
-                <span>Total Net Amount:</span>
-                <span>Rs. {formatNumber(totalNetAmount, 2, 2)}</span>
-              </div>
-              <div className="summary-column vat">
-                <span>Total VAT (18%):</span>
-                <span>Rs. {formatNumber(totalVATAmount, 2, 2)}</span>
-              </div>
-              <div className="summary-column disallowable-vat">
-                <span>Total Disallowable VAT:</span>
-                <span>Rs. {formatNumber(totalDisallowableVAT, 2, 2)}</span>
-              </div>
-              <div className="summary-column total">
-                <span>Total with VAT:</span>
-                <span>Rs. {formatNumber(totalNetAmount + totalVATAmount, 2, 2)}</span>
-              </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--spacing-lg)' }}>
+            <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
+              <div className="report-summary-label">Total Net Amount</div>
+              <div className="report-summary-value">Rs. {formatNumber(totalNetAmount, 2, 2)}</div>
+            </div>
+            <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
+              <div className="report-summary-label">Total VAT (18%)</div>
+              <div className="report-summary-value text-primary">Rs. {formatNumber(totalVATAmount, 2, 2)}</div>
+            </div>
+            <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
+              <div className="report-summary-label">Total Disallowable VAT</div>
+              <div className="report-summary-value text-danger">Rs. {formatNumber(totalDisallowableVAT, 2, 2)}</div>
+            </div>
+            <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
+              <div className="report-summary-label">Total with VAT</div>
+              <div className="report-summary-value">Rs. {formatNumber(totalNetAmount + totalVATAmount, 2, 2)}</div>
             </div>
           </div>
         </>
       ) : (
-        <div className="empty-state">
+        <div className="card" style={{ textAlign: 'center', padding: 'var(--spacing-3xl)', color: 'var(--color-text-secondary)' }}>
+          <div style={{ fontSize: '48px', marginBottom: 'var(--spacing-md)', opacity: 0.5 }}>📊</div>
+          <h3>No Data Available</h3>
           <p>No data to display. Select a date range and generate the report.</p>
         </div>
       )}

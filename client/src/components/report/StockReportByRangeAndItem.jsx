@@ -63,7 +63,7 @@ const TransactionDetailsModal = ({ date, itemId, itemName, onClose }) => {
 
   return (
     <div className="modern-modal-overlay" onClick={onClose}>
-      <div className="modern-modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modern-modal erp-transaction-modal" onClick={(e) => e.stopPropagation()}>
         
         <div className="modern-modal-header">
           <div>
@@ -382,17 +382,18 @@ const StockReportByRangeAndItem = () => {
   const summary = calculateSummary();
 
   return (
-    <div className="report-container">
-      <div className="report-header">
-        <h2>
-          RM Item Wise Stock Movement
-        </h2>
-      </div>
+    <div className="page-container">
+      <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <h2 style={{ textAlign: 'left', margin: 0 }}>RM Item Wise Stock Movement</h2>
+          <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>View auto-managed stock movement over a specific date range</p>
+        </div>
+      </header>
 
       {/* Controls */}
-      <div className="controls-row">
-        <div className="form-group">
-          <label>
+      <div className="filters-section report-filter-bar">
+        <div className="report-filter-group">
+          <label className="report-filter-label">
             <FontAwesomeIcon icon={faCalendar} /> Start Date
           </label>
           <input 
@@ -400,12 +401,12 @@ const StockReportByRangeAndItem = () => {
             max={endDate} 
             value={startDate} 
             onChange={e => setStartDate(e.target.value)}
-            className="date-input"
+            className="report-filter-input"
           />
         </div>
 
-        <div className="form-group">
-          <label>
+        <div className="report-filter-group">
+          <label className="report-filter-label">
             <FontAwesomeIcon icon={faCalendar} /> End Date
           </label>
           <input 
@@ -414,12 +415,12 @@ const StockReportByRangeAndItem = () => {
             max={today} 
             value={endDate} 
             onChange={e => setEndDate(e.target.value)}
-            className="date-input"
+            className="report-filter-input"
           />
         </div>
 
-        <div className="form-group item-search-container">
-          <label>
+        <div className="report-filter-group" style={{ flex: '1 1 200px' }}>
+          <label className="report-filter-label">
             <FontAwesomeIcon icon={faSearch} /> SELECT AUTO-ADD ITEM
           </label>
           <Select
@@ -434,38 +435,26 @@ const StockReportByRangeAndItem = () => {
           />
         </div>
 
-        <div className="form-group action-buttons-container">
-          <label style={{ opacity: 0 }}>Actions</label>
-          <div className="action-buttons-row">
-            <button 
-              onClick={fetchStockReport} 
-              disabled={loading || !selectedItem}
-              className="btn btn-generate"
-            >
-              {loading ? 'Loading...' : 'Generate Report'}
-            </button>
-            
-            {stockData.length > 0 && (
-                <button onClick={downloadExcel} className="btn btn-excel">
-                  <FontAwesomeIcon icon={faFileExcel} /> Excel
-                </button>
-            )}
-          </div>
+        <div className="report-filter-actions">
+          <button 
+            onClick={fetchStockReport} 
+            disabled={loading || !selectedItem}
+            className="btn btn-primary"
+          >
+            {loading ? 'Loading...' : 'Generate Report'}
+          </button>
+          
+          {stockData.length > 0 && (
+              <button onClick={downloadExcel} className="btn btn-success">
+                <FontAwesomeIcon icon={faFileExcel} /> Excel
+              </button>
+          )}
         </div>
       </div>
 
       {/* Error Display */}
       {error && (
-        <div className="error-banner" style={{
-          background: '#f8d7da',
-          color: '#721c24',
-          padding: '12px 16px',
-          borderRadius: '6px',
-          marginBottom: '20px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px'
-        }}>
+        <div className="alert alert-error">
           <FontAwesomeIcon icon={faExclamationTriangle} />
           <span>{error}</span>
         </div>
@@ -473,39 +462,40 @@ const StockReportByRangeAndItem = () => {
 
       {/* Summary Cards */}
       {summary && (
-        <div className="summary-cards">
-          <div className="summary-card">
-            <div className="summary-label">TOTAL PURCHASED</div>
-            <div className="summary-value positive">{formatNumber(summary.totalPurchased, 2, 2)}</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 'var(--spacing-lg)' }}>
+          <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
+            <div className="report-summary-label">TOTAL PURCHASED</div>
+            <div className="report-summary-value text-primary">{formatNumber(summary.totalPurchased, 2, 2)}</div>
           </div>
-          <div className="summary-card">
-            <div className="summary-label">TOTAL ISSUED</div>
-            <div className="summary-value negative">{formatNumber(summary.totalIssued, 2, 2)}</div>
+          <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
+            <div className="report-summary-label">TOTAL ISSUED</div>
+            <div className="report-summary-value text-danger">{formatNumber(summary.totalIssued, 2, 2)}</div>
           </div>
-          <div className="summary-card">
-            <div className="summary-label">TOTAL WASTED</div>
-            <div className="summary-value negative">{formatNumber(summary.totalWasted, 2, 2)}</div>
+          <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
+            <div className="report-summary-label">TOTAL WASTED</div>
+            <div className="report-summary-value text-danger">{formatNumber(summary.totalWasted, 2, 2)}</div>
           </div>
-          <div className="summary-card">
-            <div className="summary-label">TOTAL ADJUSTED</div>
+          <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
+            <div className="report-summary-label">TOTAL ADJUSTED</div>
             <div
-              className={`summary-value ${summary.totalAdjusted >= 0 ? 'positive' : 'negative'}`}
+              className={`report-summary-value ${summary.totalAdjusted >= 0 ? 'text-primary' : 'text-danger'}`}
             >
               {summary.totalAdjusted >= 0 ? '+' : ''}{formatNumber(summary.totalAdjusted, 2, 2)}
             </div>
           </div>
-          <div className="summary-card">
-            <div className="summary-label">AVG CLOSING</div>
-            <div className="summary-value">{formatNumber(summary.avgClosing, 2, 2)}</div>
+          <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
+            <div className="report-summary-label">AVG CLOSING</div>
+            <div className="report-summary-value">{formatNumber(summary.avgClosing, 2, 2)}</div>
           </div>
         </div>
       )}
 
       {/* Data Table */}
       {loading ? (
-        <div className="loading">Loading data...</div>
+        <div className="loading-state">Loading data...</div>
       ) : stockData.length > 0 ? (
-        <div className="table-container">
+        <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
+          <div style={{ overflowX: 'auto' }}>
           <table className="report-table">
             <thead>
               <tr>
@@ -571,8 +561,9 @@ const StockReportByRangeAndItem = () => {
                   </tr>
                 );
               })}
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </div>
         </div>
       ) : (
         <div className="empty-state">

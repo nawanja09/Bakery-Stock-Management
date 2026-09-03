@@ -170,8 +170,8 @@ const WastageReport = () => {
 
   if (loading) {
     return (
-      <div className="report-container">
-        <div className="loading-container">
+      <div className="page-container">
+        <div className="loading-state">
           <div className="loading-spinner"></div>
           <p>Loading wastage report...</p>
         </div>
@@ -180,54 +180,47 @@ const WastageReport = () => {
   }
 
   return (
-    <div className="report-container">
+    <div className="page-container">
       {/* Header */}
-      <div className="report-header">
-          <h2>
-            RM Wastage Item Detail
-          </h2>
-      </div>
+      <header className="page-header" style={{ display: 'flex', alignItems: 'flex-start', flexDirection: 'column', gap: '4px' }}>
+        <h2 style={{ textAlign: 'left', margin: 0 }}>RM Wastage Item Detail</h2>
+        <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>View detailed breakdown of raw material wastage</p>
+      </header>
 
       <div className="filters-section">
-        <div className="filters-grid">
-          <div className="filters-row">
             {/* Date Range */}
-            <div className="filter-group date-range-group">
-              <label>
-                <FontAwesomeIcon icon={faCalendarAlt} className="filter-icon" />
-                Date Range
+            <div className="report-filter-group" style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <label className="report-filter-label" style={{ marginRight: '10px' }}>
+                <FontAwesomeIcon icon={faCalendarAlt} className="filter-icon" /> Date Range
               </label>
 
-              <div className="date-range-inputs">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <input
                   type="date"
                   value={filters.startDate}
                   onChange={(e) => handleFilterChange('startDate', e.target.value)}
-                  className="filter-input"
+                  className="report-filter-input"
                 />
-
                 <span className="date-separator">to</span>
-
                 <input
                   type="date"
                   value={filters.endDate}
                   onChange={(e) => handleFilterChange('endDate', e.target.value)}
-                  className="filter-input"
+                  className="report-filter-input"
                 />
               </div>
             </div>
 
             {/* Item */}
-            <div className="filter-group">
-              <label>
-                <FontAwesomeIcon icon={faBoxOpen} className="filter-icon" />
-                Item
+            <div className="report-filter-group">
+              <label className="report-filter-label">
+                <FontAwesomeIcon icon={faBoxOpen} className="filter-icon" /> Item
               </label>
 
               <select
                 value={filters.itemId}
                 onChange={(e) => handleFilterChange('itemId', e.target.value)}
-                className="filter-select"
+                className="report-filter-select"
               >
                 <option value="">All Items</option>
                 {items.map(item => (
@@ -238,23 +231,22 @@ const WastageReport = () => {
               </select>
             </div>
 
-            <div className="filter-actions">
-              <button onClick={clearFilters} className="btn-clear">
+            <div className="report-filter-actions">
+              <button onClick={clearFilters} className="btn btn-secondary">
                 <FontAwesomeIcon icon={faTimes} /> Clear Filters
               </button>
             </div>
-          </div>
-        </div>
       </div>
 
       {/* Results - Item-wise Wastage Details */}
       {filteredData.length === 0 ? (
-        <div className="no-records">
-          <div className="no-records-icon">📊</div>
+        <div className="empty-state">
+          <div className="empty-icon">📊</div>
           <p>No wastage records found matching the filters</p>
         </div>
       ) : (
-        <div className="table-responsive">
+        <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
+          <div style={{ overflowX: 'auto' }}>
           <table className="report-table">
             <thead>
               <tr>
@@ -316,7 +308,7 @@ const WastageReport = () => {
                     </td>
                     <td className="center-align">{item.item_code || '-'}</td>
                     <td className="center-align">{item.item_name || '-'}</td>
-                    <td className="center-align">{Number(item.quantity || 0).toFixed(3)}</td>
+                    <td className="report-table-value-numeric">{Number(item.quantity || 0).toFixed(3)}</td>
                     <td className="center-align">{item.unit || '-'}</td>
                     <td className="center-align">
                       {index === 0 ? (
@@ -330,7 +322,7 @@ const WastageReport = () => {
                         </span>
                       ) : ''}
                     </td>
-                    <td className="center-align loss-amount">
+                    <td className="report-table-value-numeric text-danger">
                       {formatCurrency(item.estimated_loss || 0)}
                     </td>
                     <td className="center-align">
@@ -364,6 +356,7 @@ const WastageReport = () => {
               </tr>
             </tfoot>
           </table>
+          </div>
         </div>
       )}
 
@@ -426,9 +419,9 @@ const WastageReport = () => {
                           <tr>
                             <th className="center-align">Item Code</th>
                             <th className="center-align">Item Name</th>
-                            <th className="center-align">Quantity</th>
+                            <th className="text-right">Quantity</th>
                             <th className="center-align">Unit</th>
-                            <th className="center-align">Estimated Loss (Rs.)</th>
+                            <th className="text-right">Estimated Loss (Rs.)</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -436,9 +429,9 @@ const WastageReport = () => {
                             <tr key={idx}>
                               <td className="center-align">{item.item_code}</td>
                               <td className="center-align">{item.item_name}</td>
-                              <td className="center-align">{Number(item.quantity).toFixed(3)}</td>
+                              <td className="report-table-value-numeric">{Number(item.quantity).toFixed(3)}</td>
                               <td className="center-align">{item.unit}</td>
-                              <td className="center-align loss-amount">
+                              <td className="report-table-value-numeric text-danger">
                                 {formatCurrency(item.estimated_loss)}
                               </td>
                             </tr>

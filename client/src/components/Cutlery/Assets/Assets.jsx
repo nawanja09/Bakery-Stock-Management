@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { usePopup } from '../../context/PopupContext';
 import api from '../../../api';
 import AddAssetForm from './AddAssetForm';
@@ -23,6 +23,7 @@ const Assets = () => {
   const [showAddForm, setShowAddForm] = useState(false);
   const { showPopup } = usePopup();
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     fetchAssets();
@@ -70,13 +71,16 @@ const Assets = () => {
     }
   };
 
-  if (loading) return <div className="loading">Loading assets…</div>;
+  if (loading) return <div style={{ padding: 'var(--spacing-2xl)', textAlign: 'center', color: 'var(--color-text-secondary)' }}>Loading assets…</div>;
 
   return (
-    <div className="assets-page">
-      <header className="assets-header">
-        <h2>Cutlery Assets</h2>
-        <button className="primary-btn" onClick={() => setShowAddForm(true)}>
+    <div className="page-container erp-cutlery-assets-page">
+      <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+        <div>
+          <h2 style={{ margin: 0 }}>Cutlery Assets</h2>
+          <p style={{ margin: '4px 0 0', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>Manage cutlery assets and inventory</p>
+        </div>
+        <button className="btn btn-primary" onClick={() => setShowAddForm(true)}>
           + Add Asset
         </button>
       </header>
@@ -89,9 +93,9 @@ const Assets = () => {
       )}
 
       {assets.length === 0 ? (
-        <div className="empty-state">
-          <span>🍴</span>
-          <p>No assets found</p>
+        <div className="card" style={{ textAlign: 'center', padding: 'var(--spacing-3xl)', color: 'var(--color-text-secondary)' }}>
+          <div style={{ fontSize: '48px', marginBottom: 'var(--spacing-md)', opacity: 0.5 }}>🍴</div>
+          <p>No assets found. Add your first asset to get started.</p>
         </div>
       ) : (
         <div className="assets-grid">
@@ -99,7 +103,7 @@ const Assets = () => {
             <div key={asset.id} className="asset-card">
               <div
                 className="asset-image"
-                onClick={() => navigate(`/cutlery/assets/view/${asset.id}`)}
+                onClick={() => navigate(`/cutlery/assets/view/${asset.id}`, { state: { backgroundLocation: location } })}
               >
                 <FallbackImage src={asset.image_url} alt={asset.asset_name} />
               </div>
@@ -121,14 +125,14 @@ const Assets = () => {
               <div className="asset-actions">
                 <button
                   className="icon-btn view"
-                  onClick={() => navigate(`/cutlery/assets/view/${asset.id}`)}
+                  onClick={() => navigate(`/cutlery/assets/view/${asset.id}`, { state: { backgroundLocation: location } })}
                 >
                   <FontAwesomeIcon icon={faEye} />
                 </button>
 
                 <button
                   className="icon-btn edit"
-                  onClick={() => navigate(`/cutlery/assets/edit/${asset.id}`)}
+                  onClick={() => navigate(`/cutlery/assets/edit/${asset.id}`, { state: { backgroundLocation: location } })}
                 >
                   <FontAwesomeIcon icon={faPen} />
                 </button>

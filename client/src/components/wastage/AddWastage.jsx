@@ -164,8 +164,10 @@ const AddWastage = () => {
       <button onClick={() => navigate('/wastage/history')} className="btn-secondary">
         ← Back to History
       </button>
-      <h2>RM Wastage</h2>
-      <form onSubmit={handleSubmit}>
+      <div className="page-header">
+        <h1>RM Wastage</h1>
+      </div>
+      <form onSubmit={handleSubmit} className="purchase-form">
         <div className="form-row">
           <div className="form-group">
             <label>Date</label>

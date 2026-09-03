@@ -72,20 +72,20 @@ const AddItem = () => {
   };
 
   return (
-    <div className="minimal-container">
-      <div className="minimal-card">
-        <div className="minimal-header">
-          <h2 className="minimal-title">Add New Item</h2>
+    <div className="page-container item-management-page">
+      <div className="card item-management-card">
+        <header className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-lg)' }}>
+          <h2 style={{ margin: 0 }}>Add New Item</h2>
           <button
             onClick={() => navigate('/items')}
-            className="minimal-icon-button"
+            className="btn btn-secondary btn-sm"
             aria-label="Close"
           >
             <FontAwesomeIcon icon={faTimes} />
           </button>
-        </div>
+        </header>
 
-        <form onSubmit={handleSubmit} className="minimal-form">
+        <form onSubmit={handleSubmit}>
           <div className="form-grid">
             <div className="minimal-form-group">
               <label className="minimal-label">Item Code <span className="required-star">*</span></label>
@@ -217,18 +217,18 @@ const AddItem = () => {
             </div>
           )}
 
-          <div className="minimal-form-actions">
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: 'var(--spacing-lg)' }}>
             <button
               type="button"
               onClick={() => navigate('/items')}
-              className="minimal-button minimal-button-secondary"
+              className="btn btn-secondary"
               disabled={isLoading}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="minimal-button minimal-button-primary"
+              className="btn btn-primary"
               disabled={isLoading}
             >
               <FontAwesomeIcon icon={faSave} className="button-icon" />

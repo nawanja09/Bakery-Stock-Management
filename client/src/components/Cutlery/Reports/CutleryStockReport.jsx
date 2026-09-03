@@ -173,9 +173,9 @@ const CutleryStockReport = () => {
 
   if (loading && stockData.length === 0) {
     return (
-      <div className="cutlery-stock-report-container">
-        <div className="loading-container">
-          <div className="spinner"></div>
+      <div className="page-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh' }}>
+        <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>
+          <FontAwesomeIcon icon={faSync} spin style={{ fontSize: '24px', marginBottom: 'var(--spacing-md)' }} />
           <p>Loading stock report...</p>
         </div>
       </div>
@@ -183,8 +183,8 @@ const CutleryStockReport = () => {
   }
 
   return (
-    <div className="cutlery-stock-report-container">
-      <header className="report-header">
+    <div className="page-container">
+      <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
         <div>
           <h1>Cutlery Stock Report</h1>
           <p>As of {new Date(reportDate).toLocaleDateString('en-US', { 
@@ -219,10 +219,10 @@ const CutleryStockReport = () => {
         </div>
       </header>
 
-      <div className="filters-container">
-        <div className="filter-group">
-          <label htmlFor="reportDate">
-            <FontAwesomeIcon icon={faCalendarAlt} /> Report Date
+      <div className="filters-section card" style={{ display: 'flex', gap: 'var(--spacing-lg)', padding: 'var(--spacing-md)', marginBottom: 'var(--spacing-lg)', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+        <div className="report-filter-group" style={{ flex: 1, minWidth: '200px' }}>
+          <label htmlFor="reportDate" style={{ display: 'block', fontSize: 'var(--font-size-sm)', fontWeight: 'bold', marginBottom: 'var(--spacing-xs)' }}>
+            <FontAwesomeIcon icon={faCalendarAlt} style={{ marginRight: '8px' }} /> Report Date
           </label>
           <input
             type="date"
@@ -230,27 +230,14 @@ const CutleryStockReport = () => {
             value={reportDate}
             onChange={handleDateChange}
             max={new Date().toISOString().split('T')[0]}
+            className="report-filter-input"
+            style={{ width: '100%' }}
           />
-          <button 
-            className="btn-generate"
-            onClick={handleGenerateReport}
-            disabled={loading}
-          >
-            {loading ? (
-              <>
-                <FontAwesomeIcon icon={faSync} spin /> Generating...
-              </>
-            ) : (
-              <>
-                <FontAwesomeIcon icon={faSync} /> Generate Report
-              </>
-            )}
-          </button>
         </div>
 
-        <div className="filter-group">
-          <label htmlFor="search">
-            <FontAwesomeIcon icon={faSearch} /> Search Items
+        <div className="report-filter-group" style={{ flex: 2, minWidth: '250px' }}>
+          <label htmlFor="search" style={{ display: 'block', fontSize: 'var(--font-size-sm)', fontWeight: 'bold', marginBottom: 'var(--spacing-xs)' }}>
+            <FontAwesomeIcon icon={faSearch} style={{ marginRight: '8px' }} /> Search Items
           </label>
           <input
             type="text"
@@ -258,7 +245,23 @@ const CutleryStockReport = () => {
             placeholder="Search by item code, name..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            className="report-filter-input"
+            style={{ width: '100%' }}
           />
+        </div>
+
+        <div style={{ flex: 'none' }}>
+          <button 
+            className="btn btn-primary"
+            onClick={handleGenerateReport}
+            disabled={loading}
+          >
+            {loading ? (
+              <><FontAwesomeIcon icon={faSync} spin style={{ marginRight: '8px' }} /> Generating...</>
+            ) : (
+              <><FontAwesomeIcon icon={faSync} style={{ marginRight: '8px' }} /> Generate Report</>
+            )}
+          </button>
         </div>
       </div>
 
@@ -276,13 +279,14 @@ const CutleryStockReport = () => {
           </button>
         </div>
       ) : stockData.length === 0 ? (
-        <div className="no-data">
-          <div className="no-data-icon">📊</div>
+        <div className="card" style={{ textAlign: 'center', padding: 'var(--spacing-3xl)', color: 'var(--color-text-secondary)' }}>
+          <div style={{ fontSize: '48px', marginBottom: 'var(--spacing-md)', opacity: 0.5 }}>📊</div>
           <h3>No Stock Data Found</h3>
           <p>No stock data found for the selected date.</p>
           <p>Try selecting a different date or check if there are any transactions.</p>
           <button 
-            className="btn-generate"
+            className="btn btn-primary"
+            style={{ marginTop: 'var(--spacing-md)' }}
             onClick={handleGenerateReport}
             disabled={loading}
           >
@@ -291,8 +295,8 @@ const CutleryStockReport = () => {
         </div>
       ) : (
         <>
-          <div className="table-wrapper">
-            <table className="stock-report-table">
+          <div className="card" style={{ overflowX: 'auto', marginBottom: 'var(--spacing-lg)' }}>
+            <table className="report-table">
               <thead>
                 <tr>
                   <th rowSpan="2">#</th>

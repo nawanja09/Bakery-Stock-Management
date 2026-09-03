@@ -35,6 +35,7 @@ const FundTransfer = () => {
   const [companies, setCompanies]           = useState([]);
   const [bankAccounts, setBankAccounts]     = useState([]);
   const [loadingBanks, setLoadingBanks]     = useState(false);
+  const [bankLoadError, setBankLoadError]   = useState(false);
   const [cashBalance, setCashBalance]       = useState(null);
   const [submitting, setSubmitting]         = useState(false);
   const [message, setMessage]               = useState(null);
@@ -69,6 +70,9 @@ const FundTransfer = () => {
     let cancelled = false;
 
     setLoadingBanks(true);
+    setBankLoadError(false);
+    setBankAccounts([]);
+    setFormData(prev => ({ ...prev, bank_id: '' }));
     api.get('/finance/bank/accounts', { params: { companyId: formData.company_id } })
       .then(res => {
         if (cancelled) return;
@@ -79,7 +83,7 @@ const FundTransfer = () => {
           bank_id: list.length > 0 ? String(list[0].id) : ''
         }));
       })
-      .catch(() => { if (!cancelled) setBankAccounts([]); })
+      .catch(() => { if (!cancelled) { setBankAccounts([]); setBankLoadError(true); } })
       .finally(() => { if (!cancelled) setLoadingBanks(false); });
 
     api.get(`/finance/cash/balance/${formData.company_id}`)
@@ -175,17 +179,18 @@ const FundTransfer = () => {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="ft-page">
-      {/* ── Header ── */}
-      <div className="ft-page-header">
-        <div className="ft-page-header-icon">
-          <FontAwesomeIcon icon={faMoneyBillTransfer} />
+    <div className="page-container erp-fund-transfer-page">
+      <header className="page-header">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)' }}>
+          <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '20px' }}>
+            <FontAwesomeIcon icon={faMoneyBillTransfer} />
+          </div>
+          <div>
+            <h2 style={{ margin: 0 }}>Cash / Bank Transfer</h2>
+            <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>Move funds between cash-in-hand and a bank account</p>
+          </div>
         </div>
-        <div>
-          <h1 className="ft-page-title">Cash / Bank Transfer</h1>
-          <p className="ft-page-subtitle">Move funds between cash-in-hand and a bank account</p>
-        </div>
-      </div>
+      </header>
 
       <div className="ft-layout">
         {/* ═══════════════════ LEFT — Form ═══════════════════ */}
@@ -262,7 +267,7 @@ const FundTransfer = () => {
                     disabled={loadingBanks}
                     required
                   >
-                    <option value="">{loadingBanks ? 'Loading…' : 'Select bank account'}</option>
+                    <option value="">{loadingBanks ? 'Loading…' : bankLoadError ? 'Unable to load bank accounts' : bankAccounts.length === 0 ? 'No active bank accounts available' : 'Select bank account'}</option>
                     {bankAccounts.map(b => (
                       <option key={b.id} value={b.id}>
                         {b.bank_name}{b.account_number ? ` — ${b.account_number}` : ''}
@@ -292,7 +297,7 @@ const FundTransfer = () => {
                     disabled={loadingBanks}
                     required
                   >
-                    <option value="">{loadingBanks ? 'Loading…' : 'Select bank account'}</option>
+                    <option value="">{loadingBanks ? 'Loading…' : bankLoadError ? 'Unable to load bank accounts' : bankAccounts.length === 0 ? 'No active bank accounts available' : 'Select bank account'}</option>
                     {bankAccounts.map(b => (
                       <option key={b.id} value={b.id}>
                         {b.bank_name}{b.account_number ? ` — ${b.account_number}` : ''}
@@ -378,18 +383,20 @@ const FundTransfer = () => {
           )}
 
           {/* Submit */}
-          <button
-            className="ft-submit-btn"
-            type="button"
-            disabled={submitting}
-            onClick={handleSubmit}
-          >
-            {submitting ? (
-              <><FontAwesomeIcon icon={faSpinner} spin /> Processing…</>
-            ) : (
-              <><FontAwesomeIcon icon={faRightLeft} /> Confirm Transfer</>
-            )}
-          </button>
+          <div className="form-actions">
+            <button
+              className="btn btn-primary"
+              type="button"
+              disabled={submitting}
+              onClick={handleSubmit}
+            >
+              {submitting ? (
+                <><FontAwesomeIcon icon={faSpinner} spin /> Processing…</>
+              ) : (
+                <><FontAwesomeIcon icon={faRightLeft} /> Confirm Transfer</>
+              )}
+            </button>
+          </div>
         </div>
 
         {/* ═══════════════════ RIGHT — Summary panel ═══════════════════ */}

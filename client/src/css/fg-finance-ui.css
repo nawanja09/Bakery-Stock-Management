@@ -1,0 +1,266 @@
+:root {
+  --fg-erp-blue: #2D6CDF;
+  --fg-erp-blue-dark: #1A4FA3;
+  --fg-erp-surface: #FFFFFF;
+  --fg-erp-heading: #0F172A;
+  --fg-erp-text: #334155;
+  --fg-erp-muted: #64748B;
+  --fg-erp-border: #E2E8F0;
+  --fg-erp-success: #059669;
+  --fg-erp-warning: #D97706;
+  --fg-erp-danger: #DC2626;
+  --fg-erp-radius: 10px;
+  --fg-erp-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+}
+
+.erp-fg-recipes-page,
+.erp-fg-report-page,
+.erp-cutlery-assets-page {
+  width: 100%;
+  max-width: 1760px;
+  margin: 0 auto;
+  padding: 24px 32px 40px;
+  color: var(--fg-erp-text);
+}
+
+.erp-fg-recipes-page > .page-header,
+.erp-fg-report-page > .page-header,
+.erp-cutlery-assets-page > .page-header {
+  min-height: 48px;
+  margin-bottom: 4px;
+  text-align: left;
+}
+
+.erp-fg-recipes-page .page-header h2,
+.erp-fg-report-page .page-header h2,
+.erp-cutlery-assets-page .page-header h2 {
+  color: var(--fg-erp-heading);
+  font-size: 26px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.erp-fg-recipes-page .card,
+.erp-fg-recipes-page .fgprod-card,
+.erp-fg-report-page .card,
+.erp-cutlery-assets-page .card {
+  border: 1px solid var(--fg-erp-border);
+  border-radius: var(--fg-erp-radius);
+  background: var(--fg-erp-surface);
+  box-shadow: var(--fg-erp-shadow);
+}
+
+.erp-fg-recipes-page > .card,
+.erp-fg-report-page > .card {
+  padding: 22px 24px;
+  margin-bottom: 0;
+}
+
+.erp-fg-recipes-page .fgprod-picker-row,
+.erp-fg-report-page .fgprod-picker-row {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) auto;
+  align-items: end;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.erp-fg-recipes-page .fgprod-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--fg-erp-border);
+}
+
+.erp-fg-recipes-page .fgprod-card-title,
+.erp-fg-recipes-page > .card h3 {
+  color: var(--fg-erp-heading);
+  font-size: 17px;
+}
+
+.erp-fg-recipes-page .fgprod-table-wrapper,
+.erp-fg-report-page .fgprod-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--fg-erp-border);
+  border-radius: 8px;
+}
+
+.erp-fg-recipes-page .fgprod-table,
+.erp-fg-report-page .fgprod-recipes-report-table {
+  min-width: 900px;
+}
+
+.erp-fg-recipes-page .fgprod-table th,
+.erp-fg-report-page .fgprod-recipes-report-table th {
+  padding: 13px 14px;
+  background: var(--fg-erp-blue);
+  color: #fff;
+  border: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.erp-fg-recipes-page .fgprod-table td,
+.erp-fg-report-page .fgprod-recipes-report-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--fg-erp-border);
+  vertical-align: middle;
+}
+
+.erp-fg-recipes-page .fgprod-costing-panel {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) repeat(4, minmax(140px, auto));
+  align-items: center;
+  gap: 14px;
+  margin-top: 16px;
+  padding: 16px 18px;
+  border: 1px solid #C9D9F8;
+  border-radius: 8px;
+  background: #F6F9FF;
+}
+
+.erp-fg-recipes-page .fgprod-costing-title,
+.erp-fg-recipes-page .fgprod-cost-value,
+.erp-fg-recipes-page .fgprod-costing-highlight-value {
+  color: var(--fg-erp-heading);
+  font-weight: 700;
+}
+
+.erp-fg-production-modal {
+  width: min(720px, calc(100vw - 32px));
+  max-width: 720px;
+  border: 1px solid var(--fg-erp-border);
+  border-radius: 12px;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.2);
+}
+
+.erp-fg-production-modal .fgprod-modal-body {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  padding: 24px;
+}
+
+.erp-fg-production-modal .fgprod-form-group:first-child {
+  grid-column: 1 / -1;
+}
+
+.erp-fg-production-modal .fgprod-input,
+.erp-fg-production-modal .react-select__control {
+  min-height: 40px;
+  border-color: var(--fg-erp-border);
+  border-radius: 7px;
+  box-shadow: none;
+}
+
+.erp-fg-report-page .fgprod-picker-row {
+  grid-template-columns: minmax(260px, 1fr) 280px;
+}
+
+.erp-fg-report-page .fgprod-recipes-report-table {
+  min-width: 1180px;
+}
+
+.erp-cutlery-assets-page .assets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 18px;
+}
+
+.erp-cutlery-assets-page .asset-card {
+  overflow: hidden;
+  border: 1px solid var(--fg-erp-border);
+  border-radius: var(--fg-erp-radius);
+  background: var(--fg-erp-surface);
+  box-shadow: var(--fg-erp-shadow);
+}
+
+.erp-cutlery-assets-page .asset-image {
+  height: 190px;
+  background: #F8FAFC;
+}
+
+.erp-cutlery-assets-page .asset-body {
+  padding: 16px 18px;
+}
+
+.erp-cutlery-assets-page .asset-code {
+  color: var(--fg-erp-blue);
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.erp-cutlery-assets-page .asset-body h3 {
+  margin: 6px 0 8px;
+  color: var(--fg-erp-heading);
+  font-size: 17px;
+}
+
+.erp-cutlery-assets-page .dates {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--fg-erp-border);
+  color: var(--fg-erp-muted);
+  font-size: 12px;
+}
+
+.erp-cutlery-assets-page .asset-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--fg-erp-border);
+}
+
+.erp-asset-form {
+  width: min(560px, calc(100vw - 32px));
+  max-width: 560px;
+  border: 1px solid var(--fg-erp-border);
+  border-radius: 12px;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.2);
+}
+
+.erp-asset-form .add-asset-form {
+  padding: 24px;
+}
+
+@media (max-width: 1100px) {
+  .erp-fg-recipes-page,
+  .erp-fg-report-page,
+  .erp-cutlery-assets-page {
+    padding: 20px;
+  }
+
+  .erp-fg-recipes-page .fgprod-costing-panel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .erp-fg-recipes-page,
+  .erp-fg-report-page,
+  .erp-cutlery-assets-page {
+    padding: 16px 12px 28px;
+  }
+
+  .erp-fg-recipes-page .fgprod-picker-row,
+  .erp-fg-report-page .fgprod-picker-row,
+  .erp-fg-production-modal .fgprod-modal-body {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-fg-recipes-page .fgprod-costing-panel {
+    grid-template-columns: 1fr;
+  }
+
+}

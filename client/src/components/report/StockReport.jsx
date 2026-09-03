@@ -156,14 +156,17 @@ const StockReport = () => {
   };
 
   return (
-    <div className="report-container">
-      <div className="report-header">
-        <h2>Daily Stock Report</h2>
-      </div>
+    <div className="page-container">
+      <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <h2 style={{ textAlign: 'left', margin: 0 }}>Daily Stock Report</h2>
+          <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>View current stock balances and valuations</p>
+        </div>
+      </header>
 
-      <div className="controls-row">
-        <div className="form-group">
-          <label>
+      <div className="filters-section">
+        <div className="report-filter-group">
+          <label className="report-filter-label">
             <FontAwesomeIcon icon={faCalendar} /> Report Date
           </label>
           <input 
@@ -171,36 +174,34 @@ const StockReport = () => {
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
             max={format(new Date(), 'yyyy-MM-dd')}
-            className="date-input"
+            className="report-filter-input"
           />
         </div>
 
-        <div className="form-group action-buttons-container">
-          <label style={{ opacity: 0 }}>Actions</label>
-          <div className="action-buttons-row">
+        <div className="report-filter-actions">
             <button 
               onClick={fetchStockReport}
               disabled={loading}
-              className="btn btn-generate"
+              className="btn btn-primary"
             >
-              <FontAwesomeIcon icon={faSync} className={loading ? 'spin' : ''} />
+              <FontAwesomeIcon icon={faSync} className={loading ? 'fa-spin' : ''} />
               {loading ? 'Generating...' : 'Generate Report'}
             </button>
             
             {stockData.length > 0 && (
-                <button onClick={downloadExcel} className="btn btn-excel">
+                <button onClick={downloadExcel} className="btn btn-success">
                   <FontAwesomeIcon icon={faFileExcel} /> Excel
                 </button>
             )}
-          </div>
         </div>
       </div>
 
       {loading ? (
-        <div className="loading">Loading stock data...</div>
+        <div className="loading-state">Loading stock data...</div>
       ) : stockData.length > 0 ? (
         <>
-          <div className="table-container">
+          <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
+            <div style={{ overflowX: 'auto' }}>
             <table className="report-table">
               <thead>
                 <tr>
@@ -222,7 +223,7 @@ const StockReport = () => {
                 {stockData.map((item) => (
                   <tr key={item.id}>
                     <td>
-                      <span className="item-code-badge">{item.item_code}</span>
+                      <span className="badge badge-neutral">{item.item_code}</span>
                     </td>
                     <td>{item.item_name}</td>
                     <td>{item.unit}</td>
@@ -233,10 +234,10 @@ const StockReport = () => {
                     <td>{formatNumber(item.total_returned, 2, 2)}</td>
                     <td>{formatNumber(item.total_purchase_returned || 0, 2, 2)}</td>
                     <td>{formatNumber(item.total_adjusted || 0, 2, 2)}</td>
-                    <td style={{ fontWeight: '600' }}>
+                    <td className="report-table-value-numeric">
                       {formatNumber(item.closing_balance, 2, 2)}
                     </td>
-                    <td style={{ fontWeight: 'bold', color: '#2e7d32' }}>
+                    <td className="report-table-value-numeric text-primary">
                       {formatCurrency(calculateValue(item))}
                     </td>
                   </tr>
@@ -252,10 +253,11 @@ const StockReport = () => {
               </tfoot>
             </table>
           </div>
+          </div>
         </>
       ) : (
         <div className="empty-state">
-          <div className="empty-state-icon">📊</div>
+          <div className="empty-icon">📊</div>
           <p>Select a date and generate the report to view stock data.</p>
         </div>
       )}

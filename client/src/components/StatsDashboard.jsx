@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import api from '../api';
 import './StatsDashboard.css';
 import { formatNumber } from '../utils/formatters';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faUsers, faReceipt, faCoins, faBoxOpen } from '@fortawesome/free-solid-svg-icons';
 
 const StatsDashboard = () => {
   const [stats, setStats] = useState(null);
@@ -46,26 +48,26 @@ const StatsDashboard = () => {
     {
       label: 'Total Users',
       value: stats?.users || 0,
-      icon: '👥',
-      color: 'blue-gradient',
+      icon: faUsers,
+      color: 'blue',
     },
     {
       label: 'Total Orders',
       value: stats?.orders || 0,
-      icon: '📦',
-      color: 'green-gradient',
+      icon: faReceipt,
+      color: 'green',
     },
     {
       label: 'Revenue',
-      value: stats?.revenue ? `Rs. ${stats.revenue.toLocaleString()}` : 'Rs. 0',
-      icon: '💰',
-      color: 'purple-gradient',
+      value: stats?.revenue || 0,
+      icon: faCoins,
+      color: 'cyan',
     },
     {
       label: 'Products',
       value: stats?.products || 0,
-      icon: '🥯',
-      color: 'orange-gradient',
+      icon: faBoxOpen,
+      color: 'amber',
     },
   ];
 
@@ -77,10 +79,10 @@ const StatsDashboard = () => {
             <div className="stat-card-content">
               <div className="stat-card-info">
                 <p className="stat-label">{item.label}</p>
-                <h3 className="stat-value">{formatNumber(item.value)}</h3>
+                <h3 className="stat-value">{item.label === 'Revenue' ? `Rs. ${formatNumber(item.value)}` : formatNumber(item.value)}</h3>
               </div>
               <div className="stat-card-icon-wrapper">
-                <span className="stat-icon-large">{item.icon}</span>
+                <FontAwesomeIcon className="stat-icon-large" icon={item.icon} />
               </div>
             </div>
           </div>

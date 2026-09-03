@@ -224,94 +224,101 @@ const ExpensesReport = () => {
   };
 
   return (
-    <div className="er-container">
-      <div className="er-header">
-        <h2>Expenses Report</h2>
-        <div className="er-actions">
+    <div className="page-container">
+      <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <h2 style={{ textAlign: 'left', margin: 0 }}>Expenses Report</h2>
+          <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
+            View and export expense history across all categories
+          </p>
+        </div>
+        <div className="report-filter-actions">
           <button
             onClick={handleExportExcel}
             disabled={sortedExpenses.length === 0}
-            className="er-btn er-btn-excel"
+            className="btn btn-success"
             title="Export the currently filtered expenses to Excel"
           >
             📊 Export to Excel
           </button>
         </div>
-      </div>
+      </header>
 
       {/* Filters */}
-      <div className="er-filters">
-        <div className="er-field">
-          <label>From Date</label>
-          <input
-            type="date"
-            value={fromDate}
-            onChange={(e) => setFromDate(e.target.value)}
-            max={toDate || undefined}
-            className="er-input"
-          />
-        </div>
+      <div className="card filters-section report-filter-bar" style={{ padding: 'var(--spacing-lg)', marginBottom: 'var(--spacing-lg)' }}>
+        <div className="ledger-filter-row">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)', color: 'var(--color-text-secondary)' }}>From Date</label>
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              max={toDate || undefined}
+              className="report-filter-input"
+            />
+          </div>
 
-        <div className="er-field">
-          <label>To Date</label>
-          <input
-            type="date"
-            value={toDate}
-            onChange={(e) => setToDate(e.target.value)}
-            min={fromDate || undefined}
-            className="er-input"
-          />
-        </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)', color: 'var(--color-text-secondary)' }}>To Date</label>
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              min={fromDate || undefined}
+              className="report-filter-input"
+            />
+          </div>
 
-        <div className="er-field">
-          <label>Company</label>
-          <select
-            value={companyId}
-            onChange={(e) => setCompanyId(e.target.value)}
-            className="er-input"
-          >
-            <option value="">All Companies</option>
-            {companies.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-        </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)', color: 'var(--color-text-secondary)' }}>Company</label>
+            <select
+              value={companyId}
+              onChange={(e) => setCompanyId(e.target.value)}
+              className="report-filter-select"
+            >
+              <option value="">All Companies</option>
+              {companies.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
 
-        <div className="er-field">
-          <label>Payee</label>
-          <select
-            value={payeeId}
-            onChange={(e) => setPayeeId(e.target.value)}
-            className="er-input"
-          >
-            <option value="">All Payees</option>
-            {payees.map((p) => (
-              <option key={p.id} value={p.id}>{p.payee_name}</option>
-            ))}
-          </select>
-        </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)', color: 'var(--color-text-secondary)' }}>Payee</label>
+            <select
+              value={payeeId}
+              onChange={(e) => setPayeeId(e.target.value)}
+              className="report-filter-select"
+            >
+              <option value="">All Payees</option>
+              {payees.map((p) => (
+                <option key={p.id} value={p.id}>{p.payee_name}</option>
+              ))}
+            </select>
+          </div>
 
-        <div className="er-field">
-          <label>Type</label>
-          <select
-            value={type}
-            onChange={(e) => setType(e.target.value)}
-            className="er-input"
-          >
-            <option value="all">All</option>
-            <option value="petty_cash">Petty Cash</option>
-            <option value="other">Other</option>
-            <option value="bank_charges">Bank Charges</option>
-          </select>
-        </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)', color: 'var(--color-text-secondary)' }}>Type</label>
+            <select
+              value={type}
+              onChange={(e) => setType(e.target.value)}
+              className="report-filter-select"
+            >
+              <option value="all">All</option>
+              <option value="petty_cash">Petty Cash</option>
+              <option value="other">Other</option>
+              <option value="bank_charges">Bank Charges</option>
+            </select>
+          </div>
 
-        <div className="er-field-actions">
-          <button onClick={handleApplyFilters} disabled={loading} className="er-btn er-btn-primary">
-            {loading ? 'Searching...' : 'Search'}
-          </button>
-          <button onClick={handleReset} disabled={loading} className="er-btn er-btn-secondary">
-            Reset
-          </button>
+          <div className="report-filter-actions" style={{ alignSelf: 'flex-end', marginLeft: 'auto' }}>
+            <button onClick={handleReset} disabled={loading} className="btn btn-secondary">
+              Reset
+            </button>
+            <button onClick={handleApplyFilters} disabled={loading} className="btn btn-primary">
+              {loading ? 'Searching...' : 'Search'}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -319,11 +326,11 @@ const ExpensesReport = () => {
 
       {/* Results */}
       {loading ? (
-        <div className="er-loading">Loading expenses...</div>
+        <div style={{ textAlign: 'center', padding: 'var(--spacing-2xl)', color: 'var(--color-text-secondary)' }}>Loading expenses...</div>
       ) : sortedExpenses.length > 0 ? (
-        <>
-          <div className="er-table-container">
-            <table className="er-table">
+        <div className="card" style={{ display: 'flex', flexDirection: 'column' }}>
+          <div style={{ overflowX: 'auto' }}>
+            <table className="report-table">
               <thead>
                 <tr>
                   <th onClick={() => handleSort('date')} className="er-sortable">
@@ -378,19 +385,19 @@ const ExpensesReport = () => {
               </tfoot>
             </table>
           </div>
-          <div className="er-summary-bar">
-            <span>{sortedExpenses.length} record{sortedExpenses.length !== 1 ? 's' : ''}</span>
-            <span>Petty Cash: <strong>{formatCurrency(pettyCashTotal)}</strong></span>
-            <span>Other: <strong>{formatCurrency(otherTotal)}</strong></span>
-            <span>Bank Charges: <strong>{formatCurrency(bankChargesTotal)}</strong></span>
-            <span>Grand Total: <strong>{formatCurrency(grandTotal)}</strong></span>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--spacing-xl)', padding: 'var(--spacing-lg)', backgroundColor: 'var(--color-background)', borderTop: '1px solid var(--color-border)', borderBottomLeftRadius: 'var(--radius-lg)', borderBottomRightRadius: 'var(--radius-lg)', fontSize: 'var(--font-size-sm)' }}>
+            <span style={{ color: 'var(--color-text-secondary)' }}>{sortedExpenses.length} record{sortedExpenses.length !== 1 ? 's' : ''}</span>
+            <span>Petty Cash: <strong style={{ color: 'var(--color-text-primary)' }}>{formatCurrency(pettyCashTotal)}</strong></span>
+            <span>Other: <strong style={{ color: 'var(--color-text-primary)' }}>{formatCurrency(otherTotal)}</strong></span>
+            <span>Bank Charges: <strong style={{ color: 'var(--color-text-primary)' }}>{formatCurrency(bankChargesTotal)}</strong></span>
+            <span style={{ marginLeft: 'auto', fontSize: 'var(--font-size-base)' }}>Grand Total: <strong style={{ color: 'var(--color-primary)' }}>{formatCurrency(grandTotal)}</strong></span>
           </div>
-        </>
+        </div>
       ) : (
-        <div className="er-empty-state">
-          <div className="er-empty-icon">🧾</div>
+        <div className="card" style={{ textAlign: 'center', padding: 'var(--spacing-3xl)', color: 'var(--color-text-secondary)' }}>
+          <div style={{ fontSize: '48px', marginBottom: 'var(--spacing-md)', opacity: 0.5 }}>🧾</div>
           <p>{hasSearched ? 'No expenses match the selected filters.' : 'Select filters and click Search to view expenses.'}</p>
-          {hasSearched && <button onClick={handleReset} className="er-btn er-btn-secondary">Reset Filters</button>}
+          {hasSearched && <button onClick={handleReset} className="btn btn-secondary" style={{ marginTop: 'var(--spacing-md)' }}>Reset Filters</button>}
         </div>
       )}
     </div>

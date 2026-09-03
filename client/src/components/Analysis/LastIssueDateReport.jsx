@@ -132,7 +132,7 @@ const LastIssueDateReport = () => {
         <h2>Raw Material - Last Issue Date</h2>
       </div>
 
-      <div className="controls-row">
+      <div className="controls-row report-filter-bar">
         <div className="form-group">
           <label>
             <FontAwesomeIcon icon={faFilter} /> Item Status

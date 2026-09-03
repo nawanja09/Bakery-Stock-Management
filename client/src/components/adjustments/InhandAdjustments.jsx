@@ -236,7 +236,7 @@ const InhandAdjustments = () => {
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
   return (
-    <div className="adjustments-page">
+    <div className="page-container">
       {/* Toast */}
       {toastMsg && (
         <div className={`ih-toast ih-toast-${toastMsg.type}`}>
@@ -274,46 +274,46 @@ const InhandAdjustments = () => {
       )}
 
       {/* Page Header */}
-      <div className="page-header">
-        <div className="page-title-section">
-          <h1 className="page-title">
-            <FontAwesomeIcon icon={faMoneyBillWave} className="page-title-icon" />
-            Inhand Adjustments
-          </h1>
+      <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+        <div>
+          <h2 style={{ margin: 0 }}>
+            <FontAwesomeIcon icon={faMoneyBillWave} style={{ marginRight: '8px' }} /> Inhand Adjustments
+          </h2>
+          <p style={{ margin: '4px 0 0', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>Manage cash and cheque entries</p>
         </div>
         <button
-          className="btn-primary-action"
+          className="btn btn-primary"
           onClick={() => { setEditEntry(null); setShowForm(true); }}
         >
           <FontAwesomeIcon icon={faPlus} /> New Inhand Entry
         </button>
-      </div>
+      </header>
 
       {/* Filters */}
-      <div className="filters-section">
-        <div className="filter-row">
-          <div className="filter-group">
-            <label><FontAwesomeIcon icon={faFilter} /> Date From</label>
-            <input type="date" value={filters.startDate}
+      <div className="card" style={{ padding: 'var(--spacing-md)', marginBottom: 'var(--spacing-lg)' }}>
+        <div style={{ display: 'flex', gap: 'var(--spacing-lg)', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          <div className="filter-group" style={{ flex: 1, minWidth: '150px' }}>
+            <label style={{ display: 'block', fontSize: 'var(--font-size-sm)', fontWeight: 'bold', marginBottom: 'var(--spacing-xs)' }}><FontAwesomeIcon icon={faFilter} /> Date From</label>
+            <input type="date" value={filters.startDate} className="form-input" style={{ width: '100%' }}
               onChange={e => setFilters(f => ({ ...f, startDate: e.target.value }))} />
           </div>
-          <div className="filter-group">
-            <label>Date To</label>
-            <input type="date" value={filters.endDate}
+          <div className="filter-group" style={{ flex: 1, minWidth: '150px' }}>
+            <label style={{ display: 'block', fontSize: 'var(--font-size-sm)', fontWeight: 'bold', marginBottom: 'var(--spacing-xs)' }}>Date To</label>
+            <input type="date" value={filters.endDate} className="form-input" style={{ width: '100%' }}
               onChange={e => setFilters(f => ({ ...f, endDate: e.target.value }))} />
           </div>
-          <div className="filter-group">
-            <label>Payment Type</label>
-            <select value={filters.payment_type}
+          <div className="filter-group" style={{ flex: 1, minWidth: '150px' }}>
+            <label style={{ display: 'block', fontSize: 'var(--font-size-sm)', fontWeight: 'bold', marginBottom: 'var(--spacing-xs)' }}>Payment Type</label>
+            <select value={filters.payment_type} className="form-select" style={{ width: '100%' }}
               onChange={e => setFilters(f => ({ ...f, payment_type: e.target.value }))}>
               <option value="all">All Types</option>
               <option value="Cash In">Cash In</option>
               <option value="Cheque In">Cheque In</option>
             </select>
           </div>
-          <div className="filter-group">
-            <label>Status</label>
-            <select value={filters.status}
+          <div className="filter-group" style={{ flex: 1, minWidth: '150px' }}>
+            <label style={{ display: 'block', fontSize: 'var(--font-size-sm)', fontWeight: 'bold', marginBottom: 'var(--spacing-xs)' }}>Status</label>
+            <select value={filters.status} className="form-select" style={{ width: '100%' }}
               onChange={e => setFilters(f => ({ ...f, status: e.target.value }))}>
               <option value="all">All Statuses</option>
               <option value="Draft">Draft</option>
@@ -322,12 +322,12 @@ const InhandAdjustments = () => {
               <option value="Cancelled">Cancelled</option>
             </select>
           </div>
-          <div className="filter-group search-group">
-            <label><FontAwesomeIcon icon={faSearch} /> Search</label>
-            <input type="text" placeholder="Ref no, party, cheque..." value={filters.search}
+          <div className="filter-group search-group" style={{ flex: 2, minWidth: '200px' }}>
+            <label style={{ display: 'block', fontSize: 'var(--font-size-sm)', fontWeight: 'bold', marginBottom: 'var(--spacing-xs)' }}><FontAwesomeIcon icon={faSearch} /> Search</label>
+            <input type="text" placeholder="Ref no, party, cheque..." value={filters.search} className="form-input" style={{ width: '100%' }}
               onChange={e => setFilters(f => ({ ...f, search: e.target.value }))} />
           </div>
-          <button className="btn-icon-reset" title="Reset filters"
+          <button className="btn btn-secondary" title="Reset filters" style={{ height: '38px' }}
             onClick={() => setFilters({ startDate: '', endDate: '', payment_type: 'all', status: 'all', search: '' })}>
             <FontAwesomeIcon icon={faSync} />
           </button>
@@ -335,38 +335,38 @@ const InhandAdjustments = () => {
       </div>
 
       {/* Summary cards */}
-      <div className="ih-summary-row">
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--spacing-lg)', marginBottom: 'var(--spacing-lg)' }}>
         {[
-          { label: 'Total',     val: total, icon: faFilter,        cls: '' },
+          { label: 'Total',     val: total, icon: faFilter,        cls: 'primary' },
           { label: 'Approved',  val: entries.filter(e => e.status === 'Approved').length,  icon: faCheckCircle,    cls: 'success' },
           { label: 'Pending',   val: entries.filter(e => e.status === 'Pending').length,   icon: faClock,          cls: 'warning' },
           { label: 'Cancelled', val: entries.filter(e => e.status === 'Cancelled').length, icon: faBan,            cls: 'danger'  },
         ].map(c => (
-          <div key={c.label} className={`ih-stat-card ${c.cls}`}>
-            <FontAwesomeIcon icon={c.icon} />
+          <div key={c.label} className={`card alert-${c.cls}`} style={{ padding: 'var(--spacing-md)', display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)' }}>
+            <FontAwesomeIcon icon={c.icon} style={{ fontSize: '24px', opacity: 0.8 }} />
             <div>
-              <div className="ih-stat-value">{c.val}</div>
-              <div className="ih-stat-label">{c.label}</div>
+              <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{c.val}</div>
+              <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>{c.label}</div>
             </div>
           </div>
         ))}
       </div>
 
       {/* Table */}
-      <div className="table-responsive">
+      <div className="card" style={{ overflowX: 'auto' }}>
         {loading ? (
-          <div className="ih-loading-state">
+          <div style={{ textAlign: 'center', padding: 'var(--spacing-2xl)', color: 'var(--color-text-secondary)' }}>
             <FontAwesomeIcon icon={faSpinner} spin size="2x" />
             <p>Loading...</p>
           </div>
         ) : entries.length === 0 ? (
-          <div className="ih-empty-state">
-            <FontAwesomeIcon icon={faMoneyBillWave} size="3x" className="empty-icon" />
+          <div style={{ textAlign: 'center', padding: 'var(--spacing-3xl)', color: 'var(--color-text-secondary)' }}>
+            <FontAwesomeIcon icon={faMoneyBillWave} size="3x" style={{ marginBottom: 'var(--spacing-md)', opacity: 0.5 }} />
             <h3>No Inhand Entries Found</h3>
             <p>Create your first Cash In or Cheque In entry using the button above.</p>
           </div>
         ) : (
-          <table className="adjustments-table">
+          <table className="report-table">
             <thead>
               <tr>
                 <th>Ref No</th>

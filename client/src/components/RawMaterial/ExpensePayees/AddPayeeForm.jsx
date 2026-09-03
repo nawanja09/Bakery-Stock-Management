@@ -60,48 +60,49 @@ const AddPayeeForm = ({
   };
 
   return (
-    <div className="rm-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel(); }}>
-      <div className="rm-form-container">
-        <div className="rm-form-header">
-          <h3>{title}</h3>
-          <button type="button" className="rm-close-btn" onClick={onCancel} aria-label="Close">
+    <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel(); }}>
+      <div className="modal-content" style={{ width: '400px', maxWidth: '90%' }}>
+        <div className="modal-header">
+          <h2>{title}</h2>
+          <button type="button" className="modal-close" onClick={onCancel} aria-label="Close">
             ×
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="rm-form-body" noValidate>
-          <label htmlFor="rm-payee-name" className="rm-input-label">
-            Payee Name *
-          </label>
-          <input
-            type="text"
-            id="rm-payee-name"
-            name="rm-payee-name"
-            value={payeeName}
-            onChange={handleNameChange}
-            placeholder="e.g. Ceylon Electricity Board"
-            autoFocus
-            className={`rm-input-field ${error ? 'rm-input-error' : ''}`}
-          />
-          {error && <span className="rm-field-error">{error}</span>}
+        <form onSubmit={handleSubmit} noValidate>
+          <div className="modal-body">
+            <label htmlFor="rm-payee-name">
+              Payee Name *
+            </label>
+            <input
+              type="text"
+              id="rm-payee-name"
+              name="rm-payee-name"
+              value={payeeName}
+              onChange={handleNameChange}
+              placeholder="e.g. Ceylon Electricity Board"
+              autoFocus
+              style={{ borderColor: error ? 'var(--color-danger)' : undefined }}
+            />
+            {error && <span className="text-danger" style={{ fontSize: 'var(--font-size-xs)', marginTop: '4px', display: 'block' }}>{error}</span>}
 
-          <label htmlFor="rm-payee-vat" className="rm-input-label" style={{ marginTop: '14px' }}>
-            VAT Reg Number
-          </label>
-          <input
-            type="text"
-            id="rm-payee-vat"
-            name="rm-payee-vat"
-            value={vatRegNumber}
-            onChange={(e) => setVatRegNumber(e.target.value)}
-            placeholder="e.g. 123456789-1 (optional)"
-            className="rm-input-field"
-          />
+            <label htmlFor="rm-payee-vat" style={{ marginTop: '14px' }}>
+              VAT Reg Number
+            </label>
+            <input
+              type="text"
+              id="rm-payee-vat"
+              name="rm-payee-vat"
+              value={vatRegNumber}
+              onChange={(e) => setVatRegNumber(e.target.value)}
+              placeholder="e.g. 123456789-1 (optional)"
+            />
+          </div>
 
-          <div className="rm-form-actions">
+          <div className="modal-footer">
             <button
               type="button"
-              className="rm-btn rm-cancel"
+              className="btn btn-secondary"
               onClick={onCancel}
               disabled={submitting}
             >
@@ -109,7 +110,7 @@ const AddPayeeForm = ({
             </button>
             <button
               type="submit"
-              className="rm-btn rm-submit"
+              className="btn btn-primary"
               disabled={submitting || !payeeName.trim()}
             >
               {submitting ? 'Saving...' : submitLabel}

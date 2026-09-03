@@ -1,0 +1,178 @@
+.report-filter-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+}
+
+.report-filter-bar > .report-filter-group,
+.report-filter-bar > .filter-group,
+.report-filter-bar > .form-group {
+  flex: 0 1 190px;
+  min-width: 150px;
+}
+
+.report-filter-bar > .report-filter-group:has(.react-select-container) {
+  flex-basis: 240px;
+}
+
+.report-filter-bar .report-filter-input,
+.report-filter-bar .report-filter-select,
+.report-filter-bar .filter-select,
+.report-filter-bar .date-input,
+.report-filter-bar .filter-group input,
+.report-filter-bar .filter-group select,
+.report-filter-bar .form-group input,
+.report-filter-bar .form-group select {
+  min-width: 0;
+  height: 38px;
+}
+
+.report-filter-bar .report-filter-actions,
+.report-filter-bar .filter-actions,
+.report-filter-bar .action-buttons-container {
+  margin-left: auto;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.report-filter-bar .react-select-container {
+  min-width: 0;
+}
+
+.report-filter-bar .react-select__control {
+  min-height: 38px;
+  height: 38px;
+  border-color: var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: none;
+}
+
+.report-filter-bar .react-select__value-container {
+  height: 36px;
+  padding: 0 10px;
+}
+
+.report-filter-bar .react-select__indicators {
+  height: 36px;
+}
+
+.report-filter-bar .items-search {
+  min-width: 0;
+  width: 100%;
+}
+
+.report-filter-bar .report-filter-label,
+.report-filter-bar .form-group label,
+.report-filter-bar .filter-group label {
+  margin-bottom: 5px;
+}
+
+.adjustment-filter-form {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+}
+
+.adjustment-filter-form .filter-group {
+  flex: 0 1 220px;
+  min-width: 160px;
+}
+
+.adjustment-filter-form .filter-actions {
+  flex: 0 0 auto;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.ledger-filter-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  width: 100%;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+}
+
+.ledger-filter-row > * {
+  flex: 0 1 190px;
+  min-width: 150px;
+}
+
+.purchase-report-table {
+  min-width: 760px;
+}
+
+.purchase-report-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.purchase-report-table th {
+  padding: 13px 16px;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.04em;
+  text-align: left;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.purchase-report-table th:last-child,
+.purchase-report-table td:last-child {
+  text-align: right;
+}
+
+.purchase-report-table th.sortable {
+  cursor: pointer;
+}
+
+.purchase-report-table th.sortable:hover {
+  background: var(--color-primary-dark);
+}
+
+@media (max-width: 1024px) {
+  .report-filter-bar,
+  .adjustment-filter-form,
+  .ledger-filter-row {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+
+  .report-filter-bar > .report-filter-group,
+  .report-filter-bar > .filter-group,
+  .report-filter-bar > .form-group,
+  .adjustment-filter-form .filter-group,
+  .ledger-filter-row > * {
+    flex: 1 1 calc(50% - 6px);
+  }
+
+  .report-filter-bar .report-filter-actions,
+  .report-filter-bar .filter-actions,
+  .report-filter-bar .action-buttons-container,
+  .adjustment-filter-form .filter-actions {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .report-filter-bar,
+  .adjustment-filter-form,
+  .ledger-filter-row {
+    gap: 10px;
+  }
+
+  .report-filter-bar > .report-filter-group,
+  .report-filter-bar > .filter-group,
+  .report-filter-bar > .form-group,
+  .adjustment-filter-form .filter-group,
+  .ledger-filter-row > * {
+    flex-basis: 100%;
+  }
+}
