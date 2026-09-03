@@ -27,8 +27,6 @@ import './FGProduction.css';
 import { UTILITY_COST_RATE } from './fgProductionConstants';
 import { getCompatibleUnits, convertQuantity, areCompatibleUnits } from './unitConversion';
 
-const ALLOWED_FG_DEPARTMENTS = ['Bakery', 'Cake', 'Pastry', 'Restaurant', 'Savory'];
-
 const emptyRecipeForm = { rm_item_id: '', quantity: '', last_price: '', recipe_unit: '', base_unit: '' };
 
 const formatCurrency = (value) =>
@@ -39,6 +37,8 @@ const Recipes = () => {
 
   // Master / reference data
   const [departments, setDepartments] = useState([]);
+  const [departmentsLoading, setDepartmentsLoading] = useState(true);
+  const [departmentsError, setDepartmentsError] = useState('');
   const [rawMaterials, setRawMaterials] = useState([]);
   const [previousPrices, setPreviousPrices] = useState({});
 
@@ -122,11 +122,23 @@ const Recipes = () => {
           api.get('/departments'),
           api.get('/items')
         ]);
-        setDepartments((deptRes.data || []).filter(d => ALLOWED_FG_DEPARTMENTS.includes(d.name)));
+        const uniqueDepartments = Array.from(
+          new Map(
+            (Array.isArray(deptRes.data) ? deptRes.data : [])
+              .filter(department => department && department.id != null)
+              .filter(department => department.is_active !== false && department.deleted !== true)
+              .map(department => [department.id, department])
+          ).values()
+        );
+        setDepartments(uniqueDepartments);
+        setDepartmentsError('');
         setRawMaterials(itemsRes.data || []);
       } catch (err) {
         console.error(err);
+        setDepartmentsError('Unable to load departments. Please try again.');
         showPopup('error', 'Failed to load departments / raw materials');
+      } finally {
+        setDepartmentsLoading(false);
       }
       try {
         const priceRes = await api.get('/purchases/previous-prices');
@@ -211,6 +223,17 @@ const Recipes = () => {
   };
 
   const closeFgForm = () => setShowFgForm(false);
+
+  useEffect(() => {
+    if (!showFgForm) return undefined;
+
+    const handleEscape = (event) => {
+      if (event.key === 'Escape' && !savingFg) setShowFgForm(false);
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [showFgForm, savingFg]);
 
   const handleFgFormItemChange = (opt) => {
     setFgFormItem(opt);
@@ -460,7 +483,7 @@ const Recipes = () => {
           <p style={{ margin: '4px 0 0', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>Manage production recipes and costs</p>
         </div>
         <button className="btn btn-primary" onClick={openCreateFgForm}>
-          <FontAwesomeIcon icon={faPlus} /> New FG Production
+          <FontAwesomeIcon icon={faPlus} /> New FG Production Item
         </button>
       </header>
 
@@ -614,11 +637,11 @@ const Recipes = () => {
 
       {/* FG Create / Edit Modal */}
       {showFgForm && (
-        <div className="fgprod-modal-overlay" onClick={closeFgForm}>
+        <div className="fgprod-modal-overlay" onClick={closeFgForm} role="presentation">
           <div className="fgprod-modal-content erp-fg-production-modal" onClick={e => e.stopPropagation()}>
             <div className="fgprod-modal-header">
               <h3>{fgFormMode === 'create' ? 'New FG Production Item' : 'Edit FG Production Item'}</h3>
-              <button className="fgprod-modal-close" onClick={closeFgForm}>
+              <button className="fgprod-modal-close" onClick={closeFgForm} aria-label="Close form" title="Close form">
                 <FontAwesomeIcon icon={faTimes} />
               </button>
             </div>
@@ -666,7 +689,9 @@ const Recipes = () => {
                   options={departmentOptions}
                   value={fgFormDepartment}
                   onChange={setFgFormDepartment}
+                  isDisabled={departmentsLoading || Boolean(departmentsError)}
                   placeholder="Select department..."
+                  noOptionsMessage={() => 'No departments available'}
                 />
               </div>
               <div className="fgprod-form-group fgprod-form-group--spaced">

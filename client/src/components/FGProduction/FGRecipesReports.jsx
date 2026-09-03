@@ -15,8 +15,6 @@ import api from '../../api';
 import './FGProduction.css';
 import { UTILITY_COST_RATE } from './fgProductionConstants';
 
-const ALLOWED_FG_DEPARTMENTS = ['Bakery', 'Cake', 'Pastry', 'Restaurant', 'Savory'];
-
 const FGRecipesReports = () => {
   const { showPopup } = usePopup();
 
@@ -44,7 +42,17 @@ const FGRecipesReports = () => {
   useEffect(() => {
     fetchReport();
     api.get('/departments')
-      .then(res => setDepartments((res.data || []).filter(d => ALLOWED_FG_DEPARTMENTS.includes(d.name))))
+      .then(res => {
+        const uniqueDepartments = Array.from(
+          new Map(
+            (Array.isArray(res.data) ? res.data : [])
+              .filter(department => department && department.id != null)
+              .filter(department => department.is_active !== false && department.deleted !== true)
+              .map(department => [department.id, department])
+          ).values()
+        );
+        setDepartments(uniqueDepartments);
+      })
       .catch(err => console.error(err));
   }, [fetchReport]);
 

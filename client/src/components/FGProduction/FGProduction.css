@@ -1,2 +1,107 @@
 @import '../FinishedGoods/FinishedGoods.css';
 @import '../common/FormStyles.css';
+
+.fgprod-modal-overlay {
+	position: fixed;
+	inset: 0;
+	z-index: calc(var(--z-modal) + 20);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 24px;
+	background: rgba(15, 23, 42, 0.58);
+	backdrop-filter: blur(2px);
+	animation: fadeIn var(--transition-base);
+}
+
+.fgprod-modal-content {
+	width: min(100%, 680px);
+	max-height: min(90vh, 760px);
+	overflow-y: auto;
+	background: var(--color-surface);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-xl);
+	box-shadow: var(--shadow-2xl);
+	animation: slideUp var(--transition-base);
+}
+
+.fgprod-modal-header,
+.fgprod-modal-footer {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	padding: 18px 22px;
+}
+
+.fgprod-modal-header {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+	background: var(--color-surface);
+	border-bottom: 1px solid var(--color-border);
+}
+
+.fgprod-modal-header h3 {
+	color: var(--color-heading);
+	font-size: var(--font-size-xl);
+}
+
+.fgprod-modal-close {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 34px;
+	height: 34px;
+	flex: 0 0 34px;
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-md);
+	background: var(--color-surface-strong);
+	color: var(--color-text-secondary);
+	cursor: pointer;
+	transition: all var(--transition-fast);
+}
+
+.fgprod-modal-close:hover {
+	border-color: rgba(220, 38, 38, 0.25);
+	background: var(--color-danger-light);
+	color: var(--color-danger);
+}
+
+.fgprod-modal-body {
+	display: flex;
+	flex-direction: column;
+	gap: 18px;
+	padding: 22px;
+}
+
+.fgprod-modal-footer {
+	justify-content: flex-end;
+	border-top: 1px solid var(--color-border);
+	background: var(--color-surface);
+}
+
+.fgprod-modal-content .fgprod-form-group {
+	min-width: 0;
+}
+
+@media (max-width: 640px) {
+	.fgprod-modal-overlay { align-items: flex-end; padding: 10px; }
+
+	.fgprod-modal-content {
+		width: 100%;
+		max-height: 94vh;
+		border-radius: var(--radius-lg);
+	}
+
+	.fgprod-modal-header,
+	.fgprod-modal-body,
+	.fgprod-modal-footer { padding: 16px; }
+
+	.fgprod-modal-footer {
+		flex-direction: column-reverse;
+		align-items: stretch;
+	}
+
+	.fgprod-modal-footer button { width: 100%; }
+}
