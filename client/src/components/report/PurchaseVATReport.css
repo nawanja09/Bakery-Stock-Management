@@ -2,3 +2,14 @@
 
 .vat-report-filter { width: 100%; }
 .vat-report-filter .report-filter-group { min-width: 150px; }
+.vat-report-filter .items-search {
+	flex: 0 0 var(--input-height);
+	height: var(--input-height);
+	min-height: var(--input-height);
+	box-sizing: border-box;
+}
+
+.vat-report-filter .report-filter-group:has(.items-search) {
+	flex: 1 1 200px;
+	min-width: 200px;
+}

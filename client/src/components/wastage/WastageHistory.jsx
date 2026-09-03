@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Wastage.css';
 import api from '../../api';
@@ -25,11 +25,7 @@ const WastageHistory = () => {
   const navigate = useNavigate();
   const { showPopup } = usePopup();
 
-  useEffect(() => {
-    fetchWastages();
-  }, []);
-
-  const fetchWastages = async () => {
+  const fetchWastages = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
@@ -64,14 +60,11 @@ const WastageHistory = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [navigate, showPopup]);
 
-  // Calculate total loss for a wastage
-  const calculateTotalLoss = (wastageId) => {
-    // This would be calculated from the items, but we need to fetch items or store total in DB
-    // For now, we'll use a placeholder - ideally you'd fetch this from the API
-    return 0;
-  };
+  useEffect(() => {
+    fetchWastages();
+  }, [fetchWastages]);
 
   // View Wastage Details
   const handleView = async (id) => {

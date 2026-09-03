@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faFileExcel, 
@@ -11,8 +11,6 @@ import {
   faExclamationTriangle,
   faChevronLeft,
   faChevronRight,
-  faDownload,
-  faBuilding
 } from '@fortawesome/free-solid-svg-icons';
 import dayjs from 'dayjs';
 import api from '../../api';
@@ -31,9 +29,7 @@ const PurchaseVATReport = () => {
   const [startDate, setStartDate] = useState(dayjs().startOf('month').format('YYYY-MM-DD'));
   const [endDate, setEndDate] = useState(dayjs().format('YYYY-MM-DD'));
   const [searchQuery, setSearchQuery] = useState('');
-  const [companies, setCompanies] = useState([]);
   const [selectedCompany, setSelectedCompany] = useState('');
-  const [debugInfo, setDebugInfo] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
 
@@ -42,14 +38,6 @@ const PurchaseVATReport = () => {
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentItems = filteredReturns.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(filteredReturns.length / itemsPerPage);
-
-  useEffect(() => {
-    fetchCompanies();
-  }, []);
-
-  useEffect(() => {
-    fetchVATReturns();
-  }, [startDate, endDate, selectedCompany]);
 
   useEffect(() => {
     if (searchQuery) {
@@ -67,15 +55,6 @@ const PurchaseVATReport = () => {
     }
   }, [searchQuery, purchaseReturns]);
 
-  const fetchCompanies = async () => {
-    try {
-      const response = await api.get('/purchases/companies');
-      setCompanies(response.data);
-    } catch (error) {
-      console.error('Error fetching companies:', error);
-    }
-  };
-
   const getInvoiceNo = (ret) => {
     const val = ret.invoice_no;
     if (!val || val.trim() === '' || val === '—') {
@@ -84,7 +63,7 @@ const PurchaseVATReport = () => {
     return val;
   };
   
-  const fetchVATReturns = async () => {
+  const fetchVATReturns = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -101,11 +80,6 @@ const PurchaseVATReport = () => {
       if (response.data && response.data.length > 0) {
         console.log('First record invoice_no:', response.data[0].invoice_no);
         console.log('First record full data:', response.data[0]);
-        setDebugInfo({
-          hasInvoiceNo: response.data[0].hasOwnProperty('invoice_no'),
-          invoiceNoValue: response.data[0].invoice_no,
-          totalRecords: response.data.length
-        });
       }
 
       setPurchaseReturns(response.data);
@@ -114,11 +88,14 @@ const PurchaseVATReport = () => {
       
     } catch (error) {
       console.error('Error fetching VAT returns:', error);
-      setDebugInfo({ error: error.message });
     } finally {
       setLoading(false);
     }
-  };
+  }, [endDate, startDate]);
+
+  useEffect(() => {
+    fetchVATReturns();
+  }, [fetchVATReturns, selectedCompany]);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-LK', {
@@ -237,14 +214,13 @@ const PurchaseVATReport = () => {
             <label className="report-filter-label">
               <FontAwesomeIcon icon={faSearch} /> Search
             </label>
-            <div className="items-search" style={{ padding: 0 }}>
+            <div className="items-search report-search-field">
               <input
                 type="text"
                 placeholder="Supplier, TIN, Invoice..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="report-filter-input"
-                style={{ border: 'none', height: '100%' }}
               />
             </div>
           </div>

@@ -9,7 +9,7 @@ import api from '../../api';
 import usePaymentMethods from '../../utils/usePaymentMethods';
 import './PayNowModal.css';
 
-const PayNowModal = ({ isOpen, onClose, suppliers = [], companies = [], supplierId, supplierName, onSuccess }) => {
+const PayNowModal = ({ isOpen, onClose, suppliers = [], companies = [], supplierId, supplierName, onSuccess, embedded = false }) => {
   const { showPopup } = usePopup();
   const currentUser = JSON.parse(localStorage.getItem('user'));
   const { paymentMethods, loadingMethods } = usePaymentMethods();
@@ -163,8 +163,8 @@ const PayNowModal = ({ isOpen, onClose, suppliers = [], companies = [], supplier
   };
 
   return createPortal((
-    <div className="pnm-overlay" onClick={onClose}>
-      <div className="pnm-modal erp-payment-modal" onClick={e => e.stopPropagation()}>
+    <div className={embedded ? 'pnm-page-container' : 'pnm-overlay'} onClick={embedded ? undefined : onClose}>
+      <div className={`${embedded ? 'pnm-page-card' : 'pnm-modal'} erp-payment-modal`} onClick={e => e.stopPropagation()}>
 
         <div className="pnm-header">
           <h3>

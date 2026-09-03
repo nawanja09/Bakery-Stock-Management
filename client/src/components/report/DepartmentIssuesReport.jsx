@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faDownload, faFileExcel, faFilter, faCalendarAlt } from '@fortawesome/free-solid-svg-icons';
+import { faFileExcel, faFilter, faCalendarAlt } from '@fortawesome/free-solid-svg-icons';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';

@@ -1,24 +1,17 @@
 // src/components/purchase/AddPurchaseReturn.jsx
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faArrowLeft,
-  faExclamationTriangle,
   faBalanceScale,
-  faFileInvoice,
   faUser,
   faPercent,
-  faCreditCard,
   faBuilding,
-  faUniversity,
   faPlus,
   faTrash,
   faBoxes,
-  faSearch,
-  faCheckCircle,
-  faMoneyBillWave,
-  faReceipt
+  faSearch
 } from '@fortawesome/free-solid-svg-icons';
 import Select from 'react-select';
 import dayjs from 'dayjs';
@@ -28,18 +21,16 @@ import './AddPurchaseReturn.css';
 
 const AddPurchaseReturn = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   const { showPopup } = usePopup();
   
   const [currentUser, setCurrentUser] = useState(null);
   const [returnDate, setReturnDate] = useState(dayjs().format('YYYY-MM-DD'));
-  const [remarks, setRemarks] = useState('');
+  const [remarks] = useState('');
   const [supplierVatRegistered, setSupplierVatRegistered] = useState(false);
   const [returnNumber, setReturnNumber] = useState('');
   const [itemsList, setItemsList] = useState([]);
   const [previousPurchasePrices, setPreviousPurchasePrices] = useState({});
   const [currentStock, setCurrentStock] = useState({});
-  const [loadingStock, setLoadingStock] = useState(false);
   
   const [formData, setFormData] = useState({
     supplier_id: '',
@@ -113,7 +104,6 @@ const AddPurchaseReturn = () => {
 
   const fetchAllCurrentStock = async () => {
     try {
-      setLoadingStock(true);
       const response = await api.get('/purchase-returns/stock/current');
       const stockMap = {};
       response.data.forEach(stock => {
@@ -123,7 +113,6 @@ const AddPurchaseReturn = () => {
     } catch (error) {
       showPopup('warning', 'Could not load stock information. You can still create returns but stock validation may be limited.');
     } finally {
-      setLoadingStock(false);
     }
   };
 
@@ -233,21 +222,6 @@ const AddPurchaseReturn = () => {
     return { amount, vat, total };
   };
 
-  const calculateReturnTotal = () => {
-    let subtotal = 0;
-    let totalVat = 0;
-    returnItems.forEach(item => {
-      if (item.return_quantity > 0 && item.unit_price > 0 && item.item_id) {
-        const amount = item.return_quantity * item.unit_price;
-        subtotal += amount;
-        if (supplierVatRegistered && item.vat_applicable) {
-          totalVat += amount * (VAT_RATE / 100);
-        }
-      }
-    });
-    return subtotal + totalVat;
-  };
-
   const calculateTotals = () => {
     let subtotal = 0;
     let totalVat = 0;
@@ -280,8 +254,6 @@ const AddPurchaseReturn = () => {
     if (!currentUser?.id)       { showPopup('error', 'User information is missing. Please login again.'); navigate('/login'); return; }
 
     setIsSubmitting(true);
-    const { grandTotal } = calculateTotals();
-
     const itemsToReturn = returnItems
       .filter(item => item.return_quantity > 0 && item.unit_price > 0 && item.item_id)
       .map(item => ({

@@ -50,7 +50,7 @@ const ChangePassword = () => {
     }
 
     return (
-        <div className="change-password-container">
+        <div className="page-shell change-password-container">
             <div className="change-password-card">
                 <h2 className="change-password-title">
                     <i className="bi bi-shield-lock"></i> Change Password

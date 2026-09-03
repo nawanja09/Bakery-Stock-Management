@@ -6,7 +6,6 @@ import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
-  faDownload, 
   faFileExcel, 
   faCalendar, 
   faSync

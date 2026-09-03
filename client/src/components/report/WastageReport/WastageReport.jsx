@@ -1,12 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react';
 import './WastageReport.css';
 import api from '../../../api';
 import { usePopup } from '../../context/PopupContext';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faFileAlt,
-  faSearch,
   faCalendarAlt,
   faBoxOpen,
   faTimes,
@@ -19,7 +17,6 @@ import { formatCurrency } from '../../../utils/formatters';
 
 
 const WastageReport = () => {
-  const navigate = useNavigate();
   const { showPopup } = usePopup();
   
   const [loading, setLoading] = useState(false);
@@ -37,16 +34,7 @@ const WastageReport = () => {
     itemId: ''
   });
 
-  useEffect(() => {
-    fetchItems();
-    fetchWastageData();
-  }, []);
-
-  useEffect(() => {
-    applyFilters();
-  }, [filters, wastageData]);
-
-  const fetchItems = async () => {
+  const fetchItems = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
       const response = await api.get('/items', {
@@ -56,9 +44,9 @@ const WastageReport = () => {
     } catch (error) {
       console.error('Error fetching items:', error);
     }
-  };
+  }, []);
 
-  const fetchWastageData = async () => {
+  const fetchWastageData = useCallback(async () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
@@ -84,9 +72,9 @@ const WastageReport = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showPopup]);
 
-  const applyFilters = () => {
+  const applyFilters = useCallback(() => {
     let filtered = [...wastageData];
     
     // Date range filter
@@ -105,7 +93,16 @@ const WastageReport = () => {
     }
     
     setFilteredData(filtered);
-  };
+  }, [filters, wastageData]);
+
+  useEffect(() => {
+    fetchItems();
+    fetchWastageData();
+  }, [fetchItems, fetchWastageData]);
+
+  useEffect(() => {
+    applyFilters();
+  }, [applyFilters]);
 
   const handleFilterChange = (field, value) => {
     setFilters(prev => ({ ...prev, [field]: value }));

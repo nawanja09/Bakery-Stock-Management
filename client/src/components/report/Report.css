@@ -58,6 +58,8 @@
 
 .report-filter-bar .items-search {
   height: 38px;
+  min-height: 38px;
+  box-sizing: border-box;
   padding: 0 10px;
   border: 1px solid var(--color-border);
   border-radius: 6px;
@@ -68,6 +70,13 @@
   padding: 0 2px;
   border: 0;
   box-shadow: none;
+}
+
+.report-search-field {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  height: 38px;
 }
 
 .report-filter-actions {
@@ -88,6 +97,7 @@
 
 .report-table-shell > table {
   min-width: 760px;
+  width: 100%;
 }
 
 .report-table,
@@ -152,6 +162,25 @@
 
 .purchase-report-table {
   min-width: 900px;
+  table-layout: fixed;
+}
+
+.purchase-report-table th:nth-child(1),
+.purchase-report-table td:nth-child(1) { width: 18%; }
+.purchase-report-table th:nth-child(2),
+.purchase-report-table td:nth-child(2) { width: 16%; }
+.purchase-report-table th:nth-child(3),
+.purchase-report-table td:nth-child(3) { width: 17%; }
+.purchase-report-table th:nth-child(4),
+.purchase-report-table td:nth-child(4) { width: 29%; }
+.purchase-report-table th:nth-child(5),
+.purchase-report-table td:nth-child(5) { width: 20%; }
+.purchase-report-table .report-table-reference,
+.purchase-report-table .report-table-date {
+  white-space: nowrap;
+}
+.purchase-report-table td:not(.report-table-value-numeric) {
+  overflow-wrap: anywhere;
 }
 
 .sortable { cursor: pointer; }

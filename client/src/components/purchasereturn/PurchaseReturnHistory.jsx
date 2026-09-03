@@ -1,5 +1,5 @@
 // src/components/purchaseReturns/PurchaseReturnHistory.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
@@ -9,7 +9,6 @@ import {
   faFilter,
   faCalendar,
   faFileInvoice,
-  faUndo,
   faBalanceScale,
   faCheckCircle,
   faTimesCircle,
@@ -17,11 +16,8 @@ import {
   faChevronDown,
   faChevronUp,
   faDownload,
-  faPrint,
   faReceipt,
-  faMoneyBillWave,
-  faCreditCard,
-  faCheck
+  faCreditCard
 } from '@fortawesome/free-solid-svg-icons';
 import dayjs from 'dayjs';
 import { usePopup } from '../context/PopupContext';
@@ -59,8 +55,6 @@ const PurchaseReturnHistory = () => {
     remarks: true
   });
 
-  useEffect(() => { fetchReturns(); }, []);
-
   useEffect(() => {
     let filtered = returns;
     if (searchQuery) {
@@ -76,7 +70,7 @@ const PurchaseReturnHistory = () => {
     setFilteredReturns(filtered);
   }, [returns, searchQuery, startDate, endDate]);
 
-  const fetchReturns = async () => {
+  const fetchReturns = useCallback(async () => {
     try {
       setLoading(true);
       const response = await api.get('/purchase-returns');
@@ -89,7 +83,9 @@ const PurchaseReturnHistory = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showPopup]);
+
+  useEffect(() => { fetchReturns(); }, [fetchReturns]);
 
   const formatCurrency = (amount) =>
     new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR', minimumFractionDigits: 2 })
@@ -219,8 +215,6 @@ const PurchaseReturnHistory = () => {
 
   const toggleSection = (section) =>
     setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
-
-  const handlePrint = () => window.print();
 
   const handleExportCSV = () => {
     const headers = ['Return #', 'Date', 'Supplier', 'Invoice #', 'Invoice Date', 'Total', 'Settled', 'Balance', 'Status'];
