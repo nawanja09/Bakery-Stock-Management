@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import './OpeningBalance.css';
 import api from '../../api';
 import { formatQuantity } from '../../utils/formatters';
@@ -12,6 +12,7 @@ const OpeningBalanceHistory = () => {
   const [editData, setEditData] = useState({ date: '', quantity: '' });
   const [searchTerm, setSearchTerm] = useState('');
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     fetchBalances();
@@ -63,7 +64,7 @@ const OpeningBalanceHistory = () => {
   return (
     <div className="opening-balance-container">
       <div className="header-buttons">
-        <button onClick={() => navigate('/opening/add')} className="btn-add">
+        <button onClick={() => navigate('/opening/add', { state: { backgroundLocation: location } })} className="btn-add">
           + Add New
         </button>
         {/* Search Input */}

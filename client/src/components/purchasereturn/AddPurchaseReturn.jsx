@@ -333,7 +333,7 @@ const AddPurchaseReturn = () => {
   }));
 
   return (
-    <div className="purchase-return-container">
+    <div className="purchase-return-container erp-return-page">
       {/* PAGE HEADER */}
       <div className="page-header">
         <div className="header-title">

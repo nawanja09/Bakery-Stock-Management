@@ -6,14 +6,19 @@ import {
   faCheckCircle,
   faPaperPlane,
   faBalanceScale,
-  faSpinner,
   faSearch,
   faReceipt,
   faWallet,
   faFileInvoice,
   faMoneyBillWave,
   faFilter,
-  faTimes
+  faTimes,
+  faBuilding,
+  faCalendarAlt,
+  faExclamationCircle,
+  faClock,
+  faChevronLeft,
+  faChevronRight
 } from '@fortawesome/free-solid-svg-icons';
 import dayjs from 'dayjs';
 import { usePopup } from '../context/PopupContext';
@@ -34,6 +39,10 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], comp
 
   const [supplierSearch, setSupplierSearch] = useState('');
   const [activeFilterId, setActiveFilterId] = useState(supplierId || '');
+  const [companyFilter, setCompanyFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [dateFilter, setDateFilter] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
 
   const [showPayModal, setShowPayModal] = useState(false);
   const [showPayNowModal, setShowPayNowModal] = useState(false);
@@ -128,9 +137,16 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], comp
     return allRecords.filter((r) => {
       const matchesText = !term || r.supplier_name?.toLowerCase().includes(term);
       const matchesId = !activeFilterId || String(r.supplier_id) === String(activeFilterId);
-      return matchesText && matchesId;
+      const matchesCompany = !companyFilter || String(r.company_id || '') === String(companyFilter);
+      const matchesStatus = !statusFilter || (r.status || 'Active') === statusFilter;
+      const matchesDate = !dateFilter || (r.transaction_date && dayjs(r.transaction_date).format('YYYY-MM') === dateFilter);
+      return matchesText && matchesId && matchesCompany && matchesStatus && matchesDate;
     });
-  }, [allRecords, supplierSearch, activeFilterId]);
+  }, [allRecords, supplierSearch, activeFilterId, companyFilter, statusFilter, dateFilter]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [supplierSearch, activeFilterId, companyFilter, statusFilter, dateFilter]);
 
   // Summary cards
   const summaryStats = useMemo(() => {
@@ -296,6 +312,26 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], comp
       activeSupplierName
     : activeSupplierName;
 
+  const pageSize = 10;
+  const pageCount = Math.max(1, Math.ceil(filteredRecords.length / pageSize));
+  const pagedRecords = filteredRecords.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const pageStart = filteredRecords.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const pageEnd = Math.min(currentPage * pageSize, filteredRecords.length);
+
+  const getStatusIcon = (status) => {
+    if (status === 'Paid') return faCheckCircle;
+    if (status === 'Partially Paid') return faClock;
+    if (status === 'Credit') return faWallet;
+    return faExclamationCircle;
+  };
+
+  const handleResetFilters = () => {
+    handleClearFilter();
+    setCompanyFilter('');
+    setStatusFilter('');
+    setDateFilter('');
+  };
+
   return (
     <div className="pis-container">
       {/* Modals */}
@@ -353,12 +389,20 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], comp
         }}
       />
 
-      {/* Section Header */}
-      <div className="pis-header">
-        <h3>
-          <FontAwesomeIcon icon={faFileInvoiceDollar} />
-          Pending Invoices / Payments
-        </h3>
+      {/* Page Header */}
+      <div className="pis-page-header">
+        <div>
+          <span className="pis-eyebrow"><FontAwesomeIcon icon={faReceipt} /> SUPPLIER LEDGER</span>
+          <h2>Purchase &amp; Supplier Payments</h2>
+          <p>Manage supplier invoices, payments and credits</p>
+        </div>
+      </div>
+
+      <div className="pis-panel-heading">
+        <div>
+          <h3>Pending Invoices &amp; Payments</h3>
+          <p>Review and settle outstanding supplier invoices</p>
+        </div>
         <div className="pis-header-actions">
           <button
             className="pis-btn-pay-now"
@@ -373,29 +417,29 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], comp
 
       {/* Summary Cards */}
       <div className="pis-summary-grid">
-        <div className="pis-summary-item debt">
+        <div className="pis-summary-item debt"><div className="pis-summary-icon"><FontAwesomeIcon icon={faFileInvoiceDollar} /></div><div>
           <span>Outstanding Invoices</span>
-          <strong>{formatCurrency(summaryStats.totalOutstandingInvoices)}</strong>
-        </div>
-        <div className="pis-summary-item credit">
-          <span>Available Credits</span>
-          <strong>{formatCurrency(summaryStats.totalAvailableCredit)}</strong>
-        </div>
-        <div className="pis-summary-item">
+          {loading ? <i className="pis-skeleton pis-skeleton-value" /> : <strong>{formatCurrency(summaryStats.totalOutstandingInvoices)}</strong>}
+          <small>Total amount due</small></div></div>
+        <div className="pis-summary-item warning"><div className="pis-summary-icon"><FontAwesomeIcon icon={faClock} /></div><div>
           <span>Pending Invoices</span>
-          <strong>{summaryStats.invoiceCount}</strong>
-        </div>
-        <div className="pis-summary-item">
+          {loading ? <i className="pis-skeleton pis-skeleton-value" /> : <strong>{summaryStats.invoiceCount}</strong>}
+          <small>Need attention</small></div></div>
+        <div className="pis-summary-item credit"><div className="pis-summary-icon"><FontAwesomeIcon icon={faWallet} /></div><div>
+          <span>Available Credits</span>
+          {loading ? <i className="pis-skeleton pis-skeleton-value" /> : <strong>{formatCurrency(summaryStats.totalAvailableCredit)}</strong>}
+          <small>Supplier credits</small></div></div>
+        <div className="pis-summary-item success"><div className="pis-summary-icon"><FontAwesomeIcon icon={faCheckCircle} /></div><div>
           <span>Credit Documents</span>
-          <strong>{summaryStats.creditCount}</strong>
-        </div>
+          {loading ? <i className="pis-skeleton pis-skeleton-value" /> : <strong>{summaryStats.creditCount}</strong>}
+          <small>Active documents</small></div></div>
       </div>
 
       {/* Filter Bar */}
       <div className="pis-filter-bar">
         <div className="pis-filter-group">
           <label htmlFor="pis-supplier-search">
-            <FontAwesomeIcon icon={faFilter} /> Supplier Search / Filter
+            <FontAwesomeIcon icon={faSearch} /> Search Supplier
           </label>
           <div className="pis-filter-input-wrap">
             <FontAwesomeIcon icon={faSearch} />
@@ -404,7 +448,7 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], comp
               type="text"
               value={supplierSearch}
               onChange={(e) => setSupplierSearch(e.target.value)}
-              placeholder="Type to search suppliers…"
+              placeholder="Search suppliers..."
             />
             {supplierSearch && (
               <button
@@ -418,6 +462,10 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], comp
             )}
           </div>
         </div>
+        <div className="pis-filter-group"><label htmlFor="pis-company-filter"><FontAwesomeIcon icon={faBuilding} /> Company</label><select id="pis-company-filter" value={companyFilter} onChange={e => setCompanyFilter(e.target.value)}><option value="">All companies</option>{companies.map(company => <option key={company.id} value={company.id}>{company.name}</option>)}</select></div>
+        <div className="pis-filter-group"><label htmlFor="pis-status-filter"><FontAwesomeIcon icon={faFilter} /> Payment Status</label><select id="pis-status-filter" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}><option value="">All statuses</option><option value="Non-Paid">Non-Paid</option><option value="Partially Paid">Partially Paid</option><option value="Paid">Paid</option><option value="Credit">Credit</option><option value="Active">Active</option></select></div>
+        <div className="pis-filter-group"><label htmlFor="pis-date-filter"><FontAwesomeIcon icon={faCalendarAlt} /> Date</label><input id="pis-date-filter" type="month" value={dateFilter} onChange={e => setDateFilter(e.target.value)} /></div>
+        <button type="button" className="pis-reset-btn" onClick={handleResetFilters}><FontAwesomeIcon icon={faTimes} /> Reset Filters</button>
       </div>
 
       {/* Active filter notice */}
@@ -471,12 +519,11 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], comp
           </thead>
           <tbody>
             {loading ? (
-              <tr>
-                <td colSpan="9" className="pis-empty">
-                  <FontAwesomeIcon icon={faSpinner} spin />
-                  <p>Loading outstanding records…</p>
-                </td>
-              </tr>
+              Array.from({ length: 5 }, (_, index) => (
+                <tr key={`loading-${index}`} className="pis-loading-row">
+                  {Array.from({ length: 9 }, (_, cellIndex) => <td key={cellIndex}><i className="pis-skeleton" /></td>)}
+                </tr>
+              ))
             ) : filteredRecords.length === 0 ? (
               <tr>
                 <td colSpan="9" className="pis-empty">
@@ -489,7 +536,7 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], comp
                 </td>
               </tr>
             ) : (
-              filteredRecords.map((record) => {
+              pagedRecords.map((record) => {
                 const isInvoice = record._rowType === 'invoice';
                 const isSelected = isInvoice && selectedInvoiceIds.has(record.id);
                 const rowKey = `${record._rowType}-${record.id}`;
@@ -558,8 +605,8 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], comp
                     </td>
 
                     <td>
-                      <span className={`pis-status-badge pis-status-${(record.status || '').toLowerCase().replace(/\s+/g, '-')}`}>
-                        {record.status || 'Active'}
+                      <span className={`pis-status-badge pis-status-${(record.status || 'Active').toLowerCase().replace(/\s+/g, '-')}`}>
+                        <FontAwesomeIcon icon={getStatusIcon(record.status)} /> {record.status || 'Active'}
                       </span>
                     </td>
 
@@ -580,7 +627,7 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], comp
                             title={canSettle ? 'Settle with available credit' : disabledReason}
                             type="button"
                           >
-                            <FontAwesomeIcon icon={faBalanceScale} /> Settle Now
+                            <FontAwesomeIcon icon={faBalanceScale} /> Settle
                           </button>
                         );
                       })()}
@@ -593,8 +640,8 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], comp
         </table>
       </div>
 
-      <div className="pis-selection-summary">
-        <span>Selected Total: {formatCurrency(selectedTotal)}</span>
+      {selectedInvoiceIds.size > 0 && <div className="pis-selection-summary">
+        <span><strong>{selectedInvoiceIds.size} invoices selected</strong><small>Selected Total: {formatCurrency(selectedTotal)}</small></span>
         <button
           className="pis-btn-pay"
           onClick={handlePaySelected}
@@ -603,6 +650,11 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], comp
         >
           <FontAwesomeIcon icon={faCheckCircle} /> Pay Selected
         </button>
+      </div>}
+
+      <div className="pis-pagination">
+        <span>Showing {pageStart}–{pageEnd} of {filteredRecords.length} invoices</span>
+        <div className="pis-page-controls"><button type="button" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}><FontAwesomeIcon icon={faChevronLeft} /> Previous</button>{Array.from({ length: pageCount }, (_, index) => index + 1).slice(0, 5).map(page => <button type="button" key={page} className={page === currentPage ? 'active' : ''} onClick={() => setCurrentPage(page)}>{page}</button>)}<button type="button" onClick={() => setCurrentPage(p => Math.min(pageCount, p + 1))} disabled={currentPage === pageCount}>Next <FontAwesomeIcon icon={faChevronRight} /></button></div>
       </div>
 
       {/* Available Credits Sub-section */}
@@ -611,7 +663,7 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], comp
           <h4>
             <FontAwesomeIcon icon={faWallet} /> Available Supplier Credits
           </h4>
-          <span>Outstanding payments and unsettled return credits (shown in table above)</span>
+          <span>{formatCurrency(summaryStats.totalAvailableCredit)} outstanding / unused credit</span>
         </div>
         <div className="pis-credit-legend">
           <span className="pis-credit-badge advance">
@@ -623,6 +675,7 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], comp
           <span className="pis-credit-badge invoice-legend">
             <FontAwesomeIcon icon={faFileInvoice} /> Outstanding Invoice
           </span>
+          <button type="button" className="pis-credit-view" onClick={() => setStatusFilter('Credit')}>View Credits</button>
         </div>
       </div>
     </div>

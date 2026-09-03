@@ -535,7 +535,7 @@
 
 /* Button */
 .fg-btn-primary {
-  background: #2563eb;
+  background: var(--color-primary);
   color: white;
   padding: 0.6rem 1rem;
   border-radius: 6px;
@@ -576,7 +576,7 @@
 
 .fg-search-input:focus {
   outline: none;
-  border-color: #2563eb;
+  border-color: var(--color-primary);
   background: white;
 }
 
@@ -615,7 +615,7 @@
   padding: 0.35rem 0.6rem;
   border-radius: 6px;
   font-size: 0.75rem;
-  color: #2563eb;
+  color: var(--color-primary);
 }
 
 .fg-badge {
@@ -647,7 +647,7 @@
 }
 
 .fg-icon-btn:hover {
-  color: #2563eb;
+  color: var(--color-primary);
 }
 
 .fg-icon-btn.danger:hover {
@@ -687,7 +687,7 @@
   width: 26px;
   height: 26px;
   border: 3px solid #e5e7eb;
-  border-top: 3px solid #2563eb;
+  border-top: 3px solid var(--color-primary);
   border-radius: 50%;
   margin: 0 auto 1rem;
   animation: spin 0.8s linear infinite;

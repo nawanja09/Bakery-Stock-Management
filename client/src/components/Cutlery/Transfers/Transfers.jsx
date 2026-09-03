@@ -146,13 +146,16 @@ const Transfers = () => {
   }
 
   return (
-    <div className="transfers-page">
-      <div className="purchases-header">
-          <h1>Transfers</h1>
-          <button className="btn-add-transfer" onClick={() => setShowAddForm(true)}>
-            <FontAwesomeIcon icon={faPlus} /> Add Transfer
-          </button>
-      </div>
+    <div className="page-container">
+      <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+        <div>
+          <h2 style={{ margin: 0 }}>Cutlery Transfers</h2>
+          <p style={{ margin: '4px 0 0', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>Manage cutlery transfers between locations</p>
+        </div>
+        <button className="btn btn-primary" onClick={() => setShowAddForm(true)}>
+          <FontAwesomeIcon icon={faPlus} /> Add Transfer
+        </button>
+      </header>
 
       {showAddForm && (
         <AddTransferForm
@@ -169,20 +172,19 @@ const Transfers = () => {
         />
       )}
 
-      <section className="table-card">
+      <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
         {transfers.length === 0 ? (
-          <div className="empty-state">
-            <span>📦</span>
+          <div style={{ textAlign: 'center', padding: 'var(--spacing-3xl)', color: 'var(--color-text-secondary)' }}>
+            <div style={{ fontSize: '48px', marginBottom: 'var(--spacing-md)', opacity: 0.5 }}>📦</div>
             <h3>No transfers found</h3>
             <p>Create your first cutlery transfer to get started</p>
-            <button className="btn-primary" onClick={() => setShowAddForm(true)}>
+            <button className="btn btn-primary" style={{ marginTop: 'var(--spacing-md)' }} onClick={() => setShowAddForm(true)}>
               <FontAwesomeIcon icon={faPlus} /> Add Transfer
             </button>
           </div>
         ) : (
-          <>
-            <div className="table-responsive">
-              <table className="transfers-table">
+          <div style={{ overflowX: 'auto' }}>
+            <table className="report-table">
                 <thead>
                   <tr>
                     <th>ID</th>
@@ -224,7 +226,7 @@ const Transfers = () => {
                       <td className="right actions" data-label="Actions">
                         <button 
                           className="icon-btn view"
-                          onClick={() => navigate(`/cutlery/transfer/view/${t.id}`)} 
+                          onClick={() => navigate(`/cutlery/transfer/view/${t.id}`, { state: { backgroundLocation: location } })}
                           title="View"
                         >
                           <FontAwesomeIcon icon={faEye} />
@@ -249,9 +251,8 @@ const Transfers = () => {
                 </tbody>
               </table>
             </div>
-          </>
-        )}
-      </section>
+          )}
+      </div>
     </div>
   );
 };

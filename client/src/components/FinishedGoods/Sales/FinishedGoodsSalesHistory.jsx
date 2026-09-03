@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faEye, faTrash, faPlus, faSearch } from '@fortawesome/free-solid-svg-icons';
 import { usePopup } from '../../context/PopupContext';
@@ -15,6 +15,7 @@ const FinishedGoodsSalesHistory = () => {
   const [selectedSale, setSelectedSale] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const { showPopup } = usePopup();
 
   useEffect(() => {
@@ -113,7 +114,7 @@ const FinishedGoodsSalesHistory = () => {
           </p>
         </div>
         <button 
-          onClick={() => navigate('/finished-goods/sales/new')} 
+          onClick={() => navigate('/finished-goods/sales/new', { state: { backgroundLocation: location } })}
           className="btn btn-primary"
         >
           <FontAwesomeIcon icon={faPlus} />
@@ -152,7 +153,7 @@ const FinishedGoodsSalesHistory = () => {
           </p>
           {!searchTerm && (
             <button 
-              onClick={() => navigate('/finished-goods/sales/new')} 
+              onClick={() => navigate('/finished-goods/sales/new', { state: { backgroundLocation: location } })}
               className="btn btn-primary"
               style={{ marginTop: '1rem' }}
             >

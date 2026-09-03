@@ -1,6 +1,7 @@
 // src/components/purchase/PurchaseDetails.jsx
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faArrowLeft,
@@ -33,6 +34,7 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
   const params = useParams();
   const navigate = useNavigate();
   const id = purchaseId || params.id;
+  const location = useLocation();
 
   const [purchase, setPurchase] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -116,7 +118,7 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
   const handleEdit = () => {
     if (isModal && onClose) {
       onClose();
-      navigate(`/purchase/edit/${id}`);
+      navigate(`/purchase/edit/${id}`, { state: { backgroundLocation: location } });
     } else {
       navigate(`/purchase/edit/${id}`);
     }
@@ -191,7 +193,7 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
   const netBalanceAfterReturns = dueAmount;
 
   return (
-    <div className={`purchase-details-container ${isModal ? 'modal-view' : ''}`}>
+    <div className={`purchase-details-container erp-purchase-details ${isModal ? 'modal-view' : ''}`}>
       <div className="page-header">
         <div className="header-title">
           <button onClick={handleBack} className="back-button">

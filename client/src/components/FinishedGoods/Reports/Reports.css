@@ -439,7 +439,7 @@ button {
 }
 
 .generate-btn:hover:not(:disabled) {
-  background: #2563eb;
+  background: var(--color-primary);
   transform: translateY(-1px);
 }
 

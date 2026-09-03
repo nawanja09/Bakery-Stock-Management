@@ -88,67 +88,79 @@ const CashReceive = () => {
   };
 
   return (
-    <div className="ff-container">
-      <div className="ff-header">
-        <h2><FontAwesomeIcon icon={faHandHoldingDollar} /> Cash Receive</h2>
-      </div>
+    <div className="page-container">
+      <header className="page-header">
+        <div>
+          <h2 style={{ margin: 0 }}><FontAwesomeIcon icon={faHandHoldingDollar} style={{ marginRight: '8px' }} /> Cash Receive</h2>
+          <p style={{ margin: '4px 0 0', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>Record incoming cash receipts</p>
+        </div>
+      </header>
 
       {formData.company_id && (
-        <div className="ff-balance-card">
-          <span>Current Cash In Hand Balance</span>
-          <strong>{loadingBalance ? '…' : `Rs. ${parseFloat(balance || 0).toFixed(2)}`}</strong>
+        <div className="card" style={{ display: 'flex', alignItems: 'center', padding: 'var(--spacing-lg)', gap: 'var(--spacing-xl)', marginBottom: 'var(--spacing-md)' }}>
+          <div style={{ fontSize: '48px', color: 'var(--color-primary)', opacity: 0.8 }}><FontAwesomeIcon icon={faHandHoldingDollar} /></div>
+          <div>
+            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>Current Cash In Hand Balance</div>
+            <div style={{ fontSize: '28px', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
+              {loadingBalance ? '…' : `Rs. ${parseFloat(balance || 0).toFixed(2)}`}
+            </div>
+          </div>
         </div>
       )}
 
       {message && (
-        <div className={`ff-message ff-message-${message.type}`}>
-          {message.type === 'success' && <FontAwesomeIcon icon={faCheckCircle} />} {message.text}
+        <div className={`alert ${message.type === 'success' ? 'alert-success' : 'alert-error'}`} style={{ padding: 'var(--spacing-md)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--spacing-md)', backgroundColor: message.type === 'success' ? '#d4edda' : '#f8d7da', color: message.type === 'success' ? '#155724' : '#721c24' }}>
+          {message.type === 'success' && <FontAwesomeIcon icon={faCheckCircle} style={{ marginRight: '8px' }} />} {message.text}
         </div>
       )}
 
-      <form className="ff-form" onSubmit={handleSubmit}>
-        <div className="ff-form-group">
-          <label>Company *</label>
-          <select name="company_id" value={formData.company_id} onChange={handleChange} required>
-            {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-        </div>
-
-        <div className="ff-form-row">
-          <div className="ff-form-group">
-            <label>Date *</label>
-            <input type="date" name="date" value={formData.date} onChange={handleChange} required />
+      <div className="card form-container" style={{ padding: 'var(--spacing-lg)' }}>
+        <form onSubmit={handleSubmit}>
+          <div className="form-grid two-col">
+            <div className="form-group">
+              <label>Company <span className="required">*</span></label>
+              <select name="company_id" value={formData.company_id} onChange={handleChange} required className="form-select">
+                <option value="">Select Company</option>
+                {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Date <span className="required">*</span></label>
+              <input type="date" name="date" value={formData.date} onChange={handleChange} required className="form-input" />
+            </div>
           </div>
-          <div className="ff-form-group">
-            <label>Amount (Rs.) *</label>
-            <input type="number" name="amount" min="0.01" step="0.01" value={formData.amount} onChange={handleChange} placeholder="0.00" required />
+          <div className="form-grid two-col">
+            <div className="form-group">
+              <label>Amount (Rs.) <span className="required">*</span></label>
+              <input type="number" name="amount" min="0.01" step="0.01" value={formData.amount} onChange={handleChange} placeholder="0.00" required className="form-input" />
+            </div>
+            <div className="form-group">
+              <label>Receive Type <span className="required">*</span></label>
+              <select name="receive_type" value={formData.receive_type} onChange={handleChange} required className="form-select">
+                <option value="">Select type</option>
+                {receiveTypes.map(type => (
+                  <option key={type.id} value={type.type_name}>{type.type_name}</option>
+                ))}
+              </select>
+            </div>
           </div>
-        </div>
-
-        <div className="ff-form-group">
-          <label>Receive Type *</label>
-          <select name="receive_type" value={formData.receive_type} onChange={handleChange} required>
-            <option value="">Select type</option>
-            {receiveTypes.map(type => (
-              <option key={type.id} value={type.type_name}>{type.type_name}</option>
-            ))}
-          </select>
-        </div>
-
-        <div className="ff-form-group">
-          <label>Reference No (Optional)</label>
-          <input type="text" name="reference_number" value={formData.reference_number} onChange={handleChange} placeholder="e.g. receipt number" />
-        </div>
-
-        <div className="ff-form-group">
-          <label>Remark</label>
-          <textarea name="remark" rows={2} value={formData.remark} onChange={handleChange} placeholder="Add a note..." />
-        </div>
-
-        <button className="ff-submit-btn" type="submit" disabled={submitting}>
-          {submitting ? <><FontAwesomeIcon icon={faSpinner} spin /> Saving...</> : 'Save Receipt'}
-        </button>
-      </form>
+          <div className="form-grid two-col">
+            <div className="form-group">
+              <label>Reference No (Optional)</label>
+              <input type="text" name="reference_number" value={formData.reference_number} onChange={handleChange} placeholder="e.g. receipt number" className="form-input" />
+            </div>
+            <div className="form-group">
+              <label>Remark</label>
+              <textarea name="remark" rows={2} value={formData.remark} onChange={handleChange} placeholder="Add a note..." className="form-textarea" />
+            </div>
+          </div>
+          <div className="form-actions">
+            <button className="btn btn-primary" type="submit" disabled={submitting}>
+              {submitting ? <><FontAwesomeIcon icon={faSpinner} spin /> Saving...</> : 'Save Receipt'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 };

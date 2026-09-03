@@ -451,21 +451,22 @@ const Recipes = () => {
   // Render
   // ---------------------------------------------------------------------
   return (
-    <div className="fgprod-container">
-      <div className="fgprod-header">
+    <div className="page-container erp-fg-recipes-page">
+      <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
         <div>
-          <h1 className="fgprod-title">
-            <FontAwesomeIcon icon={faFlask} /> Finished Goods Production — Recipes
-          </h1>
+          <h2 style={{ margin: 0 }}>
+            <FontAwesomeIcon icon={faFlask} style={{ marginRight: '8px' }} /> Finished Goods Production — Recipes
+          </h2>
+          <p style={{ margin: '4px 0 0', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>Manage production recipes and costs</p>
         </div>
-        <button className="fgprod-btn-primary" onClick={openCreateFgForm}>
+        <button className="btn btn-primary" onClick={openCreateFgForm}>
           <FontAwesomeIcon icon={faPlus} /> New FG Production
         </button>
-      </div>
+      </header>
 
       {/* FG Details / picker */}
-      <div className="fgprod-card">
-        <h3 className="fgprod-card-title">FG Production Details</h3>
+      <div className="card" style={{ padding: 'var(--spacing-lg)', marginBottom: 'var(--spacing-lg)' }}>
+        <h3 style={{ marginTop: 0, marginBottom: 'var(--spacing-md)', fontSize: 'var(--font-size-lg)', borderBottom: '1px solid var(--color-border)', paddingBottom: 'var(--spacing-sm)' }}>FG Production Details</h3>
 
         <div className="fgprod-picker-row">
           <div className="fgprod-select-wrap">
@@ -614,7 +615,7 @@ const Recipes = () => {
       {/* FG Create / Edit Modal */}
       {showFgForm && (
         <div className="fgprod-modal-overlay" onClick={closeFgForm}>
-          <div className="fgprod-modal-content" onClick={e => e.stopPropagation()}>
+          <div className="fgprod-modal-content erp-fg-production-modal" onClick={e => e.stopPropagation()}>
             <div className="fgprod-modal-header">
               <h3>{fgFormMode === 'create' ? 'New FG Production Item' : 'Edit FG Production Item'}</h3>
               <button className="fgprod-modal-close" onClick={closeFgForm}>

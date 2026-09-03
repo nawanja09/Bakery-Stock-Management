@@ -304,23 +304,28 @@ const BankCharges = () => {
   );
 
   return (
-    <div className="bank-charges-container">
-      <div className="bank-header">
-        <h1 className="bank-title">
-          <FontAwesomeIcon icon={faBuildingColumns} className="title-icon" />
-          Bank Charges Management
-        </h1>
-      </div>
+    <div className="page-container">
+      <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <h2 style={{ textAlign: 'left', margin: 0 }}>
+            <FontAwesomeIcon icon={faBuildingColumns} style={{ marginRight: '8px' }} />
+            Bank Charges Management
+          </h2>
+          <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
+            Record and manage bank charges
+          </p>
+        </div>
+      </header>
 
       {/* New Bank Charge Form */}
-      <div className="form-card">
-        <h3 className="form-title">
-          <FontAwesomeIcon icon={editingId ? faEdit : faPlus} />
+      <div className="card form-container" style={{ padding: 'var(--spacing-lg)' }}>
+        <h3 className="form-section-title">
+          <FontAwesomeIcon icon={editingId ? faEdit : faPlus} style={{ marginRight: '8px' }} />
           {editingId ? 'Edit Bank Charge' : 'New Bank Charge'}
         </h3>
         
-        <form onSubmit={editingId ? handleUpdate : handleSubmit} className="bank-form">
-          <div className="form-row">
+        <form onSubmit={editingId ? handleUpdate : handleSubmit}>
+          <div className="form-grid two-col">
             <div className="form-group">
               <label>Date <span className="required">*</span></label>
               <input
@@ -358,7 +363,7 @@ const BankCharges = () => {
             </div>
           </div>
 
-          <div className="form-row">
+          <div className="form-grid two-col">
             <div className="form-group">
               <label>Reference Number</label>
               <input
@@ -395,7 +400,7 @@ const BankCharges = () => {
             </div>
           </div>
 
-            <div className="form-row">
+            <div className="form-grid two-col">
             <div className="form-group">
               <label>Amount (LKR) <span className="required">*</span></label>
               <input
@@ -470,59 +475,68 @@ const BankCharges = () => {
       </div>
 
       {/* Bank Charge Details Table */}
-      <div className="table-section">
-        <div className="table-header">
-          <h3 className="table-title">
-            <FontAwesomeIcon icon={faUniversity} />
+      <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
+        <div className="form-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
+          <div>
+            <FontAwesomeIcon icon={faUniversity} style={{ marginRight: '8px' }} />
             Bank Charge Details
-          </h3>
-          <div className="table-actions">
-            <div className="search-box">
-              <FontAwesomeIcon icon={faSearch} className="search-icon" />
+          </div>
+          <div className="report-filter-actions">
+            <button className="btn btn-secondary" title="Print">
+              <FontAwesomeIcon icon={faPrint} /> Print
+            </button>
+            <button className="btn btn-success" title="Export to Excel">
+              <FontAwesomeIcon icon={faFileExcel} /> Export
+            </button>
+          </div>
+        </div>
+
+        <div className="filters-section" style={{ marginBottom: 'var(--spacing-md)' }}>
+          <div className="report-filter-group" style={{ flex: '1 1 auto', maxWidth: '300px' }}>
+            <div style={{ position: 'relative' }}>
+              <FontAwesomeIcon icon={faSearch} style={{ position: 'absolute', left: '10px', top: '12px', color: 'var(--color-text-tertiary)' }} />
               <input
                 type="text"
                 placeholder="Search by bank, reference, charges type..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="search-input"
+                className="report-filter-input"
+                style={{ paddingLeft: '32px', width: '100%' }}
               />
               {searchTerm && (
                 <button 
                   className="clear-search"
                   onClick={() => setSearchTerm('')}
+                  style={{ position: 'absolute', right: '10px', top: '10px', background: 'none', border: 'none', cursor: 'pointer' }}
                 >
                   ×
                 </button>
               )}
             </div>
+          </div>
+          <div className="report-filter-actions" style={{ marginLeft: 'auto' }}>
             <button 
               onClick={fetchBankCharges} 
-              className="refresh-btn"
+              className="btn btn-secondary"
               disabled={isFetching}
             >
-              <FontAwesomeIcon icon={isFetching ? faSpinner : faSync} spin={isFetching} />
+              <FontAwesomeIcon icon={isFetching ? faSpinner : faSync} spin={isFetching} style={{ marginRight: '8px' }} />
               Refresh
             </button>
             <button 
               onClick={() => fetchBanks(formData.company_id)}
-              className="refresh-btn"
+              className="btn btn-secondary"
               disabled={isFetchingBanks}
               title="Refresh Company Bank List"
             >
-              <FontAwesomeIcon icon={faBuildingColumns} />
+              <FontAwesomeIcon icon={faBuildingColumns} style={{ marginRight: '8px' }} />
               Refresh Banks
-            </button>
-            <button className="action-icon-btn" title="Print">
-              <FontAwesomeIcon icon={faPrint} />
-            </button>
-            <button className="action-icon-btn" title="Export to Excel">
-              <FontAwesomeIcon icon={faFileExcel} />
             </button>
           </div>
         </div>
 
-        <div className="table-container">
-          <table className="bank-table">
+        <div style={{ overflowX: 'auto' }}>
+          <table className="report-table">
             <thead>
               <tr>
                 <th>Date</th>

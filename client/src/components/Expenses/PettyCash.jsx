@@ -402,44 +402,51 @@ const PettyCash = () => {
   };
 
   return (
-    <div className="expenses-container">
-      <div className="expenses-header">
-        <h1 className="expenses-title"><FontAwesomeIcon icon={faMoneyBillWave} className="title-icon" /> Petty Cash Expenses</h1>
-      </div>
+    <div className="page-container">
+      <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <h2 style={{ textAlign: 'left', margin: 0 }}>
+            <FontAwesomeIcon icon={faMoneyBillWave} style={{ marginRight: '8px' }} /> Petty Cash Expenses
+          </h2>
+          <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
+            Manage petty cash vouchers and reimbursements
+          </p>
+        </div>
+      </header>
 
-      <div className="balance-card">
-        <div className="balance-icon"><FontAwesomeIcon icon={faMoneyBillWave} /></div>
-        <div className="balance-info">
-          <div className="balance-label">Current Petty Cash Balance</div>
-          <div className="balance-amount">{formatCurrency(balance)}</div>
-          <div className="balance-breakdown">
-            <span className="breakdown-item">Total Reimbursement: <strong>{formatCurrency(balanceData.totalReimbursements || 0)}</strong></span>
-            <span className="breakdown-separator">|</span>
-            <span className="breakdown-item">Total Vouchers: <strong>{formatCurrency(balanceData.totalVouchers || 0)}</strong></span>
+      <div className="card" style={{ display: 'flex', alignItems: 'center', padding: 'var(--spacing-lg)', gap: 'var(--spacing-xl)', marginBottom: 'var(--spacing-md)' }}>
+        <div style={{ fontSize: '48px', color: 'var(--color-primary)', opacity: 0.8 }}><FontAwesomeIcon icon={faMoneyBillWave} /></div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', fontWeight: 'var(--font-weight-medium)' }}>Current Petty Cash Balance</div>
+          <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'var(--color-text-primary)', margin: 'var(--spacing-xs) 0' }}>{formatCurrency(balance)}</div>
+          <div style={{ display: 'flex', gap: 'var(--spacing-md)', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+            <span>Total Reimbursement: <strong style={{ color: 'var(--color-text-primary)' }}>{formatCurrency(balanceData.totalReimbursements || 0)}</strong></span>
+            <span>|</span>
+            <span>Total Vouchers: <strong style={{ color: 'var(--color-text-primary)' }}>{formatCurrency(balanceData.totalVouchers || 0)}</strong></span>
           </div>
         </div>
-        <div className="balance-stats">
-          <button className="icon-btn refresh-btn" onClick={fetchPettyCashData} disabled={isFetching} title="Refresh Balance" style={{ background: 'rgba(255,255,255,0.2)', color: 'white', border: 'none', width: '40px', height: '40px', borderRadius: '50%' }}>
-            <FontAwesomeIcon icon={isFetching ? faSpinner : faSync} spin={isFetching} />
+        <div>
+          <button className="btn btn-secondary" onClick={fetchPettyCashData} disabled={isFetching} title="Refresh Balance">
+            <FontAwesomeIcon icon={isFetching ? faSpinner : faSync} spin={isFetching} style={{ marginRight: '8px' }} /> Refresh
           </button>
         </div>
       </div>
 
-      <div className="expenses-tabs">
-        <button className={`tab-button ${activeTab === 'voucher' ? 'active' : ''}`} onClick={() => setActiveTab('voucher')}><FontAwesomeIcon icon={faReceipt} /> Petty Cash Voucher</button>
-        <button className={`tab-button ${activeTab === 'reimbursement' ? 'active' : ''}`} onClick={() => setActiveTab('reimbursement')}><FontAwesomeIcon icon={faHistory} /> Reimbursement</button>
+      <div className="expense-view-tabs" style={{ display: 'flex', gap: '10px', marginBottom: 'var(--spacing-md)' }}>
+        <button className={`btn ${activeTab === 'voucher' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab('voucher')}><FontAwesomeIcon icon={faReceipt} style={{ marginRight: '8px' }} /> Petty Cash Voucher</button>
+        <button className={`btn ${activeTab === 'reimbursement' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab('reimbursement')}><FontAwesomeIcon icon={faHistory} style={{ marginRight: '8px' }} /> Reimbursement</button>
       </div>
 
       {activeTab === 'voucher' && (
-        <div className="expenses-form-container">
-          <div className="form-card">
-            <h3 className="form-title"><FontAwesomeIcon icon={isEditing ? faEdit : faPlus} /> {isEditing ? 'Edit Petty Cash Voucher' : 'New Petty Cash Voucher'}</h3>
-            <form onSubmit={handleVoucherSubmit} className="expenses-form">
-              <div className="form-row">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-2xl)' }}>
+          <div className="card form-container" style={{ padding: 'var(--spacing-lg)' }}>
+            <h3 className="form-section-title"><FontAwesomeIcon icon={isEditing ? faEdit : faPlus} /> {isEditing ? 'Edit Petty Cash Voucher' : 'New Petty Cash Voucher'}</h3>
+            <form onSubmit={handleVoucherSubmit}>
+              <div className="form-grid two-col">
                 <div className="form-group"><label>Date <span className="required">*</span></label><input type="date" name="date" value={voucherForm.date} onChange={handleVoucherChange} required className="form-input" /></div>
                 <div className="form-group"><label>Voucher Number <span className="required">*</span></label><div className="input-with-button"><input type="text" name="voucher_number" value={voucherForm.voucher_number} onChange={handleVoucherChange} required className="form-input" placeholder="Enter voucher number" /></div></div>
               </div>
-              <div className="form-row">
+              <div className="form-grid two-col">
                 <div className="form-group"><label>Employee Name</label><input type="text" name="employee_name" value={voucherForm.employee_name} onChange={handleVoucherChange} className="form-input" placeholder="Optional" /></div>
                 <div className="form-group">
                   <label>Payee Name <span className="required">*</span></label>
@@ -449,7 +456,7 @@ const PettyCash = () => {
                   </select>
                 </div>
               </div>
-              <div className="form-row">
+              <div className="form-grid two-col">
                 <div className="form-group">
                   <label>Expenses Type <span className="required">*</span></label>
                   <select name="expense_type" value={voucherForm.expense_type} onChange={handleVoucherChange} required className="form-select">
@@ -459,11 +466,11 @@ const PettyCash = () => {
                 </div>
                 <div className="form-group"><label>Vehicle Number</label><input type="text" name="vehicle_number" value={voucherForm.vehicle_number} onChange={handleVoucherChange} className="form-input" placeholder="If applicable" /></div>
               </div>
-              <div className="form-row">
+              <div className="form-grid two-col">
                 <div className="form-group"><label>Receipt Number</label><input type="text" name="receipt_no" value={voucherForm.receipt_no} onChange={handleVoucherChange} className="form-input" placeholder="Optional" /></div>
                 <div className="form-group"><label>Amount (LKR) <span className="required">*</span></label><input type="number" name="amount" value={voucherForm.amount} onChange={handleVoucherChange} required min="0.01" step="0.01" className="form-input amount-input" placeholder="0.00" /></div>
               </div>
-              <div className="form-row">
+              <div className="form-grid two-col">
                 <div className="form-group full-width"><label>Description</label><textarea name="description" value={voucherForm.description} onChange={handleVoucherChange} className="form-textarea" rows="3" placeholder="Optional" /></div>
               </div>
               <div className="form-actions">
@@ -476,10 +483,17 @@ const PettyCash = () => {
             </form>
           </div>
 
-          <div className="history-section">
-            <div className="history-header"><h3>Recent Vouchers</h3><div className="history-actions"><button className="icon-btn" onClick={fetchPettyCashData} disabled={isFetching}><FontAwesomeIcon icon={isFetching ? faSpinner : faSync} spin={isFetching} /></button><button className="icon-btn" onClick={handlePrintVouchers}><FontAwesomeIcon icon={faPrint} /></button><button className="icon-btn" onClick={handleExportVouchers}><FontAwesomeIcon icon={faFileExcel} /></button></div></div>
-            <div className="table-container" id="vouchers-table-container">
-              <table className="data-table">
+          <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
+            <div className="form-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
+              <div><h3>Recent Vouchers</h3></div>
+              <div className="report-filter-actions">
+                <button className="btn btn-secondary" onClick={fetchPettyCashData} disabled={isFetching}><FontAwesomeIcon icon={isFetching ? faSpinner : faSync} spin={isFetching} /></button>
+                <button className="btn btn-secondary" onClick={handlePrintVouchers}><FontAwesomeIcon icon={faPrint} /> Print</button>
+                <button className="btn btn-success" onClick={handleExportVouchers}><FontAwesomeIcon icon={faFileExcel} /> Export</button>
+              </div>
+            </div>
+            <div style={{ overflowX: 'auto' }} id="vouchers-table-container">
+              <table className="report-table">
                 <thead>
                   <tr><th>Date</th><th>Voucher No.</th><th>Payee</th><th>Expense Type</th><th>Company</th><th>Receipt No.</th><th>Amount (LKR)</th><th>Actions</th></tr>
                 </thead>
@@ -522,15 +536,15 @@ const PettyCash = () => {
       
       {/* Reimbursement Tab */}
       {activeTab === 'reimbursement' && (
-        <div className="expenses-form-container">
-          <div className="form-card">
-            <h3 className="form-title"><FontAwesomeIcon icon={isEditingReimbursement ? faEdit : faHistory} /> {isEditingReimbursement ? 'Edit Reimbursement' : 'New Reimbursement'}</h3>
-            <form onSubmit={handleReimbursementSubmit} className="expenses-form">
-              <div className="form-row">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-2xl)' }}>
+          <div className="card form-container" style={{ padding: 'var(--spacing-lg)' }}>
+            <h3 className="form-section-title"><FontAwesomeIcon icon={isEditingReimbursement ? faEdit : faHistory} /> {isEditingReimbursement ? 'Edit Reimbursement' : 'New Reimbursement'}</h3>
+            <form onSubmit={handleReimbursementSubmit}>
+              <div className="form-grid two-col">
                 <div className="form-group"><label>Date <span className="required">*</span></label><input type="date" name="date" value={reimbursementForm.date} onChange={handleReimbursementChange} required className="form-input" /></div>
                 <div className="form-group"><label>Reference Number <span className="required">*</span></label><div className="input-with-button"><input type="text" name="reference_number" value={reimbursementForm.reference_number} onChange={handleReimbursementChange} required className="form-input" placeholder="Enter reference number" /></div></div>
               </div>
-              <div className="form-row">
+              <div className="form-grid two-col">
                 <div className="form-group left-align"><label>Amount (LKR) <span className="required">*</span></label><input type="number" name="amount" value={reimbursementForm.amount} onChange={handleReimbursementChange} required min="0.01" step="0.01" className="form-input amount-input" placeholder="0.00" /></div>
                 <div className="form-group">
                   <label>Cash Book {!isEditingReimbursement && <span className="required">*</span>}</label>
@@ -565,10 +579,15 @@ const PettyCash = () => {
             </form>
           </div>
 
-          <div className="history-section">
-            <div className="history-header"><h3>Reimbursement Details</h3><div className="history-actions"><button className="icon-btn" onClick={fetchPettyCashData}><FontAwesomeIcon icon={faSync} /></button></div></div>
-            <div className="table-container">
-              <table className="data-table"><thead><tr><th>Date</th><th>Reference Number</th><th>Cash Book</th><th>Amount (LKR)</th><th>Status</th><th>Actions</th></tr></thead><tbody>
+          <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
+            <div className="form-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
+              <div><h3>Reimbursement Details</h3></div>
+              <div className="report-filter-actions">
+                <button className="btn btn-secondary" onClick={fetchPettyCashData}><FontAwesomeIcon icon={faSync} /> Refresh</button>
+              </div>
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="report-table"><thead><tr><th>Date</th><th>Reference Number</th><th>Cash Book</th><th>Amount (LKR)</th><th>Status</th><th>Actions</th></tr></thead><tbody>
                 {isFetching ? <tr><td colSpan="6" className="loading-row"><FontAwesomeIcon icon={faSpinner} spin /> Loading reimbursements...</td></tr> : reimbursements.length > 0 ? reimbursements.map(r => (<tr key={r.id}><td>{formatDate(r.reimbursement_date || r.date)}</td><td className="reference-number">{r.reference_number}</td><td>{r.company_name || r.bank_name || '-'}</td><td className="amount-cell">{formatCurrency(r.amount)}</td><td><span className={`status-badge status-${(r.status || 'Completed').toLowerCase()}`}>{r.status || 'Completed'}</span></td><td><div className="action-buttons"><button className="action-btn view-btn" title="View Details" onClick={() => handleViewReimbursement(r)}><FontAwesomeIcon icon={faEye} /></button><button className="action-btn edit-btn" title="Edit Reimbursement" onClick={() => handleEditReimbursement(r)}><FontAwesomeIcon icon={faEdit} /></button></div></td></tr>)) : <tr><td colSpan="6" className="empty-row">No reimbursements found</td></tr>}
               </tbody></table>
             </div>

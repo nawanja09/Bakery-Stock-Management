@@ -96,20 +96,20 @@ const RMManagementList = ({
   const closeEditor = () => setEditingRecord(null);
 
   return (
-    <div className="rm-mgmt-container">
-      <div className="rm-mgmt-header">
-        <div className="rm-mgmt-header-top">
-          <div>
-            <h2>{pageTitle}</h2>
-            {subtitle && <p className="rm-mgmt-subtitle">{subtitle}</p>}
-          </div>
-          <button className="btn-add-rm" onClick={() => setShowAddForm(true)}>
-            <FiPlus size={16} /> {addButtonLabel}
-          </button>
+    <div className="erp-page">
+      <div className="filters-section" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <h2 style={{ margin: 0, color: 'var(--color-heading)' }}>{pageTitle}</h2>
+          {subtitle && <p className="text-muted" style={{ marginTop: '4px' }}>{subtitle}</p>}
         </div>
+        <button className="btn btn-primary" onClick={() => setShowAddForm(true)}>
+          <FiPlus size={16} /> {addButtonLabel}
+        </button>
+      </div>
 
-        <div className="rm-mgmt-search">
-          <FiSearch />
+      <div className="filters-section">
+        <div className="items-search">
+          <FiSearch className="text-muted" />
           <input
             type="text"
             placeholder={searchPlaceholder}
@@ -144,11 +144,14 @@ const RMManagementList = ({
         />
       )}
 
-      <div className="rm-mgmt-table-container">
+      <div className="card">
         {loading ? (
-          <div className="rm-mgmt-loading">Loading {pageTitle}...</div>
+          <div className="loading-state">
+            <div className="loading-spinner"></div>
+            Loading {pageTitle}...
+          </div>
         ) : filteredRecords.length === 0 ? (
-          <div className="rm-mgmt-no-data">
+          <div className="empty-state">
             <p>
               {records.length === 0
                 ? emptyMessage
@@ -156,49 +159,54 @@ const RMManagementList = ({
             </p>
           </div>
         ) : (
-          <table className="rm-mgmt-table">
-            <thead>
-              <tr>
-                <th>{nameColumnLabel}</th>
-                <th>STATUS</th>
-                <th className="rm-action-col">ACTIONS</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredRecords.map((rec) => (
-                <tr key={rec.id}>
-                  <td className="rm-name-cell">{rec[nameField]}</td>
-                  <td className="rm-status-cell">
-                    <span className={`rm-status-badge ${rec.status === 'Inactive' ? 'inactive' : 'active'}`}>
-                      <span className="rm-status-dot"></span>
-                      {rec.status || 'Active'}
-                    </span>
-                  </td>
-                  <td className="rm-action-cell">
-                    <button
-                      type="button"
-                      className="rm-btn-edit"
-                      onClick={() => setEditingRecord(rec)}
-                    >
-                      <FiEdit size={14} /> Edit
-                    </button>
-                    <button
-                      type="button"
-                      className="rm-btn-delete"
-                      onClick={() => handleDelete(rec)}
-                    >
-                      <FiTrash2 size={14} /> Delete
-                    </button>
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="erp-data-table">
+              <thead>
+                <tr>
+                  <th>{nameColumnLabel}</th>
+                  <th>STATUS</th>
+                  <th style={{ textAlign: 'right' }}>ACTIONS</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filteredRecords.map((rec) => (
+                  <tr key={rec.id}>
+                    <td><strong>{rec[nameField]}</strong></td>
+                    <td>
+                      <span className={`badge ${rec.status === 'Inactive' ? 'badge-neutral' : 'badge-success'}`}>
+                        {rec.status || 'Active'}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="table-actions" style={{ justifyContent: 'flex-end' }}>
+                        <button
+                          type="button"
+                          className="btn-icon edit"
+                          onClick={() => setEditingRecord(rec)}
+                          title="Edit"
+                        >
+                          <FiEdit size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-icon delete"
+                          onClick={() => handleDelete(rec)}
+                          title="Delete"
+                        >
+                          <FiTrash2 size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
       {!loading && records.length > 0 && (
-        <p className="rm-count-badge">
+        <p className="text-muted text-right font-sm" style={{ paddingRight: '8px' }}>
           Showing {filteredRecords.length} of {records.length} record{records.length !== 1 ? 's' : ''}
         </p>
       )}

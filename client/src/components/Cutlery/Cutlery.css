@@ -1,0 +1,476 @@
+/* ============================================================================
+   CUTLERY & MISCELLANEOUS MODULES - Comprehensive Styles
+   Covers: Cutlery Management, Adjustments, Admin, etc.
+   ============================================================================ */
+
+@import '../../css/page-design-system.css';
+
+/* ============================================================================
+   CUTLERY MODULE
+   ============================================================================ */
+
+.cutlery-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xl);
+}
+
+.cutlery-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-lg);
+  flex-wrap: wrap;
+}
+
+.cutlery-title {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+}
+
+.cutlery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--spacing-lg);
+}
+
+.cutlery-card {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: all var(--transition-base);
+}
+
+.cutlery-card:hover {
+  box-shadow: var(--shadow-lg);
+  border-color: var(--color-primary);
+  transform: translateY(-4px);
+}
+
+.cutlery-card-header {
+  padding: var(--spacing-lg);
+  background: linear-gradient(135deg, var(--color-primary-light), var(--color-secondary-light));
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.cutlery-card-icon {
+  width: 48px;
+  height: 48px;
+  background-color: var(--color-primary);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: var(--font-size-xl);
+}
+
+.cutlery-card-title {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+}
+
+.cutlery-card-body {
+  padding: var(--spacing-lg);
+}
+
+.cutlery-property {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-md);
+}
+
+.cutlery-property:last-child {
+  margin-bottom: 0;
+}
+
+.cutlery-property-label {
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.cutlery-property-value {
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+}
+
+.cutlery-card-footer {
+  padding: var(--spacing-lg);
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  gap: var(--spacing-sm);
+  justify-content: flex-end;
+}
+
+/* ============================================================================
+   CUTLERY FORM
+   ============================================================================ */
+
+.cutlery-form {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-2xl);
+}
+
+.cutlery-form-section {
+  margin-bottom: var(--spacing-2xl);
+}
+
+.cutlery-form-section-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  margin-bottom: var(--spacing-lg);
+  padding-bottom: var(--spacing-md);
+  border-bottom: 2px solid var(--color-primary-light);
+}
+
+.cutlery-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: var(--spacing-xl);
+}
+
+/* ============================================================================
+   ADJUSTMENTS MODULE
+   ============================================================================ */
+
+.adjustments-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xl);
+}
+
+.adjustments-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-lg);
+  flex-wrap: wrap;
+}
+
+.adjustments-tabs {
+  display: flex;
+  gap: var(--spacing-md);
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 0;
+}
+
+.adjustments-tab {
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+  position: relative;
+  transition: color var(--transition-fast);
+}
+
+.adjustments-tab:hover {
+  color: var(--color-primary);
+}
+
+.adjustments-tab.active {
+  color: var(--color-primary);
+}
+
+.adjustments-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background-color: var(--color-primary);
+}
+
+.adjustments-content {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-2xl);
+}
+
+.adjustments-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.adjustments-table thead {
+  background-color: var(--color-bg-tertiary);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.adjustments-table th {
+  padding: var(--spacing-md) var(--spacing-lg);
+  text-align: left;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.adjustments-table td {
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-bottom: 1px solid var(--color-border-light);
+  color: var(--color-text-secondary);
+}
+
+.adjustments-table tbody tr:hover {
+  background-color: var(--color-bg-tertiary);
+}
+
+/* ============================================================================
+   ADMIN PANEL
+   ============================================================================ */
+
+.admin-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xl);
+}
+
+.admin-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-lg);
+  flex-wrap: wrap;
+}
+
+.admin-title {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+}
+
+.user-list {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.user-row {
+  display: flex;
+  align-items: center;
+  padding: var(--spacing-lg) var(--spacing-xl);
+  border-bottom: 1px solid var(--color-border-light);
+  transition: background-color var(--transition-fast);
+  gap: var(--spacing-md);
+}
+
+.user-row:hover {
+  background-color: var(--color-bg-tertiary);
+}
+
+.user-row:last-child {
+  border-bottom: none;
+}
+
+.user-avatar-large {
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: var(--font-weight-bold);
+  flex-shrink: 0;
+}
+
+.user-info-cell {
+  flex: 1;
+}
+
+.user-name-cell {
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+}
+
+.user-email-cell {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-tertiary);
+  margin-top: var(--spacing-xs);
+}
+
+.user-role-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background-color: var(--color-primary-light);
+  color: var(--color-primary-dark);
+  border-radius: var(--spacing-full);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.user-actions-cell {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+/* ============================================================================
+   CHANGE PASSWORD FORM
+   ============================================================================ */
+
+.password-form {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-2xl);
+  max-width: 500px;
+}
+
+.password-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-lg);
+}
+
+.password-field:last-of-type {
+  margin-bottom: var(--spacing-2xl);
+}
+
+.password-field label {
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.password-field input {
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+}
+
+.password-requirements {
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md);
+  font-size: var(--font-size-xs);
+}
+
+.password-requirement {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-sm);
+  color: var(--color-text-secondary);
+}
+
+.password-requirement:last-child {
+  margin-bottom: 0;
+}
+
+.password-requirement.met {
+  color: var(--color-success);
+}
+
+.password-requirement-indicator {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background-color: var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-xs);
+}
+
+.password-requirement.met .password-requirement-indicator {
+  background-color: var(--color-success);
+  color: white;
+}
+
+/* ============================================================================
+   RESPONSIVE CUTLERY & ADMIN
+   ============================================================================ */
+
+@media (max-width: 1024px) {
+  .cutlery-grid {
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  }
+
+  .cutlery-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .cutlery-form,
+  .adjustments-content {
+    padding: var(--spacing-lg);
+  }
+
+  .adjustments-table {
+    font-size: var(--font-size-xs);
+  }
+
+  .adjustments-table th,
+  .adjustments-table td {
+    padding: var(--spacing-sm);
+  }
+
+  .user-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .user-info-cell {
+    width: 100%;
+  }
+
+  .user-role-cell,
+  .user-actions-cell {
+    width: 100%;
+  }
+
+  .password-form {
+    padding: var(--spacing-lg);
+  }
+}
+
+@media (max-width: 480px) {
+  .cutlery-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cutlery-card-header {
+    padding: var(--spacing-md);
+  }
+
+  .cutlery-card-body {
+    padding: var(--spacing-md);
+  }
+
+  .cutlery-card-footer {
+    padding: var(--spacing-md);
+  }
+
+  .adjustments-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .user-avatar-large {
+    width: 40px;
+    height: 40px;
+  }
+}

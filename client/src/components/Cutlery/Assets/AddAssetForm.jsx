@@ -76,7 +76,7 @@ const AddAssetForm = ({ onSubmit, onCancel }) => {
 
   const inner = (
     <div className="add-asset-overlay" onClick={onCancel}>
-      <div className="add-asset-card" onClick={(e) => e.stopPropagation()}>
+      <div className="add-asset-card erp-asset-form" onClick={(e) => e.stopPropagation()}>
         <div className="add-asset-header">
           <h2>Add New Asset</h2>
           <button className="btn-close" onClick={onCancel} disabled={submitting}>×</button>

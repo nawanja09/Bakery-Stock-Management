@@ -520,23 +520,28 @@ const NewExpenses = () => {
   };
 
   return (
-    <div className="online-expenses-container">
-      <div className="online-header">
-        <h1 className="online-title">
-          <FontAwesomeIcon icon={faFileInvoiceDollar} className="title-icon" />
-          New Expenses
-        </h1>
-      </div>
+    <div className="page-container">
+      <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <h2 style={{ textAlign: 'left', margin: 0 }}>
+            <FontAwesomeIcon icon={faFileInvoiceDollar} style={{ marginRight: '8px' }} />
+            New Expenses
+          </h2>
+          <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
+            Manage expense bills and payments
+          </p>
+        </div>
+      </header>
 
       {/* New Expense Bill Form */}
-      <div className="form-card">
-        <h3 className="form-title">
+      <div className="card form-container" style={{ padding: 'var(--spacing-lg)' }}>
+        <h3 className="form-section-title">
           <FontAwesomeIcon icon={editingId ? faEdit : faPlus} />
           {editingId ? 'Edit Expense Bill' : 'New Expense Bill'}
         </h3>
 
-        <form onSubmit={handleSubmit} className="online-form">
-          <div className="form-row">
+        <form onSubmit={handleSubmit}>
+          <div className="form-grid two-col">
             <div className="form-group">
               <label>Bill Date <span className="required">*</span></label>
               <input
@@ -553,7 +558,7 @@ const NewExpenses = () => {
             </div>
           </div>
 
-          <div className="form-row">
+          <div className="form-grid two-col">
             <div className="form-group">
               <label>Company <span className="required">*</span></label>
               <select name="company_id" value={formData.company_id} onChange={handleChange} required className="form-select">
@@ -602,7 +607,7 @@ const NewExpenses = () => {
             </div>
           </div>
 
-          <div className="form-row">
+          <div className="form-grid two-col">
             <div className="form-group">
               <label>VAT Reg Number</label>
               <input
@@ -626,7 +631,7 @@ const NewExpenses = () => {
             </div>
           </div>
 
-          <div className="form-row">
+          <div className="form-grid two-col">
             <div className="form-group">
               <label>Without VAT Amount <span className="required">*</span></label>
               <input
@@ -681,44 +686,52 @@ const NewExpenses = () => {
       </div>
 
       {/* Expenses Details Table */}
-      <div className="table-section">
-        <div className="table-header">
-          <h3 className="table-title">
+      <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
+        <div className="form-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
+          <div>
             <FontAwesomeIcon icon={faReceipt} /> Expenses Details
-          </h3>
-          <div className="table-actions">
-            <div className="expense-view-tabs">
-              <button
-                type="button"
-                className={`expense-view-tab ${viewFilter === 'pending' ? 'active' : ''}`}
-                onClick={() => { setViewFilter('pending'); setSelectedIds([]); }}
-              >
-                Pending ({pendingCount})
-              </button>
-              <button
-                type="button"
-                className={`expense-view-tab ${viewFilter === 'paid' ? 'active' : ''}`}
-                onClick={() => { setViewFilter('paid'); setSelectedIds([]); }}
-              >
-                Paid ({paidCount})
-              </button>
-            </div>
-            <div className="search-box">
-              <FontAwesomeIcon icon={faSearch} className="search-icon" />
-              <input
-                type="text" placeholder="Search by bill number, payee, expense type..."
-                value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="search-input"
-              />
-              {searchTerm && <button className="clear-search" onClick={() => setSearchTerm('')}>×</button>}
-            </div>
-            <button className="action-icon-btn" title="Export to Excel">
-              <FontAwesomeIcon icon={faFileExcel} />
+          </div>
+          <div className="report-filter-actions">
+            <button className="btn btn-success" title="Export to Excel">
+              <FontAwesomeIcon icon={faFileExcel} /> Export
             </button>
           </div>
         </div>
 
-        <div className="table-container">
-          <table className="online-table">
+        <div className="filters-section" style={{ marginBottom: 'var(--spacing-md)' }}>
+          <div className="expense-view-tabs" style={{ display: 'flex', gap: '10px' }}>
+            <button
+              type="button"
+              className={`btn ${viewFilter === 'pending' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => { setViewFilter('pending'); setSelectedIds([]); }}
+            >
+              Pending ({pendingCount})
+            </button>
+            <button
+              type="button"
+              className={`btn ${viewFilter === 'paid' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => { setViewFilter('paid'); setSelectedIds([]); }}
+            >
+              Paid ({paidCount})
+            </button>
+          </div>
+          <div className="report-filter-group" style={{ flex: '1 1 auto', marginLeft: 'auto', maxWidth: '300px' }}>
+            <div style={{ position: 'relative' }}>
+              <FontAwesomeIcon icon={faSearch} style={{ position: 'absolute', left: '10px', top: '12px', color: 'var(--color-text-tertiary)' }} />
+              <input
+                type="text" placeholder="Search by bill number, payee, expense type..."
+                value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+                className="report-filter-input" style={{ paddingLeft: '32px' }}
+              />
+              {searchTerm && (
+                <button className="clear-search" onClick={() => setSearchTerm('')} style={{ position: 'absolute', right: '10px', top: '10px', background: 'none', border: 'none', cursor: 'pointer' }}>×</button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ overflowX: 'auto' }}>
+          <table className="report-table">
             <thead>
               <tr>
                 {viewFilter === 'pending' && (

@@ -201,17 +201,16 @@ const DepartmentUsageReport = () => {
   const totals = calculateTotals();
 
   return (
-    <div className="department-usage-report-container">
-      <div className="report-header">
-        <h2>Department Usage Report</h2>
-        <p className="report-subtitle">Track item usage across departments with opening and due balances</p>
-      </div>
+    <div className="page-container">
+      <header className="page-header" style={{ display: 'flex', alignItems: 'flex-start', flexDirection: 'column', gap: '4px' }}>
+        <h2 style={{ textAlign: 'left', margin: 0 }}>Department Usage Report</h2>
+        <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>Track item usage across departments with opening and due balances</p>
+      </header>
 
       {/* Controls Section */}
-      <div className="controls-card">
-        <div className="controls-grid">
-          <div className="control-group">
-            <label>
+      <div className="filters-section">
+          <div className="report-filter-group">
+            <label className="report-filter-label">
               <FontAwesomeIcon icon={faCalendar} /> Start Date
             </label>
             <input
@@ -219,12 +218,12 @@ const DepartmentUsageReport = () => {
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
               max={endDate}
-              className="control-input"
+              className="report-filter-input"
             />
           </div>
 
-          <div className="control-group">
-            <label>
+          <div className="report-filter-group">
+            <label className="report-filter-label">
               <FontAwesomeIcon icon={faCalendar} /> End Date
             </label>
             <input
@@ -233,12 +232,12 @@ const DepartmentUsageReport = () => {
               onChange={(e) => setEndDate(e.target.value)}
               min={startDate}
               max={format(new Date(), 'yyyy-MM-dd')}
-              className="control-input"
+              className="report-filter-input"
             />
           </div>
 
-          <div className="control-group">
-            <label>
+          <div className="report-filter-group" style={{ flex: '1 1 200px' }}>
+            <label className="report-filter-label">
               <FontAwesomeIcon icon={faFilter} /> Filter by Item
             </label>
             <Select
@@ -247,13 +246,12 @@ const DepartmentUsageReport = () => {
               onChange={setSelectedItem}
               isClearable
               placeholder="Search items..."
-              className="select-control"
+              className="react-select-container"
               classNamePrefix="react-select"
             />
           </div>
-        </div>
 
-        <div className="control-actions">
+        <div className="report-filter-actions">
           <button
             onClick={generateReport}
             disabled={loading}
@@ -293,22 +291,22 @@ const DepartmentUsageReport = () => {
 
       {/* Summary Cards */}
       {filteredData.length > 0 && (
-        <div className="summary-cards">
-          <div className="summary-card">
-            <div className="summary-label">Total Items</div>
-            <div className="summary-value">{formatNumber(filteredData.length)}</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--spacing-lg)' }}>
+          <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
+            <div className="report-summary-label">Total Items</div>
+            <div className="report-summary-value">{formatNumber(filteredData.length)}</div>
           </div>
-          <div className="summary-card">
-            <div className="summary-label">Total Opening</div>
-            <div className="summary-value">{formatQuantity(totals.opening)}</div>
+          <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
+            <div className="report-summary-label">Total Opening</div>
+            <div className="report-summary-value">{formatQuantity(totals.opening)}</div>
           </div>
-          <div className="summary-card">
-            <div className="summary-label">Total Due</div>
-            <div className="summary-value">{formatQuantity(totals.due)}</div>
+          <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
+            <div className="report-summary-label">Total Due</div>
+            <div className="report-summary-value">{formatQuantity(totals.due)}</div>
           </div>
-          <div className="summary-card">
-            <div className="summary-label">Total Issued</div>
-            <div className="summary-value negative">
+          <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
+            <div className="report-summary-label">Total Issued</div>
+            <div className="report-summary-value text-danger">
               {formatQuantity(totals.bakery + totals.pastry + totals.savory + totals.cake)}
             </div>
           </div>
@@ -317,12 +315,13 @@ const DepartmentUsageReport = () => {
 
       {/* Report Table */}
       {loading ? (
-        <div className="loading-overlay">
+        <div className="loading-state">
           <div className="loading-spinner"></div>
           Loading department usage report...
         </div>
       ) : filteredData.length > 0 ? (
-        <div className="table-container">
+        <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
+          <div style={{ overflowX: 'auto' }}>
           <table className="report-table department-usage-table">
             <thead>
               <tr>
@@ -365,7 +364,8 @@ const DepartmentUsageReport = () => {
                 <td><strong>{formatQuantity(totals.due)}</strong></td>
               </tr>
             </tfoot>
-          </table>
+            </table>
+          </div>
         </div>
       ) : reportData.length === 0 ? (
         <div className="empty-state">

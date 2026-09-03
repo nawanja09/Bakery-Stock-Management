@@ -114,41 +114,41 @@ const Purchases = () => {
     </span>
   );
 
-  if (loading) return <div className="loading">Loading purchases…</div>;
+  if (loading) return <div style={{ padding: 'var(--spacing-2xl)', textAlign: 'center', color: 'var(--color-text-secondary)' }}>Loading purchases…</div>;
 
   return (
-    <div className="purchases-page">
-      <div className="purchases-header">
-        <div className="purchases-title">
-          <h1>Purchases</h1>
-          <p>Manage cutlery purchase records</p>
+    <div className="page-container">
+      <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+        <div>
+          <h2 style={{ margin: 0 }}>Cutlery Purchases</h2>
+          <p style={{ margin: '4px 0 0', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>Manage cutlery purchase records</p>
         </div>
-
-        <button className="btn-add-purchase" onClick={() => setShowAddForm(true)}>
+        <button className="btn btn-primary" onClick={() => setShowAddForm(true)}>
           <FiPlus /> New Purchase
         </button>
-      </div>
+      </header>
 
-      <div className="content-card">
+      <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
         {purchases.length === 0 ? (
-          <div className="no-data">
-            <span>🛒</span>
-            <p>No purchases yet</p>
+          <div style={{ textAlign: 'center', padding: 'var(--spacing-3xl)', color: 'var(--color-text-secondary)' }}>
+            <div style={{ fontSize: '48px', marginBottom: 'var(--spacing-md)', opacity: 0.5 }}>🛒</div>
+            <p>No purchases yet. Add your first purchase record to get started.</p>
           </div>
         ) : (
-          <table className="purchases-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Date</th>
-                <th>Invoice</th>
-                <th>Supplier</th>
-                <th>Total</th>
-                <th>Method</th>
-                <th>Status</th>
-                <th className="actions-header">Actions</th>
-              </tr>
-            </thead>
+          <div style={{ overflowX: 'auto' }}>
+            <table className="report-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Date</th>
+                  <th>Invoice</th>
+                  <th>Supplier</th>
+                  <th>Total</th>
+                  <th>Method</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
             <tbody>
               {purchases.map((p) => (
                 <tr key={p.id}>
@@ -187,7 +187,8 @@ const Purchases = () => {
                 </tr>
               ))}
             </tbody>
-          </table>
+            </table>
+          </div>
         )}
       </div>
 

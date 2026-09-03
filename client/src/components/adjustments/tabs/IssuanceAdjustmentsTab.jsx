@@ -1,6 +1,6 @@
 // src/components/adjustments/tabs/IssuanceAdjustmentsTab.jsx
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSync, faFileAlt } from '@fortawesome/free-solid-svg-icons';
 import api from '../../../api';
@@ -10,6 +10,7 @@ const EMPTY_FILTERS = { department_id: 'all', item_id: 'all', startDate: '', end
 
 const IssuanceAdjustmentsTab = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [departments, setDepartments] = useState([]);
   const [items, setItems] = useState([]);
   const [rows, setRows] = useState([]);
@@ -105,7 +106,7 @@ const IssuanceAdjustmentsTab = () => {
                     <td>{r.received_by}</td>
                     <td>{(r.items || []).length} item(s)</td>
                     <td>
-                      <button className="btn btn-sm btn-secondary" onClick={() => navigate(`/issuance/edit/${r.id}`)}>Edit</button>
+                      <button className="btn btn-sm btn-secondary" onClick={() => navigate(`/issuance/edit/${r.id}`, { state: { backgroundLocation: location } })}>Edit</button>
                     </td>
                   </tr>
                 )) : (

@@ -201,51 +201,54 @@ const PurchaseReport = () => {
   };
 
   return (
-    <div className="pr-container">
-      <div className="pr-header">
-        <h2>Purchase Report</h2>
-        <div className="pr-actions">
+    <div className="page-container">
+      <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <h2 style={{ textAlign: 'left', margin: 0 }}>Purchase Report</h2>
+          <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>View all your purchase invoices</p>
+        </div>
+        <div style={{ display: 'flex', gap: '10px' }}>
           <button
             onClick={handleExportExcel}
             disabled={sortedInvoices.length === 0}
-            className="pr-btn pr-btn-excel"
+            className="btn btn-success"
             title="Export the currently filtered invoices to Excel"
           >
             📊 Export to Excel
           </button>
         </div>
-      </div>
+      </header>
 
       {/* Filters */}
-      <div className="pr-filters">
-        <div className="pr-field">
-          <label>From Date</label>
+      <div className="filters-section report-filter-bar purchase-report-filter-bar">
+        <div className="report-filter-group">
+          <label className="report-filter-label">From Date</label>
           <input
             type="date"
             value={fromDate}
             onChange={(e) => setFromDate(e.target.value)}
             max={toDate || undefined}
-            className="pr-input"
+            className="report-filter-input"
           />
         </div>
 
-        <div className="pr-field">
-          <label>To Date</label>
+        <div className="report-filter-group">
+          <label className="report-filter-label">To Date</label>
           <input
             type="date"
             value={toDate}
             onChange={(e) => setToDate(e.target.value)}
             min={fromDate || undefined}
-            className="pr-input"
+            className="report-filter-input"
           />
         </div>
 
-        <div className="pr-field">
-          <label>Company</label>
+        <div className="report-filter-group">
+          <label className="report-filter-label">Company</label>
           <select
             value={companyId}
             onChange={(e) => setCompanyId(e.target.value)}
-            className="pr-input"
+            className="report-filter-select"
           >
             <option value="">All Companies</option>
             {companies.map((c) => (
@@ -254,12 +257,12 @@ const PurchaseReport = () => {
           </select>
         </div>
 
-        <div className="pr-field">
-          <label>Supplier</label>
+        <div className="report-filter-group">
+          <label className="report-filter-label">Supplier</label>
           <select
             value={supplierId}
             onChange={(e) => setSupplierId(e.target.value)}
-            className="pr-input"
+            className="report-filter-select"
           >
             <option value="">All Suppliers</option>
             {suppliers.map((s) => (
@@ -268,40 +271,41 @@ const PurchaseReport = () => {
           </select>
         </div>
 
-        <div className="pr-field-actions">
-          <button onClick={handleApplyFilters} disabled={loading} className="pr-btn pr-btn-primary">
+        <div className="report-filter-actions">
+          <button onClick={handleApplyFilters} disabled={loading} className="btn btn-primary">
             {loading ? 'Searching...' : 'Search'}
           </button>
-          <button onClick={handleReset} disabled={loading} className="pr-btn pr-btn-secondary">
+          <button onClick={handleReset} disabled={loading} className="btn btn-secondary">
             Reset
           </button>
         </div>
       </div>
 
-      {error && <div className="pr-error">{error}</div>}
+      {error && <div className="alert alert-error">{error}</div>}
 
       {/* Results */}
       {loading ? (
-        <div className="pr-loading">Loading purchase invoices...</div>
+        <div className="loading-state">Loading purchase invoices...</div>
       ) : sortedInvoices.length > 0 ? (
         <>
-          <div className="pr-table-container">
-            <table className="pr-table">
+          <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="report-table purchase-report-table">
               <thead>
                 <tr>
-                  <th onClick={() => handleSort('invoice_no')} className="pr-sortable">
+                  <th onClick={() => handleSort('invoice_no')} className="sortable">
                     Invoice Number{sortIndicator('invoice_no')}
                   </th>
-                  <th onClick={() => handleSort('purchase_date')} className="pr-sortable">
+                  <th onClick={() => handleSort('purchase_date')} className="sortable">
                     Invoice Date{sortIndicator('purchase_date')}
                   </th>
-                  <th onClick={() => handleSort('company_name')} className="pr-sortable">
+                  <th onClick={() => handleSort('company_name')} className="sortable">
                     Company{sortIndicator('company_name')}
                   </th>
-                  <th onClick={() => handleSort('supplier_name')} className="pr-sortable">
+                  <th onClick={() => handleSort('supplier_name')} className="sortable">
                     Supplier{sortIndicator('supplier_name')}
                   </th>
-                  <th onClick={() => handleSort('total_amount')} className="pr-sortable">
+                  <th onClick={() => handleSort('total_amount')} className="sortable">
                     Total Amount{sortIndicator('total_amount')}
                   </th>
                 </tr>
@@ -324,13 +328,14 @@ const PurchaseReport = () => {
                 </tr>
               </tfoot>
             </table>
+            </div>
           </div>
         </>
       ) : (
-        <div className="pr-empty-state">
-          <div className="pr-empty-icon">🧾</div>
+        <div className="empty-state">
+          <div className="empty-icon">🧾</div>
           <p>{hasSearched ? 'No purchase invoices match the selected filters.' : 'Select filters and click Search to view purchase invoices.'}</p>
-          {hasSearched && <button onClick={handleReset} className="pr-btn pr-btn-secondary">Reset Filters</button>}
+          {hasSearched && <button onClick={handleReset} className="btn btn-secondary">Reset Filters</button>}
         </div>
       )}
     </div>

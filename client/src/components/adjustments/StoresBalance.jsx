@@ -288,41 +288,43 @@ const StoresBalance = () => {
   };
 
   return (
-    <div className="adjustments-container">
-      <div className="adjustments-header">
-        <div className="adjustments-header-left">
-          <h1>RM Adjustment</h1>
+    <div className="page-container">
+      <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+        <div>
+          <h2 style={{ margin: 0 }}>RM Adjustment</h2>
+          <p style={{ margin: '4px 0 0', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>Manage raw material stock adjustments</p>
         </div>
         {adjustmentCategory === 'Department' && (
-          <div className="adjustments-header-actions">
+          <div>
             <button 
               type="button" 
               className="btn btn-secondary" 
               onClick={clearAllRows}
               disabled={loading}
             >
-              <FontAwesomeIcon icon={faTimes} /> Clear All
+              <FontAwesomeIcon icon={faTimes} style={{ marginRight: '8px' }} /> Clear All
             </button>
           </div>
         )}
-      </div>
+      </header>
 
       {/* Select Category of Adjustments - controls which edit interface loads below,
           without leaving the RM Adjustments page or creating separate routes. */}
-      <div className="form-section">
-        <div className="form-group" style={{ maxWidth: '360px' }}>
+      <div className="card" style={{ padding: 'var(--spacing-lg)', marginBottom: 'var(--spacing-lg)' }}>
+        <div className="form-group" style={{ maxWidth: '360px', margin: 0 }}>
           <label>
-            <FontAwesomeIcon icon={faFileAlt} /> Select Category of Adjustments
+            <FontAwesomeIcon icon={faFileAlt} style={{ marginRight: '8px' }} /> Select Category of Adjustments
           </label>
           <select
             value={adjustmentCategory}
             onChange={(e) => setAdjustmentCategory(e.target.value)}
+            className="form-select"
           >
             {ADJUSTMENT_CATEGORIES.map((cat) => (
               <option key={cat} value={cat}>{cat}</option>
             ))}
           </select>
-          <span className="help-text">
+          <span className="help-text" style={{ display: 'block', marginTop: 'var(--spacing-xs)', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
             {adjustmentCategory === 'Department'
               ? 'Stock count adjustment using General Information + Stock Count Details below.'
               : `Select an existing ${adjustmentCategory.toLowerCase()} record to view and modify.`}
@@ -331,8 +333,8 @@ const StoresBalance = () => {
       </div>
 
       {message.text && (
-        <div className={`alert-message ${message.type}`}>
-          <FontAwesomeIcon icon={message.type === 'error' ? faExclamationCircle : faCheckCircle} />
+        <div style={{ padding: 'var(--spacing-md)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--spacing-md)', backgroundColor: message.type === 'error' ? '#f8d7da' : '#d4edda', color: message.type === 'error' ? '#721c24' : '#155724' }}>
+          <FontAwesomeIcon icon={message.type === 'error' ? faExclamationCircle : faCheckCircle} style={{ marginRight: '8px' }} />
           {message.text}
         </div>
       )}
@@ -401,7 +403,7 @@ const StoresBalance = () => {
           </h3>
           
           <div className="table-responsive">
-            <table className="adjustments-table stock-count-table">
+            <table className="report-table">
               <thead>
                 <tr>
                   <th style={{ width: '40px' }}>#</th>

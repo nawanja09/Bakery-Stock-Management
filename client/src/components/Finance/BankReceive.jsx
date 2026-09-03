@@ -13,6 +13,7 @@ const BankReceive = () => {
   const [receiveTypes, setReceiveTypes] = useState([]);
   const [bankAccounts, setBankAccounts] = useState([]);
   const [loadingBanks, setLoadingBanks] = useState(false);
+  const [bankLoadError, setBankLoadError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState(null);
 
@@ -46,6 +47,9 @@ const BankReceive = () => {
     if (!formData.company_id) { setBankAccounts([]); return; }
     let cancelled = false;
     setLoadingBanks(true);
+    setBankLoadError(false);
+    setBankAccounts([]);
+    setFormData(prev => ({ ...prev, bank_id: '' }));
     api.get('/finance/bank/accounts', { params: { companyId: formData.company_id } })
       .then(res => {
         if (cancelled) return;
@@ -53,7 +57,7 @@ const BankReceive = () => {
         setBankAccounts(list);
         setFormData(prev => ({ ...prev, bank_id: list.length > 0 ? String(list[0].id) : '' }));
       })
-      .catch(() => { if (!cancelled) setBankAccounts([]); })
+      .catch(() => { if (!cancelled) { setBankAccounts([]); setBankLoadError(true); } })
       .finally(() => { if (!cancelled) setLoadingBanks(false); });
     return () => { cancelled = true; };
   }, [formData.company_id]);
@@ -80,6 +84,7 @@ const BankReceive = () => {
     setSubmitting(true);
     try {
       const res = await api.post('/finance/bank/receive', {
+        company_id: formData.company_id,
         bank_id: formData.bank_id,
         date: formData.date,
         amount: amt,
@@ -99,78 +104,94 @@ const BankReceive = () => {
   };
 
   return (
-    <div className="ff-container">
-      <div className="ff-header">
-        <h2><FontAwesomeIcon icon={faLandmark} /> Bank Receive</h2>
-      </div>
+    <div className="page-container">
+      <header className="page-header">
+        <div>
+          <h2 style={{ margin: 0 }}><FontAwesomeIcon icon={faLandmark} style={{ marginRight: '8px' }} /> Bank Receive</h2>
+          <p style={{ margin: '4px 0 0', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>Record incoming bank receipts</p>
+        </div>
+      </header>
 
       {selectedBank && (
-        <div className="ff-balance-card">
-          <span>{selectedBank.bank_name}{selectedBank.account_number ? ` — ${selectedBank.account_number}` : ''}</span>
-          <strong>Rs. {parseFloat(selectedBank.current_balance || 0).toFixed(2)}</strong>
+        <div className="card" style={{ display: 'flex', alignItems: 'center', padding: 'var(--spacing-lg)', gap: 'var(--spacing-xl)', marginBottom: 'var(--spacing-md)' }}>
+          <div style={{ fontSize: '48px', color: 'var(--color-primary)', opacity: 0.8 }}><FontAwesomeIcon icon={faLandmark} /></div>
+          <div>
+            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+              {selectedBank.bank_name}{selectedBank.account_number ? ` — ${selectedBank.account_number}` : ''}
+            </div>
+            <div style={{ fontSize: '28px', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
+              Rs. {parseFloat(selectedBank.current_balance || 0).toFixed(2)}
+            </div>
+          </div>
         </div>
       )}
 
       {message && (
-        <div className={`ff-message ff-message-${message.type}`}>
-          {message.type === 'success' && <FontAwesomeIcon icon={faCheckCircle} />} {message.text}
+        <div style={{ padding: 'var(--spacing-md)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--spacing-md)', backgroundColor: message.type === 'success' ? '#d4edda' : '#f8d7da', color: message.type === 'success' ? '#155724' : '#721c24' }}>
+          {message.type === 'success' && <FontAwesomeIcon icon={faCheckCircle} style={{ marginRight: '8px' }} />} {message.text}
         </div>
       )}
 
-      <form className="ff-form" onSubmit={handleSubmit}>
-        <div className="ff-form-row">
-          <div className="ff-form-group">
-            <label>Company *</label>
-            <select name="company_id" value={formData.company_id} onChange={handleChange} required>
-              {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+      <div className="card form-container" style={{ padding: 'var(--spacing-lg)' }}>
+        <form onSubmit={handleSubmit}>
+          <div className="form-grid two-col">
+            <div className="form-group">
+              <label>Company <span className="required">*</span></label>
+              <select name="company_id" value={formData.company_id} onChange={handleChange} required className="form-select">
+                <option value="">Select Company</option>
+                {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Bank Account <span className="required">*</span></label>
+              <select name="bank_id" value={formData.bank_id} onChange={handleChange} required disabled={loadingBanks} className="form-select">
+                <option value="">
+                  {loadingBanks ? 'Loading…' : bankLoadError ? 'Unable to load bank accounts' : bankAccounts.length === 0 ? 'No active bank accounts available' : 'Select bank account'}
+                </option>
+                {bankAccounts.map(b => (
+                  <option key={b.id} value={b.id}>{b.bank_name}{b.account_number ? ` — ${b.account_number}` : ''}</option>
+                ))}
+              </select>
+            </div>
           </div>
-          <div className="ff-form-group">
-            <label>Bank Account *</label>
-            <select name="bank_id" value={formData.bank_id} onChange={handleChange} required disabled={loadingBanks}>
-              <option value="">{loadingBanks ? 'Loading…' : 'Select bank account'}</option>
-              {bankAccounts.map(b => (
-                <option key={b.id} value={b.id}>{b.bank_name}{b.account_number ? ` — ${b.account_number}` : ''}</option>
-              ))}
-            </select>
+          <div className="form-grid two-col">
+            <div className="form-group">
+              <label>Date <span className="required">*</span></label>
+              <input type="date" name="date" value={formData.date} onChange={handleChange} required className="form-input" />
+            </div>
+            <div className="form-group">
+              <label>Amount (Rs.) <span className="required">*</span></label>
+              <input type="number" name="amount" min="0.01" step="0.01" value={formData.amount} onChange={handleChange} placeholder="0.00" required className="form-input" />
+            </div>
           </div>
-        </div>
-
-        <div className="ff-form-row">
-          <div className="ff-form-group">
-            <label>Date *</label>
-            <input type="date" name="date" value={formData.date} onChange={handleChange} required />
+          <div className="form-grid two-col">
+            <div className="form-group">
+              <label>Receive Type <span className="required">*</span></label>
+              <select name="receive_type" value={formData.receive_type} onChange={handleChange} required className="form-select">
+                <option value="">Select type</option>
+                {receiveTypes.map(type => (
+                  <option key={type.id} value={type.type_name}>{type.type_name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Reference No (Optional)</label>
+              <input type="text" name="reference_number" value={formData.reference_number} onChange={handleChange} placeholder="e.g. deposit slip number" className="form-input" />
+            </div>
           </div>
-          <div className="ff-form-group">
-            <label>Amount (Rs.) *</label>
-            <input type="number" name="amount" min="0.01" step="0.01" value={formData.amount} onChange={handleChange} placeholder="0.00" required />
+          <div className="form-grid two-col">
+            <div className="form-group">
+              <label>Remark</label>
+              <textarea name="remark" rows={2} value={formData.remark} onChange={handleChange} placeholder="Add a note..." className="form-textarea" />
+            </div>
           </div>
-        </div>
-
-        <div className="ff-form-group">
-          <label>Receive Type *</label>
-          <select name="receive_type" value={formData.receive_type} onChange={handleChange} required>
-            <option value="">Select type</option>
-            {receiveTypes.map(type => (
-              <option key={type.id} value={type.type_name}>{type.type_name}</option>
-            ))}
-          </select>
-        </div>
-
-        <div className="ff-form-group">
-          <label>Reference No (Optional)</label>
-          <input type="text" name="reference_number" value={formData.reference_number} onChange={handleChange} placeholder="e.g. deposit slip number" />
-        </div>
-
-        <div className="ff-form-group">
-          <label>Remark</label>
-          <textarea name="remark" rows={2} value={formData.remark} onChange={handleChange} placeholder="Add a note..." />
-        </div>
-
-        <button className="ff-submit-btn" type="submit" disabled={submitting}>
-          {submitting ? <><FontAwesomeIcon icon={faSpinner} spin /> Saving...</> : 'Save Receipt'}
-        </button>
-      </form>
+          <div className="form-actions">
+            <button className="btn btn-primary" type="submit" disabled={submitting}>
+              {submitting ? <><FontAwesomeIcon icon={faSpinner} spin /> Saving...</> : 'Save Receipt'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 };

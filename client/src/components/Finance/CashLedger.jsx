@@ -157,32 +157,39 @@ const CashLedger = () => {
   };
 
   return (
-    <div className="fl-container">
-      <div className="fl-header">
-        <h2><FontAwesomeIcon icon={faMoneyBillWave} /> Cash Ledger</h2>
-        <div className="fl-controls">
-          <label>Company</label>
-          <select value={companyId} onChange={e => setCompanyId(e.target.value)}>
+    <div className="page-container">
+      <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <h2 style={{ textAlign: 'left', margin: 0 }}>
+            <FontAwesomeIcon icon={faMoneyBillWave} style={{ marginRight: '8px' }} /> Cash Ledger
+          </h2>
+        </div>
+        <div className="report-filter-group" style={{ alignItems: 'center' }}>
+          <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)' }}>Company:</label>
+          <select value={companyId} onChange={e => setCompanyId(e.target.value)} className="report-filter-select">
             {companies.map(c => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
         </div>
-      </div>
+      </header>
 
-      <div className="fl-balance-card">
-        <span>Cash In Hand Balance</span>
-        <strong>Rs. {fmt(balance)}</strong>
-      </div>
-
-      <div className="fl-summary-grid">
-        <div className="fl-summary-card fl-summary-card-debit">
-          <span className="fl-summary-label">Total Debit</span>
-          <strong className="fl-summary-value fl-debit-amount">Rs. {fmt(totals.debit)}</strong>
+      <div className="card" style={{ display: 'flex', alignItems: 'center', padding: 'var(--spacing-lg)', gap: 'var(--spacing-xl)', marginBottom: 'var(--spacing-md)' }}>
+        <div style={{ fontSize: '48px', color: 'var(--color-primary)', opacity: 0.8 }}><FontAwesomeIcon icon={faMoneyBillWave} /></div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', fontWeight: 'var(--font-weight-medium)' }}>Cash In Hand Balance</div>
+          <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'var(--color-text-primary)', margin: 'var(--spacing-xs) 0' }}>Rs. {fmt(balance)}</div>
         </div>
-        <div className="fl-summary-card fl-summary-card-credit">
-          <span className="fl-summary-label">Total Credit</span>
-          <strong className="fl-summary-value fl-credit-amount">Rs. {fmt(totals.credit)}</strong>
+      </div>
+
+      <div style={{ display: 'flex', gap: 'var(--spacing-md)', marginBottom: 'var(--spacing-lg)' }}>
+        <div className="card" style={{ flex: 1, padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)' }}>
+          <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>Total Debit</span>
+          <strong style={{ fontSize: 'var(--font-size-xl)', color: 'var(--color-success)' }}>Rs. {fmt(totals.debit)}</strong>
+        </div>
+        <div className="card" style={{ flex: 1, padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)' }}>
+          <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>Total Credit</span>
+          <strong style={{ fontSize: 'var(--font-size-xl)', color: 'var(--color-danger)' }}>Rs. {fmt(totals.credit)}</strong>
         </div>
       </div>
 
@@ -204,25 +211,27 @@ const CashLedger = () => {
         </div>
       )}
 
-      <div className="fl-filters">
-        <input type="date" name="dateFrom" value={filters.dateFrom} onChange={handleFilterChange} title="Date From" />
-        <input type="date" name="dateTo" value={filters.dateTo} onChange={handleFilterChange} title="Date To" />
-        <input type="text" name="referenceNumber" value={filters.referenceNumber} onChange={handleFilterChange} placeholder="Reference / Invoice No" />
-        <select name="transactionType" value={filters.transactionType} onChange={handleFilterChange}>
-          {TRANSACTION_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-        </select>
-        <select name="direction" value={filters.direction} onChange={handleFilterChange}>
-          <option value="">All</option>
-          <option value="IN">IN</option>
-          <option value="OUT">OUT</option>
-        </select>
+      <div className="card filters-section report-filter-bar" style={{ padding: 'var(--spacing-lg)', marginBottom: 'var(--spacing-lg)' }}>
+        <div className="ledger-filter-row">
+          <input type="date" name="dateFrom" value={filters.dateFrom} onChange={handleFilterChange} title="Date From" className="report-filter-input" />
+          <input type="date" name="dateTo" value={filters.dateTo} onChange={handleFilterChange} title="Date To" className="report-filter-input" />
+          <input type="text" name="referenceNumber" value={filters.referenceNumber} onChange={handleFilterChange} placeholder="Reference / Invoice No" className="report-filter-input" />
+          <select name="transactionType" value={filters.transactionType} onChange={handleFilterChange} className="report-filter-select">
+            {TRANSACTION_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+          </select>
+          <select name="direction" value={filters.direction} onChange={handleFilterChange} className="report-filter-select">
+            <option value="">All Directions</option>
+            <option value="IN">IN</option>
+            <option value="OUT">OUT</option>
+          </select>
+        </div>
       </div>
 
-      <div className="fl-table-wrapper" ref={tableRef}>
+      <div className="card" ref={tableRef} style={{ overflowX: 'auto' }}>
         {loading ? (
-          <div className="fl-loading"><FontAwesomeIcon icon={faSpinner} spin /> Loading…</div>
+          <div style={{ textAlign: 'center', padding: 'var(--spacing-2xl)', color: 'var(--color-text-secondary)' }}><FontAwesomeIcon icon={faSpinner} spin /> Loading…</div>
         ) : (
-          <table className="fl-table">
+          <table className="report-table">
             <thead>
               <tr>
                 <th>Date</th>
@@ -249,7 +258,7 @@ const CashLedger = () => {
             </thead>
             <tbody>
               {transactions.length === 0 ? (
-                <tr><td colSpan={10} className="fl-empty">No transactions yet</td></tr>
+                <tr><td colSpan={10} style={{ textAlign: 'center', padding: 'var(--spacing-2xl)', color: 'var(--color-text-secondary)' }}>No transactions yet</td></tr>
               ) : transactions.map(t => {
                 const dir = (t.direction || '').toUpperCase();
                 return (

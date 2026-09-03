@@ -110,27 +110,30 @@ const Damages = () => {
   const formatCurrency = (amount) =>
     new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR', minimumFractionDigits: 2 }).format(amount);
 
-  if (loading) return <div className="loading">Loading damage records...</div>;
+  if (loading) return <div style={{ padding: 'var(--spacing-2xl)', textAlign: 'center', color: 'var(--color-text-secondary)' }}>Loading damage records...</div>;
 
   return (
-    <div className="damages-container">
-      <div className="damages-header">
-        <h2>Cutlery Damages</h2>
-        <button className="btn-add-damage" onClick={() => setShowAddForm(true)}>+ Add Damage</button>
-      </div>
+    <div className="page-container">
+      <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+        <div>
+          <h2 style={{ margin: 0 }}>Cutlery Damages</h2>
+          <p style={{ margin: '4px 0 0', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>Track and manage cutlery damage records</p>
+        </div>
+        <button className="btn btn-primary" onClick={() => setShowAddForm(true)}>+ Add Damage</button>
+      </header>
 
       {showAddForm && <AddDamageForm onSubmit={handleAddDamage} onCancel={() => setShowAddForm(false)} />}
       {viewingDamage && <ViewDamage damage={viewingDamage} onClose={() => setViewingDamage(null)} onEdit={() => { setEditingDamage(viewingDamage); setViewingDamage(null); }} />}
       {editingDamage && <EditDamage damage={editingDamage} onSubmit={handleUpdateDamage} onCancel={() => setEditingDamage(null)} />}
 
       {damages.length === 0 ? (
-        <div className="no-data">
-          <div className="no-data-icon">💔</div>
+        <div className="card" style={{ textAlign: 'center', padding: 'var(--spacing-3xl)', color: 'var(--color-text-secondary)' }}>
+          <div style={{ fontSize: '48px', marginBottom: 'var(--spacing-md)', opacity: 0.5 }}>💔</div>
           <p>No damage records found. Create your first damage record to get started.</p>
         </div>
       ) : (
-        <div className="table-wrapper">
-          <table className="damages-table">
+        <div className="card" style={{ overflowX: 'auto' }}>
+          <table className="report-table">
             <thead>
               <tr>
                 <th>Damage ID</th>
@@ -146,14 +149,14 @@ const Damages = () => {
             <tbody>
               {damages.map(damage => (
                 <tr key={damage.id}>
-                  <td className="damage-id">{damage.damage_id}</td>
+                  <td>{damage.damage_id}</td>
                   <td>{new Date(damage.damage_date).toLocaleDateString()}</td>
                   <td>{damage.location_name}</td>
                   <td>{getReasonBadge(damage.reason)}</td>
                   <td>{damage.reported_by}</td>
-                  <td className="total-loss">{formatCurrency(damage.total_loss || damage.estimated_loss)}</td>
+                  <td><strong>{formatCurrency(damage.total_loss || damage.estimated_loss)}</strong></td>
                   <td>{getStatusBadge(damage.status)}</td>
-                  <td className="actions-col">
+                  <td>
                     <button className="icon-btn" onClick={() => handleViewDamage(damage)} title="View">👁️</button>
                     <button className="icon-btn" onClick={() => handleEditDamage(damage)} title="Edit">✏️</button>
                     <button className="icon-btn danger" onClick={() => handleDeleteDamage(damage.id, damage.damage_id)} title="Delete">🗑️</button>

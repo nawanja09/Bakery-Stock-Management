@@ -139,7 +139,7 @@ const recordBankTransaction = async (connection, {
   createdBy
 }) => {
   const [bankRows] = await connection.query(
-    'SELECT company FROM bank_details WHERE id = ? AND record_status = 1 FOR UPDATE',
+    "SELECT company FROM bank_details WHERE id = ? AND status = 'Active' AND COALESCE(record_status, 1) = 1 FOR UPDATE",
     [bankId]
   );
 

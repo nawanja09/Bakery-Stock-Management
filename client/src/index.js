@@ -2,6 +2,8 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import './css/theme.css';
+import './css/page-design-system.css';
+import './css/report-filter-ui.css';
 import App from './App';
 import {PopupProvider} from './components/context/PopupContext';
 

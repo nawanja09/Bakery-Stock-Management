@@ -131,44 +131,45 @@ const EditAdjustment = () => {
 
   if (loading) {
     return (
-      <div className="adjustments-container">
-        <div className="adjustments-header">
-          <div className="adjustments-header-left">
-            <h1>Edit Adjustment</h1>
-            <p>Loading adjustment details...</p>
+      <div className="page-container">
+        <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+          <div>
+            <h2 style={{ margin: 0 }}>Edit Adjustment</h2>
+            <p style={{ margin: '4px 0 0', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>Loading adjustment details...</p>
           </div>
-        </div>
+        </header>
       </div>
     );
   }
 
   return (
-    <div className="adjustments-container">
-      <div className="adjustments-header">
-        <div className="adjustments-header-left">
-          <h1>RM Adjustment - Edit</h1>
+    <div className="page-container">
+      <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+        <div>
+          <h2 style={{ margin: 0 }}>RM Adjustment - Edit</h2>
+          <p style={{ margin: '4px 0 0', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>Edit an existing adjustment record</p>
         </div>
-        <div className="adjustments-header-actions">
+        <div>
           <button type="button" className="btn btn-secondary" onClick={() => navigate('/adjustments/stores-adjustments')}>
-            <FontAwesomeIcon icon={faArrowLeft} /> Back to History
+            <FontAwesomeIcon icon={faArrowLeft} style={{ marginRight: '8px' }} /> Back to History
           </button>
         </div>
-      </div>
+      </header>
 
       {error && (
-        <div className="alert-message error">
-          <FontAwesomeIcon icon={faExclamationCircle} /> {error}
+        <div style={{ padding: 'var(--spacing-md)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--spacing-md)', backgroundColor: '#f8d7da', color: '#721c24' }}>
+          <FontAwesomeIcon icon={faExclamationCircle} style={{ marginRight: '8px' }} /> {error}
         </div>
       )}
 
       {success && (
-        <div className="alert-message success">
-          <FontAwesomeIcon icon={faCheckCircle} /> {success}
+        <div style={{ padding: 'var(--spacing-md)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--spacing-md)', backgroundColor: '#d4edda', color: '#155724' }}>
+          <FontAwesomeIcon icon={faCheckCircle} style={{ marginRight: '8px' }} /> {success}
         </div>
       )}
 
       <form className="adjustments-form" onSubmit={handleSubmit}>
-        <div className="form-section">
+        <div className="card" style={{ padding: 'var(--spacing-lg)', marginBottom: 'var(--spacing-lg)' }}>
           <h3 className="form-section-title">
             <FontAwesomeIcon icon={faFileAlt} /> Adjustment Details
           </h3>

@@ -168,14 +168,14 @@ const AddReturn = () => {
 
   return (
     <div className="returns-container">
-      <div className="header-with-actions">
-        <h2>Department Returns</h2>
+      <div className="page-header">
+        <h1>Department Return</h1>
         <button onClick={() => navigate('/returns/history')} className="btn-secondary">
           ← Back to History
         </button>
       </div>
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} className="purchase-form">
         <div className="form-row dept-return-fields">
           <div className="form-group">
             <label>Return Date</label>

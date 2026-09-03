@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faEdit, faTrash, faPlus, faSearch, faBox, faEye } from '@fortawesome/free-solid-svg-icons';
 import { usePopup } from '../../context/PopupContext';
@@ -12,6 +12,7 @@ const ViewFinishedGoodsItems = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const navigate = useNavigate();
+  const location = useLocation();
   const { showPopup } = usePopup();
 
   useEffect(() => {
@@ -57,8 +58,8 @@ const ViewFinishedGoodsItems = () => {
     setFilteredItems(filtered);
   }, [searchTerm, items]);
 
-  const handleView = (id) => navigate(`/finished-goods/items/view/${id}`);
-  const handleEdit = (id) => navigate(`/finished-goods/items/edit/${id}`);
+  const handleView = (id) => navigate(`/finished-goods/items/view/${id}`, { state: { backgroundLocation: location } });
+  const handleEdit = (id) => navigate(`/finished-goods/items/edit/${id}`, { state: { backgroundLocation: location } });
 
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this item?')) {
@@ -85,7 +86,7 @@ const ViewFinishedGoodsItems = () => {
           <p className="fg-subtitle">Minimalist view of your finished products</p>
         </div>
 
-        <button onClick={() => navigate('/finished-goods/items/add')} className="fg-btn-primary">
+        <button onClick={() => navigate('/finished-goods/items/add', { state: { backgroundLocation: location } })} className="fg-btn-primary">
           <FontAwesomeIcon icon={faPlus} /> Add Item
         </button>
       </div>
@@ -113,7 +114,7 @@ const ViewFinishedGoodsItems = () => {
           <h3>No items found</h3>
           <p>Try adjusting your search or add a new item.</p>
           {!searchTerm && (
-            <button onClick={() => navigate('/finished-goods/items/add')} className="fg-btn-primary mt">
+            <button onClick={() => navigate('/finished-goods/items/add', { state: { backgroundLocation: location } })} className="fg-btn-primary mt">
               <FontAwesomeIcon icon={faPlus} /> Add First Item
             </button>
           )}

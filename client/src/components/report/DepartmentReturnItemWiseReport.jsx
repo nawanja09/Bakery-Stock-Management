@@ -230,94 +230,85 @@ const DepartmentReturnItemWiseReport = () => {
   };
 
   return (
-    <div className="report-container">
+    <div className="page-container">
       {/* Header with Export Button */}
-      <div className="report-header">
-        <h2>Department Return Item Wise Detail</h2>
+      <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <h2 style={{ textAlign: 'left', margin: 0 }}>Department Return Item Wise Detail</h2>
+          <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>Detailed view of items returned by departments.</p>
+        </div>
         {reportData.length > 0 && (
-          <button onClick={exportExcel} className="btn-export-excel">
-            <FontAwesomeIcon icon={faFileExcel} /> Excel
+          <button onClick={exportExcel} className="btn btn-success">
+            <FontAwesomeIcon icon={faFileExcel} /> Export Excel
           </button>
         )}
-      </div>
+      </header>
 
       {/* Filters */}
-      <div className="report-filters dept-return-iw-filters">
-        <form onSubmit={handleSearch} className="filters-form">
-          <div className="filter-row">
-            <div className="filter-group">
-              <label>From Date</label>
-              <input
-                type="date"
-                value={filters.startDate}
-                onChange={(e) => handleFilterChange('startDate', e.target.value)}
-                className="filter-input"
-              />
-            </div>
-            <div className="filter-group">
-              <label>To Date</label>
-              <input
-                type="date"
-                value={filters.endDate}
-                onChange={(e) => handleFilterChange('endDate', e.target.value)}
-                className="filter-input"
-              />
-            </div>
-            <div className="filter-group">
-              <label>Department</label>
-              <select
-                value={filters.departmentId}
-                onChange={(e) => handleFilterChange('departmentId', e.target.value)}
-                className="filter-select"
-              >
-                <option value="all">All Departments</option>
-                {departments.map(dept => (
-                  <option key={dept.id} value={dept.id}>{dept.name}</option>
-                ))}
-              </select>
-            </div>
-            <div className="filter-group search-group">
-              <label>Search</label>
-              <div className="search-input-wrapper">
-                <input
-                  type="text"
-                  value={filters.searchTerm}
-                  onChange={(e) => handleFilterChange('searchTerm', e.target.value)}
-                  placeholder="Search by item name or code..."
-                  className="filter-input search-input"
-                />
-                {filters.searchTerm && (
-                  <button
-                    type="button"
-                    className="clear-search"
-                    onClick={() => handleFilterChange('searchTerm', '')}
-                  >
-                    <FontAwesomeIcon icon={faTimes} />
-                  </button>
-                )}
-              </div>
-            </div>
-            <div className="filter-actions">
-              <button type="submit" className="btn btn-primary btn-search">
-                <FontAwesomeIcon icon={faSearch} /> Search
-              </button>
-              <button type="button" className="btn btn-secondary" onClick={clearFilters}>
-                <FontAwesomeIcon icon={faTimes} /> Cancel
-              </button>
-            </div>
+      <form onSubmit={handleSearch} className="filters-section report-filter-bar department-return-filter">
+        <div className="report-filter-group">
+          <label className="report-filter-label">From Date</label>
+          <input
+            type="date"
+            value={filters.startDate}
+            onChange={(e) => handleFilterChange('startDate', e.target.value)}
+            className="report-filter-input"
+          />
+        </div>
+        <div className="report-filter-group">
+          <label className="report-filter-label">To Date</label>
+          <input
+            type="date"
+            value={filters.endDate}
+            onChange={(e) => handleFilterChange('endDate', e.target.value)}
+            className="report-filter-input"
+          />
+        </div>
+        <div className="report-filter-group">
+          <label className="report-filter-label">Department</label>
+          <select
+            value={filters.departmentId}
+            onChange={(e) => handleFilterChange('departmentId', e.target.value)}
+            className="report-filter-select"
+          >
+            <option value="all">All Departments</option>
+            {departments.map(dept => (
+              <option key={dept.id} value={dept.id}>{dept.name}</option>
+            ))}
+          </select>
+        </div>
+        <div className="report-filter-group">
+          <label className="report-filter-label">Search</label>
+          <div className="items-search" style={{ padding: 0 }}>
+            <input
+              type="text"
+              value={filters.searchTerm}
+              onChange={(e) => handleFilterChange('searchTerm', e.target.value)}
+              placeholder="Search..."
+              className="report-filter-input"
+              style={{ border: 'none', height: '100%' }}
+            />
           </div>
-        </form>
-      </div>
+        </div>
+        <div className="report-filter-actions">
+          <button type="submit" className="btn btn-primary">
+            <FontAwesomeIcon icon={faSearch} /> Search
+          </button>
+          <button type="button" className="btn btn-secondary" onClick={clearFilters}>
+            <FontAwesomeIcon icon={faTimes} /> Reset
+          </button>
+        </div>
+      </form>
 
       {/* Report Table */}
       {loading ? (
         <div className="loading-state">
-          <div className="spinner"></div>
+          <div className="loading-spinner"></div>
           <p>Generating report...</p>
         </div>
       ) : reportData.length > 0 ? (
-        <>
-          <div className="table-container">
+        <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
+          <div style={{ overflowX: 'auto' }}>
             <table className="report-table">
               <thead>
                 <tr>
@@ -351,22 +342,22 @@ const DepartmentReturnItemWiseReport = () => {
                   <tr key={`${item.return_id}-${index}`}>
                     <td>{format(new Date(item.return_date), 'yyyy-MM-dd')}</td>
                     <td>
-                      <span className="ref-badge">{item.return_number}</span>
+                      <span className="badge badge-neutral">{item.return_number}</span>
                     </td>
                     <td>{item.department_name}</td>
                     <td>
-                      <span className="code-badge">{item.item_code}</span>
+                      <span className="badge badge-primary">{item.item_code}</span>
                     </td>
                     <td className="item-name">{item.item_name}</td>
                     <td>{item.category || 'N/A'}</td>
                     <td>
-                      <span className="unit-badge">{item.unit}</span>
+                      <span className="badge badge-neutral">{item.unit}</span>
                     </td>
-                    <td className="quantity-cell">
+                    <td className="report-table-value-numeric">
                       {Number(item.returned_quantity).toFixed(3)}
                     </td>
                     <td>
-                      <span className={`reason-badge reason-${item.return_reason?.toLowerCase().replace(' ', '-')}`}>
+                      <span className={`badge badge-neutral`}>
                         {item.return_reason}
                       </span>
                     </td>
@@ -400,7 +391,7 @@ const DepartmentReturnItemWiseReport = () => {
               </button>
             </div>
           )}
-        </>
+        </div>
       ) : (
         <div className="empty-state">
           <div className="empty-icon">📭</div>

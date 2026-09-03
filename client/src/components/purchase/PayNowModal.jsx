@@ -1,5 +1,6 @@
 // src/components/purchase/PayNowModal.jsx
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTimes, faPaperPlane, faInfoCircle, faMoneyBillWave, faSpinner } from '@fortawesome/free-solid-svg-icons';
 import dayjs from 'dayjs';
@@ -161,9 +162,9 @@ const PayNowModal = ({ isOpen, onClose, suppliers = [], companies = [], supplier
     }
   };
 
-  return (
+  return createPortal((
     <div className="pnm-overlay" onClick={onClose}>
-      <div className="pnm-modal" onClick={e => e.stopPropagation()}>
+      <div className="pnm-modal erp-payment-modal" onClick={e => e.stopPropagation()}>
 
         <div className="pnm-header">
           <h3>
@@ -351,7 +352,7 @@ const PayNowModal = ({ isOpen, onClose, suppliers = [], companies = [], supplier
 
       </div>
     </div>
-  );
+  ), document.getElementById('modal-root') || document.body);
 };
 
 export default PayNowModal;

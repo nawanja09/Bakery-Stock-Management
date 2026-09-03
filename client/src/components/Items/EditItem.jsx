@@ -116,31 +116,30 @@ const EditItem = () => {
 
   if (loading) {
     return (
-      <div className="minimal-container">
-        <div className="minimal-card loading-card">
-          <div className="minimal-spinner"></div>
-          <p className="loading-text">Loading item details...</p>
+      <div className="page-container item-management-page">
+        <div className="loading-state">
+          <div className="loading-spinner"></div>
+          <p>Loading item details...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="minimal-container">
-      <div className="minimal-card">
-        <div className="minimal-header">
+    <div className="page-container item-management-page">
+      <div className="card item-management-card">
+        <header className="page-header" style={{ display: 'flex', alignItems: 'center', marginBottom: 'var(--spacing-lg)', gap: '15px' }}>
           <button
             onClick={() => navigate('/items')}
-            className="minimal-icon-button back-button"
+            className="btn btn-secondary btn-sm"
             aria-label="Go back"
           >
-            <FontAwesomeIcon icon={faArrowLeft} />
+            <FontAwesomeIcon icon={faArrowLeft} /> Back
           </button>
-          <h2 className="minimal-title">Edit Item</h2>
-          <div className="header-spacer"></div>
-        </div>
+          <h2 style={{ margin: 0 }}>Edit Item</h2>
+        </header>
 
-        <form onSubmit={handleSubmit} className="minimal-form">
+        <form onSubmit={handleSubmit}>
           <div className="form-grid">
             <div className="minimal-form-group">
               <label className="minimal-label">Item Code <span className="required-star">*</span></label>
@@ -288,18 +287,18 @@ const EditItem = () => {
             </div>
           </div>
 
-          <div className="minimal-form-actions">
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: 'var(--spacing-lg)' }}>
             <button
               type="button"
               onClick={() => navigate('/items')}
-              className="minimal-button minimal-button-secondary"
+              className="btn btn-secondary"
               disabled={isSubmitting}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="minimal-button minimal-button-primary"
+              className="btn btn-primary"
               disabled={isSubmitting}
             >
               <FontAwesomeIcon icon={faSave} className="button-icon" />

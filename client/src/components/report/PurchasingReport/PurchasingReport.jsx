@@ -422,53 +422,56 @@ const PurchasingReport = () => {
   // 🔥 FIXED: Render
   // =============================================
   return (
-    <div className="purchasing-report-container">
+    <div className="page-container report-page-purchasing">
       {/* Header */}
-      <div className="report-header">
-        <h2>Purchasing Item Detail</h2>
+      <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <h2 style={{ textAlign: 'left', margin: 0 }}>Purchasing Item Detail</h2>
+          <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>Detailed view of purchasing items</p>
+        </div>
         {filteredItems.length > 0 && (
-          <div className="report-actions">
-            <button onClick={downloadPDF} className="btn btn-success">
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button onClick={downloadPDF} className="btn btn-secondary">
               📄 PDF
             </button>
-            <button onClick={downloadExcel} className="btn btn-excel">
+            <button onClick={downloadExcel} className="btn btn-success">
               📊 Excel
             </button>
           </div>
         )}
-      </div>
+      </header>
 
       {/* Filters */}
-      <div className="controls-section">
-        <div className="control-group">
-          <label>Start Date</label>
+      <div className="filters-section report-filter-bar">
+        <div className="report-filter-group">
+          <label className="report-filter-label">Start Date</label>
           <input
             type="date"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
             max={endDate}
-            className="control-input"
+            className="report-filter-input"
           />
         </div>
 
-        <div className="control-group">
-          <label>End Date</label>
+        <div className="report-filter-group">
+          <label className="report-filter-label">End Date</label>
           <input
             type="date"
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
             min={startDate}
             max={format(new Date(), 'yyyy-MM-dd')}
-            className="control-input"
+            className="report-filter-input"
           />
         </div>
 
-        <div className="control-group">
-          <label>Company</label>
+        <div className="report-filter-group">
+          <label className="report-filter-label">Company</label>
           <select
             value={companyFilter}
             onChange={(e) => setCompanyFilter(e.target.value)}
-            className="control-input"
+            className="report-filter-select"
           >
             <option value="">All Companies</option>
             <option value="1">JH</option>
@@ -477,12 +480,12 @@ const PurchasingReport = () => {
           </select>
         </div>
 
-        <div className="control-group">
-          <label>VAT Status</label>
+        <div className="report-filter-group">
+          <label className="report-filter-label">VAT Status</label>
           <select
             value={vatFilter}
             onChange={(e) => setVatFilter(e.target.value)}
-            className="control-input"
+            className="report-filter-select"
           >
             <option value="all">All</option>
             <option value="yes">VAT Registered</option>
@@ -490,8 +493,8 @@ const PurchasingReport = () => {
           </select>
         </div>
 
-        <div className="control-group search-group">
-          <label>Search Item</label>
+        <div className="report-filter-group" style={{ flex: '1 1 200px' }}>
+          <label className="report-filter-label">Search Item</label>
           <Select
             options={itemOptions}
             value={selectedItem}
@@ -501,36 +504,29 @@ const PurchasingReport = () => {
             placeholder="Search by item..."
             className="react-select-container"
             classNamePrefix="react-select"
-            styles={{
-              control: (base) => ({
-                ...base,
-                minHeight: '42px',
-                borderColor: '#e9ecef',
-                borderRadius: '10px',
-                boxShadow: 'none',
-                '&:hover': { borderColor: '#adb5bd' }
-              }),
-              menuPortal: (base) => ({ ...base, zIndex: 9999 })
-            }}
             menuPortalTarget={document.body}
+            menuPosition="fixed"
           />
         </div>
 
-        <button
-          onClick={fetchPurchasingReport}
-          disabled={loading}
-          className="btn btn-primary"
-        >
-          {loading ? 'Generating...' : 'Generate Report'}
-        </button>
+        <div className="report-filter-actions">
+          <button
+            onClick={fetchPurchasingReport}
+            disabled={loading}
+            className="btn btn-primary"
+          >
+            {loading ? 'Generating...' : 'Generate Report'}
+          </button>
+        </div>
       </div>
 
       {/* Table */}
       {loading ? (
-        <div className="loading-overlay">Loading report data...</div>
+        <div className="loading-state">Loading report data...</div>
       ) : filteredItems.length > 0 ? (
-        <div className="table-container">
-          <table className="purchasing-report-table">
+        <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
+          <div style={{ overflowX: 'auto' }}>
+            <table className="report-table">
             <thead>
               <tr>
                 <th>Date</th>
@@ -662,6 +658,7 @@ const PurchasingReport = () => {
               </tr>
             </tfoot>
           </table>
+        </div>
         </div>
       ) : (
         <div className="empty-state">

@@ -1,0 +1,411 @@
+/* ============================================================================
+   FINISHED GOODS MODULE - Comprehensive Styles
+   Covers: Production, Sales, Transfers, Wastage, Stock Management
+  ============================================================================ */
+
+@import '../../css/page-design-system.css';
+
+/* ============================================================================
+   FINISHED GOODS LIST
+   ============================================================================ */
+
+.fg-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xl);
+}
+
+.fg-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-lg);
+  flex-wrap: wrap;
+}
+
+.fg-title {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+}
+
+.fg-actions {
+  display: flex;
+  gap: var(--spacing-md);
+}
+
+.fg-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--spacing-lg);
+}
+
+/* ============================================================================
+   FINISHED GOODS CARD
+   ============================================================================ */
+
+.fg-card {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: all var(--transition-base);
+  display: flex;
+  flex-direction: column;
+}
+
+.fg-card:hover {
+  box-shadow: var(--shadow-lg);
+  border-color: var(--color-primary);
+  transform: translateY(-4px);
+}
+
+.fg-card-image {
+  width: 100%;
+  height: 200px;
+  background: linear-gradient(135deg, var(--color-primary-light), var(--color-secondary-light));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48px;
+  color: var(--color-primary);
+}
+
+.fg-card-body {
+  padding: var(--spacing-lg);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.fg-card-name {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+}
+
+.fg-card-description {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  line-height: var(--line-height-normal);
+}
+
+.fg-card-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  background-color: var(--color-bg-secondary);
+  border-radius: var(--radius-md);
+}
+
+.fg-card-meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.fg-card-meta-label {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.fg-card-meta-value {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+}
+
+.fg-card-footer {
+  padding: var(--spacing-lg);
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+/* ============================================================================
+   PRODUCTION FORM
+   ============================================================================ */
+
+.production-form {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-2xl);
+}
+
+.production-section {
+  margin-bottom: var(--spacing-2xl);
+}
+
+.production-section-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  margin-bottom: var(--spacing-lg);
+  padding-bottom: var(--spacing-md);
+  border-bottom: 2px solid var(--color-primary-light);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.production-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: var(--spacing-lg);
+  margin-bottom: var(--spacing-lg);
+}
+
+.production-ingredients-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.production-ingredients-table thead {
+  background-color: var(--color-bg-tertiary);
+}
+
+.production-ingredients-table th {
+  padding: var(--spacing-md);
+  text-align: left;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+}
+
+.production-ingredients-table td {
+  padding: var(--spacing-md);
+  border-bottom: 1px solid var(--color-border-light);
+  color: var(--color-text-secondary);
+}
+
+.production-ingredients-table tbody tr:hover {
+  background-color: var(--color-bg-secondary);
+}
+
+/* ============================================================================
+   TRANSFER/SALES FORM
+   ============================================================================ */
+
+.transfer-form,
+.sales-form {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-2xl);
+}
+
+.transfer-items,
+.sales-items {
+  margin-top: var(--spacing-lg);
+}
+
+.transfer-item-row,
+.sales-item-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr auto;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+  padding: var(--spacing-lg);
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  align-items: end;
+}
+
+.transfer-item-field,
+.sales-item-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.transfer-item-field label,
+.sales-item-field label {
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.transfer-item-field input,
+.sales-item-field input {
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+}
+
+/* ============================================================================
+   STOCK INFORMATION
+   ============================================================================ */
+
+.stock-info-panel {
+  background: linear-gradient(135deg, var(--color-success-light), #dcfce7);
+  border: 1px solid var(--color-success);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg) var(--spacing-xl);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-lg);
+}
+
+.stock-info-icon {
+  width: 48px;
+  height: 48px;
+  background-color: var(--color-success);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: var(--font-size-xl);
+  flex-shrink: 0;
+}
+
+.stock-info-content {
+  flex: 1;
+}
+
+.stock-info-label {
+  font-size: var(--font-size-sm);
+  color: #15803d;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: var(--font-weight-medium);
+}
+
+.stock-info-value {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: #166534;
+}
+
+.stock-info-unit {
+  font-size: var(--font-size-sm);
+  color: #15803d;
+  margin-left: var(--spacing-sm);
+  font-weight: var(--font-weight-normal);
+}
+
+.stock-warning-panel {
+  background: linear-gradient(135deg, var(--color-error-light), #fecaca);
+  border: 1px solid var(--color-error);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg) var(--spacing-xl);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-lg);
+}
+
+.stock-warning-panel .stock-info-icon {
+  background-color: var(--color-error);
+}
+
+.stock-warning-panel .stock-info-label {
+  color: #7f1d1d;
+}
+
+.stock-warning-panel .stock-info-value {
+  color: #991b1b;
+}
+
+/* ============================================================================
+   RESPONSIVE FINISHED GOODS
+   ============================================================================ */
+
+@media (max-width: 1024px) {
+  .fg-grid {
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  }
+
+  .production-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .transfer-item-row,
+  .sales-item-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .fg-card-image {
+    height: 150px;
+    font-size: 36px;
+  }
+
+  .fg-card-body {
+    padding: var(--spacing-md);
+  }
+
+  .fg-card-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .production-form,
+  .transfer-form,
+  .sales-form {
+    padding: var(--spacing-lg);
+  }
+
+  .transfer-item-row,
+  .sales-item-row {
+    grid-template-columns: 1fr;
+  }
+
+  .production-ingredients-table,
+  .production-ingredients-table thead,
+  .production-ingredients-table tbody,
+  .production-ingredients-table tr,
+  .production-ingredients-table th,
+  .production-ingredients-table td {
+    display: block;
+  }
+
+  .production-ingredients-table tr {
+    margin-bottom: var(--spacing-lg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+  }
+
+  .production-ingredients-table thead {
+    display: none;
+  }
+
+  .production-ingredients-table td {
+    display: flex;
+    justify-content: space-between;
+    padding: var(--spacing-md);
+  }
+
+  .stock-info-panel,
+  .stock-warning-panel {
+    flex-direction: column;
+    text-align: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .fg-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .fg-card-image {
+    height: 120px;
+    font-size: 28px;
+  }
+
+  .fg-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .fg-actions {
+    width: 100%;
+  }
+}

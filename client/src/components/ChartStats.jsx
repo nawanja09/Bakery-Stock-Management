@@ -71,8 +71,8 @@ const ChartStats = ({ chartData }) => {
             datasets: [{
               label: 'Issues',
               data: last7IssuesData,
-              borderColor: '#6f42c1',
-              backgroundColor: '#6f42c1',
+              borderColor: '#2D6CDF',
+              backgroundColor: '#2D6CDF',
               tension: 0.4,
               fill: false,
             }]
@@ -128,7 +128,7 @@ const ChartStats = ({ chartData }) => {
                 {
                   label: 'Issues',
                   data: last7IssuesData,
-                  backgroundColor: '#6f42c1',
+                  backgroundColor: '#2D6CDF',
                 },
                 {
                   label: 'Wastage',

@@ -161,18 +161,18 @@ const BankDetails = () => {
   );
 
   return (
-    <div className="bd-container">
+    <div className="erp-page">
       {/* Header */}
-      <div className="bd-header">
-        <div className="bd-header-left">
-          <h1 className="bd-title">
-            <FontAwesomeIcon icon={faBuildingColumns} className="bd-title-icon" />
+      <div className="filters-section" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <h2 style={{ margin: 0, color: 'var(--color-heading)' }}>
+            <FontAwesomeIcon icon={faBuildingColumns} style={{ marginRight: '8px', color: 'var(--color-primary)' }} />
             Bank Details
-          </h1>
-          <p className="bd-subtitle">Manage your bank accounts for expense tracking</p>
+          </h2>
+          <p className="text-muted" style={{ marginTop: '4px' }}>Manage your bank accounts for expense tracking</p>
         </div>
         <button
-          className="bd-btn-primary"
+          className="btn btn-primary"
           onClick={() => { setShowForm(true); setEditingId(null); setFormData(emptyForm); }}
         >
           <FontAwesomeIcon icon={faPlus} /> Add New Bank
@@ -181,33 +181,32 @@ const BankDetails = () => {
 
       {/* Add / Edit Form */}
       {showForm && (
-        <div className="bd-form-card">
-          <div className="bd-form-header">
-            <h3>
-              <FontAwesomeIcon icon={editingId ? faEdit : faPlus} />
+        <div className="card" style={{ padding: '24px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', paddingBottom: '16px', borderBottom: '1px solid var(--color-border)' }}>
+            <h3 style={{ margin: 0, fontSize: 'var(--font-size-xl)' }}>
+              <FontAwesomeIcon icon={editingId ? faEdit : faPlus} style={{ marginRight: '8px', color: 'var(--color-text-secondary)' }} />
               {editingId ? ' Edit Bank' : ' Add New Bank'}
             </h3>
-            <button className="bd-close-btn" onClick={resetForm}>
+            <button className="btn-icon" onClick={resetForm}>
               <FontAwesomeIcon icon={faTimes} />
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="bd-form">
-            <div className="bd-section-label">Basic Information</div>
-            <div className="bd-form-row">
-              <div className="bd-form-group">
-                <label>Bank Name <span className="bd-required">*</span></label>
+          <form onSubmit={handleSubmit}>
+            <h4 style={{ margin: '0 0 16px 0', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Basic Information</h4>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+              <div>
+                <label>Bank Name <span className="text-danger">*</span></label>
                 <input
                   type="text"
                   name="bank_name"
                   value={formData.bank_name}
                   onChange={handleChange}
                   placeholder="e.g. Commercial Bank of Ceylon"
-                  className="bd-input"
                   required
                 />
               </div>
-              <div className="bd-form-group">
+              <div>
                 <label>Account Number</label>
                 <input
                   type="text"
@@ -215,10 +214,9 @@ const BankDetails = () => {
                   value={formData.account_number}
                   onChange={handleChange}
                   placeholder="e.g. 1234567890"
-                  className="bd-input"
                 />
               </div>
-              <div className="bd-form-group">
+              <div>
                 <label>Branch Name</label>
                 <input
                   type="text"
@@ -226,50 +224,49 @@ const BankDetails = () => {
                   value={formData.branch_name}
                   onChange={handleChange}
                   placeholder="e.g. Colombo Main Branch"
-                  className="bd-input"
                 />
               </div>
             </div>
 
-            <div className="bd-form-row">
-              <div className="bd-form-group">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '32px' }}>
+              <div>
                 <label>Account Type</label>
-                <select name="account_type" value={formData.account_type} onChange={handleChange} className="bd-select">
+                <select name="account_type" value={formData.account_type} onChange={handleChange}>
                   <option value="Current">Current</option>
                   <option value="Savings">Savings</option>
                   <option value="Fixed Deposit">Fixed Deposit</option>
                   <option value="Other">Other</option>
                 </select>
               </div>
-              <div className="bd-form-group">
+              <div>
                 <label>Currency</label>
-                <select name="currency" value={formData.currency} onChange={handleChange} className="bd-select">
+                <select name="currency" value={formData.currency} onChange={handleChange}>
                   <option value="LKR">LKR</option>
                   <option value="USD">USD</option>
                   <option value="EUR">EUR</option>
                   <option value="GBP">GBP</option>
                 </select>
               </div>
-              <div className="bd-form-group">
-                <label>Company <span className="bd-required">*</span></label>
-                <select name="company" value={formData.company} onChange={handleChange} className="bd-select">
+              <div>
+                <label>Company <span className="text-danger">*</span></label>
+                <select name="company" value={formData.company} onChange={handleChange}>
                   <option value="JH">JH</option>
                   <option value="RD">RD</option>
                   <option value="RR">RR</option>
                 </select>
               </div>
-              <div className="bd-form-group">
+              <div>
                 <label>Status</label>
-                <select name="status" value={formData.status} onChange={handleChange} className="bd-select">
+                <select name="status" value={formData.status} onChange={handleChange}>
                   <option value="Active">Active</option>
                   <option value="Inactive">Inactive</option>
                 </select>
               </div>
             </div>
 
-            <div className="bd-section-label">Balance Information</div>
-            <div className="bd-form-row">
-              <div className="bd-form-group">
+            <h4 style={{ margin: '0 0 16px 0', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Balance Information</h4>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+              <div>
                 <label>Opening Balance (LKR)</label>
                 <input
                   type="number"
@@ -279,10 +276,9 @@ const BankDetails = () => {
                   placeholder="0.00"
                   min="0"
                   step="0.01"
-                  className="bd-input"
                 />
               </div>
-              <div className="bd-form-group">
+              <div>
                 <label>Current Balance (LKR)</label>
                 <input
                   type="number"
@@ -292,12 +288,11 @@ const BankDetails = () => {
                   placeholder="0.00"
                   min="0"
                   step="0.01"
-                  className="bd-input"
                 />
               </div>
             </div>
 
-            <div className="bd-form-group bd-full-width">
+            <div style={{ marginBottom: '24px' }}>
               <label>Notes</label>
               <textarea
                 name="notes"
@@ -305,15 +300,14 @@ const BankDetails = () => {
                 onChange={handleChange}
                 rows="2"
                 placeholder="Additional notes (optional)"
-                className="bd-textarea"
               />
             </div>
 
-            <div className="bd-form-actions">
-              <button type="button" onClick={resetForm} className="bd-btn-secondary" disabled={isLoading}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', paddingTop: '16px', borderTop: '1px solid var(--color-border)' }}>
+              <button type="button" onClick={resetForm} className="btn btn-secondary" disabled={isLoading}>
                 <FontAwesomeIcon icon={faTimes} /> Cancel
               </button>
-              <button type="submit" className="bd-btn-primary" disabled={isLoading}>
+              <button type="submit" className="btn btn-primary" disabled={isLoading}>
                 <FontAwesomeIcon icon={isLoading ? faSpinner : faSave} spin={isLoading} />
                 {isLoading ? ' Saving...' : (editingId ? ' Update Bank' : ' Add Bank')}
               </button>
@@ -323,101 +317,105 @@ const BankDetails = () => {
       )}
 
       {/* Table */}
-      <div className="bd-table-card">
-        <div className="bd-table-header">
-          <h3 className="bd-table-title">
-            <FontAwesomeIcon icon={faUniversity} /> Registered Banks
-            <span className="bd-count">{filtered.length}</span>
+      <div className="card" style={{ overflow: 'hidden' }}>
+        <div className="filters-section" style={{ border: 'none', borderRadius: 0, borderBottom: '1px solid var(--color-border)', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3 style={{ margin: 0, fontSize: 'var(--font-size-lg)' }}>
+            <FontAwesomeIcon icon={faUniversity} className="text-muted" style={{ marginRight: '8px' }} />
+            Registered Banks
+            <span className="badge badge-neutral" style={{ marginLeft: '8px' }}>{filtered.length}</span>
           </h3>
-          <div className="bd-table-actions">
-            <div className="bd-search-box">
-              <FontAwesomeIcon icon={faSearch} className="bd-search-icon" />
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <div className="items-search" style={{ minWidth: '300px' }}>
+              <FontAwesomeIcon icon={faSearch} className="text-muted" />
               <input
                 type="text"
                 placeholder="Search by bank name, account, branch..."
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
-                className="bd-search-input"
               />
               {searchTerm && (
-                <button className="bd-clear-search" onClick={() => setSearchTerm('')}>×</button>
+                <button className="btn-icon" style={{ width: '24px', height: '24px', border: 'none' }} onClick={() => setSearchTerm('')}>×</button>
               )}
             </div>
-            <button onClick={fetchBanks} className="bd-refresh-btn" disabled={isFetching}>
+            <button onClick={fetchBanks} className="btn btn-secondary" disabled={isFetching}>
               <FontAwesomeIcon icon={isFetching ? faSpinner : faSync} spin={isFetching} />
               {isFetching ? ' Loading...' : ' Refresh'}
             </button>
           </div>
         </div>
 
-        <div className="bd-table-container">
-          <table className="bd-table">
+        <div className="overflow-x-auto">
+          <table className="erp-data-table">
             <thead>
               <tr>
-                <th>#</th>
+                <th style={{ width: '40px', textAlign: 'center' }}>#</th>
                 <th>Bank Name</th>
                 <th>Account Number</th>
                 <th>Branch</th>
                 <th>Type</th>
                 <th>Company</th>
-                <th>Current Balance</th>
+                <th style={{ textAlign: 'right' }}>Current Balance</th>
                 <th>Status</th>
-                <th>Actions</th>
+                <th style={{ textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {isFetching ? (
                 <tr>
-                  <td colSpan="9" className="bd-loading-row">
-                    <FontAwesomeIcon icon={faSpinner} spin /> Loading banks...
+                  <td colSpan="9" className="text-center text-muted" style={{ padding: '32px' }}>
+                    <FontAwesomeIcon icon={faSpinner} spin style={{ fontSize: '24px', marginBottom: '8px' }} />
+                    <br />
+                    Loading banks...
                   </td>
                 </tr>
               ) : filtered.length > 0 ? (
                 filtered.map((bank, idx) => (
-                  <tr key={bank.id} className={bank.status === 'Inactive' ? 'bd-row-inactive' : ''}>
-                    <td className="bd-num">{idx + 1}</td>
-                    <td className="bd-bank-name">
-                      <FontAwesomeIcon icon={faBuildingColumns} className="bd-row-icon" />
-                      {bank.bank_name}
+                  <tr key={bank.id} style={bank.status === 'Inactive' ? { opacity: 0.6 } : {}}>
+                    <td style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>{idx + 1}</td>
+                    <td>
+                      <FontAwesomeIcon icon={faBuildingColumns} style={{ marginRight: '8px', color: 'var(--color-text-muted)' }} />
+                      <strong>{bank.bank_name}</strong>
                     </td>
                     <td>{bank.account_number || '—'}</td>
                     <td>{bank.branch_name || '—'}</td>
                     <td>
-                      <span className="bd-badge bd-badge-type">{bank.account_type || 'Current'}</span>
+                      <span className="badge badge-neutral">{bank.account_type || 'Current'}</span>
                     </td>
                     <td>
-                      <span className="bd-badge bd-badge-company">{bank.company || '—'}</span>
+                      <span className="badge badge-primary">{bank.company || '—'}</span>
                     </td>
-                    <td className="bd-balance">
-                      <FontAwesomeIcon icon={faMoneyBillWave} className="bd-money-icon" />
-                      {formatCurrency(bank.current_balance)}
+                    <td style={{ textAlign: 'right', fontWeight: 'bold' }}>
+                      <span style={{ fontSize: '0.85em', color: 'var(--color-text-muted)', marginRight: '4px' }}>LKR</span>
+                      {formatCurrency(bank.current_balance).replace('LKR', '').trim()}
                     </td>
                     <td>
-                      <span className={`bd-badge ${bank.status === 'Active' ? 'bd-badge-active' : 'bd-badge-inactive'}`}>
+                      <span className={`badge ${bank.status === 'Active' ? 'badge-success' : 'badge-neutral'}`}>
                         {bank.status || 'Active'}
                       </span>
                     </td>
-                    <td className="bd-action-cell">
-                      <button
-                        onClick={() => handleToggleStatus(bank)}
-                        className="bd-toggle-btn"
-                        title={bank.status === 'Active' ? 'Deactivate' : 'Activate'}
-                      >
-                        <FontAwesomeIcon icon={bank.status === 'Active' ? faToggleOn : faToggleOff} />
-                      </button>
-                      <button onClick={() => handleEdit(bank)} className="bd-edit-btn" title="Edit">
-                        <FontAwesomeIcon icon={faEdit} />
-                      </button>
-                      <button onClick={() => handleDelete(bank.id)} className="bd-delete-btn" title="Delete">
-                        <FontAwesomeIcon icon={faTrash} />
-                      </button>
+                    <td>
+                      <div className="table-actions" style={{ justifyContent: 'flex-end' }}>
+                        <button
+                          onClick={() => handleToggleStatus(bank)}
+                          className={`btn-icon ${bank.status === 'Active' ? 'delete' : 'edit'}`}
+                          title={bank.status === 'Active' ? 'Deactivate' : 'Activate'}
+                        >
+                          <FontAwesomeIcon icon={bank.status === 'Active' ? faToggleOn : faToggleOff} />
+                        </button>
+                        <button onClick={() => handleEdit(bank)} className="btn-icon edit" title="Edit">
+                          <FontAwesomeIcon icon={faEdit} />
+                        </button>
+                        <button onClick={() => handleDelete(bank.id)} className="btn-icon delete" title="Delete">
+                          <FontAwesomeIcon icon={faTrash} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan="9" className="bd-empty-row">
-                    <FontAwesomeIcon icon={faBuildingColumns} style={{ fontSize: '2rem', opacity: 0.3 }} />
+                  <td colSpan="9" className="text-center text-muted" style={{ padding: '48px' }}>
+                    <FontAwesomeIcon icon={faBuildingColumns} style={{ fontSize: '32px', opacity: 0.3, marginBottom: '16px' }} />
                     <p>No banks found. Add your first bank to get started.</p>
                   </td>
                 </tr>

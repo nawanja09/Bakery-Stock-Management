@@ -50,6 +50,7 @@ import EditTransfer from './components/FinishedGoods/Transfers/EditTransferPopup
 import AddTransferPopup from './components/FinishedGoods/Transfers/AddTransferPopup';
 import AddFinishedGoodsWastage from './components/FinishedGoods/Wastage/AddFinishedGoodsWastage'
 import FinishedGoodsWastageHistory from './components/FinishedGoods/Wastage/FinishedGoodsWastageHistory';
+import AddProductionWastage from './components/FinishedGoods/Production Wastage/AddProductionWastage';
 import ProductionReport from './components/FinishedGoods/Reports/ProductionReport';
 import KitchenWastageReport from './components/FinishedGoods/Reports/WastageReport';
 import TransferReport from './components/FinishedGoods/Reports/TransferReport';
@@ -118,6 +119,10 @@ import FGRecipes from './components/FGProduction/Recipes';
 import FGRecipeReport from './components/FGProduction/FGRecipesReports';
 
 import './App.css';
+import './css/page-design-system.css';
+import './css/purchasing-page-ui.css';
+import './css/fg-finance-ui.css';
+import RouteModal from './components/common/RouteModal';
 
 const RootRedirect = () => {
   localStorage.removeItem('token');
@@ -201,6 +206,13 @@ const PublicOnlyRoute = ({ children }) => {
   return children;
 };
 
+const ModalRoute = ({ children, title, size = 'large' }) => {
+  const location = useLocation();
+  return location.state?.backgroundLocation
+    ? <RouteModal title={title} size={size}>{children}</RouteModal>
+    : children;
+};
+
 function App() {
   return (
     <BrowserRouter>
@@ -221,14 +233,14 @@ function App() {
           >
             
             <Route path="dashboard" element={<Dashboard />} />
-            <Route path="purchase/new" element={<AddPurchase />} />
-            <Route path="purchase/edit/:id" element={<EditPurchase />} />
+            <Route path="purchase/new" element={<ModalRoute title="Add New Purchase"><AddPurchase /></ModalRoute>} />
+            <Route path="purchase/edit/:id" element={<ModalRoute title="Edit Purchase"><EditPurchase /></ModalRoute>} />
             <Route path="purchase/history" element={<PurchaseHistory />} />
-            <Route path="purchase/:id" element={<PurchaseDetails />} />
+            <Route path="purchase/:id" element={<ModalRoute title="Purchase Details"><PurchaseDetails /></ModalRoute>} />
             <Route path="suppliers" element={<Suppliers />} />
-            <Route path="items/add" element={<AddItem />} />
+            <Route path="items/add" element={<ModalRoute title="Add New Item" size="medium"><AddItem /></ModalRoute>} />
             <Route path="items" element={<ViewItems />} />
-            <Route path="items/edit/:id" element={<EditItem />} />
+            <Route path="items/edit/:id" element={<ModalRoute title="Edit Item" size="medium"><EditItem /></ModalRoute>} />
             <Route path="item-types" element={<ItemTypes />} />
             <Route path="departments" element={<Departments />} />
             <Route path="companies" element={<Companies />} />
@@ -236,12 +248,12 @@ function App() {
             <Route path="expense-payees-management" element={<ExpensePayeeManagement />} />
             <Route path="bank-charges-type-management" element={<BankChargesTypeManagement />} />
             <Route path="admin/password" element={<ChangePassword />} />
-            <Route path="opening/add" element={<AddOpeningBalance />} />
+            <Route path="opening/add" element={<ModalRoute title="Add Opening Balance" size="medium"><AddOpeningBalance /></ModalRoute>} />
             <Route path="opening/history" element={<OpeningBalanceHistory />} />
-            <Route path="issuance/issue" element={<IssueToDepartment />} />
-            <Route path="issuance/edit/:id" element={<EditIssuance />} />
+            <Route path="issuance/issue" element={<ModalRoute title="Add New Issuance"><IssueToDepartment /></ModalRoute>} />
+            <Route path="issuance/edit/:id" element={<ModalRoute title="Edit Issuance"><EditIssuance /></ModalRoute>} />
             <Route path="issuance/history" element={<IssuanceHistory />} />
-            <Route path="wastage/add" element={<AddWastage />} />
+            <Route path="wastage/add" element={<ModalRoute title="Add New Wastage"><AddWastage /></ModalRoute>} />
             <Route path="wastage/history" element={<WastageHistory />} />
             <Route path="reports/stock" element={<StockReport />} />
             <Route path="reports/department" element={<DepartmentIssuesReport />} />
@@ -251,20 +263,21 @@ function App() {
             <Route path="admin/users" element={<ManageUsers />} />
             <Route path="reports/stock/items" element={<ItemWiseStockReport/>} />
 
-            <Route path="finished-goods/items/add" element={<AddFinishedGoodsItem />} />
+            <Route path="finished-goods/items/add" element={<ModalRoute title="Add New Finished Goods Item"><AddFinishedGoodsItem /></ModalRoute>} />
             <Route path="finished-goods/items" element={<ViewFinishedGoodsItems />} />
-            <Route path="finished-goods/items/edit/:id" element={<EditFinishedGoodsItem />} />
-            <Route path="finished-goods/items/view/:id" element={<ViewFinishedGoodsItem />} />
-            <Route path="finished-goods/opening/add" element={<AddFinishedGoodsOpeningBalance />} />
+            <Route path="finished-goods/items/edit/:id" element={<ModalRoute title="Edit Finished Goods Item"><EditFinishedGoodsItem /></ModalRoute>} />
+            <Route path="finished-goods/items/view/:id" element={<ModalRoute title="Finished Goods Details" size="medium"><ViewFinishedGoodsItem /></ModalRoute>} />
+            <Route path="finished-goods/opening/add" element={<ModalRoute title="Add Finished Goods Opening Balance" size="medium"><AddFinishedGoodsOpeningBalance /></ModalRoute>} />
             <Route path="finished-goods/opening/history" element={<FinishedGoodsOpeningBalanceHistory />} />
             <Route path="finished-goods/production" element={<ProductionManagement />} />
-            <Route path="finished-goods/production/view/:id" element={<ViewProduction />} />
-            <Route path="finished-goods/production/edit/:id" element={<EditProduction />} />
+            <Route path="finished-goods/production/view/:id" element={<ModalRoute title="Production Details" size="medium"><ViewProduction /></ModalRoute>} />
+            <Route path="finished-goods/production/edit/:id" element={<ModalRoute title="Edit Production"><EditProduction /></ModalRoute>} />
             <Route path="finished-goods/transfer" element={<TransfersManagement />} />
-            <Route path="finished-goods/transfer/view/:id" element={<ViewTransfer />} />
-            <Route path="finished-goods/transfer/edit/:id" element={<EditTransfer />} />
-            <Route path="finished-goods/transfer/add" element={<AddTransferPopup />} />
-            <Route path="finished-goods/wastage/kitchen" element={<AddFinishedGoodsWastage />} />
+            <Route path="finished-goods/transfer/view/:id" element={<ModalRoute title="Transfer Details" size="medium"><ViewTransfer /></ModalRoute>} />
+            <Route path="finished-goods/transfer/edit/:id" element={<ModalRoute title="Edit Transfer"><EditTransfer /></ModalRoute>} />
+            <Route path="finished-goods/transfer/add" element={<ModalRoute title="Add New Transfer"><AddTransferPopup /></ModalRoute>} />
+            <Route path="finished-goods/wastage/kitchen" element={<ModalRoute title="Add Finished Goods Wastage"><AddFinishedGoodsWastage /></ModalRoute>} />
+            <Route path="finished-goods/wastage/production/add" element={<ModalRoute title="Add Production Wastage"><AddProductionWastage /></ModalRoute>} />
             <Route path="finished-goods/wastage/history" element={<FinishedGoodsWastageHistory />} />
 
             <Route path="finished-goods/reports/stock" element={<FinishedGoodsStockReport />} />
@@ -275,27 +288,27 @@ function App() {
             <Route path="cost-calculator/calculate" element={<CalculateCost />} />
             <Route path="cost-calculator/saved" element={<SavedCosting />} />
             <Route path="/reports/department-usage" element={<DepartmentUsageReport />} />
-            <Route path="finished-goods/sales/new" element={<AddFinishedGoodsSale />} />
+            <Route path="finished-goods/sales/new" element={<ModalRoute title="Add Finished Goods Sale"><AddFinishedGoodsSale /></ModalRoute>} />
             <Route path="finished-goods/sales/history" element={<FinishedGoodsSalesHistory />} />
 
             <Route path="finished-goods/reports/stock/summary" element={<StockSummary />} />
-            <Route path="returns/add" element={<AddReturn />} />
+            <Route path="returns/add" element={<ModalRoute title="Add New Return"><AddReturn /></ModalRoute>} />
             <Route path="returns/history" element={<ReturnsHistory />} />
             <Route path="finished-goods/reports/bakery-stock" element={<BakeryStockReport />} />
 
             <Route path="cutlery/locations" element={<Locations />} />
             <Route path="cutlery/assets" element={<Assets />} />
-            <Route path="cutlery/assets/view/:id" element={<ViewAsset />} />
-            <Route path="cutlery/assets/edit/:id" element={<EditAsset />} />
+            <Route path="cutlery/assets/view/:id" element={<ModalRoute title="Asset Details" size="medium"><ViewAsset /></ModalRoute>} />
+            <Route path="cutlery/assets/edit/:id" element={<ModalRoute title="Edit Asset"><EditAsset /></ModalRoute>} />
             <Route path="cutlery/transfer" element={<Transfers />} />
-            <Route path="cutlery/transfer/view/:id" element={<ViewCutleryTransfer />} />
+            <Route path="cutlery/transfer/view/:id" element={<ModalRoute title="Transfer Details" size="medium"><ViewCutleryTransfer /></ModalRoute>} />
             <Route path="cutlery/purchasing" element={<Purchases />} />
             <Route path="cutlery/damage" element={<Damages />} />
             <Route path="cutlery/reports/inventory" element={<CutleryStockReport />} />
             <Route path="cutlery/reports/stock" element={<CutleryStockReport />} />
 
             <Route path="reports/vat" element={<VATReport />} />
-            <Route path="purchase-returns/add" element={<AddPurchaseReturn />} />
+            <Route path="purchase-returns/add" element={<ModalRoute title="Add New Purchase Return"><AddPurchaseReturn /></ModalRoute>} />
             <Route path="purchase-returns/history" element={<PurchaseReturnHistory />} />
             <Route path="reports/purchase-vat" element={<PurchaseVATReport />} />
 
@@ -313,11 +326,11 @@ function App() {
             <Route path="finance/bank" element={<FinanceRoute><BankLedger /></FinanceRoute>} />
             <Route path="finance/bank-receive" element={<FinanceRoute><BankReceive /></FinanceRoute>} />
             <Route path="finance/transfer" element={<FinanceRoute><FundTransfer /></FinanceRoute>} />
-            <Route path="wastage/edit/:id" element={<EditWastage />} />
+            <Route path="wastage/edit/:id" element={<ModalRoute title="Edit Wastage"><EditWastage /></ModalRoute>} />
 
             <Route path="adjustments/stores-balance" element={<AdjustmentsRoute><StoresBalance /></AdjustmentsRoute>} />
             <Route path="adjustments/stores-adjustments" element={<AdjustmentsRoute><StoresAdjustments /></AdjustmentsRoute>} />
-            <Route path="adjustments/edit/:id" element={<AdjustmentsRoute><EditAdjustment /></AdjustmentsRoute>} />
+            <Route path="adjustments/edit/:id" element={<ModalRoute title="Edit Adjustment"><AdjustmentsRoute><EditAdjustment /></AdjustmentsRoute></ModalRoute>} />
             <Route path="adjustments/payment-methods" element={<AdjustmentsRoute><PaymentMethodManagement /></AdjustmentsRoute>} />
             <Route path="adjustments/inhand" element={<AdjustmentsRoute><InhandAdjustments /></AdjustmentsRoute>} />
             <Route path="/reports/department-return-item-wise" element={<DepartmentReturnItemWiseReport />} />

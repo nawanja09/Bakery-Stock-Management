@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowLeft, faEdit, faUtensils, faCalculator, faBox, faDollarSign } from '@fortawesome/free-solid-svg-icons';
 import { usePopup } from '../../context/PopupContext';
@@ -14,6 +15,7 @@ const ViewFinishedGoodsItem = () => {
   const { showPopup } = usePopup();
   
   const [item, setItem] = useState(null);
+  const location = useLocation();
   const [ingredients, setIngredients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [costDetails, setCostDetails] = useState({
@@ -92,7 +94,7 @@ const ViewFinishedGoodsItem = () => {
   };
 
   const handleEdit = () => {
-    navigate(`/finished-goods/items/edit/${id}`);
+    navigate(`/finished-goods/items/edit/${id}`, { state: { backgroundLocation: location } });
   };
 
   if (loading) {

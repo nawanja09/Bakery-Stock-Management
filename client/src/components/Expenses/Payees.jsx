@@ -141,41 +141,43 @@ const Payees = () => {
   );
 
   return (
-    <div className="payees-container">
-      <div className="payees-header">
-        <div className="payees-header-left">
-          <h1 className="payees-title">
-            <FontAwesomeIcon icon={faUsers} className="title-icon" />
+    <div className="page-container">
+      <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <h2 style={{ textAlign: 'left', margin: 0 }}>
+            <FontAwesomeIcon icon={faUsers} style={{ marginRight: '8px' }} />
             Payees Management
-          </h1>
-          <p className="payees-subtitle">Manage your payees for cheque and online expenses</p>
+          </h2>
+          <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
+            Manage your payees for cheque and online expenses
+          </p>
         </div>
         <button
-          className="payees-btn-primary"
+          className="btn btn-primary"
           onClick={() => { setShowForm(true); setEditingId(null); setFormData({
             payee_name: '', vat_reg_number: '', address: '', contact_person: '', phone: '', email: '', notes: ''
           }); }}
         >
           <FontAwesomeIcon icon={faUserPlus} /> Add New Payee
         </button>
-      </div>
+      </header>
 
       {/* Add/Edit Form */}
       {showForm && (
-        <div className="payees-form-card">
-          <div className="payees-form-header">
-            <h3>
-              <FontAwesomeIcon icon={editingId ? faEdit : faPlus} />
-              {editingId ? ' Edit Payee' : ' Add New Payee'}
-            </h3>
-            <button className="payees-close-btn" onClick={resetForm}>
+        <div className="card form-container" style={{ padding: 'var(--spacing-lg)' }}>
+          <div className="form-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
+            <div>
+              <FontAwesomeIcon icon={editingId ? faEdit : faPlus} style={{ marginRight: '8px' }} />
+              {editingId ? 'Edit Payee' : 'Add New Payee'}
+            </div>
+            <button className="btn btn-secondary" onClick={resetForm} style={{ padding: '4px 8px' }}>
               <FontAwesomeIcon icon={faTimes} />
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="payees-form">
-            <div className="payees-section-label">Basic Information</div>
-            <div className="payees-form-row">
+          <form onSubmit={handleSubmit}>
+            <h4 style={{ margin: '0 0 var(--spacing-md) 0', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)', textTransform: 'uppercase' }}>Basic Information</h4>
+            <div className="form-grid two-col">
               <div className="payees-form-group">
                 <label>Payee Name <span className="required">*</span></label>
                 <input
@@ -201,8 +203,8 @@ const Payees = () => {
               </div>
             </div>
 
-            <div className="payees-section-label">Contact Information</div>
-            <div className="payees-form-row">
+            <h4 style={{ margin: 'var(--spacing-lg) 0 var(--spacing-md) 0', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)', textTransform: 'uppercase' }}>Contact Information</h4>
+            <div className="form-grid three-col">
               <div className="payees-form-group">
                 <label>Contact Person</label>
                 <input
@@ -238,35 +240,37 @@ const Payees = () => {
               </div>
             </div>
 
-            <div className="payees-form-group">
-              <label>Address</label>
-              <textarea
-                name="address"
-                value={formData.address}
-                onChange={handleChange}
-                rows="2"
-                placeholder="Enter address (optional)"
-                className="payees-textarea"
-              />
+            <div className="form-grid two-col" style={{ marginTop: 'var(--spacing-lg)' }}>
+              <div className="form-group">
+                <label>Address</label>
+                <textarea
+                  name="address"
+                  value={formData.address}
+                  onChange={handleChange}
+                  rows="2"
+                  placeholder="Enter address (optional)"
+                  className="form-textarea"
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Notes</label>
+                <textarea
+                  name="notes"
+                  value={formData.notes}
+                  onChange={handleChange}
+                  rows="2"
+                  placeholder="Additional notes (optional)"
+                  className="form-textarea"
+                />
+              </div>
             </div>
 
-            <div className="payees-form-group">
-              <label>Notes</label>
-              <textarea
-                name="notes"
-                value={formData.notes}
-                onChange={handleChange}
-                rows="2"
-                placeholder="Additional notes (optional)"
-                className="payees-textarea"
-              />
-            </div>
-
-            <div className="payees-form-actions">
-              <button type="button" onClick={resetForm} className="payees-btn-secondary" disabled={isLoading}>
+            <div className="form-actions">
+              <button type="button" onClick={resetForm} className="btn btn-secondary" disabled={isLoading}>
                 <FontAwesomeIcon icon={faTimes} /> Cancel
               </button>
-              <button type="submit" className="payees-btn-primary" disabled={isLoading}>
+              <button type="submit" className="btn btn-primary" disabled={isLoading}>
                 <FontAwesomeIcon icon={isLoading ? faSpinner : faSave} spin={isLoading} />
                 {isLoading ? ' Saving...' : (editingId ? ' Update Payee' : ' Add Payee')}
               </button>
@@ -276,35 +280,39 @@ const Payees = () => {
       )}
 
       {/* Payees Table */}
-      <div className="payees-table-card">
-        <div className="payees-table-header">
-          <h3 className="payees-table-title">
-            <FontAwesomeIcon icon={faBuilding} /> Registered Payees
-            <span className="payees-count">{filteredPayees.length}</span>
-          </h3>
-          <div className="payees-table-actions">
-            <div className="payees-search-box">
-              <FontAwesomeIcon icon={faSearch} className="payees-search-icon" />
-              <input
-                type="text"
-                placeholder="Search by name, VAT, contact..."
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                className="payees-search-input"
-              />
-              {searchTerm && (
-                <button className="payees-clear-search" onClick={() => setSearchTerm('')}>×</button>
-              )}
+      <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
+        <div className="filters-section" style={{ border: 'none', borderRadius: 0, borderBottom: '1px solid var(--color-border)', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)', paddingBottom: 'var(--spacing-md)' }}>
+          <div className="form-section-title" style={{ margin: 0, border: 'none', padding: 0 }}>
+            <FontAwesomeIcon icon={faBuilding} style={{ marginRight: '8px' }} />
+            Registered Payees
+            <span className="badge badge-neutral" style={{ marginLeft: '8px' }}>{filteredPayees.length}</span>
+          </div>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <div className="report-filter-group" style={{ minWidth: '300px' }}>
+              <div style={{ position: 'relative' }}>
+                <FontAwesomeIcon icon={faSearch} style={{ position: 'absolute', left: '10px', top: '12px', color: 'var(--color-text-tertiary)' }} />
+                <input
+                  type="text"
+                  placeholder="Search by name, VAT, contact..."
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                  className="report-filter-input"
+                  style={{ paddingLeft: '32px', width: '100%' }}
+                />
+                {searchTerm && (
+                  <button className="clear-search" style={{ position: 'absolute', right: '10px', top: '10px', background: 'none', border: 'none', cursor: 'pointer' }} onClick={() => setSearchTerm('')}>×</button>
+                )}
+              </div>
             </div>
-            <button onClick={fetchPayees} className="payees-refresh-btn" disabled={isFetching}>
+            <button onClick={fetchPayees} className="btn btn-secondary" disabled={isFetching}>
               <FontAwesomeIcon icon={isFetching ? faSpinner : faSync} spin={isFetching} />
-              Refresh
+              {isFetching ? ' Loading...' : ' Refresh'}
             </button>
           </div>
         </div>
 
-        <div className="payees-table-container">
-          <table className="payees-table">
+        <div style={{ overflowX: 'auto' }}>
+          <table className="report-table">
             <thead>
               <tr>
                 <th>#</th>

@@ -1,6 +1,6 @@
 // src/components/purchase/PurchaseHistory.jsx
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faSearch,
@@ -122,7 +122,7 @@ const useDebounce = (value, delay) => {
 // ─── Memoized sub-components (outside parent → never recreated) ───────────────
 
 /** Single table row — only re-renders when its own purchase data changes */
-const PurchaseTableRow = React.memo(({ purchase }) => {
+const PurchaseTableRow = React.memo(({ purchase, backgroundLocation }) => {
   const statusConfig = getStatusConfig(purchase.payment_status);
   const invoiceNumber = purchase.invoice_no || purchase.invoice_number || 'N/A';
 
@@ -172,6 +172,7 @@ const PurchaseTableRow = React.memo(({ purchase }) => {
       <td className="actions-col text-center" onClick={(e) => e.stopPropagation()}>
         <Link
           to={`/purchase/${purchase.id}`}
+          state={{ backgroundLocation }}
           style={{
             textDecoration: 'none', background: '#3b82f6', color: 'white',
             padding: '6px 12px', borderRadius: '4px', fontSize: '13px',
@@ -187,7 +188,7 @@ const PurchaseTableRow = React.memo(({ purchase }) => {
 PurchaseTableRow.displayName = 'PurchaseTableRow';
 
 /** Single card — only re-renders when its own purchase data changes */
-const PurchaseCard = React.memo(({ purchase, isSelected, onToggleSelect }) => {
+const PurchaseCard = React.memo(({ purchase, isSelected, onToggleSelect, backgroundLocation }) => {
   const statusConfig = getStatusConfig(purchase.payment_status);
   const invoiceNumber = purchase.invoice_no || purchase.invoice_number || 'N/A';
   const paidPercentage =
@@ -259,10 +260,10 @@ const PurchaseCard = React.memo(({ purchase, isSelected, onToggleSelect }) => {
             {statusConfig.textFull}
           </div>
           <div className="card-actions-group" onClick={(e) => e.stopPropagation()}>
-            <Link to={`/purchase/${purchase.id}`} className="card-action-btn view">
+            <Link to={`/purchase/${purchase.id}`} state={{ backgroundLocation }} className="card-action-btn view">
               <FontAwesomeIcon icon={faEye} />
             </Link>
-            <Link to={`/purchase/edit/${purchase.id}`} className="card-action-btn edit">
+            <Link to={`/purchase/edit/${purchase.id}`} state={{ backgroundLocation }} className="card-action-btn edit">
               <FontAwesomeIcon icon={faEdit} />
             </Link>
           </div>
@@ -356,6 +357,7 @@ Pagination.displayName = 'Pagination';
 // ─── Main component ───────────────────────────────────────────────────────────
 const PurchaseHistory = () => {
   const responsive = useResponsive();
+  const backgroundLocation = useLocation();
 
   // ── Core data
   const [purchases, setPurchases]   = useState([]);
@@ -604,7 +606,7 @@ const PurchaseHistory = () => {
 
   // ── Render
   return (
-    <div className={`purchase-responsive-container ${responsive.isMobile ? 'mobile' : ''} ${responsive.isTablet ? 'tablet' : ''} ${responsive.isLaptop ? 'laptop' : ''} ${responsive.isDesktop ? 'desktop' : ''} ${responsive.isLargeDesktop ? 'large-desktop' : ''}`}>
+    <div className={`purchase-responsive-container erp-summary-page ${responsive.isMobile ? 'mobile' : ''} ${responsive.isTablet ? 'tablet' : ''} ${responsive.isLaptop ? 'laptop' : ''} ${responsive.isDesktop ? 'desktop' : ''} ${responsive.isLargeDesktop ? 'large-desktop' : ''}`}>
 
       {/* Mobile filter slide-over */}
       {responsive.isMobile && (
@@ -689,7 +691,7 @@ const PurchaseHistory = () => {
             <h3>No purchases found</h3>
             <p>{hasActiveFilters ? 'Try adjusting your filters' : 'Create your first purchase'}</p>
             {!hasActiveFilters && (
-              <Link to="/purchase/new" className="btn-primary-responsive">
+              <Link to="/purchase/new" state={{ backgroundLocation }} className="btn-primary-responsive">
                 <FontAwesomeIcon icon={faPlus} /> Create Purchase
               </Link>
             )}
@@ -737,7 +739,7 @@ const PurchaseHistory = () => {
                   </thead>
                   <tbody>
                     {pagedPurchases.map(purchase => (
-                      <PurchaseTableRow key={purchase.id} purchase={purchase} />
+                      <PurchaseTableRow key={purchase.id} purchase={purchase} backgroundLocation={backgroundLocation} />
                     ))}
                   </tbody>
                 </table>
@@ -756,6 +758,7 @@ const PurchaseHistory = () => {
                   purchase={purchase}
                   isSelected={selectedPurchases.has(purchase.id)}
                   onToggleSelect={toggleSelect}
+                  backgroundLocation={backgroundLocation}
                 />
               ))}
             </div>
@@ -771,7 +774,7 @@ const PurchaseHistory = () => {
 
       {/* Mobile FAB */}
       {responsive.isMobile && (
-        <Link to="/purchase/new" className="mobile-fab">
+        <Link to="/purchase/new" state={{ backgroundLocation }} className="mobile-fab">
           <FontAwesomeIcon icon={faPlus} />
         </Link>
       )}

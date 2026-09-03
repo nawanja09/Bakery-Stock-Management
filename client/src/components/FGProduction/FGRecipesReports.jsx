@@ -95,47 +95,17 @@ const FGRecipesReports = () => {
   const totalActiveRmRecipes = filteredRows.reduce((sum, r) => sum + (parseInt(r.rm_recipes_count) || 0), 0);
 
   return (
-    <div className="fgprod-container">
-      <div className="fgprod-header">
+    <div className="page-container erp-fg-report-page">
+      <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
         <div>
-          <h1 className="fgprod-title">
-            <FontAwesomeIcon icon={faChartBar} /> FG Recipes Reports
-          </h1>
+          <h2 style={{ margin: 0 }}>
+            <FontAwesomeIcon icon={faChartBar} style={{ marginRight: '8px' }} /> FG Recipes Reports
+          </h2>
+          <p style={{ margin: '4px 0 0', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>View finished goods recipe reports and cost analysis</p>
         </div>
-      </div>
+      </header>
 
-      {/* Summary Cards */}
-      <div className="fgprod-summary-grid">
-        <div className="fgprod-summary-card">
-          <div className="fgprod-summary-icon">
-            <FontAwesomeIcon icon={faBoxOpen} />
-          </div>
-          <div className="fgprod-summary-info">
-            <span className="fgprod-summary-label">Total FG Recipes</span>
-            <h4 className="fgprod-summary-val">{filteredRows.length}</h4>
-          </div>
-        </div>
-        <div className="fgprod-summary-card">
-          <div className="fgprod-summary-icon">
-            <FontAwesomeIcon icon={faFlask} />
-          </div>
-          <div className="fgprod-summary-info">
-            <span className="fgprod-summary-label">Active RM Recipes</span>
-            <h4 className="fgprod-summary-val">{totalActiveRmRecipes}</h4>
-          </div>
-        </div>
-        <div className="fgprod-summary-card">
-          <div className="fgprod-summary-icon">
-            <FontAwesomeIcon icon={faChartBar} />
-          </div>
-          <div className="fgprod-summary-info">
-            <span className="fgprod-summary-label">Total RM Cost</span>
-            <h4 className="fgprod-summary-val">Rs. {grandTotalCost.toFixed(2)}</h4>
-          </div>
-        </div>
-      </div>
-
-      <div className="fgprod-card">
+      <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
         <div className="fgprod-picker-row" style={{ marginBottom: '1.5rem' }}>
           <div className="fgprod-search-box">
             <FontAwesomeIcon icon={faSearch} />

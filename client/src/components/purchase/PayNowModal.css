@@ -1,0 +1,70 @@
+.pnm-overlay,
+.ipm-overlay {
+	position: fixed;
+	inset: 0;
+	z-index: var(--z-modal);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 24px;
+	background: rgba(15, 23, 42, 0.58);
+	backdrop-filter: blur(3px);
+}
+
+.pnm-modal {
+	width: min(760px, 100%);
+	max-height: calc(100vh - 48px);
+	overflow-y: auto;
+	border: 1px solid var(--color-border);
+	border-radius: 10px;
+	background: var(--color-surface);
+	box-shadow: var(--shadow-2xl);
+}
+
+.pnm-header,
+.pnm-footer {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	padding: 18px 24px;
+}
+
+.pnm-header { border-bottom: 1px solid var(--color-border); }
+.pnm-header h3 { display: flex; align-items: center; gap: 10px; font-size: 20px; }
+.pnm-header h3 svg { color: var(--color-primary); }
+.pnm-close { color: var(--color-text-secondary); font-size: 18px; }
+.pnm-close:hover { color: var(--color-danger); }
+
+.pnm-body { padding: 24px; }
+.pnm-info-banner,
+.pnm-balance-hint {
+	display: flex;
+	gap: 10px;
+	align-items: flex-start;
+	padding: 12px 14px;
+	border: 1px solid var(--color-primary-border);
+	border-radius: 7px;
+	background: var(--color-primary-light);
+	color: var(--color-primary-dark);
+	font-size: var(--font-size-sm);
+}
+
+.pnm-form { display: flex; flex-direction: column; gap: 16px; margin-top: 20px; }
+.pnm-form-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.pnm-form-group { min-width: 0; }
+.pnm-form-group label { margin-bottom: 6px; }
+.pnm-amount-input { font-weight: 700; font-variant-numeric: tabular-nums; }
+.pnm-footer { justify-content: flex-end; border-top: 1px solid var(--color-border); background: #f8fafc; }
+.pnm-btn-cancel,
+.pnm-btn-submit { height: var(--btn-height); padding: 0 16px; border-radius: 6px; font-weight: 700; }
+.pnm-btn-cancel { border: 1px solid var(--color-border-strong); color: var(--color-text-primary); }
+.pnm-btn-submit { display: inline-flex; align-items: center; gap: 8px; background: var(--color-primary); color: #fff; }
+.pnm-btn-submit:hover { background: var(--color-primary-dark); }
+.pnm-btn-submit:disabled { opacity: .55; cursor: not-allowed; }
+
+@media (max-width: 640px) {
+	.pnm-overlay { padding: 12px; }
+	.pnm-body, .pnm-header, .pnm-footer { padding: 16px; }
+	.pnm-form-row { grid-template-columns: 1fr; gap: 14px; }
+}

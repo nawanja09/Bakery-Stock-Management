@@ -1,6 +1,6 @@
 // src/components/adjustments/tabs/WastageAdjustmentsTab.jsx
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSync, faFileAlt } from '@fortawesome/free-solid-svg-icons';
 import api from '../../../api';
@@ -11,6 +11,7 @@ const EMPTY_FILTERS = { reason: 'all', item_id: 'all', startDate: '', endDate: '
 
 const WastageAdjustmentsTab = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [items, setItems] = useState([]);
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -104,7 +105,7 @@ const WastageAdjustmentsTab = () => {
                     <td>{r.approved_by}</td>
                     <td>{formatCurrency(r.total_loss)}</td>
                     <td>
-                      <button className="btn btn-sm btn-secondary" onClick={() => navigate(`/wastage/edit/${r.id}`)}>Edit</button>
+                      <button className="btn btn-sm btn-secondary" onClick={() => navigate(`/wastage/edit/${r.id}`, { state: { backgroundLocation: location } })}>Edit</button>
                     </td>
                   </tr>
                 )) : (

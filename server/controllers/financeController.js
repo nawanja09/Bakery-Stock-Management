@@ -9,6 +9,7 @@ const {
   calculateRunningBalances
 } = require('../utils/financeLedger');
 const { checkDuplicateReference, DuplicateReferenceError } = require('../services/referenceValidationService');
+const { getActiveBankAccounts } = require('../services/bankAccountService');
 
 const LEDGER_SELECT = `
   SELECT
@@ -299,21 +300,7 @@ const getBankLedger = async (req, res) => {
 // scoped to one company. Used by the payment forms' "Bank Account" selector.
 const getBankAccounts = async (req, res) => {
   try {
-    const { companyId } = req.query;
-    let query = `SELECT id, bank_name, account_number, branch_name, company, current_balance
-           FROM bank_details WHERE status = 'Active' AND record_status = 1`;
-    const params = [];
-
-    if (companyId) {
-      const [companyRows] = await pool.query('SELECT name FROM company WHERE id = ? LIMIT 1', [companyId]);
-      if (companyRows.length === 0) return res.json([]);
-      query += ' AND company = ?';
-      params.push(companyRows[0].name);
-    }
-
-    query += ' ORDER BY bank_name ASC';
-    const [rows] = await pool.query(query, params);
-    res.json(rows);
+    res.json(await getActiveBankAccounts(req.query.companyId || null));
   } catch (error) {
     console.error('Error fetching bank accounts:', error);
     res.status(500).json({ error: 'Failed to fetch bank accounts' });
@@ -324,11 +311,7 @@ const getBankAccounts = async (req, res) => {
 // company, for the Bank ledger page's account picker.
 const getAllBankAccounts = async (req, res) => {
   try {
-    const [rows] = await pool.query(
-      `SELECT id, bank_name, account_number, company, current_balance
-        FROM bank_details WHERE status = 'Active' AND record_status = 1 ORDER BY company ASC, bank_name ASC`
-    );
-    res.json(rows);
+    res.json(await getActiveBankAccounts());
   } catch (error) {
     console.error('Error fetching bank accounts:', error);
     res.status(500).json({ error: 'Failed to fetch bank accounts' });
@@ -337,8 +320,9 @@ const getAllBankAccounts = async (req, res) => {
 
 // POST /api/finance/bank/receive - Bank Receive (Bank In)
 const receiveBank = async (req, res) => {
-  const { bank_id, date, amount, receive_type, reference_number, remark, created_by } = req.body;
+  const { company_id, bank_id, date, amount, receive_type, reference_number, remark, created_by } = req.body;
 
+  if (!company_id) return res.status(400).json({ error: 'Company is required' });
   if (!bank_id) return res.status(400).json({ error: 'Bank account is required' });
   if (!date) return res.status(400).json({ error: 'Date is required' });
   if (!amount || parseFloat(amount) <= 0) return res.status(400).json({ error: 'Amount must be greater than 0' });
@@ -348,6 +332,17 @@ const receiveBank = async (req, res) => {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
+    const [accountRows] = await connection.query(
+      `SELECT bd.id
+       FROM bank_details bd
+       INNER JOIN company c ON LOWER(TRIM(c.name)) = LOWER(TRIM(bd.company))
+       WHERE bd.id = ? AND c.id = ? AND bd.status = 'Active' AND COALESCE(bd.record_status, 1) = 1`,
+      [bank_id, company_id]
+    );
+    if (accountRows.length === 0) {
+      await connection.rollback();
+      return res.status(400).json({ error: 'Selected bank account is not active for the selected company' });
+    }
     await checkDuplicateReference(connection, reference_number, { includeLedger: true });
     const balance = await recordBankTransaction(connection, {
       bankId: bank_id,
@@ -472,6 +467,21 @@ const bankToBankTransfer = async (req, res) => {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
+    const [accountRows] = await connection.query(
+      `SELECT id, company
+       FROM bank_details
+       WHERE id IN (?, ?) AND status = 'Active' AND COALESCE(record_status, 1) = 1
+       FOR UPDATE`,
+      [from_bank_id, to_bank_id]
+    );
+    if (accountRows.length !== 2) {
+      await connection.rollback();
+      return res.status(400).json({ error: 'Both bank accounts must be active' });
+    }
+    if (accountRows[0].company.toLowerCase() !== accountRows[1].company.toLowerCase()) {
+      await connection.rollback();
+      return res.status(400).json({ error: 'Bank accounts must belong to the same company' });
+    }
     if (reference_number) {
       await checkDuplicateReference(connection, reference_number, { includeLedger: true });
     }

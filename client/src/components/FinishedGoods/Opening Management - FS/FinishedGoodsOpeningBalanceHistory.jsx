@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import './FinishedGoodsOpeningBalance.css';
 import api from '../../../api';
 
@@ -10,6 +10,7 @@ const FinishedGoodsOpeningBalanceHistory = () => {
   const [editing, setEditing] = useState(null);
   const [editData, setEditData] = useState({ date: '', quantity: '' });
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     fetchBalances();
@@ -66,7 +67,7 @@ const FinishedGoodsOpeningBalanceHistory = () => {
   return (
     <div className="fg-opening-balance-container">
       <div className="fg-header-buttons">
-        <button onClick={() => navigate('/finished-goods/opening/add')} className="fg-btn-add">
+        <button onClick={() => navigate('/finished-goods/opening/add', { state: { backgroundLocation: location } })} className="fg-btn-add">
           + Add New Opening Balance
         </button>
       </div>

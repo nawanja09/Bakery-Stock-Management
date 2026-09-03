@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faEye, faTrash, faPlus } from '@fortawesome/free-solid-svg-icons';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../../../api';
 import { usePopup } from '../../context/PopupContext';
 import './ProductionWastage.css';
@@ -14,6 +14,7 @@ const ProductionWastageHistory = () => {
   const [showModal, setShowModal] = useState(false);
   const { showPopup } = usePopup();
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     fetchProductionWastages();
@@ -73,7 +74,7 @@ const ProductionWastageHistory = () => {
             background: '#222', color: '#fff', border: 'none', borderRadius: 6, padding: '10px 20px', fontWeight: 500,
             fontSize: 16, display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 1px 4px rgba(0,0,0,0.04)', transition: 'background 0.2s',
           }}
-          onClick={() => navigate('/finished-goods/wastage/production/add')}
+          onClick={() => navigate('/finished-goods/wastage/production/add', { state: { backgroundLocation: location } })}
         >
           <FontAwesomeIcon icon={faPlus} /> Add
         </button>

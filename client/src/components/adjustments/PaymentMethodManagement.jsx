@@ -109,27 +109,28 @@ const PaymentMethodManagement = () => {
   };
 
   return (
-    <div className="adjustments-container">
-      <div className="adjustments-header">
-        <div className="adjustments-header-left">
-          <h1>Payment Method Management</h1>
+    <div className="page-container">
+      <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+        <div>
+          <h2 style={{ margin: 0 }}>Payment Method Management</h2>
+          <p style={{ margin: '4px 0 0', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>Manage adjustment payment methods</p>
         </div>
-      </div>
+      </header>
 
       {message.text && (
-        <div className={`alert-message ${message.type}`}>
+        <div className={`alert alert-${message.type}`}>
           <FontAwesomeIcon icon={message.type === 'error' ? faExclamationCircle : faCheckCircle} />
           {message.text}
         </div>
       )}
 
-      <div className="form-section">
-        <h3 className="form-section-title">
-          <FontAwesomeIcon icon={faPlus} /> Add Payment Method
+      <div className="card" style={{ padding: '24px' }}>
+        <h3 style={{ marginBottom: '16px', fontSize: 'var(--font-size-lg)' }}>
+          <FontAwesomeIcon icon={faPlus} className="text-muted" /> Add Payment Method
         </h3>
         <form onSubmit={handleAdd} style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', maxWidth: '480px' }}>
-          <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
-            <label>Payment Method Name</label>
+          <div style={{ flex: 1 }}>
+            <label style={{ display: 'block', marginBottom: '8px', fontSize: 'var(--font-size-sm)', fontWeight: 600 }}>Payment Method Name</label>
             <input
               type="text"
               value={newName}
@@ -144,21 +145,26 @@ const PaymentMethodManagement = () => {
         </form>
       </div>
 
-      <div className="form-section">
-        <h3 className="form-section-title">
-          <FontAwesomeIcon icon={faCreditCard} /> Payment Methods
-        </h3>
+      <div className="card" style={{ overflow: 'hidden' }}>
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--color-border-light)' }}>
+          <h3 style={{ margin: 0, fontSize: 'var(--font-size-lg)' }}>
+            <FontAwesomeIcon icon={faCreditCard} className="text-muted" /> Payment Methods
+          </h3>
+        </div>
 
         {loading ? (
-          <p>Loading...</p>
+          <div className="loading-state">
+            <div className="loading-spinner"></div>
+            Loading...
+          </div>
         ) : (
-          <div className="table-responsive">
-            <table className="adjustments-table">
+          <div style={{ overflowX: 'auto' }}>
+            <table className="report-table">
               <thead>
                 <tr>
                   <th>Name</th>
                   <th>Status</th>
-                  <th style={{ width: '180px' }}>Actions</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -171,43 +177,46 @@ const PaymentMethodManagement = () => {
                           value={editingName}
                           onChange={(e) => setEditingName(e.target.value)}
                           autoFocus
+                          style={{ minHeight: '32px', height: '32px' }}
                         />
                       ) : (
-                        m.name
+                        <strong>{m.name}</strong>
                       )}
                     </td>
                     <td>
-                      <span className={`status-badge ${m.is_active ? 'success' : 'draft'}`}>
+                      <span className={`badge ${m.is_active ? 'badge-success' : 'badge-neutral'}`}>
                         {m.is_active ? 'Active' : 'Inactive'}
                       </span>
                     </td>
                     <td>
-                      {editingId === m.id ? (
-                        <>
-                          <button className="btn btn-sm btn-primary" onClick={() => saveEdit(m.id)} title="Save">
-                            <FontAwesomeIcon icon={faSave} />
-                          </button>{' '}
-                          <button className="btn btn-sm btn-secondary" onClick={cancelEdit} title="Cancel">
-                            <FontAwesomeIcon icon={faTimes} />
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button className="btn btn-sm btn-secondary" onClick={() => startEdit(m)} title="Rename">
-                            <FontAwesomeIcon icon={faEdit} />
-                          </button>{' '}
-                          <button
-                            className="btn btn-sm btn-secondary"
-                            onClick={() => toggleActive(m)}
-                            title={m.is_active ? 'Deactivate' : 'Activate'}
-                          >
-                            <FontAwesomeIcon icon={m.is_active ? faToggleOn : faToggleOff} />
-                          </button>{' '}
-                          <button className="btn btn-sm btn-danger" onClick={() => handleDelete(m)} title="Delete">
-                            <FontAwesomeIcon icon={faTrash} />
-                          </button>
-                        </>
-                      )}
+                      <div className="table-actions" style={{ justifyContent: 'flex-end' }}>
+                        {editingId === m.id ? (
+                          <>
+                            <button className="btn-icon edit" onClick={() => saveEdit(m.id)} title="Save">
+                              <FontAwesomeIcon icon={faSave} />
+                            </button>
+                            <button className="btn-icon" onClick={cancelEdit} title="Cancel">
+                              <FontAwesomeIcon icon={faTimes} />
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button className="btn-icon edit" onClick={() => startEdit(m)} title="Rename">
+                              <FontAwesomeIcon icon={faEdit} />
+                            </button>
+                            <button
+                              className={`btn-icon ${m.is_active ? 'delete' : 'edit'}`}
+                              onClick={() => toggleActive(m)}
+                              title={m.is_active ? 'Deactivate' : 'Activate'}
+                            >
+                              <FontAwesomeIcon icon={m.is_active ? faToggleOn : faToggleOff} />
+                            </button>
+                            <button className="btn-icon delete" onClick={() => handleDelete(m)} title="Delete">
+                              <FontAwesomeIcon icon={faTrash} />
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 )) : (

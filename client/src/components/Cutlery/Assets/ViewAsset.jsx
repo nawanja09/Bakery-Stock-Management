@@ -48,16 +48,21 @@ const ViewAsset = () => {
   }
 
   return (
-    <div className="view-asset-container">
-      <div className="view-asset-header">
-        <button className="btn-back" onClick={handleBack}>
-          ← Back to Assets
-        </button>
-        <h2>Asset Details</h2>
-        <button className="btn-edit-main" onClick={handleEdit}>
-          Edit Asset
-        </button>
-      </div>
+    <div className="page-container">
+      <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+        <div>
+          <h2 style={{ margin: 0 }}>Asset Details</h2>
+          <p style={{ margin: '4px 0 0', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>View cutlery asset information</p>
+        </div>
+        <div style={{ display: 'flex', gap: 'var(--spacing-md)' }}>
+          <button className="btn btn-secondary" onClick={handleBack}>
+            ← Back to Assets
+          </button>
+          <button className="btn btn-primary" onClick={handleEdit}>
+            Edit Asset
+          </button>
+        </div>
+      </header>
 
       <div className="asset-details">
         <div className="asset-image-section">

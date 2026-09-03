@@ -1,5 +1,6 @@
 // src/components/purchase/SettleNowModal.jsx
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTimes, faBalanceScale, faCheckCircle, faSpinner, faBoxOpen, faWallet } from '@fortawesome/free-solid-svg-icons';
 import dayjs from 'dayjs';
@@ -101,7 +102,10 @@ const SettleNowModal = ({ isOpen, onClose, invoice, supplierId, onSuccess }) => 
         credits: creditsToApply
       });
 
-      showPopup('success', response.data.message || 'Credit settled successfully!');
+      showPopup('success', response.data.message || 'Credit settled successfully!', {
+        title: 'Settlement Successful',
+        confirmText: 'OK'
+      });
       
       // ✅ Fix: Call onSuccess with the response data
       if (onSuccess) {
@@ -117,7 +121,7 @@ const SettleNowModal = ({ isOpen, onClose, invoice, supplierId, onSuccess }) => 
     }
   };
 
-  return (
+  return createPortal((
     <div className="snm-overlay" onClick={onClose}>
       <div className="snm-modal" onClick={e => e.stopPropagation()}>
         
@@ -239,7 +243,7 @@ const SettleNowModal = ({ isOpen, onClose, invoice, supplierId, onSuccess }) => 
 
       </div>
     </div>
-  );
+  ), document.getElementById('modal-root') || document.body);
 };
 
 export default SettleNowModal;

@@ -96,18 +96,19 @@ const ReceiveTypeManagement = () => {
   }, [records, searchTerm]);
 
   return (
-    <div className="rm-mgmt-container">
-      <div className="rm-mgmt-header">
-        <div className="rm-mgmt-header-top">
-          <div>
-            <h2>Cash / Bank Receive Types</h2>
-          </div>
-          <button className="btn-add-rm" onClick={() => { setShowAddForm(true); setEditingRecord(null); }}>
-            <FiPlus size={16} /> Add Receive Type
-          </button>
+    <div className="erp-page">
+      <div className="filters-section" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <h2 style={{ margin: 0, color: 'var(--color-heading)' }}>Cash / Bank Receive Types</h2>
         </div>
-        <div className="rm-mgmt-search">
-          <FiSearch />
+        <button className="btn btn-primary" onClick={() => { setShowAddForm(true); setEditingRecord(null); }}>
+          <FiPlus size={16} /> Add Receive Type
+        </button>
+      </div>
+
+      <div className="filters-section">
+        <div className="items-search">
+          <FiSearch className="text-muted" />
           <input
             type="text"
             placeholder="Search receive types..."
@@ -119,8 +120,8 @@ const ReceiveTypeManagement = () => {
 
       {/* Add Form */}
       {showAddForm && (
-        <form className="rm-inline-form" onSubmit={handleAdd}>
-          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="card" style={{ padding: '14px 18px', borderLeft: '4px solid var(--color-primary)' }}>
+          <form onSubmit={handleAdd} style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
             <input
               type="text"
               autoFocus
@@ -128,91 +129,99 @@ const ReceiveTypeManagement = () => {
               value={newTypeName}
               onChange={e => setNewTypeName(e.target.value)}
               required
-              style={{ flex: 1, minWidth: 200, padding: '0.5rem 0.75rem', borderRadius: 6, border: '1px solid #d1d5db', fontSize: '0.9rem' }}
+              style={{ flex: 1, minWidth: 200, height: 'var(--input-height)', padding: '0 0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', fontSize: 'var(--font-size-sm)' }}
             />
-            <button type="submit" className="btn-add-rm" disabled={submitting}>
+            <button type="submit" className="btn btn-primary" disabled={submitting}>
               {submitting ? 'Saving…' : 'Save'}
             </button>
-            <button type="button" style={{ padding: '0.45rem 0.9rem', borderRadius: 6, border: '1px solid #d1d5db', background: '#f3f4f6', cursor: 'pointer', fontSize: '0.9rem' }} onClick={() => setShowAddForm(false)}>
+            <button type="button" className="btn btn-secondary" onClick={() => setShowAddForm(false)}>
               Cancel
             </button>
-          </div>
-        </form>
+          </form>
+        </div>
       )}
 
       {/* Edit Form */}
       {editingRecord && (
-        <form className="rm-inline-form" onSubmit={handleEdit}>
-          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-            <label style={{ fontWeight: 600, fontSize: '0.9rem', whiteSpace: 'nowrap' }}>Editing: <em>{editingRecord.type_name}</em></label>
+        <div className="card" style={{ padding: '14px 18px', borderLeft: '4px solid var(--color-warning)' }}>
+          <form onSubmit={handleEdit} style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <label style={{ fontWeight: 600, fontSize: 'var(--font-size-sm)', whiteSpace: 'nowrap', color: 'var(--color-text-secondary)' }}>
+              Editing: <em style={{ color: 'var(--color-text-primary)', fontStyle: 'normal' }}>{editingRecord.type_name}</em>
+            </label>
             <input
               type="text"
               autoFocus
               value={editTypeName}
               onChange={e => setEditTypeName(e.target.value)}
               required
-              style={{ flex: 1, minWidth: 200, padding: '0.5rem 0.75rem', borderRadius: 6, border: '1px solid #6366f1', fontSize: '0.9rem' }}
+              style={{ flex: 1, minWidth: 200, height: 'var(--input-height)', padding: '0 0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-primary)', fontSize: 'var(--font-size-sm)' }}
             />
-            <button type="submit" className="btn-add-rm" disabled={submitting}>
+            <button type="submit" className="btn btn-primary" disabled={submitting}>
               {submitting ? 'Saving…' : 'Save Changes'}
             </button>
-            <button type="button" style={{ padding: '0.45rem 0.9rem', borderRadius: 6, border: '1px solid #d1d5db', background: '#f3f4f6', cursor: 'pointer', fontSize: '0.9rem' }} onClick={() => setEditingRecord(null)}>
+            <button type="button" className="btn btn-secondary" onClick={() => setEditingRecord(null)}>
               Cancel
             </button>
-          </div>
-        </form>
+          </form>
+        </div>
       )}
 
-      <div className="rm-mgmt-table-container">
+      <div className="card">
         {loading ? (
-          <div className="rm-mgmt-loading">Loading receive types…</div>
+          <div className="loading-state">
+            <div className="loading-spinner"></div>
+            Loading receive types…
+          </div>
         ) : filteredRecords.length === 0 ? (
-          <div className="rm-mgmt-no-data">
+          <div className="empty-state">
             <p>{records.length === 0 ? 'No receive types found. Add your first type to get started.' : `No results for "${searchTerm}".`}</p>
           </div>
         ) : (
-          <table className="rm-mgmt-table">
-            <thead>
-              <tr>
-                <th>RECEIVE TYPE</th>
-                <th>STATUS</th>
-                <th className="rm-action-col">ACTIONS</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredRecords.map(rec => (
-                <tr key={rec.id}>
-                  <td className="rm-name-cell">{rec.type_name}</td>
-                  <td className="rm-status-cell">
-                    <span className={`rm-status-badge ${rec.status === 1 ? 'active' : 'inactive'}`}>
-                      <span className="rm-status-dot" />
-                      {rec.status === 1 ? 'Active' : 'Inactive'}
-                    </span>
-                  </td>
-                  <td className="rm-action-cell">
-                    <button type="button" className="rm-btn-edit" onClick={() => openEdit(rec)}>
-                      <FiEdit size={14} /> Edit
-                    </button>
-                    <button
-                      type="button"
-                      className={rec.status === 1 ? 'rm-btn-delete' : 'rm-btn-edit'}
-                      onClick={() => handleToggleStatus(rec)}
-                      title={rec.status === 1 ? 'Deactivate' : 'Activate'}
-                    >
-                      {rec.status === 1
-                        ? <><FiToggleLeft size={14} /> Deactivate</>
-                        : <><FiToggleRight size={14} /> Activate</>}
-                    </button>
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="erp-data-table">
+              <thead>
+                <tr>
+                  <th>RECEIVE TYPE</th>
+                  <th>STATUS</th>
+                  <th style={{ textAlign: 'right' }}>ACTIONS</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filteredRecords.map(rec => (
+                  <tr key={rec.id}>
+                    <td><strong>{rec.type_name}</strong></td>
+                    <td>
+                      <span className={`badge ${rec.status === 1 ? 'badge-success' : 'badge-neutral'}`}>
+                        {rec.status === 1 ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="table-actions" style={{ justifyContent: 'flex-end' }}>
+                        <button type="button" className="btn-icon edit" onClick={() => openEdit(rec)} title="Edit">
+                          <FiEdit size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          className={`btn-icon ${rec.status === 1 ? 'delete' : 'edit'}`}
+                          onClick={() => handleToggleStatus(rec)}
+                          title={rec.status === 1 ? 'Deactivate' : 'Activate'}
+                        >
+                          {rec.status === 1
+                            ? <FiToggleLeft size={14} />
+                            : <FiToggleRight size={14} />}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
       {!loading && records.length > 0 && (
-        <p className="rm-count-badge">
+        <p className="text-muted text-right font-sm" style={{ paddingRight: '8px' }}>
           Showing {filteredRecords.length} of {records.length} record{records.length !== 1 ? 's' : ''}
         </p>
       )}

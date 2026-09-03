@@ -1,5 +1,6 @@
 // src/components/purchase/PaymentModal.jsx
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faCreditCard, 
@@ -149,7 +150,7 @@ const PaymentModal = ({ purchase, onClose, onPaymentComplete }) => {
     return faCreditCard;
   };
 
-  return (
+  return createPortal((
     <div className="payment-modal-overlay" onClick={onClose}>
       <div className="payment-modal" onClick={(e) => e.stopPropagation()}>
         
@@ -347,7 +348,7 @@ const PaymentModal = ({ purchase, onClose, onPaymentComplete }) => {
         </div>
       </div>
     </div>
-  );
+  ), document.getElementById('modal-root') || document.body);
 };
 
 export default PaymentModal;

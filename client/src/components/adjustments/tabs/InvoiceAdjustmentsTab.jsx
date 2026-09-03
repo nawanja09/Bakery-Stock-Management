@@ -1,6 +1,6 @@
 // src/components/adjustments/tabs/InvoiceAdjustmentsTab.jsx
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSync, faFileAlt } from '@fortawesome/free-solid-svg-icons';
 import api from '../../../api';
@@ -10,6 +10,7 @@ const EMPTY_FILTERS = { supplier_id: 'all', invoice_no: '', startDate: '', endDa
 
 const InvoiceAdjustmentsTab = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [suppliers, setSuppliers] = useState([]);
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -119,7 +120,7 @@ const InvoiceAdjustmentsTab = () => {
                     <td>{formatCurrency(r.balance_amount)}</td>
                     <td><span className="status-badge">{r.payment_status}</span></td>
                     <td>
-                      <button className="btn btn-sm btn-secondary" onClick={() => navigate(`/purchase/edit/${r.id}`)}>Edit</button>
+                      <button className="btn btn-sm btn-secondary" onClick={() => navigate(`/purchase/edit/${r.id}`, { state: { backgroundLocation: location } })}>Edit</button>
                     </td>
                   </tr>
                 )) : (

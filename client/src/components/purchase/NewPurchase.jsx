@@ -483,7 +483,7 @@ const AddPurchase = () => {
   );
 
   return (
-    <div className="purchase-container">
+    <div className="purchase-container erp-purchase-page">
       <div className="page-header">
           <h1>RM Purchasing Invoice</h1>
       </div>

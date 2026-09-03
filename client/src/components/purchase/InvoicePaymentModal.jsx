@@ -1,5 +1,6 @@
 // src/components/purchase/InvoicePaymentModal.jsx
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faCreditCard, faTimes, faCheckCircle, faFileInvoice, faSpinner
@@ -197,7 +198,10 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
 
       console.log('✅ Payment response:', response.data);
 
-      showPopup('success', response.data.message || `Payment of Rs. ${formData.amount.toFixed(2)} recorded successfully!`);
+      showPopup('success', response.data.message || `Payment of Rs. ${formData.amount.toFixed(2)} recorded successfully!`, {
+        title: 'Payment Successful',
+        confirmText: 'OK'
+      });
       
       if (onSuccess) {
         await onSuccess({
@@ -218,9 +222,9 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
     }
   };
 
-  return (
+  return createPortal((
     <div className="ipm-overlay" onClick={onClose}>
-      <div className="ipm-modal" onClick={e => e.stopPropagation()}>
+      <div className="ipm-modal erp-payment-modal" onClick={e => e.stopPropagation()}>
 
         <div className="ipm-header">
           <h3>
@@ -415,7 +419,7 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
         </div>
       </div>
     </div>
-  );
+  ), document.getElementById('modal-root') || document.body);
 };
 
 export default InvoicePaymentModal;

@@ -27,6 +27,7 @@ const BankTransfer = () => {
 
   const [bankAccounts, setBankAccounts] = useState([]);
   const [loadingBanks, setLoadingBanks] = useState(true);
+  const [bankLoadError, setBankLoadError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState(null);
 
@@ -42,6 +43,7 @@ const BankTransfer = () => {
   // Load all active bank accounts once on mount
   useEffect(() => {
     setLoadingBanks(true);
+    setBankLoadError(false);
     api.get('/finance/bank/accounts/all')
       .then(res => {
         const list = res.data || [];
@@ -56,7 +58,7 @@ const BankTransfer = () => {
           setFormData(prev => ({ ...prev, from_bank_id: String(list[0].id) }));
         }
       })
-      .catch(() => setBankAccounts([]))
+      .catch(() => { setBankAccounts([]); setBankLoadError(true); })
       .finally(() => setLoadingBanks(false));
   }, []);
 
@@ -130,17 +132,19 @@ const BankTransfer = () => {
     : 'To Bank';
 
   return (
-    <div className="ft-page">
+    <div className="page-container erp-bank-transfer-page">
       {/* Header */}
-      <div className="ft-page-header">
-        <div className="ft-page-header-icon">
-          <FontAwesomeIcon icon={faMoneyBillTransfer} />
+      <header className="page-header">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)' }}>
+          <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '20px' }}>
+            <FontAwesomeIcon icon={faMoneyBillTransfer} />
+          </div>
+          <div>
+            <h2 style={{ margin: 0 }}>Bank to Bank Transfer</h2>
+            <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>Transfer funds between two company bank accounts</p>
+          </div>
         </div>
-        <div>
-          <h1 className="ft-page-title">Bank to Bank Transfer</h1>
-          <p className="ft-page-subtitle">Transfer funds between two company bank accounts</p>
-        </div>
-      </div>
+      </header>
 
       <div className="ft-layout">
         {/* LEFT — Form */}
@@ -149,6 +153,11 @@ const BankTransfer = () => {
           {loadingBanks ? (
             <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
               <FontAwesomeIcon icon={faSpinner} spin /> Loading bank accounts…
+            </div>
+          ) : bankLoadError ? (
+            <div className="ft-message ft-message-error">
+              <FontAwesomeIcon icon={faExclamationTriangle} />
+              <span>Unable to load bank accounts.</span>
             </div>
           ) : bankAccounts.length < 2 ? (
             <div className="ft-message ft-message-error">
@@ -288,17 +297,18 @@ const BankTransfer = () => {
                 </div>
               )}
 
-              {/* Submit */}
-              <button
-                className="ft-submit-btn"
-                type="button"
-                disabled={submitting || formData.from_bank_id === formData.to_bank_id}
-                onClick={handleSubmit}
-              >
-                {submitting
-                  ? <><FontAwesomeIcon icon={faSpinner} spin /> Processing…</>
-                  : <><FontAwesomeIcon icon={faArrowRightArrowLeft} /> Confirm Transfer</>}
-              </button>
+              <div className="form-actions">
+                <button
+                  className="btn btn-primary"
+                  type="button"
+                  disabled={submitting || formData.from_bank_id === formData.to_bank_id}
+                  onClick={handleSubmit}
+                >
+                  {submitting
+                    ? <><FontAwesomeIcon icon={faSpinner} spin /> Processing…</>
+                    : <><FontAwesomeIcon icon={faArrowRightArrowLeft} /> Confirm Transfer</>}
+                </button>
+              </div>
             </>
           )}
         </div>
