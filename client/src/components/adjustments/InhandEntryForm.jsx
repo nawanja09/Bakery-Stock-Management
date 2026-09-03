@@ -90,6 +90,15 @@ const InhandEntryForm = ({ existingEntry = null, onClose, onSaved }) => {
     if (bank) setFormData(prev => ({ ...prev, bank_name: bank.bank_name }));
   }, [formData.bank_id, formData.payment_type, bankAccounts]);
 
+  useEffect(() => {
+    if (submitting) return undefined;
+    const handleEscape = event => {
+      if (event.key === 'Escape') onClose?.();
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [onClose, submitting]);
+
   const handleChange = e => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -301,11 +310,16 @@ const InhandEntryForm = ({ existingEntry = null, onClose, onSaved }) => {
             </div>
 
             {/* Submit */}
-            <button className="ih-submit-btn" type="submit" disabled={submitting}>
-              {submitting
-                ? <><FontAwesomeIcon icon={faSpinner} spin /> Saving...</>
-                : isEdit ? 'Update Entry' : 'Save as Draft'}
-            </button>
+            <div className="ih-form-footer">
+              <button className="ih-cancel-btn" type="button" onClick={onClose} disabled={submitting}>
+                Cancel
+              </button>
+              <button className="ih-submit-btn" type="submit" disabled={submitting}>
+                {submitting
+                  ? <><FontAwesomeIcon icon={faSpinner} spin /> Saving...</>
+                  : isEdit ? 'Update Entry' : 'Save as Draft'}
+              </button>
+            </div>
           </form>
         )}
       </div>

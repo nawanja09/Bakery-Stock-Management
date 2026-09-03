@@ -1,3 +1,259 @@
 @import '../common/FormStyles.css';
 @import '../common/CommonComponents.css';
 @import '../../css/page-design-system.css';
+
+/* Inhand entry modal */
+.ih-form-overlay {
+	position: fixed;
+	inset: 0;
+	z-index: calc(var(--z-modal) + 20);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 24px;
+	background: rgba(15, 23, 42, 0.58);
+	backdrop-filter: blur(2px);
+	animation: fadeIn var(--transition-base);
+}
+
+.ih-form-modal {
+	width: min(100%, 680px);
+	max-height: min(90vh, 760px);
+	overflow-y: auto;
+	background: var(--color-surface);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-xl);
+	box-shadow: var(--shadow-2xl);
+	animation: slideUp var(--transition-base);
+}
+
+.ih-form-header {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	padding: 18px 22px;
+	background: var(--color-surface);
+	border-bottom: 1px solid var(--color-border);
+}
+
+.ih-form-title {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	min-width: 0;
+}
+
+.ih-form-title h2 {
+	color: var(--color-heading);
+	font-size: var(--font-size-xl);
+}
+
+.ih-title-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 38px;
+	height: 38px;
+	flex: 0 0 38px;
+	border-radius: 9px;
+	background: var(--color-primary-light);
+	color: var(--color-primary);
+}
+
+.ih-ref-badge {
+	display: inline-block;
+	margin-top: 4px;
+	color: var(--color-text-secondary);
+	font-size: var(--font-size-xs);
+	font-weight: var(--font-weight-semibold);
+}
+
+.ih-form-header .ih-close-btn {
+	width: 34px;
+	height: 34px;
+	flex: 0 0 34px;
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-md);
+	background: var(--color-surface-strong);
+	color: var(--color-text-secondary);
+	transition: all var(--transition-fast);
+}
+
+.ih-form-header .ih-close-btn:hover {
+	border-color: rgba(220, 38, 38, 0.25);
+	background: var(--color-danger-light);
+	color: var(--color-danger);
+}
+
+.ih-message {
+	display: flex;
+	align-items: flex-start;
+	gap: 8px;
+	margin: 18px 22px 0;
+	padding: 11px 13px;
+	border-radius: var(--radius-md);
+	font-size: var(--font-size-sm);
+}
+
+.ih-message-success {
+	background: var(--color-success-light);
+	color: var(--color-success-dark);
+}
+
+.ih-message-error {
+	background: var(--color-danger-light);
+	color: var(--color-danger-dark);
+}
+
+.ih-form,
+.ih-loading {
+	display: flex;
+	flex-direction: column;
+	gap: 18px;
+	padding: 22px;
+}
+
+.ih-form-row {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 16px;
+}
+
+.ih-form-group {
+	min-width: 0;
+}
+
+.ih-form-group input,
+.ih-form-group select {
+	width: 100%;
+	min-height: var(--input-height);
+}
+
+.ih-form-group textarea {
+	width: 100%;
+	min-height: 78px;
+}
+
+.ih-payment-type-row {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 10px;
+}
+
+.ih-type-btn {
+	min-height: var(--btn-height-lg);
+	padding: 0 14px;
+	border: 1px solid var(--color-border-strong);
+	border-radius: var(--radius-md);
+	color: var(--color-text-secondary);
+	font-weight: var(--font-weight-semibold);
+	transition: all var(--transition-fast);
+}
+
+.ih-type-btn:hover,
+.ih-type-btn.active {
+	border-color: var(--color-primary);
+	background: var(--color-primary-light);
+	color: var(--color-primary-dark);
+}
+
+.ih-balance-chip {
+	padding: 10px 12px;
+	border: 1px solid var(--color-primary-border);
+	border-radius: var(--radius-md);
+	background: var(--color-primary-lighter);
+	color: var(--color-text-secondary);
+	font-size: var(--font-size-sm);
+}
+
+.ih-hint,
+.ih-form .ih-hint {
+	display: block;
+	margin-top: 5px;
+	color: var(--color-text-tertiary);
+	font-size: var(--font-size-xs);
+}
+
+.ih-form-footer {
+	display: flex;
+	justify-content: flex-end;
+	gap: 10px;
+	padding-top: 4px;
+}
+
+.ih-cancel-btn,
+.ih-submit-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	min-height: var(--btn-height);
+	padding: 0 16px;
+	border: 1px solid transparent;
+	border-radius: var(--radius-md);
+	font-size: var(--font-size-sm);
+	font-weight: var(--font-weight-semibold);
+	transition: all var(--transition-fast);
+}
+
+.ih-cancel-btn {
+	border-color: var(--color-border-strong);
+	background: var(--color-surface);
+	color: var(--color-text-primary);
+}
+
+.ih-cancel-btn:hover:not(:disabled) {
+	background: var(--color-surface-strong);
+}
+
+.ih-submit-btn {
+	min-width: 132px;
+	background: var(--color-primary);
+	border-color: var(--color-primary);
+	color: var(--color-text-inverse);
+}
+
+.ih-submit-btn:hover:not(:disabled) {
+	background: var(--color-primary-dark);
+	border-color: var(--color-primary-dark);
+	box-shadow: var(--shadow-primary);
+	transform: translateY(-1px);
+}
+
+.ih-cancel-btn:disabled,
+.ih-submit-btn:disabled {
+	cursor: not-allowed;
+	opacity: 0.55;
+}
+
+.ih-loading {
+	align-items: center;
+	justify-content: center;
+	min-height: 180px;
+	color: var(--color-text-secondary);
+}
+
+@media (max-width: 640px) {
+	.ih-form-overlay {
+		align-items: flex-end;
+		padding: 10px;
+	}
+
+	.ih-form-modal {
+		width: 100%;
+		max-height: 94vh;
+		border-radius: var(--radius-lg);
+	}
+
+	.ih-form-header,
+	.ih-form,
+	.ih-loading { padding: 16px; }
+	.ih-message { margin: 16px 16px 0; }
+	.ih-form-row { grid-template-columns: 1fr; }
+	.ih-form-footer { flex-direction: column-reverse; }
+	.ih-form-footer button { width: 100%; }
+}
