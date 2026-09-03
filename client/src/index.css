@@ -527,6 +527,23 @@ tbody tr:hover td, .data-table tbody tr:hover td, .report-table tbody tr:hover t
 .text-right  { text-align: right !important; }
 .text-center { text-align: center !important; }
 .text-left   { text-align: left !important; }
+.items-table-title,
+.items-title,
+.dashboard-header h1,
+.er-header h2,
+.report-header h2,
+.page-header h1,
+.header-with-actions h2,
+.payment-page-header h2,
+.pis-page-header h2,
+.minimalist-header h2,
+.production-header h2,
+.header-content h2,
+.fg-opening-balance-container h2,
+.page-title,
+.report-title,
+.manage-users-header h2,
+.change-password-title { text-align: left; }
 .font-mono   { font-family: var(--font-family-mono); }
 .font-bold   { font-weight: var(--font-weight-bold); }
 .font-medium { font-weight: var(--font-weight-medium); }

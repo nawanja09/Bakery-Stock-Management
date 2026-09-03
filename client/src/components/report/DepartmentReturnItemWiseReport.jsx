@@ -6,14 +6,9 @@ import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
-  faDownload, 
   faFileExcel, 
-  faFilePdf, 
-  faPrint,
   faSearch,
   faTimes,
-  faSync,
-  faChartBar
 } from '@fortawesome/free-solid-svg-icons';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
@@ -279,14 +274,13 @@ const DepartmentReturnItemWiseReport = () => {
         </div>
         <div className="report-filter-group">
           <label className="report-filter-label">Search</label>
-          <div className="items-search" style={{ padding: 0 }}>
+          <div className="items-search report-search-field">
             <input
               type="text"
               value={filters.searchTerm}
               onChange={(e) => handleFilterChange('searchTerm', e.target.value)}
               placeholder="Search..."
               className="report-filter-input"
-              style={{ border: 'none', height: '100%' }}
             />
           </div>
         </div>

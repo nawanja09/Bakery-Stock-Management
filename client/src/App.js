@@ -84,6 +84,8 @@ import PurchaseReturnHistory from './components/purchasereturn/PurchaseReturnHis
 import PurchaseVATReport from './components/report/PurchaseVATReport';
 
 import NonPaidPurchases from './components/purchase/NonPaidPurchases';
+import AdvancePaymentPage from './components/purchase/AdvancePaymentPage';
+import RecordPaymentPage from './components/purchase/RecordPaymentPage';
 
 import PettyCash from './components/Expenses/PettyCash';
 import Reimbursement from './components/Expenses/Reimbursement';
@@ -236,6 +238,8 @@ function App() {
             <Route path="purchase/new" element={<ModalRoute title="Add New Purchase"><AddPurchase /></ModalRoute>} />
             <Route path="purchase/edit/:id" element={<ModalRoute title="Edit Purchase"><EditPurchase /></ModalRoute>} />
             <Route path="purchase/history" element={<PurchaseHistory />} />
+            <Route path="purchase/advance-payment" element={<AdvancePaymentPage />} />
+            <Route path="purchase/record-payment" element={<RecordPaymentPage />} />
             <Route path="purchase/:id" element={<ModalRoute title="Purchase Details"><PurchaseDetails /></ModalRoute>} />
             <Route path="suppliers" element={<Suppliers />} />
             <Route path="items/add" element={<ModalRoute title="Add New Item" size="medium"><AddItem /></ModalRoute>} />

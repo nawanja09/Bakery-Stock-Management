@@ -1,5 +1,5 @@
 // src/components/purchase/SettleNowModal.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTimes, faBalanceScale, faCheckCircle, faSpinner, faBoxOpen, faWallet } from '@fortawesome/free-solid-svg-icons';
@@ -18,11 +18,7 @@ const SettleNowModal = ({ isOpen, onClose, invoice, supplierId, onSuccess }) => 
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    if (isOpen && supplierId) fetchCredits();
-  }, [isOpen, supplierId]);
-
-  const fetchCredits = async () => {
+  const fetchCredits = useCallback(async () => {
     setLoading(true);
     try {
       const { data } = await api.get(`/suppliers/${supplierId}/credits`);
@@ -38,7 +34,11 @@ const SettleNowModal = ({ isOpen, onClose, invoice, supplierId, onSuccess }) => 
     } finally {
       setLoading(false);
     }
-  };
+  }, [showPopup, supplierId]);
+
+  useEffect(() => {
+    if (isOpen && supplierId) fetchCredits();
+  }, [fetchCredits, isOpen, supplierId]);
 
   if (!isOpen || !invoice) return null;
 

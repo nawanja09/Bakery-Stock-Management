@@ -7,13 +7,10 @@ import * as XLSX from 'xlsx';
 import Select from 'react-select';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
-  faDownload, 
   faFileExcel, 
   faCalendar, 
-  faChartLine, 
   faEye, 
   faSearch,
-  faInfoCircle,
   faExclamationTriangle
 } from '@fortawesome/free-solid-svg-icons';
 import api from '../../api';

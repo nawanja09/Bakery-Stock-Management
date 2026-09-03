@@ -1,4 +1,9 @@
 @import './Report.css';
 
 .department-return-filter { width: 100%; }
-.department-return-filter .items-search { flex-basis: 240px; }
+.department-return-filter .items-search {
+	flex: 0 0 var(--input-height);
+	height: var(--input-height);
+	min-height: var(--input-height);
+	box-sizing: border-box;
+}

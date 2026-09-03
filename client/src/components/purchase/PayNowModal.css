@@ -21,6 +21,20 @@
 	box-shadow: var(--shadow-2xl);
 }
 
+.pnm-page-container {
+	display: flex;
+	justify-content: center;
+	width: 100%;
+}
+
+.pnm-page-card {
+	width: min(900px, 100%);
+	border: 1px solid var(--color-border);
+	border-radius: 10px;
+	background: var(--color-surface);
+	box-shadow: var(--shadow-card);
+}
+
 .pnm-header,
 .pnm-footer {
 	display: flex;
@@ -65,6 +79,7 @@
 
 @media (max-width: 640px) {
 	.pnm-overlay { padding: 12px; }
+	.pnm-page-container { display: block; }
 	.pnm-body, .pnm-header, .pnm-footer { padding: 16px; }
 	.pnm-form-row { grid-template-columns: 1fr; gap: 14px; }
 }

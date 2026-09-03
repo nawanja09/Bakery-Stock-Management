@@ -289,7 +289,7 @@ const PurchaseReport = () => {
       ) : sortedInvoices.length > 0 ? (
         <>
           <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
-            <div style={{ overflowX: 'auto' }}>
+            <div className="report-table-shell">
               <table className="report-table purchase-report-table">
               <thead>
                 <tr>
@@ -313,11 +313,11 @@ const PurchaseReport = () => {
               <tbody>
                 {sortedInvoices.map((inv) => (
                   <tr key={inv.id}>
-                    <td>{inv.invoice_no}</td>
-                    <td>{inv.purchase_date ? format(new Date(inv.purchase_date), 'MMM dd, yyyy') : 'N/A'}</td>
-                    <td>{inv.company_name}</td>
-                    <td>{inv.supplier_name}</td>
-                    <td>{formatCurrency(inv.total_amount)}</td>
+                    <td className="report-table-reference">{inv.invoice_no || 'N/A'}</td>
+                    <td className="report-table-date">{inv.purchase_date ? format(new Date(inv.purchase_date), 'MMM dd, yyyy') : 'N/A'}</td>
+                    <td>{inv.company_name || 'N/A'}</td>
+                    <td>{inv.supplier_name || 'N/A'}</td>
+                    <td className="report-table-value-numeric">{formatCurrency(inv.total_amount)}</td>
                   </tr>
                 ))}
               </tbody>
