@@ -8,11 +8,23 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background:
-    radial-gradient(circle at top left, rgba(37, 99, 235, 0.18), transparent 28%),
-    radial-gradient(circle at bottom right, rgba(139, 92, 246, 0.18), transparent 30%),
-    linear-gradient(135deg, #f8fafc 0%, #eef4ff 46%, #f8fafc 100%);
   padding: 32px 20px;
+}
+
+.login-page-wrapper {
+  position: relative;
+  isolation: isolate;
+  background:
+    linear-gradient(90deg, rgba(15, 23, 42, 0.72), rgba(15, 23, 42, 0.34)),
+    url('../images/cake.jpg') center / cover no-repeat;
+}
+
+.login-page-wrapper::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  content: '';
+  background: rgba(10, 25, 40, 0.18);
 }
 
 .login-container,
