@@ -81,21 +81,26 @@ const NavigationBar = () => {
     const path = location.pathname;
     if (path.startsWith('/dashboard')) {
       setActiveModule(null);
+    } else if (path.startsWith('/items') || path.startsWith('/item-types') ||
+               path.startsWith('/suppliers') || path.startsWith('/departments') ||
+               path.startsWith('/companies') || path.startsWith('/adjustments/payment-methods') ||
+               path.startsWith('/expenses/bank-details') ||
+               path.startsWith('/expense-types-management') ||
+               path.startsWith('/expense-payees-management') ||
+               path.startsWith('/bank-charges-type-management') ||
+               path.startsWith('/finance/receive-types')) {
+      setActiveModule('management');
     } else if (path.startsWith('/adjustments')) {
       setActiveModule('adjustments');
     } else if (path.startsWith('/reports/vat') || path.startsWith('/reports/purchase-vat')) {
       setActiveModule('vat');
-    } else if (path.startsWith('/items') || path.startsWith('/suppliers') || 
-               path.startsWith('/purchase') || path.startsWith('/issuance') || 
+    } else if (path.startsWith('/purchase') || path.startsWith('/issuance') || 
                path.startsWith('/wastage') || path.startsWith('/returns') || 
                path.startsWith('/reports/stock') ||
                path.startsWith('/reports/department') || path.startsWith('/reports/purchasing') ||
                path.startsWith('/reports/purchase-report') ||
                path.startsWith('/reports/wastage') || 
-               path.startsWith('/purchase-returns') || path.startsWith('/opening') ||
-               path.startsWith('/departments') || path.startsWith('/companies') ||
-               path.startsWith('/payment-methods') || path.startsWith('/item-types') ||
-               path.startsWith('/expense-types-management') || path.startsWith('/expense-payees-management')) {
+               path.startsWith('/purchase-returns') || path.startsWith('/opening')) {
       setActiveModule('raw');
     } else if (path.startsWith('/finished-goods') || path.startsWith('/cost-calculator')) {
       setActiveModule('finished');
@@ -126,6 +131,9 @@ const NavigationBar = () => {
     
     // Navigate to the module's main page
     switch(moduleName) {
+      case 'management':
+        navigate('/items');
+        break;
       case 'raw':
         navigate('/items');
         break;
@@ -189,6 +197,8 @@ const NavigationBar = () => {
     switch(activeModule) {
       case 'raw':
         return renderRawMaterialContent();
+      case 'management':
+        return renderManagementContent();
       case 'finished':
         return renderFinishedGoodsContent();
       case 'expenses':
@@ -208,84 +218,79 @@ const NavigationBar = () => {
     }
   };
 
+  const renderManagementContent = () => (
+    <>
+      <li>
+        <NavLink to="/items" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          <span className="icon-container"><FontAwesomeIcon icon={faBox} /></span>
+          <span>RM Item</span>
+        </NavLink>
+      </li>
+      <li>
+        <NavLink to="/item-types" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          <span className="icon-container"><FontAwesomeIcon icon={faClipboardList} /></span>
+          <span>RM Item Types</span>
+        </NavLink>
+      </li>
+      <li>
+        <NavLink to="/suppliers" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          <span className="icon-container"><FontAwesomeIcon icon={faTruck} /></span>
+          <span>Suppliers</span>
+        </NavLink>
+      </li>
+      <li>
+        <NavLink to="/departments" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          <span className="icon-container"><FontAwesomeIcon icon={faBuilding} /></span>
+          <span>Departments</span>
+        </NavLink>
+      </li>
+      <li>
+        <NavLink to="/companies" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          <span className="icon-container"><FontAwesomeIcon icon={faBuilding} /></span>
+          <span>Companies</span>
+        </NavLink>
+      </li>
+      <li>
+        <NavLink to="/adjustments/payment-methods" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          <span className="icon-container"><FontAwesomeIcon icon={faCreditCard} /></span>
+          <span>Payment Methods</span>
+        </NavLink>
+      </li>
+      <li>
+        <NavLink to="/expenses/bank-details" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          <span className="icon-container"><FontAwesomeIcon icon={faBuildingColumns} /></span>
+          <span>Bank Details</span>
+        </NavLink>
+      </li>
+      <li>
+        <NavLink to="/expense-types-management" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          <span className="icon-container"><FontAwesomeIcon icon={faFileInvoiceDollar} /></span>
+          <span>Expenses Type Management</span>
+        </NavLink>
+      </li>
+      <li>
+        <NavLink to="/expense-payees-management" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          <span className="icon-container"><FontAwesomeIcon icon={faIdCard} /></span>
+          <span>Expenses Payee Management</span>
+        </NavLink>
+      </li>
+      <li>
+        <NavLink to="/bank-charges-type-management" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          <span className="icon-container"><FontAwesomeIcon icon={faUniversity} /></span>
+          <span>Bank Charges Type Management</span>
+        </NavLink>
+      </li>
+      <li>
+        <NavLink to="/finance/receive-types" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          <span className="icon-container"><FontAwesomeIcon icon={faCashRegister} /></span>
+          <span>Receive Types</span>
+        </NavLink>
+      </li>
+    </>
+  );
+
   const renderRawMaterialContent = () => (
     <>
-      <li className={`dropdown ${activeDropdown === 'raw-opening' ? 'active' : ''}`}>
-        <div className="dropdown-header" onClick={() => toggleDropdown('raw-opening')}>
-          <span className="icon-container"><FontAwesomeIcon icon={faBalanceScale} /></span>
-          <span>Management</span>
-          <FontAwesomeIcon icon={faChevronDown} className="chevron" />
-        </div>
-        <ul className="dropdown-menu">
-          <li>
-            <NavLink to="/items" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-              <span className="icon-container"><FontAwesomeIcon icon={faBox} /></span>
-              <span>RM Item</span>
-            </NavLink>
-          </li>
-          <li>
-            <NavLink to="/item-types" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-              <span className="icon-container"><FontAwesomeIcon icon={faClipboardList} /></span>
-              <span>RM Item Types</span>
-            </NavLink>
-          </li>
-          <li>
-            <NavLink to="/suppliers" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-              <span className="icon-container"><FontAwesomeIcon icon={faTruck} /></span>
-              <span>Suppliers</span>
-            </NavLink>
-          </li>
-          <li>
-            <NavLink to="/departments" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-              <span className="icon-container"><FontAwesomeIcon icon={faBuilding} /></span>
-              <span>Departments</span>
-            </NavLink>
-          </li>
-          <li>
-            <NavLink to="/companies" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-              <span className="icon-container"><FontAwesomeIcon icon={faBuilding} /></span>
-              <span>Companies</span>
-            </NavLink>
-          </li>
-          <li>
-            <NavLink to="/adjustments/payment-methods" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-              <span className="icon-container"><FontAwesomeIcon icon={faCreditCard} /></span>
-              <span>Payment Methods</span>
-            </NavLink>
-          </li>
-          <li>
-            <NavLink to="/expenses/bank-details" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-              <span className="icon-container"><FontAwesomeIcon icon={faBuildingColumns} /></span>
-              <span>Bank Details</span>
-            </NavLink>
-          </li>
-          <li>
-            <NavLink to="/expense-types-management" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-              <span className="icon-container"><FontAwesomeIcon icon={faFileInvoiceDollar} /></span>
-              <span>Expenses Type Management</span>
-            </NavLink>
-          </li>
-          <li>
-            <NavLink to="/expense-payees-management" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-              <span className="icon-container"><FontAwesomeIcon icon={faIdCard} /></span>
-              <span>Expenses Payee Management</span>
-            </NavLink>
-          </li>
-          <li>
-            <NavLink to="/bank-charges-type-management" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-              <span className="icon-container"><FontAwesomeIcon icon={faUniversity} /></span>
-              <span>Bank Charges Type Management</span>
-            </NavLink>
-          </li>
-          <li>
-            <NavLink to="/finance/receive-types" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-              <span className="icon-container"><FontAwesomeIcon icon={faCashRegister} /></span>
-              <span>Receive Types</span>
-            </NavLink>
-          </li>
-        </ul>
-      </li>
-
       <li className={`dropdown ${activeDropdown === 'purchase' ? 'active' : ''}`}>
         <div className="dropdown-header" onClick={() => toggleDropdown('purchase')}>
           <span className="icon-container"><FontAwesomeIcon icon={faShoppingCart} /></span>
@@ -692,9 +697,27 @@ const NavigationBar = () => {
 
           <div className="section-separator"></div>
 
-          {/* Raw Material Module */}
+          {/* Management Module */}
           <li>
             <div 
+              className={`nav-link module-item ${activeModule === 'management' ? 'active-module' : ''}`}
+              onClick={() => handleModuleClick('management')}
+            >
+              <span className="icon-container"><FontAwesomeIcon icon={faCog} /></span>
+              <span>Management</span>
+              {!isCollapsed && <FontAwesomeIcon icon={faChevronDown} className={`chevron ${activeModule === 'management' ? 'rotated' : ''}`} />}
+            </div>
+          </li>
+
+          {!isCollapsed && activeModule === 'management' && (
+            <div className="module-content">
+              {renderManagementContent()}
+            </div>
+          )}
+
+          {/* Raw Material Module */}
+          <li>
+            <div
               className={`nav-link module-item ${activeModule === 'raw' ? 'active-module' : ''}`}
               onClick={() => handleModuleClick('raw')}
             >

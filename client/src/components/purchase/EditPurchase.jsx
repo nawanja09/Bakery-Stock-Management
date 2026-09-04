@@ -682,14 +682,10 @@ const EditPurchase = ({ embeddedId, onSaved, onCancel } = {}) => {
                           isSearchable
                           isClearable
                           placeholder="Search or select item..."
-                          className="react-select-container"
+                          className="purchase-item-select"
                           classNamePrefix="react-select"
                           styles={{
-                            control: (base) => ({
-                              ...base,
-                              minHeight: '38px',
-                              borderColor: '#ced4da'
-                            }),
+                            control: (base) => ({ ...base, borderColor: '#ced4da' }),
                             menuPortal: (base) => ({ ...base, zIndex: 9999 })
                           }}
                           menuPortalTarget={document.body}

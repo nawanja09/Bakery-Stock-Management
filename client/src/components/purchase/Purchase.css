@@ -426,6 +426,44 @@
   background-color: #f9fafb;
 }
 
+/* Keep the item selector compact and aligned with the table inputs. */
+.purchase-item-select .react-select__control {
+  min-height: 34px;
+  height: 34px;
+  border-color: var(--color-border);
+  border-radius: var(--radius-sm);
+  box-shadow: none;
+}
+
+.purchase-item-select .react-select__control:hover {
+  border-color: var(--color-primary);
+}
+
+.purchase-item-select .react-select__control--is-focused {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-focus-ring);
+}
+
+.purchase-item-select .react-select__value-container {
+  min-height: 32px;
+  padding: 0 8px;
+}
+
+.purchase-item-select .react-select__input-container,
+.purchase-item-select .react-select__single-value,
+.purchase-item-select .react-select__placeholder {
+  margin: 0;
+  font-size: var(--font-size-sm);
+}
+
+.purchase-item-select .react-select__indicators {
+  height: 32px;
+}
+
+.purchase-item-select .react-select__indicator {
+  padding: 6px;
+}
+
 .filters-bar {
   background-color: #ffffff;
   border-radius: 12px;
