@@ -133,62 +133,68 @@
 	padding: 0;
 	overflow: hidden;
 }
-.cash-ledger-table-card .report-table {
+.cash-ledger-table-card .cash-ledger-table {
 	width: 100%;
 	max-width: 100%;
 	box-sizing: border-box;
 	table-layout: fixed;
+	border-collapse: collapse;
 }
-.cash-ledger-table-card .report-table th {
+.cash-ledger-table-card .cash-ledger-table tbody tr {
+	height: 48px;
+}
+.cash-ledger-table-card .cash-ledger-table th,
+.cash-ledger-table-card .cash-ledger-table td {
 	box-sizing: border-box;
 	padding: 10px 8px;
+	vertical-align: middle;
+	font-size: 0.78rem;
+	line-height: 1.4;
+	word-break: normal;
+}
+.cash-ledger-table-card .cash-ledger-table th {
 	background: var(--color-bg-secondary);
 	border-bottom: 1px solid var(--cash-border);
 	color: var(--color-text-secondary);
-	font-size: 0.64rem;
-	line-height: 1.25;
 	white-space: normal;
-	word-break: normal;
 }
-.cash-ledger-table-card .report-table td {
-	box-sizing: border-box;
-	padding: 10px 8px;
+.cash-ledger-table-card .cash-ledger-table td {
 	color: var(--color-text-primary);
-	font-size: 0.78rem;
-	line-height: 1.35;
 	border-bottom-color: var(--color-border-light);
 	white-space: normal;
 	overflow-wrap: anywhere;
 	word-break: break-word;
 }
-.cash-ledger-table-card .report-table th:nth-child(1),
-.cash-ledger-table-card .report-table td:nth-child(1) { width: 7%; }
-.cash-ledger-table-card .report-table th:nth-child(2),
-.cash-ledger-table-card .report-table td:nth-child(2) { width: 8%; }
-.cash-ledger-table-card .report-table th:nth-child(3),
-.cash-ledger-table-card .report-table td:nth-child(3) { width: 14%; }
-.cash-ledger-table-card .report-table th:nth-child(4),
-.cash-ledger-table-card .report-table td:nth-child(4) { width: 10%; }
-.cash-ledger-table-card .report-table th:nth-child(5),
-.cash-ledger-table-card .report-table td:nth-child(5) { width: 10%; }
-.cash-ledger-table-card .report-table th:nth-child(6),
-.cash-ledger-table-card .report-table td:nth-child(6) {
+.cash-ledger-table-card .cash-ledger-table td p,
+.cash-ledger-table-card .cash-ledger-table td div,
+.cash-ledger-table-card .cash-ledger-table td span {
+	margin-top: 0;
+	margin-bottom: 0;
+	line-height: inherit;
+}
+.cash-ledger-table-card .cash-ledger-table td br {
+	line-height: 1.2;
+}
+.cash-ledger-table-card .cash-ledger-table th:nth-child(1),
+.cash-ledger-table-card .cash-ledger-table td:nth-child(1) { width: 7%; }
+.cash-ledger-table-card .cash-ledger-table th:nth-child(2),
+.cash-ledger-table-card .cash-ledger-table td:nth-child(2) { width: 8%; }
+.cash-ledger-table-card .cash-ledger-table th:nth-child(3),
+.cash-ledger-table-card .cash-ledger-table td:nth-child(3) { width: 14%; }
+.cash-ledger-table-card .cash-ledger-table th:nth-child(4),
+.cash-ledger-table-card .cash-ledger-table td:nth-child(4) { width: 10%; }
+.cash-ledger-table-card .cash-ledger-table th:nth-child(5),
+.cash-ledger-table-card .cash-ledger-table td:nth-child(5) { width: 10%; }
+.cash-ledger-table-card .cash-ledger-table th:nth-child(6),
+.cash-ledger-table-card .cash-ledger-table td:nth-child(6) {
 	width: 17% !important;
 	min-width: 0 !important;
 	max-width: none !important;
 }
-.cash-ledger-table-card .report-table th:nth-child(7),
-.cash-ledger-table-card .report-table td:nth-child(7),
-.cash-ledger-table-card .report-table th:nth-child(8),
-.cash-ledger-table-card .report-table td:nth-child(8),
-.cash-ledger-table-card .report-table th:nth-child(9),
-.cash-ledger-table-card .report-table td:nth-child(9) { width: 8%; }
-.cash-ledger-table-card .report-table th:nth-child(10),
-.cash-ledger-table-card .report-table td:nth-child(10) { width: 10%; }
-.cash-ledger-table-card .report-table .fl-remark-cell,
-.cash-ledger-table-card .report-table .fl-remark-header { overflow-wrap: anywhere; }
-.cash-ledger-table-card .report-table tbody tr:hover td { background: var(--color-primary-lighter); }
-.cash-ledger-table-card .report-table .fl-num {
+.cash-ledger-table-card .cash-ledger-table .fl-remark-cell,
+.cash-ledger-table-card .cash-ledger-table .fl-remark-header { overflow-wrap: anywhere; }
+.cash-ledger-table-card .cash-ledger-table tbody tr:hover td { background: var(--color-primary-lighter); }
+.cash-ledger-table-card .cash-ledger-table .fl-num {
 	text-align: right;
 	white-space: nowrap;
 	font-variant-numeric: tabular-nums;

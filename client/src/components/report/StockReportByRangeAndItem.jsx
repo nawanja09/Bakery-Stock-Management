@@ -9,6 +9,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faFileExcel, 
   faCalendar, 
+  faBoxOpen,
   faEye, 
   faSearch,
   faExclamationTriangle
@@ -415,20 +416,23 @@ const StockReportByRangeAndItem = () => {
           />
         </div>
 
-        <div className="report-filter-group" style={{ flex: '1 1 200px' }}>
+        <div className="report-filter-group">
           <label className="report-filter-label">
-            <FontAwesomeIcon icon={faSearch} /> SELECT AUTO-ADD ITEM
+            <FontAwesomeIcon icon={faBoxOpen} className="filter-icon" /> Item
           </label>
-          <Select
-            options={items}
-            value={selectedItem}
-            onChange={setSelectedItem}
-            isClearable
-            placeholder="Search auto-add items..."
-            className="react-select-container"
-            classNamePrefix="react-select"
-            noOptionsMessage={() => "No auto-add items found"}
-          />
+        
+          <select
+            value={selectedItem ? selectedItem.value : ''}
+            onChange={(e) => setSelectedItem(items.find(item => String(item.value) === e.target.value) || null)}
+            className="report-filter-select"
+          >
+            <option value="">All Items</option>
+              {items.map(item => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+          </select>
         </div>
 
         <div className="report-filter-actions">

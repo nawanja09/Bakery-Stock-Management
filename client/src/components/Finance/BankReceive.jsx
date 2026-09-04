@@ -90,8 +90,7 @@ const BankReceive = () => {
         amount: amt,
         receive_type: formData.receive_type,
         reference_number: formData.reference_number || null,
-        remark: formData.remark || null,
-        created_by: currentUser.id
+        remark: formData.remark || null
       });
       setMessage({ type: 'success', text: 'Bank receipt recorded successfully!' });
       setBankAccounts(prev => prev.map(b => String(b.id) === String(formData.bank_id) ? { ...b, current_balance: res.data?.balance ?? b.current_balance } : b));

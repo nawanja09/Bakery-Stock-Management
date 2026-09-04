@@ -1591,7 +1591,10 @@ router.post('/banks', authenticate, async (req, res) => {
   } catch (error) {
     console.error('Error creating bank:', error);
     if (error.code === 'ER_DUP_ENTRY') {
-      return res.status(400).json({ error: 'Bank name already exists' });
+      const duplicateField = /account_number/i.test(error.sqlMessage || '')
+        ? 'account number'
+        : 'bank details';
+      return res.status(400).json({ error: `A bank with the same ${duplicateField} already exists` });
     }
     res.status(500).json({ error: 'Failed to add bank' });
   }

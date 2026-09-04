@@ -320,14 +320,15 @@ const getAllBankAccounts = async (req, res) => {
 
 // POST /api/finance/bank/receive - Bank Receive (Bank In)
 const receiveBank = async (req, res) => {
-  const { company_id, bank_id, date, amount, receive_type, reference_number, remark, created_by } = req.body;
+  const { company_id, bank_id, date, amount, receive_type, reference_number, remark } = req.body;
+  const created_by = req.user.userId;
 
   if (!company_id) return res.status(400).json({ error: 'Company is required' });
   if (!bank_id) return res.status(400).json({ error: 'Bank account is required' });
   if (!date) return res.status(400).json({ error: 'Date is required' });
   if (!amount || parseFloat(amount) <= 0) return res.status(400).json({ error: 'Amount must be greater than 0' });
   if (!receive_type) return res.status(400).json({ error: 'Receive type is required' });
-  if (!created_by) return res.status(400).json({ error: 'Created by is required' });
+  if (!created_by) return res.status(401).json({ error: 'Authenticated user is required' });
 
   const connection = await pool.getConnection();
   try {

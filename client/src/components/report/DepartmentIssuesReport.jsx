@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faFileExcel, faFilter, faCalendarAlt } from '@fortawesome/free-solid-svg-icons';
+import { faFileExcel, faFilter, faCalendarAlt, faBoxOpen } from '@fortawesome/free-solid-svg-icons';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
@@ -179,45 +179,36 @@ const DepartmentIssuesReport = () => {
         </div>
 
         <div className="report-filter-group">
-          <label className="report-filter-label">
-            <FontAwesomeIcon icon={faFilter} /> DEPARTMENT
-          </label>
-          <Select
-            className="react-select-container"
-            classNamePrefix="react-select"
-            value={selectedDepartment === "all" ? { value: "all", label: "All Departments" } : departments.find(d => d.id === Number(selectedDepartment)) && { value: selectedDepartment, label: departments.find(d => d.id === Number(selectedDepartment))?.name }}
-            onChange={(option) => setSelectedDepartment(option.value)}
-            options={[
-              { value: "all", label: "All Departments" },
-              ...departments.map((dept) => ({
-                value: dept.id.toString(),
-                label: dept.name,
-              })),
-            ]}
-            menuPortalTarget={document.body}
-            menuPosition="fixed"
-          />
+          <label className="report-filter-label">Department</label>
+          <select
+            value={selectedDepartment}
+            onChange={(e) => setSelectedDepartment(e.target.value)}
+            className="report-filter-select"
+          >
+            <option value="all">All Departments</option>
+            {departments.map(dept => (
+              <option key={dept.id} value={dept.id}>{dept.name}</option>
+            ))}
+          </select>
         </div>
 
         <div className="report-filter-group">
           <label className="report-filter-label">
-            <FontAwesomeIcon icon={faFilter} /> ITEM SECTION
+            <FontAwesomeIcon icon={faBoxOpen} className="filter-icon" /> Item
           </label>
-          <Select
-            className="react-select-container"
-            classNamePrefix="react-select"
-            value={selectedItem === "all" ? { value: "all", label: "All Items" } : items.find(i => i.id === Number(selectedItem)) && { value: selectedItem, label: items.find(i => i.id === Number(selectedItem))?.name + ` (${items.find(i => i.id === Number(selectedItem))?.item_code})` }}
-            onChange={(option) => setSelectedItem(option.value)}
-            options={[
-              { value: "all", label: "All Items" },
-              ...items.map((item) => ({
-                value: item.id.toString(),
-                label: `${item.name} (${item.item_code})`,
-              })),
-            ]}
-            menuPortalTarget={document.body}
-            menuPosition="fixed"
-          />
+
+          <select
+            value={selectedItem}
+            onChange={(e) => setSelectedItem(e.target.value)}
+            className="report-filter-select"
+          >
+            <option value="all">All Items</option>
+              {items.map(item => (
+              <option key={item.id} value={item.id}>
+                {item.item_code} - {item.name}
+              </option>
+              ))}
+          </select>
         </div>
 
         <div className="report-filter-actions">
