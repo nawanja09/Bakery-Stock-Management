@@ -406,9 +406,6 @@ const EditFinishedGoodsItem = () => {
         <div className="header-actions">
           <div>
             <h1 className="page-title">Edit Product</h1>
-            <p className="page-subtitle">
-              Update product information and ingredients
-            </p>
           </div>
         </div>
       </div>

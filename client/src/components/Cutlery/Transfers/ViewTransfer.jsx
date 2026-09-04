@@ -95,7 +95,6 @@ const ViewTransfer = () => {
           </button>
           <div className="header-title-text">
             <h2>Transfer Details</h2>
-            <p className="subtitle">ID: {transfer.transfer_id}</p>
           </div>
         </div>
         <div className="header-actions-details">

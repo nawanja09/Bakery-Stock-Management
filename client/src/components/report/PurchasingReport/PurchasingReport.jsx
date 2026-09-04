@@ -427,7 +427,6 @@ const PurchasingReport = () => {
       <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           <h2 style={{ textAlign: 'left', margin: 0 }}>Purchasing Item Detail</h2>
-          <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>Detailed view of purchasing items</p>
         </div>
         {filteredItems.length > 0 && (
           <div style={{ display: 'flex', gap: '10px' }}>

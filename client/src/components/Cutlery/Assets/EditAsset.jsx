@@ -115,7 +115,6 @@ const EditAsset = () => {
       <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
         <div>
           <h2 style={{ margin: 0 }}>Edit Asset</h2>
-          <p style={{ margin: '4px 0 0', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>Edit cutlery asset information</p>
         </div>
         <div>
           <button className="btn btn-secondary" onClick={handleCancel}>← Back</button>

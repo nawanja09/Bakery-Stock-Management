@@ -92,7 +92,6 @@ const CashReceive = () => {
       <header className="page-header">
         <div>
           <h2 style={{ margin: 0 }}><FontAwesomeIcon icon={faHandHoldingDollar} style={{ marginRight: '8px' }} /> Cash Receive</h2>
-          <p style={{ margin: '4px 0 0', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>Record incoming cash receipts</p>
         </div>
       </header>
 

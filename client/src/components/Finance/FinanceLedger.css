@@ -2,15 +2,15 @@
 @import '../common/FormStyles.css';
 
 .cash-ledger-page {
-	--cash-navy: #102a43;
-	--cash-muted: #64748b;
-	--cash-blue: #2563eb;
-	--cash-blue-soft: #eff6ff;
-	--cash-border: #dbe5f0;
-	--cash-green: #15803d;
-	--cash-green-soft: #ecfdf3;
-	--cash-red: #c2413b;
-	--cash-red-soft: #fff1f2;
+	--cash-navy: var(--color-heading);
+	--cash-muted: var(--color-text-secondary);
+	--cash-blue: var(--color-primary);
+	--cash-blue-soft: var(--color-primary-light);
+	--cash-border: var(--color-border);
+	--cash-green: var(--color-success);
+	--cash-green-soft: var(--color-success-light);
+	--cash-red: var(--color-danger);
+	--cash-red-soft: var(--color-danger-light);
 	gap: 12px;
 	color: var(--cash-navy);
 }
@@ -28,7 +28,7 @@
 .cash-ledger-page .card {
 	border-color: var(--cash-border);
 	border-radius: 10px;
-	box-shadow: 0 4px 16px rgba(16, 42, 67, 0.06);
+	box-shadow: var(--shadow-card);
 }
 
 .cash-ledger-kpi-row {
@@ -102,7 +102,7 @@
 .cash-ledger-page .filters-section {
 	padding: 12px 14px !important;
 	margin-bottom: 0 !important;
-	box-shadow: 0 3px 12px rgba(16, 42, 67, 0.045);
+	box-shadow: var(--shadow-sm);
 }
 .cash-ledger-page .ledger-filter-row {
 	display: grid;
@@ -117,13 +117,13 @@
 	padding-left: 12px;
 	border-color: var(--cash-border);
 	border-radius: 8px;
-	background-color: #fff;
+	background-color: var(--color-surface);
 	color: var(--cash-navy);
 }
 .cash-ledger-page .ledger-filter-row .report-filter-input:focus,
 .cash-ledger-page .ledger-filter-row .report-filter-select:focus {
 	border-color: var(--cash-blue);
-	box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.13);
+	box-shadow: 0 0 0 3px var(--color-focus-ring);
 }
 
 .cash-ledger-table-card {
@@ -142,9 +142,9 @@
 .cash-ledger-table-card .report-table th {
 	box-sizing: border-box;
 	padding: 10px 8px;
-	background: #f5f8fc;
+	background: var(--color-bg-secondary);
 	border-bottom: 1px solid var(--cash-border);
-	color: #52657a;
+	color: var(--color-text-secondary);
 	font-size: 0.64rem;
 	line-height: 1.25;
 	white-space: normal;
@@ -153,10 +153,10 @@
 .cash-ledger-table-card .report-table td {
 	box-sizing: border-box;
 	padding: 10px 8px;
-	color: #243b53;
+	color: var(--color-text-primary);
 	font-size: 0.78rem;
 	line-height: 1.35;
-	border-bottom-color: #edf2f7;
+	border-bottom-color: var(--color-border-light);
 	white-space: normal;
 	overflow-wrap: anywhere;
 	word-break: break-word;
@@ -187,7 +187,7 @@
 .cash-ledger-table-card .report-table td:nth-child(10) { width: 10%; }
 .cash-ledger-table-card .report-table .fl-remark-cell,
 .cash-ledger-table-card .report-table .fl-remark-header { overflow-wrap: anywhere; }
-.cash-ledger-table-card .report-table tbody tr:hover td { background: #f8fbff; }
+.cash-ledger-table-card .report-table tbody tr:hover td { background: var(--color-primary-lighter); }
 .cash-ledger-table-card .report-table .fl-num {
 	text-align: right;
 	white-space: nowrap;
@@ -213,24 +213,24 @@
 	max-width: 210px;
 	overflow: hidden;
 	background: var(--cash-blue-soft);
-	color: #1d4ed8;
+	color: var(--color-primary-dark);
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
 .cash-ledger-page .fl-debit-amount { color: var(--cash-green); font-weight: 700; }
 .cash-ledger-page .fl-credit-amount { color: var(--cash-red); font-weight: 700; }
-.cash-ledger-page .fl-empty-val { color: #94a3b8; }
+.cash-ledger-page .fl-empty-val { color: var(--color-text-tertiary); }
 
 .bank-ledger-page {
-	--bank-navy: #102a43;
-	--bank-muted: #64748b;
-	--bank-blue: #2563eb;
-	--bank-blue-soft: #eff6ff;
-	--bank-border: #dbe5f0;
-	--bank-green: #15803d;
-	--bank-green-soft: #ecfdf3;
-	--bank-red: #c2413b;
-	--bank-red-soft: #fff1f2;
+	--bank-navy: var(--color-heading);
+	--bank-muted: var(--color-text-secondary);
+	--bank-blue: var(--color-primary);
+	--bank-blue-soft: var(--color-primary-light);
+	--bank-border: var(--color-border);
+	--bank-green: var(--color-success);
+	--bank-green-soft: var(--color-success-light);
+	--bank-red: var(--color-danger);
+	--bank-red-soft: var(--color-danger-light);
 	gap: 12px;
 	color: var(--bank-navy);
 }
@@ -248,7 +248,7 @@
 .bank-ledger-page .card {
 	border-color: var(--bank-border);
 	border-radius: 10px;
-	box-shadow: 0 4px 16px rgba(16, 42, 67, 0.06);
+	box-shadow: var(--shadow-card);
 }
 .bank-ledger-kpi-row {
 	display: grid;
@@ -319,7 +319,7 @@
 .bank-ledger-page .filters-section {
 	padding: 12px 14px !important;
 	margin-bottom: 0 !important;
-	box-shadow: 0 3px 12px rgba(16, 42, 67, 0.045);
+	box-shadow: var(--shadow-sm);
 }
 .bank-ledger-page .ledger-filter-row {
 	display: grid;
@@ -334,13 +334,13 @@
 	padding-left: 12px;
 	border-color: var(--bank-border);
 	border-radius: 8px;
-	background-color: #fff;
+	background-color: var(--color-surface);
 	color: var(--bank-navy);
 }
 .bank-ledger-page .ledger-filter-row .report-filter-input:focus,
 .bank-ledger-page .ledger-filter-row .report-filter-select:focus {
 	border-color: var(--bank-blue);
-	box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.13);
+	box-shadow: 0 0 0 3px var(--color-focus-ring);
 }
 .bank-ledger-table-card {
 	width: 100%;
@@ -358,9 +358,9 @@
 .bank-ledger-table-card .report-table th {
 	box-sizing: border-box;
 	padding: 10px 8px;
-	background: #f5f8fc;
+	background: var(--color-bg-secondary);
 	border-bottom: 1px solid var(--bank-border);
-	color: #52657a;
+	color: var(--color-text-secondary);
 	font-size: 0.64rem;
 	line-height: 1.25;
 	white-space: normal;
@@ -368,10 +368,10 @@
 .bank-ledger-table-card .report-table td {
 	box-sizing: border-box;
 	padding: 10px 8px;
-	color: #243b53;
+	color: var(--color-text-primary);
 	font-size: 0.78rem;
 	line-height: 1.35;
-	border-bottom-color: #edf2f7;
+	border-bottom-color: var(--color-border-light);
 	white-space: normal;
 	overflow-wrap: anywhere;
 	word-break: break-word;
@@ -396,7 +396,7 @@
 .bank-ledger-table-card .report-table td:nth-child(9) { width: 8%; }
 .bank-ledger-table-card .report-table th:nth-child(10),
 .bank-ledger-table-card .report-table td:nth-child(10) { width: 10%; }
-.bank-ledger-table-card .report-table tbody tr:hover td { background: #f8fbff; }
+.bank-ledger-table-card .report-table tbody tr:hover td { background: var(--color-primary-lighter); }
 .bank-ledger-table-card .report-table .fl-num {
 	text-align: right;
 	white-space: nowrap;
@@ -421,13 +421,13 @@
 	max-width: 210px;
 	overflow: hidden;
 	background: var(--bank-blue-soft);
-	color: #1d4ed8;
+	color: var(--color-primary-dark);
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
 .bank-ledger-page .fl-debit-amount { color: var(--bank-green); font-weight: 700; }
 .bank-ledger-page .fl-credit-amount { color: var(--bank-red); font-weight: 700; }
-.bank-ledger-page .fl-empty-val { color: #94a3b8; }
+.bank-ledger-page .fl-empty-val { color: var(--color-text-tertiary); }
 
 @media (max-width: 900px) {
 	.bank-ledger-page .ledger-filter-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }

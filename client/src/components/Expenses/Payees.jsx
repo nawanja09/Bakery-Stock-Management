@@ -148,9 +148,6 @@ const Payees = () => {
             <FontAwesomeIcon icon={faUsers} style={{ marginRight: '8px' }} />
             Payees Management
           </h2>
-          <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-            Manage your payees for cheque and online expenses
-          </p>
         </div>
         <button
           className="btn btn-primary"

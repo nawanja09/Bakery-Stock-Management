@@ -31,7 +31,6 @@ const AdvancePaymentPage = () => {
       <header className="page-header payment-page-header">
         <div>
           <h2>Advance Payment</h2>
-          <p>Record a supplier payment to use against future invoices.</p>
         </div>
       </header>
       <PayNowModal

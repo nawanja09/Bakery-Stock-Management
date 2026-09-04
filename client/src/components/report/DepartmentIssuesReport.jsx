@@ -151,7 +151,6 @@ const DepartmentIssuesReport = () => {
     <div className="page-container">
       <header className="page-header" style={{ display: 'flex', alignItems: 'flex-start', flexDirection: 'column', gap: '4px' }}>
         <h2 style={{ textAlign: 'left', margin: 0 }}>RM Issue Item Detail</h2>
-        <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>Track and manage raw material issued to departments.</p>
       </header>
 
       <div className="filters-section report-filter-bar">

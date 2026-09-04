@@ -109,7 +109,6 @@ const FGRecipesReports = () => {
           <h2 style={{ margin: 0 }}>
             <FontAwesomeIcon icon={faChartBar} style={{ marginRight: '8px' }} /> FG Recipes Reports
           </h2>
-          <p style={{ margin: '4px 0 0', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>View finished goods recipe reports and cost analysis</p>
         </div>
       </header>
 

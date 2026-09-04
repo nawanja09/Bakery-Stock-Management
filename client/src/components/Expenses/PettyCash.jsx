@@ -408,9 +408,6 @@ const PettyCash = () => {
           <h2 style={{ textAlign: 'left', margin: 0 }}>
             <FontAwesomeIcon icon={faMoneyBillWave} style={{ marginRight: '8px' }} /> Petty Cash Expenses
           </h2>
-          <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-            Manage petty cash vouchers and reimbursements
-          </p>
         </div>
       </header>
 

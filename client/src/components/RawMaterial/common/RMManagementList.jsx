@@ -100,7 +100,6 @@ const RMManagementList = ({
       <div className="filters-section" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h2 style={{ margin: 0, color: 'var(--color-heading)' }}>{pageTitle}</h2>
-          {subtitle && <p className="text-muted" style={{ marginTop: '4px' }}>{subtitle}</p>}
         </div>
         <button className="btn btn-primary" onClick={() => setShowAddForm(true)}>
           <FiPlus size={16} /> {addButtonLabel}

@@ -383,7 +383,6 @@ const StockReportByRangeAndItem = () => {
       <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           <h2 style={{ textAlign: 'left', margin: 0 }}>RM Item Wise Stock Movement</h2>
-          <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>View auto-managed stock movement over a specific date range</p>
         </div>
       </header>
 

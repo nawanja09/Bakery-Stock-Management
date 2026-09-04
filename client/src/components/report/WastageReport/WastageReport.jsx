@@ -181,7 +181,6 @@ const WastageReport = () => {
       {/* Header */}
       <header className="page-header" style={{ display: 'flex', alignItems: 'flex-start', flexDirection: 'column', gap: '4px' }}>
         <h2 style={{ textAlign: 'left', margin: 0 }}>RM Wastage Item Detail</h2>
-        <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>View detailed breakdown of raw material wastage</p>
       </header>
 
       <div className="filters-section">

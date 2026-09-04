@@ -161,9 +161,6 @@ const AddWastage = () => {
 
   return (
     <div className="wastage-container">
-      <button onClick={() => navigate('/wastage/history')} className="btn-secondary">
-        ← Back to History
-      </button>
       <div className="page-header">
         <h1>RM Wastage</h1>
       </div>

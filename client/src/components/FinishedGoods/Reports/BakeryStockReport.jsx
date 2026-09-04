@@ -175,9 +175,6 @@ const BakeryStockReport = () => {
             <FontAwesomeIcon icon={faUtensils} className="header-icon" />
             Bakery Stock Report
           </h2>
-          <p className="report-subtitle">
-            Shows only items issued to Bakery department - Opening balances and issuances from previous day, production requirements from selected date
-          </p>
         </div>
       </div>
 

@@ -187,12 +187,6 @@ const CutleryStockReport = () => {
       <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
         <div>
           <h1>Cutlery Stock Report</h1>
-          <p>As of {new Date(reportDate).toLocaleDateString('en-US', { 
-            weekday: 'long', 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-          })}</p>
           {error && (
             <div className="error-banner">
               <FontAwesomeIcon icon={faExclamationTriangle} />

@@ -170,9 +170,6 @@ const Reimbursement = () => {
             <FontAwesomeIcon icon={faMoneyBillWave} style={{ marginRight: '8px' }} />
             Petty Cash Reimbursement
           </h2>
-          <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-            Record and manage petty cash reimbursements
-          </p>
         </div>
       </header>
 

@@ -139,10 +139,6 @@ const BankTransfer = () => {
           <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '20px' }}>
             <FontAwesomeIcon icon={faMoneyBillTransfer} />
           </div>
-          <div>
-            <h2 style={{ margin: 0 }}>Bank to Bank Transfer</h2>
-            <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>Transfer funds between two company bank accounts</p>
-          </div>
         </div>
       </header>
 

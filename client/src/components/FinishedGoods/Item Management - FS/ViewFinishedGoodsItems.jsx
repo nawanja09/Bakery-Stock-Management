@@ -83,7 +83,6 @@ const ViewFinishedGoodsItems = () => {
       <div className="fg-header">
         <div>
           <h1 className="fg-title">Finished Goods</h1>
-          <p className="fg-subtitle">Minimalist view of your finished products</p>
         </div>
 
         <button onClick={() => navigate('/finished-goods/items/add', { state: { backgroundLocation: location } })} className="fg-btn-primary">

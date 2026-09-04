@@ -348,9 +348,6 @@ const AddFinishedGoodsItem = () => {
         <div className="header-actions">
           <div>
             <h1 className="page-title">Add New Product</h1>
-            <p className="page-subtitle">
-              Create a new finished product with ingredients and cost calculation
-            </p>
           </div>
         </div>
       </div>
