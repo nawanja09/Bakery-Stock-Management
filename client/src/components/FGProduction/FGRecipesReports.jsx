@@ -9,7 +9,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faChartBar, faSearch, faBoxOpen, faFlask } from '@fortawesome/free-solid-svg-icons';
-import Select from 'react-select';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
 import './FGProduction.css';
@@ -21,7 +20,7 @@ const FGRecipesReports = () => {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [departments, setDepartments] = useState([]);
-  const [departmentFilter, setDepartmentFilter] = useState(null);
+  const [selectedDepartment, setSelectedDepartment] = useState('all');
   const [search, setSearch] = useState('');
 
   const fetchReport = useCallback(async (deptId) => {
@@ -40,7 +39,6 @@ const FGRecipesReports = () => {
   }, [showPopup]);
 
   useEffect(() => {
-    fetchReport();
     api.get('/departments')
       .then(res => {
         const uniqueDepartments = Array.from(
@@ -57,10 +55,8 @@ const FGRecipesReports = () => {
   }, [fetchReport]);
 
   useEffect(() => {
-    fetchReport(departmentFilter?.value);
-  }, [departmentFilter, fetchReport]);
-
-  const departmentOptions = departments.map(d => ({ value: d.id, label: d.name }));
+    fetchReport(selectedDepartment === 'all' ? undefined : selectedDepartment);
+  }, [selectedDepartment, fetchReport]);
 
   const filteredRows = rows
     .filter(r => r.fg_item_name.toLowerCase().includes(search.toLowerCase()))
@@ -103,37 +99,46 @@ const FGRecipesReports = () => {
   const totalActiveRmRecipes = filteredRows.reduce((sum, r) => sum + (parseInt(r.rm_recipes_count) || 0), 0);
 
   return (
-    <div className="page-container erp-fg-report-page">
-      <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+    <div className="fg-production-page">
+      <header className="fg-production-header">
         <div>
-          <h2 style={{ margin: 0 }}>
-            <FontAwesomeIcon icon={faChartBar} style={{ marginRight: '8px' }} /> FG Recipes Reports
-          </h2>
+          <div className="fg-production-breadcrumb">Finished Goods Production / Reports</div>
+          <h1><FontAwesomeIcon icon={faChartBar} /> FG Recipes Reports</h1>
+          <p className="fg-production-subtitle">Review recipe counts, production cost, selling price, and margin by item.</p>
         </div>
       </header>
 
-      <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
-        <div className="fgprod-picker-row" style={{ marginBottom: '1.5rem' }}>
-          <div className="fgprod-search-box">
-            <FontAwesomeIcon icon={faSearch} />
+      <div className="fg-production-card fg-production-card-body fg-production-filter">
+        <div className="fg-production-filter-group">
+          <label htmlFor="search-input">Search FG Item:</label>
+          <div className="search-input-wrapper">
             <input
-              placeholder="Search by FG item name..."
+              id="search-input"
+              type="text"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Type to search..."
             />
-          </div>
-          <div className="fgprod-select-wrap" style={{ maxWidth: 280 }}>
-            <Select
-              classNamePrefix="react-select"
-              options={departmentOptions}
-              value={departmentFilter}
-              onChange={setDepartmentFilter}
-              isClearable
-              placeholder="Filter by department..."
-            />
+            <FontAwesomeIcon icon={faSearch} className="search-icon" />
           </div>
         </div>
 
+        <div className="fg-production-filter-group">
+          <label className="report-filter-label">Department</label>
+          <select
+            value={selectedDepartment}
+            onChange={(e) => setSelectedDepartment(e.target.value)}
+            className="report-filter-select"
+          >
+            <option value="all">All Departments</option>
+            {departments.map(dept => (
+              <option key={dept.id} value={dept.id}>{dept.name}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="fg-production-card">
         {loading ? (
           <div className="fgprod-loading">
             <div className="fgprod-spinner"></div>
@@ -176,39 +181,37 @@ const FGRecipesReports = () => {
               <tbody>
                 {filteredRows.map(row => (
                   <tr key={row.id}>
-                    <td className="fgprod-bold" title={row.fg_item_name} style={{ color: 'var(--fgprod-text)' }}>{row.fg_item_name}</td>
+                    <td className="fgprod-bold" title={row.fg_item_name}>{row.fg_item_name}</td>
                     <td>{row.department_name || '-'}</td>
                     <td className="fgprod-report-center">{parseFloat(row.recipe_output_quantity || 0).toFixed(0)}</td>
-                    <td className="fgprod-report-center" style={{ fontWeight: 500 }}>{row.rm_recipes_count}</td>
-                    <td className="fgprod-report-currency fgprod-bold" style={{ color: 'var(--fgprod-primary)' }}>
+                    <td className="fgprod-report-center fgprod-report-count">{row.rm_recipes_count}</td>
+                    <td className="fgprod-report-currency fgprod-bold">
                       Rs. {parseFloat(row.rm_cost).toFixed(2)}
                     </td>
-                    <td className="fgprod-report-currency fgprod-bold" style={{ color: 'var(--fgprod-primary)' }}>
+                    <td className="fgprod-report-currency fgprod-bold">
                       {row.rmCostPerPiece !== null
                         ? `Rs. ${row.rmCostPerPiece.toFixed(2)}`
                         : 'N/A'}
                     </td>
-                    <td className="fgprod-report-currency fgprod-bold" style={{ color: 'var(--fgprod-primary)' }}>
+                    <td className="fgprod-report-currency fgprod-bold">
                       {row.productionCostPerPiece !== null
                         ? `Rs. ${row.productionCostPerPiece.toFixed(2)}`
                         : 'N/A'}
                     </td>
-                    <td className="fgprod-report-currency fgprod-bold" style={{ color: 'var(--fgprod-primary)' }}>
+                    <td className="fgprod-report-currency fgprod-bold">
                       {row.selling_price !== null && row.selling_price !== undefined
                         ? `Rs. ${parseFloat(row.selling_price).toFixed(2)}`
                         : 'N/A'}
                     </td>
                     <td
-                      className="fgprod-report-currency fgprod-bold"
-                      style={{ color: row.grossProfitPerPiece === null ? 'inherit' : (row.grossProfitPerPiece >= 0 ? '#1a9c4b' : '#d32f2f') }}
+                      className={`fgprod-report-currency fgprod-bold ${row.grossProfitPerPiece === null ? '' : row.grossProfitPerPiece >= 0 ? 'fgprod-positive' : 'fgprod-negative'}`}
                     >
                       {row.grossProfitPerPiece !== null
                         ? `Rs. ${row.grossProfitPerPiece.toFixed(2)}`
                         : 'N/A'}
                     </td>
                     <td
-                      className="fgprod-report-center fgprod-bold"
-                      style={{ color: row.grossMarginPct === null ? 'inherit' : (row.grossMarginPct >= 0 ? '#1a9c4b' : '#d32f2f') }}
+                      className={`fgprod-report-center fgprod-bold ${row.grossMarginPct === null ? '' : row.grossMarginPct >= 0 ? 'fgprod-positive' : 'fgprod-negative'}`}
                     >
                       {row.grossMarginPct !== null
                         ? `${row.grossMarginPct.toFixed(1)}%`
