@@ -474,21 +474,21 @@ const Recipes = () => {
   // Render
   // ---------------------------------------------------------------------
   return (
-    <div className="page-container erp-fg-recipes-page">
-      <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+    <div className="fg-production-page">
+      <header className="fg-production-header">
         <div>
-          <h2 style={{ margin: 0 }}>
-            <FontAwesomeIcon icon={faFlask} style={{ marginRight: '8px' }} /> Finished Goods Production — Recipes
-          </h2>
+          <div className="fg-production-breadcrumb">Finished Goods Production / Recipes</div>
+          <h1><FontAwesomeIcon icon={faFlask} /> Finished Goods Production</h1>
+          <p className="fg-production-subtitle">Manage production items, raw material recipes, and recipe costing.</p>
         </div>
-        <button className="btn btn-primary" onClick={openCreateFgForm}>
+        <button className="fgprod-btn-primary" onClick={openCreateFgForm}>
           <FontAwesomeIcon icon={faPlus} /> New FG Production Item
         </button>
       </header>
 
       {/* FG Details / picker */}
-      <div className="card" style={{ padding: 'var(--spacing-lg)', marginBottom: 'var(--spacing-lg)' }}>
-        <h3 style={{ marginTop: 0, marginBottom: 'var(--spacing-md)', fontSize: 'var(--font-size-lg)', borderBottom: '1px solid var(--color-border)', paddingBottom: 'var(--spacing-sm)' }}>FG Production Details</h3>
+      <div className="fg-production-card fg-production-card-body">
+        <h3 className="fg-production-section-title">FG Production Details</h3>
 
         <div className="fgprod-picker-row">
           <div className="fgprod-select-wrap">
@@ -533,7 +533,7 @@ const Recipes = () => {
 
       {/* Recipes table */}
       {selectedFg && (
-        <div className="fgprod-card">
+        <div className="fg-production-card fgprod-card">
           <div className="fgprod-section-header">
             <h3 className="fgprod-card-title">
               Recipe Items for "{selectedFg.fg_item_name}"
@@ -637,7 +637,7 @@ const Recipes = () => {
       {/* FG Create / Edit Modal */}
       {showFgForm && (
         <div className="fgprod-modal-overlay" onClick={closeFgForm} role="presentation">
-          <div className="fgprod-modal-content erp-fg-production-modal" onClick={e => e.stopPropagation()}>
+          <div className="fgprod-modal-content" onClick={e => e.stopPropagation()}>
             <div className="fgprod-modal-header">
               <h3>{fgFormMode === 'create' ? 'New FG Production Item' : 'Edit FG Production Item'}</h3>
               <button className="fgprod-modal-close" onClick={closeFgForm} aria-label="Close form" title="Close form">
