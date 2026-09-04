@@ -94,7 +94,7 @@ const BankLedger = () => {
   };
 
   return (
-    <div className="page-container">
+    <div className="page-container bank-ledger-page">
       <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           <h2 style={{ textAlign: 'left', margin: 0 }}>
@@ -114,26 +114,28 @@ const BankLedger = () => {
         </div>
       </header>
 
-      {bank && (
-        <div className="card" style={{ display: 'flex', alignItems: 'center', padding: 'var(--spacing-lg)', gap: 'var(--spacing-xl)', marginBottom: 'var(--spacing-md)' }}>
-          <div style={{ fontSize: '48px', color: 'var(--color-primary)', opacity: 0.8 }}><FontAwesomeIcon icon={faUniversity} /></div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', fontWeight: 'var(--font-weight-medium)' }}>
-              {bank.bank_name}{bank.account_number ? ` — ${bank.account_number}` : ''} ({bank.company})
+      <div className="bank-ledger-kpi-row">
+        {bank && (
+          <div className="card bank-ledger-balance-card" style={{ display: 'flex', alignItems: 'center', padding: 'var(--spacing-lg)', gap: 'var(--spacing-xl)', marginBottom: 'var(--spacing-md)' }}>
+            <div className="bank-ledger-balance-icon" style={{ fontSize: '48px', color: 'var(--color-primary)', opacity: 0.8 }}><FontAwesomeIcon icon={faUniversity} /></div>
+            <div style={{ flex: 1 }}>
+              <div className="bank-ledger-balance-label" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', fontWeight: 'var(--font-weight-medium)' }}>
+                {bank.bank_name}{bank.account_number ? ` — ${bank.account_number}` : ''} ({bank.company})
+              </div>
+              <div className={`bank-ledger-balance-value${parseFloat(bank.current_balance) < 0 ? ' is-negative' : ''}`} style={{ fontSize: '32px', fontWeight: 'bold', color: 'var(--color-text-primary)', margin: 'var(--spacing-xs) 0' }}>Rs. {fmt(bank.current_balance)}</div>
             </div>
-            <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'var(--color-text-primary)', margin: 'var(--spacing-xs) 0' }}>Rs. {fmt(bank.current_balance)}</div>
           </div>
-        </div>
-      )}
+        )}
 
-      <div style={{ display: 'flex', gap: 'var(--spacing-md)', marginBottom: 'var(--spacing-lg)' }}>
-        <div className="card" style={{ flex: 1, padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)' }}>
-          <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>Total Debit</span>
-          <strong style={{ fontSize: 'var(--font-size-xl)', color: 'var(--color-success)' }}>Rs. {fmt(totals.debit)}</strong>
+        <div className="bank-ledger-summary" style={{ display: 'flex', gap: 'var(--spacing-md)', marginBottom: 'var(--spacing-lg)' }}>
+        <div className="card bank-ledger-total-card bank-ledger-debit-card" style={{ flex: 1, padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)' }}>
+          <span className="bank-ledger-total-label" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>Total Debit</span>
+          <strong className="bank-ledger-total-value" style={{ fontSize: 'var(--font-size-xl)', color: 'var(--color-success)' }}>Rs. {fmt(totals.debit)}</strong>
         </div>
-        <div className="card" style={{ flex: 1, padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)' }}>
-          <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>Total Credit</span>
-          <strong style={{ fontSize: 'var(--font-size-xl)', color: 'var(--color-danger)' }}>Rs. {fmt(totals.credit)}</strong>
+        <div className="card bank-ledger-total-card bank-ledger-credit-card" style={{ flex: 1, padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)' }}>
+          <span className="bank-ledger-total-label" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>Total Credit</span>
+          <strong className="bank-ledger-total-value" style={{ fontSize: 'var(--font-size-xl)', color: 'var(--color-danger)' }}>Rs. {fmt(totals.credit)}</strong>
+        </div>
         </div>
       </div>
 
@@ -153,7 +155,7 @@ const BankLedger = () => {
         </div>
       </div>
 
-      <div className="card" style={{ overflowX: 'auto' }}>
+      <div className="card bank-ledger-table-card">
         {loading ? (
           <div style={{ textAlign: 'center', padding: 'var(--spacing-2xl)', color: 'var(--color-text-secondary)' }}><FontAwesomeIcon icon={faSpinner} spin /> Loading…</div>
         ) : (

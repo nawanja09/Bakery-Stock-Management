@@ -49,25 +49,25 @@ const StatsDashboard = () => {
       label: 'Total Users',
       value: stats?.users || 0,
       icon: faUsers,
-      color: 'blue',
+      color: 'tone-primary',
     },
     {
       label: 'Total Orders',
       value: stats?.orders || 0,
       icon: faReceipt,
-      color: 'green',
+      color: 'tone-success',
     },
     {
       label: 'Revenue',
       value: stats?.revenue || 0,
       icon: faCoins,
-      color: 'cyan',
+      color: 'tone-info',
     },
     {
       label: 'Products',
       value: stats?.products || 0,
       icon: faBoxOpen,
-      color: 'amber',
+      color: 'tone-warning',
     },
   ];
 
