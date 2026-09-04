@@ -527,9 +527,6 @@ const NewExpenses = () => {
             <FontAwesomeIcon icon={faFileInvoiceDollar} style={{ marginRight: '8px' }} />
             New Expenses
           </h2>
-          <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-            Manage expense bills and payments
-          </p>
         </div>
       </header>
 

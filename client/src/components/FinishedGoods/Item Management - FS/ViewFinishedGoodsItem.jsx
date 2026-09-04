@@ -144,9 +144,6 @@ const ViewFinishedGoodsItem = () => {
         <div className="header-actions">
           <div>
             <h1 className="page-title">Product Details</h1>
-            <p className="page-subtitle">
-              View complete information about {item.name}
-            </p>
           </div>
           
           <button 

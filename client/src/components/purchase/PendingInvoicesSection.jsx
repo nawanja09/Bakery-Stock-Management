@@ -394,14 +394,12 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], comp
         <div>
           <span className="pis-eyebrow"><FontAwesomeIcon icon={faReceipt} /> SUPPLIER LEDGER</span>
           <h2>Purchase &amp; Supplier Payments</h2>
-          <p>Manage supplier invoices, payments and credits</p>
         </div>
       </div>
 
       <div className="pis-panel-heading">
         <div>
           <h3>Pending Invoices &amp; Payments</h3>
-          <p>Review and settle outstanding supplier invoices</p>
         </div>
         <div className="pis-header-actions">
           <button

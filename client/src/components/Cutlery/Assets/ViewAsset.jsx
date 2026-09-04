@@ -52,7 +52,6 @@ const ViewAsset = () => {
       <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
         <div>
           <h2 style={{ margin: 0 }}>Asset Details</h2>
-          <p style={{ margin: '4px 0 0', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>View cutlery asset information</p>
         </div>
         <div style={{ display: 'flex', gap: 'var(--spacing-md)' }}>
           <button className="btn btn-secondary" onClick={handleBack}>

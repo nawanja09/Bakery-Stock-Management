@@ -135,7 +135,6 @@ const EditAdjustment = () => {
         <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
           <div>
             <h2 style={{ margin: 0 }}>Edit Adjustment</h2>
-            <p style={{ margin: '4px 0 0', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>Loading adjustment details...</p>
           </div>
         </header>
       </div>
@@ -147,7 +146,6 @@ const EditAdjustment = () => {
       <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
         <div>
           <h2 style={{ margin: 0 }}>RM Adjustment - Edit</h2>
-          <p style={{ margin: '4px 0 0', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>Edit an existing adjustment record</p>
         </div>
         <div>
           <button type="button" className="btn btn-secondary" onClick={() => navigate('/adjustments/stores-adjustments')}>

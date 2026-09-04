@@ -204,7 +204,6 @@ const DepartmentUsageReport = () => {
     <div className="page-container">
       <header className="page-header" style={{ display: 'flex', alignItems: 'flex-start', flexDirection: 'column', gap: '4px' }}>
         <h2 style={{ textAlign: 'left', margin: 0 }}>Department Usage Report</h2>
-        <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>Track item usage across departments with opening and due balances</p>
       </header>
 
       {/* Controls Section */}

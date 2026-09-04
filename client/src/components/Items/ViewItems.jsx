@@ -169,7 +169,6 @@ const ViewItems = () => {
       <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           <h2 style={{ textAlign: 'left', margin: 0 }}>Items Management</h2>
-          <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>Manage all inventory items and materials</p>
         </div>
         <div className="page-actions">
           <button

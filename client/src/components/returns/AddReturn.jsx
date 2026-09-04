@@ -170,9 +170,6 @@ const AddReturn = () => {
     <div className="returns-container">
       <div className="page-header">
         <h1>Department Return</h1>
-        <button onClick={() => navigate('/returns/history')} className="btn-secondary">
-          ← Back to History
-        </button>
       </div>
 
       <form onSubmit={handleSubmit} className="purchase-form">

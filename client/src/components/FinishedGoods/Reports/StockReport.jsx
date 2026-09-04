@@ -115,7 +115,6 @@ const FinishedGoodsStockReport = () => {
       <div className="report-header">
         <div className="header-content">
           <h1 className="report-title">Finished Goods Stock Report</h1>
-          <p className="report-subtitle">Track inventory movements and stock levels</p>
         </div>
       </div>
 

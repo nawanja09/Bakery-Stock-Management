@@ -215,9 +215,7 @@ const Dashboard = () => {
     <div className="dashboard-container page-shell">
       <header className="dashboard-header">
         <div>
-          <p className="dashboard-eyebrow">Bakery operations</p>
           <h1>Dashboard</h1>
-          <p className="page-subtitle">Overview of stock, purchasing, issuance, wastage and production activity.</p>
         </div>
         <div className="dashboard-date">
           <span className="dashboard-date-label">Today</span>

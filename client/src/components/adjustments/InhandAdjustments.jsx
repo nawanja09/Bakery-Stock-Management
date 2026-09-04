@@ -279,7 +279,6 @@ const InhandAdjustments = () => {
           <h2 style={{ margin: 0 }}>
             <FontAwesomeIcon icon={faMoneyBillWave} style={{ marginRight: '8px' }} /> Inhand Adjustments
           </h2>
-          <p style={{ margin: '4px 0 0', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>Manage cash and cheque entries</p>
         </div>
         <button
           className="btn btn-primary"

@@ -113,7 +113,6 @@ const PaymentMethodManagement = () => {
       <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
         <div>
           <h2 style={{ margin: 0 }}>Payment Method Management</h2>
-          <p style={{ margin: '4px 0 0', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>Manage adjustment payment methods</p>
         </div>
       </header>
 

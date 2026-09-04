@@ -92,7 +92,6 @@ const PayeeManagementList = () => {
       <div className="filters-section" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h2 style={{ margin: 0, color: 'var(--color-heading)' }}>{pageTitle}</h2>
-          <p className="text-muted" style={{ marginTop: '4px' }}>Manage the payees used on the New Expenses form</p>
         </div>
         <button className="btn btn-primary" onClick={() => setShowAddForm(true)}>
           <FiPlus size={16} /> Add Payee

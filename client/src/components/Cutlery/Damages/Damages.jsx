@@ -117,7 +117,6 @@ const Damages = () => {
       <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
         <div>
           <h2 style={{ margin: 0 }}>Cutlery Damages</h2>
-          <p style={{ margin: '4px 0 0', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>Track and manage cutlery damage records</p>
         </div>
         <button className="btn btn-primary" onClick={() => setShowAddForm(true)}>+ Add Damage</button>
       </header>

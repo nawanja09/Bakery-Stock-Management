@@ -480,7 +480,6 @@ const Recipes = () => {
           <h2 style={{ margin: 0 }}>
             <FontAwesomeIcon icon={faFlask} style={{ marginRight: '8px' }} /> Finished Goods Production — Recipes
           </h2>
-          <p style={{ margin: '4px 0 0', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>Manage production recipes and costs</p>
         </div>
         <button className="btn btn-primary" onClick={openCreateFgForm}>
           <FontAwesomeIcon icon={faPlus} /> New FG Production Item

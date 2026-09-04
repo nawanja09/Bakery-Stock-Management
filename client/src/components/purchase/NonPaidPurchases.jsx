@@ -163,7 +163,6 @@ const NonPaidPurchases = () => {
             <FontAwesomeIcon icon={faMoneyBillWave} className="header-icon" />
             Outstanding Bills
           </h1>
-          <p className="subtitle">Bills with pending payments (Balance &gt; 0)</p>
         </div>
         <Link to="/purchase/new" state={{ backgroundLocation: location }} className="btn btn-primary">
           <FontAwesomeIcon icon={faFileInvoice} />

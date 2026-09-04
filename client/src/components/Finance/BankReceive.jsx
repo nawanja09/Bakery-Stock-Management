@@ -108,7 +108,6 @@ const BankReceive = () => {
       <header className="page-header">
         <div>
           <h2 style={{ margin: 0 }}><FontAwesomeIcon icon={faLandmark} style={{ marginRight: '8px' }} /> Bank Receive</h2>
-          <p style={{ margin: '4px 0 0', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>Record incoming bank receipts</p>
         </div>
       </header>
 

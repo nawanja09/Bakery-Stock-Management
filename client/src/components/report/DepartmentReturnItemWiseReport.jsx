@@ -230,7 +230,6 @@ const DepartmentReturnItemWiseReport = () => {
       <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           <h2 style={{ textAlign: 'left', margin: 0 }}>Department Return Item Wise Detail</h2>
-          <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>Detailed view of items returned by departments.</p>
         </div>
         {reportData.length > 0 && (
           <button onClick={exportExcel} className="btn btn-success">

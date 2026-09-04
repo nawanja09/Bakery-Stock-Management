@@ -311,9 +311,6 @@ const BankCharges = () => {
             <FontAwesomeIcon icon={faBuildingColumns} style={{ marginRight: '8px' }} />
             Bank Charges Management
           </h2>
-          <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-            Record and manage bank charges
-          </p>
         </div>
       </header>
 

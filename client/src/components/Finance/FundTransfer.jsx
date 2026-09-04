@@ -187,7 +187,6 @@ const FundTransfer = () => {
           </div>
           <div>
             <h2 style={{ margin: 0 }}>Cash / Bank Transfer</h2>
-            <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>Move funds between cash-in-hand and a bank account</p>
           </div>
         </div>
       </header>

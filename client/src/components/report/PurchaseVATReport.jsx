@@ -166,7 +166,6 @@ const PurchaseVATReport = () => {
       <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           <h2 style={{ textAlign: 'left', margin: 0 }}>Purchase Returns VAT Report</h2>
-          <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>Tax Credit Notes from VAT Registered Suppliers</p>
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
           <button onClick={resetFilters} className="btn btn-secondary">

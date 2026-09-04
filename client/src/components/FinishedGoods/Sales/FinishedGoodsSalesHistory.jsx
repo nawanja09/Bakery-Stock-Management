@@ -109,9 +109,6 @@ const FinishedGoodsSalesHistory = () => {
       <div className="header-buttons">
         <div>
           <h1 className="page-title">Sales History</h1>
-          <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
-            View and manage finished goods sales records
-          </p>
         </div>
         <button 
           onClick={() => navigate('/finished-goods/sales/new', { state: { backgroundLocation: location } })}
