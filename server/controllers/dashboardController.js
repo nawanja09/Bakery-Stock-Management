@@ -139,6 +139,190 @@ exports.getGeneralStats = async (req, res) => {
 };
 
 // ==========================
+// Dashboard Overview Endpoint (new, consolidated)
+// Used by the redesigned Dashboard page. Every metric is wrapped in its
+// own try/catch so one failing query never blanks out the whole page.
+// ==========================
+exports.getDashboardOverview = async (req, res) => {
+  try {
+    // ---- Low stock (raw material items at/under their reorder level) ----
+    let lowStockItems = [];
+    try {
+      const [rows] = await pool.query(`
+        SELECT
+          i.id, i.item_code, i.name, i.unit, i.reorder_level,
+          COALESCE(
+            (SELECT COALESCE(SUM(quantity), 0) FROM opening_balances WHERE item_id = i.id) +
+            (SELECT COALESCE(SUM(pi.quantity), 0) FROM purchase_items pi JOIN purchases p ON pi.purchase_id = p.id WHERE pi.item_id = i.id) -
+            (SELECT COALESCE(SUM(ii.quantity), 0) FROM issuance_items ii JOIN issuances iss ON ii.issuance_id = iss.id WHERE ii.item_id = i.id) -
+            (SELECT COALESCE(SUM(wi.quantity), 0) FROM wastage_items wi JOIN wastages w ON wi.wastage_id = w.id WHERE wi.item_id = i.id) +
+            (SELECT COALESCE(SUM(ri.quantity), 0) FROM return_items ri JOIN returns r ON ri.return_id = r.id WHERE ri.item_id = i.id),
+          0) AS current_stock
+        FROM items i
+        WHERE i.deleted = FALSE AND i.is_active = TRUE
+          AND i.reorder_level IS NOT NULL AND i.reorder_level > 0
+        HAVING current_stock <= i.reorder_level
+        ORDER BY (i.reorder_level - current_stock) DESC
+      `);
+      lowStockItems = rows;
+    } catch (e) {
+      console.warn('low-stock query failed, falling back to empty list', e.message);
+    }
+
+    // ---- Purchasing (last 7 days) ----
+    let purchases7d = { count: 0, totalAmount: 0 };
+    try {
+      const [[row]] = await pool.query(`
+        SELECT COUNT(*) AS count, COALESCE(SUM(bill_amount), 0) AS totalAmount
+        FROM purchases
+        WHERE purchase_date BETWEEN CURDATE() - INTERVAL 6 DAY AND CURDATE()
+          AND deleted = FALSE
+      `);
+      purchases7d = { count: row.count, totalAmount: Number(row.totalAmount) || 0 };
+    } catch (e) {
+      console.warn('purchases7d query failed', e.message);
+    }
+
+    // ---- Pending purchase payments (non-paid + partially paid) ----
+    let pendingPayments = { count: 0, totalAmount: 0 };
+    try {
+      const [[row]] = await pool.query(`
+        SELECT COUNT(*) AS count, COALESCE(SUM(balance_amount), 0) AS totalAmount
+        FROM purchases
+        WHERE balance_amount > 0.001 AND payment_status != 'Paid' AND deleted = FALSE
+      `);
+      pendingPayments = { count: row.count, totalAmount: Number(row.totalAmount) || 0 };
+    } catch (e) {
+      console.warn('pendingPayments query failed', e.message);
+    }
+
+    // ---- Issuance to departments (last 7 days) ----
+    let issues7d = 0;
+    try {
+      const [[row]] = await pool.query(`
+        SELECT COUNT(*) AS count FROM issuances
+        WHERE issuance_date BETWEEN CURDATE() - INTERVAL 6 DAY AND CURDATE()
+      `);
+      issues7d = row.count;
+    } catch (e) {
+      console.warn('issues7d query failed', e.message);
+    }
+
+    // ---- Wastage (last 7 days) — raw material + finished goods ----
+    let wastage7d = { rawCount: 0, fgCount: 0 };
+    try {
+      const [[row]] = await pool.query(`
+        SELECT COUNT(*) AS count FROM wastages
+        WHERE date BETWEEN CURDATE() - INTERVAL 6 DAY AND CURDATE()
+      `);
+      wastage7d.rawCount = row.count;
+    } catch (e) {
+      console.warn('raw wastage7d query failed', e.message);
+    }
+    try {
+      const [[row]] = await pool.query(`
+        SELECT COUNT(*) AS count FROM finished_goods_wastages
+        WHERE date BETWEEN CURDATE() - INTERVAL 6 DAY AND CURDATE()
+      `);
+      wastage7d.fgCount = row.count;
+    } catch (e) {
+      console.warn('fg wastage7d query failed', e.message);
+    }
+
+    // ---- Finished goods production (last 7 days) ----
+    let production7d = { count: 0, totalUnits: 0 };
+    try {
+      const [[row]] = await pool.query(`
+        SELECT COUNT(DISTINCT p.id) AS count, COALESCE(SUM(pi.quantity), 0) AS totalUnits
+        FROM finished_goods_productions p
+        JOIN finished_goods_production_items pi ON pi.production_id = p.id
+        WHERE p.production_date BETWEEN CURDATE() - INTERVAL 6 DAY AND CURDATE()
+      `);
+      production7d = { count: row.count, totalUnits: Number(row.totalUnits) || 0 };
+    } catch (e) {
+      console.warn('production7d query failed', e.message);
+    }
+
+    res.json({
+      lowStock: {
+        count: lowStockItems.length,
+        items: lowStockItems.slice(0, 6)
+      },
+      purchases7d,
+      pendingPayments,
+      issues7d,
+      wastage7d,
+      production7d
+    });
+  } catch (error) {
+    console.error('Error in getDashboardOverview:', error);
+    res.status(500).json({ error: 'Server error', details: error.message });
+  }
+};
+
+// ==========================
+// Top Issued / Wasted Items Endpoint
+// ==========================
+exports.getTopItems = async (req, res) => {
+  const type = req.query.type === 'wasted' ? 'wasted' : req.query.type === 'issued' ? 'issued' : null;
+  const { startDate, endDate } = req.query;
+  const limit = Number.parseInt(req.query.limit, 10);
+  const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+  const isValidDate = value => {
+    if (!datePattern.test(value || '')) return false;
+    const parsed = new Date(`${value}T00:00:00Z`);
+    return !Number.isNaN(parsed.getTime()) && parsed.toISOString().startsWith(value);
+  };
+  const validDates = isValidDate(startDate) && isValidDate(endDate);
+
+  if (!type || !validDates || !Number.isInteger(limit) || limit < 5 || limit > 8 || startDate > endDate) {
+    return res.status(400).json({ error: 'type, valid startDate/endDate, and limit between 5 and 8 are required.' });
+  }
+
+  const query = type === 'issued' ? `
+    SELECT ii.item_id AS itemId, i.name AS itemName, i.unit,
+           COALESCE(SUM(ii.quantity), 0) AS quantity
+    FROM issuance_items ii
+    JOIN issuances iss ON iss.id = ii.issuance_id
+    JOIN items i ON i.id = ii.item_id
+    WHERE iss.issuance_date >= ? AND iss.issuance_date < DATE_ADD(?, INTERVAL 1 DAY)
+      AND i.deleted = 0 AND COALESCE(i.status, 1) = 1
+    GROUP BY ii.item_id, i.name, i.unit
+    ORDER BY quantity DESC
+    LIMIT ?
+  ` : `
+    SELECT wi.item_id AS itemId, i.name AS itemName, i.unit,
+           COALESCE(SUM(wi.quantity), 0) AS quantity
+    FROM wastage_items wi
+    JOIN wastages w ON w.id = wi.wastage_id
+    JOIN items i ON i.id = wi.item_id
+    WHERE w.date >= ? AND w.date < DATE_ADD(?, INTERVAL 1 DAY)
+      AND w.deleted = 0 AND i.deleted = 0 AND COALESCE(i.status, 1) = 1
+    GROUP BY wi.item_id, i.name, i.unit
+    ORDER BY quantity DESC
+    LIMIT ?
+  `;
+
+  try {
+    const [rows] = await pool.query(query, [startDate, endDate, limit]);
+    res.json({
+      type,
+      startDate,
+      endDate,
+      items: rows.map(row => ({
+        itemId: row.itemId,
+        itemName: row.itemName,
+        unit: row.unit,
+        quantity: Number(row.quantity) || 0
+      }))
+    });
+  } catch (error) {
+    console.error('Error in getTopItems:', error);
+    res.status(500).json({ error: 'Server error', details: error.message });
+  }
+};
+
+// ==========================
 // Chart Data Endpoint
 // ==========================
 exports.getChartData = async (req, res) => {

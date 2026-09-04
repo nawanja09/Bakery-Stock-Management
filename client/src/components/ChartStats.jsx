@@ -1,153 +1,117 @@
 import React from 'react';
-import { Bar, Line } from 'react-chartjs-2';
+import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
-  BarElement,
   CategoryScale,
   LinearScale,
   PointElement,
   LineElement,
+  Filler,
   Title,
   Tooltip,
   Legend
 } from 'chart.js';
 
 ChartJS.register(
-  BarElement,
   CategoryScale,
   LinearScale,
   PointElement,
   LineElement,
+  Filler,
   Title,
   Tooltip,
   Legend
 );
 
+// Colors are read from the same CSS custom properties the rest of the app
+// uses (index.css) so the chart always matches the current theme instead of
+// carrying its own hardcoded palette.
+const getThemeColor = (varName, fallback) => {
+  if (typeof window === 'undefined') return fallback;
+  const value = getComputedStyle(document.documentElement).getPropertyValue(varName);
+  return value?.trim() || fallback;
+};
+
+/**
+ * Single consolidated trend chart: purchases vs issues vs wastage over the
+ * last N days. Replaces the previous 5-panel layout (which duplicated the
+ * "Purchasing" series as both a line and a bar chart with off-theme colors).
+ */
 const ChartStats = ({ chartData }) => {
-  const {
-    openingBalanceData,
-    purchasingData,
-    issuesVsWastageData
-  } = chartData;
+  const { purchasingData, issuesVsWastageData } = chartData;
 
-  // Get last 7 days - align using common labels
-  const commonLabels = openingBalanceData.labels.slice(-7); 
+  const labels = issuesVsWastageData.labels?.length
+    ? issuesVsWastageData.labels
+    : purchasingData.labels;
 
-  const last7PurchasingData = commonLabels.map(label => {
-    const idx = purchasingData.labels.indexOf(label);
-    return idx !== -1 ? purchasingData.data[idx] : 0;
-  });
+  const primary = getThemeColor('--color-primary', '#2D6CDF');
+  const success = getThemeColor('--color-success', '#059669');
+  const danger = getThemeColor('--color-danger', '#dc2626');
 
-  // Issues vs Wastage
-  const last7IssuesLabels = issuesVsWastageData.labels.slice(-7);
-  const last7IssuesData = issuesVsWastageData.issues.slice(-7);
-  const last7WastageData = issuesVsWastageData.wastage.slice(-7);
+  const alignToLabels = (sourceLabels, sourceData) =>
+    labels.map(label => {
+      const idx = sourceLabels.indexOf(label);
+      return idx !== -1 ? sourceData[idx] : 0;
+    });
 
+  const data = {
+    labels,
+    datasets: [
+      {
+        label: 'Purchases',
+        data: alignToLabels(purchasingData.labels, purchasingData.data),
+        borderColor: primary,
+        backgroundColor: `${primary}1a`,
+        tension: 0.35,
+        pointRadius: 3,
+        pointHoverRadius: 5,
+        fill: true
+      },
+      {
+        label: 'Issues',
+        data: issuesVsWastageData.issues,
+        borderColor: success,
+        backgroundColor: `${success}1a`,
+        tension: 0.35,
+        pointRadius: 3,
+        pointHoverRadius: 5,
+        fill: true
+      },
+      {
+        label: 'Wastage',
+        data: issuesVsWastageData.wastage,
+        borderColor: danger,
+        backgroundColor: `${danger}1a`,
+        tension: 0.35,
+        pointRadius: 3,
+        pointHoverRadius: 5,
+        fill: true
+      }
+    ]
+  };
 
-  const purchasingChart = {
-    labels: purchasingData.labels,
-    datasets: [{
-      label: 'Purchasing',
-      data: purchasingData.data,
-      borderColor: '#1cc88a',
-      backgroundColor: '#1cc88a',
-      tension: 0.4,
-      fill: false,
-    }]
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: {
+        position: 'top',
+        align: 'end',
+        labels: { usePointStyle: true, boxWidth: 8, font: { size: 12 } }
+      },
+      tooltip: { padding: 10, cornerRadius: 8 }
+    },
+    scales: {
+      x: { grid: { display: false } },
+      y: { beginAtZero: true, grid: { color: 'rgba(148, 163, 184, 0.18)' } }
+    }
   };
 
   return (
-    <>
-      {/* First Chart Row */}
-      <div className="chart-stats-row">
-        <div className="chart-box">
-          <h3>Purchasing</h3>
-          <Line data={purchasingChart} />
-        </div>
-        <div className="chart-box">
-          <h3>Issues</h3>
-          <Line data={{
-            labels: last7IssuesLabels,
-            datasets: [{
-              label: 'Issues',
-              data: last7IssuesData,
-              borderColor: '#2D6CDF',
-              backgroundColor: '#2D6CDF',
-              tension: 0.4,
-              fill: false,
-            }]
-          }} />
-        </div>
-        <div className="chart-box">
-          <h3>Wastage</h3>
-          <Line data={{
-            labels: last7IssuesLabels,
-            datasets: [{
-              label: 'Wastage',
-              data: last7WastageData,
-              borderColor: '#ff6384',
-              backgroundColor: '#ff6384',
-              tension: 0.4,
-              fill: false,
-            }]
-          }} />
-        </div>
-      </div>
-
-      {/* Second Chart Row */}
-      <div className="chart-stats-row">
-        <div className="chart-box">
-          <h3>Purchasing</h3>
-          <Bar
-            data={{
-              labels: commonLabels,
-              datasets: [
-                {
-                  label: 'Purchasing',
-                  data: last7PurchasingData,
-                  backgroundColor: '#1cc88a',
-                },
-              ],
-            }}
-            options={{
-              responsive: true,
-              scales: {
-                x: { stacked: true },
-                y: { stacked: true }
-              }
-            }}
-          />
-        </div>
-
-        <div className="chart-box">
-          <h3>Issues vs Wastage</h3>
-          <Bar
-            data={{
-              labels: last7IssuesLabels,
-              datasets: [
-                {
-                  label: 'Issues',
-                  data: last7IssuesData,
-                  backgroundColor: '#2D6CDF',
-                },
-                {
-                  label: 'Wastage',
-                  data: last7WastageData,
-                  backgroundColor: '#ff6384',
-                },
-              ],
-            }}
-            options={{
-              responsive: true,
-              scales: {
-                x: { stacked: true },
-                y: { stacked: true }
-              }
-            }}
-          />
-        </div>
-      </div>
-    </>
+    <div className="trend-chart-box">
+      <Line data={data} options={options} />
+    </div>
   );
 };
 
