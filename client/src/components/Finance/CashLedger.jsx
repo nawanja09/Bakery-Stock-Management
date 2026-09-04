@@ -233,7 +233,7 @@ const CashLedger = () => {
         {loading ? (
           <div style={{ textAlign: 'center', padding: 'var(--spacing-2xl)', color: 'var(--color-text-secondary)' }}><FontAwesomeIcon icon={faSpinner} spin /> Loading…</div>
         ) : (
-          <table className="report-table">
+          <table className="report-table cash-ledger-table">
             <thead>
               <tr>
                 <th>Date</th>

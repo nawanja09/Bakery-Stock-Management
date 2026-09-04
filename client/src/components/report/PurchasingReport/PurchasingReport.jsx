@@ -4,6 +4,8 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import Select from 'react-select';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faBoxOpen } from '@fortawesome/free-solid-svg-icons';
 import './PurchasingReport.css';
 import api from '../../../api';
 import { formatNumber } from '../../../utils/formatters';
@@ -492,20 +494,23 @@ const PurchasingReport = () => {
           </select>
         </div>
 
-        <div className="report-filter-group" style={{ flex: '1 1 200px' }}>
-          <label className="report-filter-label">Search Item</label>
-          <Select
-            options={itemOptions}
-            value={selectedItem}
-            onChange={setSelectedItem}
-            isSearchable
-            isClearable
-            placeholder="Search by item..."
-            className="react-select-container"
-            classNamePrefix="react-select"
-            menuPortalTarget={document.body}
-            menuPosition="fixed"
-          />
+        <div className="report-filter-group">
+          <label className="report-filter-label">
+            <FontAwesomeIcon icon={faBoxOpen} className="filter-icon" /> Item
+          </label>
+                
+          <select
+            value={selectedItem ? selectedItem.value : ''}
+            onChange={(e) => setSelectedItem(itemOptions.find(item => String(item.value) === e.target.value) || null)}
+            className="report-filter-select"
+          >
+          <option value="">All Items</option>
+            {itemOptions.map(item => (
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="report-filter-actions">
