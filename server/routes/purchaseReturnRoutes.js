@@ -2,6 +2,9 @@
 const express = require('express');
 const router = express.Router();
 const purchaseReturnController = require('../controllers/purchaseReturnController');
+const { rawMaterialAccess } = require('../middleware/moduleAccess');
+
+router.use(...rawMaterialAccess);
 
 // =============================================
 // STOCK ROUTES (MUST COME BEFORE PARAMETER ROUTES)

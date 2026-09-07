@@ -2,6 +2,9 @@
 const express = require('express');
 const router = express.Router();
 const supplierCreditController = require('../controllers/supplierCreditController');
+const { rawMaterialAccess } = require('../middleware/moduleAccess');
+
+router.use(...rawMaterialAccess);
 
 // GET credits for a supplier
 router.get('/:id/credits', supplierCreditController.getSupplierCredits);

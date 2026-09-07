@@ -120,6 +120,7 @@ import ReceiveTypeManagement from './components/Finance/ReceiveTypeManagement';
 
 import FGRecipes from './components/FGProduction/Recipes';
 import FGRecipeReport from './components/FGProduction/FGRecipesReports';
+import AnalystPage from './components/Analyst/AnalystPage';
 
 import './App.css';
 import './css/page-design-system.css';
@@ -149,7 +150,8 @@ const ProtectedRoute = ({ children }) => {
 const getStoredUserRole = () => {
   try {
     const storedUser = localStorage.getItem('user');
-    return storedUser ? JSON.parse(storedUser).role : null;
+    const role = storedUser ? JSON.parse(storedUser).role : null;
+    return role === 'QB' ? 'View Only' : role;
   } catch (e) {
     return null;
   }
@@ -162,6 +164,34 @@ const isRestrictedStoreRole = (role) => {
 
 const isViewOnlyRole = (role) => role === 'View Only';
 
+const AnalystRoute = ({ children }) => {
+  const token = localStorage.getItem('token');
+  const location = useLocation();
+  if (!token) return <Navigate to="/login" state={{ from: location }} replace />;
+  if (getStoredUserRole() !== 'Super Admin') return <Navigate to="/dashboard" replace />;
+  return children;
+};
+
+const RawMaterialRoute = ({ children }) => (
+  <RoleRoute roles={['Admin', 'Super Admin', 'Store Keeper', 'Stores', 'View Only']}>
+    {children}
+  </RoleRoute>
+);
+
+const FgProductionRoute = ({ children }) => (
+  <RoleRoute roles={['Admin', 'Super Admin', 'Accountant', 'Store Keeper', 'Stores', 'View Only']}>
+    {children}
+  </RoleRoute>
+);
+
+const RoleRoute = ({ children, roles }) => {
+  const token = localStorage.getItem('token');
+  const location = useLocation();
+  if (!token) return <Navigate to="/login" state={{ from: location }} replace />;
+  if (!roles.includes(getStoredUserRole())) return <Navigate to="/dashboard" replace />;
+  return children;
+};
+
 // Blocks direct URL navigation into the Adjustments module for restricted users
 // accounts (the API itself also rejects these requests server-side).
 const AdjustmentsRoute = ({ children }) => {
@@ -169,7 +199,7 @@ const AdjustmentsRoute = ({ children }) => {
   const location = useLocation();
   if (!token) return <Navigate to="/login" state={{ from: location }} replace />;
   const role = getStoredUserRole();
-  if (isRestrictedStoreRole(role) || isViewOnlyRole(role)) return <Navigate to="/dashboard" replace />;
+  if (role !== 'Admin' && role !== 'Super Admin') return <Navigate to="/dashboard" replace />;
   return children;
 };
 
@@ -179,7 +209,7 @@ const FinanceRoute = ({ children }) => {
   const location = useLocation();
   if (!token) return <Navigate to="/login" state={{ from: location }} replace />;
   const role = getStoredUserRole();
-  if (role !== 'Admin' && role !== 'Accountant' && !isViewOnlyRole(role)) return <Navigate to="/dashboard" replace />;
+  if (!['Admin', 'Super Admin', 'Accountant', 'View Only'].includes(role)) return <Navigate to="/dashboard" replace />;
   return children;
 };
 
@@ -236,32 +266,32 @@ function App() {
           >
             
             <Route path="dashboard" element={<Dashboard />} />
-            <Route path="purchase/new" element={<ModalRoute title="Add New Purchase"><AddPurchase /></ModalRoute>} />
-            <Route path="purchase/edit/:id" element={<ModalRoute title="Edit Purchase"><EditPurchase /></ModalRoute>} />
-            <Route path="purchase/history" element={<PurchaseHistory />} />
-            <Route path="purchase/orders" element={<OrdersPage />} />
-            <Route path="purchase/advance-payment" element={<AdvancePaymentPage />} />
-            <Route path="purchase/record-payment" element={<RecordPaymentPage />} />
-            <Route path="purchase/:id" element={<ModalRoute title="Purchase Details"><PurchaseDetails /></ModalRoute>} />
-            <Route path="suppliers" element={<Suppliers />} />
-            <Route path="items/add" element={<ModalRoute title="Add New Item" size="medium"><AddItem /></ModalRoute>} />
-            <Route path="items" element={<ViewItems />} />
-            <Route path="items/edit/:id" element={<ModalRoute title="Edit Item" size="medium"><EditItem /></ModalRoute>} />
-            <Route path="item-types" element={<ItemTypes />} />
-            <Route path="departments" element={<Departments />} />
-            <Route path="companies" element={<Companies />} />
+            <Route path="purchase/new" element={<RoleRoute roles={['Admin', 'Super Admin', 'Store Keeper']}><ModalRoute title="Add New Purchase"><AddPurchase /></ModalRoute></RoleRoute>} />
+            <Route path="purchase/edit/:id" element={<RawMaterialRoute><ModalRoute title="Edit Purchase"><EditPurchase /></ModalRoute></RawMaterialRoute>} />
+            <Route path="purchase/history" element={<RawMaterialRoute><PurchaseHistory /></RawMaterialRoute>} />
+            <Route path="purchase/orders" element={<RawMaterialRoute><OrdersPage /></RawMaterialRoute>} />
+            <Route path="purchase/advance-payment" element={<RawMaterialRoute><AdvancePaymentPage /></RawMaterialRoute>} />
+            <Route path="purchase/record-payment" element={<RawMaterialRoute><RecordPaymentPage /></RawMaterialRoute>} />
+            <Route path="purchase/:id" element={<RawMaterialRoute><ModalRoute title="Purchase Details"><PurchaseDetails /></ModalRoute></RawMaterialRoute>} />
+            <Route path="suppliers" element={<RawMaterialRoute><Suppliers /></RawMaterialRoute>} />
+            <Route path="items/add" element={<RawMaterialRoute><ModalRoute title="Add New Item" size="medium"><AddItem /></ModalRoute></RawMaterialRoute>} />
+            <Route path="items" element={<RoleRoute roles={['Admin', 'Super Admin', 'Store Keeper', 'View Only']}><ViewItems /></RoleRoute>} />
+            <Route path="items/edit/:id" element={<RawMaterialRoute><ModalRoute title="Edit Item" size="medium"><EditItem /></ModalRoute></RawMaterialRoute>} />
+            <Route path="item-types" element={<RawMaterialRoute><ItemTypes /></RawMaterialRoute>} />
+            <Route path="departments" element={<RawMaterialRoute><Departments /></RawMaterialRoute>} />
+            <Route path="companies" element={<RawMaterialRoute><Companies /></RawMaterialRoute>} />
             <Route path="expense-types-management" element={<ExpenseTypeManagement />} />
             <Route path="expense-payees-management" element={<ExpensePayeeManagement />} />
             <Route path="bank-charges-type-management" element={<BankChargesTypeManagement />} />
             <Route path="admin/password" element={<ChangePassword />} />
-            <Route path="opening/add" element={<ModalRoute title="Add Opening Balance" size="medium"><AddOpeningBalance /></ModalRoute>} />
-            <Route path="opening/history" element={<OpeningBalanceHistory />} />
-            <Route path="issuance/issue" element={<ModalRoute title="Add New Issuance"><IssueToDepartment /></ModalRoute>} />
-            <Route path="issuance/edit/:id" element={<ModalRoute title="Edit Issuance"><EditIssuance /></ModalRoute>} />
-            <Route path="issuance/history" element={<IssuanceHistory />} />
-            <Route path="wastage/add" element={<ModalRoute title="Add New Wastage"><AddWastage /></ModalRoute>} />
-            <Route path="wastage/history" element={<WastageHistory />} />
-            <Route path="reports/stock" element={<StockReport />} />
+            <Route path="opening/add" element={<RawMaterialRoute><ModalRoute title="Add Opening Balance" size="medium"><AddOpeningBalance /></ModalRoute></RawMaterialRoute>} />
+            <Route path="opening/history" element={<RawMaterialRoute><OpeningBalanceHistory /></RawMaterialRoute>} />
+            <Route path="issuance/issue" element={<RawMaterialRoute><ModalRoute title="Add New Issuance"><IssueToDepartment /></ModalRoute></RawMaterialRoute>} />
+            <Route path="issuance/edit/:id" element={<RawMaterialRoute><ModalRoute title="Edit Issuance"><EditIssuance /></ModalRoute></RawMaterialRoute>} />
+            <Route path="issuance/history" element={<RawMaterialRoute><IssuanceHistory /></RawMaterialRoute>} />
+            <Route path="wastage/add" element={<RawMaterialRoute><ModalRoute title="Add New Wastage"><AddWastage /></ModalRoute></RawMaterialRoute>} />
+            <Route path="wastage/history" element={<RawMaterialRoute><WastageHistory /></RawMaterialRoute>} />
+            <Route path="reports/stock" element={<RawMaterialRoute><StockReport /></RawMaterialRoute>} />
             <Route path="reports/department" element={<DepartmentIssuesReport />} />
             <Route path="reports/purchasing" element={<PurchasingReport />} />
             <Route path="reports/purchase-report" element={<PurchaseReport />} />
@@ -275,7 +305,7 @@ function App() {
             <Route path="finished-goods/items/view/:id" element={<ModalRoute title="Finished Goods Details" size="medium"><ViewFinishedGoodsItem /></ModalRoute>} />
             <Route path="finished-goods/opening/add" element={<ModalRoute title="Add Finished Goods Opening Balance" size="medium"><AddFinishedGoodsOpeningBalance /></ModalRoute>} />
             <Route path="finished-goods/opening/history" element={<FinishedGoodsOpeningBalanceHistory />} />
-            <Route path="finished-goods/production" element={<ProductionManagement />} />
+            <Route path="finished-goods/production" element={<FgProductionRoute><ProductionManagement /></FgProductionRoute>} />
             <Route path="finished-goods/production/view/:id" element={<ModalRoute title="Production Details" size="medium"><ViewProduction /></ModalRoute>} />
             <Route path="finished-goods/production/edit/:id" element={<ModalRoute title="Edit Production"><EditProduction /></ModalRoute>} />
             <Route path="finished-goods/transfer" element={<TransfersManagement />} />
@@ -298,8 +328,8 @@ function App() {
             <Route path="finished-goods/sales/history" element={<FinishedGoodsSalesHistory />} />
 
             <Route path="finished-goods/reports/stock/summary" element={<StockSummary />} />
-            <Route path="returns/add" element={<ModalRoute title="Add New Return"><AddReturn /></ModalRoute>} />
-            <Route path="returns/history" element={<ReturnsHistory />} />
+            <Route path="returns/add" element={<RawMaterialRoute><ModalRoute title="Add New Return"><AddReturn /></ModalRoute></RawMaterialRoute>} />
+            <Route path="returns/history" element={<RawMaterialRoute><ReturnsHistory /></RawMaterialRoute>} />
             <Route path="finished-goods/reports/bakery-stock" element={<BakeryStockReport />} />
 
             <Route path="cutlery/locations" element={<Locations />} />
@@ -314,8 +344,8 @@ function App() {
             <Route path="cutlery/reports/stock" element={<CutleryStockReport />} />
 
             <Route path="reports/vat" element={<VATReport />} />
-            <Route path="purchase-returns/add" element={<ModalRoute title="Add New Purchase Return"><AddPurchaseReturn /></ModalRoute>} />
-            <Route path="purchase-returns/history" element={<PurchaseReturnHistory />} />
+            <Route path="purchase-returns/add" element={<RawMaterialRoute><ModalRoute title="Add New Purchase Return"><AddPurchaseReturn /></ModalRoute></RawMaterialRoute>} />
+            <Route path="purchase-returns/history" element={<RawMaterialRoute><PurchaseReturnHistory /></RawMaterialRoute>} />
             <Route path="reports/purchase-vat" element={<PurchaseVATReport />} />
 
             <Route path="purchase/non-paid" element={<NonPaidPurchases />} />
@@ -344,8 +374,12 @@ function App() {
             <Route path="/finance/bank-transfer" element={<FinanceRoute><BankTransfer /></FinanceRoute>} />
             <Route path="/finance/receive-types" element={<FinanceRoute><ReceiveTypeManagement /></FinanceRoute>} />
 
-            <Route path="/fg-production/recipes" element={<FGRecipes />} />
-            <Route path="/fg-production/reports" element={<FGRecipeReport />} />
+            <Route path="analyst/incomes" element={<AnalystRoute><AnalystPage /></AnalystRoute>} />
+            <Route path="analyst/expenses" element={<AnalystRoute><AnalystPage /></AnalystRoute>} />
+            <Route path="analyst/balance-sheet" element={<AnalystRoute><AnalystPage /></AnalystRoute>} />
+
+            <Route path="/fg-production/recipes" element={<FgProductionRoute><FGRecipes /></FgProductionRoute>} />
+            <Route path="/fg-production/reports" element={<FgProductionRoute><FGRecipeReport /></FgProductionRoute>} />
 
           </Route>
 

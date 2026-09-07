@@ -1,6 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const issuanceController = require('../controllers/issuanceController');
+const { rawMaterialAccess } = require('../middleware/moduleAccess');
+
+router.use(...rawMaterialAccess);
 
 router.post('/', issuanceController.createIssuance);
 router.get('/', issuanceController.getAllIssuances);

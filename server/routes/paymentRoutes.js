@@ -3,6 +3,9 @@ const express = require('express');
 const router = express.Router();
 const purchaseController = require('../controllers/purchaseController');
 const paymentHistoryController = require('../controllers/paymentHistoryController');
+const { rawMaterialAccess } = require('../middleware/moduleAccess');
+
+router.use(...rawMaterialAccess);
 
 // Get all non-paid purchases
 router.get('/non-paid', purchaseController.getNonPaidPurchases);

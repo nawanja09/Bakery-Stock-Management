@@ -13,7 +13,11 @@
 // Usage:
 //   router.use(authenticate, requireRoles('Admin', 'Accountant'));
 
-const normalizeRole = (role) => role === 'Stores' ? 'Store Keeper' : role;
+const normalizeRole = (role) => {
+  if (role === 'Stores') return 'Store Keeper';
+  if (role === 'QB') return 'View Only';
+  return role;
+};
 
 const requireRoles = (...allowedRoles) => (req, res, next) => {
   const normalizedAllowedRoles = allowedRoles.map(normalizeRole);

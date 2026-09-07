@@ -182,7 +182,7 @@ const ensureUsernameAuthSchema = async () => {
     // 4. Extend role enum (existing values/order preserved, only appending).
     await pool.query(`
       ALTER TABLE users MODIFY COLUMN role
-      ENUM('Admin','Staff','Manager','User','Store Keeper','Accountant','View Only')
+      ENUM('Admin','Staff','Manager','User','Store Keeper','Accountant','View Only','Super Admin')
       NOT NULL DEFAULT 'Staff'
     `);
 
@@ -194,7 +194,8 @@ const ensureUsernameAuthSchema = async () => {
       { name: 'Admin', username: 'admin', password: 'Admin123', role: 'Admin' },
       { name: 'Store Keeper', username: 'stores', password: 'password', role: 'Store Keeper' },
       { name: 'Accountant', username: 'accountant', password: 'password', role: 'Accountant' },
-      { name: 'QB', username: 'QB', password: 'password', role: 'View Only' }
+      { name: 'QB', username: 'QB', password: 'password', role: 'View Only' },
+      { name: 'Super Admin', username: 'superadmin', password: 'SuperAdmin123', role: 'Super Admin' }
     ];
 
     for (const seed of seedUsers) {
