@@ -101,8 +101,10 @@
   color: var(--color-warning-dark, #b45309);
 }
 
-.orders-actions {
+.orders-page .orders-actions {
   display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   gap: 12px;
   white-space: nowrap;
 }
