@@ -314,6 +314,13 @@ const NavigationBar = () => {
       </li>
 
       <li>
+        <NavLink to="/purchase/orders" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          <span className="icon-container"><FontAwesomeIcon icon={faClipboardList} /></span>
+          <span>Orders</span>
+        </NavLink>
+      </li>
+
+      <li>
         <NavLink to="/issuance/issue" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
           <span className="icon-container"><FontAwesomeIcon icon={faTruckLoading} /></span>
           <span>RM Issue</span>
