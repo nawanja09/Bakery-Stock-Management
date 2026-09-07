@@ -322,6 +322,34 @@ const ensureFinanceSchema = async () => {
       WHERE NOT EXISTS (SELECT 1 FROM cash_accounts ca WHERE ca.company_id = c.id)
     `);
 
+    // Older bank records may have a balance in bank_details but no matching
+    // finance_transactions row, which makes the Bank Ledger appear empty.
+    // Backfill those legacy balances once; accounts with ledger history are
+    // left untouched.
+    await pool.query(`
+      INSERT INTO finance_transactions
+        (account_type, company_id, bank_id, transaction_date, transaction_type,
+         transaction_direction, remark, debit, credit, balance_after,
+         reference_type)
+      SELECT
+        'BANK', c.id, bd.id, COALESCE(DATE(bd.created_at), CURDATE()),
+        'Opening Balance', 'IN', 'Opening Balance',
+        COALESCE(NULLIF(bd.current_balance, 0), bd.opening_balance), 0,
+        COALESCE(NULLIF(bd.current_balance, 0), bd.opening_balance),
+        'OPENING_BALANCE'
+      FROM bank_details bd
+      INNER JOIN company c ON LOWER(TRIM(c.name)) = LOWER(TRIM(bd.company))
+      WHERE bd.status = 'Active'
+        AND COALESCE(bd.record_status, 1) = 1
+        AND COALESCE(NULLIF(bd.current_balance, 0), bd.opening_balance) <> 0
+        AND NOT EXISTS (
+          SELECT 1 FROM finance_transactions ft
+          WHERE ft.account_type = 'BANK'
+            AND ft.bank_id = bd.id
+            AND ft.status = 1
+        )
+    `);
+
     console.log('Finance (Cash & Bank ledger) schema ready');
   } catch (error) {
     console.warn('Finance schema check skipped:', error.message);
@@ -332,6 +360,7 @@ ensureFinanceSchema();
 
 const ensureAutoIncrementPrimaryKeys = async () => {
   const repairTables = [
+    'bank_details',
     'purchases',
     'purchase_items',
     'payment_history',
