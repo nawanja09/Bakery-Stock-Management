@@ -7,6 +7,9 @@
 const express = require('express');
 const router = express.Router();
 const fgProductionController = require('../controllers/fgProductionController');
+const { fgProductionAccess } = require('../middleware/moduleAccess');
+
+router.use(...fgProductionAccess);
 
 // IMPORTANT: literal routes must be declared before the ':id' param routes
 // so they aren't accidentally captured by the wildcard.

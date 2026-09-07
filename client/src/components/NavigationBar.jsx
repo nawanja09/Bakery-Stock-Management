@@ -66,7 +66,8 @@ const NavigationBar = () => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       try {
-        return JSON.parse(storedUser).role;
+        const role = JSON.parse(storedUser).role;
+        return role === 'QB' ? 'View Only' : role;
       } catch (e) { return null; }
     }
     return null;
@@ -74,7 +75,10 @@ const NavigationBar = () => {
   const userRole = getUserRole();
   const isStoreKeeper = userRole === 'Store Keeper' || userRole === 'Stores';
   const isViewOnly = userRole === 'View Only';
-  const canAccessFinance = userRole === 'Admin' || userRole === 'Accountant';
+  const canAccessFinance = userRole === 'Admin' || userRole === 'Super Admin' || userRole === 'Accountant' || isViewOnly;
+  const canAccessAnalyst = userRole === 'Super Admin';
+  const canAccessRawMaterial = ['Admin', 'Super Admin', 'Store Keeper', 'Stores', 'View Only'].includes(userRole);
+  const canAccessFgProduction = ['Admin', 'Super Admin', 'Accountant', 'Store Keeper', 'Stores', 'View Only'].includes(userRole);
 
   // Determine active module based on current path
   useEffect(() => {
@@ -112,6 +116,8 @@ const NavigationBar = () => {
       setActiveModule('cutlery');
     } else if (path.startsWith('/fg-production')) {
       setActiveModule('fg-production');
+    } else if (path.startsWith('/analyst')) {
+      setActiveModule('analyst');
     }
   }, [location.pathname]);
 
@@ -154,6 +160,9 @@ const NavigationBar = () => {
         break;
       case 'adjustments':
         navigate('/adjustments/stores-balance');
+        break;
+      case 'analyst':
+        navigate('/analyst/incomes');
         break;
       case 'vat':
         navigate('/reports/vat');
@@ -213,6 +222,8 @@ const NavigationBar = () => {
         return renderAdjustmentsContent();
       case 'vat':
         return renderVATContent();
+      case 'analyst':
+        return renderAnalystContent();
       default:
         return null;
     }
@@ -680,6 +691,14 @@ const NavigationBar = () => {
     </>
   );
 
+  const renderAnalystContent = () => (
+    <>
+      <li><NavLink to="/analyst/incomes" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faChartBar} /></span><span>Incomes</span></NavLink></li>
+      <li><NavLink to="/analyst/expenses" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faDollarSign} /></span><span>Expenses</span></NavLink></li>
+      <li><NavLink to="/analyst/balance-sheet" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faBalanceScale} /></span><span>Balance Sheet</span></NavLink></li>
+    </>
+  );
+
   return (
     <div className={`sidebar ${isCollapsed ? 'collapsed' : ''} ${isMobileOpen ? 'mobile-open' : ''}`} ref={sidebarRef}>
       <button className="toggle-button" onClick={toggleSidebar} aria-label="Toggle navigation">
@@ -705,7 +724,7 @@ const NavigationBar = () => {
           <div className="section-separator"></div>
 
           {/* Management Module */}
-          <li>
+          {canAccessRawMaterial && <li>
             <div 
               className={`nav-link module-item ${activeModule === 'management' ? 'active-module' : ''}`}
               onClick={() => handleModuleClick('management')}
@@ -714,16 +733,16 @@ const NavigationBar = () => {
               <span>Management</span>
               {!isCollapsed && <FontAwesomeIcon icon={faChevronDown} className={`chevron ${activeModule === 'management' ? 'rotated' : ''}`} />}
             </div>
-          </li>
+          </li>}
 
-          {!isCollapsed && activeModule === 'management' && (
+          {canAccessRawMaterial && !isCollapsed && activeModule === 'management' && (
             <div className="module-content">
               {renderManagementContent()}
             </div>
           )}
 
           {/* Raw Material Module */}
-          <li>
+          {canAccessRawMaterial && <li>
             <div
               className={`nav-link module-item ${activeModule === 'raw' ? 'active-module' : ''}`}
               onClick={() => handleModuleClick('raw')}
@@ -732,10 +751,10 @@ const NavigationBar = () => {
               <span>Raw Material</span>
               {!isCollapsed && <FontAwesomeIcon icon={faChevronDown} className={`chevron ${activeModule === 'raw' ? 'rotated' : ''}`} />}
             </div>
-          </li>
+          </li>}
 
           {/* Module content - shown only when module is active */}
-          {!isCollapsed && activeModule === 'raw' && (
+          {canAccessRawMaterial && !isCollapsed && activeModule === 'raw' && (
             <div className="module-content">
               {renderRawMaterialContent()}
             </div>
@@ -822,7 +841,7 @@ const NavigationBar = () => {
           )}
 
           {/*FG Production Module */}
-          <li>
+          {canAccessFgProduction && <li>
             <div 
               className={`nav-link module-item ${activeModule === 'fg-production' ? 'active-module' : ''}`}
               onClick={() => handleModuleClick('fg-production')}
@@ -831,16 +850,16 @@ const NavigationBar = () => {
               <span>FG Production</span>
               {!isCollapsed && <FontAwesomeIcon icon={faChevronDown} className={`chevron ${activeModule === 'fg-production' ? 'rotated' : ''}`} />}
             </div>
-          </li>
+          </li>}
 
-          {!isCollapsed && activeModule === 'fg-production' && (
+          {canAccessFgProduction && !isCollapsed && activeModule === 'fg-production' && (
             <div className="module-content">
               {renderFGProductionContent()}
             </div>
           )}
 
           {/* Adjustments Module */}
-          {!isStoreKeeper && !isViewOnly && (
+          {(userRole === 'Admin' || userRole === 'Super Admin') && (
             <>
               <li>
                 <div 
@@ -877,6 +896,20 @@ const NavigationBar = () => {
             <div className="module-content">
               {renderVATContent()}
             </div>
+          )}
+
+          {/* Analyst Module */}
+          {canAccessAnalyst && (
+            <>
+              <li>
+                <div className={`nav-link module-item ${activeModule === 'analyst' ? 'active-module' : ''}`} onClick={() => handleModuleClick('analyst')}>
+                  <span className="icon-container"><FontAwesomeIcon icon={faMagnifyingGlassChart} /></span>
+                  <span>Analyst</span>
+                  {!isCollapsed && <FontAwesomeIcon icon={faChevronDown} className={`chevron ${activeModule === 'analyst' ? 'rotated' : ''}`} />}
+                </div>
+              </li>
+              {!isCollapsed && activeModule === 'analyst' && <div className="module-content">{renderAnalystContent()}</div>}
+            </>
           )}
           
 

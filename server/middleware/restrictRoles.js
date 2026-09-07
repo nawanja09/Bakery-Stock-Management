@@ -10,7 +10,11 @@
 // Usage:
 //   router.use(authenticate, restrictRoles('Store Keeper'));
 
-const normalizeRole = (role) => role === 'Stores' ? 'Store Keeper' : role;
+const normalizeRole = (role) => {
+  if (role === 'Stores') return 'Store Keeper';
+  if (role === 'QB') return 'View Only';
+  return role;
+};
 
 const restrictRoles = (...blockedRoles) => (req, res, next) => {
   const normalizedBlockedRoles = blockedRoles.map(normalizeRole);

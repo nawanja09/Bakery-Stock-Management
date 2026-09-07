@@ -4,11 +4,11 @@ const express       = require('express');
 const router        = express.Router();
 const ctrl          = require('../controllers/inhandController');
 const authenticate  = require('../middleware/authenticate');
-const restrictRoles = require('../middleware/restrictRoles');
+const { adjustmentsAccess } = require('../middleware/moduleAccess');
 
 // All Inhand routes require authentication and block Store Keepers
 // (same access rule as the existing Adjustments module).
-router.use(authenticate, restrictRoles('Store Keeper', 'Stores'));
+router.use(...adjustmentsAccess);
 
 // ── CRUD ────────────────────────────────────────────────────────────────────
 router.get  ('/',     ctrl.getInhandList);   // paginated list + filters

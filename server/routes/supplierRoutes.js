@@ -1,6 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
+const { rawMaterialAccess } = require('../middleware/moduleAccess');
+
+router.use(...rawMaterialAccess);
 
 // Helper function to validate VAT number
 const validateVATNumber = (vatNumber, isVatRegistered) => {

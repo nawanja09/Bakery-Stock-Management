@@ -4,6 +4,9 @@ const router = express.Router();
 const purchaseController = require('../controllers/purchaseController');
 const paymentHistoryController = require('../controllers/paymentHistoryController');
 const pool = require('../config/db');
+const { rawMaterialAccess } = require('../middleware/moduleAccess');
+
+router.use(...rawMaterialAccess);
 
 // Existing routes
 router.post('/', purchaseController.createPurchase);

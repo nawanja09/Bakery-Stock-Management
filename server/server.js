@@ -57,6 +57,7 @@ const financeRoutes = require('./routes/financeRoutes');
 const inhandRoutes  = require('./routes/inhandRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const receiveTypeRoutes = require('./routes/receiveTypeRoutes');
+const analystRoutes = require('./routes/analystRoutes');
 const readOnly = require('./middleware/readOnly');
 
 // NEW, independent module - FG (Finished Goods) Production.
@@ -155,6 +156,7 @@ app.use('/api/payment-methods', PaymentMethodManagement);
 app.use('/api/finance', financeRoutes);
 app.use('/api/inhand', inhandRoutes);
 app.use('/api/receive-types', receiveTypeRoutes);
+app.use('/api/analyst', analystRoutes);
 
 // Error handling middleware for file uploads
 app.use((err, req, res, next) => {
