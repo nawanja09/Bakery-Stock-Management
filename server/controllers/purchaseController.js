@@ -139,7 +139,8 @@ const createPurchase = async (req, res) => {
     check_number,
     remarks, 
     prepared_by,
-    company_id
+    company_id,
+    order_id
   } = req.body;
 
   const connection = await pool.getConnection();
@@ -149,6 +150,31 @@ const createPurchase = async (req, res) => {
 
     // Check duplicate invoice across all transactions
     await checkDuplicateReference(connection, invoice_no);
+
+    // If this invoice is being created from an RM Order (spec: "Order Complete"
+    // / "Go to Invoice" flow), validate the order and guard against creating a
+    // second invoice for the same order (order_id stays NULL for every normal
+    // invoice created without an Order - that flow is completely unaffected).
+    let linkedOrder = null;
+    if (order_id) {
+      const [orderRows] = await connection.query(
+        'SELECT * FROM orders WHERE id = ? FOR UPDATE', [order_id]
+      );
+      if (orderRows.length === 0) {
+        await connection.rollback();
+        return res.status(404).json({ error: 'Referenced order was not found.' });
+      }
+      linkedOrder = orderRows[0];
+
+      if (linkedOrder.status === 'CANCELLED') {
+        await connection.rollback();
+        return res.status(400).json({ error: 'This order has been cancelled and cannot be invoiced.' });
+      }
+      if (linkedOrder.status === 'COMPLETED' || linkedOrder.invoice_id) {
+        await connection.rollback();
+        return res.status(409).json({ error: 'This order has already been processed into a Purchase Invoice.' });
+      }
+    }
 
     const effectiveInvoiceTotal = parseFloat(total_with_vat) || (parseFloat(subtotal || 0) + parseFloat(vat_amount || 0));
     // The amount entered by the user can exceed this invoice's total (an overpayment).
@@ -174,11 +200,11 @@ const createPurchase = async (req, res) => {
       `INSERT INTO purchases 
       (invoice_no, purchase_date, supplier_id, bill_amount, subtotal, vat_amount, 
        total_with_vat, vat_rate, paid_amount, balance_amount, balance_status, 
-       payment_method, check_number, remarks, prepared_by, company_id, payment_status) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       payment_method, check_number, remarks, prepared_by, company_id, order_id, payment_status) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [invoice_no, purchase_date, supplier_id, total_with_vat, subtotal, vat_amount, 
        total_with_vat, vat_rate, normalizedPaidAmount, normalizedBalanceAmount, normalizedBalanceStatus, 
-       payment_method, check_number, remarks, resolvedPreparedBy, company_id, normalizedPaymentStatus]
+       payment_method, check_number, remarks, resolvedPreparedBy, company_id, order_id || null, normalizedPaymentStatus]
     );
     
     const purchaseId = purchaseResult.insertId;
@@ -215,6 +241,19 @@ const createPurchase = async (req, res) => {
       );
     }
 
+    // Only now that the invoice + its items are actually saved does the
+    // originating Order become COMPLETED (spec section 28/54) - within the
+    // same transaction, so a failure anywhere above leaves the Order exactly
+    // as it was (PENDING), never partially completed.
+    if (linkedOrder) {
+      await connection.query(
+        `UPDATE orders
+         SET status = 'COMPLETED', completed_date = NOW(), completed_by = ?, invoice_id = ?
+         WHERE id = ?`,
+        [resolvedPreparedBy, purchaseId, linkedOrder.id]
+      );
+    }
+
     await connection.commit();
     
     res.status(201).json({ 
@@ -223,7 +262,8 @@ const createPurchase = async (req, res) => {
       purchase_id: purchaseId,
       payment_status: normalizedPaymentStatus,
       paid_amount: normalizedPaidAmount,
-      balance_amount: normalizedBalanceAmount
+      balance_amount: normalizedBalanceAmount,
+      order_id: linkedOrder ? linkedOrder.id : null
     });
     
   } catch (error) {
@@ -232,7 +272,7 @@ const createPurchase = async (req, res) => {
     
     if (error.code === 'ER_DUP_ENTRY' || error.name === 'DuplicateReferenceError') {
       return res.status(400).json({ 
-        error: error.name === 'DuplicateReferenceError' ? error.message : 'Invoice number already exists. Please use a unique invoice number.' 
+        error: 'Invoice number already exists. Please use a unique invoice number.'
       });
     }
     

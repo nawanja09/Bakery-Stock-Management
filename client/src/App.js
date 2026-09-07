@@ -6,6 +6,7 @@ import AddPurchase from './components/purchase/NewPurchase';
 import EditPurchase from './components/purchase/EditPurchase';
 import PurchaseHistory from './components/purchase/PurchaseHistory';
 import PurchaseDetails from './components/purchase/PurchaseDetails';
+import OrdersPage from './components/purchase/Orders/OrdersPage';
 import Suppliers from './components/Suppliers/Suppliers';
 import AddItem from './components/Items/AddNewItems';
 import ViewItems from './components/Items/ViewItems';
@@ -238,6 +239,7 @@ function App() {
             <Route path="purchase/new" element={<ModalRoute title="Add New Purchase"><AddPurchase /></ModalRoute>} />
             <Route path="purchase/edit/:id" element={<ModalRoute title="Edit Purchase"><EditPurchase /></ModalRoute>} />
             <Route path="purchase/history" element={<PurchaseHistory />} />
+            <Route path="purchase/orders" element={<OrdersPage />} />
             <Route path="purchase/advance-payment" element={<AdvancePaymentPage />} />
             <Route path="purchase/record-payment" element={<RecordPaymentPage />} />
             <Route path="purchase/:id" element={<ModalRoute title="Purchase Details"><PurchaseDetails /></ModalRoute>} />

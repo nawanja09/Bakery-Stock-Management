@@ -322,34 +322,6 @@ const ensureFinanceSchema = async () => {
       WHERE NOT EXISTS (SELECT 1 FROM cash_accounts ca WHERE ca.company_id = c.id)
     `);
 
-    // Older bank records may have a balance in bank_details but no matching
-    // finance_transactions row, which makes the Bank Ledger appear empty.
-    // Backfill those legacy balances once; accounts with ledger history are
-    // left untouched.
-    await pool.query(`
-      INSERT INTO finance_transactions
-        (account_type, company_id, bank_id, transaction_date, transaction_type,
-         transaction_direction, remark, debit, credit, balance_after,
-         reference_type)
-      SELECT
-        'BANK', c.id, bd.id, COALESCE(DATE(bd.created_at), CURDATE()),
-        'Opening Balance', 'IN', 'Opening Balance',
-        COALESCE(NULLIF(bd.current_balance, 0), bd.opening_balance), 0,
-        COALESCE(NULLIF(bd.current_balance, 0), bd.opening_balance),
-        'OPENING_BALANCE'
-      FROM bank_details bd
-      INNER JOIN company c ON LOWER(TRIM(c.name)) = LOWER(TRIM(bd.company))
-      WHERE bd.status = 'Active'
-        AND COALESCE(bd.record_status, 1) = 1
-        AND COALESCE(NULLIF(bd.current_balance, 0), bd.opening_balance) <> 0
-        AND NOT EXISTS (
-          SELECT 1 FROM finance_transactions ft
-          WHERE ft.account_type = 'BANK'
-            AND ft.bank_id = bd.id
-            AND ft.status = 1
-        )
-    `);
-
     console.log('Finance (Cash & Bank ledger) schema ready');
   } catch (error) {
     console.warn('Finance schema check skipped:', error.message);
@@ -492,5 +464,70 @@ const ensureFgProductionExternalItemSchema = async () => {
 };
 
 ensureFgProductionExternalItemSchema();
+
+// --- RM Orders module (Low Stock -> Order -> Purchasing Invoice) -----------
+// Adds `orders` / `order_items` (new, additive tables) and a nullable
+// `purchases.order_id` link back to the originating Order. Creating an Order
+// never touches RM stock - stock only ever changes through the existing
+// Purchasing Invoice workflow (purchase_items), exactly as before.
+const ensureOrdersSchema = async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS orders (
+        id INT NOT NULL AUTO_INCREMENT,
+        order_no VARCHAR(30) NOT NULL,
+        status ENUM('PENDING','COMPLETED','CANCELLED') NOT NULL DEFAULT 'PENDING',
+        supplier_id INT NULL,
+        expected_receive_date DATE NOT NULL,
+        ordered_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        completed_date DATETIME NULL,
+        cancelled_date DATETIME NULL,
+        invoice_id INT NULL,
+        created_by INT NULL,
+        completed_by INT NULL,
+        cancelled_by INT NULL,
+        created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        UNIQUE KEY uniq_orders_order_no (order_no),
+        KEY idx_orders_status (status),
+        KEY idx_orders_supplier (supplier_id),
+        KEY idx_orders_invoice (invoice_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS order_items (
+        id INT NOT NULL AUTO_INCREMENT,
+        order_id INT NOT NULL,
+        item_id INT NOT NULL,
+        quantity DECIMAL(10,2) NOT NULL,
+        unit VARCHAR(20) NULL,
+        current_stock_at_order DECIMAL(10,2) NOT NULL DEFAULT 0,
+        buffer_stock_at_order DECIMAL(10,2) NOT NULL DEFAULT 0,
+        required_quantity DECIMAL(10,2) NOT NULL DEFAULT 0,
+        created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        KEY idx_order_items_order (order_id),
+        KEY idx_order_items_item (item_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    try {
+      await pool.query("ALTER TABLE purchases ADD COLUMN IF NOT EXISTS order_id INT NULL AFTER company_id");
+    } catch (e) { /* already present */ }
+
+    try {
+      await pool.query("ALTER TABLE purchases ADD INDEX IF NOT EXISTS idx_purchases_order_id (order_id)");
+    } catch (e) { /* already present */ }
+
+    console.log('RM Orders module schema ready');
+  } catch (error) {
+    console.warn('RM Orders module schema check skipped:', error.message);
+  }
+};
+
+ensureOrdersSchema();
 
 module.exports = pool;

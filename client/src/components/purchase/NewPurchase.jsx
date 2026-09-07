@@ -1,6 +1,6 @@
 // src/components/purchase/NewPurchase.jsx
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faSave, 
@@ -26,6 +26,11 @@ import PendingInvoicesSection from './PendingInvoicesSection';
 
 const AddPurchase = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const orderId = searchParams.get('order_id');
+  const [orderInfo, setOrderInfo] = useState(null); // { order_no, status } once loaded from an Order
+  const [orderLoadError, setOrderLoadError] = useState('');
+  const [orderPrefillDone, setOrderPrefillDone] = useState(false);
   const [suppliers, setSuppliers] = useState([]);
   const [itemsList, setItemsList] = useState([]);
   const [companies, setCompanies] = useState([]);
@@ -57,6 +62,7 @@ const AddPurchase = () => {
     check_number: '',
     remarks: '',
     company_id: '',
+    order_id: null,
     items: [{ 
       id: '', 
       item_name: '', 
@@ -97,6 +103,69 @@ const AddPurchase = () => {
 
     fetchData();
   }, [showPopup]);
+
+  // Order-based invoice: auto-populate from RM -> Orders -> Order Complete /
+  // Go to Invoice (spec sections 17-23). Runs once suppliers/items are loaded
+  // so the Select components and VAT lookups resolve correctly. Normal
+  // invoices (no ?order_id) are completely unaffected.
+  useEffect(() => {
+    if (!orderId || orderPrefillDone) return;
+    if (suppliers.length === 0 || itemsList.length === 0) return;
+
+    const loadOrder = async () => {
+      try {
+        const { data } = await api.get(`/orders/${orderId}/for-invoice`);
+
+        const supplier = data.supplier_id ? suppliers.find(s => s.id === data.supplier_id) : null;
+        setSelectedSupplier(supplier || null);
+        setSupplierVatRegistered(supplier?.vat_registered || false);
+        setSupplierVatNumber(supplier?.vat_number || '');
+
+        const prefilledItems = data.items.map(orderItem => {
+          const catalogItem = itemsList.find(i => i.id === orderItem.item_id);
+          const base = {
+            id: orderItem.item_id,
+            item_name: orderItem.item_name,
+            quantity: orderItem.quantity,
+            unit_price: orderItem.unit_price || 0,
+            unit: orderItem.unit || catalogItem?.unit || '',
+            vat_applicable: catalogItem?.vat_applicable || false,
+            amount: 0, vat: 0, lineTotal: 0
+          };
+          const { amount, vat, lineTotal } = calculateItemValues(base, supplier?.vat_registered || false);
+          return { ...base, amount, vat, lineTotal };
+        });
+
+        const { subtotal, totalVat, grandTotal, balanceAmount, balanceStatus } = calculateTotals(
+          prefilledItems, supplier?.vat_registered || false, 0
+        );
+
+        setFormData(prev => ({
+          ...prev,
+          supplier_id: data.supplier_id || '',
+          purchase_date: data.purchase_date || prev.purchase_date,
+          order_id: data.order_id,
+          items: prefilledItems,
+          subtotal,
+          vat_amount: totalVat,
+          total_with_vat: grandTotal,
+          balance_amount: balanceAmount,
+          balance_status: balanceStatus
+        }));
+
+        setOrderInfo({ order_no: data.order_no, status: data.status });
+      } catch (error) {
+        console.error('Error loading order for invoice:', error);
+        const message = error.response?.data?.error || 'Failed to load the selected order.';
+        setOrderLoadError(message);
+        showPopup('error', message);
+      } finally {
+        setOrderPrefillDone(true);
+      }
+    };
+
+    loadOrder();
+  }, [orderId, orderPrefillDone, suppliers, itemsList, showPopup]);
 
   useEffect(() => {
     const total = formData.total_with_vat;
@@ -400,6 +469,7 @@ const AddPurchase = () => {
       ...formData,
       prepared_by: currentUser.id,
       company_id: formData.company_id || null,
+      order_id: formData.order_id || null,
       items: formData.items.map(item => ({
         item_id: item.id,
         item_name: item.item_name,
@@ -423,11 +493,21 @@ const AddPurchase = () => {
       }
       
       showPopup('success', successMessage);
+
+      if (formData.order_id) {
+        // Order Complete flow - the Order is now COMPLETED server-side.
+        navigate('/purchase/orders');
+      }
     } catch (error) {
       console.error('Error creating purchase:', error);
       
-      if (error.response?.data?.error?.includes('Invoice number already exists')) {
+      if (
+        error.response?.data?.error?.includes('Invoice number already exists') ||
+        error.response?.data?.error?.includes('Duplicate reference number')
+      ) {
         showPopup('error', 'This invoice number already exists. Please use a different number.');
+      } else if (error.response?.status === 409) {
+        showPopup('error', error.response?.data?.error || 'This order has already been processed into a Purchase Invoice.');
       } else {
         showPopup('error', error.response?.data?.error || 'Server error');
       }
@@ -487,6 +567,22 @@ const AddPurchase = () => {
       <div className="page-header">
           <h1>RM Purchasing Invoice</h1>
       </div>
+
+      {orderInfo && (
+        <div className="order-linked-banner">
+          <FontAwesomeIcon icon={faBoxes} />
+          <span>
+            Creating this invoice from Order <strong>{orderInfo.order_no}</strong>. Purchase Date, Supplier and
+            Purchase Items were auto-filled and remain fully editable below.
+          </span>
+        </div>
+      )}
+      {orderLoadError && (
+        <div className="order-linked-banner order-linked-banner-error">
+          <FontAwesomeIcon icon={faExclamationTriangle} />
+          <span>{orderLoadError}</span>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="purchase-form">
         {/* Basic Information Section */}

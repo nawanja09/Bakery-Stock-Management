@@ -55,6 +55,7 @@ const PaymentMethodManagement = require('./routes/paymentMethodRoutes');
 
 const financeRoutes = require('./routes/financeRoutes');
 const inhandRoutes  = require('./routes/inhandRoutes');
+const orderRoutes = require('./routes/orderRoutes');
 const receiveTypeRoutes = require('./routes/receiveTypeRoutes');
 const readOnly = require('./middleware/readOnly');
 
@@ -109,6 +110,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.get('/api/stats', dashboardController.getGeneralStats);
 app.use('/api/users', userRoutes);
 app.use('/api/adjustments', adjustmentRoutes);
+app.use('/api/orders', orderRoutes);
 
 app.use('/api/finished-goods-items', finishedGoodsItemsRouter);
 app.use('/api/finished-goods-opening-balance', finishedGoodsOpeningBalanceRouter);
