@@ -47,7 +47,8 @@ import {
   faLandmark,
   faRightLeft,
   faFileInvoiceDollar,
-  faIdCard
+  faIdCard,
+  faSackDollar
 } from '@fortawesome/free-solid-svg-icons';
 import bakeryLogo from '../images/icon.jpeg';
 import './NavigationBar.css';
@@ -162,7 +163,7 @@ const NavigationBar = () => {
         navigate('/adjustments/stores-balance');
         break;
       case 'analyst':
-        navigate('/analyst/incomes');
+        navigate('/analyst/income');
         break;
       case 'vat':
         navigate('/reports/vat');
@@ -693,7 +694,7 @@ const NavigationBar = () => {
 
   const renderAnalystContent = () => (
     <>
-      <li><NavLink to="/analyst/incomes" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faChartBar} /></span><span>Incomes</span></NavLink></li>
+      <li><NavLink to="/analyst/income" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faSackDollar} /></span><span>Income</span></NavLink></li>
       <li><NavLink to="/analyst/expenses" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faDollarSign} /></span><span>Expenses</span></NavLink></li>
       <li><NavLink to="/analyst/balance-sheet" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faBalanceScale} /></span><span>Balance Sheet</span></NavLink></li>
     </>

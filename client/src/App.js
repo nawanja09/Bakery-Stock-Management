@@ -121,6 +121,8 @@ import ReceiveTypeManagement from './components/Finance/ReceiveTypeManagement';
 import FGRecipes from './components/FGProduction/Recipes';
 import FGRecipeReport from './components/FGProduction/FGRecipesReports';
 import AnalystPage from './components/Analyst/AnalystPage';
+import AnalystIncomePage from './components/Analyst/AnalystIncomePage';
+import IncomePage from './components/Income/IncomePage';
 
 import './App.css';
 import './css/page-design-system.css';
@@ -362,6 +364,7 @@ function App() {
             <Route path="finance/bank" element={<FinanceRoute><BankLedger /></FinanceRoute>} />
             <Route path="finance/bank-receive" element={<FinanceRoute><BankReceive /></FinanceRoute>} />
             <Route path="finance/transfer" element={<FinanceRoute><FundTransfer /></FinanceRoute>} />
+            <Route path="finance/income" element={<FinanceRoute><IncomePage /></FinanceRoute>} />
             <Route path="wastage/edit/:id" element={<ModalRoute title="Edit Wastage"><EditWastage /></ModalRoute>} />
 
             <Route path="adjustments/stores-balance" element={<AdjustmentsRoute><StoresBalance /></AdjustmentsRoute>} />
@@ -374,7 +377,8 @@ function App() {
             <Route path="/finance/bank-transfer" element={<FinanceRoute><BankTransfer /></FinanceRoute>} />
             <Route path="/finance/receive-types" element={<FinanceRoute><ReceiveTypeManagement /></FinanceRoute>} />
 
-            <Route path="analyst/incomes" element={<AnalystRoute><AnalystPage /></AnalystRoute>} />
+            <Route path="analyst/income" element={<AnalystRoute><AnalystIncomePage /></AnalystRoute>} />
+            <Route path="analyst/incomes" element={<AnalystRoute><AnalystIncomePage /></AnalystRoute>} />
             <Route path="analyst/expenses" element={<AnalystRoute><AnalystPage /></AnalystRoute>} />
             <Route path="analyst/balance-sheet" element={<AnalystRoute><AnalystPage /></AnalystRoute>} />
 

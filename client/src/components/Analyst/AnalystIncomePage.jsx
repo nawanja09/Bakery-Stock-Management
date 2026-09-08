@@ -1,0 +1,144 @@
+import React, { useCallback, useEffect, useState } from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faEdit, faPlus, faSackDollar, faSpinner, faTrash } from '@fortawesome/free-solid-svg-icons';
+import api from '../../api';
+import { formatCurrency } from '../../utils/formatters';
+import { usePopup } from '../context/PopupContext';
+import NewIncomeModal from '../Income/NewIncomeModal';
+import '../Income/Income.css';
+
+const ALLOWED_COMPANY_NAMES = ['JH', 'RD'];
+const formatDate = (value) => (value ? new Date(`${value}T00:00:00`).toLocaleDateString('en-GB') : '-');
+const sortRecords = (records) => [...records].sort((a, b) => (
+  b.income_date.localeCompare(a.income_date) || Number(b.id) - Number(a.id)
+));
+
+const AnalystIncomePage = () => {
+  const { showPopup } = usePopup();
+  const [records, setRecords] = useState([]);
+  const [companies, setCompanies] = useState([]);
+  const [departments, setDepartments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [editingRecord, setEditingRecord] = useState(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+
+  const loadRecords = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await api.get('/incomes');
+      setRecords(sortRecords(response.data.records || []));
+    } catch (requestError) {
+      setError(requestError.response?.data?.error || 'Unable to load income records.');
+      setRecords([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadRecords();
+    Promise.all([api.get('/companies'), api.get('/departments')])
+      .then(([companyResponse, departmentResponse]) => {
+        setCompanies((companyResponse.data || []).filter((company) => (
+          ALLOWED_COMPANY_NAMES.includes((company.name || '').toUpperCase())
+        )));
+        setDepartments(departmentResponse.data || []);
+      })
+      .catch(() => showPopup('error', 'Unable to load companies or departments for the form.'));
+  }, [loadRecords, showPopup]);
+
+  const openCreateForm = () => {
+    setEditingRecord(null);
+    setIsFormOpen(true);
+  };
+
+  const openEditForm = (record) => {
+    setEditingRecord(record);
+    setIsFormOpen(true);
+  };
+
+  const closeForm = () => {
+    setEditingRecord(null);
+    setIsFormOpen(false);
+  };
+
+  const handleSaved = (record, isEditing) => {
+    setRecords((current) => sortRecords(isEditing
+      ? current.map((item) => item.id === record.id ? record : item)
+      : [...current, record]
+    ));
+    closeForm();
+    showPopup('success', isEditing ? 'Income updated successfully.' : 'Income added successfully.');
+  };
+
+  const handleDelete = async (record) => {
+    if (!window.confirm('Delete this income record?')) return;
+    try {
+      await api.delete(`/incomes/${record.id}`);
+      setRecords((current) => current.filter((item) => item.id !== record.id));
+      showPopup('success', 'Income deleted successfully.');
+    } catch (requestError) {
+      showPopup('error', requestError.response?.data?.error || 'Unable to delete income record.');
+    }
+  };
+
+  return (
+    <div className="page-container income-page">
+      <header className="page-header income-header">
+        <h2><FontAwesomeIcon icon={faSackDollar} /> Income</h2>
+        <button className="btn btn-primary income-new-btn" onClick={openCreateForm}>
+          <FontAwesomeIcon icon={faPlus} /> Add New Income
+        </button>
+      </header>
+
+      {error && <div className="income-error" role="alert">{error}</div>}
+
+      {loading ? (
+        <div className="income-empty-panel"><FontAwesomeIcon icon={faSpinner} spin /> Loading income records...</div>
+      ) : records.length ? (
+        <div className="card income-table-card">
+          <div className="income-table-scroll">
+            <table className="report-table">
+              <thead><tr><th>Date</th><th>Company</th><th>Department</th><th className="income-amount">Amount</th><th>Actions</th></tr></thead>
+              <tbody>
+                {records.map((record) => (
+                  <tr key={record.id}>
+                    <td>{formatDate(record.income_date)}</td>
+                    <td><span className="income-badge">{record.company_name}</span></td>
+                    <td>{record.department_name}</td>
+                    <td className="income-amount">{formatCurrency(record.amount)}</td>
+                    <td className="income-actions">
+                      <button className="btn btn-secondary" onClick={() => openEditForm(record)}><FontAwesomeIcon icon={faEdit} /> Edit</button>
+                      <button className="btn btn-danger" onClick={() => handleDelete(record)}><FontAwesomeIcon icon={faTrash} /> Delete</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        <div className="income-empty-panel">
+          <strong>No income records yet</strong>
+          <span>Add your first income record to get started.</span>
+          <button className="btn btn-primary income-new-btn" onClick={openCreateForm}>
+            <FontAwesomeIcon icon={faPlus} /> Add New Income
+          </button>
+        </div>
+      )}
+
+      <NewIncomeModal
+        isOpen={isFormOpen}
+        record={editingRecord}
+        companies={companies}
+        departments={departments}
+        onClose={closeForm}
+        onSuccess={handleSaved}
+      />
+    </div>
+  );
+};
+
+export default AnalystIncomePage;

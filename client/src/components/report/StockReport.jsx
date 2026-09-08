@@ -1,5 +1,5 @@
 // src/components/report/StockReport.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { format } from 'date-fns';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -13,12 +13,62 @@ import {
 import './StockReport.css';
 import api from '../../api';
 import { formatCurrency, formatNumber } from '../../utils/formatters';
+import { ITEM_TYPE_OPTIONS } from '../Items/itemTypeOptions';
 
 const StockReport = () => {
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [statusFilter, setStatusFilter] = useState('All');
+  const [categoryFilter, setCategoryFilter] = useState('All');
+  const [categories, setCategories] = useState(ITEM_TYPE_OPTIONS);
   const [stockData, setStockData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [itemPrices, setItemPrices] = useState({});
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await api.get('/item-types');
+        if (response.data && Array.isArray(response.data)) {
+          const typeNames = response.data.map((t) => t.type_name).filter(Boolean);
+          const combined = Array.from(new Set([...typeNames, ...ITEM_TYPE_OPTIONS]));
+          setCategories(combined.sort());
+        }
+      } catch (err) {
+        console.error('Error fetching categories:', err);
+        setCategories(ITEM_TYPE_OPTIONS);
+      }
+    };
+    fetchCategories();
+  }, []);
+
+  const availableCategories = useMemo(() => {
+    const itemCats = stockData.map((item) => item.category || item.item_type).filter(Boolean);
+    const combined = Array.from(new Set([...categories, ...itemCats]));
+    return combined.sort();
+  }, [categories, stockData]);
+
+  const filteredStockData = useMemo(() => {
+    return stockData.filter((item) => {
+      // Status filter: 'All' | 'Active' | 'Inactive'
+      if (statusFilter === 'Active') {
+        const isActive = item.is_active === 1 || item.is_active === true || item.is_active === '1';
+        if (!isActive) return false;
+      } else if (statusFilter === 'Inactive') {
+        const isActive = item.is_active === 1 || item.is_active === true || item.is_active === '1';
+        if (isActive) return false;
+      }
+
+      // Category filter: 'All' | specific category
+      if (categoryFilter !== 'All') {
+        const itemCat = item.category || item.item_type || 'Other';
+        if (itemCat.toLowerCase() !== categoryFilter.toLowerCase()) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [stockData, statusFilter, categoryFilter]);
 
   const fetchStockReport = async () => {
     setLoading(true);
@@ -74,7 +124,7 @@ const StockReport = () => {
   };
 
   const calculateTotal = () => {
-    const total = stockData.reduce((acc, item) => {
+    const total = filteredStockData.reduce((acc, item) => {
       return acc + Number(calculateValue(item));
     }, 0);
     return total;
@@ -91,7 +141,7 @@ const StockReport = () => {
     doc.setFontSize(16);
     doc.text(`Stock Report - ${dateStr}`, 15, 15);
     
-    const tableData = stockData.map(item => [
+    const tableData = filteredStockData.map(item => [
       item.item_code,
       item.item_name,
       item.unit,
@@ -133,7 +183,7 @@ const StockReport = () => {
   };
 
   const downloadExcel = () => {
-    const worksheetData = stockData.map(item => ({
+    const worksheetData = filteredStockData.map(item => ({
       'Item Code': item.item_code,
       'Item Name': item.item_name,
       'Unit': item.unit,
@@ -162,7 +212,8 @@ const StockReport = () => {
         </div>
       </header>
 
-      <div className="filters-section">
+      <div className="filters-section report-filter-bar">
+        {/* Date Filter (kept as it is) */}
         <div className="report-filter-group">
           <label className="report-filter-label">
             <FontAwesomeIcon icon={faCalendar} /> Report Date
@@ -176,27 +227,60 @@ const StockReport = () => {
           />
         </div>
 
+        {/* Active / Inactive Filter (immediately to the right of Date) */}
+        <div className="report-filter-group">
+          <label className="report-filter-label">
+            Active / Inactive
+          </label>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="report-filter-select"
+          >
+            <option value="All">All</option>
+            <option value="Active">Active</option>
+            <option value="Inactive">Inactive</option>
+          </select>
+        </div>
+
+        {/* Category Filter (immediately to the right of Active / Inactive) */}
+        <div className="report-filter-group">
+          <label className="report-filter-label">
+            Category
+          </label>
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="report-filter-select"
+          >
+            <option value="All">All Categories</option>
+            {availableCategories.map((cat) => (
+              <option key={cat} value={cat}>{cat}</option>
+            ))}
+          </select>
+        </div>
+
         <div className="report-filter-actions">
-            <button 
-              onClick={fetchStockReport}
-              disabled={loading}
-              className="btn btn-primary"
-            >
-              <FontAwesomeIcon icon={faSync} className={loading ? 'fa-spin' : ''} />
-              {loading ? 'Generating...' : 'Generate Report'}
+          <button 
+            onClick={fetchStockReport}
+            disabled={loading}
+            className="btn btn-primary"
+          >
+            <FontAwesomeIcon icon={faSync} className={loading ? 'fa-spin' : ''} />
+            {loading ? 'Generating...' : 'Generate Report'}
+          </button>
+          
+          {filteredStockData.length > 0 && (
+            <button onClick={downloadExcel} className="btn btn-success">
+              <FontAwesomeIcon icon={faFileExcel} /> Excel
             </button>
-            
-            {stockData.length > 0 && (
-                <button onClick={downloadExcel} className="btn btn-success">
-                  <FontAwesomeIcon icon={faFileExcel} /> Excel
-                </button>
-            )}
+          )}
         </div>
       </div>
 
       {loading ? (
         <div className="loading-state">Loading stock data...</div>
-      ) : stockData.length > 0 ? (
+      ) : filteredStockData.length > 0 ? (
         <>
           <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
             <div style={{ overflowX: 'auto' }}>
@@ -218,7 +302,7 @@ const StockReport = () => {
                 </tr>
               </thead>
               <tbody>
-                {stockData.map((item) => (
+                {filteredStockData.map((item) => (
                   <tr key={item.id}>
                     <td>
                       <span className="badge badge-neutral">{item.item_code}</span>
@@ -253,6 +337,11 @@ const StockReport = () => {
           </div>
           </div>
         </>
+      ) : stockData.length > 0 ? (
+        <div className="empty-state">
+          <div className="empty-icon">📊</div>
+          <p>No items match the selected filters.</p>
+        </div>
       ) : (
         <div className="empty-state">
           <div className="empty-icon">📊</div>
