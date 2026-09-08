@@ -14,13 +14,16 @@ import {
   faMoneyBillWave
 } from '@fortawesome/free-solid-svg-icons';
 import { formatCurrency } from '../../../utils/formatters';
+import Select from 'react-select';
+import { filterItemByName, reportItemSelectStyles } from '../reportItemSelectHelper';
 
+const ALL_ITEMS_OPTION = { value: 'all', label: 'All Items', name: 'All Items', item_code: '', data: null };
 
 const WastageReport = () => {
   const { showPopup } = usePopup();
   
   const [loading, setLoading] = useState(false);
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState([ALL_ITEMS_OPTION]);
   const [wastageData, setWastageData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -31,7 +34,7 @@ const WastageReport = () => {
   const [filters, setFilters] = useState({
     startDate: '',
     endDate: '',
-    itemId: ''
+    itemId: 'all'
   });
 
   const fetchItems = useCallback(async () => {
@@ -40,7 +43,16 @@ const WastageReport = () => {
       const response = await api.get('/items', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      setItems(response.data);
+      setItems([
+        ALL_ITEMS_OPTION,
+        ...response.data.map(item => ({
+          value: item.id,
+          label: `${item.item_code} - ${item.name}`,
+          name: item.name,
+          item_code: item.item_code,
+          data: item
+        }))
+      ]);
     } catch (error) {
       console.error('Error fetching items:', error);
     }
@@ -86,7 +98,7 @@ const WastageReport = () => {
     }
     
     // Item filter - filter by items within each wastage
-    if (filters.itemId) {
+    if (filters.itemId && filters.itemId !== 'all') {
       filtered = filtered.filter(w => 
         w.items && w.items.some(item => String(item.item_id) === String(filters.itemId))
       );
@@ -112,7 +124,7 @@ const WastageReport = () => {
     setFilters({
       startDate: '',
       endDate: '',
-      itemId: ''
+      itemId: 'all'
     });
   };
 
@@ -213,18 +225,18 @@ const WastageReport = () => {
                 <FontAwesomeIcon icon={faBoxOpen} className="filter-icon" /> Item
               </label>
 
-              <select
-                value={filters.itemId}
-                onChange={(e) => handleFilterChange('itemId', e.target.value)}
-                className="report-filter-select"
-              >
-                <option value="">All Items</option>
-                {items.map(item => (
-                  <option key={item.id} value={item.id}>
-                    {item.item_code} - {item.name}
-                  </option>
-                ))}
-              </select>
+              <Select
+                value={items.find(it => String(it.value) === String(filters.itemId)) || ALL_ITEMS_OPTION}
+                onChange={(selected) => handleFilterChange('itemId', selected ? selected.value : 'all')}
+                options={items}
+                filterOption={filterItemByName}
+                styles={reportItemSelectStyles}
+                className="react-select-container"
+                classNamePrefix="react-select"
+                isSearchable
+                isClearable={false}
+                placeholder="Select item..."
+              />
             </div>
 
             <div className="report-filter-actions">
@@ -260,37 +272,14 @@ const WastageReport = () => {
             <tbody>
               {filteredData.map(wastage => {
                 const statusInfo = getStatusInfo(wastage.reason);
-                const items = getWastageItems(wastage);
+                const rawItems = getWastageItems(wastage);
+                const items = (filters.itemId && filters.itemId !== 'all')
+                  ? rawItems.filter(item => String(item.item_id) === String(filters.itemId))
+                  : rawItems;
                 
                 // If no items, show a single row with no items
                 if (items.length === 0) {
-                  return (
-                    <tr key={wastage.id} className="report-row">
-                      <td className="center-align">{new Date(wastage.date).toLocaleDateString()}</td>
-                      <td className="center-align">{wastage.wastage_note_number}</td>
-                      <td className="center-align" colSpan="3">No items</td>
-                      <td className="center-align">
-                        <span className="reason-badge" style={{ 
-                          backgroundColor: statusInfo.bg,
-                          color: statusInfo.color,
-                          borderColor: statusInfo.color
-                        }}>
-                          <FontAwesomeIcon icon={statusInfo.icon} className="reason-icon" />
-                          {wastage.reason}
-                        </span>
-                      </td>
-                      <td className="center-align">0.00</td>
-                      <td className="center-align">
-                        <button
-                          className="action-btn view-btn"
-                          onClick={() => handleViewDetails(wastage.id)}
-                          title="View Details"
-                        >
-                          <FontAwesomeIcon icon={faEye} />
-                        </button>
-                      </td>
-                    </tr>
-                  );
+                  return null;
                 }
 
                 // Show each item as a separate row

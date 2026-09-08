@@ -9,16 +9,20 @@ import './DepartmentIssuesReport.css';
 import Select from 'react-select';
 import api from '../../api';
 import { formatNumber } from '../../utils/formatters';
+import { filterItemByName, reportItemSelectStyles } from './reportItemSelectHelper';
+
+const ALL_ITEMS_OPTION = { value: 'all', label: 'All Items', name: 'All Items', item_code: '', data: null };
 
 const DepartmentIssuesReport = () => {
   const [departments, setDepartments] = useState([]);
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState([ALL_ITEMS_OPTION]);
   const [selectedDepartment, setSelectedDepartment] = useState("all");
-  const [selectedItem, setSelectedItem] = useState("all");
+  const [selectedItem, setSelectedItem] = useState(ALL_ITEMS_OPTION);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [reportData, setReportData] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [hasGenerated, setHasGenerated] = useState(false);
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -28,7 +32,16 @@ const DepartmentIssuesReport = () => {
           api.get("/items")
         ]);
         setDepartments(deptResponse.data);
-        setItems(itemsResponse.data);
+        setItems([
+          ALL_ITEMS_OPTION,
+          ...itemsResponse.data.map(item => ({
+            value: item.id,
+            label: `${item.item_code} - ${item.name}`,
+            name: item.name,
+            item_code: item.item_code,
+            data: item
+          }))
+        ]);
       } catch (error) {
         console.error("Error fetching initial data:", error);
       }
@@ -44,25 +57,38 @@ const DepartmentIssuesReport = () => {
     setEndDate(end.toISOString().split("T")[0]);
   }, []);
 
-  const generateReport = async () => {
+  const generateReport = async (overrideItem = null) => {
     if (!startDate || !endDate) {
       alert("Please select a date range");
       return;
     }
 
+    const itemToFetch = overrideItem !== null ? overrideItem : selectedItem;
+
     setLoading(true);
     try {
       const params = { startDate, endDate };
       if (selectedDepartment !== "all") params.departmentId = selectedDepartment;
-      if (selectedItem !== "all") params.itemId = selectedItem;
+      if (itemToFetch && itemToFetch.value && itemToFetch.value !== "all") {
+        params.itemId = itemToFetch.value;
+      }
 
       const response = await api.get("/reports/department", { params });
       setReportData(response.data);
+      setHasGenerated(true);
     } catch (error) {
       console.error("Error generating report:", error);
       alert("Failed to generate report");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleItemChange = (selected) => {
+    const nextItem = selected || ALL_ITEMS_OPTION;
+    setSelectedItem(nextItem);
+    if (hasGenerated) {
+      generateReport(nextItem);
     }
   };
 
@@ -79,9 +105,9 @@ const DepartmentIssuesReport = () => {
       ? "All Departments"
       : (departments.find((dept) => dept.id === Number(selectedDepartment))?.name || "Unknown Department");
 
-    const itemName = selectedItem === "all"
+    const itemName = (!selectedItem || selectedItem.value === "all")
       ? "All Items"
-      : (items.find((item) => item.id === Number(selectedItem))?.name || "Unknown Item");
+      : (selectedItem.name || selectedItem.label || "Unknown Item");
 
     doc.setFontSize(16);
     doc.text("Issuance Report", 14, 16);
@@ -197,18 +223,18 @@ const DepartmentIssuesReport = () => {
             <FontAwesomeIcon icon={faBoxOpen} className="filter-icon" /> Item
           </label>
 
-          <select
-            value={selectedItem}
-            onChange={(e) => setSelectedItem(e.target.value)}
-            className="report-filter-select"
-          >
-            <option value="all">All Items</option>
-              {items.map(item => (
-              <option key={item.id} value={item.id}>
-                {item.item_code} - {item.name}
-              </option>
-              ))}
-          </select>
+          <Select
+            value={selectedItem || ALL_ITEMS_OPTION}
+            onChange={handleItemChange}
+            options={items}
+            filterOption={filterItemByName}
+            styles={reportItemSelectStyles}
+            className="react-select-container"
+            classNamePrefix="react-select"
+            isSearchable
+            isClearable={false}
+            placeholder="Select item..."
+          />
         </div>
 
         <div className="report-filter-actions">

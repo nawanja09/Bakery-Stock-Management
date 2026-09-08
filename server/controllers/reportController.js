@@ -218,89 +218,164 @@ const getStockReportByRangeAndItem = async (req, res) => {
   try {
     const { startDate, endDate, itemId } = req.query;
 
-    if (!startDate || !endDate || !itemId) {
-      return res.status(400).json({ error: 'startDate, endDate, and itemId are required (format: YYYY-MM-DD)' });
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: 'startDate and endDate are required (format: YYYY-MM-DD)' });
     }
 
-    // 🔥 Check if the requested item is auto-add enabled
-    const [itemCheck] = await pool.query(
-      'SELECT auto_add_to_stock FROM items WHERE id = ? AND deleted = FALSE',
-      [itemId]
-    );
+    const isAllItems = !itemId || itemId === 'all';
 
-    if (itemCheck.length === 0) {
-      return res.status(404).json({ error: 'Item not found' });
-    }
+    if (!isAllItems) {
+      // 🔥 Check if the requested item is auto-add enabled
+      const [itemCheck] = await pool.query(
+        'SELECT auto_add_to_stock FROM items WHERE id = ? AND deleted = FALSE',
+        [itemId]
+      );
 
-    if (itemCheck[0].auto_add_to_stock === 0) {
-      return res.status(400).json({ 
-        error: 'This report only shows Auto-Add enabled items. Selected item is manual.' 
-      });
+      if (itemCheck.length === 0) {
+        return res.status(404).json({ error: 'Item not found' });
+      }
+
+      if (itemCheck[0].auto_add_to_stock === 0) {
+        return res.status(400).json({ 
+          error: 'This report only shows Auto-Add enabled items. Selected item is manual.' 
+        });
+      }
     }
 
     const dateRange = getDateRange(startDate, endDate);
     const report = [];
 
     // Get the opening balance from before the start date
-    const [[openingRow]] = await pool.query(
-      `SELECT date, quantity FROM opening_balances 
-       WHERE item_id = ? AND date < ? 
-       ORDER BY date DESC LIMIT 1`,
-      [itemId, startDate]
-    );
-
     let openingBalance = 0;
-    if (openingRow) {
-      openingBalance = parseFloat(openingRow.quantity);
+    if (!isAllItems) {
+      const [[openingRow]] = await pool.query(
+        `SELECT date, quantity FROM opening_balances 
+         WHERE item_id = ? AND date < ? 
+         ORDER BY date DESC LIMIT 1`,
+        [itemId, startDate]
+      );
+      if (openingRow) {
+        openingBalance = parseFloat(openingRow.quantity);
+      }
+    } else {
+      const [[openingRow]] = await pool.query(
+        `SELECT SUM(ob.quantity) AS quantity 
+         FROM opening_balances ob
+         JOIN items i ON ob.item_id = i.id
+         WHERE i.auto_add_to_stock = 1 AND (i.deleted = FALSE OR i.deleted IS NULL) AND ob.date < ?`,
+        [startDate]
+      );
+      if (openingRow && openingRow.quantity !== null) {
+        openingBalance = parseFloat(openingRow.quantity);
+      }
     }
 
     // Get all transactions before the start date
-    const [[{ purchased: prePurchased = 0 }]] = await pool.query(
-      `SELECT SUM(pi.quantity) AS purchased
-       FROM purchase_items pi
-       JOIN purchases p ON pi.purchase_id = p.id
-       WHERE pi.item_id = ? AND DATE(p.purchase_date) < ? AND (p.deleted = FALSE OR p.deleted IS NULL)`,
-      [itemId, startDate]
-    );
+    const [[{ purchased: prePurchased = 0 }]] = !isAllItems
+      ? await pool.query(
+          `SELECT SUM(pi.quantity) AS purchased
+           FROM purchase_items pi
+           JOIN purchases p ON pi.purchase_id = p.id
+           WHERE pi.item_id = ? AND DATE(p.purchase_date) < ? AND (p.deleted = FALSE OR p.deleted IS NULL)`,
+          [itemId, startDate]
+        )
+      : await pool.query(
+          `SELECT SUM(pi.quantity) AS purchased
+           FROM purchase_items pi
+           JOIN purchases p ON pi.purchase_id = p.id
+           JOIN items i ON pi.item_id = i.id
+           WHERE i.auto_add_to_stock = 1 AND (i.deleted = FALSE OR i.deleted IS NULL)
+             AND DATE(p.purchase_date) < ? AND (p.deleted = FALSE OR p.deleted IS NULL)`,
+          [startDate]
+        );
 
-    const [[{ issued: preIssued = 0 }]] = await pool.query(
-      `SELECT SUM(ii.quantity) AS issued
-       FROM issuance_items ii
-       JOIN issuances i ON ii.issuance_id = i.id
-       WHERE ii.item_id = ? AND DATE(i.issuance_date) < ?`,
-      [itemId, startDate]
-    );
+    const [[{ issued: preIssued = 0 }]] = !isAllItems
+      ? await pool.query(
+          `SELECT SUM(ii.quantity) AS issued
+           FROM issuance_items ii
+           JOIN issuances i ON ii.issuance_id = i.id
+           WHERE ii.item_id = ? AND DATE(i.issuance_date) < ?`,
+          [itemId, startDate]
+        )
+      : await pool.query(
+          `SELECT SUM(ii.quantity) AS issued
+           FROM issuance_items ii
+           JOIN issuances i ON ii.issuance_id = i.id
+           JOIN items it ON ii.item_id = it.id
+           WHERE it.auto_add_to_stock = 1 AND (it.deleted = FALSE OR it.deleted IS NULL)
+             AND DATE(i.issuance_date) < ?`,
+          [startDate]
+        );
 
-    const [[{ wasted: preWasted = 0 }]] = await pool.query(
-      `SELECT SUM(wi.quantity) AS wasted
-       FROM wastage_items wi
-       JOIN wastages w ON wi.wastage_id = w.id
-       WHERE wi.item_id = ? AND DATE(w.date) < ?`,
-      [itemId, startDate]
-    );
+    const [[{ wasted: preWasted = 0 }]] = !isAllItems
+      ? await pool.query(
+          `SELECT SUM(wi.quantity) AS wasted
+           FROM wastage_items wi
+           JOIN wastages w ON wi.wastage_id = w.id
+           WHERE wi.item_id = ? AND DATE(w.date) < ?`,
+          [itemId, startDate]
+        )
+      : await pool.query(
+          `SELECT SUM(wi.quantity) AS wasted
+           FROM wastage_items wi
+           JOIN wastages w ON wi.wastage_id = w.id
+           JOIN items it ON wi.item_id = it.id
+           WHERE it.auto_add_to_stock = 1 AND (it.deleted = FALSE OR it.deleted IS NULL)
+             AND DATE(w.date) < ?`,
+          [startDate]
+        );
 
-    const [[{ returned: preReturned = 0 }]] = await pool.query(
-      `SELECT SUM(ri.quantity) AS returned
-       FROM return_items ri
-       JOIN returns r ON ri.return_id = r.id
-       WHERE ri.item_id = ? AND DATE(r.return_date) < ?`,
-      [itemId, startDate]
-    );
+    const [[{ returned: preReturned = 0 }]] = !isAllItems
+      ? await pool.query(
+          `SELECT SUM(ri.quantity) AS returned
+           FROM return_items ri
+           JOIN returns r ON ri.return_id = r.id
+           WHERE ri.item_id = ? AND DATE(r.return_date) < ?`,
+          [itemId, startDate]
+        )
+      : await pool.query(
+          `SELECT SUM(ri.quantity) AS returned
+           FROM return_items ri
+           JOIN returns r ON ri.return_id = r.id
+           JOIN items it ON ri.item_id = it.id
+           WHERE it.auto_add_to_stock = 1 AND (it.deleted = FALSE OR it.deleted IS NULL)
+             AND DATE(r.return_date) < ?`,
+          [startDate]
+        );
 
-    const [[{ purchaseReturned: prePurchaseReturned = 0 }]] = await pool.query(
-      `SELECT SUM(pri.quantity) AS purchaseReturned
-       FROM purchase_return_items pri
-       JOIN purchase_returns pr ON pri.return_id = pr.id
-       WHERE pri.item_id = ? AND DATE(pr.return_date) < ?`,
-      [itemId, startDate]
-    );
+    const [[{ purchaseReturned: prePurchaseReturned = 0 }]] = !isAllItems
+      ? await pool.query(
+          `SELECT SUM(pri.quantity) AS purchaseReturned
+           FROM purchase_return_items pri
+           JOIN purchase_returns pr ON pri.return_id = pr.id
+           WHERE pri.item_id = ? AND DATE(pr.return_date) < ?`,
+          [itemId, startDate]
+        )
+      : await pool.query(
+          `SELECT SUM(pri.quantity) AS purchaseReturned
+           FROM purchase_return_items pri
+           JOIN purchase_returns pr ON pri.return_id = pr.id
+           JOIN items it ON pri.item_id = it.id
+           WHERE it.auto_add_to_stock = 1 AND (it.deleted = FALSE OR it.deleted IS NULL)
+             AND DATE(pr.return_date) < ?`,
+          [startDate]
+        );
 
-    const [[{ adjusted: preAdjusted = 0 }]] = await pool.query(
-      `SELECT SUM(variance) AS adjusted
-       FROM stock_adjustments
-       WHERE item_id = ? AND DATE(date) < ?`,
-      [itemId, startDate]
-    );
+    const [[{ adjusted: preAdjusted = 0 }]] = !isAllItems
+      ? await pool.query(
+          `SELECT SUM(variance) AS adjusted
+           FROM stock_adjustments
+           WHERE item_id = ? AND DATE(date) < ?`,
+          [itemId, startDate]
+        )
+      : await pool.query(
+          `SELECT SUM(variance) AS adjusted
+           FROM stock_adjustments sa
+           JOIN items it ON sa.item_id = it.id
+           WHERE it.auto_add_to_stock = 1 AND (it.deleted = FALSE OR it.deleted IS NULL)
+             AND DATE(sa.date) < ?`,
+          [startDate]
+        );
 
     // Calculate initial opening balance
     let runningBalance = openingBalance + 
@@ -321,63 +396,124 @@ const getStockReportByRangeAndItem = async (req, res) => {
       let adjusted = 0;
 
       // Check if there's an opening balance specifically for this date
-      const [[specificOpening]] = await pool.query(
-        `SELECT quantity FROM opening_balances 
-         WHERE item_id = ? AND DATE(date) = ?`,
-        [itemId, date]
-      );
+      if (!isAllItems) {
+        const [[specificOpening]] = await pool.query(
+          `SELECT quantity FROM opening_balances 
+           WHERE item_id = ? AND DATE(date) = ?`,
+          [itemId, date]
+        );
 
-      if (specificOpening) {
-        opening = parseFloat(specificOpening.quantity);
-        runningBalance = opening;
+        if (specificOpening) {
+          opening = parseFloat(specificOpening.quantity);
+          runningBalance = opening;
+        }
       }
 
-      const [[{ purchased: dbPurchased = 0 }]] = await pool.query(
-        `SELECT SUM(pi.quantity) AS purchased
-         FROM purchase_items pi
-         JOIN purchases p ON pi.purchase_id = p.id
-         WHERE pi.item_id = ? AND DATE(p.purchase_date) = ? AND (p.deleted = FALSE OR p.deleted IS NULL)`,
-        [itemId, date]
-      );
+      const [[{ purchased: dbPurchased = 0 }]] = !isAllItems
+        ? await pool.query(
+            `SELECT SUM(pi.quantity) AS purchased
+             FROM purchase_items pi
+             JOIN purchases p ON pi.purchase_id = p.id
+             WHERE pi.item_id = ? AND DATE(p.purchase_date) = ? AND (p.deleted = FALSE OR p.deleted IS NULL)`,
+            [itemId, date]
+          )
+        : await pool.query(
+            `SELECT SUM(pi.quantity) AS purchased
+             FROM purchase_items pi
+             JOIN purchases p ON pi.purchase_id = p.id
+             JOIN items i ON pi.item_id = i.id
+             WHERE i.auto_add_to_stock = 1 AND (i.deleted = FALSE OR i.deleted IS NULL)
+               AND DATE(p.purchase_date) = ? AND (p.deleted = FALSE OR p.deleted IS NULL)`,
+            [date]
+          );
 
-      const [[{ issued: dbIssued = 0 }]] = await pool.query(
-        `SELECT SUM(ii.quantity) AS issued
-         FROM issuance_items ii
-         JOIN issuances i ON ii.issuance_id = i.id
-         WHERE ii.item_id = ? AND DATE(i.issuance_date) = ?`,
-        [itemId, date]
-      );
+      const [[{ issued: dbIssued = 0 }]] = !isAllItems
+        ? await pool.query(
+            `SELECT SUM(ii.quantity) AS issued
+             FROM issuance_items ii
+             JOIN issuances i ON ii.issuance_id = i.id
+             WHERE ii.item_id = ? AND DATE(i.issuance_date) = ?`,
+            [itemId, date]
+          )
+        : await pool.query(
+            `SELECT SUM(ii.quantity) AS issued
+             FROM issuance_items ii
+             JOIN issuances i ON ii.issuance_id = i.id
+             JOIN items it ON ii.item_id = it.id
+             WHERE it.auto_add_to_stock = 1 AND (it.deleted = FALSE OR it.deleted IS NULL)
+               AND DATE(i.issuance_date) = ?`,
+            [date]
+          );
 
-      const [[{ wasted: dbWasted = 0 }]] = await pool.query(
-        `SELECT SUM(wi.quantity) AS wasted
-         FROM wastage_items wi
-         JOIN wastages w ON wi.wastage_id = w.id
-         WHERE wi.item_id = ? AND DATE(w.date) = ?`,
-        [itemId, date]
-      );
+      const [[{ wasted: dbWasted = 0 }]] = !isAllItems
+        ? await pool.query(
+            `SELECT SUM(wi.quantity) AS wasted
+             FROM wastage_items wi
+             JOIN wastages w ON wi.wastage_id = w.id
+             WHERE wi.item_id = ? AND DATE(w.date) = ?`,
+            [itemId, date]
+          )
+        : await pool.query(
+            `SELECT SUM(wi.quantity) AS wasted
+             FROM wastage_items wi
+             JOIN wastages w ON wi.wastage_id = w.id
+             JOIN items it ON wi.item_id = it.id
+             WHERE it.auto_add_to_stock = 1 AND (it.deleted = FALSE OR it.deleted IS NULL)
+               AND DATE(w.date) = ?`,
+            [date]
+          );
 
-      const [[{ returned: dbReturned = 0 }]] = await pool.query(
-        `SELECT SUM(ri.quantity) AS returned
-         FROM return_items ri
-         JOIN returns r ON ri.return_id = r.id
-         WHERE ri.item_id = ? AND DATE(r.return_date) = ?`,
-        [itemId, date]
-      );
+      const [[{ returned: dbReturned = 0 }]] = !isAllItems
+        ? await pool.query(
+            `SELECT SUM(ri.quantity) AS returned
+             FROM return_items ri
+             JOIN returns r ON ri.return_id = r.id
+             WHERE ri.item_id = ? AND DATE(r.return_date) = ?`,
+            [itemId, date]
+          )
+        : await pool.query(
+            `SELECT SUM(ri.quantity) AS returned
+             FROM return_items ri
+             JOIN returns r ON ri.return_id = r.id
+             JOIN items it ON ri.item_id = it.id
+             WHERE it.auto_add_to_stock = 1 AND (it.deleted = FALSE OR it.deleted IS NULL)
+               AND DATE(r.return_date) = ?`,
+            [date]
+          );
 
-      const [[{ purchaseReturned: dbPurchaseReturned = 0 }]] = await pool.query(
-        `SELECT SUM(pri.quantity) AS purchaseReturned
-         FROM purchase_return_items pri
-         JOIN purchase_returns pr ON pri.return_id = pr.id
-         WHERE pri.item_id = ? AND DATE(pr.return_date) = ?`,
-        [itemId, date]
-      );
+      const [[{ purchaseReturned: dbPurchaseReturned = 0 }]] = !isAllItems
+        ? await pool.query(
+            `SELECT SUM(pri.quantity) AS purchaseReturned
+             FROM purchase_return_items pri
+             JOIN purchase_returns pr ON pri.return_id = pr.id
+             WHERE pri.item_id = ? AND DATE(pr.return_date) = ?`,
+            [itemId, date]
+          )
+        : await pool.query(
+            `SELECT SUM(pri.quantity) AS purchaseReturned
+             FROM purchase_return_items pri
+             JOIN purchase_returns pr ON pri.return_id = pr.id
+             JOIN items it ON pri.item_id = it.id
+             WHERE it.auto_add_to_stock = 1 AND (it.deleted = FALSE OR it.deleted IS NULL)
+               AND DATE(pr.return_date) = ?`,
+            [date]
+          );
 
-      const [[{ adjusted: dbAdjusted = 0 }]] = await pool.query(
-        `SELECT SUM(variance) AS adjusted
-         FROM stock_adjustments
-         WHERE item_id = ? AND DATE(date) = ?`,
-        [itemId, date]
-      );
+      const [[{ adjusted: dbAdjusted = 0 }]] = !isAllItems
+        ? await pool.query(
+            `SELECT SUM(variance) AS adjusted
+             FROM stock_adjustments
+             WHERE item_id = ? AND DATE(date) = ?`,
+            [itemId, date]
+          )
+        : await pool.query(
+            `SELECT SUM(variance) AS adjusted
+             FROM stock_adjustments sa
+             JOIN items it ON sa.item_id = it.id
+             WHERE it.auto_add_to_stock = 1 AND (it.deleted = FALSE OR it.deleted IS NULL)
+               AND DATE(sa.date) = ?`,
+            [date]
+          );
 
       purchased = parseFloat(dbPurchased || 0);
       issued = parseFloat(dbIssued || 0);
@@ -550,6 +686,7 @@ const getDepartmentIssuesReport = async (req, res) => {
                 i.issuance_date,
                 d.name AS department_name,
                 i.received_by,
+                it.id AS item_id,
                 it.item_code,
                 it.name AS item_name,
                 ii.quantity,

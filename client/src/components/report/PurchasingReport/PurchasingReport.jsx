@@ -9,6 +9,9 @@ import { faBoxOpen } from '@fortawesome/free-solid-svg-icons';
 import './PurchasingReport.css';
 import api from '../../../api';
 import { formatNumber } from '../../../utils/formatters';
+import { filterItemByName, reportItemSelectStyles } from '../reportItemSelectHelper';
+
+const ALL_ITEMS_OPTION = { value: 'all', label: 'All Items', name: 'All Items', item_code: '', data: null };
 
 const PurchasingReport = () => {
   const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-01'));
@@ -193,20 +196,27 @@ const PurchasingReport = () => {
     return allItems;
   };
 
-  // =============================================
-  // 🔥 FIXED: Item options for react-select
-  // =============================================
   const itemOptions = useMemo(() => {
     // Prefer the items list fetched from the /items API (populates dropdown
     // even before generating a report). Fall back to extracting unique
     // items from reportData when itemsList is empty.
     if (itemsList && itemsList.length > 0) {
-      return itemsList.map((it) => ({
-        value: it.id || it.item_id,
-        label: `${it.name || it.item_name || 'Unknown'}${it.vat_applicable ? ' (VAT)' : ''}`,
-        name: it.name || it.item_name || 'Unknown',
-        vat_applicable: it.vat_applicable
-      }));
+      return [
+        ALL_ITEMS_OPTION,
+        ...itemsList.map((it) => {
+          const name = it.name || it.item_name || 'Unknown';
+          const code = it.item_code;
+          const displayLabel = code ? `${code} - ${name}` : name;
+          return {
+            value: it.id || it.item_id,
+            label: displayLabel,
+            name: name,
+            item_code: code || '',
+            vat_applicable: it.vat_applicable,
+            data: it
+          };
+        })
+      ];
     }
 
     const uniqueItems = new Map();
@@ -214,18 +224,23 @@ const PurchasingReport = () => {
       if (purchase.items && purchase.items.length > 0) {
         purchase.items.forEach((item) => {
           if (item.item_id && !uniqueItems.has(item.item_id)) {
+            const name = item.item_name || item.name || 'Unknown';
+            const code = item.item_code;
+            const displayLabel = code ? `${code} - ${name}` : name;
             uniqueItems.set(item.item_id, {
               value: item.item_id,
-              label: `${item.item_name || item.name || 'Unknown'}${item.vat_applicable ? ' (VAT)' : ''}`,
-              name: item.item_name || item.name || 'Unknown',
-              vat_applicable: item.vat_applicable
+              label: displayLabel,
+              name: name,
+              item_code: code || '',
+              vat_applicable: item.vat_applicable,
+              data: item
             });
           }
         });
       }
     });
 
-    return Array.from(uniqueItems.values());
+    return [ALL_ITEMS_OPTION, ...Array.from(uniqueItems.values())];
   }, [itemsList, reportData]);
 
   // =============================================
@@ -236,7 +251,8 @@ const PurchasingReport = () => {
   const filteredItems = allItems.filter((item) => {
     // Filter by selected item (using item_id)
     const matchesItem = !selectedItem || 
-      (item.item_id && item.item_id === selectedItem.value);
+      selectedItem.value === 'all' || 
+      (item.item_id && String(item.item_id) === String(selectedItem.value));
 
     // Filter by VAT status
     const matchesVat = vatFilter === 'all' ||
@@ -499,18 +515,18 @@ const PurchasingReport = () => {
             <FontAwesomeIcon icon={faBoxOpen} className="filter-icon" /> Item
           </label>
                 
-          <select
-            value={selectedItem ? selectedItem.value : ''}
-            onChange={(e) => setSelectedItem(itemOptions.find(item => String(item.value) === e.target.value) || null)}
-            className="report-filter-select"
-          >
-          <option value="">All Items</option>
-            {itemOptions.map(item => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </select>
+          <Select
+            value={selectedItem || ALL_ITEMS_OPTION}
+            onChange={(selected) => setSelectedItem(selected || ALL_ITEMS_OPTION)}
+            options={itemOptions}
+            filterOption={filterItemByName}
+            styles={reportItemSelectStyles}
+            className="react-select-container"
+            classNamePrefix="react-select"
+            isSearchable
+            isClearable={false}
+            placeholder="Select item..."
+          />
         </div>
 
         <div className="report-filter-actions">
