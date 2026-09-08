@@ -8,6 +8,10 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowLeft, faSave, faPlus, faTrash, faMoneyBillWave, faCreditCard, faCheckCircle, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
 import dayjs from 'dayjs';
 import './NewPurchase.css';
+import {
+  purchaseItemSelectComponents,
+  purchaseItemSelectStyles
+} from './PurchaseItemSelect';
 
 // props.embeddedId / props.onSaved / props.onCancel are optional.
 // When absent (standalone route usage via /purchase/edit/:id), behavior is unchanged.
@@ -514,8 +518,11 @@ const EditPurchase = ({ embeddedId, onSaved, onCancel } = {}) => {
   // Create item options for react-select with proper formatting
   const itemOptions = itemsList.map(item => ({
     value: item.id,
-    label: `${item.item_code} - ${item.name} ${item.vat_applicable ? '(VAT)' : ''}`,
+    label: `${item.name}${item.item_code ? ` (${item.item_code})` : ''}`,
+    name: item.name,
+    item_code: item.item_code,
     unit: item.unit,
+    current_stock: item.current_stock ?? item.stock_quantity ?? item.stock ?? item.available_stock,
     vat_applicable: item.vat_applicable,
     previousPrice: previousPurchasePrices[item.id] || 0
   }));
@@ -684,10 +691,11 @@ const EditPurchase = ({ embeddedId, onSaved, onCancel } = {}) => {
                           placeholder="Search or select item..."
                           className="purchase-item-select"
                           classNamePrefix="react-select"
-                          styles={{
-                            control: (base) => ({ ...base, borderColor: '#ced4da' }),
-                            menuPortal: (base) => ({ ...base, zIndex: 9999 })
-                          }}
+                          components={purchaseItemSelectComponents}
+                          styles={purchaseItemSelectStyles}
+                          menuPlacement="auto"
+                          closeMenuOnSelect
+                          blurInputOnSelect
                           menuPortalTarget={document.body}
                         />
                         {item.vat_applicable && (

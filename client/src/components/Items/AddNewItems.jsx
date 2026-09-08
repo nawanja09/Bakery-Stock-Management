@@ -171,10 +171,6 @@ const AddItem = () => {
                   checked={formData.vat_applicable}
                   onChange={handleChange}
                 />
-                <div className="toggle-animate">
-                  <span className="toggle-off">OFF</span>
-                  <span className="toggle-on">ON</span>
-                </div>
               </div>
             </label>
             <span className="minimal-helper-text">
@@ -193,10 +189,6 @@ const AddItem = () => {
                   checked={formData.auto_add_to_stock}
                   onChange={handleChange}
                 />
-                <div className="toggle-animate">
-                  <span className="toggle-off">OFF</span>
-                  <span className="toggle-on">ON</span>
-                </div>
               </div>
             </label>
             <span className="minimal-helper-text">

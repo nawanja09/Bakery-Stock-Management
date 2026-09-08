@@ -10,13 +10,15 @@ import {
   faCheck,
   faBan,
   faToggleOn,
-  faToggleOff
+  faToggleOff,
+  faFileExcel
 } from '@fortawesome/free-solid-svg-icons';
 import './ItemManagement.css';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
 import { ITEM_TYPE_OPTIONS } from './itemTypeOptions';
 import { formatNumber } from '../../utils/formatters';
+import * as XLSX from 'xlsx';
 
 const ViewItems = () => {
   const [items, setItems] = useState([]);
@@ -146,6 +148,41 @@ const ViewItems = () => {
     setFilterAutoAdd('all');
     setFilterItemType('all');
     setFilterStatus('active');
+  };
+
+  const handleExportExcel = () => {
+    if (filteredItems.length === 0) {
+      return;
+    }
+
+    const worksheetData = filteredItems.map(item => ({
+      'Item Code': item.item_code || '',
+      'Item Name': item.name || '',
+      'Unit': item.unit || '',
+      'Item Type': item.item_type || 'Other',
+      'Status': item.is_active ? 'Active' : 'Inactive',
+      'VAT Status': item.vat_applicable ? 'VAT Applicable' : 'VAT Not Applicable',
+      'Auto-Add to Stock': item.auto_add_to_stock ? 'Enabled' : 'Disabled',
+      'Current Stock': Number(item.current_stock || 0),
+      'Reorder Level': Number(item.reorder_level || 0)
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+    worksheet['!cols'] = [
+      { wch: 15 },
+      { wch: 30 },
+      { wch: 10 },
+      { wch: 18 },
+      { wch: 12 },
+      { wch: 20 },
+      { wch: 20 },
+      { wch: 16 },
+      { wch: 16 }
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Items');
+    XLSX.writeFile(workbook, `items-${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
   const hasActiveFilters = searchTerm || filterVat !== 'all' || filterAutoAdd !== 'all' || filterItemType !== 'all' || filterStatus !== 'active';
@@ -431,7 +468,13 @@ const ViewItems = () => {
               </span>
             </div>
             <div>
-              <button className="btn btn-secondary" disabled>
+              <button
+                className="btn btn-secondary"
+                onClick={handleExportExcel}
+                disabled={filteredItems.length === 0}
+                title="Export the currently displayed items to Excel"
+              >
+                <FontAwesomeIcon icon={faFileExcel} className="button-icon" />
                 Export List
               </button>
             </div>
