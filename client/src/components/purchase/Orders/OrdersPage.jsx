@@ -96,6 +96,14 @@ const OrdersPage = () => {
     fetchPending();
   }, [fetchLowStock, fetchPending]);
 
+  useEffect(() => {
+    if (activeTab === 'low-stock') {
+      fetchLowStock();
+    } else if (activeTab === 'pending') {
+      fetchPending();
+    }
+  }, [activeTab, fetchLowStock, fetchPending]);
+
   const searchCompleted = async (e) => {
     e?.preventDefault();
     if (!fromDate || !toDate) {
@@ -130,9 +138,7 @@ const OrdersPage = () => {
       showPopup('success', `Order ${data.order_no} placed successfully.`);
       setOrderModalItem(null);
       fetchPending();
-      // Stock is unaffected by placing an order, so Low Stock is intentionally
-      // NOT re-fetched here - the item correctly remains until it is actually
-      // received via the Purchasing Invoice.
+      fetchLowStock();
     } catch (error) {
       showPopup('error', error.response?.data?.error || 'Failed to place order.');
     } finally {
@@ -166,6 +172,7 @@ const OrdersPage = () => {
       showPopup('success', `Order ${order.order_no} cancelled.`);
       setConfirmAction(null);
       fetchPending();
+      fetchLowStock();
     } catch (error) {
       showPopup('error', error.response?.data?.error || 'Failed to cancel order.');
     } finally {
@@ -212,26 +219,36 @@ const OrdersPage = () => {
                     <th>Unit</th>
                     <th>Minimum Buffer Stock</th>
                     <th>Required Qty</th>
-                    <th>Supplier</th>
+                    <th>Ordered</th>
                     <th>Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {lowStock.map(item => (
-                    <tr key={item.item_id}>
-                      <td>{item.item_name}</td>
-                      <td>{formatNumber(item.current_stock)}</td>
-                      <td>{item.unit}</td>
-                      <td>{formatNumber(item.buffer_stock)}</td>
-                      <td className="orders-required-qty">{formatNumber(item.required_qty)}</td>
-                      <td>{item.supplier_name || '-'}</td>
-                      <td>
-                        <button className="btn-primary btn-sm" onClick={() => setOrderModalItem(item)}>
-                          Order
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {lowStock.map(item => {
+                    const isOrdered = Boolean(item.is_ordered || item.ordered === 'Yes');
+                    return (
+                      <tr key={item.item_id}>
+                        <td>{item.item_name}</td>
+                        <td>{formatNumber(item.current_stock)}</td>
+                        <td>{item.unit}</td>
+                        <td>{formatNumber(item.buffer_stock)}</td>
+                        <td className="orders-required-qty">{formatNumber(item.required_qty)}</td>
+                        <td>
+                          <span
+                            className={`orders-badge ${isOrdered ? 'orders-badge-yes' : 'orders-badge-no'}`}
+                            title={isOrdered && item.pending_order_no ? `Pending order: ${item.pending_order_no}` : undefined}
+                          >
+                            {isOrdered ? 'Yes' : 'No'}
+                          </span>
+                        </td>
+                        <td>
+                          <button className="btn-primary btn-sm" onClick={() => setOrderModalItem(item)}>
+                            Order
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
