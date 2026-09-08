@@ -10,6 +10,7 @@ import {
   Legend
 } from 'chart.js';
 import { formatNumber } from '../utils/formatters';
+import { UTILITY_COST_RATE } from './FGProduction/fgProductionConstants';
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Title, Tooltip, Legend);
 
@@ -29,9 +30,25 @@ const MAX_ITEMS = 8;
  * data actually supports.
  */
 const FgMarginChart = ({ recipes = [], loading }) => {
-  const priced = recipes
-    .filter(r => r.selling_price !== null && r.selling_price !== undefined && r.rm_cost > 0)
-    .sort((a, b) => b.rm_cost - a.rm_cost)
+  const processedRecipes = recipes.map(r => {
+    const outputQty = parseFloat(r.recipe_output_quantity) || 0;
+    const rmCost = parseFloat(r.rm_cost) || 0;
+
+    const utilityPercentage = Number.parseFloat(r.utility_cost_percentage);
+    const configuredUtilityPercentage = Number.isFinite(utilityPercentage)
+      ? utilityPercentage
+      : UTILITY_COST_RATE * 100;
+    
+    const utilityCost = rmCost * (configuredUtilityPercentage / 100);
+    const totalProductionCost = rmCost + utilityCost;
+    const productionCostPerPiece = outputQty > 0 ? totalProductionCost / outputQty : 0;
+    
+    return { ...r, productionCostPerPiece };
+  });
+
+  const priced = processedRecipes
+    .filter(r => r.selling_price !== null && r.selling_price !== undefined && r.productionCostPerPiece > 0)
+    .sort((a, b) => b.productionCostPerPiece - a.productionCostPerPiece)
     .slice(0, MAX_ITEMS);
 
   if (loading) {
@@ -53,8 +70,8 @@ const FgMarginChart = ({ recipes = [], loading }) => {
     labels: priced.map(r => r.fg_item_name),
     datasets: [
       {
-        label: 'RM Cost',
-        data: priced.map(r => Number(r.rm_cost.toFixed(2))),
+        label: 'Recipe Cost',
+        data: priced.map(r => Number(r.productionCostPerPiece.toFixed(2))),
         backgroundColor: primary,
         borderRadius: 4,
         maxBarThickness: 28
