@@ -145,7 +145,7 @@ const getWastageById = async (req, res) => {
       SELECT 
         w.*, u.username AS entered_by
       FROM wastages w
-      JOIN users u ON w.entered_by = u.id
+      LEFT JOIN users u ON w.entered_by = u.id
       WHERE w.id = ? AND COALESCE(w.status, 1) = 1
     `, [id]);
 

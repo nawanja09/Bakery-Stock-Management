@@ -16,6 +16,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import api from '../../api';
 import { formatNumber } from '../../utils/formatters';
+import { filterItemByName, reportItemSelectStyles } from './reportItemSelectHelper';
 import './StockReport.css';   
 
 // Transaction Details Modal Component
@@ -201,14 +202,17 @@ const TransactionDetailsModal = ({ date, itemId, itemName, onClose }) => {
   );
 };
 
+const ALL_ITEMS_OPTION = { value: 'all', label: 'All Items', name: 'All Items', item_code: '', data: null };
+
 const StockReportByRangeAndItem = () => {
   const today = format(new Date(), 'yyyy-MM-dd');
   const [startDate, setStartDate] = useState(today);
   const [endDate, setEndDate] = useState(today);
-  const [items, setItems] = useState([]);
-  const [selectedItem, setSelectedItem] = useState(null);
+  const [items, setItems] = useState([ALL_ITEMS_OPTION]);
+  const [selectedItem, setSelectedItem] = useState(ALL_ITEMS_OPTION);
   const [stockData, setStockData] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [hasGenerated, setHasGenerated] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
   const [error, setError] = useState('');
 
@@ -217,11 +221,16 @@ const StockReportByRangeAndItem = () => {
       try {
         // Only fetch auto-add enabled items
         const res = await api.get('/items?auto_add_only=true');
-        const itemsData = res.data.map(item => ({
-          value: item.id,
-          label: `${item.item_code} - ${item.name} (Auto-Add)`,
-          data: item
-        }));
+        const itemsData = [
+          ALL_ITEMS_OPTION,
+          ...res.data.map(item => ({
+            value: item.id,
+            label: `${item.item_code} - ${item.name} (Auto-Add)`,
+            name: item.name,
+            item_code: item.item_code,
+            data: item
+          }))
+        ];
         setItems(itemsData);
       } catch (err) {
         console.error('Failed to fetch items:', err);
@@ -231,9 +240,9 @@ const StockReportByRangeAndItem = () => {
     fetchItems();
   }, []);
 
-  const fetchStockReport = async () => {
-    if (!startDate || !endDate || !selectedItem) {
-      alert('Please select start date, end date, and item.');
+  const fetchStockReport = async (overrideItem = null) => {
+    if (!startDate || !endDate) {
+      alert('Please select start date and end date.');
       return;
     }
     
@@ -242,14 +251,19 @@ const StockReportByRangeAndItem = () => {
       return;
     }
 
+    const currentItem = overrideItem !== null ? overrideItem : selectedItem;
+
     setLoading(true);
     setError('');
     
     try {
-      const res = await api.get(`/reports/stock-range-item`, {
-        params: { startDate, endDate, itemId: selectedItem.value }
-      });
+      const params = { startDate, endDate };
+      if (currentItem && currentItem.value && currentItem.value !== 'all') {
+        params.itemId = currentItem.value;
+      }
+      const res = await api.get(`/reports/stock-range-item`, { params });
       setStockData(res.data);
+      setHasGenerated(true);
     } catch (err) {
       console.error(err);
       setError(err.response?.data?.error || 'Error fetching stock data');
@@ -258,8 +272,16 @@ const StockReportByRangeAndItem = () => {
     }
   };
 
+  const handleItemChange = (selected) => {
+    const nextItem = selected || ALL_ITEMS_OPTION;
+    setSelectedItem(nextItem);
+    if (hasGenerated) {
+      fetchStockReport(nextItem);
+    }
+  };
+
   const handleRowClick = (rowData) => {
-    if (selectedItem) {
+    if (selectedItem && selectedItem.value !== 'all') {
       setSelectedTransaction({
         date: rowData.date,
         itemId: selectedItem.value,
@@ -284,7 +306,7 @@ const StockReportByRangeAndItem = () => {
     // Subtitle
     doc.setFontSize(12);
     doc.setTextColor(100, 100, 100);
-    const itemLabel = selectedItem ? selectedItem.label : 'Selected Item';
+    const itemLabel = (selectedItem && selectedItem.value !== 'all') ? selectedItem.label : 'All Items';
     doc.text(itemLabel, 105, 22, { align: 'center' });
     
     // Date range
@@ -321,7 +343,8 @@ const StockReportByRangeAndItem = () => {
       headStyles: { fillColor: [0, 102, 204] }
     });
 
-    doc.save(`auto-stock-movement-${selectedItem.value}-${startDate}-to-${endDate}.pdf`);
+    const itemSuffix = (selectedItem && selectedItem.value !== 'all') ? selectedItem.value : 'all';
+    doc.save(`auto-stock-movement-${itemSuffix}-${startDate}-to-${endDate}.pdf`);
   };
 
   const downloadExcel = () => {
@@ -330,9 +353,10 @@ const StockReportByRangeAndItem = () => {
       return;
     }
 
+    const itemLabel = (selectedItem && selectedItem.value !== 'all') ? selectedItem.label : 'All Items';
     const worksheetData = [
       ['AUTO-MANAGED STOCK MOVEMENT REPORT'],
-      [`Item: ${selectedItem ? selectedItem.label : ''}`],
+      [`Item: ${itemLabel}`],
       [`Period: ${format(new Date(startDate), 'MMM dd, yyyy')} to ${format(new Date(endDate), 'MMM dd, yyyy')}`],
       [''],
       ['Date', 'Opening', 'Purchased', 'Issued', 'Wasted', 'Dept Return', 'Purchase Return', 'Adjustments', 'Closing', 'Net Change']
@@ -359,7 +383,8 @@ const StockReportByRangeAndItem = () => {
     const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Auto-Managed Stock');
     
-    const fileName = `auto-stock-movement-${selectedItem?.value}-${startDate}-to-${endDate}.xlsx`;
+    const itemSuffix = (selectedItem && selectedItem.value !== 'all') ? selectedItem.value : 'all';
+    const fileName = `auto-stock-movement-${itemSuffix}-${startDate}-to-${endDate}.xlsx`;
     XLSX.writeFile(workbook, fileName);
   };
 
@@ -421,24 +446,24 @@ const StockReportByRangeAndItem = () => {
             <FontAwesomeIcon icon={faBoxOpen} className="filter-icon" /> Item
           </label>
         
-          <select
-            value={selectedItem ? selectedItem.value : ''}
-            onChange={(e) => setSelectedItem(items.find(item => String(item.value) === e.target.value) || null)}
-            className="report-filter-select"
-          >
-            <option value="">All Items</option>
-              {items.map(item => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
-                </option>
-              ))}
-          </select>
+          <Select
+            value={selectedItem || ALL_ITEMS_OPTION}
+            onChange={handleItemChange}
+            options={items}
+            filterOption={filterItemByName}
+            styles={reportItemSelectStyles}
+            className="react-select-container"
+            classNamePrefix="react-select"
+            isSearchable
+            isClearable={false}
+            placeholder="Select item..."
+          />
         </div>
 
         <div className="report-filter-actions">
           <button 
-            onClick={fetchStockReport} 
-            disabled={loading || !selectedItem}
+            onClick={() => fetchStockReport()} 
+            disabled={loading}
             className="btn btn-primary"
           >
             {loading ? 'Loading...' : 'Generate Report'}
