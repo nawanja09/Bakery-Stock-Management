@@ -42,11 +42,27 @@ const getLowStock = async (req, res) => {
   try {
     const items = await getAllItemsWithStock();
 
+    // Query active/pending orders to determine if an order has already been placed
+    const [pendingRows] = await pool.query(`
+      SELECT DISTINCT oi.item_id, o.order_no
+      FROM order_items oi
+      JOIN orders o ON oi.order_id = o.id
+      WHERE o.status = 'PENDING'
+      ORDER BY o.id DESC
+    `);
+    const pendingOrderMap = new Map();
+    for (const row of pendingRows) {
+      if (!pendingOrderMap.has(row.item_id)) {
+        pendingOrderMap.set(row.item_id, row.order_no);
+      }
+    }
+
     const lowStock = items
       .map(item => {
         const currentStock = parseFloat(item.current_stock) || 0;
         const bufferStock = parseFloat(item.reorder_level) || 0;
         const requiredQty = bufferStock - currentStock;
+        const isOrdered = pendingOrderMap.has(item.id);
         return {
           item_id: item.id,
           item_code: item.item_code,
@@ -55,11 +71,9 @@ const getLowStock = async (req, res) => {
           current_stock: currentStock,
           buffer_stock: bufferStock,
           required_qty: requiredQty,
-          // No RM item -> default supplier link exists in this system yet,
-          // so the Supplier column/field stays optional/empty here (per spec
-          // section 5 - never forced).
-          supplier_id: null,
-          supplier_name: null
+          is_ordered: isOrdered,
+          ordered: isOrdered ? 'Yes' : 'No',
+          pending_order_no: pendingOrderMap.get(item.id) || null
         };
       })
       .filter(item => item.required_qty > 0)
