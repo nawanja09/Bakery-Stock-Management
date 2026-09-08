@@ -428,6 +428,7 @@
 
 /* Keep the item selector compact and aligned with the table inputs. */
 .purchase-item-select .react-select__control {
+  width: 100%;
   min-height: 34px;
   height: 34px;
   border-color: var(--color-border);
@@ -462,6 +463,59 @@
 
 .purchase-item-select .react-select__indicator {
   padding: 6px;
+}
+
+.purchase-item-option {
+  min-width: 0;
+}
+
+.purchase-item-option-name {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.purchase-item-option-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 3px;
+  color: #64748b;
+  font-size: 11px;
+}
+
+.purchase-item-option mark {
+  padding: 0;
+  background: #dbeafe;
+  color: inherit;
+}
+
+.purchase-item-select .react-select__menu {
+  position: absolute;
+  z-index: 10000;
+  max-height: 240px;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid #dbe3ec;
+  border-radius: 8px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14);
+}
+
+.purchase-item-select .react-select__menu-list {
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+@media (max-width: 768px) {
+  .purchase-item-option-meta {
+    gap: 5px;
+  }
+
+  .purchase-item-select .react-select__option {
+    padding: 10px;
+  }
 }
 
 .filters-bar {

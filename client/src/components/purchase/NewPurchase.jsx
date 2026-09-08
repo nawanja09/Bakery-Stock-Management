@@ -23,6 +23,10 @@ import './NewPurchase.css';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
 import PendingInvoicesSection from './PendingInvoicesSection';
+import {
+  purchaseItemSelectComponents,
+  purchaseItemSelectStyles
+} from './PurchaseItemSelect';
 
 const AddPurchase = () => {
   const navigate = useNavigate();
@@ -421,6 +425,7 @@ const AddPurchase = () => {
 
   // Custom components to hide dropdown indicator and separator
   const customSelectComponents = {
+    ...purchaseItemSelectComponents,
     DropdownIndicator: null,
     IndicatorSeparator: null
   };
@@ -526,7 +531,11 @@ const AddPurchase = () => {
 
   const itemOptions = itemsList.map(itm => ({
     value: itm.id,
-    label: `${itm.name} (${itm.item_code || ''})`,
+    label: `${itm.name}${itm.item_code ? ` (${itm.item_code})` : ''}`,
+    name: itm.name,
+    item_code: itm.item_code,
+    unit: itm.unit,
+    current_stock: itm.current_stock ?? itm.stock_quantity ?? itm.stock ?? itm.available_stock,
     previousPrice: previousPurchasePrices[itm.id] || 0
   }));
 
@@ -732,10 +741,10 @@ const AddPurchase = () => {
                             className="purchase-item-select"
                             classNamePrefix="react-select"
                             components={customSelectComponents}
-                            styles={{
-                              control: (base) => ({ ...base, borderColor: '#ced4da' }),
-                              menuPortal: (base) => ({ ...base, zIndex: 9999 })
-                            }}
+                            styles={purchaseItemSelectStyles}
+                            menuPlacement="auto"
+                            closeMenuOnSelect
+                            blurInputOnSelect
                             menuPortalTarget={document.body}
                           />
                           {item.vat_applicable && (

@@ -141,7 +141,7 @@ const NavigationBar = () => {
         navigate('/items');
         break;
       case 'raw':
-        navigate('/items');
+        navigate('/purchase/new');
         break;
       case 'finished':
         navigate('/finished-goods/items');
