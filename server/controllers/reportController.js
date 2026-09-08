@@ -2,7 +2,7 @@ const pool = require('../config/db');
 
 const getStockReport = async (req, res) => {
   try {
-    const { date } = req.query;
+    const { date, status, category } = req.query;
 
     if (!date) {
       return res.status(400).json({ error: 'Date parameter is required' });
@@ -18,12 +18,32 @@ const getStockReport = async (req, res) => {
     prevDate.setDate(prevDate.getDate() - 1);
     const prevDateStr = prevDate.toISOString().split('T')[0];
 
+    let statusCondition = '';
+    if (status) {
+      const s = String(status).toLowerCase();
+      if (s === 'active') {
+        statusCondition = ' AND i.is_active = TRUE';
+      } else if (s === 'inactive') {
+        statusCondition = ' AND i.is_active = FALSE';
+      }
+    }
+
+    let categoryCondition = '';
+    const additionalParams = [];
+    if (category && category !== 'All' && category !== 'all' && category !== 'All Categories') {
+      categoryCondition = ' AND (i.item_type = ? OR (? = "Other" AND i.item_type IS NULL))';
+      additionalParams.push(category, category);
+    }
+
     const query = `
       SELECT 
         i.id,
         i.item_code,
         i.name AS item_name,
         i.unit,
+        i.item_type,
+        i.item_type AS category,
+        i.is_active,
         i.auto_add_to_stock,
         COALESCE(prev.closing_balance, 0) + COALESCE(ob_today.opening_balance_today, 0) AS opening_balance,
         COALESCE(purchases.total_purchased, 0) AS total_purchased,
@@ -114,7 +134,6 @@ const getStockReport = async (req, res) => {
           GROUP BY item_id
         ) adjustments ON i2.id = adjustments.item_id
         WHERE i2.deleted = FALSE
-          AND i2.is_active = TRUE
       ) prev ON i.id = prev.item_id
       LEFT JOIN (
         SELECT item_id, SUM(quantity) AS opening_balance_today
@@ -166,7 +185,8 @@ const getStockReport = async (req, res) => {
       ) adjustments ON i.id = adjustments.item_id
       WHERE i.auto_add_to_stock = 1
         AND i.deleted = FALSE
-        AND i.is_active = TRUE
+        ${statusCondition}
+        ${categoryCondition}
       ORDER BY i.item_code
     `;
 
@@ -174,7 +194,8 @@ const getStockReport = async (req, res) => {
       date, // For unit price subquery
       prevDateStr, prevDateStr, prevDateStr, prevDateStr, prevDateStr, prevDateStr, prevDateStr, // yesterday x7
       date,                                              // today opening
-      date, date, date, date, date, date                 // today purchases/issues/wastage/returns/purchase_returns/adjustments
+      date, date, date, date, date, date,                // today purchases/issues/wastage/returns/purchase_returns/adjustments
+      ...additionalParams
     ];
 
     const [rows] = await pool.query(query, params);
@@ -187,6 +208,7 @@ const getStockReport = async (req, res) => {
       
       return {
         ...item,
+        category: item.item_type || 'Other',
         value: value,
         unit_price: unitPrice,
         stock_type: 'Auto-Managed'

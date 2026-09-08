@@ -58,6 +58,7 @@ const inhandRoutes  = require('./routes/inhandRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const receiveTypeRoutes = require('./routes/receiveTypeRoutes');
 const analystRoutes = require('./routes/analystRoutes');
+const incomeRoutes = require('./routes/incomeRoutes');
 const readOnly = require('./middleware/readOnly');
 
 // NEW, independent module - FG (Finished Goods) Production.
@@ -157,6 +158,7 @@ app.use('/api/finance', financeRoutes);
 app.use('/api/inhand', inhandRoutes);
 app.use('/api/receive-types', receiveTypeRoutes);
 app.use('/api/analyst', analystRoutes);
+app.use('/api/incomes', incomeRoutes);
 
 // Error handling middleware for file uploads
 app.use((err, req, res, next) => {
@@ -177,4 +179,4 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Uploads directory: ${path.join(__dirname, 'uploads')}`);
-}); 
+});

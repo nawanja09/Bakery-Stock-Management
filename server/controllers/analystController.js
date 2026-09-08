@@ -11,27 +11,49 @@ const number = (value) => Number.parseFloat(value || 0) || 0;
 
 const getIncomes = async (req, res) => {
   try {
-    const { fromDate, toDate } = req.query;
+    const { fromDate, toDate, company } = req.query;
     dateFilters(fromDate, toDate);
-    const clauses = [
-      "ft.status = 1", "ft.debit > 0",
-      "COALESCE(ft.reference_type, '') NOT IN ('PETTY_CASH_VOUCHER', 'BANK_CHARGE', 'EXPENSE_PAYMENT', 'PURCHASE_PAYMENT', 'CASH_BANK_TRANSFER', 'BANK_TRANSFER')",
-      "COALESCE(ft.transaction_type, '') NOT IN ('RM Purchase Payment', 'Supplier Advance Payment', 'Bank Deposit', 'Bank Withdrawal', 'Bank Transfer')"
-    ];
+    const clauses = ['i.status = 1'];
     const params = [];
-    if (fromDate) { clauses.push('ft.transaction_date >= ?'); params.push(fromDate); }
-    if (toDate) { clauses.push('ft.transaction_date <= ?'); params.push(toDate); }
+    if (fromDate) {
+      clauses.push('i.income_date >= ?');
+      params.push(fromDate);
+    }
+    if (toDate) {
+      clauses.push('i.income_date <= ?');
+      params.push(toDate);
+    }
+    if (company && company !== 'all') {
+      clauses.push('(c.name = ? OR i.company_id = ?)');
+      params.push(company, company);
+    }
     const [rows] = await pool.query(`
-      SELECT ft.id, DATE_FORMAT(ft.transaction_date, '%Y-%m-%d') AS date,
-             COALESCE(ft.reference_number, ft.invoice_number, CONCAT('TXN-', ft.id)) AS reference,
-             COALESCE(ft.transaction_type, 'Income') AS income_type,
-             COALESCE(ft.remark, ft.party_name, '') AS description,
-             COALESCE(ft.party_name, CASE WHEN ft.account_type = 'BANK' THEN 'Bank Account' ELSE 'Cash Book' END) AS payment_method,
-             CAST(ft.debit AS DECIMAL(14,2)) AS amount
-      FROM finance_transactions ft
+      SELECT i.id,
+             DATE_FORMAT(i.income_date, '%Y-%m-%d') AS date,
+             i.income_date,
+             CONCAT('INC-', i.id) AS reference,
+             'Income' AS income_type,
+             i.company_id,
+             c.name AS company_name,
+             i.department_id,
+             d.name AS department_name,
+             CONCAT(c.name, ' - ', d.name) AS description,
+             c.name AS payment_method,
+             i.amount,
+             i.created_at
+      FROM incomes i
+      JOIN company c ON c.id = i.company_id
+      JOIN departments d ON d.id = i.department_id
       WHERE ${clauses.join(' AND ')}
-      ORDER BY ft.transaction_date DESC, ft.id DESC`, params);
-    res.json({ records: rows, totalIncome: rows.reduce((sum, row) => sum + number(row.amount), 0), transactionCount: rows.length });
+      ORDER BY i.income_date DESC, i.id DESC
+    `, params);
+    const records = rows.map(row => ({ ...row, amount: number(row.amount) }));
+    res.json({
+      records,
+      totalIncome: records.reduce((sum, row) => sum + row.amount, 0),
+      transactionCount: records.length,
+      company: company || 'all'
+    });
   } catch (error) {
     const status = error.message.startsWith('Invalid') || error.message.includes('cannot be') ? 400 : 500;
     console.error('Analyst income report error:', error);
@@ -46,7 +68,7 @@ const getExpenses = async (req, res) => {
     if (!VALID_METHODS.has(method)) return res.status(400).json({ error: 'Invalid expense method' });
     const sources = [];
     const range = (column) => `${fromDate ? ` AND ${column} >= ?` : ''}${toDate ? ` AND ${column} <= ?` : ''}`;
-    const rangeParams = () => [ ...(fromDate ? [fromDate] : []), ...(toDate ? [toDate] : []) ];
+    const rangeParams = () => [...(fromDate ? [fromDate] : []), ...(toDate ? [toDate] : [])];
 
     if (method === 'all' || method === 'petty_cash') {
       sources.push({ sql: `SELECT pv.id, pv.voucher_date AS date, pv.voucher_number AS reference, 'Petty Cash' AS expense_method, COALESCE(pv.description, pv.expense_type, '') AS description, 'Petty Cash' AS payment_source, pv.amount FROM petty_cash_vouchers pv WHERE COALESCE(pv.status, '') NOT IN ('Cancelled', 'Deleted', 'Voided')${range('pv.voucher_date')}`, params: rangeParams() });
@@ -74,6 +96,37 @@ const getExpenses = async (req, res) => {
     res.status(status).json({ error: status === 400 ? error.message : 'Failed to load expense report' });
   }
 };
+
+// Shared fragment: amount actually paid against a purchase, as of a given date.
+// 1) Sums payment_history (respecting purchase_payment_allocations splits), same as before.
+// 2) FIX: adds a fallback for purchases that were settled at the counter (payment_status = 'Paid',
+//    e.g. CASH/BANK_TRANSFER paid in full at time of purchase) and therefore never got a
+//    payment_history row at all. Without this fallback these purchases were being treated as
+//    100% unpaid, which was inflating Outstanding Invoices / Purchasing Payable by tens of millions.
+const PAID_TO_DATE_SQL = `
+  COALESCE((
+    SELECT SUM(CASE
+      WHEN ppa.purchase_id IS NOT NULL THEN ppa.allocated_amount
+      ELSE ph.amount
+    END)
+    FROM payment_history ph
+    LEFT JOIN purchase_payment_allocations ppa
+      ON ppa.payment_history_id = ph.id AND ppa.purchase_id = p.id
+    WHERE ph.payment_date <= ?
+      AND (ppa.purchase_id = p.id OR (
+        ph.purchase_id = p.id AND NOT EXISTS (
+          SELECT 1 FROM purchase_payment_allocations ppa2
+          WHERE ppa2.payment_history_id = ph.id
+        )
+      ))
+  ), 0)
+  + CASE
+      WHEN p.payment_status = 'Paid'
+       AND NOT EXISTS (SELECT 1 FROM payment_history ph3 WHERE ph3.purchase_id = p.id)
+      THEN COALESCE(NULLIF(p.total_with_vat, 0), NULLIF(p.bill_amount, 0), COALESCE(p.subtotal, 0) + COALESCE(p.vat_amount, 0))
+      ELSE 0
+    END
+`;
 
 const getBalanceSheet = async (req, res) => {
   try {
@@ -152,12 +205,134 @@ const getBalanceSheet = async (req, res) => {
           AND i.deleted = FALSE
           AND i.is_active = TRUE
       ) stock_values`, [date, date, date, date, date, date, date, date]);
+    const [purchasingRows] = await pool.query(`
+      SELECT
+        COALESCE(SUM(invoice_total), 0) AS total_purchasing_value,
+        COALESCE(SUM(CASE WHEN outstanding <= 0 THEN invoice_total ELSE 0 END), 0) AS total_purchasing_completed,
+        COALESCE(SUM(CASE WHEN outstanding > 0 THEN outstanding ELSE 0 END), 0) AS total_purchasing_pending,
+        COUNT(CASE WHEN outstanding <= 0 THEN 1 END) AS completed_purchasing_count,
+        COUNT(CASE WHEN outstanding > 0 THEN 1 END) AS pending_purchasing_count
+      FROM (
+        SELECT invoice_total,
+          GREATEST(invoice_total - paid_to_date, 0) AS outstanding
+        FROM (
+          SELECT p.id,
+            GREATEST(
+              COALESCE(NULLIF(p.total_with_vat, 0), NULLIF(p.bill_amount, 0), COALESCE(p.subtotal, 0) + COALESCE(p.vat_amount, 0))
+              - COALESCE((
+                SELECT SUM(pr.total_amount)
+                FROM purchase_returns pr
+                WHERE pr.purchase_id = p.id
+                  AND DATE(pr.return_date) <= ?
+              ), 0),
+              0
+            ) AS invoice_total,
+            ${PAID_TO_DATE_SQL} AS paid_to_date
+          FROM purchases p
+          WHERE DATE(p.purchase_date) <= ?
+            AND COALESCE(p.deleted, 0) = 0
+        ) invoice_positions
+      ) invoice_balances`, [date, date, date]);
+    const [advanceRows] = await pool.query(`
+      SELECT COALESCE(SUM(GREATEST(so.original_amount - COALESCE(used.amount, 0), 0)), 0) AS advance_payment_balance
+      FROM supplier_overpayments so
+      LEFT JOIN (
+        SELECT overpayment_id, SUM(allocated_amount) AS amount
+        FROM credit_allocations
+        WHERE credit_type = 'overpayment' AND settlement_date <= ?
+        GROUP BY overpayment_id
+      ) used ON used.overpayment_id = so.id
+      WHERE so.payment_date <= ?`, [date, date]);
+    const [excessPaymentRows] = await pool.query(`
+      SELECT COALESCE(SUM(GREATEST(ph.amount - COALESCE(allocations.allocated_amount, 0), 0)), 0) AS payment_overpayment
+      FROM payment_history ph
+      INNER JOIN (
+        SELECT payment_history_id, SUM(allocated_amount) AS allocated_amount
+        FROM purchase_payment_allocations
+        GROUP BY payment_history_id
+      ) allocations ON allocations.payment_history_id = ph.id
+      WHERE ph.payment_date <= ?
+        AND EXISTS (
+          SELECT 1
+          FROM purchase_payment_allocations ppa
+          INNER JOIN purchases p ON p.id = ppa.purchase_id
+          WHERE ppa.payment_history_id = ph.id
+            AND DATE(p.purchase_date) <= ?
+            AND COALESCE(p.deleted, 0) = 0
+        )`, [date, date]);
+    const [returnExcessRows] = await pool.query(`
+      SELECT COALESCE(SUM(GREATEST(paid_to_date - net_invoice_total, 0)), 0) AS return_overpayment
+      FROM (
+        SELECT p.id,
+          GREATEST(
+            COALESCE(NULLIF(p.total_with_vat, 0), NULLIF(p.bill_amount, 0), COALESCE(p.subtotal, 0) + COALESCE(p.vat_amount, 0))
+            - COALESCE((
+              SELECT SUM(pr.total_amount)
+              FROM purchase_returns pr
+              WHERE pr.purchase_id = p.id AND DATE(pr.return_date) <= ?
+            ), 0),
+            0
+          ) AS net_invoice_total,
+          ${PAID_TO_DATE_SQL} AS paid_to_date
+        FROM purchases p
+        WHERE DATE(p.purchase_date) <= ? AND COALESCE(p.deleted, 0) = 0
+      ) invoice_positions`, [date, date, date]);
     const cashBooks = cashRows.map(row => ({ companyId: row.company_id, name: row.name, balance: number(row.balance) }));
     const cashBookJH = cashBooks.find(row => /jh/i.test(row.name))?.balance || 0;
     const cashBookRD = cashBooks.find(row => /rd/i.test(row.name))?.balance || 0;
-    const totalBankValues = bankRows.reduce((sum, row) => sum + number(row.balance), 0);
+    const cashBookTotal = cashBookJH + cashBookRD;
+    const bankOfCeylon = bankRows
+      .filter(row => /\b(boc|bank of ceylon)\b/i.test(row.bank_name || ''))
+      .reduce((sum, row) => sum + number(row.balance), 0);
+    const peoplesBank = bankRows
+      .filter(row => /people.?s bank/i.test(row.bank_name || ''))
+      .reduce((sum, row) => sum + number(row.balance), 0);
+    const totalBankValues = bankOfCeylon + peoplesBank;
     const storesValue = number(storesRows[0]?.stores_value);
-    res.json({ date, cashBookJH, cashBookRD, cashBooks, storesValue, banks: bankRows.map(row => ({ ...row, balance: number(row.balance) })), totalBankValues, totalFinancialPosition: cashBookJH + cashBookRD + storesValue + totalBankValues });
+    const totalAssets = cashBookTotal + storesValue + totalBankValues;
+    const totalPurchasingValue = number(purchasingRows[0]?.total_purchasing_value);
+    const totalPurchasingCompleted = number(purchasingRows[0]?.total_purchasing_completed);
+    const totalPurchasingPending = number(purchasingRows[0]?.total_purchasing_pending);
+    const completedPurchasingCount = Number(purchasingRows[0]?.completed_purchasing_count || 0);
+    const pendingPurchasingCount = Number(purchasingRows[0]?.pending_purchasing_count || 0);
+    // Reconciliation check: total purchasing value should equal completed value plus pending value.
+    const purchasingReconciliationDifference = totalPurchasingValue
+      - (totalPurchasingCompleted + totalPurchasingPending);
+    if (Math.abs(purchasingReconciliationDifference) > 0.01) {
+      console.warn('Balance sheet purchasing totals do not reconcile:', {
+        totalPurchasingValue,
+        totalPurchasingCompleted,
+        totalPurchasingPending,
+        difference: purchasingReconciliationDifference
+      });
+    }
+    // The legacy outstandingInvoices field intentionally uses this same pending aggregate
+    // so it remains a direct cross-check for existing consumers and the Supplier Ledger.
+    const outstandingInvoices = totalPurchasingPending;
+    const purchasingPayable = outstandingInvoices;
+    const purchasingAdvancePaymentBalance = number(advanceRows[0]?.advance_payment_balance);
+    const purchasingOverpayment = number(excessPaymentRows[0]?.payment_overpayment)
+      + number(returnExcessRows[0]?.return_overpayment);
+    const totalPayables = purchasingPayable + purchasingOverpayment;
+    const netBalance = totalAssets - totalPayables;
+    res.json({
+      date, cashBookJH, cashBookRD, cashBookTotal, cashBooks,
+      storesValue, banks: bankRows.map(row => ({ ...row, balance: number(row.balance) })),
+      bankOfCeylon, peoplesBank, totalBankValues,
+      totalAssets, outstandingInvoices, purchasingPayable,
+      totalPurchasingValue, totalPurchasingCompleted, totalPurchasingPending,
+      completedPurchasingCount, pendingPurchasingCount,
+      purchasing: {
+        totalValue: totalPurchasingValue,
+        completedValue: totalPurchasingCompleted,
+        pendingValue: totalPurchasingPending,
+        completedCount: completedPurchasingCount,
+        pendingCount: pendingPurchasingCount
+      },
+      purchasingAdvancePaymentBalance, purchasingOverpayment, totalPayables, netBalance,
+      // kept for backward compatibility with any other consumer of this endpoint
+      totalFinancialPosition: totalAssets
+    });
   } catch (error) {
     console.error('Analyst balance sheet error:', error);
     res.status(500).json({ error: 'Failed to calculate balance sheet' });

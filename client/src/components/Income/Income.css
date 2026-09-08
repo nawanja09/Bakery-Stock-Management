@@ -1,0 +1,101 @@
+/* ===== Income page ===== */
+.income-page { gap: 16px; color: var(--color-heading); }
+
+.income-header { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.income-header h2 { display: flex; align-items: center; gap: 10px; margin: 0; }
+.income-header h2 svg { color: var(--color-primary); }
+.income-header-actions { display: flex; gap: 10px; }
+.income-header-actions button { height: 40px; display: inline-flex; align-items: center; gap: 8px; }
+.income-new-btn { font-weight: 700; box-shadow: var(--shadow-primary); }
+
+.income-summary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.income-summary-card { min-height: 92px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between; border-top: 3px solid var(--color-primary); }
+.income-summary-card span { color: var(--color-text-secondary); font-size: .76rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.income-summary-card strong { color: var(--color-heading); font-size: 1.35rem; font-variant-numeric: tabular-nums; }
+
+.income-error { padding: 12px 14px; border: 1px solid var(--color-danger); border-radius: 6px; color: var(--color-danger); background: var(--color-danger-light); }
+
+.income-table-card { padding: 0; overflow: hidden; }
+.income-table-scroll { width: 100%; overflow-x: auto; }
+.income-table-card table { min-width: 560px; }
+.income-amount { text-align: right; font-variant-numeric: tabular-nums; }
+.income-badge { display: inline-block; padding: 4px 8px; border-radius: 999px; color: var(--color-primary-dark); background: var(--color-primary-light); font-size: .75rem; font-weight: 700; }
+.income-empty { padding: 34px !important; text-align: center; color: var(--color-text-secondary); }
+.income-empty-panel { min-height: 220px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 32px; border: 1px dashed var(--color-border); border-radius: 8px; color: var(--color-text-secondary); text-align: center; }
+.income-empty-panel strong { color: var(--color-heading); font-size: 1.05rem; }
+.income-empty-panel .income-new-btn { margin-top: 8px; }
+.income-actions { display: flex; gap: 8px; white-space: nowrap; }
+.income-actions .btn { display: inline-flex; align-items: center; gap: 6px; }
+
+@media (max-width: 640px) {
+  .income-header { flex-direction: column; align-items: stretch; }
+  .income-header-actions { justify-content: flex-end; }
+  .income-summary-grid { grid-template-columns: 1fr; }
+}
+
+/* ===== New Income modal ===== */
+.inc-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal, 1000);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.58);
+  backdrop-filter: blur(3px);
+}
+
+.inc-modal {
+  width: min(560px, 100%);
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-2xl);
+}
+
+.inc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--color-border);
+}
+.inc-header h3 { display: flex; align-items: center; gap: 10px; margin: 0; font-size: 20px; }
+.inc-header h3 svg { color: var(--color-primary); }
+.inc-close { color: var(--color-text-secondary); font-size: 18px; }
+.inc-close:hover { color: var(--color-danger); }
+
+.inc-body { padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+.inc-form-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.inc-form-group { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.inc-form-group label { font-size: .8rem; font-weight: 700; color: var(--color-text-secondary); }
+.inc-form-group input,
+.inc-form-group select {
+  height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+}
+.inc-amount-input { font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.inc-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 18px 24px;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg-warm);
+}
+.inc-btn-cancel, .inc-btn-submit { height: var(--btn-height, 40px); padding: 0 16px; border-radius: 6px; font-weight: 700; display: inline-flex; align-items: center; gap: 8px; }
+
+@media (max-width: 600px) {
+  .inc-overlay { padding: 12px; }
+  .inc-body, .inc-header, .inc-footer { padding: 16px; }
+  .inc-form-row { grid-template-columns: 1fr; gap: 14px; }
+}
