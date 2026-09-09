@@ -257,8 +257,14 @@ const BalanceSheet = ({ selectedDate, setSelectedDate, balance, loading, error, 
                 <BsSubheadRow label="2. Stock Value" />
                 <BsRow label="Stock Value" value={balance.storesValue} indent />
                 <BsSubheadRow label="3. Bank Value" />
-                <BsRow label="BOC" value={balance.bankOfCeylon} indent />
-                <BsRow label="People's Bank" value={balance.peoplesBank} indent />
+                {(balance.bankBreakdown || []).map((bank) => (
+                  <BsRow
+                    key={`${bank.id || bank.bankName}-${bank.accountNumber || 'account'}`}
+                    label={bank.accountNumber ? `${bank.bankName} (${bank.accountNumber})` : bank.bankName}
+                    value={bank.balance}
+                    indent
+                  />
+                ))}
                 <BsRow label="Total of Bank Value" value={balance.totalBankValues} tone="subtotal" indent />
                 <BsRow label="Total Value" value={balance.totalAssets} tone="total" />
 

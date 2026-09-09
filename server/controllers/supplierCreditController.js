@@ -70,6 +70,38 @@ const getSupplierCredits = async (req, res) => {
       ORDER BY so.payment_date DESC
     `, [supplierId]);
 
+    const [unallocatedPaymentCredits] = await pool.query(`
+      SELECT
+        ph.id,
+        'overpayment' AS credit_type,
+        'Payment History Overpayment' AS source,
+        CONCAT('UNALLOC-', ph.id) AS credit_number,
+        p.company_id AS company_id,
+        c.name AS company_name,
+        ph.payment_date AS credit_date,
+        GREATEST(ph.amount - COALESCE(alloc.total_allocated, 0), 0) AS original_amount,
+        GREATEST(ph.amount - COALESCE(alloc.total_allocated, 0), 0) AS remaining_credit,
+        'Active' AS status,
+        NULL AS voucher_number,
+        NULL AS reference_number,
+        CONCAT('Unallocated payment against purchase ', p.invoice_no) AS notes,
+        u.name AS created_by_name,
+        p.supplier_id
+      FROM payment_history ph
+      JOIN purchases p ON p.id = ph.purchase_id
+      LEFT JOIN company c ON p.company_id = c.id
+      LEFT JOIN users u ON ph.created_by = u.id
+      LEFT JOIN (
+        SELECT payment_history_id, SUM(allocated_amount) AS total_allocated
+        FROM purchase_payment_allocations
+        GROUP BY payment_history_id
+      ) alloc ON alloc.payment_history_id = ph.id
+      WHERE p.supplier_id = ?
+        AND COALESCE(p.deleted, 0) = 0
+        AND GREATEST(ph.amount - COALESCE(alloc.total_allocated, 0), 0) > 0
+      ORDER BY ph.payment_date DESC
+    `, [supplierId]);
+
     const [returnCredits] = await pool.query(`
       SELECT
         prc.id,
@@ -94,11 +126,18 @@ const getSupplierCredits = async (req, res) => {
     `, [supplierId]);
 
     res.json({
-      overpayments: overpayments.map(r => ({
-        ...r,
-        original_amount: formatNum(r.original_amount),
-        remaining_credit: formatNum(r.remaining_credit)
-      })),
+      overpayments: [
+        ...overpayments.map(r => ({
+          ...r,
+          original_amount: formatNum(r.original_amount),
+          remaining_credit: formatNum(r.remaining_credit)
+        })),
+        ...unallocatedPaymentCredits.map(r => ({
+          ...r,
+          original_amount: formatNum(r.original_amount),
+          remaining_credit: formatNum(r.remaining_credit)
+        }))
+      ],
       return_credits: returnCredits.map(r => ({
         ...r,
         original_amount: formatNum(r.original_amount),
@@ -136,6 +175,21 @@ const getSupplierOutstanding = async (req, res) => {
       WHERE supplier_id = ? AND status != 'Fully Used' AND remaining_credit > 0
     `, [supplierId]);
 
+    const [[unallocatedCreditSummary]] = await pool.query(`
+      SELECT
+        COALESCE(SUM(GREATEST(ph.amount - COALESCE(alloc.total_allocated, 0), 0)), 0) AS unallocated_credit
+      FROM payment_history ph
+      JOIN purchases p ON p.id = ph.purchase_id
+      LEFT JOIN (
+        SELECT payment_history_id, SUM(allocated_amount) AS total_allocated
+        FROM purchase_payment_allocations
+        GROUP BY payment_history_id
+      ) alloc ON alloc.payment_history_id = ph.id
+      WHERE p.supplier_id = ?
+        AND COALESCE(p.deleted, 0) = 0
+        AND GREATEST(ph.amount - COALESCE(alloc.total_allocated, 0), 0) > 0
+    `, [supplierId]);
+
     const [[returnCreditSummary]] = await pool.query(`
       SELECT
         COALESCE(SUM(remaining_credit),0) AS return_credit
@@ -143,14 +197,18 @@ const getSupplierOutstanding = async (req, res) => {
       WHERE supplier_id = ? AND status != 'Fully Used' AND remaining_credit > 0
     `, [supplierId]);
 
+    const totalAvailableCredit = formatNum(creditSummary.overpayment_credit)
+      + formatNum(unallocatedCreditSummary.unallocated_credit)
+      + formatNum(returnCreditSummary.return_credit);
+
     res.json({
       total_invoices: invoiceSummary.total_invoices || 0,
       total_billed: formatNum(invoiceSummary.total_billed),
       total_paid: formatNum(invoiceSummary.total_paid),
       total_outstanding: formatNum(invoiceSummary.total_outstanding),
-      overpayment_credit: formatNum(creditSummary.overpayment_credit),
+      overpayment_credit: formatNum(creditSummary.overpayment_credit) + formatNum(unallocatedCreditSummary.unallocated_credit),
       return_credit: formatNum(returnCreditSummary.return_credit),
-      total_credit: formatNum(creditSummary.overpayment_credit) + formatNum(returnCreditSummary.return_credit)
+      total_credit: totalAvailableCredit
     });
   } catch (error) {
     console.error('Error fetching supplier outstanding:', error);
@@ -518,6 +576,32 @@ const getAllOutstandingRecords = async (req, res) => {
       ORDER BY s.name ASC, so.payment_date DESC
     `);
 
+    const [unallocatedPayments] = await pool.query(`
+      SELECT
+        ph.id,
+        s.id                    AS supplier_id,
+        s.name                  AS supplier_name,
+        p.company_id            AS company_id,
+        c.name                  AS company_name,
+        'Advance Payment'       AS document_type,
+        CONCAT('UNALLOC-', ph.id) AS document_number,
+        ph.payment_date         AS transaction_date,
+        GREATEST(ph.amount - COALESCE(alloc.total_allocated, 0), 0) AS outstanding_amount,
+        'Active'                AS status
+      FROM payment_history ph
+      JOIN purchases p ON p.id = ph.purchase_id
+      JOIN supplier s ON p.supplier_id = s.id
+      LEFT JOIN company c ON p.company_id = c.id
+      LEFT JOIN (
+        SELECT payment_history_id, SUM(allocated_amount) AS total_allocated
+        FROM purchase_payment_allocations
+        GROUP BY payment_history_id
+      ) alloc ON alloc.payment_history_id = ph.id
+      WHERE COALESCE(p.deleted, 0) = 0
+        AND GREATEST(ph.amount - COALESCE(alloc.total_allocated, 0), 0) > 0
+      ORDER BY s.name ASC, ph.payment_date DESC
+    `);
+
     const [returnCredits] = await pool.query(`
       SELECT
         prc.id,
@@ -548,7 +632,7 @@ const getAllOutstandingRecords = async (req, res) => {
       }));
 
     const normalizedInvoices = normalize(invoices);
-    const normalizedAdvances = normalize(advances);
+    const normalizedAdvances = normalize([...advances, ...unallocatedPayments]);
     const normalizedReturnCredits = normalize(returnCredits);
 
     res.json({

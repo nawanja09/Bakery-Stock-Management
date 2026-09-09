@@ -281,13 +281,20 @@ const getBalanceSheet = async (req, res) => {
     const cashBookJH = cashBooks.find(row => /jh/i.test(row.name))?.balance || 0;
     const cashBookRD = cashBooks.find(row => /rd/i.test(row.name))?.balance || 0;
     const cashBookTotal = cashBookJH + cashBookRD;
+    const bankBreakdown = bankRows.map(row => ({
+      id: row.id,
+      bankName: row.bank_name,
+      accountNumber: row.account_number,
+      company: row.company,
+      balance: number(row.balance)
+    }));
     const bankOfCeylon = bankRows
       .filter(row => /\b(boc|bank of ceylon)\b/i.test(row.bank_name || ''))
       .reduce((sum, row) => sum + number(row.balance), 0);
     const peoplesBank = bankRows
       .filter(row => /people.?s bank/i.test(row.bank_name || ''))
       .reduce((sum, row) => sum + number(row.balance), 0);
-    const totalBankValues = bankOfCeylon + peoplesBank;
+    const totalBankValues = bankBreakdown.reduce((sum, row) => sum + row.balance, 0);
     const storesValue = number(storesRows[0]?.stores_value);
     const totalAssets = cashBookTotal + storesValue + totalBankValues;
     const totalPurchasingValue = number(purchasingRows[0]?.total_purchasing_value);
@@ -317,7 +324,7 @@ const getBalanceSheet = async (req, res) => {
     const netBalance = totalAssets - totalPayables;
     res.json({
       date, cashBookJH, cashBookRD, cashBookTotal, cashBooks,
-      storesValue, banks: bankRows.map(row => ({ ...row, balance: number(row.balance) })),
+      storesValue, banks: bankBreakdown, bankBreakdown,
       bankOfCeylon, peoplesBank, totalBankValues,
       totalAssets, outstandingInvoices, purchasingPayable,
       totalPurchasingValue, totalPurchasingCompleted, totalPurchasingPending,
