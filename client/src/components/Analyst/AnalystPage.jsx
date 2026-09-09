@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faChartLine, faSpinner, faSearch, faRotateLeft, faBalanceScale, faCalendarDay } from '@fortawesome/free-solid-svg-icons';
@@ -30,6 +30,7 @@ const AnalystPage = () => {
   const [selectedDate, setSelectedDate] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const balanceRequestRef = useRef(0);
 
   const updateRange = (event) => setRange(current => ({ ...current, [event.target.name]: event.target.value }));
   const validateRange = () => range.fromDate && range.toDate && range.fromDate > range.toDate ? 'From Date cannot be after To Date.' : '';
@@ -105,16 +106,56 @@ const AnalystPage = () => {
   };
 
   const loadBalance = useCallback(async () => {
-    if (!selectedDate) return setError('Select a date to view the balance sheet.');
-    setLoading(true); setError('');
-    try { const response = await api.get('/analyst/balance-sheet', { params: { date: selectedDate } }); setBalance(response.data); }
-    catch (requestError) { setError(requestError.response?.data?.error || 'Unable to calculate the balance sheet.'); setBalance(null); }
-    finally { setLoading(false); }
+    const requestId = ++balanceRequestRef.current;
+    if (!selectedDate) {
+      setLoading(false);
+      setBalance(null);
+      setError('Select a date to view the balance sheet.');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    try {
+      const response = await api.get('/analyst/balance-sheet', {
+        params: { date: selectedDate },
+        timeout: 30000
+      });
+      if (requestId !== balanceRequestRef.current) return;
+      if (!response.data || typeof response.data !== 'object') {
+        throw new Error('The Balance Sheet response was empty.');
+      }
+      setBalance(response.data);
+    } catch (requestError) {
+      if (requestId !== balanceRequestRef.current) return;
+      const message = requestError.code === 'ECONNABORTED'
+        ? 'The Balance Sheet request timed out. Please try again.'
+        : requestError.response?.data?.error || requestError.message || 'Unable to calculate the balance sheet.';
+      setError(message);
+      setBalance(null);
+    } finally {
+      if (requestId === balanceRequestRef.current) setLoading(false);
+    }
   }, [selectedDate]);
   useEffect(() => {
     if (isBalanceSheet && selectedDate) loadBalance();
+    return () => { balanceRequestRef.current += 1; };
   }, [isBalanceSheet, selectedDate, loadBalance]);
-  const clearBalance = () => { setSelectedDate(''); setBalance(null); setError(''); };
+  useEffect(() => {
+    if (!isBalanceSheet) return undefined;
+    const refreshBalance = () => {
+      if (selectedDate) loadBalance();
+    };
+    window.addEventListener('purchase-payment-updated', refreshBalance);
+    return () => window.removeEventListener('purchase-payment-updated', refreshBalance);
+  }, [isBalanceSheet, selectedDate, loadBalance]);
+  const clearBalance = () => {
+    balanceRequestRef.current += 1;
+    setSelectedDate('');
+    setBalance(null);
+    setError('');
+    setLoading(false);
+  };
 
   if (isBalanceSheet) return <BalanceSheet selectedDate={selectedDate} setSelectedDate={setSelectedDate} balance={balance} loading={loading} error={error} loadBalance={loadBalance} clearBalance={clearBalance} />;
   return (
@@ -237,7 +278,7 @@ const BalanceSheet = ({ selectedDate, setSelectedDate, balance, loading, error, 
       {error && <div className="analyst-error" role="alert">{error}</div>}
 
       {!balance ? (
-        <div className="analyst-empty-panel">Select a date to view the balance sheet.</div>
+        <div className="analyst-empty-panel">{error || 'Select a date to view the balance sheet.'}</div>
       ) : (
         <div className="card bs-sheet-card">
           <div className="bs-table-scroll">
@@ -266,8 +307,10 @@ const BalanceSheet = ({ selectedDate, setSelectedDate, balance, loading, error, 
                 <BsRow label={`Total Purchasing (as of date)`} value={balance.totalPurchasingValue} indent />
                 <BsRow label={`Completed / Paid (${balance.completedPurchasingCount || 0} invoices)`} value={balance.totalPurchasingCompleted} indent />
                 <BsRow label={`Pending / Outstanding (${balance.pendingPurchasingCount || 0} invoices)`} value={balance.totalPurchasingPending} indent />
+                <BsRow label="Pending Invoice Amount" value={balance.pendingInvoiceAmount ?? balance.totalPurchasingPending} indent />
                 <BsRow label="Purchasing Advance Payment Balance" value={balance.purchasingAdvancePaymentBalance} indent />
                 <BsRow label="Purchasing Overpayment" value={balance.purchasingOverpayment} indent />
+                <BsRow label="Total Available Pending Credits" value={balance.totalAvailablePendingCredits} indent />
                 <BsRow label="Total Payables" value={balance.totalPayables} tone="total" />
 
                 <tr className={`bs-row bs-row--net ${netPositive ? 'bs-row--net-positive' : 'bs-row--net-negative'}`}>
