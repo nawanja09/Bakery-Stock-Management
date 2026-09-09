@@ -14,7 +14,18 @@ const COMPANIES = [
   ['all', 'All Companies'], ['JH', 'JH'], ['RD', 'RD']
 ];
 const initialRange = { fromDate: '', toDate: '' };
-const formatDate = (value) => value ? new Date(`${value}T00:00:00`).toLocaleDateString('en-GB') : '-';
+const formatDate = (value) => {
+  if (!value) return '-';
+  const raw = String(value);
+  const datePart = raw.slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+    const [year, month, day] = datePart.split('-');
+    return `${day}/${month}/${year}`;
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '-';
+  return `${String(parsed.getDate()).padStart(2, '0')}/${String(parsed.getMonth() + 1).padStart(2, '0')}/${parsed.getFullYear()}`;
+};
 
 const AnalystPage = () => {
   const page = useLocation().pathname.split('/').pop();

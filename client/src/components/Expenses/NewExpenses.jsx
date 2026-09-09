@@ -520,7 +520,7 @@ const NewExpenses = () => {
   };
 
   return (
-    <div className="page-container">
+    <div className="page-container new-expenses-page">
       <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           <h2 style={{ textAlign: 'left', margin: 0 }}>
@@ -683,7 +683,7 @@ const NewExpenses = () => {
       </div>
 
       {/* Expenses Details Table */}
-      <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
+      <div className="card expenses-details-card" style={{ padding: 'var(--spacing-lg)' }}>
         <div className="form-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
           <div>
             <FontAwesomeIcon icon={faReceipt} /> Expenses Details
