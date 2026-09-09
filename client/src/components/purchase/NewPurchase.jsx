@@ -498,6 +498,7 @@ const AddPurchase = () => {
       }
       
       showPopup('success', successMessage);
+      window.dispatchEvent(new Event('purchase-payment-updated'));
 
       if (formData.order_id) {
         // Order Complete flow - the Order is now COMPLETED server-side.

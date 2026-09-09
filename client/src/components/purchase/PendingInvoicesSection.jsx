@@ -35,6 +35,7 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], comp
   const [allInvoices, setAllInvoices] = useState([]);
   const [allAdvances, setAllAdvances] = useState([]);
   const [allReturnCredits, setAllReturnCredits] = useState([]);
+  const [purchasingPosition, setPurchasingPosition] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const [supplierSearch, setSupplierSearch] = useState('');
@@ -81,6 +82,7 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], comp
       setAllInvoices(parsedInvoices);
       setAllAdvances(advancePayments);
       setAllReturnCredits(purchaseReturnCredits);
+      setPurchasingPosition(data.purchasingPosition || null);
       setSelectedInvoiceIds(new Set());
       
       console.log('✅ Outstanding records updated:', {
@@ -163,11 +165,24 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], comp
       ...records.filter((r) => r._rowType === 'return_credit')
     ].reduce((s, r) => s + (parseFloat(r.outstanding_amount) || 0), 0);
 
+    const authoritativeSummary = !activeFilterId && purchasingPosition;
+
     const invoiceCount = records.filter((r) => r._rowType === 'invoice').length;
     const creditCount = records.filter((r) => r._rowType !== 'invoice').length;
 
-    return { totalOutstandingInvoices, totalAvailableCredit, invoiceCount, creditCount };
-  }, [allRecords, activeFilterId]);
+    return {
+      totalOutstandingInvoices: authoritativeSummary
+        ? parseFloat(authoritativeSummary.totalPending) || 0
+        : totalOutstandingInvoices,
+      totalAvailableCredit: authoritativeSummary
+        ? parseFloat(authoritativeSummary.totalAvailablePendingCredits) || 0
+        : totalAvailableCredit,
+      invoiceCount: authoritativeSummary
+        ? Number(authoritativeSummary.pendingCount || 0)
+        : invoiceCount,
+      creditCount
+    };
+  }, [allRecords, activeFilterId, purchasingPosition]);
 
   // Selection helpers
   const selectedInvoicesList = allInvoices.filter((i) => selectedInvoiceIds.has(i.id));
@@ -427,6 +442,10 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], comp
           <span>Available Credits</span>
           {loading ? <i className="pis-skeleton pis-skeleton-value" /> : <strong>{formatCurrency(summaryStats.totalAvailableCredit)}</strong>}
           <small>Supplier credits</small></div></div>
+        <div className="pis-summary-item pending-credit"><div className="pis-summary-icon"><FontAwesomeIcon icon={faWallet} /></div><div>
+          <span>Pending Available Credits</span>
+          {loading ? <i className="pis-skeleton pis-skeleton-value" /> : <strong>{formatCurrency(summaryStats.totalAvailableCredit)}</strong>}
+          <small>Unused and partially unused credits</small></div></div>
         <div className="pis-summary-item success"><div className="pis-summary-icon"><FontAwesomeIcon icon={faCheckCircle} /></div><div>
           <span>Credit Documents</span>
           {loading ? <i className="pis-skeleton pis-skeleton-value" /> : <strong>{summaryStats.creditCount}</strong>}

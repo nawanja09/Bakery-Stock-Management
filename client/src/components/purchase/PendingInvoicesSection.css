@@ -30,10 +30,10 @@
 .pis-btn-pay-now { background: var(--pis-orange); color: #fff; }
 .pis-btn-pay-now:hover { background: #b45309; }
 .pis-btn-new svg, .pis-btn-pay-now svg, .pis-btn-pay svg { margin-right: 7px; }
-.pis-summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.pis-summary-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; }
 .pis-summary-item { align-items: flex-start; background: #fff; border: 1px solid var(--pis-border); border-left: 4px solid #d1d5db; border-radius: 10px; box-shadow: 0 3px 10px rgba(22, 38, 58, .06); display: flex; gap: 13px; min-height: 110px; padding: 18px; transition: transform .18s ease, box-shadow .18s ease; }
 .pis-summary-item:hover { box-shadow: 0 8px 18px rgba(22, 38, 58, .1); transform: translateY(-2px); }
-.pis-summary-item.debt { border-left-color: #DC2626; }.pis-summary-item.warning { border-left-color: #F59E0B; }.pis-summary-item.credit { border-left-color: #EAB308; }.pis-summary-item.success { border-left-color: #16A34A; }
+.pis-summary-item.debt { border-left-color: #DC2626; }.pis-summary-item.warning { border-left-color: #F59E0B; }.pis-summary-item.credit, .pis-summary-item.pending-credit { border-left-color: #EAB308; }.pis-summary-item.success { border-left-color: #16A34A; }
 .pis-summary-icon { align-items: center; background: #f3f4f6; border-radius: 8px; color: var(--pis-navy); display: flex; flex: 0 0 34px; height: 34px; justify-content: center; }
 .debt .pis-summary-icon { background: #fef2f2; color: #DC2626; }.warning .pis-summary-icon { background: #fffbeb; color: #D97706; }.credit .pis-summary-icon { background: #fefce8; color: #a16207; }.success .pis-summary-icon { background: #f0fdf4; color: #16A34A; }
 .pis-summary-item span, .pis-summary-item small { display: block; }.pis-summary-item span { color: #6B7280; font-size: 12px; font-weight: 700; }.pis-summary-item strong { color: var(--pis-navy); display: block; font-size: 21px; margin: 8px 0 4px; }.pis-summary-item small { color: #9CA3AF; font-size: 11px; }
