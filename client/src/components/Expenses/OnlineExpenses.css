@@ -1,2 +1,391 @@
 @import '../Finance/Finance.css';
 @import '../common/FormStyles.css';
+
+.new-expenses-page {
+	gap: 20px;
+}
+
+.new-expenses-page > .page-header {
+	margin-bottom: 0;
+}
+
+.new-expenses-page .form-container,
+.new-expenses-page .expenses-details-card {
+	border: 1px solid var(--color-border);
+	border-radius: 10px;
+	box-shadow: var(--shadow-sm);
+}
+
+.new-expenses-page .form-section-title {
+	display: flex;
+	align-items: center;
+	gap: 9px;
+	margin: 0 0 20px;
+	padding-bottom: 12px;
+	border-bottom: 1px solid var(--color-border);
+	color: var(--color-heading);
+	font-size: 1rem;
+}
+
+.new-expenses-page .expenses-details-card {
+	min-width: 0;
+	overflow: hidden;
+}
+
+.new-expenses-page .expenses-details-card > .form-section-title {
+	justify-content: space-between;
+}
+
+.new-expenses-page .filters-section {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 14px;
+	padding: 12px;
+	border: 1px solid var(--color-border);
+	border-radius: 8px;
+	background: var(--color-background);
+}
+
+.new-expenses-page .expense-view-tabs {
+	flex-wrap: wrap;
+}
+
+.new-expenses-page .report-table {
+	min-width: 1100px;
+}
+
+.new-expenses-page .report-table th {
+	white-space: nowrap;
+}
+
+.new-expenses-page .report-table td,
+.new-expenses-page .report-table th {
+	vertical-align: middle;
+}
+
+.new-expenses-page .date-cell,
+.new-expenses-page .amount-cell,
+.new-expenses-page .balance-cell {
+	white-space: nowrap;
+}
+
+.new-expenses-page .payment-action-bar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	margin-top: 16px;
+	padding: 14px 16px;
+	border: 1px solid var(--color-border);
+	border-radius: 8px;
+	background: var(--color-background);
+}
+
+.new-expenses-page .selected-info {
+	min-width: 0;
+}
+
+.new-expenses-page .btn-pay {
+	flex: 0 0 auto;
+	min-width: 110px;
+}
+
+/* Payment Details modal */
+.new-expenses-page .payment-modal-overlay {
+	position: fixed;
+	inset: 0;
+	z-index: 1000;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 24px;
+	background: rgba(15, 23, 42, .62);
+	backdrop-filter: blur(3px);
+}
+
+.new-expenses-page .payment-modal-content {
+	width: min(920px, 100%);
+	max-height: min(820px, calc(100vh - 48px));
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+	border: 1px solid var(--color-border);
+	border-radius: 14px;
+	background: var(--color-surface);
+	box-shadow: 0 24px 70px rgba(15, 23, 42, .28);
+}
+
+.new-expenses-page .payment-modal-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	padding: 18px 24px;
+	background: var(--color-primary);
+	color: #fff;
+}
+
+.new-expenses-page .payment-modal-header h3 {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin: 0;
+	color: #fff;
+	font-size: 1.15rem;
+}
+
+.new-expenses-page .payment-count {
+	display: inline-flex;
+	align-items: center;
+	min-height: 24px;
+	padding: 3px 9px;
+	border: 1px solid rgba(255, 255, 255, .3);
+	border-radius: 999px;
+	font-size: .72rem;
+	font-weight: 700;
+}
+
+.new-expenses-page .payment-modal-close {
+	width: 32px;
+	height: 32px;
+	border: 1px solid rgba(255, 255, 255, .35);
+	border-radius: 7px;
+	background: transparent;
+	color: #fff;
+	font-size: 1.25rem;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.new-expenses-page .payment-modal-close:hover {
+	background: rgba(255, 255, 255, .14);
+}
+
+.new-expenses-page .payment-modal-body {
+	display: grid;
+	grid-template-columns: minmax(0, 1.15fr) minmax(280px, .85fr);
+	gap: 20px;
+	overflow-y: auto;
+	padding: 24px;
+	background: var(--color-background);
+}
+
+.new-expenses-page .payment-details-section,
+.new-expenses-page .online-details-section {
+	min-width: 0;
+	padding: 18px;
+	border: 1px solid var(--color-border);
+	border-radius: 10px;
+	background: var(--color-surface);
+}
+
+.new-expenses-page .payment-section-title {
+	margin-bottom: 18px;
+	padding-bottom: 10px;
+	border-bottom: 1px solid var(--color-border);
+	color: var(--color-heading);
+	font-size: .86rem;
+	font-weight: 800;
+	letter-spacing: .04em;
+	text-transform: uppercase;
+}
+
+.new-expenses-page .payment-form-row {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 14px;
+	margin-bottom: 14px;
+}
+
+.new-expenses-page .payment-form-group {
+	min-width: 0;
+}
+
+.new-expenses-page .payment-form-group.full-width {
+	grid-column: 1 / -1;
+}
+
+.new-expenses-page .payment-form-group label {
+	display: block;
+	margin-bottom: 6px;
+	color: var(--color-text-secondary);
+	font-size: .76rem;
+	font-weight: 700;
+}
+
+.new-expenses-page .payment-input,
+.new-expenses-page .custom-select-input {
+	box-sizing: border-box;
+	width: 100%;
+	min-height: 42px;
+	padding: 9px 11px;
+	border: 1px solid var(--color-border);
+	border-radius: 7px;
+	background: var(--color-surface);
+	color: var(--color-text-primary);
+	font: inherit;
+}
+
+.new-expenses-page .payment-input:focus,
+.new-expenses-page .custom-select-input:focus {
+	border-color: var(--color-primary);
+	box-shadow: 0 0 0 3px var(--color-primary-light);
+	outline: 0;
+}
+
+.new-expenses-page .custom-select-container {
+	position: relative;
+}
+
+.new-expenses-page .custom-select-trigger {
+	position: relative;
+}
+
+.new-expenses-page .custom-select-trigger .dropdown-icon {
+	position: absolute;
+	right: 12px;
+	top: 14px;
+	color: var(--color-text-tertiary);
+	pointer-events: none;
+}
+
+.new-expenses-page .custom-select-dropdown {
+	position: absolute;
+	top: calc(100% + 5px);
+	right: 0;
+	left: 0;
+	z-index: 5;
+	max-height: 190px;
+	overflow-y: auto;
+	border: 1px solid var(--color-border);
+	border-radius: 7px;
+	background: var(--color-surface);
+	box-shadow: var(--shadow-md);
+}
+
+.new-expenses-page .custom-select-dropdown .dropdown-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 10px 12px;
+	color: var(--color-text-primary);
+	cursor: pointer;
+}
+
+.new-expenses-page .custom-select-dropdown .dropdown-item:hover {
+	background: var(--color-primary-light);
+}
+
+.new-expenses-page .online-expense-summary {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+.new-expenses-page .expense-summary-item {
+	padding: 12px;
+	border: 1px solid var(--color-border);
+	border-radius: 8px;
+	background: var(--color-background);
+}
+
+.new-expenses-page .expense-summary-row {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 16px;
+	padding: 5px 0;
+}
+
+.new-expenses-page .summary-label {
+	color: var(--color-text-secondary);
+	font-size: .78rem;
+}
+
+.new-expenses-page .summary-value {
+	color: var(--color-heading);
+	font-size: .86rem;
+	font-weight: 700;
+	text-align: right;
+}
+
+.new-expenses-page .expense-divider {
+	margin: 8px 0;
+	border: 0;
+	border-top: 1px solid var(--color-border);
+}
+
+.new-expenses-page .total-row {
+	margin-top: 16px;
+	padding: 14px 0;
+	border-top: 2px solid var(--color-border);
+}
+
+.new-expenses-page .total-row .summary-value,
+.new-expenses-page .transfer-row .transfer-input {
+	font-size: 1.05rem;
+	font-weight: 800;
+}
+
+.new-expenses-page .transfer-row {
+	margin-top: 12px;
+}
+
+.new-expenses-page .payment-modal-footer {
+	display: flex;
+	justify-content: flex-end;
+	gap: 10px;
+	padding: 16px 24px;
+	border-top: 1px solid var(--color-border);
+	background: var(--color-surface);
+}
+
+@media (max-width: 760px) {
+	.new-expenses-page .payment-modal-overlay {
+		align-items: flex-end;
+		padding: 0;
+	}
+
+	.new-expenses-page .payment-modal-content {
+		max-height: 94vh;
+		border-radius: 14px 14px 0 0;
+	}
+
+	.new-expenses-page .payment-modal-body {
+		grid-template-columns: 1fr;
+		padding: 16px;
+	}
+
+	.new-expenses-page .payment-form-row {
+		grid-template-columns: 1fr;
+	}
+
+	.new-expenses-page .payment-modal-header,
+	.new-expenses-page .payment-modal-footer {
+		padding: 14px 16px;
+	}
+
+	.new-expenses-page .payment-modal-footer > button {
+		flex: 1;
+	}
+}
+
+@media (max-width: 760px) {
+	.new-expenses-page .filters-section,
+	.new-expenses-page .payment-action-bar {
+		align-items: stretch;
+		flex-direction: column;
+	}
+
+	.new-expenses-page .report-filter-group {
+		max-width: none !important;
+		width: 100%;
+	}
+
+	.new-expenses-page .expense-view-tabs,
+	.new-expenses-page .expense-view-tabs .btn,
+	.new-expenses-page .payment-action-bar .btn-pay {
+		width: 100%;
+	}
+}
