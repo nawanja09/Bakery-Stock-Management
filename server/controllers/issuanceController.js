@@ -264,7 +264,13 @@ const getItemsWithStock = async (req, res) => {
            JOIN issuances iss ON ii.issuance_id = iss.id 
            WHERE ii.item_id = i.id AND DATE(iss.issuance_date) <= CURDATE()
           ), 0
-        ) - 
+        ) +
+        COALESCE(
+          (SELECT SUM(sa.variance)
+           FROM stock_adjustments sa
+           WHERE sa.item_id = i.id AND DATE(sa.date) <= CURDATE()
+          ), 0
+        ) -
         COALESCE(
           (SELECT SUM(wi.quantity) 
            FROM wastage_items wi 

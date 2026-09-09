@@ -1,10 +1,33 @@
 const pool = require('../config/db');
 
+const VALID_UNITS = new Set(['kg', 'g', 'L', 'ml', 'quantity']);
+
+const validateItemInput = (input) => {
+  const itemCode = String(input.item_code || '').trim();
+  const name = String(input.name || '').trim();
+  const unit = input.unit;
+  const reorderLevel = Number(input.reorder_level);
+
+  if (!itemCode) return { error: 'Item code is required' };
+  if (!name) return { error: 'Item name is required' };
+  if (!VALID_UNITS.has(unit)) return { error: 'A valid unit of measurement is required' };
+  if (!Number.isFinite(reorderLevel) || reorderLevel < 0) {
+    return { error: 'A valid non-negative reorder level is required' };
+  }
+
+  return { itemCode, name, unit, reorderLevel };
+};
+
 // =============================================
 // CREATE ITEM with Auto-Add functionality
 // =============================================
 const createItem = async (req, res) => {
   const { item_code, name, unit, item_type, vat_applicable, auto_add_to_stock, reorder_level } = req.body;
+  const validation = validateItemInput({ item_code, name, unit, reorder_level });
+
+  if (validation.error) {
+    return res.status(400).json({ error: validation.error });
+  }
 
   const connection = await pool.getConnection();
 
@@ -14,7 +37,7 @@ const createItem = async (req, res) => {
     // Insert item
     const [result] = await connection.query(
       'INSERT INTO items (item_code, name, unit, item_type, vat_applicable, auto_add_to_stock, reorder_level) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [item_code, name, unit, item_type || 'Other', vat_applicable || false, auto_add_to_stock !== undefined ? auto_add_to_stock : true, reorder_level]
+      [validation.itemCode, validation.name, validation.unit, String(item_type || 'Other').trim() || 'Other', Boolean(vat_applicable), auto_add_to_stock !== undefined ? Boolean(auto_add_to_stock) : true, validation.reorderLevel]
     );
 
     // Auto-add to stock if enabled (default is true)
@@ -90,7 +113,10 @@ const getAllItems = async (req, res) => {
           (SELECT COALESCE(SUM(ri.quantity), 0) 
            FROM return_items ri 
            JOIN returns r ON ri.return_id = r.id 
-           WHERE ri.item_id = i.id),
+           WHERE ri.item_id = i.id) +
+          (SELECT COALESCE(SUM(sa.variance), 0)
+           FROM stock_adjustments sa
+           WHERE sa.item_id = i.id),
         0) AS current_stock
       FROM items i
       WHERE i.deleted = FALSE
@@ -149,7 +175,10 @@ const getItemById = async (req, res) => {
           (SELECT COALESCE(SUM(ri.quantity), 0) 
            FROM return_items ri 
            JOIN returns r ON ri.return_id = r.id 
-           WHERE ri.item_id = i.id),
+           WHERE ri.item_id = i.id) +
+          (SELECT COALESCE(SUM(sa.variance), 0)
+           FROM stock_adjustments sa
+           WHERE sa.item_id = i.id),
         0) AS current_stock
       FROM items i
       WHERE i.id = ? AND i.deleted = FALSE
@@ -172,6 +201,11 @@ const getItemById = async (req, res) => {
 const updateItem = async (req, res) => {
   const { id } = req.params;
   const { item_code, name, unit, item_type, vat_applicable, auto_add_to_stock, reorder_level } = req.body;
+  const validation = validateItemInput({ item_code, name, unit, reorder_level });
+
+  if (validation.error) {
+    return res.status(400).json({ error: validation.error });
+  }
 
   const connection = await pool.getConnection();
 
@@ -187,7 +221,7 @@ const updateItem = async (req, res) => {
     // Update item
     const [result] = await connection.query(
       'UPDATE items SET item_code = ?, name = ?, unit = ?, item_type = ?, vat_applicable = ?, auto_add_to_stock = ?, reorder_level = ? WHERE id = ? AND deleted = FALSE',
-      [item_code, name, unit, item_type || 'Other', vat_applicable || false, auto_add_to_stock !== undefined ? auto_add_to_stock : true, reorder_level, id]
+      [validation.itemCode, validation.name, validation.unit, String(item_type || 'Other').trim() || 'Other', Boolean(vat_applicable), auto_add_to_stock !== undefined ? Boolean(auto_add_to_stock) : true, validation.reorderLevel, id]
     );
 
     if (result.affectedRows === 0) {
@@ -356,5 +390,6 @@ module.exports = {
   updateItem,
   deleteItem,
   updateItemStatus,
-  getItemsWithoutOpeningBalance
+  getItemsWithoutOpeningBalance,
+  validateItemInput
 };

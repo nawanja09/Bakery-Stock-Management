@@ -33,6 +33,24 @@ const AddItem = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!formData.item_code.trim()) {
+      showPopup('error', 'Item code is required');
+      return;
+    }
+    if (!formData.item_name.trim()) {
+      showPopup('error', 'Item name is required');
+      return;
+    }
+    if (!formData.unit) {
+      showPopup('error', 'Unit of measurement is required');
+      return;
+    }
+    if (formData.reorder_level === '' || Number(formData.reorder_level) < 0) {
+      showPopup('error', 'Valid reorder level is required');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -51,7 +69,7 @@ const AddItem = () => {
 
       if (response.status === 201) {
         showPopup('success', `Item added successfully! ID: ${data.id}`);
-        setTimeout(() => navigate('/items'), 1500);
+        navigate('/items');
         setFormData({
           item_code: '',
           item_name: '',
@@ -65,7 +83,13 @@ const AddItem = () => {
         showPopup('error', data.error || 'Failed to add item');
       }
     } catch (error) {
-      showPopup('error', 'Network error. Please try again.');
+      const status = error.response?.status;
+      const message = error.response?.data?.error;
+      if (status === 400 && message) {
+        showPopup('error', message);
+      } else {
+        showPopup('error', 'Unable to add item. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }
