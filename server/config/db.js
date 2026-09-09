@@ -94,7 +94,8 @@ const ensureSoftDeleteStatusSchema = async () => {
       ['cutlery_transfer_items', "ADD COLUMN IF NOT EXISTS status TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=Active, 0=Deleted (soft delete)'"],
       ['finished_goods_sale_items', "ADD COLUMN IF NOT EXISTS status TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=Active, 0=Deleted (soft delete)'"],
       ['finished_goods_transfer_items', "ADD COLUMN IF NOT EXISTS status TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=Active, 0=Deleted (soft delete)'"],
-      ['finished_goods_wastage_items', "ADD COLUMN IF NOT EXISTS status TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=Active, 0=Deleted (soft delete)'"]
+      ['finished_goods_wastage_items', "ADD COLUMN IF NOT EXISTS status TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=Active, 0=Deleted (soft delete)'"],
+      ['stock_adjustments', 'ADD COLUMN IF NOT EXISTS request_id VARCHAR(64) NULL']
     ];
 
     for (const [table, clause] of alterations) {
@@ -103,6 +104,12 @@ const ensureSoftDeleteStatusSchema = async () => {
       } catch (error) {
         // Table may not exist yet, or the server may not support the clause.
       }
+    }
+
+    try {
+      await pool.query('CREATE UNIQUE INDEX uq_stock_adjustments_request_id ON stock_adjustments (request_id)');
+    } catch (error) {
+      // The index may already exist on an upgraded database.
     }
 
     const backfills = [

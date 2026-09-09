@@ -1,20 +1,53 @@
 const pool = require('../config/db');
 
+const getAdjustmentValues = ({ system_qty, actual_qty, unit_price }) => {
+  const systemQuantity = Number(system_qty);
+  const actualQuantity = Number(actual_qty);
+  const unitPrice = Number(unit_price);
+
+  if (![systemQuantity, actualQuantity, unitPrice].every(Number.isFinite)) {
+    throw new Error('system_qty, actual_qty, and unit_price must be valid numbers');
+  }
+
+  const variance = Number((actualQuantity - systemQuantity).toFixed(3));
+  const amount = Number((variance * unitPrice).toFixed(2));
+
+  return { systemQuantity, actualQuantity, unitPrice, variance, amount };
+};
+
 // Create a new stock adjustment
 const createAdjustment = async (req, res) => {
   const { date, user_name, reference_note, item_id, system_qty, actual_qty, variance, unit_price, amount, reason } = req.body;
+  const requestId = req.get('Idempotency-Key') || req.body.request_id || null;
 
   const connection = await pool.getConnection();
 
   try {
     await connection.beginTransaction();
 
+    if (requestId) {
+      const [existing] = await connection.query(
+        'SELECT id FROM stock_adjustments WHERE request_id = ? FOR UPDATE',
+        [requestId]
+      );
+      if (existing.length > 0) {
+        await connection.commit();
+        return res.status(200).json({
+          message: 'Adjustment already saved.',
+          adjustment_id: existing[0].id,
+          duplicate: true
+        });
+      }
+    }
+
+    const values = getAdjustmentValues({ system_qty, actual_qty, unit_price });
+
     // 1. Insert into stock_adjustments table for history
     const [result] = await connection.query(
       `INSERT INTO stock_adjustments 
-      (date, user_name, reference_note, item_id, system_qty, actual_qty, variance, unit_price, amount, reason) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [date, user_name, reference_note, item_id, system_qty, actual_qty, variance, unit_price, amount, reason]
+      (date, user_name, reference_note, item_id, system_qty, actual_qty, variance, unit_price, amount, reason, request_id) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [date, user_name, reference_note, item_id, values.systemQuantity, values.actualQuantity, values.variance, values.unitPrice, values.amount, reason, requestId]
     );
 
     // 2. Log the adjustment as a stock movement. Opening balances remain one-time item balances.
@@ -22,7 +55,7 @@ const createAdjustment = async (req, res) => {
       `INSERT INTO stock_movements 
        (item_id, quantity, movement_type, reference_id, reference_type, movement_date, notes)
        VALUES (?, ?, 'ADJUSTMENT', ?, 'stock_adjustments', ?, ?)`,
-      [item_id, variance, result.insertId, date, reason]
+      [item_id, values.variance, result.insertId, date, reason]
     );
 
     await connection.commit();
@@ -263,24 +296,41 @@ const updateAdjustment = async (req, res) => {
   try {
     await connection.beginTransaction();
 
-    const [result] = await connection.query(
-      `UPDATE stock_adjustments
-       SET date = ?, user_name = ?, reference_note = ?, item_id = ?, system_qty = ?, actual_qty = ?, variance = ?, unit_price = ?, amount = ?, reason = ?
-       WHERE id = ?`,
-      [date, user_name, reference_note, item_id, system_qty, actual_qty, variance, unit_price, amount, reason, id]
+    const [existingRows] = await connection.query(
+      `SELECT item_id, request_id FROM stock_adjustments WHERE id = ? FOR UPDATE`,
+      [id]
     );
 
-    if (result.affectedRows === 0) {
+    if (existingRows.length === 0) {
       await connection.rollback();
       return res.status(404).json({ error: 'Adjustment not found' });
     }
 
-    await connection.query(
-      `UPDATE stock_movements
-       SET quantity = ?, notes = ?, movement_date = ?
-       WHERE reference_type = 'stock_adjustments' AND reference_id = ?`,
-      [variance, reason, date, id]
+    const values = getAdjustmentValues({ system_qty, actual_qty, unit_price });
+    const adjustmentItemId = item_id || existingRows[0].item_id;
+
+    const [result] = await connection.query(
+      `UPDATE stock_adjustments
+       SET date = ?, user_name = ?, reference_note = ?, item_id = ?, system_qty = ?, actual_qty = ?, variance = ?, unit_price = ?, amount = ?, reason = ?
+       WHERE id = ?`,
+      [date, user_name, reference_note, adjustmentItemId, values.systemQuantity, values.actualQuantity, values.variance, values.unitPrice, values.amount, reason, id]
     );
+
+    const [movementResult] = await connection.query(
+      `UPDATE stock_movements
+       SET item_id = ?, quantity = ?, notes = ?, movement_date = ?
+       WHERE reference_type = 'stock_adjustments' AND reference_id = ?`,
+      [adjustmentItemId, values.variance, reason, date, id]
+    );
+
+    if (movementResult.affectedRows === 0) {
+      await connection.query(
+        `INSERT INTO stock_movements
+         (item_id, quantity, movement_type, reference_id, reference_type, movement_date, notes)
+         VALUES (?, ?, 'ADJUSTMENT', ?, 'stock_adjustments', ?, ?)`,
+        [adjustmentItemId, values.variance, id, date, reason]
+      );
+    }
 
     await connection.commit();
     res.json({ message: 'Adjustment updated successfully.' });
@@ -330,5 +380,6 @@ module.exports = {
   getSystemQuantity,
   getAdjustmentById,
   updateAdjustment,
-  deleteAdjustment
+  deleteAdjustment,
+  getAdjustmentValues
 };

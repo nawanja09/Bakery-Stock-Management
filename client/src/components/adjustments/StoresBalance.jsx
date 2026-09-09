@@ -258,10 +258,12 @@ const StoresBalance = () => {
       setIsSubmitting(true);
       setLoading(true);
 
-      for (const row of rows) {
+      for (const [index, row] of rows.entries()) {
+        const requestId = window.crypto?.randomUUID?.() || `${Date.now()}-${index}-${Math.random()}`;
         await api.post('/adjustments', {
           ...generalInfo,
-          ...row
+          ...row,
+          request_id: requestId
         });
       }
 
