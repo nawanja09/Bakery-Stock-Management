@@ -24,18 +24,19 @@ const getPurchasingPosition = async (pool, { asOfDate } = {}) => {
       SELECT COALESCE(SUM(remaining_credit), 0) AS advance_credit
       FROM supplier_overpayments
       WHERE status != 'Fully Used' AND remaining_credit > 0
+        AND (is_deleted = 0 OR is_deleted IS NULL)
     `),
     pool.query(`
-      SELECT COALESCE(SUM(GREATEST(ph.amount - COALESCE(alloc.total_allocated, 0), 0)), 0) AS unallocated_credit
+      SELECT COALESCE(SUM(GREATEST(ph.amount - alloc.total_allocated, 0)), 0) AS unallocated_credit
       FROM payment_history ph
       JOIN purchases p ON p.id = ph.purchase_id
-      LEFT JOIN (
+      JOIN (
         SELECT payment_history_id, SUM(allocated_amount) AS total_allocated
         FROM purchase_payment_allocations
         GROUP BY payment_history_id
       ) alloc ON alloc.payment_history_id = ph.id
       WHERE COALESCE(p.deleted, 0) = 0
-        AND GREATEST(ph.amount - COALESCE(alloc.total_allocated, 0), 0) > 0
+        AND (ph.amount - alloc.total_allocated) > 0.001
     `),
     pool.query(`
       SELECT COALESCE(SUM(remaining_credit), 0) AS return_credit
