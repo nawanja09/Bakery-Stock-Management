@@ -13,7 +13,7 @@ const fgProductionAccess = [
 
 const financeReadAccess = [
   authenticate,
-  requireRoles('Admin', 'Super Admin', 'Accountant', 'View Only')
+  requireRoles('Admin', 'Super Admin', 'Accountant', 'Store Keeper', 'Stores', 'View Only')
 ];
 
 const financeWriteAccess = [

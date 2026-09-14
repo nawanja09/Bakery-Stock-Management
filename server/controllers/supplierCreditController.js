@@ -43,7 +43,7 @@ const getSupplierCredits = async (req, res) => {
   const { id: supplierId } = req.params;
   try {
     await ensureUnsettledReturnCredits();
-    
+
     const [overpayments] = await pool.query(`
       SELECT
         so.id,
@@ -67,6 +67,7 @@ const getSupplierCredits = async (req, res) => {
       WHERE so.supplier_id = ?
         AND so.status != 'Fully Used'
         AND so.remaining_credit > 0
+        AND (so.is_deleted = 0 OR so.is_deleted IS NULL)
       ORDER BY so.payment_date DESC
     `, [supplierId]);
 
@@ -116,7 +117,7 @@ const getSupplierOutstanding = async (req, res) => {
   const { id: supplierId } = req.params;
   try {
     await ensureUnsettledReturnCredits();
-    
+
     const [[invoiceSummary]] = await pool.query(`
       SELECT
         COUNT(*)                       AS total_invoices,
@@ -134,6 +135,7 @@ const getSupplierOutstanding = async (req, res) => {
         COALESCE(SUM(remaining_credit),0) AS overpayment_credit
       FROM supplier_overpayments
       WHERE supplier_id = ? AND status != 'Fully Used' AND remaining_credit > 0
+        AND (is_deleted = 0 OR is_deleted IS NULL)
     `, [supplierId]);
 
     const [[returnCreditSummary]] = await pool.query(`
@@ -224,9 +226,6 @@ const createOverpayment = async (req, res) => {
       notes || null, created_by
     ]);
 
-    // Post the advance payment to the relevant Cash/Bank ledger in the same
-    // transaction, so a ledger failure rolls back the advance payment too.
-    // Money going OUT is a Credit under this ledger's convention.
     let ledgerBalance = null;
     const ledgerRemark = `Advance payment to supplier "${supplierRows[0].name}" (${overpayment_number})`;
     if (normalizedPaymentMethod === 'CASH') {
@@ -261,34 +260,30 @@ const createOverpayment = async (req, res) => {
 
     const [[inserted]] = await connection.query(
       `SELECT so.id, so.overpayment_number, so.supplier_id, s.name AS supplier_name,
-              so.company_id, c.name AS company_name,
-              so.payment_date, so.payment_method, so.voucher_number, 
-              so.reference_number, so.original_amount, so.remaining_credit, 
-              so.status, so.notes, so.created_by
+              so.company_id, so.payment_date, so.original_amount, so.remaining_credit,
+              so.status, so.payment_method, so.voucher_number, so.reference_number, so.notes
        FROM supplier_overpayments so
        JOIN supplier s ON so.supplier_id = s.id
-       LEFT JOIN company c ON so.company_id = c.id
-       WHERE so.id = ? LIMIT 1`,
+       WHERE so.id = ?`,
       [result.insertId]
     );
 
     res.status(201).json({
       message: 'Advance payment recorded successfully!',
-      overpayment_id: result.insertId,
+      overpayment: {
+        ...inserted,
+        original_amount: formatNum(inserted.original_amount),
+        remaining_credit: formatNum(inserted.remaining_credit)
+      },
       overpayment_number,
-      amount: parseFloat(amount),
-      overpayment: inserted || null,
       ledger_balance: ledgerBalance
     });
   } catch (error) {
     await connection.rollback();
-    if (error.name === 'DuplicateReferenceError') {
+    if (error instanceof DuplicateReferenceError) {
       return res.status(400).json({ error: error.message });
     }
     console.error('Error creating overpayment:', error);
-    if (error.name === 'InsufficientBalanceError') {
-      return res.status(400).json({ error: error.message });
-    }
     res.status(500).json({ error: 'Server error: ' + error.message });
   } finally {
     connection.release();
@@ -297,12 +292,14 @@ const createOverpayment = async (req, res) => {
 
 // POST /api/suppliers/settle-credit
 const settleCreditToInvoice = async (req, res) => {
-  const { purchase_id, settlement_date, settled_by, notes, credits } = req.body;
+  const { purchase_id, credits, settlement_date, settled_by, notes } = req.body;
 
-  if (!purchase_id) return res.status(400).json({ error: 'Invoice (purchase_id) is required' });
-  if (!credits || credits.length === 0) return res.status(400).json({ error: 'At least one credit is required' });
-  if (!settled_by) return res.status(400).json({ error: 'settled_by is required' });
+  if (!purchase_id) return res.status(400).json({ error: 'Purchase ID is required' });
+  if (!Array.isArray(credits) || credits.length === 0) {
+    return res.status(400).json({ error: 'At least one credit must be selected' });
+  }
   if (!settlement_date) return res.status(400).json({ error: 'Settlement date is required' });
+  if (!settled_by) return res.status(400).json({ error: 'Settled by is required' });
 
   const connection = await pool.getConnection();
   try {
@@ -314,30 +311,23 @@ const settleCreditToInvoice = async (req, res) => {
     );
     if (!invoice) {
       await connection.rollback();
-      return res.status(404).json({ error: 'Invoice not found' });
-    }
-    if (formatNum(invoice.balance_amount) <= 0) {
-      await connection.rollback();
-      return res.status(400).json({ error: 'Invoice already fully paid' });
+      return res.status(404).json({ error: 'Purchase invoice not found' });
     }
 
-    let remainingInvoiceBalance = formatNum(invoice.balance_amount);
     let totalSettled = 0;
+    let remainingInvoiceBalance = formatNum(invoice.balance_amount);
 
     for (const credit of credits) {
       const amount = formatNum(credit.amount);
       if (amount <= 0) continue;
-
       if (amount > remainingInvoiceBalance + 0.001) {
         await connection.rollback();
-        return res.status(400).json({ 
-          error: `Credit amount ${amount} exceeds remaining invoice balance ${remainingInvoiceBalance}` 
-        });
+        return res.status(400).json({ error: `Credit amount exceeds remaining invoice balance` });
       }
 
       if (credit.credit_type === 'overpayment') {
         const [[op]] = await connection.query(
-          'SELECT * FROM supplier_overpayments WHERE id = ? FOR UPDATE',
+          'SELECT * FROM supplier_overpayments WHERE id = ? AND (is_deleted = 0 OR is_deleted IS NULL) FOR UPDATE',
           [credit.credit_id]
         );
         if (!op) {
@@ -350,21 +340,20 @@ const settleCreditToInvoice = async (req, res) => {
         }
 
         const newRemaining = formatNum(op.remaining_credit) - amount;
-        const newStatus = newRemaining <= 0.001 ? 'Fully Used' : 
-                         newRemaining < formatNum(op.original_amount) ? 'Partially Used' : 'Active';
+        const newStatus = newRemaining <= 0.001 ? 'Fully Used' :
+          newRemaining < formatNum(op.original_amount) ? 'Partially Used' : 'Active';
 
         await connection.query(
-          'UPDATE supplier_overpayments SET remaining_credit = ?, status = ?, updated_by = ? WHERE id = ?',
-          [Math.max(0, newRemaining), newStatus, settled_by, op.id]
+          'UPDATE supplier_overpayments SET remaining_credit = ?, status = ?, updated_at = NOW() WHERE id = ?',
+          [Math.max(0, newRemaining), newStatus, op.id]
         );
 
         await connection.query(`
           INSERT INTO credit_allocations
-            (credit_type, overpayment_id, return_credit_id, purchase_id, 
+            (credit_type, overpayment_id, return_credit_id, purchase_id,
              allocated_amount, settlement_date, settled_by, notes)
           VALUES ('overpayment', ?, NULL, ?, ?, ?, ?, ?)
         `, [op.id, purchase_id, amount, settlement_date, settled_by, notes || null]);
-
       } else if (credit.credit_type === 'return_credit') {
         const [[rc]] = await connection.query(
           'SELECT * FROM purchase_return_credits WHERE id = ? FOR UPDATE',
@@ -380,8 +369,8 @@ const settleCreditToInvoice = async (req, res) => {
         }
 
         const newRemaining = formatNum(rc.remaining_credit) - amount;
-        const newStatus = newRemaining <= 0.001 ? 'Fully Used' : 
-                         newRemaining < formatNum(rc.original_amount) ? 'Partially Used' : 'Active';
+        const newStatus = newRemaining <= 0.001 ? 'Fully Used' :
+          newRemaining < formatNum(rc.original_amount) ? 'Partially Used' : 'Active';
 
         await connection.query(
           'UPDATE purchase_return_credits SET remaining_credit = ?, status = ?, updated_at = NOW() WHERE id = ?',
@@ -390,9 +379,9 @@ const settleCreditToInvoice = async (req, res) => {
 
         await connection.query(`
           INSERT INTO credit_allocations
-            (credit_type, overpayment_id, return_credit_id, purchase_id, 
+            (credit_type, overpayment_id, return_credit_id, purchase_id,
              allocated_amount, settlement_date, settled_by, notes)
-          VALUES ('return_credit', NULL, ?, ?, ?, ?, ?, ?)
+          VALUES ('return_credit', NULL, ?, ?, ?, ?, ?)
         `, [rc.id, purchase_id, amount, settlement_date, settled_by, notes || null]);
       } else {
         await connection.rollback();
@@ -472,10 +461,11 @@ const getSupplierCreditHistory = async (req, res) => {
 };
 
 // GET /api/suppliers/outstanding/all
+// GET /api/suppliers/outstanding/all
 const getAllOutstandingRecords = async (req, res) => {
   try {
     await ensureUnsettledReturnCredits();
-    
+
     const [invoices] = await pool.query(`
       SELECT
         p.id,
@@ -498,7 +488,8 @@ const getAllOutstandingRecords = async (req, res) => {
       ORDER BY s.name ASC, p.purchase_date DESC
     `);
 
-    const [advances] = await pool.query(`
+    // Real, explicit advance payments (Pay Now -> ADV-... rows)
+    const [realAdvances] = await pool.query(`
       SELECT
         so.id,
         s.id                    AS supplier_id,
@@ -515,8 +506,46 @@ const getAllOutstandingRecords = async (req, res) => {
       LEFT JOIN company c ON so.company_id = c.id
       WHERE so.status != 'Fully Used'
         AND so.remaining_credit > 0
-      ORDER BY s.name ASC, so.payment_date DESC
+        AND (so.is_deleted = 0 OR so.is_deleted IS NULL)
     `);
+
+    // Genuinely unallocated payments: only payments that actually went through
+    // the split-allocation path (pay-multiple-invoices) and still have leftover
+    // amount. INNER JOIN is required here - a single-invoice payment has NO row
+    // in purchase_payment_allocations by design (it's implicitly fully allocated
+    // via payment_history.purchase_id), so a LEFT JOIN + COALESCE(...,0) wrongly
+    // flags every ordinary payment as "unallocated". This is what was producing
+    // the UNALLOC-* rows for legitimate, already-settled invoice payments.
+    const [unallocatedPayments] = await pool.query(`
+      SELECT
+        ph.id                                       AS id,
+        p.supplier_id                                AS supplier_id,
+        s.name                                        AS supplier_name,
+        p.company_id                                  AS company_id,
+        c.name                                          AS company_name,
+        'Advance Payment'                             AS document_type,
+        CONCAT('UNALLOC-', ph.id)                     AS document_number,
+        ph.payment_date                               AS transaction_date,
+        (ph.amount - alloc.total_allocated)           AS outstanding_amount,
+        'Active'                                       AS status
+      FROM payment_history ph
+      JOIN purchases p ON p.id = ph.purchase_id
+      JOIN supplier s ON s.id = p.supplier_id
+      LEFT JOIN company c ON c.id = p.company_id
+      JOIN (
+        SELECT payment_history_id, SUM(allocated_amount) AS total_allocated
+        FROM purchase_payment_allocations
+        GROUP BY payment_history_id
+      ) alloc ON alloc.payment_history_id = ph.id
+      WHERE COALESCE(p.deleted, 0) = 0
+        AND (ph.amount - alloc.total_allocated) > 0.001
+    `);
+
+    const advances = [...realAdvances, ...unallocatedPayments].sort(
+      (a, b) =>
+        (a.supplier_name || '').localeCompare(b.supplier_name || '') ||
+        new Date(b.transaction_date) - new Date(a.transaction_date)
+    );
 
     const [returnCredits] = await pool.query(`
       SELECT
