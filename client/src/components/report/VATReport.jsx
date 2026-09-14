@@ -184,6 +184,7 @@ const VATReport = () => {
     const worksheetData = [];
 
     worksheetData.push([
+      'Purchasing Date',
       'Invoice No',
       'Supplier TIN Number',
       'Name of Supplier',
@@ -195,6 +196,7 @@ const VATReport = () => {
 
     vatData.forEach((item) => {
       worksheetData.push([
+        item.invoiceDate ? format(new Date(item.invoiceDate), 'dd/MM/yyyy') : 'N/A',
         item.invoiceNo,
         item.supplierTIN,
         item.supplierName,
@@ -216,6 +218,7 @@ const VATReport = () => {
       '',
       '',
       '',
+      '',
       formatNumber(totalNetAmount, 2, 2),
       formatNumber(totalVATAmount, 2, 2),
       formatNumber(totalDisallowableVAT, 2, 2)
@@ -224,6 +227,7 @@ const VATReport = () => {
     const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
 
     worksheet['!cols'] = [
+      { wch: 16 },
       { wch: 18 },
       { wch: 22 },
       { wch: 28 },
@@ -352,6 +356,7 @@ const VATReport = () => {
             <div style={{ overflowX: 'auto' }}>
             <table className="report-table">
               <colgroup>
+                <col style={{ width: '130px' }} />
                 <col style={{ width: '140px' }} />
                 <col style={{ width: '180px' }} />
                 <col style={{ width: '200px' }} />
@@ -362,6 +367,7 @@ const VATReport = () => {
               </colgroup>
               <thead>
                 <tr>
+                  <th className="text-left">Purchasing Date</th>
                   <th className="text-left">Invoice No</th>
                   <th className="text-left">Supplier TIN Number</th>
                   <th className="text-left">Name of Supplier</th>
@@ -379,6 +385,7 @@ const VATReport = () => {
                     className={item.isExpense ? '' : 'clickable-row'}
                     title={item.isExpense ? '' : 'Click to view full purchase details'}
                   >
+                    <td className="text-left">{item.invoiceDate ? format(new Date(item.invoiceDate), 'dd/MM/yyyy') : 'N/A'}</td>
                     <td className="text-left">{item.invoiceNo}</td>
                     <td className="text-left">{item.supplierTIN}</td>
                     <td className="text-left">{item.supplierName}</td>
@@ -391,7 +398,7 @@ const VATReport = () => {
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan="4" className="text-right"><strong>TOTAL</strong></td>
+                  <td colSpan="5" className="text-right"><strong>TOTAL</strong></td>
                   <td className="report-table-value-numeric"><strong>{formatNumber(totalNetAmount, 2, 2)}</strong></td>
                   <td className="report-table-value-numeric text-primary"><strong>{formatNumber(totalVATAmount, 2, 2)}</strong></td>
                   <td className="report-table-value-numeric text-danger"><strong>{formatNumber(totalDisallowableVAT, 2, 2)}</strong></td>
