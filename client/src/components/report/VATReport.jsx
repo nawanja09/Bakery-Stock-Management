@@ -196,7 +196,7 @@ const VATReport = () => {
 
     vatData.forEach((item) => {
       worksheetData.push([
-        item.invoiceDate ? format(new Date(item.invoiceDate), 'dd/MM/yyyy') : 'N/A',
+        item.invoiceDate ? format(new Date(item.invoiceDate), 'MM/dd/yyyy') : 'N/A',
         item.invoiceNo,
         item.supplierTIN,
         item.supplierName,
