@@ -38,6 +38,7 @@ const EditPurchase = ({ embeddedId, onSaved, onCancel } = {}) => {
 
   const [formData, setFormData] = useState({
     purchase_date: '',
+    invoice_date: '',
     invoice_no: '',
     supplier_id: '',
     subtotal: 0,
@@ -129,6 +130,7 @@ const EditPurchase = ({ embeddedId, onSaved, onCancel } = {}) => {
 
         setFormData({
           purchase_date: dayjs(purchaseData.purchase_date).format('YYYY-MM-DD'),
+          invoice_date: purchaseData.invoice_date ? dayjs(purchaseData.invoice_date).format('YYYY-MM-DD') : '',
           invoice_no: purchaseData.invoice_no || '',
           supplier_id: purchaseData.supplier_id,
           subtotal: subtotal,
@@ -587,12 +589,21 @@ const EditPurchase = ({ embeddedId, onSaved, onCancel } = {}) => {
           <h3>Basic Information</h3>
           <div className="form-grid">
             <div className="form-group">
-              <label>Purchase Date *</label>
+              <label>Purchase Date - Delivery Date *</label>
               <input
                 type="date"
                 value={formData.purchase_date}
                 onChange={(e) => setFormData({ ...formData, purchase_date: e.target.value })}
                 required
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Invoice Date</label>
+              <input
+                type="date"
+                value={formData.invoice_date}
+                onChange={(e) => setFormData({ ...formData, invoice_date: e.target.value })}
               />
             </div>
 

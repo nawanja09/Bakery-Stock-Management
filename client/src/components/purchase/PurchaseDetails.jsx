@@ -235,9 +235,15 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
               </div>
             )}
             <div className="info-row">
-              <span className="label">Purchase Date:</span>
+              <span className="label">Delivery Date:</span>
               <span className="value">{formatDate(purchase.purchase_date)}</span>
             </div>
+            {purchase.invoice_date && (
+              <div className="info-row">
+                <span className="label">Invoice Date:</span>
+                <span className="value">{formatDate(purchase.invoice_date)}</span>
+              </div>
+            )}
             <div className="info-row">
               <span className="label">Invoice No:</span>
               <span className="value invoice-number">{purchase.invoice_no}</span>

@@ -28,7 +28,7 @@ const PurchaseReport = () => {
   const [hasSearched, setHasSearched] = useState(false);
 
   // Sorting
-  const [sortField, setSortField] = useState('purchase_date');
+  const [sortField, setSortField] = useState('invoice_date');
   const [sortDirection, setSortDirection] = useState('desc');
 
   // Load Company / Supplier dropdown options once on mount
@@ -122,9 +122,9 @@ const PurchaseReport = () => {
       let valA = a[sortField];
       let valB = b[sortField];
 
-      if (sortField === 'purchase_date') {
-        valA = new Date(valA).getTime();
-        valB = new Date(valB).getTime();
+      if (sortField === 'purchase_date' || sortField === 'invoice_date') {
+        valA = new Date(valA || a.purchase_date || a.invoice_date).getTime();
+        valB = new Date(valB || b.purchase_date || b.invoice_date).getTime();
       } else if (sortField === 'total_amount') {
         valA = Number(valA) || 0;
         valB = Number(valB) || 0;
@@ -175,7 +175,7 @@ const PurchaseReport = () => {
     sortedInvoices.forEach((inv) => {
       worksheetData.push([
         inv.invoice_no || 'N/A',
-        inv.purchase_date ? format(new Date(inv.purchase_date), 'yyyy-MM-dd') : 'N/A',
+        (inv.invoice_date || inv.purchase_date) ? format(new Date(inv.invoice_date || inv.purchase_date), 'yyyy-MM-dd') : 'N/A',
         inv.company_name || 'N/A',
         inv.supplier_name || 'N/A',
         Number(inv.total_amount || 0)
@@ -295,8 +295,8 @@ const PurchaseReport = () => {
                   <th onClick={() => handleSort('invoice_no')} className="sortable">
                     Invoice Number{sortIndicator('invoice_no')}
                   </th>
-                  <th onClick={() => handleSort('purchase_date')} className="sortable">
-                    Invoice Date{sortIndicator('purchase_date')}
+                  <th onClick={() => handleSort('invoice_date')} className="sortable">
+                    Invoice Date{sortIndicator('invoice_date')}
                   </th>
                   <th onClick={() => handleSort('company_name')} className="sortable">
                     Company{sortIndicator('company_name')}
@@ -313,7 +313,7 @@ const PurchaseReport = () => {
                 {sortedInvoices.map((inv) => (
                   <tr key={inv.id}>
                     <td className="report-table-reference">{inv.invoice_no || 'N/A'}</td>
-                    <td className="report-table-date">{inv.purchase_date ? format(new Date(inv.purchase_date), 'MMM dd, yyyy') : 'N/A'}</td>
+                    <td className="report-table-date">{(inv.invoice_date || inv.purchase_date) ? format(new Date(inv.invoice_date || inv.purchase_date), 'MMM dd, yyyy') : 'N/A'}</td>
                     <td>{inv.company_name || 'N/A'}</td>
                     <td>{inv.supplier_name || 'N/A'}</td>
                     <td className="report-table-value-numeric">{formatCurrency(inv.total_amount)}</td>
