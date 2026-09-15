@@ -663,13 +663,13 @@ const NavigationBar = () => {
       <li>
         <NavLink to="/adjustments/stores-balance" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
           <span className="icon-container"><FontAwesomeIcon icon={faWarehouse} /></span>
-          <span>RM Adjustments</span>
+          <span>Adjustments</span>
         </NavLink>
       </li>
       <li>
         <NavLink to="/adjustments/stores-adjustments" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
           <span className="icon-container"><FontAwesomeIcon icon={faTools} /></span>
-          <span>Stores Adjustment Summary</span>
+          <span>Adjustment Summary Report</span>
         </NavLink>
       </li>
       <li>
