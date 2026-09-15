@@ -532,6 +532,12 @@ const NavigationBar = () => {
         </NavLink>
       </li>
       <li>
+        <NavLink to="/expenses/cash-expenses" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          <span className="icon-container"><FontAwesomeIcon icon={faWallet} /></span>
+          <span>Cash Expenses</span>
+        </NavLink>
+      </li>
+      <li>
         <NavLink to="/expenses/reports" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
           <span className="icon-container"><FontAwesomeIcon icon={faChartBar} /></span>
           <span>Expenses Reports</span>

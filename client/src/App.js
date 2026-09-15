@@ -92,6 +92,8 @@ import PettyCash from './components/Expenses/PettyCash';
 import Reimbursement from './components/Expenses/Reimbursement';
 import NewExpenses from './components/Expenses/NewExpenses';
 import BankCharges from './components/Expenses/BankCharges';
+import CashExpenses from './components/Expenses/CashExpenses';
+
 
 import BankDetails from './components/Expenses/BankDetails';
 import Payees from './components/Expenses/Payees';
@@ -358,6 +360,8 @@ function App() {
             <Route path="expenses/new" element={<ExpensesRoute><NewExpenses /></ExpensesRoute>} />
             <Route path="expenses/bank-details" element={<ExpensesRoute><BankDetails /></ExpensesRoute>} />
             <Route path="expenses/reports" element={<ExpensesRoute><ExpensesReport /></ExpensesRoute>} />
+            <Route path="expenses/cash-expenses" element={<ExpensesRoute><CashExpenses /></ExpensesRoute>} />
+
 
             <Route path="finance/cash" element={<FinanceRoute><CashLedger /></FinanceRoute>} />
             <Route path="finance/cash-receive" element={<FinanceRoute><CashReceive /></FinanceRoute>} />

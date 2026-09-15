@@ -564,4 +564,35 @@ const ensureIncomeSchema = async () => {
 
 ensureIncomeSchema();
 
+// --- Cash Expenses module -----------------------------------------------------
+// `cash_expenses` is a dedicated table for recording cash-based expenses that
+// debit a company's Cash In Hand account (linked through company_id).
+const ensureCashExpensesSchema = async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS cash_expenses (
+        id             INT NOT NULL AUTO_INCREMENT,
+        voucher_number VARCHAR(50) NOT NULL,
+        expense_date   DATE NOT NULL,
+        company_id     INT NOT NULL,
+        expense_type   VARCHAR(255) NOT NULL,
+        description    VARCHAR(500) NULL,
+        amount         DECIMAL(14,2) NOT NULL,
+        created_by     INT NULL,
+        status         TINYINT(1) NOT NULL DEFAULT 1,
+        created_at     TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        UNIQUE KEY uq_cash_exp_voucher (voucher_number),
+        KEY idx_cash_exp_company (company_id),
+        KEY idx_cash_exp_date (expense_date)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    `);
+    console.log('Cash Expenses schema ready');
+  } catch (error) {
+    console.warn('Cash Expenses schema check skipped:', error.message);
+  }
+};
+
+ensureCashExpensesSchema();
+
 module.exports = pool;
