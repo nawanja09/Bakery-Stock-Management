@@ -861,6 +861,7 @@ const getPurchasingReport = async (req, res) => {
         p.id,
         p.invoice_no,
         p.purchase_date,
+        p.invoice_date,
         s.name AS supplier_name,
         s.vat_number AS supplier_vat_number,
         s.vat_registered AS supplier_vat_registered,
@@ -883,7 +884,7 @@ const getPurchasingReport = async (req, res) => {
       LEFT JOIN company c ON p.company_id = c.id
       -- ✅ LEFT JOIN to payment_history for actual payments
       LEFT JOIN payment_history ph ON p.id = ph.purchase_id
-      WHERE p.purchase_date BETWEEN ? AND ?
+      WHERE COALESCE(p.invoice_date, p.purchase_date) BETWEEN ? AND ?
         AND (p.deleted = FALSE OR p.deleted IS NULL)
     `;
 
@@ -901,12 +902,12 @@ const getPurchasingReport = async (req, res) => {
 
     query += `
       GROUP BY 
-        p.id, p.invoice_no, p.purchase_date, s.name, s.vat_number, 
+        p.id, p.invoice_no, p.purchase_date, p.invoice_date, s.name, s.vat_number, 
         s.vat_registered, p.payment_method, p.total_with_vat, p.bill_amount,
         p.check_number, c.name, p.company_id, p.vat_rate, 
         p.vat_amount, p.subtotal
     `;
-    query += ' ORDER BY p.purchase_date DESC';
+    query += ' ORDER BY COALESCE(p.invoice_date, p.purchase_date) DESC';
 
     const [purchases] = await pool.query(query, params);
 
@@ -1405,6 +1406,7 @@ const getPurchaseReport = async (req, res) => {
         p.id,
         p.invoice_no,
         p.purchase_date,
+        p.invoice_date,
         p.company_id,
         COALESCE(c.name, 'N/A') AS company_name,
         p.supplier_id,
@@ -1423,13 +1425,12 @@ const getPurchaseReport = async (req, res) => {
     const params = [];
 
     if (startDate) {
-      query += ' AND p.purchase_date >= ?';
+      query += ' AND COALESCE(p.invoice_date, p.purchase_date) >= ?';
       params.push(startDate);
     }
 
     if (endDate) {
-      // Include the whole end date (purchase_date is a datetime column)
-      query += ' AND p.purchase_date < DATE_ADD(?, INTERVAL 1 DAY)';
+      query += ' AND COALESCE(p.invoice_date, p.purchase_date) < DATE_ADD(?, INTERVAL 1 DAY)';
       params.push(endDate);
     }
 
@@ -1443,7 +1444,7 @@ const getPurchaseReport = async (req, res) => {
       params.push(supplierId);
     }
 
-    query += ' ORDER BY p.purchase_date DESC, p.id DESC';
+    query += ' ORDER BY COALESCE(p.invoice_date, p.purchase_date) DESC, p.id DESC';
 
     const [rows] = await pool.query(query, params);
 
@@ -1451,6 +1452,7 @@ const getPurchaseReport = async (req, res) => {
       id: row.id,
       invoice_no: row.invoice_no,
       purchase_date: row.purchase_date,
+      invoice_date: row.invoice_date,
       company_id: row.company_id,
       company_name: row.company_name,
       supplier_id: row.supplier_id,

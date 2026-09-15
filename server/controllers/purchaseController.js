@@ -125,6 +125,7 @@ const normalizePaymentMethodForHistory = (paymentMethod) => {
 const createPurchase = async (req, res) => {
   const { 
     purchase_date, 
+    invoice_date,
     invoice_no,
     supplier_id, 
     items, 
@@ -198,11 +199,11 @@ const createPurchase = async (req, res) => {
     // Insert purchase
     const [purchaseResult] = await connection.query(
       `INSERT INTO purchases 
-      (invoice_no, purchase_date, supplier_id, bill_amount, subtotal, vat_amount, 
+      (invoice_no, purchase_date, invoice_date, supplier_id, bill_amount, subtotal, vat_amount, 
        total_with_vat, vat_rate, paid_amount, balance_amount, balance_status, 
        payment_method, check_number, remarks, prepared_by, company_id, order_id, payment_status) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [invoice_no, purchase_date, supplier_id, total_with_vat, subtotal, vat_amount, 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [invoice_no, purchase_date, invoice_date || null, supplier_id, total_with_vat, subtotal, vat_amount, 
        total_with_vat, vat_rate, normalizedPaidAmount, normalizedBalanceAmount, normalizedBalanceStatus, 
        payment_method, check_number, remarks, resolvedPreparedBy, company_id, order_id || null, normalizedPaymentStatus]
     );
@@ -297,6 +298,7 @@ const getAllPurchases = async (req, res) => {
         p.id,
         p.invoice_no,
         p.purchase_date,
+        p.invoice_date,
         p.subtotal,
         p.vat_amount,
         p.total_with_vat,
@@ -518,6 +520,7 @@ const updatePurchase = async (req, res) => {
   const { id } = req.params;
   const { 
     purchase_date, 
+    invoice_date,
     invoice_no,
     supplier_id, 
     items, 
@@ -562,12 +565,12 @@ const updatePurchase = async (req, res) => {
 
     await connection.query(
       `UPDATE purchases 
-       SET invoice_no = ?, purchase_date = ?, supplier_id = ?, bill_amount = ?, subtotal = ?, 
+       SET invoice_no = ?, purchase_date = ?, invoice_date = ?, supplier_id = ?, bill_amount = ?, subtotal = ?, 
            vat_amount = ?, total_with_vat = ?, vat_rate = ?, paid_amount = ?, 
            balance_amount = ?, balance_status = ?, payment_method = ?, check_number = ?, 
            remarks = ?, prepared_by = ?, company_id = ?, payment_status = ?
        WHERE id = ?`,
-      [invoice_no, purchase_date, supplier_id, total_with_vat, subtotal, vat_amount, 
+      [invoice_no, purchase_date, invoice_date || null, supplier_id, total_with_vat, subtotal, vat_amount, 
        total_with_vat, vat_rate, normalizedPaidAmount, normalizedBalanceAmount, normalizedBalanceStatus, 
        payment_method, check_number, remarks, resolvedPreparedBy, company_id, normalizedPaymentStatus, id]
     );

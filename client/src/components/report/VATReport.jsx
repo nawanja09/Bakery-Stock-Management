@@ -106,7 +106,7 @@ const VATReport = () => {
       let totalNetAmount = 0;
       let totalVATAmount = 0;
       let totalDisallowableVAT = 0;
-      let invoiceDate = entry.purchase_date || entry.invoiceDate || entry.bill_date;
+      let invoiceDate = entry.invoice_date || entry.purchase_date || entry.invoiceDate || entry.bill_date;
       let invoiceNo = entry.invoice_no || entry.bill_number || entry.invoiceNo || 'N/A';
       let supplierTIN = entry.supplier_vat_number || entry.supplierTIN || '—';
       let supplierName = entry.supplier_name || entry.supplierName || 'Expense';
@@ -184,7 +184,7 @@ const VATReport = () => {
     const worksheetData = [];
 
     worksheetData.push([
-      'Purchasing Date',
+      'Invoice Date',
       'Invoice No',
       'Supplier TIN Number',
       'Name of Supplier',
@@ -367,7 +367,7 @@ const VATReport = () => {
               </colgroup>
               <thead>
                 <tr>
-                  <th className="text-left">Purchasing Date</th>
+                  <th className="text-left">Invoice Date</th>
                   <th className="text-left">Invoice No</th>
                   <th className="text-left">Supplier TIN Number</th>
                   <th className="text-left">Name of Supplier</th>

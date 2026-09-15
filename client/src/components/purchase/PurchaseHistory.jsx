@@ -132,7 +132,12 @@ const PurchaseTableRow = React.memo(({ purchase, backgroundLocation }) => {
       onClick={() => (window.location.href = `/purchase/${purchase.id}`)}
     >
       <td className="text-left">
-        <span className="date-main">{formatDate(purchase.purchase_date)}</span>
+        <div className="date-main" title="Delivery Date">D: {formatDate(purchase.purchase_date)}</div>
+        {purchase.invoice_date && (
+          <div className="date-sub" title="Invoice Date" style={{ fontSize: '0.85em', color: '#6b7280', marginTop: '2px' }}>
+            I: {formatDate(purchase.invoice_date)}
+          </div>
+        )}
       </td>
       <td className="text-left">
         <span className="invoice-number">{invoiceNumber}</span>
@@ -213,8 +218,13 @@ const PurchaseCard = React.memo(({ purchase, isSelected, onToggleSelect, backgro
             <span className="invoice-label">Invoice</span>
             <span className="invoice-value">{invoiceNumber}</span>
           </div>
-          <div className="card-date-info">
-            <span className="date-value">{formatMobileDate(purchase.purchase_date)}</span>
+          <div className="card-date-info" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
+            <span className="date-value" title="Delivery Date">D: {formatMobileDate(purchase.purchase_date)}</span>
+            {purchase.invoice_date && (
+              <span className="date-value" title="Invoice Date" style={{ fontSize: '0.85em', color: '#6b7280' }}>
+                I: {formatMobileDate(purchase.invoice_date)}
+              </span>
+            )}
           </div>
         </div>
 
@@ -714,7 +724,7 @@ const PurchaseHistory = () => {
                   <thead>
                     <tr>
                       <th className="sortable-header text-left" onClick={() => handleSort('purchase_date')}>
-                        Date {sortConfig.key === 'purchase_date' && <FontAwesomeIcon icon={sortConfig.direction === 'asc' ? faArrowUp : faArrowDown} className="sort-indicator" />}
+                        Dates {sortConfig.key === 'purchase_date' && <FontAwesomeIcon icon={sortConfig.direction === 'asc' ? faArrowUp : faArrowDown} className="sort-indicator" />}
                       </th>
                       <th className="sortable-header text-left" onClick={() => handleSort('invoice_no')}>
                         Invoice No. {sortConfig.key === 'invoice_no' && <FontAwesomeIcon icon={sortConfig.direction === 'asc' ? faArrowUp : faArrowDown} className="sort-indicator" />}

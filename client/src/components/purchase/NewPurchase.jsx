@@ -2,9 +2,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
-  faSave, 
-  faPlus, 
+import {
+  faSave,
+  faPlus,
   faTrash,
   faMoneyBillWave,
   faUniversity,
@@ -47,11 +47,12 @@ const AddPurchase = () => {
   const [supplierVatNumber, setSupplierVatNumber] = useState('');
   const [previousPurchasePrices, setPreviousPurchasePrices] = useState({});
   const [pendingRefreshKey, setPendingRefreshKey] = useState(0);
-  
+
   const VAT_RATE = 18;
 
   const [formData, setFormData] = useState({
     purchase_date: new Date().toLocaleDateString('en-CA'),
+    invoice_date: '',
     invoice_no: '',
     supplier_id: '',
     subtotal: 0,
@@ -67,10 +68,10 @@ const AddPurchase = () => {
     remarks: '',
     company_id: '',
     order_id: null,
-    items: [{ 
-      id: '', 
-      item_name: '', 
-      quantity: 1, 
+    items: [{
+      id: '',
+      item_name: '',
+      quantity: 1,
       unit_price: 0,
       unit: '',
       vat_applicable: false,
@@ -94,7 +95,7 @@ const AddPurchase = () => {
           api.get('/purchases/companies'),
           api.get('/purchases/previous-prices')
         ]);
-        
+
         setSuppliers(suppliersRes.data);
         setItemsList(itemsRes.data);
         setCompanies(companiesRes.data);
@@ -174,10 +175,10 @@ const AddPurchase = () => {
   useEffect(() => {
     const total = formData.total_with_vat;
     const paid = formData.paid_amount;
-    
+
     let paymentStatus = 'Non-Paid';
     let balanceStatus = 0;
-    
+
     if (paid >= total && total > 0) {
       paymentStatus = 'Paid';
       balanceStatus = 0;
@@ -188,59 +189,59 @@ const AddPurchase = () => {
       paymentStatus = 'Non-Paid';
       balanceStatus = total > 0 ? 1 : 0;
     }
-    
+
     const balance = Math.max(0, total - paid);
-    
+
     setFormData(prev => ({
       ...prev,
       balance_amount: balance,
       balance_status: balanceStatus,
       payment_status: paymentStatus
     }));
-    
+
   }, [formData.paid_amount, formData.total_with_vat]);
 
   const calculateItemValues = (item, supplierVatRegistered) => {
     const amount = item.quantity * item.unit_price;
     let vat = 0;
-    
+
     if (supplierVatRegistered && item.vat_applicable) {
       vat = amount * (VAT_RATE / 100);
     }
-    
+
     const lineTotal = amount + vat;
-    
+
     return { amount, vat, lineTotal };
   };
 
   const calculateTotals = (items, supplierVatRegistered, paidAmount) => {
     let subtotal = 0;
     let totalVat = 0;
-    
+
     items.forEach(item => {
       const amount = item.quantity * item.unit_price;
       subtotal += amount;
-      
+
       if (supplierVatRegistered && item.vat_applicable) {
         totalVat += amount * (VAT_RATE / 100);
       }
     });
-    
+
     const grandTotal = subtotal + totalVat;
     const balanceAmount = Math.max(0, grandTotal - paidAmount);
     const balanceStatus = balanceAmount > 0 ? 1 : 0;
-    
+
     return { subtotal, totalVat, grandTotal, balanceAmount, balanceStatus };
   };
 
   const handleSupplierChange = (e) => {
     const supplierId = parseInt(e.target.value);
     const supplier = suppliers.find(s => s.id === supplierId);
-    
+
     setSelectedSupplier(supplier);
     setSupplierVatRegistered(supplier?.vat_registered || false);
     setSupplierVatNumber(supplier?.vat_number || '');
-    
+
     setFormData(prev => ({
       ...prev,
       supplier_id: supplierId
@@ -252,7 +253,7 @@ const AddPurchase = () => {
     });
 
     const { subtotal, totalVat, grandTotal, balanceAmount, balanceStatus } = calculateTotals(
-      newItems, 
+      newItems,
       supplier?.vat_registered || false,
       formData.paid_amount
     );
@@ -278,16 +279,16 @@ const AddPurchase = () => {
     newItems[index][field] = value;
 
     const { amount, vat, lineTotal } = calculateItemValues(
-      newItems[index], 
+      newItems[index],
       supplierVatRegistered
     );
-    
+
     newItems[index].amount = amount;
     newItems[index].vat = vat;
     newItems[index].lineTotal = lineTotal;
 
     const { subtotal, totalVat, grandTotal, balanceAmount, balanceStatus } = calculateTotals(
-      newItems, 
+      newItems,
       supplierVatRegistered,
       formData.paid_amount
     );
@@ -315,11 +316,11 @@ const AddPurchase = () => {
   const addItemRow = () => {
     setFormData({
       ...formData,
-      items: [...formData.items, { 
-        id: '', 
-        item_name: '', 
-        quantity: 1, 
-        unit_price: 0, 
+      items: [...formData.items, {
+        id: '',
+        item_name: '',
+        quantity: 1,
+        unit_price: 0,
         unit: '',
         vat_applicable: false,
         amount: 0,
@@ -331,7 +332,7 @@ const AddPurchase = () => {
 
   const handleItemSelect = (index, selectedOption) => {
     if (!selectedOption) return;
-    
+
     const selectedItem = itemsList.find(item => item.id === selectedOption.value);
     if (!selectedItem) return;
 
@@ -348,22 +349,22 @@ const AddPurchase = () => {
     };
 
     const { amount, vat, lineTotal } = calculateItemValues(
-      newItems[index], 
+      newItems[index],
       supplierVatRegistered
     );
-    
+
     newItems[index].amount = amount;
     newItems[index].vat = vat;
     newItems[index].lineTotal = lineTotal;
 
     const { subtotal, totalVat, grandTotal, balanceAmount, balanceStatus } = calculateTotals(
-      newItems, 
+      newItems,
       supplierVatRegistered,
       formData.paid_amount
     );
 
-    setFormData({ 
-      ...formData, 
+    setFormData({
+      ...formData,
       items: newItems,
       subtotal,
       vat_amount: totalVat,
@@ -375,17 +376,17 @@ const AddPurchase = () => {
 
   const removeItemRow = (index) => {
     if (formData.items.length <= 1) return;
-    
+
     const newItems = formData.items.filter((_, i) => i !== index);
-    
+
     const { subtotal, totalVat, grandTotal, balanceAmount, balanceStatus } = calculateTotals(
-      newItems, 
+      newItems,
       supplierVatRegistered,
       formData.paid_amount
     );
-    
-    setFormData({ 
-      ...formData, 
+
+    setFormData({
+      ...formData,
       items: newItems,
       subtotal,
       vat_amount: totalVat,
@@ -397,12 +398,12 @@ const AddPurchase = () => {
 
   const handlePaidAmountChange = (e) => {
     const paidAmount = parseFloat(e.target.value) || 0;
-    
+
     if (paidAmount > formData.total_with_vat) {
       showPopup('warning', `Paid amount cannot exceed total bill amount (${formatCurrency(formData.total_with_vat)})`);
       return;
     }
-    
+
     setFormData(prev => ({
       ...prev,
       paid_amount: paidAmount
@@ -486,9 +487,9 @@ const AddPurchase = () => {
 
     try {
       const response = await api.post('/purchases', submitData);
-      
+
       let successMessage = `Purchase created successfully! Invoice: ${response.data.invoice_no}`;
-      
+
       if (response.data.payment_status === 'Paid') {
         successMessage += ' (Fully Paid)';
       } else if (response.data.payment_status === 'Partially Paid') {
@@ -496,7 +497,7 @@ const AddPurchase = () => {
       } else {
         successMessage += ` (Non-Paid - Amount Due: ${formatCurrency(formData.total_with_vat)})`;
       }
-      
+
       showPopup('success', successMessage);
       window.dispatchEvent(new Event('purchase-payment-updated'));
 
@@ -506,7 +507,7 @@ const AddPurchase = () => {
       }
     } catch (error) {
       console.error('Error creating purchase:', error);
-      
+
       if (
         error.response?.data?.error?.includes('Invoice number already exists') ||
         error.response?.data?.error?.includes('Duplicate reference number')
@@ -541,24 +542,24 @@ const AddPurchase = () => {
   }));
 
   const getPaymentStatusInfo = () => {
-    switch(formData.payment_status) {
+    switch (formData.payment_status) {
       case 'Paid':
-        return { 
-          color: '#10b981', 
+        return {
+          color: '#10b981',
           icon: faCheckCircle,
           text: 'Fully Paid',
           bg: '#d1fae5'
         };
       case 'Partially Paid':
-        return { 
-          color: '#f59e0b', 
+        return {
+          color: '#f59e0b',
           icon: faExclamationTriangle,
           text: 'Partially Paid',
           bg: '#fef3c7'
         };
       default:
-        return { 
-          color: '#ef4444', 
+        return {
+          color: '#ef4444',
           icon: faMoneyBillWave,
           text: 'Non-Paid',
           bg: '#fee2e2'
@@ -575,7 +576,7 @@ const AddPurchase = () => {
   return (
     <div className="purchase-container erp-purchase-page">
       <div className="page-header">
-          <h1>RM Purchasing Invoice</h1>
+        <h1>RM Purchasing Invoice</h1>
       </div>
 
       {orderInfo && (
@@ -608,14 +609,27 @@ const AddPurchase = () => {
             <div className="form-group">
               <label>
                 <FontAwesomeIcon icon={faCalendar} />
-                Purchase Date
+                Delivery Date
               </label>
-              <input 
-                type="date" 
+              <input
+                type="date"
                 value={formData.purchase_date}
-                onChange={(e) => setFormData({...formData, purchase_date: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, purchase_date: e.target.value })}
                 className="form-control"
                 required
+              />
+            </div>
+
+            <div className="form-group">
+              <label>
+                <FontAwesomeIcon icon={faCalendar} />
+                Invoice Date
+              </label>
+              <input
+                type="date"
+                value={formData.invoice_date}
+                onChange={(e) => setFormData({ ...formData, invoice_date: e.target.value })}
+                className="form-control"
               />
             </div>
 
@@ -627,7 +641,7 @@ const AddPurchase = () => {
               <input
                 type="text"
                 value={formData.invoice_no}
-                onChange={(e) => setFormData({...formData, invoice_no: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, invoice_no: e.target.value })}
                 placeholder="INV-2024-001"
                 className="form-control"
                 required
@@ -675,7 +689,7 @@ const AddPurchase = () => {
               </label>
               <select
                 value={formData.company_id}
-                onChange={(e) => setFormData({...formData, company_id: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, company_id: e.target.value })}
                 className="form-control"
                 required
               >
@@ -694,7 +708,7 @@ const AddPurchase = () => {
               <input
                 type="text"
                 value={formData.check_number}
-                onChange={(e) => setFormData({...formData, check_number: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, check_number: e.target.value })}
                 placeholder="Optional"
                 className="form-control"
               />
@@ -710,129 +724,129 @@ const AddPurchase = () => {
               Purchase Items
             </h2>
           </div>
-          
-            <div className="items-table-container">
-              <table className="items-table">
-                <thead>
-                  <tr>
-                    <th className="text-left" style={{ width: '35%' }}>Item Name</th>
-                    <th className="text-right" style={{ width: '10%' }}>Quantity</th>
-                    <th className="text-center" style={{ width: '8%' }}>Unit</th>
-                    <th className="text-right" style={{ width: '15%' }}>Unit Price (Net)</th>
-                    <th className="text-right" style={{ width: '12%' }}>Amount</th>
-                    {supplierVatRegistered && <th className="text-right" style={{ width: '10%' }}>VAT 18%</th>}
-                    <th className="text-right" style={{ width: '12%' }}>Line Total</th>
-                    <th className="text-center" style={{ width: '8%' }}>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {formData.items.map((item, index) => {
-                    const selectedOption = item.id ? itemOptions.find(opt => String(opt.value) === String(item.id)) : null;
-                    const previousPrice = previousPurchasePrices[item.id] || 0;
-                    
-                    return (
-                      <tr key={index}>
-                        <td>
-                          <Select
-                            options={itemOptions}
-                            value={itemOptions.find(opt => String(opt.value) === String(item.id)) || null}
-                            onChange={(selected) => handleItemSelect(index, selected)}
-                            isSearchable
-                            placeholder="Select item..."
-                            className="purchase-item-select"
-                            classNamePrefix="react-select"
-                            components={customSelectComponents}
-                            styles={purchaseItemSelectStyles}
-                            menuPlacement="auto"
-                            closeMenuOnSelect
-                            blurInputOnSelect
-                            menuPortalTarget={document.body}
-                          />
-                          {item.vat_applicable && (
-                            <small style={{ color: '#28a745', display: 'block', marginTop: '4px' }}>
-                              ✓ VAT Applicable
-                            </small>
-                          )}
-                        </td>
-                        <td>
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.001"
-                            value={item.quantity}
-                            onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
-                            required
-                            className="quantity-input"
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="text"
-                            value={item.unit}
-                            readOnly
-                            className="unit-display"
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="number"
-                            min="0.01"
-                            step="0.01"
-                            value={item.unit_price}
-                            onChange={(e) => handleItemChange(index, 'unit_price', e.target.value)}
-                            required
-                            className={previousPrice && item.unit_price !== previousPrice ? 'price-different' : ''}
-                          />
-                          {previousPrice > 0 && (
-                            <small style={{ display: 'block', fontSize: '11px', color: '#6c757d' }}>
-                              Prev: {formatCurrency(previousPrice)}
-                            </small>
-                          )}
-                        </td>
-                        <td className="text-right">{formatCurrency(item.amount)}</td>
-                        {supplierVatRegistered && (
-                          <td className="text-right vat-column">
-                            {item.vat_applicable ? formatCurrency(item.vat) : '-'}
-                          </td>
-                        )}
-                        <td className="text-right">
-                          <strong>{formatCurrency(item.lineTotal)}</strong>
-                        </td>
-                        <td className="text-center">
-                          <button 
-                            type="button" 
-                            className="btn btn-outline-danger btn-sm"
-                            onClick={() => removeItemRow(index)}
-                            disabled={formData.items.length <= 1}
-                            title="Remove item"
-                          >
-                            <FontAwesomeIcon icon={faTrash} />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-                <tfoot>
-                  <tr className="full-total-row">
-                    <td colSpan={supplierVatRegistered ? 6 : 5} className="text-right">
-                      <strong>Full Total:</strong>
-                    </td>
-                    <td className="text-right full-total-value">
-                      <strong>{formatCurrency(fullTotal)}</strong>
-                    </td>
-                    <td></td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
 
-          <button 
-            type="button" 
+          <div className="items-table-container">
+            <table className="items-table">
+              <thead>
+                <tr>
+                  <th className="text-left" style={{ width: '35%' }}>Item Name</th>
+                  <th className="text-right" style={{ width: '10%' }}>Quantity</th>
+                  <th className="text-center" style={{ width: '8%' }}>Unit</th>
+                  <th className="text-right" style={{ width: '15%' }}>Unit Price (Net)</th>
+                  <th className="text-right" style={{ width: '12%' }}>Amount</th>
+                  {supplierVatRegistered && <th className="text-right" style={{ width: '10%' }}>VAT 18%</th>}
+                  <th className="text-right" style={{ width: '12%' }}>Line Total</th>
+                  <th className="text-center" style={{ width: '8%' }}>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {formData.items.map((item, index) => {
+                  const selectedOption = item.id ? itemOptions.find(opt => String(opt.value) === String(item.id)) : null;
+                  const previousPrice = previousPurchasePrices[item.id] || 0;
+
+                  return (
+                    <tr key={index}>
+                      <td>
+                        <Select
+                          options={itemOptions}
+                          value={itemOptions.find(opt => String(opt.value) === String(item.id)) || null}
+                          onChange={(selected) => handleItemSelect(index, selected)}
+                          isSearchable
+                          placeholder="Select item..."
+                          className="purchase-item-select"
+                          classNamePrefix="react-select"
+                          components={customSelectComponents}
+                          styles={purchaseItemSelectStyles}
+                          menuPlacement="auto"
+                          closeMenuOnSelect
+                          blurInputOnSelect
+                          menuPortalTarget={document.body}
+                        />
+                        {item.vat_applicable && (
+                          <small style={{ color: '#28a745', display: 'block', marginTop: '4px' }}>
+                            ✓ VAT Applicable
+                          </small>
+                        )}
+                      </td>
+                      <td>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.001"
+                          value={item.quantity}
+                          onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
+                          required
+                          className="quantity-input"
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="text"
+                          value={item.unit}
+                          readOnly
+                          className="unit-display"
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="number"
+                          min="0.01"
+                          step="0.01"
+                          value={item.unit_price}
+                          onChange={(e) => handleItemChange(index, 'unit_price', e.target.value)}
+                          required
+                          className={previousPrice && item.unit_price !== previousPrice ? 'price-different' : ''}
+                        />
+                        {previousPrice > 0 && (
+                          <small style={{ display: 'block', fontSize: '11px', color: '#6c757d' }}>
+                            Prev: {formatCurrency(previousPrice)}
+                          </small>
+                        )}
+                      </td>
+                      <td className="text-right">{formatCurrency(item.amount)}</td>
+                      {supplierVatRegistered && (
+                        <td className="text-right vat-column">
+                          {item.vat_applicable ? formatCurrency(item.vat) : '-'}
+                        </td>
+                      )}
+                      <td className="text-right">
+                        <strong>{formatCurrency(item.lineTotal)}</strong>
+                      </td>
+                      <td className="text-center">
+                        <button
+                          type="button"
+                          className="btn btn-outline-danger btn-sm"
+                          onClick={() => removeItemRow(index)}
+                          disabled={formData.items.length <= 1}
+                          title="Remove item"
+                        >
+                          <FontAwesomeIcon icon={faTrash} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="full-total-row">
+                  <td colSpan={supplierVatRegistered ? 6 : 5} className="text-right">
+                    <strong>Full Total:</strong>
+                  </td>
+                  <td className="text-right full-total-value">
+                    <strong>{formatCurrency(fullTotal)}</strong>
+                  </td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <button
+            type="button"
             className="btn btn-secondary"
             onClick={addItemRow}
           >
-          <FontAwesomeIcon icon={faPlus} />
+            <FontAwesomeIcon icon={faPlus} />
             Add New Item
           </button>
         </div>
