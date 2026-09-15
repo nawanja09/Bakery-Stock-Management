@@ -269,6 +269,8 @@ const AddPurchaseReturn = () => {
       return_number: returnNumber.trim().toUpperCase(),
       purchase_id: null,
       supplier_id: formData.supplier_id,
+      supplier_vat_registered: supplierVatRegistered, // Passed to server, though server re-verifies for safety
+      vat_rate: VAT_RATE,
       return_date: returnDate,
       items: itemsToReturn,
       remarks: remarks || null,
@@ -423,7 +425,7 @@ const AddPurchaseReturn = () => {
                   <th style={{ width: '12%' }}>Unit Price</th>
                   <th style={{ width: '14%' }}>Qty to Return</th>
                   <th style={{ width: '10%', textAlign: 'right' }}>Amount</th>
-                  {supplierVatRegistered && <th style={{ width: '10%', textAlign: 'right' }}>VAT (18%)</th>}
+                  {supplierVatRegistered && <th style={{ width: '10%', textAlign: 'right' }}>VAT ({VAT_RATE}%)</th>}
                   <th style={{ width: '10%', textAlign: 'right' }}>Total</th>
                   <th style={{ width: '7%' }}></th>
                 </tr>
