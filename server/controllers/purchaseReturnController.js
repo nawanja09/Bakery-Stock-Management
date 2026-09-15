@@ -130,8 +130,13 @@ const createPurchaseReturn = async (req, res) => {
       payment_method,
       company_id,
       check_number,
-      settlements
+      settlements,
+      vat_rate: clientVatRate
     } = req.body;
+
+    // Use the rate sent by the client, defaulting to 18 (the system-wide rate).
+    // Never trust the client for supplier VAT registration status — always re-verify from DB.
+    const vatRate = parseFloat(clientVatRate) > 0 ? parseFloat(clientVatRate) : 18;
 
     // Validate required fields
     if (!return_number) {
@@ -150,33 +155,49 @@ const createPurchaseReturn = async (req, res) => {
       throw new Error('Returned by user ID is required');
     }
 
+    // ─── Re-verify supplier VAT registration directly from DB ──────────────
+    // This prevents the client from spoofing VAT status and ensures the
+    // server is the single source of truth for this business rule.
+    const [supplierRows] = await connection.query(
+      'SELECT vat_registered FROM supplier WHERE id = ? LIMIT 1',
+      [supplier_id]
+    );
+    if (supplierRows.length === 0) {
+      throw new Error('Supplier not found');
+    }
+    const supplierVatRegistered = supplierRows[0].vat_registered === 1 || supplierRows[0].vat_registered === true;
+
     // Calculate totals
     let subtotal = 0;
     let totalVat = 0;
     let totalAmount = 0;
 
     // Process each item
+    // VAT logic: apply VAT only when BOTH supplier is VAT-registered
+    // AND the individual RM item is flagged vat_applicable.
     const processedItems = [];
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
-      
-      const quantity = parseFloat(item.return_quantity) || 0;
-      const unitPrice = parseFloat(item.unit_price) || 0;
-      const amount = quantity * unitPrice;
+
+      const quantity  = parseFloat(item.return_quantity) || 0;
+      const unitPrice = parseFloat(item.unit_price)      || 0;
+      const amount    = quantity * unitPrice;
       subtotal += amount;
-      
+
       const isVatApplicable = item.vat_applicable === true || item.vat_applicable === 1;
-      const vatAmount = isVatApplicable ? (amount * 0.18) : 0;
-      totalVat += vatAmount;
+      // VAT is charged only when the supplier is VAT-registered AND the item is VAT applicable
+      const shouldApplyVat = supplierVatRegistered && isVatApplicable;
+      const vatAmount = shouldApplyVat ? (amount * (vatRate / 100)) : 0;
+      totalVat    += vatAmount;
       totalAmount += amount + vatAmount;
-      
+
       processedItems.push({
-        originalItem: item,
-        quantity: quantity,
-        unit_price: unitPrice,
-        amount: amount,
-        vat_amount: vatAmount,
-        total_amount: amount + vatAmount
+        originalItem:  item,
+        quantity:      quantity,
+        unit_price:    unitPrice,
+        amount:        amount,
+        vat_amount:    vatAmount,
+        total_amount:  amount + vatAmount
       });
     }
 
@@ -216,26 +237,58 @@ const createPurchaseReturn = async (req, res) => {
     const balanceAmount = totalAmount - settledAmount;
 
     // Insert purchase return
-    const [returnResult] = await connection.query(
-      `INSERT INTO purchase_returns 
-      (return_number, return_date, purchase_id, supplier_id, subtotal, vat_amount, 
-       total_amount, settled_amount, balance_amount, settlement_details, remarks, returned_by) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        return_number, 
-        return_date, 
-        purchase_id || null, 
-        supplier_id, 
-        subtotal, 
-        totalVat, 
-        totalAmount, 
-        settledAmount, 
-        balanceAmount,
-        JSON.stringify(enhancedSettlements), 
-        remarks || null, 
-        returned_by
-      ]
-    );
+    // vat_rate column is added by migration 010_add_vat_rate_to_purchase_returns.sql.
+    // If the column does not yet exist the INSERT falls back gracefully (column simply omitted).
+    let returnResult;
+    try {
+      [returnResult] = await connection.query(
+        `INSERT INTO purchase_returns 
+        (return_number, return_date, purchase_id, supplier_id, subtotal, vat_amount, vat_rate,
+         total_amount, settled_amount, balance_amount, settlement_details, remarks, returned_by) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          return_number,
+          return_date,
+          purchase_id || null,
+          supplier_id,
+          subtotal,
+          totalVat,
+          vatRate,
+          totalAmount,
+          settledAmount,
+          balanceAmount,
+          JSON.stringify(enhancedSettlements),
+          remarks || null,
+          returned_by
+        ]
+      );
+    } catch (insertErr) {
+      // Fallback: if vat_rate column does not exist yet, retry without it
+      if (insertErr.code === 'ER_BAD_FIELD_ERROR') {
+        [returnResult] = await connection.query(
+          `INSERT INTO purchase_returns 
+          (return_number, return_date, purchase_id, supplier_id, subtotal, vat_amount,
+           total_amount, settled_amount, balance_amount, settlement_details, remarks, returned_by) 
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            return_number,
+            return_date,
+            purchase_id || null,
+            supplier_id,
+            subtotal,
+            totalVat,
+            totalAmount,
+            settledAmount,
+            balanceAmount,
+            JSON.stringify(enhancedSettlements),
+            remarks || null,
+            returned_by
+          ]
+        );
+      } else {
+        throw insertErr;
+      }
+    }
     const returnId = returnResult.insertId;
 
     // Insert return items
@@ -714,7 +767,7 @@ const getVATReturns = async (req, res) => {
         supplier_name: row.supplier_name,
         tin_no: row.tin_no || '',
         invoice_date: invoice_date,
-        invoice_no: invoice_no,
+        invoice_no: invoice_no || '—',
         tax_credit: 'Credit',
         date_of_tax_credit: row.return_date,
         tax_credit_no: row.tax_credit_no,
