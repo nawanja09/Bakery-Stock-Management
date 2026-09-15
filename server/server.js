@@ -60,6 +60,8 @@ const receiveTypeRoutes = require('./routes/receiveTypeRoutes');
 const analystRoutes = require('./routes/analystRoutes');
 const incomeRoutes = require('./routes/incomeRoutes');
 const readOnly = require('./middleware/readOnly');
+const cashExpenseRoutes = require('./routes/cashExpenseRoutes');
+
 
 // NEW, independent module - FG (Finished Goods) Production.
 // Kept completely separate from the existing finished-goods-* routes above.
@@ -159,6 +161,8 @@ app.use('/api/inhand', inhandRoutes);
 app.use('/api/receive-types', receiveTypeRoutes);
 app.use('/api/analyst', analystRoutes);
 app.use('/api/incomes', incomeRoutes);
+app.use('/api/cash-expenses', cashExpenseRoutes);
+
 
 // Error handling middleware for file uploads
 app.use((err, req, res, next) => {
