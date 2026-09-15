@@ -309,20 +309,16 @@ const BalanceSheet = ({ selectedDate, setSelectedDate, balance, loading, error, 
                 <BsSubheadRow label="2. Stock Value" />
                 <BsRow label="Stock Value" value={balance.storesValue} indent />
                 <BsSubheadRow label="3. Bank Value" />
-                <BsRow label="BOC" value={balance.bankOfCeylon} indent />
-                <BsRow label="People's Bank" value={balance.peoplesBank} indent />
+                {balance.banks && balance.banks.map((bank, index) => (
+                  <BsRow key={bank.id || index} label={`${bank.bank_name} - ${bank.account_number}${bank.company ? ` (${bank.company})` : ''}`} value={bank.balance} indent />
+                ))}
                 <BsRow label="Total of Bank Value" value={balance.totalBankValues} tone="subtotal" indent />
                 <BsRow label="Total Value" value={balance.totalAssets} tone="total" />
 
                 <BsSectionRow label="PAYABLES / LIABILITIES" />
-                <BsRow label={`Total Purchasing (as of date)`} value={balance.totalPurchasingValue} indent />
-                <BsRow label={`Completed / Paid (${balance.completedPurchasingCount || 0} invoices)`} value={balance.totalPurchasingCompleted} indent />
                 <BsRow label={`Pending / Outstanding (${balance.pendingPurchasingCount || 0} invoices)`} value={balance.totalPurchasingPending} indent />
-                <BsRow label="Pending Invoice Amount" value={balance.pendingInvoiceAmount ?? balance.totalPurchasingPending} indent />
                 <BsRow label="Purchasing Advance Payment Balance" value={balance.purchasingAdvancePaymentBalance} indent />
-                <BsRow label="Purchasing Overpayment" value={balance.purchasingOverpayment} indent />
                 <BsRow label="Total Available Pending Credits" value={balance.totalAvailablePendingCredits} indent />
-                <BsRow label="Total Payables" value={balance.totalPayables} tone="total" />
 
                 <tr className={`bs-row bs-row--net ${netPositive ? 'bs-row--net-positive' : 'bs-row--net-negative'}`}>
                   <td className="bs-row-label">NET BALANCE</td>
