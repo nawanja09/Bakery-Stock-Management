@@ -63,9 +63,12 @@ const CATEGORY_CONFIG = {
       row.reason?.toLowerCase().includes(term),
     Editor: EditWastage,
   },
-  'Purchasing Payment Adjustment': {
+  // This key must exactly match the value emitted by StoresBalance. Keeping
+  // the selected composite payment/invoice ID intact is what makes an edit
+  // apply to the intended payment allocation rather than another invoice.
+  'Purchasing Payment': {
     endpoint: '/purchases/payments/adjustable',
-    label: 'Purchasing Payment Adjustment',
+    label: 'Purchasing Payment',
     getRows: (data) => data,
     columns: [
       { key: 'invoice_no', label: 'Invoice No.' },
@@ -130,6 +133,7 @@ const CategoryAdjustmentPanel = ({ category, onAdjustmentSaved }) => {
         </button>
         <Editor
           embeddedId={selectedId}
+          isRmAdjustment
           onCancel={() => setSelectedId(null)}
           onSaved={() => {
             setSelectedId(null);

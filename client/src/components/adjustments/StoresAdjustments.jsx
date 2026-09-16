@@ -176,7 +176,7 @@ const StoresAdjustments = () => {
       if (filters.reference_note) params.append('reference_note', filters.reference_note);
       if (filters.search) params.append('search', filters.search);
 
-      const response = await api.get(`/adjustments?${params.toString()}`);
+      const response = await api.get(`/adjustments/summary/Department?${params.toString()}`);
       setAdjustments(response.data);
       setCurrentPage(1);
     } catch (error) {
@@ -311,7 +311,7 @@ const StoresAdjustments = () => {
       {/* Header */}
       <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
         <div>
-          <h2 style={{ margin: 0 }}>Stores Adjustment Summary</h2>
+          <h2 style={{ margin: 0 }}>Adjustment Summary</h2>
         </div>
       </header>
 

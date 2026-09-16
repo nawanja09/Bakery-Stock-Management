@@ -15,7 +15,7 @@ import {
 
 // props.embeddedId / props.onSaved / props.onCancel are optional.
 // When absent (standalone route usage via /purchase/edit/:id), behavior is unchanged.
-const EditPurchase = ({ embeddedId, onSaved, onCancel } = {}) => {
+const EditPurchase = ({ embeddedId, onSaved, onCancel, isRmAdjustment = false } = {}) => {
   const params = useParams();
   const id = embeddedId || params.id;
   const navigate = useNavigate();
@@ -484,7 +484,9 @@ const EditPurchase = ({ embeddedId, onSaved, onCancel } = {}) => {
     };
 
     try {
-      const response = await api.put(`/purchases/${id}`, submitData);
+      const response = await api.put(`/purchases/${id}`, submitData, {
+        headers: isRmAdjustment ? { 'X-RM-Adjustment': 'true' } : undefined
+      });
       
       let successMessage = `Purchase updated successfully! Invoice: ${response.data.invoice_no}`;
       

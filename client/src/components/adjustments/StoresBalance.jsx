@@ -11,7 +11,7 @@ import api from '../../api';
 import './Adjustments.css';
 import CategoryAdjustmentPanel from './CategoryAdjustmentPanel';
 
-const ADJUSTMENT_CATEGORIES = ['Department', 'Invoice', 'Issuance', 'Wastage', 'Purchasing Payment Adjustment'];
+const ADJUSTMENT_CATEGORIES = ['Department', 'Invoice', 'Issuance', 'Wastage', 'Purchasing Payment'];
 
 // Reusable Modal Component
 const Modal = ({ isOpen, onClose, title, message, type = 'info', onConfirm, confirmText = 'Confirm', cancelText = 'Cancel' }) => {
@@ -293,7 +293,7 @@ const StoresBalance = () => {
     <div className="page-container">
       <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
         <div>
-          <h2 style={{ margin: 0 }}>RM Adjustment</h2>
+          <h2 style={{ margin: 0 }}> Adjustment</h2>
         </div>
         {adjustmentCategory === 'Department' && (
           <div>
@@ -310,7 +310,7 @@ const StoresBalance = () => {
       </header>
 
       {/* Select Category of Adjustments - controls which edit interface loads below,
-          without leaving the RM Adjustments page or creating separate routes. */}
+          without leaving the Adjustments page or creating separate routes. */}
       <div className="card" style={{ padding: 'var(--spacing-lg)', marginBottom: 'var(--spacing-lg)' }}>
         <div className="form-group" style={{ maxWidth: '360px', margin: 0 }}>
           <label>

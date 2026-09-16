@@ -90,7 +90,7 @@ app.use(cors({
   //origin: 'https://cjtradingcompany.lk',
   origin: 'http://localhost:3000',
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-RM-Adjustment'],
   credentials: true
 }));
 
@@ -101,6 +101,10 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.use('/api', authRoutes);
 app.use('/api', readOnly);
+// Payment adjustment routes must be mounted before purchaseRoutes: the latter
+// has a generic GET /:id route, which would otherwise treat
+// "/payment-adjustments" as a purchase ID and return 404.
+app.use('/api/purchases', paymentRoutes);
 app.use('/api/purchases', purchaseRoutes);
 app.use('/api/suppliers', supplierRoutes);
 app.use('/api/payees', payeeRoutes);
@@ -143,7 +147,6 @@ app.use('/api/cutlery-reports', cutleryStockReportRoutes);
 const bankChargesTypeRoutes = require('./routes/bankChargesTypeRoutes');
 
 app.use('/api/purchase-returns', purchaseReturnRoutes);
-app.use('/api/purchases', paymentRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/new-expenses', newExpenseRoutes);
 app.use('/api/expense-types', expenseTypeRoutes);

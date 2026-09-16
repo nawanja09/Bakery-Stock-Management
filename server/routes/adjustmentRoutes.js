@@ -11,6 +11,9 @@ router.use(...adjustmentsAccess);
 // Get all adjustments
 router.get('/', adjustmentController.getAdjustments);
 
+// Must be before /:id so "summary" is never treated as an adjustment ID.
+router.get('/summary/:category', adjustmentController.getRmAdjustmentSummary);
+
 // Create a new adjustment
 router.post('/', adjustmentController.createAdjustment);
 
