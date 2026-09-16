@@ -13,12 +13,14 @@ import { formatCurrency, formatNumber, formatQuantity } from '../../utils/format
 import InvoiceAdjustmentsTab from './tabs/InvoiceAdjustmentsTab';
 import IssuanceAdjustmentsTab from './tabs/IssuanceAdjustmentsTab';
 import WastageAdjustmentsTab from './tabs/WastageAdjustmentsTab';
+import PurchasingPaymentAdjustmentsTab from './tabs/PurchasingPaymentAdjustmentsTab';
 
 const SUMMARY_TABS = [
   { key: 'Department', label: 'Department Adjustments' },
   { key: 'Invoice', label: 'Invoice Adjustments' },
   { key: 'Issuance', label: 'Issuance Adjustments' },
   { key: 'Wastage', label: 'Wastage Adjustments' },
+  { key: 'Purchasing Payment', label: 'Purchasing Payment' },
 ];
 
 // Reusable Skeleton Component
@@ -332,6 +334,7 @@ const StoresAdjustments = () => {
       {activeTab === 'Invoice' && <InvoiceAdjustmentsTab />}
       {activeTab === 'Issuance' && <IssuanceAdjustmentsTab />}
       {activeTab === 'Wastage' && <WastageAdjustmentsTab />}
+      {activeTab === 'Purchasing Payment' && <PurchasingPaymentAdjustmentsTab />}
 
       {activeTab === 'Department' && (
       <>

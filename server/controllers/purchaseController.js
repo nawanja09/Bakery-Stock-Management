@@ -111,8 +111,12 @@ const normalizePaymentMethodForHistory = (paymentMethod) => {
     case 'BANK_TRANSFER':
       return 'BANK_TRANSFER';
     case 'CREDIT':
-    case 'CHEQUE':
       return 'CREDIT_CARD';
+    case 'CHEQUE':
+      // Preserve CHEQUE distinctly - the schema already supports this
+      // value and the Expenses Cheque Registry depends on being able to
+      // tell a real cheque payment apart from a Credit-method payment.
+      return 'CHEQUE';
     case 'CREDIT_CARD':
       return 'CREDIT_CARD';
     case 'CASH':
@@ -125,7 +129,6 @@ const normalizePaymentMethodForHistory = (paymentMethod) => {
 const createPurchase = async (req, res) => {
   const { 
     purchase_date, 
-    invoice_date,
     invoice_no,
     supplier_id, 
     items, 
@@ -199,11 +202,11 @@ const createPurchase = async (req, res) => {
     // Insert purchase
     const [purchaseResult] = await connection.query(
       `INSERT INTO purchases 
-      (invoice_no, purchase_date, invoice_date, supplier_id, bill_amount, subtotal, vat_amount, 
+      (invoice_no, purchase_date, supplier_id, bill_amount, subtotal, vat_amount, 
        total_with_vat, vat_rate, paid_amount, balance_amount, balance_status, 
        payment_method, check_number, remarks, prepared_by, company_id, order_id, payment_status) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [invoice_no, purchase_date, invoice_date || null, supplier_id, total_with_vat, subtotal, vat_amount, 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [invoice_no, purchase_date, supplier_id, total_with_vat, subtotal, vat_amount, 
        total_with_vat, vat_rate, normalizedPaidAmount, normalizedBalanceAmount, normalizedBalanceStatus, 
        payment_method, check_number, remarks, resolvedPreparedBy, company_id, order_id || null, normalizedPaymentStatus]
     );
@@ -298,7 +301,6 @@ const getAllPurchases = async (req, res) => {
         p.id,
         p.invoice_no,
         p.purchase_date,
-        p.invoice_date,
         p.subtotal,
         p.vat_amount,
         p.total_with_vat,
@@ -520,7 +522,6 @@ const updatePurchase = async (req, res) => {
   const { id } = req.params;
   const { 
     purchase_date, 
-    invoice_date,
     invoice_no,
     supplier_id, 
     items, 
@@ -565,12 +566,12 @@ const updatePurchase = async (req, res) => {
 
     await connection.query(
       `UPDATE purchases 
-       SET invoice_no = ?, purchase_date = ?, invoice_date = ?, supplier_id = ?, bill_amount = ?, subtotal = ?, 
+       SET invoice_no = ?, purchase_date = ?, supplier_id = ?, bill_amount = ?, subtotal = ?, 
            vat_amount = ?, total_with_vat = ?, vat_rate = ?, paid_amount = ?, 
            balance_amount = ?, balance_status = ?, payment_method = ?, check_number = ?, 
            remarks = ?, prepared_by = ?, company_id = ?, payment_status = ?
        WHERE id = ?`,
-      [invoice_no, purchase_date, invoice_date || null, supplier_id, total_with_vat, subtotal, vat_amount, 
+      [invoice_no, purchase_date, supplier_id, total_with_vat, subtotal, vat_amount, 
        total_with_vat, vat_rate, normalizedPaidAmount, normalizedBalanceAmount, normalizedBalanceStatus, 
        payment_method, check_number, remarks, resolvedPreparedBy, company_id, normalizedPaymentStatus, id]
     );
@@ -808,6 +809,9 @@ const makePayment = async (req, res) => {
   if (normalizedPaymentMethod === 'BANK_TRANSFER' && !bank_id) {
     return res.status(400).json({ error: 'Bank account is required for bank payments' });
   }
+  if (normalizedPaymentMethod === 'CHEQUE' && (!check_number || !String(check_number).trim())) {
+    return res.status(400).json({ error: 'Cheque number is required for cheque payments' });
+  }
 
   const connection = await pool.getConnection();
 
@@ -885,13 +889,13 @@ const makePayment = async (req, res) => {
     try {
       [paymentResult] = await connection.query(
         `INSERT INTO payment_history
-           (purchase_id, payment_date, amount, payment_method, check_number, voucher_number, notes, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+           (purchase_id, payment_date, amount, payment_method, check_number, bank_id, voucher_number, notes, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [paymentHistoryPurchaseId, payment_date, normalizedPaymentAmount, normalizedPaymentMethodForHistory,
-         check_number || null, voucher_number || null, notes || null, resolvedCreatedBy]
+         check_number || null, bank_id || null, voucher_number || null, notes || null, resolvedCreatedBy]
       );
     } catch (colErr) {
-      console.warn('voucher_number column not found, using fallback:', colErr.message);
+      console.warn('voucher_number/bank_id column not found, using fallback:', colErr.message);
       [paymentResult] = await connection.query(
         `INSERT INTO payment_history
            (purchase_id, payment_date, amount, payment_method, check_number, notes, created_by)
@@ -1413,6 +1417,343 @@ const addSettlementToReturn = async (req, res) => {
   }
 };
 
+// =============================================
+// PURCHASING PAYMENT ADJUSTMENT
+// (RM Adjustment -> "Purchasing Payment Adjustment" tab)
+//
+// Adjusts a payment that was already recorded against a purchasing
+// invoice. Only Payment Date and Payment Amount can change; everything
+// else about the payment (supplier, company, method, voucher, bank
+// account, invoice) is fixed and read-only. Reuses the same reconciliation
+// helpers and ledger functions as a normal payment so the invoice balance
+// and Cash/Bank ledger stay correct, and preserves the existing behavior
+// of treating any amount above the invoice's balance as supplier credit.
+// =============================================
+
+// A pickable "record" for the adjustment list is one (payment x invoice)
+// pair - the same unit getActualAllocatedPaidAmount/getPaymentHistory
+// already reconcile against. Its composite id is "<paymentId>-<purchaseId>".
+const getAdjustablePayments = async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT
+        CONCAT(ph.id, '-', COALESCE(ppa.purchase_id, ph.purchase_id)) AS id,
+        ph.id AS payment_id,
+        COALESCE(ppa.purchase_id, ph.purchase_id) AS purchase_id,
+        p.invoice_no,
+        s.name AS supplier_name,
+        DATE_FORMAT(ph.payment_date, '%Y-%m-%d') AS payment_date,
+        COALESCE(ppa.allocated_amount, ph.amount) AS amount,
+        ph.payment_method,
+        ph.voucher_number,
+        p.payment_status
+      FROM payment_history ph
+      LEFT JOIN purchase_payment_allocations ppa ON ppa.payment_history_id = ph.id
+      JOIN purchases p ON p.id = COALESCE(ppa.purchase_id, ph.purchase_id)
+      LEFT JOIN supplier s ON s.id = p.supplier_id
+      ORDER BY ph.payment_date DESC, ph.created_at DESC
+      LIMIT 500
+    `);
+    res.json(rows || []);
+  } catch (error) {
+    console.error('Error fetching adjustable payments:', error);
+    res.status(500).json({ error: 'Failed to fetch payments for adjustment' });
+  }
+};
+
+// GET Record Payment Details for the picked payment x invoice pair.
+const getPaymentAdjustmentDetail = async (req, res) => {
+  const [paymentId, purchaseId] = String(req.params.id).split('-').map(Number);
+  if (!paymentId || !purchaseId) {
+    return res.status(400).json({ error: 'Invalid payment adjustment reference' });
+  }
+
+  try {
+    const [paymentRows] = await pool.query(
+      `SELECT ph.id AS payment_id, ph.payment_date, ph.amount AS transaction_amount,
+              ph.payment_method, ph.voucher_number, ph.check_number, ph.notes,
+              ph.created_at, u.name AS created_by_name
+       FROM payment_history ph
+       LEFT JOIN users u ON u.id = ph.created_by
+       WHERE ph.id = ?`,
+      [paymentId]
+    );
+    if (paymentRows.length === 0) {
+      return res.status(404).json({ error: 'Payment record not found' });
+    }
+    const payment = paymentRows[0];
+
+    const [purchaseRows] = await pool.query(
+      `SELECT p.id, p.invoice_no, p.total_with_vat, p.balance_amount, p.paid_amount,
+              p.payment_status, p.company_id, s.name AS supplier_name, c.name AS company_name
+       FROM purchases p
+       LEFT JOIN supplier s ON s.id = p.supplier_id
+       LEFT JOIN company c ON c.id = p.company_id
+       WHERE p.id = ?`,
+      [purchaseId]
+    );
+    if (purchaseRows.length === 0) {
+      return res.status(404).json({ error: 'Invoice not found' });
+    }
+    const purchase = purchaseRows[0];
+
+    const [allocRows] = await pool.query(
+      'SELECT allocated_amount FROM purchase_payment_allocations WHERE payment_history_id = ? AND purchase_id = ?',
+      [paymentId, purchaseId]
+    );
+    const allocatedAmount = allocRows.length > 0
+      ? parseFloat(allocRows[0].allocated_amount)
+      : parseFloat(payment.transaction_amount);
+
+    // The Bank Account shown is whatever this payment actually posted
+    // against in the ledger (read-only - resolved from finance_transactions,
+    // since payment_history itself does not store a bank_id column).
+    const [ledgerRows] = await pool.query(
+      `SELECT ft.bank_id, bd.bank_name, bd.account_number
+       FROM finance_transactions ft
+       LEFT JOIN bank_details bd ON bd.id = ft.bank_id
+       WHERE ft.reference_type = 'PURCHASE_PAYMENT' AND ft.reference_id = ? LIMIT 1`,
+      [paymentId]
+    );
+    const bankInfo = ledgerRows[0] || {};
+
+    const invoiceTotal = resolveInvoiceTotalAmount(purchase);
+    const actualAllocatedExcludingThis = await getActualAllocatedPaidAmount(pool, purchaseId, paymentId);
+    const availableBalance = Math.max(0, invoiceTotal - actualAllocatedExcludingThis);
+
+    res.json({
+      payment_id: payment.payment_id,
+      purchase_id: purchase.id,
+      invoice_no: purchase.invoice_no,
+      supplier_name: purchase.supplier_name,
+      company_name: purchase.company_name,
+      payment_date: payment.payment_date,
+      payment_method: payment.payment_method,
+      voucher_number: payment.voucher_number,
+      reference_number: payment.check_number,
+      amount: allocatedAmount,
+      bank_id: bankInfo.bank_id || null,
+      bank_name: bankInfo.bank_name || null,
+      account_number: bankInfo.account_number || null,
+      notes: payment.notes,
+      invoice_total: invoiceTotal,
+      // The most this invoice can accept from this payment before any excess
+      // becomes supplier credit (i.e. the invoice balance if this payment's
+      // own current contribution is set aside).
+      invoice_available_balance: availableBalance,
+      created_by_name: payment.created_by_name,
+      created_at: payment.created_at
+    });
+  } catch (error) {
+    console.error('Error fetching payment adjustment detail:', error);
+    res.status(500).json({ error: 'Failed to fetch payment details' });
+  }
+};
+
+// PUT Save / Confirm Adjustment - only Payment Date and Payment Amount change.
+const adjustPurchasePayment = async (req, res) => {
+  const [paymentId, purchaseId] = String(req.params.id).split('-').map(Number);
+  const { payment_date, amount } = req.body;
+
+  if (!paymentId || !purchaseId) {
+    return res.status(400).json({ error: 'Invalid payment adjustment reference' });
+  }
+  if (!payment_date) {
+    return res.status(400).json({ error: 'Payment Date is required' });
+  }
+  const newAmount = parseFloat(amount);
+  if (!Number.isFinite(newAmount) || newAmount <= 0) {
+    return res.status(400).json({ error: 'Payment Amount must be a valid amount greater than 0' });
+  }
+
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const [paymentRows] = await connection.query(
+      'SELECT * FROM payment_history WHERE id = ? FOR UPDATE', [paymentId]
+    );
+    if (paymentRows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ error: 'Payment record not found' });
+    }
+    const payment = paymentRows[0];
+
+    const [purchaseRows] = await connection.query(
+      'SELECT * FROM purchases WHERE id = ? FOR UPDATE', [purchaseId]
+    );
+    if (purchaseRows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ error: 'Invoice not found' });
+    }
+    const purchase = purchaseRows[0];
+    const invoiceTotal = resolveInvoiceTotalAmount(purchase);
+
+    const [allocRows] = await connection.query(
+      'SELECT id, allocated_amount FROM purchase_payment_allocations WHERE payment_history_id = ? AND purchase_id = ? FOR UPDATE',
+      [paymentId, purchaseId]
+    );
+    const hasAllocationRow = allocRows.length > 0;
+    const oldAllocatedAmount = hasAllocationRow
+      ? parseFloat(allocRows[0].allocated_amount)
+      : parseFloat(payment.amount);
+
+    // Balance available to this invoice from every OTHER payment - i.e. what
+    // the balance would be if this payment's old contribution didn't exist.
+    const actualAllocatedExcludingThis = await getActualAllocatedPaidAmount(connection, purchaseId, paymentId);
+    const availableBalance = Math.max(0, invoiceTotal - actualAllocatedExcludingThis);
+
+    // Cap what actually applies to the invoice at its own balance - existing
+    // behavior: any amount above that is preserved as supplier credit.
+    const appliedAmount = Number(Math.min(newAmount, availableBalance).toFixed(2));
+    const excessAmount = Number((newAmount - appliedAmount).toFixed(2));
+
+    if (hasAllocationRow) {
+      await connection.query(
+        'UPDATE purchase_payment_allocations SET allocated_amount = ? WHERE id = ?',
+        [appliedAmount, allocRows[0].id]
+      );
+    } else {
+      await connection.query(
+        'INSERT INTO purchase_payment_allocations (payment_history_id, purchase_id, allocated_amount) VALUES (?, ?, ?)',
+        [paymentId, purchaseId, appliedAmount]
+      );
+    }
+
+    // Keep the overall payment_history record (the full transaction amount)
+    // in step with this invoice's change - it moves by the same amount the
+    // user's entered figure moved by for this invoice. Other invoices in a
+    // split payment, if any, are never touched by this adjustment.
+    const oldTransactionAmount = parseFloat(payment.amount) || 0;
+    const totalDelta = Number((newAmount - oldAllocatedAmount).toFixed(2));
+    const newTransactionAmount = Number((oldTransactionAmount + totalDelta).toFixed(2));
+
+    await connection.query(
+      'UPDATE payment_history SET payment_date = ?, amount = ? WHERE id = ?',
+      [payment_date, newTransactionAmount, paymentId]
+    );
+
+    // Recompute this invoice's paid/balance/status from the real allocations.
+    const reconciled = await reconcilePurchasePaymentState(connection, purchaseId, invoiceTotal, purchase.paid_amount);
+
+    // Sync the linked Cash/Bank ledger entry by the same delta, once, so the
+    // account balance reflects the adjustment exactly - never double-posted.
+    let ledgerUpdated = false;
+    const [finRows] = await connection.query(
+      `SELECT id, credit, account_type, company_id, bank_id FROM finance_transactions
+       WHERE reference_type = 'PURCHASE_PAYMENT' AND reference_id = ? LIMIT 1`,
+      [paymentId]
+    );
+    if (finRows.length > 0) {
+      const fin = finRows[0];
+      const newCredit = Number((parseFloat(fin.credit) + totalDelta).toFixed(2));
+      await connection.query(
+        'UPDATE finance_transactions SET credit = ?, transaction_date = ? WHERE id = ?',
+        [newCredit, payment_date, fin.id]
+      );
+      if (fin.account_type === 'CASH' && fin.company_id) {
+        await connection.query(
+          'UPDATE cash_accounts SET current_balance = current_balance - ? WHERE company_id = ?',
+          [totalDelta, fin.company_id]
+        );
+      } else if (fin.account_type === 'BANK' && fin.bank_id) {
+        await connection.query(
+          'UPDATE bank_details SET current_balance = current_balance - ? WHERE id = ?',
+          [totalDelta, fin.bank_id]
+        );
+      }
+      ledgerUpdated = true;
+    }
+
+    // Excess above the invoice balance is preserved as supplier credit,
+    // using the same supplier_overpayments mechanism the system already
+    // relies on for supplier credit elsewhere.
+    let overpaymentRecord = null;
+    const [supplierNameRows] = await connection.query('SELECT name FROM supplier WHERE id = ?', [purchase.supplier_id]);
+    const supplierName = supplierNameRows[0]?.name || null;
+
+    if (excessAmount > 0 && purchase.supplier_id) {
+      const datePart = String(payment_date).replace(/-/g, '');
+      const rand = Math.floor(Math.random() * 9000) + 1000;
+      const overpaymentNumber = `ADJ-${datePart}-${rand}`;
+      const overpaymentMethod = payment.payment_method === 'BANK_TRANSFER' ? 'BANK_TRANSFER' : 'CASH';
+
+      const [overpayResult] = await connection.query(
+        `INSERT INTO supplier_overpayments
+           (overpayment_number, supplier_id, company_id, payment_date, payment_method,
+            voucher_number, reference_number, original_amount, remaining_credit, status, notes, created_by)
+         VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?, 'Active', ?, ?)`,
+        [
+          overpaymentNumber, purchase.supplier_id, purchase.company_id || null, payment_date, overpaymentMethod,
+          payment.voucher_number || null, excessAmount, excessAmount,
+          `Supplier credit from Purchasing Payment Adjustment on invoice ${purchase.invoice_no} (Payment #${paymentId})`,
+          await resolveUserId(connection, req.user?.id)
+        ]
+      );
+      overpaymentRecord = { id: overpayResult.insertId, overpayment_number: overpaymentNumber, amount: excessAmount };
+    }
+
+    // Audit trail entry backing the RM Adjustment Summary / Stores
+    // Adjustment Summary "Purchasing Payment" view.
+    await connection.query(
+      `INSERT INTO purchase_payment_adjustments
+         (payment_history_id, purchase_id, invoice_no, supplier_id, supplier_name, voucher_number,
+          original_payment_date, updated_payment_date, original_amount, adjusted_amount,
+          adjustment_difference, status, notes, updated_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Adjusted', ?, ?)`,
+      [
+        paymentId, purchaseId, purchase.invoice_no, purchase.supplier_id, supplierName, payment.voucher_number || null,
+        payment.payment_date, payment_date, oldAllocatedAmount, newAmount,
+        Number((newAmount - oldAllocatedAmount).toFixed(2)),
+        excessAmount > 0 ? `Rs. ${excessAmount.toFixed(2)} recorded as supplier credit${overpaymentRecord ? ` (${overpaymentRecord.overpayment_number})` : ''}` : null,
+        await resolveUserId(connection, req.user?.id)
+      ]
+    );
+
+    await connection.commit();
+
+    res.json({
+      message: 'Payment adjustment saved successfully',
+      payment_id: paymentId,
+      purchase_id: purchaseId,
+      applied_amount: appliedAmount,
+      excess_amount: excessAmount,
+      overpayment: overpaymentRecord,
+      invoice_state: reconciled,
+      ledger_updated: ledgerUpdated
+    });
+  } catch (error) {
+    await connection.rollback();
+    console.error('Error adjusting payment:', error);
+    res.status(500).json({ error: 'Failed to save payment adjustment: ' + error.message });
+  } finally {
+    connection.release();
+  }
+};
+
+// GET the Purchasing Payment adjustment audit trail (RM Adjustment Summary
+// / Stores Adjustment Summary "Purchasing Payment" tab).
+const getPurchasePaymentAdjustmentsSummary = async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT pa.id, pa.invoice_no, pa.supplier_name, pa.voucher_number,
+             DATE_FORMAT(pa.original_payment_date, '%Y-%m-%d') AS original_payment_date,
+             DATE_FORMAT(pa.updated_payment_date, '%Y-%m-%d') AS updated_payment_date,
+             pa.original_amount, pa.adjusted_amount, pa.adjustment_difference,
+             pa.status, pa.notes, u.name AS updated_by_name,
+             DATE_FORMAT(pa.created_at, '%Y-%m-%d %H:%i:%s') AS updated_at
+      FROM purchase_payment_adjustments pa
+      LEFT JOIN users u ON u.id = pa.updated_by
+      ORDER BY pa.created_at DESC
+      LIMIT 500
+    `);
+    res.json(rows || []);
+  } catch (error) {
+    console.error('Error fetching purchasing payment adjustments summary:', error);
+    res.status(500).json({ error: 'Failed to fetch purchasing payment adjustments' });
+  }
+};
+
 module.exports = {
   calculatePaymentState,
   resolveInvoiceTotalAmount,
@@ -1431,5 +1772,9 @@ module.exports = {
   getPurchaseReturnsForBill,
   getSupplierBills,
   addSettlementToReturn,
-  getPendingInvoicesBySupplier
+  getPendingInvoicesBySupplier,
+  getAdjustablePayments,
+  getPaymentAdjustmentDetail,
+  adjustPurchasePayment,
+  getPurchasePaymentAdjustmentsSummary
 };

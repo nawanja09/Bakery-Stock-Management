@@ -11,7 +11,7 @@ import api from '../../api';
 import './Adjustments.css';
 import CategoryAdjustmentPanel from './CategoryAdjustmentPanel';
 
-const ADJUSTMENT_CATEGORIES = ['Department', 'Invoice', 'Issuance', 'Wastage'];
+const ADJUSTMENT_CATEGORIES = ['Department', 'Invoice', 'Issuance', 'Wastage', 'Purchasing Payment Adjustment'];
 
 // Reusable Modal Component
 const Modal = ({ isOpen, onClose, title, message, type = 'info', onConfirm, confirmText = 'Confirm', cancelText = 'Cancel' }) => {
