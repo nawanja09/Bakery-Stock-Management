@@ -273,7 +273,8 @@ router.post('/pay', async (req, res) => {
 
     const placeholders = expense_ids.map(() => '?').join(',');
     const [bills] = await connection.query(
-      `SELECT id, balance, total_bill_amount, paid_amount, payee_id, payee_name, bill_number, company_id
+            `SELECT id, balance, total_bill_amount, paid_amount, payee_id, payee_name, bill_number,
+              company_id, expense_type
        FROM expenses
        WHERE id IN (${placeholders}) AND is_deleted = 0 FOR UPDATE`,
       expense_ids
@@ -347,13 +348,15 @@ router.post('/pay', async (req, res) => {
     const billNumbers = bills.map(b => b.bill_number).filter(Boolean).join(', ');
     const remark = `New Expenses payment - ${payee_name || bills[0].payee_name}${billNumbers ? ` (Bill ${billNumbers})` : ''}`;
 
-    if (isCheque || isBank) {
+    // Ledger posting - Only online/bank transfers and cash payments deduct immediately.
+    // Cheque payments are NOT deducted before the cheque is released (deducted on release date via Cheque Registry).
+    if (isBank) {
       await recordBankTransaction(connection, {
         bankId: bank_id,
         date: payment_date,
         remark,
         credit: transferAmount,
-        transactionType: isCheque ? 'Cheque Expense Payment' : 'Online Expense Payment',
+        transactionType: 'Online Expense Payment',
         referenceNumber: referenceToCheck,
         invoiceNumber: billNumbers || null,
         partyName: payee_name || bills[0].payee_name,
@@ -361,7 +364,7 @@ router.post('/pay', async (req, res) => {
         referenceId: paymentId,
         createdBy: userId
       });
-    } else {
+    } else if (!isCheque) {
       // Use the selected bill company. Historical bills without a company retain
       // the previous behaviour of using the first configured cash account.
       let companyId = distinctCompanies[0];
@@ -395,6 +398,47 @@ router.post('/pay', async (req, res) => {
 
     await connection.commit();
 
+    // ── Auto-register in Expenses Cheque Registry (New Expenses Payment + Cheque) ──
+    // Recorded with release_status = 'Pending'. Ledger deduction occurs on release date.
+    if (isCheque && cheque_number && String(cheque_number).trim()) {
+      try {
+        let bankName = null;
+        if (bank_id) {
+          const [bankRows] = await pool.query(
+            'SELECT bank_name, account_number FROM bank_details WHERE id = ? LIMIT 1',
+            [bank_id]
+          );
+          if (bankRows.length) {
+            bankName = `${bankRows[0].bank_name}${bankRows[0].account_number ? ` (${bankRows[0].account_number})` : ''}`;
+          }
+        }
+        await pool.query(
+          `INSERT INTO expenses_cheque_registry
+             (source_type, source_id, date, name, cheque_number, amount, bank, bank_id, status)
+           VALUES ('EXPENSE_PAYMENT', ?, ?, ?, ?, ?, ?, ?, 'Pending')
+           ON DUPLICATE KEY UPDATE
+             date             = VALUES(date),
+             name             = VALUES(name),
+             cheque_number    = VALUES(cheque_number),
+             amount           = VALUES(amount),
+             bank             = VALUES(bank),
+             bank_id          = VALUES(bank_id),
+             status           = 'Pending'`,
+          [
+            paymentId,
+            payment_date,
+            payee_name || bills[0]?.payee_name || 'Payee',
+            String(cheque_number).trim(),
+            transferAmount,
+            bankName,
+            bank_id || null
+          ]
+        );
+      } catch (registryErr) {
+        console.error('Expenses cheque registry upsert error (New Expenses):', registryErr.message);
+      }
+    }
+
     res.status(201).json({
       message: 'Payment submitted successfully',
       payment_id: paymentId,
@@ -416,5 +460,12 @@ router.post('/pay', async (req, res) => {
     connection.release();
   }
 });
+
+// =============================================
+// Cheque Registry routes (Expenses sub-menu)
+// =============================================
+const chequeRegistryController = require('../controllers/chequeRegistryController');
+router.get('/cheque-registry', chequeRegistryController.getChequeRegistry);
+router.patch('/cheque-registry/:id', chequeRegistryController.updateChequeRegistryRecord);
 
 module.exports = router;

@@ -914,6 +914,9 @@ const NewExpenses = () => {
                         onChange={handlePaymentFormChange} className="payment-input"
                         placeholder="Enter cheque number" required
                       />
+                      <div style={{ padding: '6px 10px', background: '#fef3c7', color: '#92400e', borderRadius: '6px', fontSize: '12px', marginTop: '6px', borderLeft: '4px solid #f59e0b' }}>
+                        ℹ️ <strong>Cheque Payment:</strong> Remains <strong>Pending / Unreleased</strong>. Ledger balance is deducted only upon Cheque Release.
+                      </div>
                     </div>
                   )}
                   {isBankLike && (

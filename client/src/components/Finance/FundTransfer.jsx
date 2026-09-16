@@ -44,9 +44,10 @@ const FundTransfer = () => {
     company_id: '',
     direction: 'CASH_TO_BANK',     // CASH_TO_BANK | BANK_TO_CASH
     bank_id:   '',
-    date:      new Date().toISOString().slice(0, 10),
-    amount:    '',
-    remark:    ''
+    date:          new Date().toISOString().slice(0, 10),
+    amount:        '',
+    cheque_number: '',
+    remark:        ''
   });
 
   const selectedDirection = DIRECTIONS.find(d => d.value === formData.direction);
@@ -116,14 +117,16 @@ const FundTransfer = () => {
     if (!currentUser?.id)      return setMessage({ type: 'error', text: 'Session expired — please log in again.' });
 
     // Client-side balance pre-check (server enforces this too, but gives
-    // faster UX feedback).
+    // faster UX feedback). Cheques are not deducted today, so we only check cash or non-cheque bank transfers.
+    const isCheque = formData.direction === 'BANK_TO_CASH' && !!formData.cheque_number?.trim();
+
     if (formData.direction === 'CASH_TO_BANK' && cashBalance !== null && amt > cashBalance) {
       return setMessage({
         type: 'error',
         text: `Insufficient cash balance. Available: Rs. ${fmt(cashBalance)}`
       });
     }
-    if (formData.direction === 'BANK_TO_CASH' && selectedBank && amt > parseFloat(selectedBank.current_balance || 0)) {
+    if (formData.direction === 'BANK_TO_CASH' && !isCheque && selectedBank && amt > parseFloat(selectedBank.current_balance || 0)) {
       return setMessage({
         type: 'error',
         text: `Insufficient bank balance. Available: Rs. ${fmt(selectedBank.current_balance)}`
@@ -140,14 +143,20 @@ const FundTransfer = () => {
         amount:       amt,
         date:         formData.date,
         remark:       formData.remark || null,
+        cheque_number: formData.direction === 'BANK_TO_CASH' ? formData.cheque_number.trim() : null,
         created_by:   currentUser.id
       });
 
-      setMessage({ type: 'success', text: 'Transfer completed successfully!' });
+      setMessage({
+        type: 'success',
+        text: res.data?.message || (isCheque
+          ? 'Cheque transfer recorded! Cheque is Pending / Unreleased in Expenses Cheque Registry.'
+          : 'Transfer completed successfully!')
+      });
 
-      // Optimistically update displayed balances
-      if (res.data?.cash_balance !== undefined) setCashBalance(res.data.cash_balance);
-      if (res.data?.bank_balance !== undefined) {
+      // Optimistically update displayed balances only if returned by server (non-cheque)
+      if (res.data?.cash_balance !== null && res.data?.cash_balance !== undefined) setCashBalance(res.data.cash_balance);
+      if (res.data?.bank_balance !== null && res.data?.bank_balance !== undefined) {
         setBankAccounts(prev =>
           prev.map(b =>
             String(b.id) === String(formData.bank_id)
@@ -157,7 +166,7 @@ const FundTransfer = () => {
         );
       }
 
-      setFormData(prev => ({ ...prev, amount: '', remark: '' }));
+      setFormData(prev => ({ ...prev, amount: '', cheque_number: '', remark: '' }));
     } catch (err) {
       setMessage({
         type: 'error',
@@ -358,6 +367,28 @@ const FundTransfer = () => {
             </div>
           </div>
 
+          {/* Cheque Number (Bank to Cash only) */}
+          {formData.direction === 'BANK_TO_CASH' && (
+            <div className="ft-section">
+              <label className="ft-label">
+                Cheque Number <span className="ft-hint" style={{ fontSize: '12px', color: '#6b7280', fontWeight: 'normal' }}>(will be registered in Expenses Cheque Registry)</span>
+              </label>
+              <input
+                type="text"
+                name="cheque_number"
+                className="ft-input"
+                value={formData.cheque_number}
+                onChange={handleChange}
+                placeholder="Enter cheque number (e.g. 0065)"
+              />
+              {formData.cheque_number?.trim() && (
+                <div style={{ fontSize: '12px', color: '#b45309', marginTop: '6px', fontWeight: 500 }}>
+                  ℹ️ Cheque payments remain Pending / Unreleased. The Bank Ledger is NOT deducted until the cheque is released.
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Remark */}
           <div className="ft-section">
             <label className="ft-label">Remark</label>
@@ -435,6 +466,13 @@ const FundTransfer = () => {
               <div className="ft-summary-row ft-summary-amount">
                 <span className="ft-summary-lbl">Transfer Amount</span>
                 <span className="ft-summary-val-big">Rs. {fmt(formData.amount)}</span>
+              </div>
+            )}
+
+            {!isCashToBank && formData.cheque_number && (
+              <div className="ft-summary-row">
+                <span className="ft-summary-lbl">Cheque #</span>
+                <span className="ft-summary-val font-mono">{formData.cheque_number}</span>
               </div>
             )}
 

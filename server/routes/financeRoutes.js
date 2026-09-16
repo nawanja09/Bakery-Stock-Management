@@ -2,6 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const financeController = require('../controllers/financeController');
+const chequeRegistryController = require('../controllers/chequeRegistryController');
 const authenticate = require('../middleware/authenticate');
 const { financeReadAccess, financeWriteAccess } = require('../middleware/moduleAccess');
 
@@ -37,5 +38,9 @@ router.post('/transfer', ...financeOnly, financeController.transferFunds);
 
 // Bank-to-Bank transfer - Finance module page
 router.post('/bank/transfer', ...financeOnly, financeController.bankToBankTransfer);
+
+// Expenses Cheque Registry - Finance module page
+router.get('/cheque-registry', ...financeReadOnly, chequeRegistryController.getChequeRegistry);
+router.patch('/cheque-registry/:id', ...financeOnly, chequeRegistryController.updateChequeRegistryRecord);
 
 module.exports = router;

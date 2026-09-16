@@ -51,10 +51,12 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
   const [loadingCashBalance, setLoadingCashBalance] = useState(false);
 
   const isCashMethod = formData.payment_method === 'Cash';
+  const isChequeMethod = formData.payment_method === 'Cheque';
   const isBankMethod = formData.payment_method === 'Bank';
+  const needsBank = isBankMethod || isChequeMethod;
 
   useEffect(() => {
-    if (!isBankMethod || !resolvedCompanyId) {
+    if (!needsBank || !resolvedCompanyId) {
       setBankAccounts([]);
       return;
     }
@@ -65,7 +67,7 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
       .catch(() => { if (!cancelled) setBankAccounts([]); })
       .finally(() => { if (!cancelled) setLoadingBanks(false); });
     return () => { cancelled = true; };
-  }, [isBankMethod, resolvedCompanyId]);
+  }, [needsBank, resolvedCompanyId]);
 
   useEffect(() => {
     if (!isCashMethod || !resolvedCompanyId) {
@@ -193,7 +195,7 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
         notes: formData.notes || null,
         created_by: currentUser.id,
         invoice_allocations: payloadAllocations,
-        bank_id: normalizedPaymentMethod === 'BANK_TRANSFER' ? formData.bank_id : null
+        bank_id: (normalizedPaymentMethod === 'BANK_TRANSFER' || normalizedPaymentMethod === 'CHEQUE') ? (formData.bank_id || null) : null
       });
 
       console.log('✅ Payment response:', response.data);
@@ -337,20 +339,26 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
               <span className="ipm-hint">Any amount above the invoice balance will be stored as supplier credit.</span>
             </div>
 
-            {isBankMethod && (
+            {isChequeMethod && (
+              <div style={{ padding: '8px 12px', background: '#fef3c7', color: '#92400e', borderRadius: '6px', fontSize: '13px', margin: '8px 0', borderLeft: '4px solid #f59e0b' }}>
+                ℹ️ <strong>Cheque Payment:</strong> Amount remains <strong>Pending / Unreleased</strong>. The Bank Ledger will NOT be deducted until the cheque is released.
+              </div>
+            )}
+
+            {needsBank && (
               <div className="ipm-form-group">
-                <label>Bank Account *</label>
+                <label>Bank Account {isBankMethod ? '*' : '(Cheque account)'}</label>
                 <select
                   name="bank_id"
                   value={formData.bank_id}
                   onChange={handleChange}
-                  required
+                  required={isBankMethod}
                   disabled={!resolvedCompanyId || loadingBanks}
                 >
                   <option value="">
                     {!resolvedCompanyId
                       ? 'No company found for selected invoices'
-                      : loadingBanks ? 'Loading…' : 'Select bank account'}
+                      : loadingBanks ? 'Loading…' : (isBankMethod ? 'Select bank account *' : 'Select bank account (optional)')}
                   </option>
                   {bankAccounts.map(b => (
                     <option key={b.id} value={b.id}>
