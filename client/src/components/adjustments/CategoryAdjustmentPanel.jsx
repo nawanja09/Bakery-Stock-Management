@@ -11,6 +11,7 @@ import api from '../../api';
 import EditPurchase from '../purchase/EditPurchase';
 import EditIssuance from '../issuance/EditIssuance';
 import EditWastage from '../wastage/EditWastage';
+import PurchasingPaymentAdjustmentEditor from './PurchasingPaymentAdjustmentEditor';
 import './Adjustments.css';
 
 // Category -> { endpoint, columns, editor }
@@ -61,6 +62,23 @@ const CATEGORY_CONFIG = {
       row.approved_by?.toLowerCase().includes(term) ||
       row.reason?.toLowerCase().includes(term),
     Editor: EditWastage,
+  },
+  'Purchasing Payment Adjustment': {
+    endpoint: '/purchases/payments/adjustable',
+    label: 'Purchasing Payment Adjustment',
+    getRows: (data) => data,
+    columns: [
+      { key: 'invoice_no', label: 'Invoice No.' },
+      { key: 'supplier_name', label: 'Supplier' },
+      { key: 'payment_date', label: 'Payment Date', format: (v) => new Date(v).toLocaleDateString() },
+      { key: 'amount', label: 'Amount', format: (v) => `Rs. ${parseFloat(v || 0).toFixed(2)}` },
+      { key: 'voucher_number', label: 'Voucher No.' },
+    ],
+    matches: (row, term) =>
+      row.invoice_no?.toLowerCase().includes(term) ||
+      row.supplier_name?.toLowerCase().includes(term) ||
+      row.voucher_number?.toLowerCase().includes(term),
+    Editor: PurchasingPaymentAdjustmentEditor,
   },
 };
 
