@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { isRmAdjustmentRequest, recordRmAdjustment, sameItems, sameValue } = require('../utils/rmAdjustmentAudit');
 
 // Create new issuance
 const createIssuance = async (req, res) => {
@@ -197,6 +198,16 @@ const updateIssuance = async (req, res) => {
   try {
     await connection.beginTransaction();
 
+    const trackRmAdjustment = isRmAdjustmentRequest(req);
+    let originalIssuance = null;
+    let originalItems = [];
+    if (trackRmAdjustment) {
+      const [issuanceRows] = await connection.query('SELECT * FROM issuances WHERE id = ? FOR UPDATE', [id]);
+      originalIssuance = issuanceRows[0] || null;
+      const [itemRows] = await connection.query('SELECT item_id, quantity FROM issuance_items WHERE issuance_id = ?', [id]);
+      originalItems = itemRows;
+    }
+
     // Combine date and time into one datetime
     const datetime = issuance_time 
       ? `${issuance_date} ${issuance_time}:00`
@@ -225,6 +236,22 @@ const updateIssuance = async (req, res) => {
         VALUES (?, ?, ?)`,
         [id, item.item_id, item.quantity]
       );
+    }
+
+    const issuanceChanged = trackRmAdjustment && originalIssuance && (
+      !sameValue(originalIssuance.issuance_date, datetime) ||
+      !sameValue(originalIssuance.issued_by, issued_by) ||
+      !sameValue(originalIssuance.department_id, department_id) ||
+      !sameValue(originalIssuance.received_by, received_by) ||
+      !sameValue(originalIssuance.remarks, remarks) ||
+      !sameValue(originalIssuance.approved_by, approved_by) ||
+      !sameValue(originalIssuance.check_number, check_number) ||
+      !sameItems(originalItems, items, ['item_id', 'quantity'])
+    );
+    if (issuanceChanged) {
+      await recordRmAdjustment(connection, {
+        category: 'Issuance', sourceRecordId: id, referenceId: String(id), updatedBy: issued_by
+      });
     }
 
     await connection.commit();

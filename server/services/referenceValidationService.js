@@ -5,6 +5,10 @@ class DuplicateReferenceError extends Error {
   }
 }
 
+// Some deployments do not install every optional finance module. A missing
+// optional table must not block edits to an otherwise available module.
+const unavailableReferenceTables = new Set();
+
 /**
  * Checks if a given reference number is already used in any of the financial transactions across the system.
  * 
@@ -45,6 +49,8 @@ const checkDuplicateReference = async (connection, referenceNo, excludeConfig = 
   }
 
   for (const { table, column } of queries) {
+    if (unavailableReferenceTables.has(table)) continue;
+
     // Treat surrounding whitespace and letter case consistently, so " INV-1 "
     // and "inv-1" cannot be used to bypass the validation.
     let query = `SELECT id FROM ?? WHERE LOWER(TRIM(??)) = LOWER(?)`;
@@ -58,7 +64,17 @@ const checkDuplicateReference = async (connection, referenceNo, excludeConfig = 
 
     query += ` LIMIT 1`;
 
-    const [rows] = await connection.query(query, params);
+    let rows;
+    try {
+      [rows] = await connection.query(query, params);
+    } catch (error) {
+      if (error.code === 'ER_NO_SUCH_TABLE' || error.code === 'ER_BAD_FIELD_ERROR') {
+        unavailableReferenceTables.add(table);
+        console.warn(`Skipping unavailable reference-validation table: ${table}`);
+        continue;
+      }
+      throw error;
+    }
     
     if (rows && rows.length > 0) {
       throw new DuplicateReferenceError('Duplicate reference number. This number already exists and cannot be used again.');

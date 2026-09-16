@@ -3,6 +3,7 @@ const pool = require('../config/db');
 const { normalizePaymentMethodValue } = require('../utils/paymentMethodUtils');
 const { recordCashTransaction, recordBankTransaction } = require('../utils/financeLedger');
 const { checkDuplicateReference, DuplicateReferenceError } = require('../services/referenceValidationService');
+const { isRmAdjustmentRequest, recordRmAdjustment, sameItems, sameValue } = require('../utils/rmAdjustmentAudit');
 
 const resolveUserId = async (connection, ...candidateIds) => {
   for (const candidateId of candidateIds) {
@@ -544,6 +545,18 @@ const updatePurchase = async (req, res) => {
   try {
     await connection.beginTransaction();
 
+    const trackRmAdjustment = isRmAdjustmentRequest(req);
+    let originalPurchase = null;
+    let originalItems = [];
+    if (trackRmAdjustment) {
+      const [purchaseRows] = await connection.query('SELECT * FROM purchases WHERE id = ? FOR UPDATE', [id]);
+      originalPurchase = purchaseRows[0] || null;
+      const [itemRows] = await connection.query(
+        'SELECT item_id, item_name, quantity, unit_price FROM purchase_items WHERE purchase_id = ?', [id]
+      );
+      originalItems = itemRows;
+    }
+
     await checkDuplicateReference(connection, invoice_no, { table: 'purchases', id });
 
     const resolvedPreparedBy = await resolveUserId(connection, prepared_by, req.user?.id);
@@ -585,6 +598,27 @@ const updatePurchase = async (req, res) => {
         VALUES (?, ?, ?, ?, ?)`,
         [id, item.item_name, item.quantity, item.unit_price, item.item_id]
       );
+    }
+
+    const purchaseChanged = trackRmAdjustment && originalPurchase && (
+      !sameValue(originalPurchase.invoice_no, invoice_no) ||
+      !sameValue(originalPurchase.purchase_date, purchase_date) ||
+      !sameValue(originalPurchase.supplier_id, supplier_id) ||
+      !sameValue(originalPurchase.subtotal, subtotal) ||
+      !sameValue(originalPurchase.vat_amount, vat_amount) ||
+      !sameValue(originalPurchase.total_with_vat, total_with_vat) ||
+      !sameValue(originalPurchase.vat_rate, vat_rate) ||
+      !sameValue(originalPurchase.paid_amount, normalizedPaidAmount) ||
+      !sameValue(originalPurchase.payment_method, payment_method) ||
+      !sameValue(originalPurchase.check_number, check_number) ||
+      !sameValue(originalPurchase.remarks, remarks) ||
+      !sameValue(originalPurchase.company_id, company_id) ||
+      !sameItems(originalItems, items, ['item_id', 'item_name', 'quantity', 'unit_price'])
+    );
+    if (purchaseChanged) {
+      await recordRmAdjustment(connection, {
+        category: 'Invoice', sourceRecordId: id, referenceId: invoice_no, updatedBy: resolvedPreparedBy
+      });
     }
 
     await connection.commit();
@@ -1441,6 +1475,7 @@ const getAdjustablePayments = async (req, res) => {
         ph.id AS payment_id,
         COALESCE(ppa.purchase_id, ph.purchase_id) AS purchase_id,
         p.invoice_no,
+        s.id AS supplier_id,
         s.name AS supplier_name,
         DATE_FORMAT(ph.payment_date, '%Y-%m-%d') AS payment_date,
         COALESCE(ppa.allocated_amount, ph.amount) AS amount,
@@ -1736,7 +1771,8 @@ const adjustPurchasePayment = async (req, res) => {
 const getPurchasePaymentAdjustmentsSummary = async (req, res) => {
   try {
     const [rows] = await pool.query(`
-      SELECT pa.id, pa.invoice_no, pa.supplier_name, pa.voucher_number,
+      SELECT pa.id, pa.payment_history_id, pa.purchase_id, pa.supplier_id,
+             pa.invoice_no, pa.supplier_name, pa.voucher_number,
              DATE_FORMAT(pa.original_payment_date, '%Y-%m-%d') AS original_payment_date,
              DATE_FORMAT(pa.updated_payment_date, '%Y-%m-%d') AS updated_payment_date,
              pa.original_amount, pa.adjusted_amount, pa.adjustment_difference,

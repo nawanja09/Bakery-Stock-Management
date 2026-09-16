@@ -71,6 +71,32 @@ const ensurePaymentMethodsSchema = async () => {
 
 ensurePaymentMethodsSchema();
 
+// RM Adjustment Summary is an audit view, so this table must be available
+// before the first Summary request even on installations where SQL migration
+// files are applied manually.
+const ensureRmAdjustmentRecordsSchema = async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS rm_adjustment_records (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        category ENUM('Department', 'Invoice', 'Issuance', 'Wastage') NOT NULL,
+        source_record_id INT NOT NULL,
+        reference_id VARCHAR(100) NULL,
+        updated_by INT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_rm_adjustment_source (category, source_record_id),
+        KEY idx_rm_adjustment_category_updated (category, updated_at)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    `);
+    console.log('RM adjustment summary schema ready');
+  } catch (error) {
+    console.warn('RM adjustment summary schema check skipped:', error.message);
+  }
+};
+
+ensureRmAdjustmentRecordsSchema();
+
 const ensureSoftDeleteStatusSchema = async () => {
   try {
     const alterations = [

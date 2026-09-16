@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { recordRmAdjustment } = require('../utils/rmAdjustmentAudit');
 
 const getAdjustmentValues = ({ system_qty, actual_qty, unit_price }) => {
   const systemQuantity = Number(system_qty);
@@ -57,6 +58,10 @@ const createAdjustment = async (req, res) => {
        VALUES (?, ?, 'ADJUSTMENT', ?, 'stock_adjustments', ?, ?)`,
       [item_id, values.variance, result.insertId, date, reason]
     );
+
+    await recordRmAdjustment(connection, {
+      category: 'Department', sourceRecordId: result.insertId, referenceId: requestId, updatedBy: null
+    });
 
     await connection.commit();
 
@@ -137,6 +142,81 @@ const getAdjustments = async (req, res) => {
   } catch (error) {
     console.error('Error fetching adjustments:', error);
     res.status(500).json({ error: 'Server error' });
+  }
+};
+
+// RM Adjustment Summary data. Unlike the transaction history endpoints, this
+// returns only source records that were actually changed and saved from the
+// RM Adjustment page (tracked by rm_adjustment_records).
+const getRmAdjustmentSummary = async (req, res) => {
+  const { category } = req.params;
+  const { startDate, endDate, item_id, department_id, supplier_id, invoice_no, payment_status, reason } = req.query;
+
+  try {
+    let rows;
+    if (category === 'Department') {
+      let query = `SELECT sa.id, sa.date, sa.user_name, sa.reference_note, sa.item_id,
+          sa.system_qty, sa.actual_qty, sa.variance, sa.unit_price, sa.amount, sa.reason,
+          i.name AS item_name, i.item_code, i.unit, rar.updated_at AS rm_adjusted_at
+        FROM rm_adjustment_records rar
+        JOIN stock_adjustments sa ON sa.id = rar.source_record_id
+        JOIN items i ON i.id = sa.item_id
+        WHERE rar.category = 'Department'`;
+      const params = [];
+      if (startDate && endDate) { query += ' AND DATE(sa.date) BETWEEN ? AND ?'; params.push(startDate, endDate); }
+      if (item_id && item_id !== 'all') { query += ' AND sa.item_id = ?'; params.push(item_id); }
+      query += ' ORDER BY rar.updated_at DESC';
+      [rows] = await pool.query(query, params);
+    } else if (category === 'Invoice') {
+      let query = `SELECT p.id, p.invoice_no, p.purchase_date, p.subtotal, p.vat_amount,
+          p.total_with_vat, p.paid_amount, p.balance_amount, p.payment_status, p.supplier_id,
+          s.name AS supplier_name, rar.updated_at AS rm_adjusted_at
+        FROM rm_adjustment_records rar
+        JOIN purchases p ON p.id = rar.source_record_id
+        JOIN supplier s ON s.id = p.supplier_id
+        WHERE rar.category = 'Invoice' AND (p.deleted = FALSE OR p.deleted IS NULL)`;
+      const params = [];
+      if (supplier_id && supplier_id !== 'all') { query += ' AND p.supplier_id = ?'; params.push(supplier_id); }
+      if (invoice_no) { query += ' AND p.invoice_no LIKE ?'; params.push(`%${invoice_no}%`); }
+      if (startDate && endDate) { query += ' AND DATE(p.purchase_date) BETWEEN ? AND ?'; params.push(startDate, endDate); }
+      if (payment_status && payment_status !== 'all') { query += ' AND p.payment_status = ?'; params.push(payment_status); }
+      query += ' ORDER BY rar.updated_at DESC';
+      [rows] = await pool.query(query, params);
+    } else if (category === 'Issuance') {
+      let query = `SELECT iss.id, iss.issuance_date, iss.department_id, d.name AS department_name,
+          iss.received_by, iss.remarks, iss.approved_by, iss.check_number,
+          COUNT(ii.item_id) AS item_count, rar.updated_at AS rm_adjusted_at
+        FROM rm_adjustment_records rar
+        JOIN issuances iss ON iss.id = rar.source_record_id
+        JOIN departments d ON d.id = iss.department_id
+        LEFT JOIN issuance_items ii ON ii.issuance_id = iss.id
+        WHERE rar.category = 'Issuance'`;
+      const params = [];
+      if (department_id && department_id !== 'all') { query += ' AND iss.department_id = ?'; params.push(department_id); }
+      if (startDate && endDate) { query += ' AND DATE(iss.issuance_date) BETWEEN ? AND ?'; params.push(startDate, endDate); }
+      if (item_id && item_id !== 'all') { query += ' AND EXISTS (SELECT 1 FROM issuance_items ii2 WHERE ii2.issuance_id = iss.id AND ii2.item_id = ?)'; params.push(item_id); }
+      query += ' GROUP BY iss.id ORDER BY rar.updated_at DESC';
+      [rows] = await pool.query(query, params);
+    } else if (category === 'Wastage') {
+      let query = `SELECT w.id, w.wastage_note_number, w.date, w.approved_by, w.reason, w.remarks,
+          COALESCE(SUM(wi.estimated_loss), 0) AS total_loss, rar.updated_at AS rm_adjusted_at
+        FROM rm_adjustment_records rar
+        JOIN wastages w ON w.id = rar.source_record_id
+        LEFT JOIN wastage_items wi ON wi.wastage_id = w.id
+        WHERE rar.category = 'Wastage' AND COALESCE(w.status, 1) = 1`;
+      const params = [];
+      if (reason && reason !== 'all') { query += ' AND w.reason = ?'; params.push(reason); }
+      if (startDate && endDate) { query += ' AND DATE(w.date) BETWEEN ? AND ?'; params.push(startDate, endDate); }
+      if (item_id && item_id !== 'all') { query += ' AND EXISTS (SELECT 1 FROM wastage_items wi2 WHERE wi2.wastage_id = w.id AND wi2.item_id = ?)'; params.push(item_id); }
+      query += ' GROUP BY w.id ORDER BY rar.updated_at DESC';
+      [rows] = await pool.query(query, params);
+    } else {
+      return res.status(400).json({ error: 'Invalid RM adjustment category' });
+    }
+    res.json(rows || []);
+  } catch (error) {
+    console.error('Error fetching RM adjustment summary:', error);
+    res.status(500).json({ error: 'Unable to fetch RM adjustment summary' });
   }
 };
 
@@ -377,6 +457,7 @@ const deleteAdjustment = async (req, res) => {
 module.exports = {
   createAdjustment,
   getAdjustments,
+  getRmAdjustmentSummary,
   getSystemQuantity,
   getAdjustmentById,
   updateAdjustment,

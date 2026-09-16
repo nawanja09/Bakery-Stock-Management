@@ -26,7 +26,7 @@ import './EditWastage.css';
 
 // props.embeddedId / props.onSaved / props.onCancel are optional.
 // When absent (standalone route usage via /wastage/edit/:id), behavior is unchanged.
-const EditWastage = ({ embeddedId, onSaved, onCancel } = {}) => {
+const EditWastage = ({ embeddedId, onSaved, onCancel, isRmAdjustment = false } = {}) => {
   const params = useParams();
   const id = embeddedId || params.id;
   const navigate = useNavigate();
@@ -302,7 +302,10 @@ const EditWastage = ({ embeddedId, onSaved, onCancel } = {}) => {
     try {
       const token = localStorage.getItem('token');
       const response = await api.put(`/wastages/${id}`, submitData, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          ...(isRmAdjustment ? { 'X-RM-Adjustment': 'true' } : {})
+        }
       });
 
       if (response.status === 200) {

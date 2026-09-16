@@ -11,7 +11,7 @@ import { FaTrashAlt } from "react-icons/fa";
 // props.embeddedId / props.onSaved / props.onCancel are optional.
 // When absent (standalone route usage via /issuance/edit/:id), behavior is unchanged:
 // id comes from the URL and Cancel/Save navigate to /issuance/history as before.
-const EditIssuance = ({ embeddedId, onSaved, onCancel } = {}) => {
+const EditIssuance = ({ embeddedId, onSaved, onCancel, isRmAdjustment = false } = {}) => {
   const params = useParams();
   const id = embeddedId || params.id;
   const navigate = useNavigate();
@@ -186,7 +186,9 @@ const EditIssuance = ({ embeddedId, onSaved, onCancel } = {}) => {
     };
 
     try {
-      await api.put(`/issuances/${id}`, payload);
+      await api.put(`/issuances/${id}`, payload, {
+        headers: isRmAdjustment ? { 'X-RM-Adjustment': 'true' } : undefined
+      });
       showPopup('success', 'Issuance updated successfully!');
       goAfterSave();
     } catch (error) {

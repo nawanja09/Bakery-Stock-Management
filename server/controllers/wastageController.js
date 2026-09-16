@@ -1,5 +1,6 @@
 const pool = require('../config/db');
 const { v4: uuidv4 } = require('uuid');
+const { isRmAdjustmentRequest, recordRmAdjustment, sameItems, sameValue } = require('../utils/rmAdjustmentAudit');
 
 // Create wastage
 const createWastage = async (req, res) => {
@@ -182,6 +183,8 @@ const updateWastage = async (req, res) => {
   try {
     await connection.beginTransaction();
 
+    const trackRmAdjustment = isRmAdjustmentRequest(req);
+
     // Check if wastage exists and is not deleted
     const [existing] = await connection.query(
       `SELECT id, wastage_note_number FROM wastages 
@@ -195,6 +198,14 @@ const updateWastage = async (req, res) => {
     }
 
     const wastageNoteNumber = existing[0].wastage_note_number;
+    let originalWastage = null;
+    let originalItems = [];
+    if (trackRmAdjustment) {
+      const [wastageRows] = await connection.query('SELECT * FROM wastages WHERE id = ? FOR UPDATE', [id]);
+      originalWastage = wastageRows[0] || null;
+      const [itemRows] = await connection.query('SELECT item_id, quantity, estimated_loss FROM wastage_items WHERE wastage_id = ?', [id]);
+      originalItems = itemRows;
+    }
 
     // Update wastage header
     await connection.query(
@@ -223,6 +234,19 @@ const updateWastage = async (req, res) => {
       if (item.estimated_loss) {
         totalEstimatedLoss += parseFloat(item.estimated_loss);
       }
+    }
+
+    const wastageChanged = trackRmAdjustment && originalWastage && (
+      !sameValue(originalWastage.date, date) ||
+      !sameValue(originalWastage.approved_by, approved_by) ||
+      !sameValue(originalWastage.reason, reason) ||
+      !sameValue(originalWastage.remarks, remarks) ||
+      !sameItems(originalItems, items, ['item_id', 'quantity', 'estimated_loss'])
+    );
+    if (wastageChanged) {
+      await recordRmAdjustment(connection, {
+        category: 'Wastage', sourceRecordId: id, referenceId: wastageNoteNumber, updatedBy: req.user?.userId
+      });
     }
 
     await connection.commit();

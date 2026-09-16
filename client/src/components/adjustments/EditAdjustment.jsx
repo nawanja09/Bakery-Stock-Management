@@ -147,7 +147,7 @@ const EditAdjustment = () => {
     <div className="page-container">
       <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
         <div>
-          <h2 style={{ margin: 0 }}>RM Adjustment - Edit</h2>
+          <h2 style={{ margin: 0 }}>Adjustment - Edit</h2>
         </div>
         <div>
           <button type="button" className="btn btn-secondary" onClick={() => navigate('/adjustments/stores-adjustments')}>

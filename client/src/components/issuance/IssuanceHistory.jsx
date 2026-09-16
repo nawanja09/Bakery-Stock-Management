@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { 
+  faSearch, faCalendarAlt, faFilter, faPlus, faEye, 
+  faEdit, faSync, faChevronLeft, faChevronRight, 
+  faBuilding, faTimes, faTruckLoading, faFileAlt 
+} from '@fortawesome/free-solid-svg-icons';
 import { usePopup } from '../context/PopupContext';
 import './Issuance.css';
 import api from '../../api';
@@ -59,16 +65,16 @@ const IssuanceDetailsModal = ({ id, onClose }) => {
   }, [id, showPopup]);
 
   if (loading) return (
-    <div className="modal-loading">
-      <div className="loading-spinner"></div>
+    <div className="empty-state" style={{ minHeight: '200px' }}>
+      <FontAwesomeIcon icon={faSync} spin style={{ fontSize: '28px', opacity: 0.5 }} />
       <p>Loading issuance details...</p>
     </div>
   );
   
   if (!issuance) return (
-    <div className="modal-error">
+    <div className="empty-state" style={{ minHeight: '200px' }}>
       <p>No issuance data found</p>
-      <button onClick={onClose} className="btn-secondary">Close</button>
+      <button onClick={onClose} className="btn btn-secondary">Close</button>
     </div>
   );
 
@@ -118,14 +124,14 @@ const IssuanceDetailsModal = ({ id, onClose }) => {
       {/* Items Table */}
       <div className="detail-items-section">
         <h3>Issued Items</h3>
-        <div className="detail-table-responsive">
-          <table className="detail-items-table">
+        <div style={{ overflowX: 'auto' }}>
+          <table className="adjustments-table">
             <thead>
               <tr>
                 <th>#</th>
                 <th>Item Code</th>
                 <th>Item Name</th>
-                <th>Quantity</th>
+                <th className="text-right">Quantity</th>
                 <th>Unit</th>
               </tr>
             </thead>
@@ -134,15 +140,15 @@ const IssuanceDetailsModal = ({ id, onClose }) => {
                 issuance.items.map((item, index) => (
                   <tr key={index}>
                     <td>{index + 1}</td>
-                    <td><span className="item-code-badge">{item.item_code || 'N/A'}</span></td>
-                    <td>{item.item_name}</td>
-                    <td className="quantity-cell">{formatQuantity(item.quantity)}</td>
+                    <td><span className="status-badge neutral">{item.item_code || 'N/A'}</span></td>
+                    <td><strong>{item.item_name}</strong></td>
+                    <td className="text-right font-mono font-bold">{formatQuantity(item.quantity)}</td>
                     <td>{item.unit || 'N/A'}</td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan="5" className="no-items-message">No items found in this issuance</td>
+                  <td colSpan="5" className="empty-state">No items found in this issuance</td>
                 </tr>
               )}
             </tbody>
@@ -152,121 +158,338 @@ const IssuanceDetailsModal = ({ id, onClose }) => {
 
       {/* Footer Actions */}
       <div className="detail-modal-footer">
-        <button onClick={onClose} className="btn-secondary">Close</button>
+        <button onClick={onClose} className="btn btn-secondary">Close</button>
       </div>
     </div>
   );
 };
 
 const IssuanceHistory = () => {
+  const navigate = useNavigate();
   const [issuances, setIssuances] = useState([]);
+  const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedIssuanceId, setSelectedIssuanceId] = useState(null);
+  const [showFilters, setShowFilters] = useState(true);
 
   // Filter states
+  const [search, setSearch] = useState('');
+  const [departmentId, setDepartmentId] = useState('all');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
 
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
   const handleView = (id) => setSelectedIssuanceId(id);
-  const handleEdit = (id) => { window.location.href = `/issuance/edit/${id}`; };
+  const handleEdit = (id) => navigate(`/issuance/edit/${id}`);
+
+  const fetchIssuances = async () => {
+    try {
+      setLoading(true);
+      const [issRes, deptRes] = await Promise.all([
+        api.get('/issuances'),
+        api.get('/departments').catch(() => ({ data: [] }))
+      ]);
+      const sorted = (issRes.data || []).sort((a, b) => new Date(b.issuance_date) - new Date(a.issuance_date));
+      setIssuances(sorted);
+      setDepartments(deptRes.data || []);
+    } catch (error) {
+      console.error('Error fetching issuances:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchIssuances = async () => {
-      try {
-        const response = await api.get('/issuances');
-        const sorted = response.data.sort((a, b) => new Date(b.issuance_date) - new Date(a.issuance_date));
-        setIssuances(sorted);
-      } catch (error) {
-        console.error('Error fetching issuances:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchIssuances();
   }, []);
+
+  const clearFilters = () => {
+    setSearch('');
+    setDepartmentId('all');
+    setFromDate('');
+    setToDate('');
+    setCurrentPage(1);
+  };
 
   // Apply filters
   const filteredIssuances = issuances.filter((issuance) => {
     const issuanceDate = new Date(issuance.issuance_date);
     const from = fromDate ? new Date(fromDate) : null;
-    const to = toDate ? new Date(toDate) : null;
+    const to = toDate ? new Date(toDate + 'T23:59:59') : null;
 
     const matchesDate =
       (!from || issuanceDate >= from) &&
       (!to || issuanceDate <= to);
 
-    return matchesDate;
+    const matchesDept = 
+      departmentId === 'all' || 
+      String(issuance.department_id) === String(departmentId) ||
+      issuance.department_name?.toLowerCase() === departmentId.toLowerCase();
+
+    const term = search.trim().toLowerCase();
+    const matchesSearch = !term || (
+      String(issuance.id).includes(term) ||
+      issuance.department_name?.toLowerCase().includes(term) ||
+      issuance.received_by?.toLowerCase().includes(term) ||
+      issuance.remarks?.toLowerCase().includes(term)
+    );
+
+    return matchesDate && matchesDept && matchesSearch;
   });
 
-  if (loading) return <div className="loading">Loading...</div>;
+  const totalPages = Math.ceil(filteredIssuances.length / itemsPerPage);
+  const paginatedData = filteredIssuances.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   return (
-    <div className="issuance-container">
+    <div className="issuance-page-container">
+      {/* Page Header with Actions */}
       <div className="header-with-actions">
-        <h2 style={{ margin: 0 }}>RM Issue Summary</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <h2>
+            <FontAwesomeIcon icon={faTruckLoading} style={{ marginRight: '10px', color: 'var(--color-primary)' }} />
+            RM Issue Summary
+          </h2>
+          <span className="pagination-entries">
+            {formatNumber(filteredIssuances.length)} records
+          </span>
+        </div>
+        <div className="header-actions">
+          <button 
+            type="button" 
+            className="btn btn-primary" 
+            onClick={() => navigate('/issuance/issue')}
+          >
+            <FontAwesomeIcon icon={faPlus} /> Add New Issuance
+          </button>
+        </div>
       </div>
 
-      {/* Filter Section - Single Line */}
-      <div className="filters-bar single-line" style={{ display: "flex", gap: "16px", alignItems: "center", marginBottom: "20px" }}>
-        <label style={{ margin: 0 }}>
-          From:
-          <input
-            type="date"
-            value={fromDate}
-            onChange={(e) => setFromDate(e.target.value)}
-            className="filter-input"
-            style={{ marginLeft: "8px" }}
-          />
-        </label>
-        <label style={{ margin: 0 }}>
-          To:
-          <input
-            type="date"
-            value={toDate}
-            onChange={(e) => setToDate(e.target.value)}
-            className="filter-input"
-            style={{ marginLeft: "8px" }}
-          />
-        </label>
+      {/* Filter Section Card */}
+      <div className="card filter-card">
+        <div className="filter-header">
+          <h4>
+            <FontAwesomeIcon icon={faFilter} /> Filter Issuance Records
+          </h4>
+          <button 
+            type="button" 
+            className="filter-toggle" 
+            onClick={() => setShowFilters(!showFilters)}
+          >
+            <FontAwesomeIcon icon={showFilters ? faTimes : faSearch} />
+            {showFilters ? ' Hide Filters' : ' Show Filters'}
+          </button>
+        </div>
+
+        {showFilters && (
+          <div className="filter-form adjustment-filter-form">
+            <div className="filter-group">
+              <label><FontAwesomeIcon icon={faSearch} /> Search</label>
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
+                placeholder="Search ID, department, received by..."
+              />
+            </div>
+            <div className="filter-group">
+              <label><FontAwesomeIcon icon={faBuilding} /> Department</label>
+              <select
+                value={departmentId}
+                onChange={(e) => { setDepartmentId(e.target.value); setCurrentPage(1); }}
+              >
+                <option value="all">All Departments</option>
+                {departments.map((d) => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="filter-group">
+              <label><FontAwesomeIcon icon={faCalendarAlt} /> From Date</label>
+              <input
+                type="date"
+                value={fromDate}
+                onChange={(e) => { setFromDate(e.target.value); setCurrentPage(1); }}
+              />
+            </div>
+            <div className="filter-group">
+              <label><FontAwesomeIcon icon={faCalendarAlt} /> To Date</label>
+              <input
+                type="date"
+                value={toDate}
+                onChange={(e) => { setToDate(e.target.value); setCurrentPage(1); }}
+              />
+            </div>
+            <div className="filter-actions">
+              <button 
+                type="button" 
+                className="btn btn-secondary" 
+                onClick={clearFilters}
+              >
+                <FontAwesomeIcon icon={faSync} /> Reset
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Table */}
-      <div className="table-responsive" style={{ width: "100%" }}>
-        <table className="issuance-table styled-table" style={{ width: "100%" }}>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Date & Time</th>
-              <th>Department</th>
-              <th>Received By</th>
-              <th>Time of Day</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredIssuances.length > 0 ? (
-              filteredIssuances.map(issuance => (
-                <tr key={issuance.id}>
-                  <td data-label="ID">{formatNumber(issuance.id)}</td>
-                  <td data-label="Date & Time">{new Date(issuance.issuance_date).toLocaleString()}</td>
-                  <td data-label="Department">{issuance.department_name}</td>
-                  <td data-label="Received By">{issuance.received_by}</td>
-                  <td data-label="Time of Day">{issuance.remarks}</td>
-                  <td data-label="Actions" className="actions-column">
-                    <button className="btn-view" onClick={() => handleView(issuance.id)}>View</button>
-                    <button className="btn-edit" onClick={() => handleEdit(issuance.id)}>Edit</button>
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan="6" style={{ textAlign: 'center', color: '#888' }}>
-                  No issuance records found.
-                </td>
-              </tr>
+      {/* Table Data Card */}
+      <div className="card data-card">
+        <div className="data-card-header">
+          <h3>Issuance Records</h3>
+          <div className="data-card-actions">
+            <span className="pagination-entries">
+              {formatNumber(filteredIssuances.length)} entries found
+            </span>
+            <button 
+              type="button" 
+              className="btn btn-sm btn-secondary" 
+              onClick={fetchIssuances}
+              disabled={loading}
+              title="Refresh Records"
+            >
+              <FontAwesomeIcon icon={faSync} spin={loading} /> Refresh
+            </button>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="empty-state">
+            <FontAwesomeIcon icon={faSync} spin style={{ fontSize: '28px', opacity: 0.5 }} />
+            <p>Loading issuance records...</p>
+          </div>
+        ) : (
+          <>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="adjustments-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: '80px' }}>ID</th>
+                    <th>Date & Time</th>
+                    <th>Department</th>
+                    <th>Received By</th>
+                    <th>Time of Day</th>
+                    <th className="text-center" style={{ width: '160px' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedData.length > 0 ? (
+                    paginatedData.map((issuance) => (
+                      <tr key={issuance.id}>
+                        <td>
+                          <strong>#{formatNumber(issuance.id)}</strong>
+                        </td>
+                        <td>
+                          {new Date(issuance.issuance_date).toLocaleDateString()}
+                          <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
+                            {new Date(issuance.issuance_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                        </td>
+                        <td>
+                          <span className="status-badge neutral">
+                            {issuance.department_name || 'N/A'}
+                          </span>
+                        </td>
+                        <td>{issuance.received_by || '-'}</td>
+                        <td>
+                          <span style={{ color: 'var(--color-text-secondary)' }}>
+                            {issuance.remarks || '-'}
+                          </span>
+                        </td>
+                        <td className="text-center actions-column">
+                          <div className="table-actions" style={{ justifyContent: 'center' }}>
+                            <button 
+                              type="button"
+                              className="btn btn-sm btn-outline" 
+                              onClick={() => handleView(issuance.id)}
+                              title="View Issuance Details"
+                            >
+                              <FontAwesomeIcon icon={faEye} /> View
+                            </button>
+                            <button 
+                              type="button"
+                              className="btn btn-sm btn-secondary" 
+                              onClick={() => handleEdit(issuance.id)}
+                              title="Edit Issuance"
+                            >
+                              <FontAwesomeIcon icon={faEdit} /> Edit
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="6" className="empty-state">
+                        <FontAwesomeIcon icon={faTruckLoading} />
+                        <strong>No issuance records found.</strong>
+                        <span className="empty-state-subtitle">
+                          Try adjusting your search criteria or date filters.
+                        </span>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="pagination">
+                <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
+                  Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredIssuances.length)} of {filteredIssuances.length} entries
+                </span>
+                <div className="pagination-controls">
+                  <button 
+                    type="button"
+                    onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))} 
+                    disabled={currentPage === 1}
+                    className="page-btn"
+                    aria-label="Previous Page"
+                  >
+                    <FontAwesomeIcon icon={faChevronLeft} />
+                  </button>
+                  {[...Array(Math.min(totalPages, 5))].map((_, i) => {
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+                    return (
+                      <button
+                        key={pageNum}
+                        type="button"
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`page-btn ${currentPage === pageNum ? 'active' : ''}`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                  <button 
+                    type="button"
+                    onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))} 
+                    disabled={currentPage === totalPages}
+                    className="page-btn"
+                    aria-label="Next Page"
+                  >
+                    <FontAwesomeIcon icon={faChevronRight} />
+                  </button>
+                </div>
+              </div>
             )}
-          </tbody>
-        </table>
+          </>
+        )}
       </div>
 
       {selectedIssuanceId && (
