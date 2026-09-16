@@ -370,7 +370,7 @@ const receiveBank = async (req, res) => {
 
 // POST /api/finance/transfer - Cash <-> Bank transfer
 const transferFunds = async (req, res) => {
-  const { company_id, from_account, to_account, bank_id, amount, date, remark, created_by } = req.body;
+  const { company_id, from_account, to_account, bank_id, amount, date, remark, created_by, cheque_number } = req.body;
 
   if (!company_id) return res.status(400).json({ error: 'Company is required' });
   if (!from_account || !to_account) return res.status(400).json({ error: 'From and To accounts are required' });
@@ -388,10 +388,40 @@ const transferFunds = async (req, res) => {
     await connection.beginTransaction();
 
     const transferAmount = parseFloat(amount);
+    const isChequeTransfer = from_account === 'BANK'
+      && to_account === 'CASH'
+      && cheque_number
+      && String(cheque_number).trim();
     let cashBalance = null;
     let bankBalance = null;
 
-    if (from_account === 'CASH' && to_account === 'BANK') {
+    if (isChequeTransfer) {
+      const [transferResult] = await connection.query(
+        `INSERT INTO finance_cheque_transfers
+           (company_id, bank_id, amount, transfer_date, cheque_number, remark, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)`,
+        [company_id, bank_id, transferAmount, date, String(cheque_number).trim(), remark || null, created_by]
+      );
+      const transferId = transferResult.insertId;
+
+      const [bankRows] = await connection.query(
+        'SELECT bank_name, account_number FROM bank_details WHERE id = ? LIMIT 1',
+        [bank_id]
+      );
+      const bankLabel = bankRows.length
+        ? `${bankRows[0].bank_name}${bankRows[0].account_number ? ` (${bankRows[0].account_number})` : ''}`
+        : `Bank ID ${bank_id}`;
+
+      await connection.query(
+        `INSERT INTO expenses_cheque_registry
+           (source_type, source_id, date, name, cheque_number, amount, bank, bank_id, release_date, status)
+         VALUES ('BANK_TO_CASH', ?, ?, ?, ?, ?, ?, ?, NULL, 'Pending')
+         ON DUPLICATE KEY UPDATE
+           date = VALUES(date), name = VALUES(name), amount = VALUES(amount), bank = VALUES(bank), bank_id = VALUES(bank_id), status = 'Pending'`,
+        [transferId, date, bankLabel, String(cheque_number).trim(), transferAmount, bankLabel, bank_id || null]
+      );
+    } else if (from_account === 'CASH' && to_account === 'BANK') {
       // Depositing cash into the bank - same label on both ledger entries so
       // the two rows are recognizable as the same event.
       cashBalance = await recordCashTransaction(connection, {
@@ -435,8 +465,12 @@ const transferFunds = async (req, res) => {
     }
 
     await connection.commit();
+
     res.status(201).json({
-      message: 'Transfer completed successfully!',
+      message: isChequeTransfer
+        ? 'Cheque transfer recorded. Cheque is Pending / Unreleased until release date.'
+        : 'Transfer completed successfully!',
+      is_cheque: !!isChequeTransfer,
       cash_balance: cashBalance,
       bank_balance: bankBalance
     });

@@ -393,6 +393,26 @@ const ensureAutoIncrementPrimaryKeys = async () => {
 
 ensureAutoIncrementPrimaryKeys();
 
+const ensurePaymentHistorySchema = async () => {
+  try {
+    await pool.query('ALTER TABLE payment_history ADD COLUMN IF NOT EXISTS bank_id INT NULL AFTER check_number');
+  } catch (error) {
+    try {
+      await pool.query('ALTER TABLE payment_history ADD COLUMN bank_id INT NULL AFTER check_number');
+    } catch (_) {}
+  }
+
+  try {
+    await pool.query('ALTER TABLE expenses_cheque_registry ADD COLUMN IF NOT EXISTS bank_id INT NULL AFTER bank');
+  } catch (error) {
+    try {
+      await pool.query('ALTER TABLE expenses_cheque_registry ADD COLUMN bank_id INT NULL AFTER bank');
+    } catch (_) {}
+  }
+};
+
+ensurePaymentHistorySchema();
+
 // --- Connect the Expenses modules to Finance -------------------------------
 // Adds the columns each expense table needs to post a Cash/Bank ledger entry:
 //   - company_id: which company's Cash In Hand this expense belongs to

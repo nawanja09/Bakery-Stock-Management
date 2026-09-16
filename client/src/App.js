@@ -119,6 +119,7 @@ import FundTransfer from './components/Finance/FundTransfer';
 
 import BankTransfer from './components/Finance/BankTransfer';
 import ReceiveTypeManagement from './components/Finance/ReceiveTypeManagement';
+import ExpensesChequeRegistry from './components/Finance/ExpensesChequeRegistry';
 
 import FGRecipes from './components/FGProduction/Recipes';
 import FGRecipeReport from './components/FGProduction/FGRecipesReports';
@@ -380,6 +381,7 @@ function App() {
             <Route path="/analysis/last-issued-date" element={<LastIssueDateReport />} />
             <Route path="/finance/bank-transfer" element={<FinanceRoute><BankTransfer /></FinanceRoute>} />
             <Route path="/finance/receive-types" element={<FinanceRoute><ReceiveTypeManagement /></FinanceRoute>} />
+            <Route path="/finance/cheque-registry" element={<FinanceRoute><ExpensesChequeRegistry /></FinanceRoute>} />
 
             <Route path="analyst/income" element={<AnalystRoute><AnalystIncomePage /></AnalystRoute>} />
             <Route path="analyst/incomes" element={<AnalystRoute><AnalystIncomePage /></AnalystRoute>} />

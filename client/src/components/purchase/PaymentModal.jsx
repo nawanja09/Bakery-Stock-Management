@@ -243,6 +243,9 @@ const PaymentModal = ({ purchase, onClose, onPaymentComplete }) => {
                   placeholder="Enter cheque number"
                   required
                 />
+                <div style={{ padding: '8px 12px', background: '#fef3c7', color: '#92400e', borderRadius: '6px', fontSize: '12px', marginTop: '6px', borderLeft: '4px solid #f59e0b' }}>
+                  ℹ️ <strong>Cheque Payment:</strong> Remains <strong>Pending / Unreleased</strong>. The Bank Ledger will NOT be deducted until the cheque is released.
+                </div>
               </div>
             )}
 

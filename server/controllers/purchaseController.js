@@ -1105,6 +1105,46 @@ const makePayment = async (req, res) => {
 
     await connection.commit();
 
+    // ── Auto-register in Expenses Cheque Registry (Purchasing Payment + Cheque) ──
+    if (normalizedPaymentMethod === 'CHEQUE' && check_number && String(check_number).trim()) {
+      try {
+        let bankName = null;
+        if (bank_id) {
+          const [bankRows] = await pool.query(
+            'SELECT bank_name, account_number FROM bank_details WHERE id = ? LIMIT 1',
+            [bank_id]
+          );
+          if (bankRows.length) {
+            bankName = `${bankRows[0].bank_name}${bankRows[0].account_number ? ` (${bankRows[0].account_number})` : ''}`;
+          }
+        }
+        await pool.query(
+          `INSERT INTO expenses_cheque_registry
+             (source_type, source_id, date, name, cheque_number, amount, bank, bank_id, status)
+           VALUES ('PURCHASING_PAYMENT', ?, ?, ?, ?, ?, ?, ?, 'Pending')
+           ON DUPLICATE KEY UPDATE
+             date          = VALUES(date),
+             name          = VALUES(name),
+             cheque_number = VALUES(cheque_number),
+             amount        = VALUES(amount),
+             bank          = VALUES(bank),
+             bank_id       = VALUES(bank_id),
+             status        = 'Pending'`,
+          [
+            paymentHistoryId,
+            payment_date,
+            supplierNameForLedger || 'Supplier',
+            String(check_number).trim(),
+            normalizedPaymentAmount,
+            bankName,
+            bank_id || null
+          ]
+        );
+      } catch (registryErr) {
+        console.error('Expenses cheque registry upsert error (RM Purchasing):', registryErr.message);
+      }
+    }
+
     res.json({
       message: 'Payment recorded successfully!',
       payment_id: paymentHistoryId,

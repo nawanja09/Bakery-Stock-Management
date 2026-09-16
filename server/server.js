@@ -61,6 +61,7 @@ const analystRoutes = require('./routes/analystRoutes');
 const incomeRoutes = require('./routes/incomeRoutes');
 const readOnly = require('./middleware/readOnly');
 const cashExpenseRoutes = require('./routes/cashExpenseRoutes');
+const { ensureChequeReleaseSchema, startChequeReleaseProcessor } = require('./services/chequeReleaseService');
 
 
 // NEW, independent module - FG (Finished Goods) Production.
@@ -183,7 +184,18 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Something went wrong!' });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Uploads directory: ${path.join(__dirname, 'uploads')}`);
-});
+const startServer = async () => {
+  try {
+    await ensureChequeReleaseSchema();
+    app.listen(PORT, () => {
+      startChequeReleaseProcessor();
+      console.log(`Server running on port ${PORT}`);
+      console.log(`Uploads directory: ${path.join(__dirname, 'uploads')}`);
+    });
+  } catch (error) {
+    console.error('Unable to start cheque release processing:', error);
+    process.exitCode = 1;
+  }
+};
+
+startServer();
