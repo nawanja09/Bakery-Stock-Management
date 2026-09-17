@@ -975,6 +975,156 @@ const getVATReturnsSummary = async (req, res) => {
   }
 };
 
+// ============================================================
+// Return VAT Report (renamed from "VAT Effect")
+//
+// Unifies two return types under one report:
+//   - Purchase Returns (purchase_returns / purchase_return_items) - the
+//     data that used to be the whole "VAT Effect" report above.
+//   - Credit Notes (payee_credit_notes, from the New Expenses module).
+// The existing getVATReturns / getVATReturnsSummary above are left
+// untouched so any existing integrations keep working.
+// ============================================================
+const formatReturnAmt = (v) => parseFloat(v) || 0;
+
+const getReturnVATReport = async (req, res) => {
+  const { startDate, endDate, returnType } = req.query;
+
+  if (!startDate || !endDate) {
+    return res.status(400).json({ error: 'startDate and endDate are required' });
+  }
+
+  const type = (returnType || 'All').trim();
+  const wantPurchaseReturns = type === 'All' || type === 'Purchase Returns';
+  const wantCreditNotes = type === 'All' || type === 'Credit Note';
+
+  try {
+    let rows = [];
+
+    if (wantPurchaseReturns) {
+      const [prRows] = await pool.query(`
+        SELECT
+          DATE(pr.return_date) AS date,
+          'Purchase Return' AS return_type,
+          s.name AS supplier,
+          pr.return_number AS reference_no,
+          SUM(pri.quantity * pri.unit_price) AS amount_before_vat,
+          SUM(COALESCE(pri.vat_amount, 0)) AS vat_amount,
+          pr.total_amount AS total_amount,
+          c.name AS company
+        FROM purchase_returns pr
+        JOIN supplier s ON pr.supplier_id = s.id
+        JOIN purchase_return_items pri ON pr.id = pri.return_id
+        LEFT JOIN purchases p ON pr.purchase_id = p.id
+        LEFT JOIN company c ON p.company_id = c.id
+        WHERE s.vat_registered = 1
+          AND DATE(pr.return_date) BETWEEN ? AND ?
+        GROUP BY pr.id, s.name, pr.return_number, pr.total_amount, c.name
+      `, [startDate, endDate]);
+      rows = rows.concat(prRows);
+    }
+
+    if (wantCreditNotes) {
+      const [cnRows] = await pool.query(`
+        SELECT
+          cn.credit_note_date AS date,
+          'Credit Note' AS return_type,
+          cn.payee_name AS supplier,
+          cn.credit_note_number AS reference_no,
+          cn.without_vat_amount AS amount_before_vat,
+          cn.vat_amount AS vat_amount,
+          cn.total_amount AS total_amount,
+          c.name AS company
+        FROM payee_credit_notes cn
+        LEFT JOIN company c ON c.id = cn.company_id
+        WHERE cn.status != 'Cancelled'
+          AND cn.credit_note_date BETWEEN ? AND ?
+      `, [startDate, endDate]);
+      rows = rows.concat(cnRows);
+    }
+
+    rows.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    const formatted = rows.map((r, idx) => ({
+      serial_no: idx + 1,
+      date: r.date,
+      return_type: r.return_type,
+      supplier: r.supplier,
+      reference_no: r.reference_no,
+      amount_before_vat: formatReturnAmt(r.amount_before_vat),
+      vat_amount: formatReturnAmt(r.vat_amount),
+      total_amount: formatReturnAmt(r.total_amount),
+      company: r.company || '-'
+    }));
+
+    res.json(formatted);
+  } catch (error) {
+    console.error('Error fetching Return VAT report:', error);
+    res.status(500).json({ error: 'Server error: ' + error.message });
+  }
+};
+
+const getReturnVATSummary = async (req, res) => {
+  const { startDate, endDate, returnType } = req.query;
+
+  if (!startDate || !endDate) {
+    return res.status(400).json({ error: 'startDate and endDate are required' });
+  }
+
+  const type = (returnType || 'All').trim();
+  const wantPurchaseReturns = type === 'All' || type === 'Purchase Returns';
+  const wantCreditNotes = type === 'All' || type === 'Credit Note';
+
+  try {
+    let totalCount = 0, totalBeforeVat = 0, totalVat = 0, totalAmount = 0;
+
+    if (wantPurchaseReturns) {
+      const [[s]] = await pool.query(`
+        SELECT
+          COUNT(DISTINCT pr.id) AS cnt,
+          COALESCE(SUM(pri.quantity * pri.unit_price), 0) AS before_vat,
+          COALESCE(SUM(pri.vat_amount), 0) AS vat
+        FROM purchase_returns pr
+        JOIN supplier s ON pr.supplier_id = s.id
+        JOIN purchase_return_items pri ON pr.id = pri.return_id
+        WHERE s.vat_registered = 1
+          AND DATE(pr.return_date) BETWEEN ? AND ?
+      `, [startDate, endDate]);
+      totalCount += s.cnt || 0;
+      totalBeforeVat += formatReturnAmt(s.before_vat);
+      totalVat += formatReturnAmt(s.vat);
+      totalAmount += formatReturnAmt(s.before_vat) + formatReturnAmt(s.vat);
+    }
+
+    if (wantCreditNotes) {
+      const [[s]] = await pool.query(`
+        SELECT
+          COUNT(*) AS cnt,
+          COALESCE(SUM(without_vat_amount), 0) AS before_vat,
+          COALESCE(SUM(vat_amount), 0) AS vat,
+          COALESCE(SUM(total_amount), 0) AS total
+        FROM payee_credit_notes
+        WHERE status != 'Cancelled'
+          AND credit_note_date BETWEEN ? AND ?
+      `, [startDate, endDate]);
+      totalCount += s.cnt || 0;
+      totalBeforeVat += formatReturnAmt(s.before_vat);
+      totalVat += formatReturnAmt(s.vat);
+      totalAmount += formatReturnAmt(s.total);
+    }
+
+    res.json({
+      total_returns: totalCount,
+      total_before_vat: totalBeforeVat,
+      total_vat: totalVat,
+      total_amount: totalAmount || (totalBeforeVat + totalVat)
+    });
+  } catch (error) {
+    console.error('Error fetching Return VAT summary:', error);
+    res.status(500).json({ error: 'Server error: ' + error.message });
+  }
+};
+
 // Add settlement to existing purchase return
 const addSettlementToPurchaseReturn = async (req, res) => {
   const { id } = req.params;
@@ -1149,6 +1299,8 @@ module.exports = {
   getCurrentStock,
   getVATReturns,
   getVATSummary,
+  getReturnVATReport,
+  getReturnVATSummary,
   createPurchaseReturn,
   addSettlementToPurchaseReturn,
   getAllPurchaseReturns,

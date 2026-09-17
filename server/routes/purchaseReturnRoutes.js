@@ -18,6 +18,12 @@ router.get('/stock/item/:itemId', purchaseReturnController.getItemStock);
 router.get('/reports/vat-returns', purchaseReturnController.getVATReturns);  // ← ADD THIS LINE
 router.get('/reports/vat-summary', purchaseReturnController.getVATReturnsSummary);
 
+// Return VAT Report (renamed from "VAT Effect") - unifies Purchase Returns
+// and New Expenses Credit Notes behind a Return Type filter. The two
+// routes above are kept working untouched.
+router.get('/reports/return-vat', purchaseReturnController.getReturnVATReport);
+router.get('/reports/return-vat-summary', purchaseReturnController.getReturnVATSummary);
+
 // =============================================
 // PURCHASE RETURNS ROUTES
 // =============================================

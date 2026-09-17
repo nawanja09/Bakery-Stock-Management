@@ -187,7 +187,7 @@ const ExpensesReport = () => {
     }
     worksheetData.push([]);
 
-    worksheetData.push(['Date', 'Type', 'Payee', 'Expense Type', 'Reference', 'Company', 'Status', 'Amount (Rs.)']);
+    worksheetData.push(['Date', 'Type', 'Payee', 'Expenses Type', 'Reference', 'Company', 'Status', 'Amount (Rs.)']);
 
     sortedExpenses.forEach((exp) => {
       worksheetData.push([
@@ -340,7 +340,7 @@ const ExpensesReport = () => {
                     Payee{sortIndicator('payee_name')}
                   </th>
                   <th onClick={() => handleSort('expense_type')} className="er-sortable">
-                    Expense Type{sortIndicator('expense_type')}
+                    Expenses Type{sortIndicator('expense_type')}
                   </th>
                   <th onClick={() => handleSort('reference')} className="er-sortable">
                     Reference{sortIndicator('reference')}

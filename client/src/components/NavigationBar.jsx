@@ -697,8 +697,9 @@ const NavigationBar = () => {
       </li>
       <li>
         <NavLink to="/reports/purchase-vat" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          {/* Renamed from "VAT Purchasing Return Report" to "Return VAT Report" */}
           <span className="icon-container"><FontAwesomeIcon icon={faCalculator} /></span>
-          <span>VAT Purchasing Return Report</span>
+          <span>Return VAT Report</span>
         </NavLink>
       </li>
     </>
