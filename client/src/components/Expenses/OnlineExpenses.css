@@ -5,7 +5,7 @@
 	gap: 20px;
 }
 
-.new-expenses-page > .page-header {
+.new-expenses-page>.page-header {
 	margin-bottom: 0;
 }
 
@@ -29,10 +29,10 @@
 
 .new-expenses-page .expenses-details-card {
 	min-width: 0;
-	overflow: hidden;
+	overflow: visible;
 }
 
-.new-expenses-page .expenses-details-card > .form-section-title {
+.new-expenses-page .expenses-details-card>.form-section-title {
 	justify-content: space-between;
 }
 
@@ -149,17 +149,12 @@
 .new-expenses-page .payment-modal-close {
 	width: 32px;
 	height: 32px;
-	border: 1px solid rgba(255, 255, 255, .35);
 	border-radius: 7px;
 	background: transparent;
 	color: #fff;
 	font-size: 1.25rem;
 	line-height: 1;
 	cursor: pointer;
-}
-
-.new-expenses-page .payment-modal-close:hover {
-	background: rgba(255, 255, 255, .14);
 }
 
 .new-expenses-page .payment-modal-body {
@@ -366,12 +361,13 @@
 		padding: 14px 16px;
 	}
 
-	.new-expenses-page .payment-modal-footer > button {
+	.new-expenses-page .payment-modal-footer>button {
 		flex: 1;
 	}
 }
 
 @media (max-width: 760px) {
+
 	.new-expenses-page .filters-section,
 	.new-expenses-page .payment-action-bar {
 		align-items: stretch;
@@ -387,5 +383,415 @@
 	.new-expenses-page .expense-view-tabs .btn,
 	.new-expenses-page .payment-action-bar .btn-pay {
 		width: 100%;
+	}
+}
+
+/* ============================================================
+   Primary modal action button (Pay / Create Credit Note / Apply)
+   ============================================================ */
+.new-expenses-page .btn-pay {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	padding: 10px 20px;
+	border: 1px solid var(--color-primary);
+	border-radius: 8px;
+	background: var(--color-primary);
+	color: #fff;
+	font-weight: 700;
+	font-size: .88rem;
+	cursor: pointer;
+	transition: background .15s ease, box-shadow .15s ease, transform .15s ease;
+}
+
+.new-expenses-page .btn-pay:hover:not(:disabled) {
+	background: var(--color-primary-dark);
+	border-color: var(--color-primary-dark);
+	box-shadow: 0 5px 14px rgba(45, 108, 223, .25);
+	transform: translateY(-1px);
+}
+
+.new-expenses-page .btn-pay:disabled {
+	background: var(--color-gray-300);
+	border-color: var(--color-gray-300);
+	color: var(--color-text-secondary);
+	cursor: not-allowed;
+	transform: none;
+	box-shadow: none;
+}
+
+/* ============================================================
+   Credit Note modal — compact single-column layout
+   Used by: Create/View Credit Note popup, Apply Credit Note popup
+   ============================================================ */
+.new-expenses-page .cn-modal .payment-modal-content {
+	width: min(520px, 100%);
+}
+
+.new-expenses-page .cn-modal.cn-modal-wide .payment-modal-content {
+	width: min(600px, 100%);
+}
+
+.new-expenses-page .cn-modal .payment-modal-body {
+	display: block;
+	padding: 22px 24px;
+}
+
+.new-expenses-page .cn-modal .payment-details-section {
+	padding: 20px 22px 22px;
+	border-radius: 12px;
+}
+
+.new-expenses-page .cn-modal .payment-form-row {
+	gap: 16px;
+	margin-bottom: 16px;
+}
+
+.new-expenses-page .cn-modal .payment-form-row:last-child {
+	margin-bottom: 0;
+}
+
+.new-expenses-page .cn-modal .payment-form-group label {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	margin-bottom: 7px;
+}
+
+.new-expenses-page .cn-modal .payment-form-group label .required {
+	color: var(--color-danger);
+	font-weight: 700;
+}
+
+.new-expenses-page .cn-modal .payment-input {
+	min-height: 40px;
+	transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+.new-expenses-page .cn-modal .payment-input[readonly] {
+	background: var(--color-background);
+	color: var(--color-text-secondary);
+	cursor: default;
+}
+
+.new-expenses-page .cn-modal .payment-input.total-amount {
+	border-color: var(--color-primary);
+	background: var(--color-primary-light);
+	color: var(--color-primary-dark);
+	font-size: 1.05rem;
+	font-weight: 800;
+}
+
+.new-expenses-page .cn-modal .payment-section-title {
+	margin-bottom: 14px;
+}
+
+.new-expenses-page .cn-modal .expense-summary-row {
+	padding: 8px 0;
+	border-bottom: 1px dashed var(--color-border);
+}
+
+.new-expenses-page .cn-modal .expense-summary-row:last-child {
+	border-bottom: 0;
+}
+
+.new-expenses-page .cn-modal .expense-summary-row.balance-row {
+	margin-top: 4px;
+	padding-top: 10px;
+	border-top: 1px solid var(--color-border);
+	border-bottom: 0;
+}
+
+.new-expenses-page .cn-modal .expense-summary-row.balance-row .summary-value.balance-amount {
+	color: var(--color-primary);
+	font-size: 1rem;
+}
+
+.new-expenses-page .cn-modal .cn-note-banner {
+	margin: 0 0 16px;
+	padding: 10px 14px;
+	border: 1px solid var(--color-primary-border);
+	border-radius: 8px;
+	background: var(--color-primary-light);
+	color: var(--color-text-secondary);
+	font-size: .8rem;
+	line-height: 1.5;
+}
+
+.new-expenses-page .cn-modal .cn-credit-table {
+	width: 100%;
+	border: 1px solid var(--color-border);
+	border-radius: 10px;
+	overflow: hidden;
+	border-spacing: 0;
+}
+
+.new-expenses-page .cn-modal .cn-credit-table th,
+.new-expenses-page .cn-modal .cn-credit-table td {
+	padding: 10px 12px;
+	border-bottom: 1px solid var(--color-border-light);
+	font-size: .82rem;
+}
+
+.new-expenses-page .cn-modal .cn-credit-table thead th {
+	background: var(--color-background);
+	color: var(--color-text-secondary);
+	font-weight: 700;
+	text-align: left;
+}
+
+.new-expenses-page .cn-modal .cn-credit-table tbody tr:last-child td {
+	border-bottom: 0;
+}
+
+.new-expenses-page .cn-modal .cn-credit-table tbody tr:hover {
+	background: var(--color-primary-lighter);
+}
+
+.new-expenses-page .cn-modal .cn-credit-table .payment-input {
+	min-height: 36px;
+	padding: 6px 10px;
+}
+
+.new-expenses-page .cn-modal .payment-modal-footer {
+	gap: 12px;
+}
+
+/* ============================================================
+   Expenses Details table — three-dot action menu
+   ============================================================ */
+.new-expenses-page .action-cell {
+	text-align: center;
+	overflow: visible;
+	position: relative;
+	white-space: nowrap;
+}
+
+.new-expenses-page .action-cell.menu-open {
+	z-index: 50;
+}
+
+.new-expenses-page .expense-type-cell {
+	font-weight: 500;
+	color: var(--color-text-primary);
+	white-space: nowrap;
+}
+
+.new-expenses-page .expense-action-menu-wrapper {
+	position: relative;
+	display: inline-block;
+}
+
+.new-expenses-page .action-menu-trigger {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 34px;
+	height: 34px;
+	border: 1px solid var(--color-border);
+	border-radius: 8px;
+	background: var(--color-surface);
+	color: var(--color-text-secondary);
+	font-size: 1rem;
+	cursor: pointer;
+	transition: background .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease;
+}
+
+.new-expenses-page .action-menu-trigger:hover,
+.new-expenses-page .action-menu-trigger.active {
+	border-color: var(--color-primary);
+	background: var(--color-primary-light);
+	color: var(--color-primary);
+	box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
+}
+
+.action-menu-dropdown,
+.new-expenses-page .action-menu-dropdown {
+	position: absolute;
+	top: calc(100% + 6px);
+	right: 0;
+	z-index: 99999;
+	min-width: 190px;
+	padding: 6px;
+	border: 1px solid var(--color-border);
+	border-radius: 10px;
+	background: var(--color-surface);
+	box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.18), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	animation: actionMenuFadeIn 0.15s ease-out;
+}
+
+.action-menu-dropdown.portal-dropdown {
+	position: fixed;
+}
+
+@keyframes actionMenuFadeIn {
+	from {
+		opacity: 0;
+		transform: scale(0.96);
+	}
+
+	to {
+		opacity: 1;
+		transform: scale(1);
+	}
+}
+
+.action-menu-item,
+.new-expenses-page .action-menu-item {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	width: 100%;
+	padding: 9px 12px;
+	border: 0;
+	border-radius: 7px;
+	background: transparent;
+	color: var(--color-text-primary);
+	font-size: .85rem;
+	font-weight: 600;
+	text-align: left;
+	cursor: pointer;
+	transition: background .12s ease, color .12s ease;
+	white-space: nowrap;
+}
+
+.action-menu-item svg,
+.new-expenses-page .action-menu-item svg {
+	width: 15px;
+	font-size: 0.9rem;
+	color: var(--color-text-tertiary);
+	flex-shrink: 0;
+	transition: color .12s ease;
+}
+
+.action-menu-item:hover,
+.new-expenses-page .action-menu-item:hover {
+	background: var(--color-primary-light);
+	color: var(--color-primary);
+}
+
+.action-menu-item:hover svg,
+.new-expenses-page .action-menu-item:hover svg {
+	color: var(--color-primary);
+}
+
+.action-menu-item.danger,
+.new-expenses-page .action-menu-item.danger {
+	color: var(--color-danger);
+}
+
+.action-menu-item.danger svg,
+.new-expenses-page .action-menu-item.danger svg {
+	color: var(--color-danger);
+}
+
+.action-menu-item.danger:hover,
+.new-expenses-page .action-menu-item.danger:hover {
+	background: var(--color-danger-light);
+	color: var(--color-danger);
+}
+
+.action-menu-item.danger:hover svg,
+.new-expenses-page .action-menu-item.danger:hover svg {
+	color: var(--color-danger);
+}
+
+.action-menu-divider,
+.new-expenses-page .action-menu-divider {
+	margin: 4px 2px;
+	border: 0;
+	border-top: 1px solid var(--color-border-light);
+}
+
+/* ============================================================
+   Payee Name dropdown (New Expense Bill form)
+   ============================================================ */
+.new-expenses-page .payee-dropdown-wrapper {
+	position: relative;
+}
+
+.new-expenses-page .payee-input-inner {
+	position: relative;
+}
+
+.new-expenses-page .payee-dropdown {
+	position: absolute;
+	top: calc(100% + 6px);
+	left: 0;
+	right: 0;
+	z-index: 15;
+	max-height: 240px;
+	overflow-y: auto;
+	padding: 6px;
+	border: 1px solid var(--color-border);
+	border-radius: 10px;
+	background: var(--color-surface);
+	box-shadow: var(--shadow-md);
+}
+
+.new-expenses-page .payee-dropdown .dropdown-item {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	width: 100%;
+	padding: 10px 12px;
+	border: 0;
+	border-radius: 7px;
+	background: transparent;
+	color: var(--color-text-primary);
+	font-size: .86rem;
+	font-weight: 600;
+	text-align: left;
+	cursor: pointer;
+	transition: background .12s ease, color .12s ease;
+}
+
+.new-expenses-page .payee-dropdown .dropdown-item:hover,
+.new-expenses-page .payee-dropdown .dropdown-item.highlighted {
+	background: var(--color-primary-light);
+	color: var(--color-primary);
+}
+
+.new-expenses-page .dropdown-annotation {
+	flex: 0 0 auto;
+	padding: 2px 8px;
+	border-radius: 999px;
+	background: var(--color-background);
+	color: var(--color-text-tertiary);
+	font-size: .72rem;
+	font-weight: 700;
+	white-space: nowrap;
+}
+
+.new-expenses-page .dropdown-empty {
+	padding: 14px 12px;
+	color: var(--color-text-tertiary);
+	font-size: .82rem;
+	text-align: center;
+}
+
+@media (max-width: 760px) {
+
+	.new-expenses-page .cn-modal .payment-modal-content,
+	.new-expenses-page .cn-modal.cn-modal-wide .payment-modal-content {
+		width: 100%;
+	}
+
+	.new-expenses-page .cn-modal .payment-modal-body {
+		padding: 16px;
+	}
+
+	.new-expenses-page .cn-modal .payment-details-section {
+		padding: 16px;
+	}
+
+	.new-expenses-page .action-menu-dropdown {
+		right: 0;
+		left: auto;
 	}
 }

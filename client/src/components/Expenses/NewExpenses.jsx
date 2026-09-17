@@ -6,6 +6,8 @@
 // submit. Transfer Amount must cover the Total Bill Amount; anything
 // extra is recorded as an overpayment credit for that payee.
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import * as XLSX from 'xlsx';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faSave,
@@ -24,7 +26,10 @@ import {
   faChevronDown,
   faChevronUp,
   faExclamationTriangle,
-  faFileInvoiceDollar
+  faFileInvoiceDollar,
+  faFileInvoice,
+  faRightLeft,
+  faEllipsisV
 } from '@fortawesome/free-solid-svg-icons';
 import './OnlineExpenses.css';
 import { usePopup } from '../context/PopupContext';
@@ -105,6 +110,103 @@ const NewExpenses = () => {
 
   const [formData, setFormData] = useState(emptyBillForm);
 
+  // Credit Note - create/view modal
+  const [showCreditNoteModal, setShowCreditNoteModal] = useState(false);
+  const [creditNoteSourceBill, setCreditNoteSourceBill] = useState(null);
+  const [creditNoteForm, setCreditNoteForm] = useState(null);
+  const [creditNoteModalMode, setCreditNoteModalMode] = useState('create'); // 'create' | 'view'
+  const [creditNoteExisting, setCreditNoteExisting] = useState(null);
+  const [isCheckingExistingCreditNote, setIsCheckingExistingCreditNote] = useState(false);
+
+  // All non-cancelled Credit Notes, keyed by their source Expense Detail id,
+  // so we know instantly whether the selected row already has one.
+  const [creditNotesByExpenseId, setCreditNotesByExpenseId] = useState({});
+
+  // Credit Note - apply (set-off) modal
+  const [showApplyCreditNoteModal, setShowApplyCreditNoteModal] = useState(false);
+  const [applyCreditNoteBill, setApplyCreditNoteBill] = useState(null);
+  const [availableCreditNotes, setAvailableCreditNotes] = useState([]);
+  const [creditNoteApplyAmounts, setCreditNoteApplyAmounts] = useState({});
+  const [isLoadingCreditNotes, setIsLoadingCreditNotes] = useState(false);
+
+  // Expenses Details table - row three-dot action menu
+  const [openActionMenuId, setOpenActionMenuId] = useState(null);
+  const [menuPosition, setMenuPosition] = useState(null);
+  const actionMenuDropdownRef = useRef(null);
+  const actionMenuTriggerRef = useRef(null);
+
+  useEffect(() => {
+    if (!openActionMenuId) return;
+
+    const handleOutsideClick = (event) => {
+      if (actionMenuDropdownRef.current && actionMenuDropdownRef.current.contains(event.target)) {
+        return;
+      }
+      if (actionMenuTriggerRef.current && actionMenuTriggerRef.current.contains(event.target)) {
+        return;
+      }
+      setOpenActionMenuId(null);
+      setMenuPosition(null);
+    };
+
+    const handleScrollOrResize = (event) => {
+      if (actionMenuDropdownRef.current && actionMenuDropdownRef.current.contains(event.target)) {
+        return;
+      }
+      setOpenActionMenuId(null);
+      setMenuPosition(null);
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick, true);
+    window.addEventListener('scroll', handleScrollOrResize, true);
+    window.addEventListener('resize', handleScrollOrResize);
+
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick, true);
+      window.removeEventListener('scroll', handleScrollOrResize, true);
+      window.removeEventListener('resize', handleScrollOrResize);
+    };
+  }, [openActionMenuId]);
+
+  const handleToggleActionMenu = (bill, e) => {
+    e.stopPropagation();
+    if (openActionMenuId === bill.id) {
+      setOpenActionMenuId(null);
+      setMenuPosition(null);
+      actionMenuTriggerRef.current = null;
+    } else {
+      const btn = e.currentTarget;
+      actionMenuTriggerRef.current = btn;
+      const rect = btn.getBoundingClientRect();
+      const dropdownHeight = 145;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      const openUpward = spaceBelow < 155 && spaceAbove > spaceBelow;
+
+      setMenuPosition({
+        top: openUpward ? Math.max(10, rect.top - dropdownHeight - 6) : rect.bottom + 6,
+        right: Math.max(12, window.innerWidth - rect.right),
+        bill,
+        openUpward
+      });
+      setOpenActionMenuId(bill.id);
+    }
+  };
+
+
+  const fetchCreditNotesIndex = useCallback(async () => {
+    try {
+      const response = await api.get('/new-expenses/credit-notes');
+      const map = {};
+      (response.data || []).forEach(cn => {
+        if (cn.expense_id && cn.status !== 'Cancelled') map[cn.expense_id] = cn;
+      });
+      setCreditNotesByExpenseId(map);
+    } catch (error) {
+      console.error('Error fetching credit notes index:', error);
+    }
+  }, []);
+
   const fetchBills = useCallback(async () => {
     setIsFetching(true);
     try {
@@ -118,6 +220,10 @@ const NewExpenses = () => {
       setIsFetching(false);
     }
   }, [showPopup]);
+
+  useEffect(() => {
+    fetchCreditNotesIndex();
+  }, [fetchCreditNotesIndex]);
 
   const fetchPayees = useCallback(async () => {
     try {
@@ -519,6 +625,236 @@ const NewExpenses = () => {
     }
   };
 
+  // ---------- Credit Note: create / view (one per Expense Detail) ----------
+  const handleOpenCreditNoteModal = async (bill) => {
+    if (!bill) return;
+    setCreditNoteSourceBill(bill);
+    setShowCreditNoteModal(true);
+    setIsCheckingExistingCreditNote(true);
+    setCreditNoteExisting(null);
+
+    // A Credit Note is a transaction that belongs to exactly one Expense
+    // Detail - check locally first (from the index we already fetched),
+    // and always re-confirm with the server before allowing creation.
+    const cachedExisting = creditNotesByExpenseId[bill.id];
+    try {
+      const response = await api.get('/new-expenses/credit-notes', { params: { expense_id: bill.id } });
+      const existing = (response.data || []).find(cn => cn.status !== 'Cancelled') || cachedExisting || null;
+      if (existing) {
+        setCreditNoteExisting(existing);
+        setCreditNoteModalMode('view');
+        setCreditNoteForm(null);
+      } else {
+        setCreditNoteModalMode('create');
+        setCreditNoteForm({
+          credit_note_date: new Date().toISOString().split('T')[0],
+          payee_id: bill.payee_id || '',
+          payee_name: bill.payee_name,
+          company_id: bill.company_id || '',
+          company_name: bill.company_name || '',
+          without_vat_amount: String(bill.without_vat_amount ?? ''),
+          vat_amount: String(bill.vat_amount ?? '0'),
+          total_amount: String(bill.total_bill_amount ?? ''),
+          notes: ''
+        });
+      }
+    } catch (error) {
+      console.error('Error checking for an existing credit note:', error);
+      showPopup('error', 'Failed to check for an existing credit note on this expense detail');
+      setShowCreditNoteModal(false);
+    } finally {
+      setIsCheckingExistingCreditNote(false);
+    }
+  };
+
+  const handleCloseCreditNoteModal = () => {
+    setShowCreditNoteModal(false);
+    setCreditNoteSourceBill(null);
+    setCreditNoteForm(null);
+    setCreditNoteExisting(null);
+    setCreditNoteModalMode('create');
+  };
+
+  const handleCreditNoteFormChange = (e) => {
+    const { name, value } = e.target;
+    setCreditNoteForm(prev => {
+      const next = { ...prev, [name]: value };
+      if (name === 'without_vat_amount' || name === 'vat_amount') {
+        const withoutVat = parseFloat(next.without_vat_amount) || 0;
+        const vat = parseFloat(next.vat_amount) || 0;
+        next.total_amount = (withoutVat + vat).toFixed(2);
+      }
+      return next;
+    });
+  };
+
+  const handleSaveCreditNote = async () => {
+    if (!creditNoteForm) return;
+    const total = parseFloat(creditNoteForm.total_amount) || 0;
+    if (!creditNoteForm.credit_note_date || !creditNoteForm.company_id || total <= 0) {
+      showPopup('error', 'Date, company and a valid amount are required');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await api.post('/new-expenses/credit-notes', {
+        expense_id: creditNoteSourceBill?.id || null,
+        credit_note_date: creditNoteForm.credit_note_date,
+        payee_id: creditNoteForm.payee_id || null,
+        payee_name: creditNoteForm.payee_name,
+        company_id: creditNoteForm.company_id,
+        without_vat_amount: parseFloat(creditNoteForm.without_vat_amount) || 0,
+        vat_amount: parseFloat(creditNoteForm.vat_amount) || 0,
+        total_amount: total,
+        notes: creditNoteForm.notes || null
+      });
+      showPopup('success', 'Credit Note created successfully!');
+      handleCloseCreditNoteModal();
+      setSelectedIds([]);
+      await Promise.all([fetchBills(), fetchCreditNotesIndex()]);
+    } catch (error) {
+      console.error('Error creating credit note:', error);
+      // A 409 means someone else just created one for this same expense
+      // detail - surface it as the existing record rather than a plain error.
+      if (error.response?.status === 409 && error.response?.data?.existing_credit_note) {
+        setCreditNoteExisting(error.response.data.existing_credit_note);
+        setCreditNoteModalMode('view');
+        showPopup('error', error.response.data.error);
+      } else {
+        showPopup('error', error.response?.data?.error || 'Failed to create credit note');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // ---------- Credit Note: apply (set-off against a pending bill) ----------
+  const handleOpenApplyCreditNoteModal = async (bill) => {
+    setApplyCreditNoteBill(bill);
+    setCreditNoteApplyAmounts({});
+    setShowApplyCreditNoteModal(true);
+    setIsLoadingCreditNotes(true);
+    try {
+      const params = bill.payee_id
+        ? { payee_id: bill.payee_id, company_id: bill.company_id }
+        : { payee_name: bill.payee_name, company_id: bill.company_id };
+      const response = await api.get('/new-expenses/credit-notes/available', { params });
+      setAvailableCreditNotes(response.data || []);
+    } catch (error) {
+      console.error('Error fetching available credit notes:', error);
+      showPopup('error', 'Failed to load available credit notes');
+      setAvailableCreditNotes([]);
+    } finally {
+      setIsLoadingCreditNotes(false);
+    }
+  };
+
+  const handleCloseApplyCreditNoteModal = () => {
+    setShowApplyCreditNoteModal(false);
+    setApplyCreditNoteBill(null);
+    setAvailableCreditNotes([]);
+    setCreditNoteApplyAmounts({});
+  };
+
+  const handleCreditNoteApplyAmountChange = (creditNoteId, value) => {
+    setCreditNoteApplyAmounts(prev => ({ ...prev, [creditNoteId]: value }));
+  };
+
+  const totalCreditNoteApplyAmount = Object.values(creditNoteApplyAmounts)
+    .reduce((sum, v) => sum + (parseFloat(v) || 0), 0);
+
+  const handleSubmitApplyCreditNote = async () => {
+    const entries = Object.entries(creditNoteApplyAmounts)
+      .map(([creditNoteId, amount]) => ({ credit_note_id: creditNoteId, amount: parseFloat(amount) || 0 }))
+      .filter(e => e.amount > 0);
+
+    if (entries.length === 0) {
+      showPopup('error', 'Enter an amount to apply from at least one credit note');
+      return;
+    }
+    if (totalCreditNoteApplyAmount > parseFloat(applyCreditNoteBill?.balance || 0) + 0.001) {
+      showPopup('error', 'Total applied amount cannot exceed the bill balance');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await api.post('/new-expenses/credit-notes/apply', {
+        expense_id: applyCreditNoteBill.id,
+        credit_notes: entries,
+        applied_date: new Date().toISOString().split('T')[0]
+      });
+      showPopup('success', `Credit note applied. New balance: ${formatCurrency(response.data?.new_balance || 0)}`);
+      handleCloseApplyCreditNoteModal();
+      await Promise.all([fetchBills(), fetchCreditNotesIndex()]);
+    } catch (error) {
+      console.error('Error applying credit note:', error);
+      showPopup('error', error.response?.data?.error || 'Failed to apply credit note');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleExportExcel = () => {
+    if (filteredBills.length === 0) return;
+
+    const worksheetData = [];
+    worksheetData.push(['Expenses Report']);
+    worksheetData.push([`Status: ${viewFilter === 'paid' ? 'Paid' : 'Pending'}`]);
+    worksheetData.push([]);
+    worksheetData.push([
+      'Bill Date',
+      'Bill Number',
+      'Payee Name',
+      'Expenses Type',
+      'Company',
+      'VAT Reg No',
+      'Without VAT Amount',
+      'VAT Amount',
+      'Total Bill Amount',
+      'Balance',
+      'Status',
+      'Description'
+    ]);
+
+    filteredBills.forEach((b) => {
+      worksheetData.push([
+        b.bill_date || 'N/A',
+        b.bill_number || 'N/A',
+        b.payee_name || 'N/A',
+        b.expense_type || 'N/A',
+        b.company_name || 'N/A',
+        b.vat_reg_number || 'N/A',
+        parseFloat(b.without_vat_amount) || 0,
+        parseFloat(b.vat_amount) || 0,
+        parseFloat(b.total_bill_amount) || 0,
+        parseFloat(b.balance) || 0,
+        b.payment_status || (parseFloat(b.balance) <= 0 ? 'Paid' : 'Pending'),
+        b.description || ''
+      ]);
+    });
+
+    const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+    worksheet['!cols'] = [
+      { wch: 14 },
+      { wch: 14 },
+      { wch: 22 },
+      { wch: 18 },
+      { wch: 16 },
+      { wch: 16 },
+      { wch: 18 },
+      { wch: 16 },
+      { wch: 18 },
+      { wch: 16 },
+      { wch: 14 },
+      { wch: 25 }
+    ];
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Expenses');
+    XLSX.writeFile(workbook, `expenses-${viewFilter}-${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
   return (
     <div className="page-container new-expenses-page">
       <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
@@ -685,11 +1021,26 @@ const NewExpenses = () => {
       {/* Expenses Details Table */}
       <div className="card expenses-details-card" style={{ padding: 'var(--spacing-lg)' }}>
         <div className="form-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
-          <div>
-            <FontAwesomeIcon icon={faReceipt} /> Expenses Details
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <span><FontAwesomeIcon icon={faReceipt} /> Expenses Details</span>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              title={selectedIds.length === 1 ? 'Create a Credit Note for the selected expense detail' : 'Select exactly one expense detail to create a Credit Note'}
+              disabled={selectedIds.length !== 1}
+              onClick={() => handleOpenCreditNoteModal(bills.find(b => b.id === selectedIds[0]))}
+            >
+              <FontAwesomeIcon icon={faFileInvoice} /> Credit Note
+            </button>
           </div>
           <div className="report-filter-actions">
-            <button className="btn btn-success" title="Export to Excel">
+            <button
+              type="button"
+              className="btn btn-success"
+              title="Export to Excel"
+              onClick={handleExportExcel}
+              disabled={filteredBills.length === 0}
+            >
               <FontAwesomeIcon icon={faFileExcel} /> Export
             </button>
           </div>
@@ -731,14 +1082,13 @@ const NewExpenses = () => {
           <table className="report-table">
             <thead>
               <tr>
-                {viewFilter === 'pending' && (
-                  <th style={{ width: '40px' }}>
-                    <input type="checkbox" checked={allSelected} onChange={handleSelectAll} className="select-checkbox" />
-                  </th>
-                )}
+                <th style={{ width: '40px' }}>
+                  <input type="checkbox" checked={allSelected} onChange={handleSelectAll} className="select-checkbox" />
+                </th>
                 <th>Bill Date</th>
                 <th>Bill Number</th>
                 <th>Payee Name</th>
+                <th>Expenses Type</th>
                 <th>Company</th>
                 <th>VAT Reg No</th>
                 <th>Without VAT Amount</th>
@@ -747,25 +1097,32 @@ const NewExpenses = () => {
                 <th>Balance</th>
                 <th>Status</th>
                 <th>Description</th>
-                {viewFilter === 'pending' && <th>Action</th>}
+                <th>Action</th>
               </tr>
             </thead>
             <tbody>
               {isFetching ? (
-                <tr><td colSpan="12" className="loading-row"><FontAwesomeIcon icon={faSpinner} spin /> Loading expenses...</td></tr>
+                <tr><td colSpan="14" className="loading-row"><FontAwesomeIcon icon={faSpinner} spin /> Loading expenses...</td></tr>
               ) : filteredBills.length > 0 ? (
                 filteredBills.map(bill => {
                   const isPaid = parseFloat(bill.balance || 0) <= 0;
+                  const existingCn = creditNotesByExpenseId[bill.id];
                   return (
                     <tr key={bill.id}>
-                      {viewFilter === 'pending' && (
-                        <td>
-                          <input type="checkbox" checked={selectedIds.includes(bill.id)} onChange={() => handleSelectOne(bill.id)} className="select-checkbox" />
-                        </td>
-                      )}
+                      <td>
+                        <input type="checkbox" checked={selectedIds.includes(bill.id)} onChange={() => handleSelectOne(bill.id)} className="select-checkbox" />
+                      </td>
                       <td className="date-cell">{bill.bill_date}</td>
-                      <td className="bill-number-cell">{bill.bill_number || '-'}</td>
+                      <td className="bill-number-cell">
+                        {bill.bill_number || '-'}
+                        {existingCn && (
+                          <span className="badge badge-primary" style={{ marginLeft: '6px' }} title={`Credit Note ${existingCn.credit_note_number} (${existingCn.status})`}>
+                            CN
+                          </span>
+                        )}
+                      </td>
                       <td className="payee-cell">{bill.payee_name}</td>
+                      <td className="expense-type-cell">{bill.expense_type || '-'}</td>
                       <td>{bill.company_name || '-'}</td>
                       <td className="vat-cell">{bill.vat_reg_number || '-'}</td>
                       <td className="amount-cell">{formatCurrency(bill.without_vat_amount)}</td>
@@ -783,18 +1140,28 @@ const NewExpenses = () => {
                         </span>
                       </td>
                       <td className="description-cell">{bill.description || '-'}</td>
-                      {viewFilter === 'pending' && (
-                        <td className="action-cell">
-                          <button onClick={() => handleEdit(bill)} className="edit-btn" title="Edit"><FontAwesomeIcon icon={faEdit} /></button>
-                          <button onClick={() => handleDelete(bill.id)} className="delete-btn" title="Delete"><FontAwesomeIcon icon={faTrash} /></button>
-                        </td>
-                      )}
+                      <td className={`action-cell ${openActionMenuId === bill.id ? 'menu-open' : ''}`}>
+                        {viewFilter === 'pending' ? (
+                          <div className="expense-action-menu-wrapper">
+                            <button
+                              type="button"
+                              className={`action-menu-trigger ${openActionMenuId === bill.id ? 'active' : ''}`}
+                              onClick={(e) => handleToggleActionMenu(bill, e)}
+                              title="More actions"
+                              aria-haspopup="true"
+                              aria-expanded={openActionMenuId === bill.id}
+                            >
+                              <FontAwesomeIcon icon={faEllipsisV} />
+                            </button>
+                          </div>
+                        ) : '-'}
+                      </td>
                     </tr>
                   );
                 })
               ) : (
                 <tr>
-                  <td colSpan="12" className="empty-row">
+                  <td colSpan="14" className="empty-row">
                     {viewFilter === 'paid' ? 'No paid expense bills found' : 'No pending expense bills found'}
                   </td>
                 </tr>
@@ -803,7 +1170,7 @@ const NewExpenses = () => {
           </table>
         </div>
 
-        {viewFilter === 'pending' && (
+        {viewFilter === 'pending' ? (
           <div className="payment-action-bar">
             <div className="selected-info">
               {selectedIds.length > 0 ? (
@@ -821,12 +1188,23 @@ const NewExpenses = () => {
                   ) : null}
                 </>
               ) : (
-                <span className="selected-count"><FontAwesomeIcon icon={faReceipt} /> Select bill(s) to pay</span>
+                <span className="selected-count"><FontAwesomeIcon icon={faReceipt} /> Select bill(s) to pay, or select one to raise a Credit Note</span>
               )}
             </div>
             <button className="btn-pay" onClick={handleOpenPaymentModal} disabled={isLoading}>
               <FontAwesomeIcon icon={faMoneyBillWave} /> Pay
             </button>
+          </div>
+        ) : (
+          <div className="payment-action-bar">
+            <div className="selected-info">
+              <span className="selected-count">
+                <FontAwesomeIcon icon={faCheckCircle} />
+                {selectedIds.length === 1
+                  ? '1 expense detail selected - use the Credit Note button above'
+                  : 'Select one expense detail to raise a Credit Note'}
+              </span>
+            </div>
           </div>
         )}
       </div>
@@ -1017,6 +1395,199 @@ const NewExpenses = () => {
         </div>
       )}
 
+      {/* Credit Note - create / view modal (one Credit Note per Expense Detail) */}
+      {showCreditNoteModal && creditNoteSourceBill && (
+        <div className="payment-modal-overlay cn-modal" onClick={handleCloseCreditNoteModal}>
+          <div className="payment-modal-content" style={{ maxWidth: '480px' }} onClick={(e) => e.stopPropagation()}>
+            <div className="payment-modal-header">
+              <h3><FontAwesomeIcon icon={faFileInvoice} /> Credit Note</h3>
+              <button className="payment-modal-close" onClick={handleCloseCreditNoteModal}>×</button>
+            </div>
+            <div className="payment-modal-body">
+              {isCheckingExistingCreditNote ? (
+                <div className="loading-row"><FontAwesomeIcon icon={faSpinner} spin /> Checking this expense detail...</div>
+              ) : creditNoteModalMode === 'view' && creditNoteExisting ? (
+                <div className="payment-details-section">
+                  <div className="expense-summary-row">
+                    <span className="summary-label">Expense Detail</span>
+                    <span className="summary-value">{creditNoteSourceBill.bill_number || `#${creditNoteSourceBill.id}`}</span>
+                  </div>
+                  <p className="cn-note-banner">
+                    This expense detail already has a Credit Note. Only one Credit Note can be raised per expense detail.
+                  </p>
+                  <div className="expense-summary-row">
+                    <span className="summary-label">Credit Note No</span>
+                    <span className="summary-value">{creditNoteExisting.credit_note_number}</span>
+                  </div>
+                  <div className="expense-summary-row">
+                    <span className="summary-label">Status</span>
+                    <span className="summary-value">{creditNoteExisting.status}</span>
+                  </div>
+                  <div className="expense-summary-row">
+                    <span className="summary-label">Total Amount</span>
+                    <span className="summary-value">{formatCurrency(creditNoteExisting.total_amount)}</span>
+                  </div>
+                  <div className="expense-summary-row balance-row">
+                    <span className="summary-label">Remaining Balance</span>
+                    <span className="summary-value balance-amount">{formatCurrency(creditNoteExisting.remaining_credit)}</span>
+                  </div>
+                </div>
+              ) : creditNoteForm ? (
+                <div className="payment-details-section">
+                  <div className="payment-form-row">
+                    <div className="payment-form-group">
+                      <label>Date <span className="required">*</span></label>
+                      <input
+                        type="date" name="credit_note_date" value={creditNoteForm.credit_note_date}
+                        onChange={handleCreditNoteFormChange} className="payment-input" required
+                      />
+                    </div>
+                    <div className="payment-form-group">
+                      <label>Supplier Name</label>
+                      <input type="text" value={creditNoteForm.payee_name} readOnly className="payment-input" />
+                    </div>
+                  </div>
+                  <div className="payment-form-row">
+                    <div className="payment-form-group">
+                      <label>Company</label>
+                      <input type="text" value={creditNoteForm.company_name || '-'} readOnly className="payment-input" />
+                    </div>
+                  </div>
+                  <div className="payment-form-row">
+                    <div className="payment-form-group">
+                      <label>Amount Before VAT <span className="required">*</span></label>
+                      <input
+                        type="number" name="without_vat_amount" value={creditNoteForm.without_vat_amount}
+                        onChange={handleCreditNoteFormChange} className="payment-input" min="0" step="0.01"
+                      />
+                    </div>
+                    <div className="payment-form-group">
+                      <label>VAT Amount</label>
+                      <input
+                        type="number" name="vat_amount" value={creditNoteForm.vat_amount}
+                        onChange={handleCreditNoteFormChange} className="payment-input" min="0" step="0.01"
+                      />
+                    </div>
+                  </div>
+                  <div className="payment-form-row">
+                    <div className="payment-form-group">
+                      <label>Total Credit Note Amount</label>
+                      <input type="text" value={creditNoteForm.total_amount} readOnly className="payment-input total-amount" />
+                    </div>
+                  </div>
+                  <div className="payment-form-row">
+                    <div className="payment-form-group full-width">
+                      <label>Notes</label>
+                      <input
+                        type="text" name="notes" value={creditNoteForm.notes}
+                        onChange={handleCreditNoteFormChange} className="payment-input" placeholder="Optional"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+            <div className="payment-modal-footer">
+              <button type="button" className="btn-secondary" onClick={handleCloseCreditNoteModal} disabled={isLoading}>
+                <FontAwesomeIcon icon={faTimes} /> {creditNoteModalMode === 'view' ? 'Close' : 'Cancel'}
+              </button>
+              {creditNoteModalMode === 'create' && !isCheckingExistingCreditNote && creditNoteForm && (
+                <button type="button" className="btn-pay" onClick={handleSaveCreditNote} disabled={isLoading}>
+                  <FontAwesomeIcon icon={isLoading ? faSpinner : faSave} spin={isLoading} />
+                  {isLoading ? 'Saving...' : 'Create Credit Note'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Credit Note - apply (set-off) modal */}
+      {showApplyCreditNoteModal && applyCreditNoteBill && (
+        <div className="payment-modal-overlay cn-modal cn-modal-wide" onClick={handleCloseApplyCreditNoteModal}>
+          <div className="payment-modal-content" style={{ maxWidth: '560px' }} onClick={(e) => e.stopPropagation()}>
+            <div className="payment-modal-header">
+              <h3><FontAwesomeIcon icon={faRightLeft} /> Apply Credit Note</h3>
+              <button className="payment-modal-close" onClick={handleCloseApplyCreditNoteModal}>×</button>
+            </div>
+            <div className="payment-modal-body">
+              <div className="payment-details-section">
+                <div className="expense-summary-row">
+                  <span className="summary-label">Supplier</span>
+                  <span className="summary-value">{applyCreditNoteBill.payee_name}</span>
+                </div>
+                <div className="expense-summary-row">
+                  <span className="summary-label">Bill Balance</span>
+                  <span className="summary-value">{formatCurrency(applyCreditNoteBill.balance)}</span>
+                </div>
+
+                <div className="payment-section-title" style={{ marginTop: '12px' }}>Available Credit Notes</div>
+                {isLoadingCreditNotes ? (
+                  <div className="loading-row"><FontAwesomeIcon icon={faSpinner} spin /> Loading credit notes...</div>
+                ) : availableCreditNotes.length === 0 ? (
+                  <div className="dropdown-empty">No available credit notes for this supplier and company.</div>
+                ) : (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table className="cn-credit-table">
+                      <thead>
+                        <tr>
+                          <th>Credit Note No</th>
+                          <th>Date</th>
+                          <th>Available</th>
+                          <th>Amount to Apply</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {availableCreditNotes.map(cn => (
+                          <tr key={cn.id}>
+                            <td>{cn.credit_note_number}</td>
+                            <td>{cn.credit_note_date}</td>
+                            <td className="amount-cell">{formatCurrency(cn.remaining_credit)}</td>
+                            <td>
+                              <input
+                                type="number" min="0" step="0.01" max={cn.remaining_credit}
+                                value={creditNoteApplyAmounts[cn.id] || ''}
+                                onChange={(e) => handleCreditNoteApplyAmountChange(cn.id, e.target.value)}
+                                className="payment-input" style={{ width: '110px' }}
+                                placeholder="0.00"
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {totalCreditNoteApplyAmount > 0 && (
+                  <div className="expense-summary-row balance-row" style={{ marginTop: '10px' }}>
+                    <span className="summary-label">Total to Apply</span>
+                    <span className="summary-value balance-amount">{formatCurrency(totalCreditNoteApplyAmount)}</span>
+                  </div>
+                )}
+                {totalCreditNoteApplyAmount > parseFloat(applyCreditNoteBill.balance || 0) && (
+                  <small style={{ color: '#dc3545', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                    Total applied amount cannot exceed the bill balance
+                  </small>
+                )}
+              </div>
+            </div>
+            <div className="payment-modal-footer">
+              <button type="button" className="btn-secondary" onClick={handleCloseApplyCreditNoteModal} disabled={isLoading}>
+                <FontAwesomeIcon icon={faTimes} /> Cancel
+              </button>
+              <button
+                type="button" className="btn-pay" onClick={handleSubmitApplyCreditNote}
+                disabled={isLoading || availableCreditNotes.length === 0 || totalCreditNoteApplyAmount <= 0}
+              >
+                <FontAwesomeIcon icon={isLoading ? faSpinner : faRightLeft} spin={isLoading} />
+                {isLoading ? 'Applying...' : 'Apply'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Quick-add Payee modal */}
       {showAddPayee && (
         <div className="payment-modal-overlay" onClick={() => setShowAddPayee(false)}>
@@ -1065,6 +1636,62 @@ const NewExpenses = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Three-dot action menu rendered via portal so it floats cleanly above the table without clipping */}
+      {openActionMenuId && menuPosition && createPortal(
+        <div
+          ref={actionMenuDropdownRef}
+          className={`action-menu-dropdown portal-dropdown ${menuPosition.openUpward ? 'open-upward' : 'open-downward'}`}
+          style={{
+            position: 'fixed',
+            top: `${menuPosition.top}px`,
+            right: `${menuPosition.right}px`,
+            zIndex: 99999
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            className="action-menu-item"
+            onClick={() => {
+              const targetBill = menuPosition.bill;
+              setOpenActionMenuId(null);
+              setMenuPosition(null);
+              handleOpenApplyCreditNoteModal(targetBill);
+            }}
+          >
+            <FontAwesomeIcon icon={faRightLeft} />
+            <span>Apply Credit Note</span>
+          </button>
+          <button
+            type="button"
+            className="action-menu-item"
+            onClick={() => {
+              const targetBill = menuPosition.bill;
+              setOpenActionMenuId(null);
+              setMenuPosition(null);
+              handleEdit(targetBill);
+            }}
+          >
+            <FontAwesomeIcon icon={faEdit} />
+            <span>Edit</span>
+          </button>
+          <button
+            type="button"
+            className="action-menu-item danger"
+            onClick={() => {
+              const targetBillId = menuPosition.bill.id;
+              setOpenActionMenuId(null);
+              setMenuPosition(null);
+              handleDelete(targetBillId);
+            }}
+          >
+            <FontAwesomeIcon icon={faTrash} />
+            <span>Delete</span>
+          </button>
+        </div>,
+        document.body
       )}
     </div>
   );

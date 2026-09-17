@@ -641,4 +641,64 @@ const ensureCashExpensesSchema = async () => {
 
 ensureCashExpensesSchema();
 
+// --- New Expenses: Credit Note module -----------------------------------
+// A Credit Note is a payee-scoped credit (same idea as payee_overpayments,
+// the existing "Advance Payment"-style credit for this module) that is
+// raised from an expense bill and can later be set off against a pending
+// expense bill for the SAME payee + SAME company. Applying a Credit Note
+// never touches Cash/Bank (see expense_credit_note_allocations) - it only
+// reduces the target bill's balance, mirroring how supplier_overpayments /
+// purchase_return_credits settle a purchase invoice without a cash entry.
+const ensureCreditNotesSchema = async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS payee_credit_notes (
+        id                   INT NOT NULL AUTO_INCREMENT,
+        credit_note_number   VARCHAR(50) NOT NULL,
+        expense_id           INT NULL,
+        payee_id             INT NULL,
+        payee_name           VARCHAR(255) NOT NULL,
+        company_id           INT NOT NULL,
+        credit_note_date     DATE NOT NULL,
+        without_vat_amount   DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+        vat_amount           DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+        total_amount         DECIMAL(15,2) NOT NULL,
+        remaining_credit     DECIMAL(15,2) NOT NULL,
+        status               ENUM('Active','Partially Used','Fully Used','Cancelled') NOT NULL DEFAULT 'Active',
+        notes                TEXT NULL,
+        created_by           INT NULL,
+        created_at           TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at           TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        UNIQUE KEY uniq_credit_note_number (credit_note_number),
+        KEY idx_pcn_payee (payee_id),
+        KEY idx_pcn_company (company_id),
+        KEY idx_pcn_expense (expense_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS payee_credit_note_allocations (
+        id                INT NOT NULL AUTO_INCREMENT,
+        credit_note_id    INT NOT NULL,
+        expense_id        INT NOT NULL,
+        allocated_amount  DECIMAL(15,2) NOT NULL,
+        applied_date      DATE NOT NULL,
+        applied_by        INT NULL,
+        notes             TEXT NULL,
+        created_at        TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        KEY idx_pcna_credit_note (credit_note_id),
+        KEY idx_pcna_expense (expense_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    `);
+
+    console.log('Payee Credit Notes schema ready');
+  } catch (error) {
+    console.warn('Payee Credit Notes schema check skipped:', error.message);
+  }
+};
+
+ensureCreditNotesSchema();
+
 module.exports = pool;
