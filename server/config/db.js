@@ -739,6 +739,76 @@ const ensureEmployeesSchema = async () => {
   }
 };
 
-ensureEmployeesSchema();
+// Finance -> Staff Loans.
+// `staff_loans` references employees.id (Employee Management - reused, not
+// duplicated) and company.id (whose Cash Book pays out the loan and receives
+// repayments; issue_finance_transaction_id points at the payout's Cash Out row).
+// `staff_loan_repayments` stores every repayment separately; the outstanding
+// balance is always derived as loan_amount - SUM(repayments) and is never
+// stored, so it cannot drift from the repayment history. See
+// migrations/017_staff_loans.sql for the documented schema.
+const ensureStaffLoansSchema = async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS staff_loans (
+        id             INT NOT NULL AUTO_INCREMENT,
+        employee_id    INT NOT NULL,
+        company_id     INT NOT NULL,
+        loan_amount    DECIMAL(14,2) NOT NULL,
+        issued_date    DATE NOT NULL,
+        cheque_details VARCHAR(500) NULL,
+        issue_finance_transaction_id INT NULL,
+        status         ENUM('Active','Settled') NOT NULL DEFAULT 'Active',
+        created_by     INT NULL,
+        created_at     TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at     TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        KEY idx_staff_loans_employee (employee_id),
+        KEY idx_staff_loans_company (company_id),
+        KEY idx_staff_loans_status (status),
+        KEY idx_staff_loans_issued_date (issued_date),
+        CONSTRAINT fk_staff_loans_employee FOREIGN KEY (employee_id) REFERENCES employees(id),
+        CONSTRAINT fk_staff_loans_company FOREIGN KEY (company_id) REFERENCES company(id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS staff_loan_repayments (
+        id                     INT NOT NULL AUTO_INCREMENT,
+        staff_loan_id          INT NOT NULL,
+        amount                 DECIMAL(14,2) NOT NULL,
+        received_date          DATE NOT NULL,
+        finance_transaction_id INT NULL,
+        created_by             INT NULL,
+        created_at             TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at             TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        KEY idx_staff_loan_repayments_loan (staff_loan_id),
+        KEY idx_staff_loan_repayments_date (received_date),
+        CONSTRAINT fk_staff_loan_repayments_loan FOREIGN KEY (staff_loan_id) REFERENCES staff_loans(id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    // Installs that created staff_loans before loan payouts were posted to the
+    // Cash Book: add the link to the Cash Out row (additive, safe to re-run).
+    try {
+      await pool.query(
+        "ALTER TABLE staff_loans ADD COLUMN IF NOT EXISTS issue_finance_transaction_id INT NULL AFTER cheque_details"
+      );
+    } catch (colErr) {
+      // Column already present on some MySQL/MariaDB versions that don't
+      // support IF NOT EXISTS here - safe to ignore.
+    }
+
+    console.log('Staff Loans schema ready');
+  } catch (error) {
+    console.warn('Staff Loans schema check skipped:', error.message);
+  }
+};
+
+// The staff-loan tables have foreign keys to `employees`, so they are created
+// only after the employees table check has finished (the schema checks in this
+// file otherwise start concurrently).
+ensureEmployeesSchema().then(ensureStaffLoansSchema);
 
 module.exports = pool;

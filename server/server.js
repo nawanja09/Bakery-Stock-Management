@@ -55,6 +55,7 @@ const companyRoutes = require('./routes/companyRoutes');
 const PaymentMethodManagement = require('./routes/paymentMethodRoutes');
 
 const financeRoutes = require('./routes/financeRoutes');
+const staffLoanRoutes = require('./routes/staffLoanRoutes');
 const inhandRoutes  = require('./routes/inhandRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const receiveTypeRoutes = require('./routes/receiveTypeRoutes');
@@ -163,6 +164,7 @@ app.use('/api/companies', companyRoutes);
 app.use('/api/fg-production', fgProductionRoutes);
 app.use('/api/payment-methods', PaymentMethodManagement);
 app.use('/api/finance', financeRoutes);
+app.use('/api/staff-loans', staffLoanRoutes);
 app.use('/api/inhand', inhandRoutes);
 app.use('/api/receive-types', receiveTypeRoutes);
 app.use('/api/analyst', analystRoutes);

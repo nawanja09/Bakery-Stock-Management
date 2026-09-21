@@ -1,0 +1,208 @@
+/* ============================================================================
+   FINANCE -> STAFF LOANS
+   Everything is scoped with the `sl-` prefix so nothing here can leak into
+   Employee Management or any other Finance page. The Receive Cash modal follows
+   the look of the existing Finance modal (Expenses Cheque Registry -> Release).
+   ============================================================================ */
+
+.sl-section-title {
+  margin: 0 0 var(--spacing-lg, 16px);
+  font-size: var(--font-size-lg, 1.125rem);
+  font-weight: var(--font-weight-semibold, 600);
+  color: var(--color-text-primary, #0f172a);
+}
+
+.sl-loans-card {
+  padding: var(--spacing-lg, 16px);
+}
+
+.sl-table-wrap {
+  overflow-x: auto;
+}
+
+.sl-table {
+  width: 100%;
+}
+
+.sl-table .sl-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.sl-balance {
+  font-weight: 600;
+}
+
+.sl-row-settled td {
+  color: var(--color-text-secondary, #64748b);
+}
+
+.sl-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sl-icon-btn {
+  background: transparent;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 6px;
+  color: var(--color-text-secondary, #64748b);
+  cursor: pointer;
+  padding: 6px 9px;
+  line-height: 1;
+}
+
+.sl-icon-btn:hover {
+  color: var(--color-primary, #2563eb);
+  border-color: var(--color-primary, #2563eb);
+}
+
+.sl-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.sl-badge-settled {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.sl-empty {
+  text-align: center;
+  padding: var(--spacing-2xl, 32px);
+  color: var(--color-text-secondary, #64748b);
+}
+
+/* ════════════ Modals ════════════ */
+.sl-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 99999;
+}
+
+.sl-modal {
+  background: #ffffff;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 440px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+}
+
+.sl-modal-wide {
+  max-width: 560px;
+}
+
+.sl-modal form {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.sl-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.sl-modal-header h3 {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.sl-modal-close {
+  background: transparent;
+  border: none;
+  font-size: 1.1rem;
+  color: #64748b;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.sl-modal-close:hover {
+  color: #0f172a;
+}
+
+.sl-modal-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+}
+
+.sl-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 20px;
+  border-top: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.sl-summary-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sl-summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  font-size: 0.875rem;
+}
+
+.sl-summary-lbl {
+  color: #64748b;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.sl-balance-strong {
+  color: #b45309;
+}
+
+.sl-cheque-text {
+  text-align: right;
+  word-break: break-word;
+}
+
+.sl-modal-error {
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  font-size: 0.875rem;
+}
+
+@media (max-width: 640px) {
+  .sl-page .form-grid.two-col {
+    grid-template-columns: 1fr;
+  }
+}

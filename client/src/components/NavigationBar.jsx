@@ -596,6 +596,12 @@ const NavigationBar = () => {
           <span>Expenses Cheque Registry</span>
         </NavLink>
       </li>
+      <li>
+        <NavLink to="/finance/staff-loans" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          <span className="icon-container"><FontAwesomeIcon icon={faSackDollar} /></span>
+          <span>Staff Loans</span>
+        </NavLink>
+      </li>
     </>
   );
 

@@ -21,6 +21,14 @@ const financeWriteAccess = [
   requireRoles('Admin', 'Super Admin', 'Accountant')
 ];
 
+// Staff Loans (Finance -> Staff Loans) hold personal loan balances, so reads are
+// limited to the same roles that can open the Finance pages in the client.
+// Store Keeper / Stores are intentionally excluded.
+const staffLoanReadAccess = [
+  authenticate,
+  requireRoles('Admin', 'Super Admin', 'Accountant', 'View Only')
+];
+
 const adjustmentsAccess = [
   authenticate,
   requireRoles('Admin', 'Super Admin')
@@ -38,6 +46,7 @@ module.exports = {
   fgProductionAccess,
   financeReadAccess,
   financeWriteAccess,
+  staffLoanReadAccess,
   adjustmentsAccess,
   employeeAccess
 };
