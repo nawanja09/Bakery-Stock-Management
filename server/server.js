@@ -16,6 +16,7 @@ const reportRoutes = require('./routes/reportRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const dashboardController = require('./controllers/dashboardController');
 const userRoutes = require('./routes/userRoutes');
+const employeeRoutes = require('./routes/employeeRoutes');
 const adjustmentRoutes = require('./routes/adjustmentRoutes');
 
 const finishedGoodsItemsRouter = require('./routes/finishedGoodsItems');
@@ -118,6 +119,7 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.get('/api/stats', dashboardController.getGeneralStats);
 app.use('/api/users', userRoutes);
+app.use('/api/employees', employeeRoutes);
 app.use('/api/adjustments', adjustmentRoutes);
 app.use('/api/orders', orderRoutes);
 

@@ -26,10 +26,18 @@ const adjustmentsAccess = [
   requireRoles('Admin', 'Super Admin')
 ];
 
+// Employee Management holds HR/personal data (NIC, contact number, etc.),
+// so it is locked down the same way as Adjustments - Admin/Super Admin only.
+const employeeAccess = [
+  authenticate,
+  requireRoles('Admin', 'Super Admin')
+];
+
 module.exports = {
   rawMaterialAccess,
   fgProductionAccess,
   financeReadAccess,
   financeWriteAccess,
-  adjustmentsAccess
+  adjustmentsAccess,
+  employeeAccess
 };

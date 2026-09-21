@@ -701,4 +701,44 @@ const ensureCreditNotesSchema = async () => {
 
 ensureCreditNotesSchema();
 
+// Employee Management module: employees are company staff records used for
+// HR purposes (separate from `users`, which are application login accounts).
+// department_id links to the existing `departments` master (reused, not
+// duplicated - see departmentController.js). designation has no existing
+// master table in this project, so it is stored as validated free text for
+// now; it can be swapped for a designation_id FK later without any other
+// change to this module.
+const ensureEmployeesSchema = async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS employees (
+        id               INT NOT NULL AUTO_INCREMENT,
+        employee_code    VARCHAR(30) NOT NULL,
+        employee_name    VARCHAR(150) NOT NULL,
+        nic              VARCHAR(20) NOT NULL,
+        contact_number   VARCHAR(15) NOT NULL,
+        department_id    INT NULL,
+        designation      VARCHAR(100) NOT NULL,
+        joining_date     DATE NOT NULL,
+        status           ENUM('Active','Inactive') NOT NULL DEFAULT 'Active',
+        created_by       INT NULL,
+        created_at       TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at       TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        UNIQUE KEY uniq_employees_employee_code (employee_code),
+        UNIQUE KEY uniq_employees_nic (nic),
+        KEY idx_employees_department (department_id),
+        KEY idx_employees_status (status),
+        CONSTRAINT fk_employees_department FOREIGN KEY (department_id) REFERENCES departments(id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    console.log('Employees schema ready');
+  } catch (error) {
+    console.warn('Employees schema check skipped:', error.message);
+  }
+};
+
+ensureEmployeesSchema();
+
 module.exports = pool;

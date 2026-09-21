@@ -93,7 +93,8 @@ const NavigationBar = () => {
                path.startsWith('/expense-types-management') ||
                path.startsWith('/expense-payees-management') ||
                path.startsWith('/bank-charges-type-management') ||
-               path.startsWith('/finance/receive-types')) {
+               path.startsWith('/finance/receive-types') ||
+               path.startsWith('/admin/employees')) {
       setActiveModule('management');
     } else if (path.startsWith('/adjustments')) {
       setActiveModule('adjustments');
@@ -298,6 +299,14 @@ const NavigationBar = () => {
           <span>Receive Types</span>
         </NavLink>
       </li>
+      {(userRole === 'Admin' || userRole === 'Super Admin') && (
+        <li>
+          <NavLink to="/admin/employees" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+            <span className="icon-container"><FontAwesomeIcon icon={faIdCard} /></span>
+            <span>Employee Management</span>
+          </NavLink>
+        </li>
+      )}
     </>
   );
 
@@ -352,9 +361,6 @@ const NavigationBar = () => {
           <span>Department Return</span>
         </NavLink>
       </li>
-
-
-
 
       <li className={`dropdown ${activeDropdown === 'reports' ? 'active' : ''}`}>
         <div className="dropdown-header" onClick={() => toggleDropdown('reports')}>
@@ -649,18 +655,18 @@ const NavigationBar = () => {
 
   const renderFGProductionContent = () => (
     <>
-          <li>
-            <NavLink to="/fg-production/recipes" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-              <span className="icon-container"><FontAwesomeIcon icon={faClipboardList} /></span>
-              <span>Recipes</span>
-            </NavLink>
-          </li>
-          <li>
-            <NavLink to="/fg-production/reports" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-              <span className="icon-container"><FontAwesomeIcon icon={faChartBar} /></span>
-              <span>FG Recipes Reports</span>
-            </NavLink>
-          </li>
+      <li>
+        <NavLink to="/fg-production/recipes" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          <span className="icon-container"><FontAwesomeIcon icon={faClipboardList} /></span>
+          <span>Recipes</span>
+        </NavLink>
+      </li>
+      <li>
+        <NavLink to="/fg-production/reports" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          <span className="icon-container"><FontAwesomeIcon icon={faChartBar} /></span>
+          <span>FG Recipes Reports</span>
+        </NavLink>
+      </li>
     </>
   );
 
@@ -697,7 +703,6 @@ const NavigationBar = () => {
       </li>
       <li>
         <NavLink to="/reports/purchase-vat" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-          {/* Renamed from "VAT Purchasing Return Report" to "Return VAT Report" */}
           <span className="icon-container"><FontAwesomeIcon icon={faCalculator} /></span>
           <span>Return VAT Report</span>
         </NavLink>
@@ -767,7 +772,6 @@ const NavigationBar = () => {
             </div>
           </li>}
 
-          {/* Module content - shown only when module is active */}
           {canAccessRawMaterial && !isCollapsed && activeModule === 'raw' && (
             <div className="module-content">
               {renderRawMaterialContent()}
