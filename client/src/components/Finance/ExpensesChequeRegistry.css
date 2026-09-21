@@ -247,6 +247,43 @@
   color: #1e293b;
 }
 
+/* ════════════ Status Tabs (Pending / Completed / Returned) ════════════ */
+.ecr-status-tabs {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ecr-status-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 18px;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.ecr-status-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.ecr-status-tab.btn-secondary .ecr-status-tab-count {
+  background: rgba(15, 23, 42, 0.08);
+  color: var(--color-text, #334155);
+}
+
 /* ════════════ Table Card ════════════ */
 .ecr-table-card {
   border-radius: 12px;
@@ -679,4 +716,3 @@
 .ecr-btn-confirm-release:hover:not(:disabled) {
   background: #059669;
 }
-

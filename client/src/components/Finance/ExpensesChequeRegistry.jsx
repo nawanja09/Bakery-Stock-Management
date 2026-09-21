@@ -31,20 +31,42 @@ const SOURCE_LABELS = {
   EXPENSE_PAYMENT: { label: 'New Expenses', badgeClass: 'ecr-badge-expense' }
 };
 
+// Single source of truth for a row's status "bucket" - used by both the
+// metrics cards and the 3 tabs below, so they can never disagree.
+// Maps directly to the database `status` column values (Pending / Released
+// / Returned) - only the tab LABELS are renamed for display ("Completed
+// Cheque" for Released), per the Expenses Cheque Registry tab spec.
+const getRowStatusKey = (row) => {
+  if (row.returned || row.status === 'Returned') return 'Returned';
+  if (row.status === 'Released') return 'Released';
+  return 'Pending';
+};
+
+const CHEQUE_TABS = [
+  { key: 'Pending', label: 'Pending Cheque' },
+  { key: 'Released', label: 'Completed Cheque' },
+  { key: 'Returned', label: 'Returned Cheque' }
+];
+
 const ExpensesChequeRegistry = () => {
   // ── Filters state ──────────────────────────────────────────────────────────
   const [filterInputs, setFilterInputs] = useState({
     dateFrom: '',
     dateTo: '',
-    name: '',
-    status: ''
+    name: ''
   });
   const [appliedFilters, setAppliedFilters] = useState({
     dateFrom: '',
     dateTo: '',
-    name: '',
-    status: ''
+    name: ''
   });
+
+  // ── Status tabs (Pending Cheque / Completed Cheque / Returned Cheque) ─────
+  // Filtered client-side from the already-fetched `records` (below) so the
+  // metrics cards - which must always reflect ALL statuses - stay correct
+  // regardless of which tab is active, and switching tabs is instant with
+  // no extra request and no risk of stale/duplicate rows.
+  const [activeTab, setActiveTab] = useState('Pending');
 
   // ── Data & Loading ─────────────────────────────────────────────────────────
   const [records, setRecords] = useState([]);
@@ -71,7 +93,6 @@ const ExpensesChequeRegistry = () => {
       if (filtersToUse.dateFrom) params.dateFrom = filtersToUse.dateFrom;
       if (filtersToUse.dateTo) params.dateTo = filtersToUse.dateTo;
       if (filtersToUse.name && filtersToUse.name.trim()) params.name = filtersToUse.name.trim();
-      if (filtersToUse.status && filtersToUse.status.trim()) params.status = filtersToUse.status.trim();
 
       const res = await api.get('/finance/cheque-registry', { params });
       setRecords(res.data || []);
@@ -100,7 +121,7 @@ const ExpensesChequeRegistry = () => {
   };
 
   const handleReset = () => {
-    const emptyFilters = { dateFrom: '', dateTo: '', name: '', status: '' };
+    const emptyFilters = { dateFrom: '', dateTo: '', name: '' };
     setFilterInputs(emptyFilters);
     setAppliedFilters(emptyFilters);
   };
@@ -215,7 +236,7 @@ const ExpensesChequeRegistry = () => {
 
   // ── Export CSV Handler ─────────────────────────────────────────────────────
   const handleExportCSV = () => {
-    if (records.length === 0) {
+    if (tabRecords.length === 0) {
       showToast('No records available to export', 'error');
       return;
     }
@@ -237,7 +258,7 @@ const ExpensesChequeRegistry = () => {
 
     const csvRows = [
       headers.join(','),
-      ...records.map((r) => {
+      ...tabRecords.map((r) => {
         const sourceName = SOURCE_LABELS[r.source_type]?.label || r.source_type || '';
         const escapeCSV = (val) => {
           if (val === null || val === undefined) return '""';
@@ -309,6 +330,13 @@ const ExpensesChequeRegistry = () => {
     };
   }, [records]);
 
+  // Rows for the currently active tab - derived from `records` so it never
+  // goes stale or duplicates anything relative to the metrics above.
+  const tabRecords = useMemo(
+    () => records.filter((r) => getRowStatusKey(r) === activeTab),
+    [records, activeTab]
+  );
+
   return (
     <div className="page-container ecr-page">
       {/* ════════════ Page Header ════════════ */}
@@ -319,9 +347,6 @@ const ExpensesChequeRegistry = () => {
           </div>
           <div>
             <h2 className="ecr-title">Expenses Cheque Registry</h2>
-            <p className="ecr-subtitle">
-              Centralized registry for Cash/Bank Transfers, RM Purchasing, and New Expenses cheques
-            </p>
           </div>
         </div>
 
@@ -397,21 +422,6 @@ const ExpensesChequeRegistry = () => {
             />
           </div>
 
-          <div className="ecr-filter-group">
-            <label className="ecr-filter-lbl">Status</label>
-            <select
-              name="status"
-              value={filterInputs.status}
-              onChange={handleInputChange}
-              className="ecr-filter-input"
-            >
-              <option value="">All Statuses</option>
-              <option value="Pending">Pending / Unreleased</option>
-              <option value="Released">Released</option>
-              <option value="Returned">Returned</option>
-            </select>
-          </div>
-
           <div className="ecr-filter-group ecr-filter-name-group">
             <label className="ecr-filter-lbl">Name / Payee / Supplier</label>
             <input
@@ -449,6 +459,25 @@ const ExpensesChequeRegistry = () => {
         </form>
       </div>
 
+      {/* ════════════ Status Tabs ════════════ */}
+      <div className="ecr-status-tabs" role="tablist">
+        {CHEQUE_TABS.map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab.key}
+            className={`btn ${activeTab === tab.key ? 'btn-primary' : 'btn-secondary'} ecr-status-tab`}
+            onClick={() => setActiveTab(tab.key)}
+          >
+            {tab.label}
+            <span className="ecr-status-tab-count">
+              {tab.key === 'Pending' ? metrics.pendingCount : tab.key === 'Released' ? metrics.releasedCount : metrics.returnedCount}
+            </span>
+          </button>
+        ))}
+      </div>
+
       {/* ════════════ Main Unified Table ════════════ */}
       <div className="card ecr-table-card">
         {error && (
@@ -463,10 +492,10 @@ const ExpensesChequeRegistry = () => {
             <FontAwesomeIcon icon={faSpinner} spin size="2x" />
             <p>Loading Expenses Cheque Registry…</p>
           </div>
-        ) : records.length === 0 ? (
+        ) : tabRecords.length === 0 ? (
           <div className="ecr-empty-state">
             <FontAwesomeIcon icon={faMoneyCheck} size="3x" />
-            <h3>No Cheque Records Found</h3>
+            <h3>No {CHEQUE_TABS.find((t) => t.key === activeTab)?.label} Records Found</h3>
             <p>
               Expense cheques recorded through Cash/Bank Transfers (Bank to Cash), RM Purchasing payments, or New Expenses
               will automatically appear here with status Pending / Unreleased.
@@ -491,7 +520,7 @@ const ExpensesChequeRegistry = () => {
                 </tr>
               </thead>
               <tbody>
-                {records.map((row) => {
+                {tabRecords.map((row) => {
                   const isEditing = editingId === row.id;
                   const isSaving = savingId === row.id;
                   const sourceConfig = SOURCE_LABELS[row.source_type] || {
