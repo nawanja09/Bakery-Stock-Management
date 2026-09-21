@@ -32,6 +32,7 @@ router.get('/details/:id', async (req, res) => {
         p.id,
         p.invoice_no,
         p.purchase_date,
+        p.invoice_date,
         p.subtotal,
         p.vat_amount,
         p.total_with_vat,

@@ -34,7 +34,7 @@ import {
   faMoneyBillWave,
   faUsers,
   faStore,
-  faSyncAlt,  // ← fixed: was faRefresh which doesn't exist
+  faSyncAlt,
   faAngleLeft,
   faAngleRight,
 } from '@fortawesome/free-solid-svg-icons';
@@ -70,10 +70,16 @@ const formatCompactCurrency = (amount) => {
   return formatCurrency(num);
 };
 
-const formatDate = (date) => dayjs(date).format('MMM DD, YYYY');
+const formatDate = (date) => {
+  if (!date) return 'N/A';
+  const d = dayjs(date);
+  return d.isValid() ? d.format('MMM DD, YYYY') : 'N/A';
+};
 
 const formatMobileDate = (date) => {
+  if (!date) return 'N/A';
   const d = dayjs(date);
+  if (!d.isValid()) return 'N/A';
   if (d.isToday())     return 'Today';
   if (d.isYesterday()) return 'Yesterday';
   return d.format('MMM DD');
@@ -121,7 +127,11 @@ const useDebounce = (value, delay) => {
 
 // ─── Memoized sub-components (outside parent → never recreated) ───────────────
 
-/** Single table row — only re-renders when its own purchase data changes */
+/**
+ * Single table row — only re-renders when its own purchase data changes.
+ * Displays BOTH Delivery Date (purchase_date) and Invoice Date (invoice_date)
+ * in separate columns.
+ */
 const PurchaseTableRow = React.memo(({ purchase, backgroundLocation }) => {
   const statusConfig = getStatusConfig(purchase.payment_status);
   const invoiceNumber = purchase.invoice_no || purchase.invoice_number || 'N/A';
@@ -131,14 +141,20 @@ const PurchaseTableRow = React.memo(({ purchase, backgroundLocation }) => {
       className="data-row"
       onClick={() => (window.location.href = `/purchase/${purchase.id}`)}
     >
+      {/* Delivery Date (purchase_date) */}
       <td className="text-left">
-        <div className="date-main" title="Delivery Date">D: {formatDate(purchase.purchase_date)}</div>
-        {purchase.invoice_date && (
-          <div className="date-sub" title="Invoice Date" style={{ fontSize: '0.85em', color: '#6b7280', marginTop: '2px' }}>
-            I: {formatDate(purchase.invoice_date)}
-          </div>
+        <div className="date-main">{formatDate(purchase.purchase_date)}</div>
+      </td>
+
+      {/* Invoice Date (invoice_date) — NEW COLUMN */}
+      <td className="text-left">
+        {purchase.invoice_date ? (
+          <div className="date-main">{formatDate(purchase.invoice_date)}</div>
+        ) : (
+          <span style={{ color: '#9ca3af', fontStyle: 'italic', fontSize: '13px' }}>Not set</span>
         )}
       </td>
+
       <td className="text-left">
         <span className="invoice-number">{invoiceNumber}</span>
       </td>
@@ -192,12 +208,15 @@ const PurchaseTableRow = React.memo(({ purchase, backgroundLocation }) => {
 });
 PurchaseTableRow.displayName = 'PurchaseTableRow';
 
-/** Single card — only re-renders when its own purchase data changes */
+/**
+ * Single card (mobile view) — displays both dates distinctly.
+ */
 const PurchaseCard = React.memo(({ purchase, isSelected, onToggleSelect, backgroundLocation }) => {
   const statusConfig = getStatusConfig(purchase.payment_status);
   const invoiceNumber = purchase.invoice_no || purchase.invoice_number || 'N/A';
-  const paidPercentage =
-    (parseFloat(purchase.paid_amount) / parseFloat(purchase.total_with_vat)) * 100;
+  const total = parseFloat(purchase.total_with_vat) || 0;
+  const paid = parseFloat(purchase.paid_amount) || 0;
+  const paidPercentage = total > 0 ? (paid / total) * 100 : 0;
 
   return (
     <div className={`purchase-card-responsive ${isSelected ? 'selected' : ''}`}>
@@ -219,7 +238,9 @@ const PurchaseCard = React.memo(({ purchase, isSelected, onToggleSelect, backgro
             <span className="invoice-value">{invoiceNumber}</span>
           </div>
           <div className="card-date-info" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
-            <span className="date-value" title="Delivery Date">D: {formatMobileDate(purchase.purchase_date)}</span>
+            <span className="date-value" title="Delivery Date">
+              D: {formatMobileDate(purchase.purchase_date)}
+            </span>
             {purchase.invoice_date && (
               <span className="date-value" title="Invoice Date" style={{ fontSize: '0.85em', color: '#6b7280' }}>
                 I: {formatMobileDate(purchase.invoice_date)}
@@ -235,8 +256,14 @@ const PurchaseCard = React.memo(({ purchase, isSelected, onToggleSelect, backgro
           </div>
           <div className="card-company-row">
             <FontAwesomeIcon icon={faBuilding} className="row-icon" />
-            <span className="company-value">{purchase.company_name}</span>
+            <span className="company-value">{purchase.company_name || 'N/A'}</span>
           </div>
+        </div>
+
+        {/* Dates summary for mobile — explicit and clear */}
+        <div className="card-dates-responsive" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#6b7280', padding: '6px 0' }}>
+          <span><strong>Delivery:</strong> {formatDate(purchase.purchase_date)}</span>
+          <span><strong>Invoice:</strong> {purchase.invoice_date ? formatDate(purchase.invoice_date) : 'Not set'}</span>
         </div>
 
         <div className="card-financials-responsive">
@@ -447,6 +474,7 @@ const PurchaseHistory = () => {
       const now = dayjs();
       result = result.filter(p => {
         const d = dayjs(p.purchase_date);
+        if (!d.isValid()) return false;
         switch (quickFilter) {
           case 'today':     return d.isToday();
           case 'yesterday': return d.isYesterday();
@@ -488,11 +516,24 @@ const PurchaseHistory = () => {
     if (sortConfig.key) {
       const sorted = [...result];
       sorted.sort((a, b) => {
-        if (sortConfig.key === 'purchase_date') {
+        // Date-based sorting (handles both purchase_date and invoice_date)
+        if (sortConfig.key === 'purchase_date' || sortConfig.key === 'invoice_date') {
+          const dateA = dayjs(a[sortConfig.key]);
+          const dateB = dayjs(b[sortConfig.key]);
+
+          // Treat invalid/missing dates as oldest
+          const aValid = dateA.isValid();
+          const bValid = dateB.isValid();
+          if (!aValid && !bValid) return 0;
+          if (!aValid) return 1;
+          if (!bValid) return -1;
+
           return sortConfig.direction === 'asc'
-            ? dayjs(a.purchase_date).diff(dayjs(b.purchase_date))
-            : dayjs(b.purchase_date).diff(dayjs(a.purchase_date));
+            ? dateA.diff(dateB)
+            : dateB.diff(dateA);
         }
+
+        // Numeric sorting for amounts, etc.
         const av = parseFloat(a[sortConfig.key]) || 0;
         const bv = parseFloat(b[sortConfig.key]) || 0;
         return sortConfig.direction === 'asc' ? av - bv : bv - av;
@@ -571,10 +612,11 @@ const PurchaseHistory = () => {
   }, [filteredPurchases]);
 
   const exportToCSV = useCallback(() => {
-    const headers = ['Invoice #', 'Date', 'Supplier', 'Company', 'Total', 'Paid', 'Balance', 'Status'];
+    const headers = ['Invoice #', 'Delivery Date', 'Invoice Date', 'Supplier', 'Company', 'Total', 'Paid', 'Balance', 'Status'];
     const rows = filteredPurchases.map(p => [
       p.invoice_no || p.invoice_number || 'N/A',
       formatDate(p.purchase_date),
+      formatDate(p.invoice_date),
       p.supplier_name, p.company_name,
       p.total_with_vat, p.paid_amount, p.balance_amount,
       p.payment_status,
@@ -724,7 +766,11 @@ const PurchaseHistory = () => {
                   <thead>
                     <tr>
                       <th className="sortable-header text-left" onClick={() => handleSort('purchase_date')}>
-                        Dates {sortConfig.key === 'purchase_date' && <FontAwesomeIcon icon={sortConfig.direction === 'asc' ? faArrowUp : faArrowDown} className="sort-indicator" />}
+                        Delivery Date {sortConfig.key === 'purchase_date' && <FontAwesomeIcon icon={sortConfig.direction === 'asc' ? faArrowUp : faArrowDown} className="sort-indicator" />}
+                      </th>
+                      {/* NEW: Invoice Date column */}
+                      <th className="sortable-header text-left" onClick={() => handleSort('invoice_date')}>
+                        Invoice Date {sortConfig.key === 'invoice_date' && <FontAwesomeIcon icon={sortConfig.direction === 'asc' ? faArrowUp : faArrowDown} className="sort-indicator" />}
                       </th>
                       <th className="sortable-header text-left" onClick={() => handleSort('invoice_no')}>
                         Invoice No. {sortConfig.key === 'invoice_no' && <FontAwesomeIcon icon={sortConfig.direction === 'asc' ? faArrowUp : faArrowDown} className="sort-indicator" />}
