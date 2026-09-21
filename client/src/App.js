@@ -28,6 +28,7 @@ import PurchaseReport from './components/report/PurchaseReport/PurchaseReport';
 import WastageReport from './components/report/WastageReport/WastageReport';
 import ItemWiseStockReport from './components/report/StockReportByRangeAndItem';
 import ManageUsers from './components/admin/ManageUsers';
+import EmployeeManagement from './components/Employees/EmployeeManagement';
 
 import ItemTypes from './components/RawMaterial/ItemTypes/ItemTypes';
 import Departments from './components/RawMaterial/Departments/Departments';
@@ -302,6 +303,7 @@ function App() {
             <Route path="reports/purchase-report" element={<PurchaseReport />} />
             <Route path="reports/wastage" element={<WastageReport />} />
             <Route path="admin/users" element={<ManageUsers />} />
+            <Route path="admin/employees" element={<RoleRoute roles={['Admin', 'Super Admin']}><EmployeeManagement /></RoleRoute>} />
             <Route path="reports/stock/items" element={<ItemWiseStockReport/>} />
 
             <Route path="finished-goods/items/add" element={<ModalRoute title="Add New Finished Goods Item"><AddFinishedGoodsItem /></ModalRoute>} />
