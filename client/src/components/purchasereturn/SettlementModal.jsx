@@ -138,16 +138,16 @@ const SettlementModal = ({
             </div>
             <div className="summary-item">
               <span className="label">Return Amount</span>
-              <span className="value highlight">Rs. {returnAmount.toFixed(2)}</span>
+              <span className="value highlight">Rs. {returnAmount.toFixed(4)}</span>
             </div>
             <div className="summary-item">
               <span className="label">Selected Settlement</span>
-              <span className="value success">Rs. {totalSelectedAmount.toFixed(2)}</span>
+              <span className="value success">Rs. {totalSelectedAmount.toFixed(4)}</span>
             </div>
             <div className="summary-item">
               <span className="label">Remaining Balance</span>
               <span className={`value ${remainingAmount > 0 ? 'warning' : 'success'}`}>
-                Rs. {remainingAmount.toFixed(2)}
+                Rs. {remainingAmount.toFixed(4)}
               </span>
             </div>
           </div>
@@ -182,9 +182,9 @@ const SettlementModal = ({
                           </span>
                         </div>
                         <div className="bill-details">
-                          <span>Total: Rs. {parseFloat(bill.total_with_vat).toFixed(2)}</span>
-                          <span>Paid: Rs. {parseFloat(bill.paid_amount).toFixed(2)}</span>
-                          <span className="balance">Balance: Rs. {parseFloat(bill.balance_amount).toFixed(2)}</span>
+                          <span>Total: Rs. {parseFloat(bill.total_with_vat).toFixed(4)}</span>
+                          <span>Paid: Rs. {parseFloat(bill.paid_amount).toFixed(4)}</span>
+                          <span className="balance">Balance: Rs. {parseFloat(bill.balance_amount).toFixed(4)}</span>
                         </div>
                       </div>
 
@@ -193,7 +193,7 @@ const SettlementModal = ({
                           type="number"
                           min="0"
                           max={bill.balance_amount}
-                          step="0.01"
+                          step="0.0001"
                           value={allocatedAmount}
                           onChange={(e) => handleBillSelection(bill, parseFloat(e.target.value) || 0)}
                           placeholder="0.00"
@@ -216,7 +216,7 @@ const SettlementModal = ({
                       </div>
                       {allocatedAmount > 0 && allocatedAmount < bill.balance_amount && (
                         <div className="remaining-bill-hint">
-                          Remaining on this bill: Rs. {(bill.balance_amount - allocatedAmount).toFixed(2)}
+                          Remaining on this bill: Rs. {(bill.balance_amount - allocatedAmount).toFixed(4)}
                         </div>
                       )}
                     </div>
@@ -231,7 +231,7 @@ const SettlementModal = ({
             <div className="settlement-progress">
               <div className="progress-label">
                 <span>Settlement Progress</span>
-                <span>{totalSelectedAmount.toFixed(2)} of {returnAmount.toFixed(2)}</span>
+                <span>{totalSelectedAmount.toFixed(4)} of {returnAmount.toFixed(4)}</span>
               </div>
               <div className="progress-bar">
                 <div

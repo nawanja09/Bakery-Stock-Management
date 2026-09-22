@@ -51,3 +51,49 @@ export const formatCurrency = (value, currencyPrefix = 'Rs.') => (
 export const formatIssueTime = (issuance) => (
   issuance?.issue_time || issuance?.Time || issuance?.time || issuance?.remarks || 'N/A'
 );
+
+/**
+ * Rounds a value to a fixed number of decimal places and returns it as a
+ * genuine JS number (never a string). This is the ONLY helper that should be
+ * used to place numeric values into report/export cells (XLSX, CSV, etc.) so
+ * that spreadsheet consumers see real numbers usable for formulas, sorting,
+ * filtering and aggregation, rather than text.
+ *
+ * If `decimals` is omitted, the value is returned as-is (still a number),
+ * with no rounding applied.
+ */
+export const toExportNumber = (value, decimals) => {
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return 0;
+  }
+
+  if (decimals === undefined || decimals === null) {
+    return number;
+  }
+
+  const factor = 10 ** decimals;
+  return Math.round((number + Number.EPSILON) * factor) / factor;
+};
+
+// ---------------------------------------------------------------------------
+// Purchasing module: every applicable numeric value across the Purchasing
+// module (Purchase Orders, Purchase Requests, GRN, supplier purchasing pages,
+// RM Purchasing, purchasing transactions, tables, forms, details, summaries,
+// reports and exports) must use exactly 4 decimal places, while remaining a
+// real number for calculation/export purposes.
+// ---------------------------------------------------------------------------
+export const PURCHASING_DECIMALS = 4;
+
+// Display string with exactly 4 decimal places, e.g. 10 -> "10.0000".
+export const formatPurchasingNumber = (value) => formatNumber(value, PURCHASING_DECIMALS, PURCHASING_DECIMALS);
+
+// Display string with a currency prefix and exactly 4 decimal places.
+export const formatPurchasingCurrency = (value, currencyPrefix = 'Rs.') => (
+  `${currencyPrefix} ${formatPurchasingNumber(value)}`
+);
+
+// Real number rounded to 4 decimal places, for use in report/export cells
+// on Purchasing pages (never a string).
+export const toPurchasingExportNumber = (value) => toExportNumber(value, PURCHASING_DECIMALS);

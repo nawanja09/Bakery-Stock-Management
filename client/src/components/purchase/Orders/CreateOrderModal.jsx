@@ -5,7 +5,7 @@ import ReactDOM from 'react-dom';
 import Select from 'react-select';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTimes, faBoxes } from '@fortawesome/free-solid-svg-icons';
-import { formatNumber } from '../../../utils/formatters';
+import { formatPurchasingNumber } from '../../../utils/formatters';
 
 const CreateOrderModal = ({ item, suppliers, onClose, onSubmit, submitting }) => {
   const [orderQty, setOrderQty] = useState(item.required_qty);
@@ -58,16 +58,16 @@ const CreateOrderModal = ({ item, suppliers, onClose, onSubmit, submitting }) =>
                 </div>
                 <div>
                   <label>Current Stock</label>
-                  <div className="orders-modal-readonly-value">{formatNumber(item.current_stock)} {item.unit}</div>
+                  <div className="orders-modal-readonly-value">{formatPurchasingNumber(item.current_stock)} {item.unit}</div>
                 </div>
                 <div>
                   <label>Minimum Buffer Stock</label>
-                  <div className="orders-modal-readonly-value">{formatNumber(item.buffer_stock)} {item.unit}</div>
+                  <div className="orders-modal-readonly-value">{formatPurchasingNumber(item.buffer_stock)} {item.unit}</div>
                 </div>
                 <div>
                   <label>Required Qty</label>
                   <div className="orders-modal-readonly-value orders-modal-required">
-                    {formatNumber(item.required_qty)} {item.unit}
+                    {formatPurchasingNumber(item.required_qty)} {item.unit}
                   </div>
                 </div>
               </div>
@@ -80,8 +80,8 @@ const CreateOrderModal = ({ item, suppliers, onClose, onSubmit, submitting }) =>
                 <label>Order Qty ({item.unit}) <span className="required">*</span></label>
                 <input
                   type="number"
-                  step="0.01"
-                  min="0.01"
+                  step="0.0001"
+                  min="0.0001"
                   value={orderQty}
                   onChange={(e) => setOrderQty(e.target.value)}
                   disabled={submitting}

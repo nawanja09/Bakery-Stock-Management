@@ -1185,7 +1185,7 @@ const addSettlementToPurchaseReturn = async (req, res) => {
     // Validate settlement doesn't exceed total
     if (newTotalSettled > totalReturnAmount) {
       return res.status(400).json({ 
-        error: `Settlement amount exceeds return total. Return total: Rs. ${totalReturnAmount.toFixed(2)}, Already settled: Rs. ${currentSettledAmount.toFixed(2)}, Remaining: Rs. ${(totalReturnAmount - currentSettledAmount).toFixed(2)}`
+        error: `Settlement amount exceeds return total. Return total: Rs. ${totalReturnAmount.toFixed(4)}, Already settled: Rs. ${currentSettledAmount.toFixed(4)}, Remaining: Rs. ${(totalReturnAmount - currentSettledAmount).toFixed(4)}`
       });
     }
 

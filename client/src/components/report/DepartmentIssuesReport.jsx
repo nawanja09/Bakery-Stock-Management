@@ -8,7 +8,7 @@ import { format } from 'date-fns';
 import './DepartmentIssuesReport.css';
 import Select from 'react-select';
 import api from '../../api';
-import { formatNumber } from '../../utils/formatters';
+import { formatNumber, toExportNumber } from '../../utils/formatters';
 import { filterItemByName, reportItemSelectStyles } from './reportItemSelectHelper';
 
 const ALL_ITEMS_OPTION = { value: 'all', label: 'All Items', name: 'All Items', item_code: '', data: null };
@@ -154,10 +154,10 @@ const DepartmentIssuesReport = () => {
       'Department': row.department_name,
       'Item Code': row.item_code,
       'Item Name': row.item_name,
-      'Quantity': formatNumber(row.quantity, 3, 3),
+      'Quantity': toExportNumber(row.quantity, 3),
       'Unit': row.unit,
-      'Unit Price (Rs.)': row.unit_price ? formatNumber(row.unit_price, 2, 2) : 'N/A',
-      'Total Price (Rs.)': row.total_price ? formatNumber(row.total_price, 2, 2) : 'N/A',
+      'Unit Price (Rs.)': row.unit_price ? toExportNumber(row.unit_price, 2) : 'N/A',
+      'Total Price (Rs.)': row.total_price ? toExportNumber(row.total_price, 2) : 'N/A',
       'Received By': row.received_by,
       'Remarks': row.remarks || 'N/A'
     }));
@@ -168,7 +168,7 @@ const DepartmentIssuesReport = () => {
     
     // Add grand total
     const grandTotal = reportData.reduce((total, row) => total + (parseFloat(row.total_price) || 0), 0);
-    XLSX.utils.sheet_add_aoa(worksheet, [['', '', '', '', '', '', 'Grand Total:', `Rs. ${formatNumber(grandTotal, 2, 2)}`]], { origin: -1 });
+    XLSX.utils.sheet_add_aoa(worksheet, [['', '', '', '', '', '', 'Grand Total (Rs.):', toExportNumber(grandTotal, 2)]], { origin: -1 });
     
     XLSX.writeFile(workbook, `issuance-report-${startDate}-to-${endDate}.xlsx`);
   };

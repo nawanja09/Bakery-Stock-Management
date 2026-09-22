@@ -12,6 +12,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
+import { toExportNumber } from '../../utils/formatters';
 import './DepartmentReturnReport.css';
 
 const DepartmentReturnItemWiseReport = () => {
@@ -186,7 +187,7 @@ const DepartmentReturnItemWiseReport = () => {
       'Item Name': item.item_name,
       'Category': item.category || 'N/A',
       'Unit': item.unit,
-      'Returned Quantity': Number(item.returned_quantity).toFixed(3),
+      'Returned Quantity': toExportNumber(item.returned_quantity, 3),
       'Return Reason': item.return_reason,
       'Received By': item.received_by,
       'Remarks': item.remarks || ''
@@ -196,7 +197,7 @@ const DepartmentReturnItemWiseReport = () => {
       { 'Summary': 'Department Return Item Wise Report' },
       {},
       { 'Total Items Returned': summary?.totalItems || 0 },
-      { 'Total Return Quantity': summary?.totalReturnQuantity?.toFixed(3) || 0 },
+      { 'Total Return Quantity': toExportNumber(summary?.totalReturnQuantity || 0, 3) },
       { 'Total Return Transactions': summary?.totalTransactions || 0 },
       {},
       { 'Item Summary:' : '' },
@@ -204,7 +205,7 @@ const DepartmentReturnItemWiseReport = () => {
       ...(summary?.itemSummaryList?.map(item => ({
         'Item Code': item.item_code,
         'Item Name': item.item_name,
-        'Total Quantity Returned': item.total_quantity.toFixed(3),
+        'Total Quantity Returned': toExportNumber(item.total_quantity, 3),
         'Number of Returns': item.return_count,
         'Unit': item.unit
       })) || [])

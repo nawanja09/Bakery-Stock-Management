@@ -275,8 +275,8 @@ const PayNowModal = ({ isOpen, onClose, suppliers = [], companies = [], supplier
                   name="amount"
                   value={formData.amount}
                   onChange={handleChange}
-                  min="0.01"
-                  step="0.01"
+                  min="0.0001"
+                  step="0.0001"
                   placeholder="0.00"
                   required
                   className="pnm-amount-input"
@@ -307,7 +307,7 @@ const PayNowModal = ({ isOpen, onClose, suppliers = [], companies = [], supplier
                 </select>
                 {selectedBankAccount && (
                   <div className="pnm-balance-hint">
-                    Current Balance: Rs. {parseFloat(selectedBankAccount.current_balance || 0).toFixed(2)}
+                    Current Balance: Rs. {parseFloat(selectedBankAccount.current_balance || 0).toFixed(4)}
                   </div>
                 )}
               </div>
@@ -318,7 +318,7 @@ const PayNowModal = ({ isOpen, onClose, suppliers = [], companies = [], supplier
                 <div className="pnm-balance-hint">
                   {loadingCashBalance
                     ? 'Loading cash balance…'
-                    : `Cash In Hand Balance: Rs. ${parseFloat(cashBalance || 0).toFixed(2)}`}
+                    : `Cash In Hand Balance: Rs. ${parseFloat(cashBalance || 0).toFixed(4)}`}
                 </div>
               </div>
             )}

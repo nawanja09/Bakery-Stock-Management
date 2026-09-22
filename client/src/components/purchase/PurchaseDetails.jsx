@@ -28,7 +28,7 @@ import dayjs from 'dayjs';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
 import './Purchase.css';
-import { formatQuantity } from '../../utils/formatters';
+import { formatQuantity, PURCHASING_DECIMALS } from '../../utils/formatters';
 
 const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
   const params = useParams();
@@ -86,8 +86,8 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
     return new Intl.NumberFormat('en-LK', {
       style: 'currency',
       currency: 'LKR',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
+      minimumFractionDigits: 4,
+      maximumFractionDigits: 4
     }).format(amount).replace('LKR', 'Rs.');
   };
 
@@ -411,7 +411,7 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
                         )}
                       </td>
                       <td className="text-left">{item.item_code || '-'}</td>
-                      <td className="text-right">{formatQuantity(item.quantity)}</td>
+                      <td className="text-right">{formatQuantity(item.quantity, PURCHASING_DECIMALS)}</td>
                       <td className="text-center">{item.unit || '-'}</td>
                       <td className="text-right">
                         <span className={isPriceDifferent ? 'price-different' : ''}>
@@ -464,7 +464,7 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
               <div className="stat">
                 <span className="stat-label">Total Quantity:</span>
                 <span className="stat-value">
-                  {formatQuantity(purchase.items?.reduce((sum, item) => sum + parseFloat(item.quantity), 0))}
+                  {formatQuantity(purchase.items?.reduce((sum, item) => sum + parseFloat(item.quantity), 0), PURCHASING_DECIMALS)}
                 </span>
               </div>
             </div>

@@ -88,7 +88,7 @@ const PurchaseReturnHistory = () => {
   useEffect(() => { fetchReturns(); }, [fetchReturns]);
 
   const formatCurrency = (amount) =>
-    new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR', minimumFractionDigits: 2 })
+    new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR', minimumFractionDigits: 4, maximumFractionDigits: 4 })
       .format(amount).replace('LKR', 'Rs.');
 
   const formatDate = (d) => d ? dayjs(d).format('DD MMM YYYY') : '-';
@@ -169,8 +169,8 @@ const PurchaseReturnHistory = () => {
       if (response.data) {
         showPopup('success', 
           `Settlement added successfully!\n` +
-          `Amount: Rs. ${settlementData.settlements.reduce((s, b) => s + b.amount, 0).toFixed(2)}\n` +
-          `Remaining Balance: Rs. ${response.data.summary.balance_amount.toFixed(2)}`
+          `Amount: Rs. ${settlementData.settlements.reduce((s, b) => s + b.amount, 0).toFixed(4)}\n` +
+          `Remaining Balance: Rs. ${response.data.summary.balance_amount.toFixed(4)}`
         );
         
         // Refresh the returns list
@@ -708,7 +708,7 @@ const PurchaseReturnHistory = () => {
                                     <div className="item-name">{item.item_name}</div>
                                     {item.item_code && <div className="item-code">{item.item_code}</div>}
                                   </td>
-                                  <td className="text-center">{parseFloat(item.quantity).toFixed(3)}</td>
+                                  <td className="text-center">{parseFloat(item.quantity).toFixed(4)}</td>
                                   <td>{item.unit || '-'}</td>
                                   <td className="text-right">{formatCurrency(item.unit_price)}</td>
                                   <td className="text-right">{formatCurrency(item.quantity * item.unit_price)}</td>

@@ -527,7 +527,8 @@ const AddPurchase = () => {
     return new Intl.NumberFormat('en-LK', {
       style: 'currency',
       currency: 'LKR',
-      minimumFractionDigits: 2
+      minimumFractionDigits: 4,
+      maximumFractionDigits: 4
     }).format(amount).replace('LKR', 'Rs.');
   };
 
@@ -772,7 +773,7 @@ const AddPurchase = () => {
                         <input
                           type="number"
                           min="0"
-                          step="0.001"
+                          step="0.0001"
                           value={item.quantity}
                           onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
                           required
@@ -790,8 +791,8 @@ const AddPurchase = () => {
                       <td>
                         <input
                           type="number"
-                          min="0.01"
-                          step="0.01"
+                          min="0.0001"
+                          step="0.0001"
                           value={item.unit_price}
                           onChange={(e) => handleItemChange(index, 'unit_price', e.target.value)}
                           required

@@ -90,7 +90,8 @@ const ReturnVATReport = () => {
     return new Intl.NumberFormat('en-LK', {
       style: 'currency',
       currency: 'LKR',
-      minimumFractionDigits: 2
+      minimumFractionDigits: 4,
+      maximumFractionDigits: 4
     }).format(amount).replace('LKR', 'Rs.');
   };
 
@@ -107,7 +108,7 @@ const ReturnVATReport = () => {
     let csvContent = "Serial No,Date,Return Type,Supplier,Reference No,Amount Before VAT (Rs.),VAT Amount (Rs.),Total Amount (Rs.),Company\n";
 
     filteredReturns.forEach(ret => {
-      csvContent += `${ret.serial_no},${formatDate(ret.date)},${ret.return_type},"${ret.supplier || ''}",${ret.reference_no || ''},${ret.amount_before_vat.toFixed(2)},${ret.vat_amount.toFixed(2)},${ret.total_amount.toFixed(2)},"${ret.company || ''}"\n`;
+      csvContent += `${ret.serial_no},${formatDate(ret.date)},${ret.return_type},"${ret.supplier || ''}",${ret.reference_no || ''},${ret.amount_before_vat.toFixed(4)},${ret.vat_amount.toFixed(4)},${ret.total_amount.toFixed(4)},"${ret.company || ''}"\n`;
     });
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });

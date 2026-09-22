@@ -283,7 +283,7 @@ const AddPurchaseReturn = () => {
     try {
       const response = await api.post('/purchase-returns', finalFormData);
       showPopup('success',
-        `Return created successfully!\nReturn #: ${response.data.return_number}\nTotal Amount: Rs. ${response.data.summary.total_amount.toFixed(2)}\nSettled: Rs. ${response.data.summary.settled_amount.toFixed(2)}\nBalance: Rs. ${response.data.summary.balance_amount.toFixed(2)}`
+        `Return created successfully!\nReturn #: ${response.data.return_number}\nTotal Amount: Rs. ${response.data.summary.total_amount.toFixed(4)}\nSettled: Rs. ${response.data.summary.settled_amount.toFixed(4)}\nBalance: Rs. ${response.data.summary.balance_amount.toFixed(4)}`
       );
       navigate('/purchase-returns/history');
     } catch (error) {
@@ -495,7 +495,7 @@ const AddPurchaseReturn = () => {
                           <input
                             type="number"
                             min="0"
-                            step="0.01"
+                            step="0.0001"
                             value={item.unit_price}
                             onChange={(e) => handlePriceChange(index, e.target.value)}
                             className="quantity-input"
@@ -513,7 +513,7 @@ const AddPurchaseReturn = () => {
                             <input
                               type="number"
                               min="0"
-                              step="0.001"
+                              step="0.0001"
                               max={item.current_stock}
                               value={item.return_quantity}
                               onChange={(e) => handleQuantityChange(index, e.target.value)}
@@ -533,14 +533,14 @@ const AddPurchaseReturn = () => {
                             )}
                           </div>
                         </td>
-                        <td className="amount-column">Rs. {amount?.toFixed(2)}</td>
+                        <td className="amount-column">Rs. {amount?.toFixed(4)}</td>
                         {supplierVatRegistered && (
                           <td className="vat-amount">
-                            {item.vat_applicable ? `Rs. ${vat?.toFixed(2)}` : '—'}
+                            {item.vat_applicable ? `Rs. ${vat?.toFixed(4)}` : '—'}
                           </td>
                         )}
                         <td className="amount-column">
-                          <strong>Rs. {total?.toFixed(2)}</strong>
+                          <strong>Rs. {total?.toFixed(4)}</strong>
                         </td>
                         <td>
                           <button
@@ -563,15 +563,15 @@ const AddPurchaseReturn = () => {
           <div className="summary-section">
             <div className="summary-row">
               <span>Subtotal (Net Amount)</span>
-              <span>Rs. {totals.subtotal.toFixed(2)}</span>
+              <span>Rs. {totals.subtotal.toFixed(4)}</span>
             </div>
             <div className="summary-row vat">
               <span>VAT ({VAT_RATE}%)</span>
-              <span>Rs. {totals.totalVat.toFixed(2)}</span>
+              <span>Rs. {totals.totalVat.toFixed(4)}</span>
             </div>
             <div className="summary-row grand-total">
               <span>Total Return Amount</span>
-              <span>Rs. {totals.grandTotal.toFixed(2)}</span>
+              <span>Rs. {totals.grandTotal.toFixed(4)}</span>
             </div>
           </div>
         </div>

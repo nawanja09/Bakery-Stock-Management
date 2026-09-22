@@ -3,7 +3,7 @@ import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
 import './PurchaseReport.css';
 import api from '../../../api';
-import { formatCurrency } from '../../../utils/formatters';
+import { formatPurchasingCurrency, toPurchasingExportNumber } from '../../../utils/formatters';
 
 // Default date range: first day of current month -> today
 const defaultFromDate = format(new Date(), 'yyyy-MM-01');
@@ -178,12 +178,12 @@ const PurchaseReport = () => {
         (inv.invoice_date || inv.purchase_date) ? format(new Date(inv.invoice_date || inv.purchase_date), 'yyyy-MM-dd') : 'N/A',
         inv.company_name || 'N/A',
         inv.supplier_name || 'N/A',
-        Number(inv.total_amount || 0)
+        toPurchasingExportNumber(inv.total_amount || 0)
       ]);
     });
 
     worksheetData.push([]);
-    worksheetData.push(['', '', '', 'Grand Total', Number(grandTotal || 0)]);
+    worksheetData.push(['', '', '', 'Grand Total', toPurchasingExportNumber(grandTotal || 0)]);
 
     const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
     worksheet['!cols'] = [
@@ -316,14 +316,14 @@ const PurchaseReport = () => {
                     <td className="report-table-date">{(inv.invoice_date || inv.purchase_date) ? format(new Date(inv.invoice_date || inv.purchase_date), 'MMM dd, yyyy') : 'N/A'}</td>
                     <td>{inv.company_name || 'N/A'}</td>
                     <td>{inv.supplier_name || 'N/A'}</td>
-                    <td className="report-table-value-numeric">{formatCurrency(inv.total_amount)}</td>
+                    <td className="report-table-value-numeric">{formatPurchasingCurrency(inv.total_amount)}</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr>
                   <td colSpan="4"><strong>Grand Total</strong></td>
-                  <td><strong>{formatCurrency(grandTotal)}</strong></td>
+                  <td><strong>{formatPurchasingCurrency(grandTotal)}</strong></td>
                 </tr>
               </tfoot>
             </table>
