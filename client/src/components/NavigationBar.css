@@ -152,11 +152,19 @@
   transform: rotate(180deg);
 }
 
+/* Smooth accordion for main module content */
 .module-content {
   display: flex;
   flex-direction: column;
   gap: 4px;
   padding: 6px 0 0 12px;
+  animation: accordionIn 0.2s ease;
+  overflow: hidden;
+}
+
+@keyframes accordionIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .module-content .dropdown-header,
@@ -178,6 +186,12 @@
   padding: 6px 0 0 0;
   border-left: 1px solid var(--sidebar-border);
   margin-left: 10px;
+  animation: dropdownIn 0.18s ease;
+}
+
+@keyframes dropdownIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .dropdown-menu li {
@@ -252,15 +266,8 @@
 }
 
 @media (max-width: 1199px) {
-  .sidebar {
-    width: 260px;
-    min-width: 260px;
-  }
-
-  .sidebar.collapsed {
-    width: 76px;
-    min-width: 76px;
-  }
+  .sidebar { width: 260px; min-width: 260px; }
+  .sidebar.collapsed { width: 76px; min-width: 76px; }
 }
 
 @media (max-width: 767px) {
@@ -274,20 +281,13 @@
     transform: translateX(-105%);
     box-shadow: 0 24px 40px rgba(15, 23, 42, 0.2);
   }
-
-  .sidebar.mobile-open {
-    transform: translateX(0);
-  }
-
+  .sidebar.mobile-open { transform: translateX(0); }
   .sidebar.collapsed {
     width: min(82vw, 320px);
     min-width: min(82vw, 320px);
     transform: translateX(-105%);
   }
-
-  .sidebar.collapsed.mobile-open {
-    transform: translateX(0);
-  }
+  .sidebar.collapsed.mobile-open { transform: translateX(0); }
 
   .sidebar .nav-link span:not(.icon-container),
   .sidebar .dropdown-header span:not(.icon-container),
@@ -297,18 +297,11 @@
     display: inline;
   }
 
-  .toggle-button {
-    right: 14px;
-    top: 14px;
-  }
+  .toggle-button { right: 14px; top: 14px; }
 }
 
 @media (max-width: 479px) {
-  .sidebar {
-    width: min(84vw, 300px);
-    min-width: min(84vw, 300px);
-  }
-
+  .sidebar { width: min(84vw, 300px); min-width: min(84vw, 300px); }
   .nav-link,
   .dropdown-header,
   .module-item {
