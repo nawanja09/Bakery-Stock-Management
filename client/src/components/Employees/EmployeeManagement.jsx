@@ -17,6 +17,7 @@ const EMPTY_FORM = {
   contact_number: '',
   department_id: '',
   designation: '',
+  company: '',
   joining_date: ''
 };
 
@@ -28,6 +29,7 @@ const NIC_REGEX = /^([0-9]{9}[vVxX]|[0-9]{12})$/;
 const EmployeeManagement = () => {
   const [employees, setEmployees] = useState([]);
   const [departments, setDepartments] = useState([]);
+  const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Modals state
@@ -78,10 +80,24 @@ const EmployeeManagement = () => {
     }
   }, []);
 
+  // Same master list the Companies management page and other modules
+  // (Expenses, Bank Details) already use (GET /api/companies -> the
+  // `company` table, e.g. JH/RR/RD).
+  const fetchCompanies = useCallback(async () => {
+    try {
+      const response = await api.get('/companies');
+      setCompanies(response.data);
+    } catch (error) {
+      // Non-fatal: the page still works, the company dropdown is just empty.
+      console.error('Error fetching companies:', error);
+    }
+  }, []);
+
   // Initial load
   useEffect(() => {
     fetchEmployees();
     fetchDepartments();
+    fetchCompanies();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -131,6 +147,7 @@ const EmployeeManagement = () => {
 
     if (!form.department_id) errors.department_id = 'Department is required';
     if (!form.designation.trim()) errors.designation = 'Designation is required';
+    if (!form.company) errors.company = 'Company is required';
     if (!form.joining_date) errors.joining_date = 'Joining Date is required';
 
     setFormErrors(errors);
@@ -183,6 +200,7 @@ const EmployeeManagement = () => {
       contact_number: employee.contact_number || '',
       department_id: employee.department_id ? String(employee.department_id) : '',
       designation: employee.designation || '',
+      company: employee.company || '',
       joining_date: employee.joining_date ? String(employee.joining_date).slice(0, 10) : ''
     });
     setFormErrors({});
@@ -301,6 +319,7 @@ const EmployeeManagement = () => {
                 <th>Contact Number</th>
                 <th>Department</th>
                 <th>Designation</th>
+                <th>Company</th>
                 <th>Joining Date</th>
                 <th>Status</th>
                 <th style={{ textAlign: 'right' }}>Actions</th>
@@ -315,6 +334,7 @@ const EmployeeManagement = () => {
                   <td>{employee.contact_number}</td>
                   <td>{departmentName(employee)}</td>
                   <td>{employee.designation}</td>
+                  <td>{employee.company || 'N/A'}</td>
                   <td>{employee.joining_date ? String(employee.joining_date).slice(0, 10) : 'N/A'}</td>
                   <td>
                     <span className={`badge ${employee.status === 'Active' ? 'badge-success' : 'badge-danger'}`}>
@@ -342,7 +362,7 @@ const EmployeeManagement = () => {
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan="9">
+                  <td colSpan="10">
                     <div className="em-empty-state">No employees found matching your search criteria.</div>
                   </td>
                 </tr>
@@ -370,6 +390,7 @@ const EmployeeManagement = () => {
                 <div className="em-card-row"><span>Contact</span><strong>{employee.contact_number}</strong></div>
                 <div className="em-card-row"><span>Department</span><strong>{departmentName(employee)}</strong></div>
                 <div className="em-card-row"><span>Designation</span><strong>{employee.designation}</strong></div>
+                <div className="em-card-row"><span>Company</span><strong>{employee.company || 'N/A'}</strong></div>
                 <div className="em-card-row"><span>Joined</span><strong>{employee.joining_date ? String(employee.joining_date).slice(0, 10) : 'N/A'}</strong></div>
               </div>
               <div className="em-card-footer">
@@ -526,6 +547,22 @@ const EmployeeManagement = () => {
                 </div>
 
                 <div className="em-form-group">
+                  <label>Company *</label>
+                  <select
+                    name="company"
+                    value={form.company}
+                    onChange={handleInputChange}
+                    className={formErrors.company ? 'error' : ''}
+                  >
+                    <option value="">Select Company</option>
+                    {companies.map(comp => (
+                      <option key={comp.id} value={comp.name}>{comp.name}</option>
+                    ))}
+                  </select>
+                  {formErrors.company && <span className="error-message">{formErrors.company}</span>}
+                </div>
+
+                <div className="em-form-group">
                   <label>Joining Date *</label>
                   <input
                     type="date"
@@ -648,6 +685,22 @@ const EmployeeManagement = () => {
                 </div>
 
                 <div className="em-form-group">
+                  <label>Company *</label>
+                  <select
+                    name="company"
+                    value={form.company}
+                    onChange={handleInputChange}
+                    className={formErrors.company ? 'error' : ''}
+                  >
+                    <option value="">Select Company</option>
+                    {companies.map(comp => (
+                      <option key={comp.id} value={comp.name}>{comp.name}</option>
+                    ))}
+                  </select>
+                  {formErrors.company && <span className="error-message">{formErrors.company}</span>}
+                </div>
+
+                <div className="em-form-group">
                   <label>Joining Date *</label>
                   <input
                     type="date"
@@ -713,6 +766,10 @@ const EmployeeManagement = () => {
               <div className="em-view-row">
                 <span className="em-view-label">Designation</span>
                 <span className="em-view-value">{currentEmployee.designation}</span>
+              </div>
+              <div className="em-view-row">
+                <span className="em-view-label">Company</span>
+                <span className="em-view-value">{currentEmployee.company || 'N/A'}</span>
               </div>
               <div className="em-view-row">
                 <span className="em-view-label">Joining Date</span>

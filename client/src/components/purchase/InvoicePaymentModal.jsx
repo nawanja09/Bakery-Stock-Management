@@ -200,7 +200,7 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
 
       console.log('✅ Payment response:', response.data);
 
-      showPopup('success', response.data.message || `Payment of Rs. ${formData.amount.toFixed(2)} recorded successfully!`, {
+      showPopup('success', response.data.message || `Payment of Rs. ${formData.amount.toFixed(4)} recorded successfully!`, {
         title: 'Payment Successful',
         confirmText: 'OK'
       });
@@ -244,13 +244,13 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
             <div>
               {selectedInvoices.map(inv => (
                 <span key={inv.id} className="ipm-invoice-tag">
-                  {inv.invoice_no} &nbsp;·&nbsp; Rs. {parseFloat(inv.balance_amount).toFixed(2)}
+                  {inv.invoice_no} &nbsp;·&nbsp; Rs. {parseFloat(inv.balance_amount).toFixed(4)}
                 </span>
               ))}
             </div>
             <div className="ipm-total-row">
               <span>Total Balance Due</span>
-              <span className="ipm-balance">Rs. {totalBalance.toFixed(2)}</span>
+              <span className="ipm-balance">Rs. {totalBalance.toFixed(4)}</span>
             </div>
           </div>
 
@@ -324,8 +324,8 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
                   name="amount"
                   value={formData.amount}
                   onChange={handleChange}
-                  min="0.01"
-                  step="0.01"
+                  min="0.0001"
+                  step="0.0001"
                   required
                 />
                 <button
@@ -368,7 +368,7 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
                 </select>
                 {selectedBankAccount && (
                   <div className="ipm-balance-hint">
-                    Current Balance: Rs. {parseFloat(selectedBankAccount.current_balance || 0).toFixed(2)}
+                    Current Balance: Rs. {parseFloat(selectedBankAccount.current_balance || 0).toFixed(4)}
                   </div>
                 )}
               </div>
@@ -379,7 +379,7 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
                 <div className="ipm-balance-hint">
                   {loadingCashBalance
                     ? 'Loading cash balance…'
-                    : `Cash In Hand Balance: Rs. ${parseFloat(cashBalance || 0).toFixed(2)}`}
+                    : `Cash In Hand Balance: Rs. ${parseFloat(cashBalance || 0).toFixed(4)}`}
                 </div>
               </div>
             )}
@@ -403,9 +403,9 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
                 <div key={a.id} className="ipm-alloc-row">
                   <div>
                     <span className="ipm-alloc-inv">{a.invoice_no}</span>
-                    <span className="ipm-alloc-remaining"> — Balance: Rs. {parseFloat(a.balance_amount).toFixed(2)}</span>
+                    <span className="ipm-alloc-remaining"> — Balance: Rs. {parseFloat(a.balance_amount).toFixed(4)}</span>
                   </div>
-                  <span className="ipm-alloc-amt">Rs. {a.allocated.toFixed(2)}</span>
+                  <span className="ipm-alloc-amt">Rs. {a.allocated.toFixed(4)}</span>
                 </div>
               ))}
             </div>

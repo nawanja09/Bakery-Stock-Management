@@ -8,7 +8,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBoxOpen } from '@fortawesome/free-solid-svg-icons';
 import './PurchasingReport.css';
 import api from '../../../api';
-import { formatNumber } from '../../../utils/formatters';
+import { formatPurchasingNumber, toPurchasingExportNumber } from '../../../utils/formatters';
 import { filterItemByName, reportItemSelectStyles } from '../reportItemSelectHelper';
 
 const ALL_ITEMS_OPTION = { value: 'all', label: 'All Items', name: 'All Items', item_code: '', data: null };
@@ -281,6 +281,9 @@ const PurchasingReport = () => {
     ]);
 
     // Data rows
+    // NOTE: numeric fields are exported as real numbers (rounded to the
+    // Purchasing module's 4 decimal places), never as text/strings, so the
+    // exported cells stay usable for calculations, sorting and filtering.
     filteredItems.forEach((item) => {
       worksheetData.push([
         item.invoice_no || 'N/A',
@@ -290,16 +293,16 @@ const PurchasingReport = () => {
         item.company_name || 'N/A',
         item.check_number || 'N/A',
         item.item_name || 'N/A',
-        item.quantity !== null && item.quantity !== undefined ? formatNumber(item.quantity, 3, 3) : 'N/A',
+        item.quantity !== null && item.quantity !== undefined ? toPurchasingExportNumber(item.quantity) : 'N/A',
         item.unit || 'N/A',
-        item.unit_price !== null && item.unit_price !== undefined ? formatNumber(item.unit_price, 2, 2) : 'N/A',
+        item.unit_price !== null && item.unit_price !== undefined ? toPurchasingExportNumber(item.unit_price) : 'N/A',
         item.payment_method || 'N/A',
-        formatNumber(item.item_subtotal || 0, 2, 2),
-        formatNumber(item.item_vat_amount || 0, 2, 2),
-        formatNumber(item.item_bill_amount || 0, 2, 2),
-        formatNumber(item.bill_amount || 0, 2, 2),
-        formatNumber(item.item_paid_amount || 0, 2, 2),
-        formatNumber(item.item_due_amount || 0, 2, 2)
+        toPurchasingExportNumber(item.item_subtotal || 0),
+        toPurchasingExportNumber(item.item_vat_amount || 0),
+        toPurchasingExportNumber(item.item_bill_amount || 0),
+        toPurchasingExportNumber(item.bill_amount || 0),
+        toPurchasingExportNumber(item.item_paid_amount || 0),
+        toPurchasingExportNumber(item.item_due_amount || 0)
       ]);
     });
 
@@ -315,12 +318,12 @@ const PurchasingReport = () => {
 
     worksheetData.push([
       'TOTAL', '', '', '', '', '', '', '', '', '', '',
-      formatNumber(totalSubtotal, 2, 2),
-      formatNumber(totalVat, 2, 2),
-      formatNumber(totalBill, 2, 2),
-      formatNumber(totalBill, 2, 2),
-      formatNumber(totalPaid, 2, 2),
-      formatNumber(totalDue, 2, 2)
+      toPurchasingExportNumber(totalSubtotal),
+      toPurchasingExportNumber(totalVat),
+      toPurchasingExportNumber(totalBill),
+      toPurchasingExportNumber(totalBill),
+      toPurchasingExportNumber(totalPaid),
+      toPurchasingExportNumber(totalDue)
     ]);
 
     // Create worksheet
@@ -391,11 +394,11 @@ const PurchasingReport = () => {
     const totalDue = totalBill - totalPaid;
 
     doc.setFontSize(11);
-    doc.text(`Total Bill: Rs. ${formatNumber(totalBill, 2, 2)}`, 15, yOffset);
+    doc.text(`Total Bill: Rs. ${formatPurchasingNumber(totalBill)}`, 15, yOffset);
     yOffset += 6;
-    doc.text(`Total Paid: Rs. ${formatNumber(totalPaid, 2, 2)}`, 15, yOffset);
+    doc.text(`Total Paid: Rs. ${formatPurchasingNumber(totalPaid)}`, 15, yOffset);
     yOffset += 6;
-    doc.text(`Total Due: Rs. ${formatNumber(totalDue, 2, 2)}`, 15, yOffset);
+    doc.text(`Total Due: Rs. ${formatPurchasingNumber(totalDue)}`, 15, yOffset);
     yOffset += 8;
 
     // Table
@@ -404,12 +407,12 @@ const PurchasingReport = () => {
       item.purchase_date ? format(new Date(item.purchase_date), 'MMM dd, yyyy') : 'N/A',
       item.supplier_name || 'N/A',
       item.item_name || 'N/A',
-      item.quantity !== null ? formatNumber(item.quantity, 3, 3) : 'N/A',
-      formatNumber(item.item_subtotal || 0, 2, 2),
-      formatNumber(item.item_vat_amount || 0, 2, 2),
-      formatNumber(item.item_bill_amount || 0, 2, 2),
-      formatNumber(item.item_paid_amount || 0, 2, 2),
-      formatNumber(item.item_due_amount || 0, 2, 2)
+      item.quantity !== null ? formatPurchasingNumber(item.quantity) : 'N/A',
+      formatPurchasingNumber(item.item_subtotal || 0),
+      formatPurchasingNumber(item.item_vat_amount || 0),
+      formatPurchasingNumber(item.item_bill_amount || 0),
+      formatPurchasingNumber(item.item_paid_amount || 0),
+      formatPurchasingNumber(item.item_due_amount || 0)
     ]);
 
     const headers = [
@@ -575,16 +578,16 @@ const PurchasingReport = () => {
                   <td>{item.supplier_vat_number || '—'}</td>
                   <td>{item.company_name}</td>
                   <td>{item.item_name}</td>
-                  <td className="text-right">{item.quantity !== null ? formatNumber(item.quantity, 3, 3) : 'N/A'}</td>
-                  <td className="text-right">{item.unit_price !== null ? formatNumber(item.unit_price, 2, 2) : 'N/A'}</td>
+                  <td className="text-right">{item.quantity !== null ? formatPurchasingNumber(item.quantity) : 'N/A'}</td>
+                  <td className="text-right">{item.unit_price !== null ? formatPurchasingNumber(item.unit_price) : 'N/A'}</td>
                   <td>{item.payment_method}</td>
-                  <td className="text-right">{formatNumber(item.item_subtotal || 0, 2, 2)}</td>
-                  <td className="text-right">{formatNumber(item.item_vat_amount || 0, 2, 2)}</td>
-                  <td className="text-right">{formatNumber(item.item_bill_amount || 0, 2, 2)}</td>
-                  <td className="text-right">{formatNumber(item.bill_amount || 0, 2, 2)}</td>
-                  <td className="text-right paid-amount">{formatNumber(item.item_paid_amount || 0, 2, 2)}</td>
+                  <td className="text-right">{formatPurchasingNumber(item.item_subtotal || 0)}</td>
+                  <td className="text-right">{formatPurchasingNumber(item.item_vat_amount || 0)}</td>
+                  <td className="text-right">{formatPurchasingNumber(item.item_bill_amount || 0)}</td>
+                  <td className="text-right">{formatPurchasingNumber(item.bill_amount || 0)}</td>
+                  <td className="text-right paid-amount">{formatPurchasingNumber(item.item_paid_amount || 0)}</td>
                   <td className={`text-right ${(item.item_due_amount || 0) > 0 ? 'due-amount' : 'paid-amount'}`}>
-                    {formatNumber(item.item_due_amount || 0, 2, 2)}
+                    {formatPurchasingNumber(item.item_due_amount || 0)}
                   </td>
                 </tr>
               ))}
@@ -596,10 +599,8 @@ const PurchasingReport = () => {
                 {/* Total Quantity */}
                 <td className="text-right">
                   <strong>
-                    {formatNumber(
-                      filteredItems.reduce((sum, i) => sum + (Number(i.quantity) || 0), 0),
-                      3,
-                      3
+                    {formatPurchasingNumber(
+                      filteredItems.reduce((sum, i) => sum + (Number(i.quantity) || 0), 0)
                     )}
                   </strong>
                 </td>
@@ -613,10 +614,8 @@ const PurchasingReport = () => {
                 {/* Subtotal */}
                 <td className="text-right">
                   <strong>
-                    {formatNumber(
-                      filteredItems.reduce((sum, i) => sum + (i.item_subtotal || 0), 0),
-                      2,
-                      2
+                    {formatPurchasingNumber(
+                      filteredItems.reduce((sum, i) => sum + (i.item_subtotal || 0), 0)
                     )}
                   </strong>
                 </td>
@@ -624,10 +623,8 @@ const PurchasingReport = () => {
                 {/* VAT */}
                 <td className="text-right">
                   <strong>
-                    {formatNumber(
-                      filteredItems.reduce((sum, i) => sum + (i.item_vat_amount || 0), 2),
-                      2,
-                      2
+                    {formatPurchasingNumber(
+                      filteredItems.reduce((sum, i) => sum + (i.item_vat_amount || 0), 0)
                     )}
                   </strong>
                 </td>
@@ -635,10 +632,8 @@ const PurchasingReport = () => {
                 {/* Total Price */}
                 <td className="text-right">
                   <strong>
-                    {formatNumber(
-                      filteredItems.reduce((sum, i) => sum + (i.item_bill_amount || 0), 0),
-                      2,
-                      2
+                    {formatPurchasingNumber(
+                      filteredItems.reduce((sum, i) => sum + (i.item_bill_amount || 0), 0)
                     )}
                   </strong>
                 </td>
@@ -646,10 +641,8 @@ const PurchasingReport = () => {
                 {/* Bill Amount */}
                 <td className="text-right">
                   <strong>
-                    {formatNumber(
-                      filteredItems.reduce((sum, i) => sum + (i.bill_amount || 0), 0),
-                      2,
-                      2
+                    {formatPurchasingNumber(
+                      filteredItems.reduce((sum, i) => sum + (i.bill_amount || 0), 0)
                     )}
                   </strong>
                 </td>
@@ -657,10 +650,8 @@ const PurchasingReport = () => {
                 {/* Paid */}
                 <td className="text-right">
                   <strong>
-                    {formatNumber(
-                      filteredItems.reduce((sum, i) => sum + (i.item_paid_amount || 0), 0),
-                      2,
-                      2
+                    {formatPurchasingNumber(
+                      filteredItems.reduce((sum, i) => sum + (i.item_paid_amount || 0), 0)
                     )}
                   </strong>
                 </td>
@@ -668,10 +659,8 @@ const PurchasingReport = () => {
                 {/* Due */}
                 <td className="text-right">
                   <strong>
-                    {formatNumber(
-                      filteredItems.reduce((sum, i) => sum + (i.item_due_amount || 0), 0),
-                      2,
-                      2
+                    {formatPurchasingNumber(
+                      filteredItems.reduce((sum, i) => sum + (i.item_due_amount || 0), 0)
                     )}
                   </strong>
                 </td>

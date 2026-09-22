@@ -1683,8 +1683,8 @@ const adjustPurchasePayment = async (req, res) => {
 
     // Cap what actually applies to the invoice at its own balance - existing
     // behavior: any amount above that is preserved as supplier credit.
-    const appliedAmount = Number(Math.min(newAmount, availableBalance).toFixed(2));
-    const excessAmount = Number((newAmount - appliedAmount).toFixed(2));
+    const appliedAmount = Number(Math.min(newAmount, availableBalance).toFixed(4));
+    const excessAmount = Number((newAmount - appliedAmount).toFixed(4));
 
     if (hasAllocationRow) {
       await connection.query(
@@ -1703,8 +1703,8 @@ const adjustPurchasePayment = async (req, res) => {
     // user's entered figure moved by for this invoice. Other invoices in a
     // split payment, if any, are never touched by this adjustment.
     const oldTransactionAmount = parseFloat(payment.amount) || 0;
-    const totalDelta = Number((newAmount - oldAllocatedAmount).toFixed(2));
-    const newTransactionAmount = Number((oldTransactionAmount + totalDelta).toFixed(2));
+    const totalDelta = Number((newAmount - oldAllocatedAmount).toFixed(4));
+    const newTransactionAmount = Number((oldTransactionAmount + totalDelta).toFixed(4));
 
     await connection.query(
       'UPDATE payment_history SET payment_date = ?, amount = ? WHERE id = ?',
@@ -1724,7 +1724,7 @@ const adjustPurchasePayment = async (req, res) => {
     );
     if (finRows.length > 0) {
       const fin = finRows[0];
-      const newCredit = Number((parseFloat(fin.credit) + totalDelta).toFixed(2));
+      const newCredit = Number((parseFloat(fin.credit) + totalDelta).toFixed(4));
       await connection.query(
         'UPDATE finance_transactions SET credit = ?, transaction_date = ? WHERE id = ?',
         [newCredit, payment_date, fin.id]
@@ -1782,8 +1782,8 @@ const adjustPurchasePayment = async (req, res) => {
       [
         paymentId, purchaseId, purchase.invoice_no, purchase.supplier_id, supplierName, payment.voucher_number || null,
         payment.payment_date, payment_date, oldAllocatedAmount, newAmount,
-        Number((newAmount - oldAllocatedAmount).toFixed(2)),
-        excessAmount > 0 ? `Rs. ${excessAmount.toFixed(2)} recorded as supplier credit${overpaymentRecord ? ` (${overpaymentRecord.overpayment_number})` : ''}` : null,
+        Number((newAmount - oldAllocatedAmount).toFixed(4)),
+        excessAmount > 0 ? `Rs. ${excessAmount.toFixed(4)} recorded as supplier credit${overpaymentRecord ? ` (${overpaymentRecord.overpayment_number})` : ''}` : null,
         await resolveUserId(connection, req.user?.id)
       ]
     );

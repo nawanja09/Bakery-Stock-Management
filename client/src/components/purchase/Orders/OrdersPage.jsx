@@ -19,7 +19,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import api from '../../../api';
 import { usePopup } from '../../context/PopupContext';
-import { formatNumber } from '../../../utils/formatters';
+import { formatPurchasingNumber } from '../../../utils/formatters';
 import CreateOrderModal from './CreateOrderModal';
 import ConfirmOrderModal from './ConfirmOrderModal';
 import './OrdersPage.css';
@@ -229,10 +229,10 @@ const OrdersPage = () => {
                     return (
                       <tr key={item.item_id}>
                         <td>{item.item_name}</td>
-                        <td>{formatNumber(item.current_stock)}</td>
+                        <td>{formatPurchasingNumber(item.current_stock)}</td>
                         <td>{item.unit}</td>
-                        <td>{formatNumber(item.buffer_stock)}</td>
-                        <td className="orders-required-qty">{formatNumber(item.required_qty)}</td>
+                        <td>{formatPurchasingNumber(item.buffer_stock)}</td>
+                        <td className="orders-required-qty">{formatPurchasingNumber(item.required_qty)}</td>
                         <td>
                           <span
                             className={`orders-badge ${isOrdered ? 'orders-badge-yes' : 'orders-badge-no'}`}
@@ -286,7 +286,7 @@ const OrdersPage = () => {
                     <tr key={order.id}>
                       <td>{order.order_no}</td>
                       <td>{order.items.map(i => i.item_name).join(', ')}</td>
-                      <td>{order.items.map(i => formatNumber(i.quantity)).join(', ')}</td>
+                      <td>{order.items.map(i => formatPurchasingNumber(i.quantity)).join(', ')}</td>
                       <td>{order.items.map(i => i.unit).join(', ')}</td>
                       <td>{order.supplier_name || '-'}</td>
                       <td>{order.ordered_date}</td>
@@ -363,7 +363,7 @@ const OrdersPage = () => {
                     <tr key={order.id}>
                       <td>{order.order_no}</td>
                       <td>{order.items.map(i => i.item_name).join(', ')}</td>
-                      <td>{order.items.map(i => formatNumber(i.quantity)).join(', ')}</td>
+                      <td>{order.items.map(i => formatPurchasingNumber(i.quantity)).join(', ')}</td>
                       <td>{order.items.map(i => i.unit).join(', ')}</td>
                       <td>{order.supplier_name || '-'}</td>
                       <td>{order.ordered_date}</td>

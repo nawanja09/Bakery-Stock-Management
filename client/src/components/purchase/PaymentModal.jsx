@@ -130,7 +130,8 @@ const PaymentModal = ({ purchase, onClose, onPaymentComplete }) => {
     return new Intl.NumberFormat('en-LK', {
       style: 'currency',
       currency: 'LKR',
-      minimumFractionDigits: 2
+      minimumFractionDigits: 4,
+      maximumFractionDigits: 4
     }).format(amount).replace('LKR', 'Rs.');
   };
 
@@ -257,9 +258,9 @@ const PaymentModal = ({ purchase, onClose, onPaymentComplete }) => {
                   name="amount"
                   value={formData.amount}
                   onChange={handleChange}
-                  min="0.01"
+                  min="0.0001"
                   max={purchase.balance_amount}
-                  step="0.01"
+                  step="0.0001"
                   required
                   className="amount-input"
                 />

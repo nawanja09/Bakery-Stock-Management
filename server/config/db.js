@@ -708,6 +708,12 @@ ensureCreditNotesSchema();
 // master table in this project, so it is stored as validated free text for
 // now; it can be swapped for a designation_id FK later without any other
 // change to this module.
+// `company` mirrors the pattern already used by bank_details.company: the
+// dropdown is populated from the `company` master (JH/RR/RD, see
+// companyController.js) but the chosen name is stored as plain text on the
+// row itself, not as a company_id FK - kept a simple VARCHAR (not an ENUM)
+// so it never needs a schema change when a new company is added via the
+// Companies page.
 const ensureEmployeesSchema = async () => {
   try {
     await pool.query(`
@@ -719,6 +725,7 @@ const ensureEmployeesSchema = async () => {
         contact_number   VARCHAR(15) NOT NULL,
         department_id    INT NULL,
         designation      VARCHAR(100) NOT NULL,
+        company          VARCHAR(100) NULL,
         joining_date     DATE NOT NULL,
         status           ENUM('Active','Inactive') NOT NULL DEFAULT 'Active',
         created_by       INT NULL,
@@ -732,6 +739,11 @@ const ensureEmployeesSchema = async () => {
         CONSTRAINT fk_employees_department FOREIGN KEY (department_id) REFERENCES departments(id)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
+
+    // Existing installs (table already created before this change) won't
+    // have the column yet - add it in place, same "ADD COLUMN IF NOT
+    // EXISTS" pattern used everywhere else in this file.
+    await pool.query("ALTER TABLE employees ADD COLUMN IF NOT EXISTS company VARCHAR(100) NULL AFTER designation");
 
     console.log('Employees schema ready');
   } catch (error) {

@@ -6,7 +6,7 @@ import { faTimes, faBalanceScale, faCheckCircle, faSpinner, faBoxOpen, faWallet 
 import dayjs from 'dayjs';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
-import { formatCurrency } from '../../utils/formatters';
+import { formatPurchasingCurrency as formatCurrency } from '../../utils/formatters';
 import './SettleNowModal.css';
 
 const SettleNowModal = ({ isOpen, onClose, invoice, supplierId, onSuccess }) => {
@@ -187,7 +187,7 @@ const SettleNowModal = ({ isOpen, onClose, invoice, supplierId, onSuccess }) => 
                           <input
                             type="number"
                             min="0"
-                            step="0.01"
+                            step="0.0001"
                             placeholder="0.00"
                             value={amt}
                             onChange={(e) => handleAllocationChange(credit, e.target.value)}
@@ -219,11 +219,11 @@ const SettleNowModal = ({ isOpen, onClose, invoice, supplierId, onSuccess }) => 
           </div>
           <div className="snm-total-item active">
             <span>Total Settled</span>
-            <span>Rs. {totalAllocated.toFixed(2)}</span>
+            <span>Rs. {totalAllocated.toFixed(4)}</span>
           </div>
           <div className={`snm-total-item rem ${remainingInvoiceBalance <= 0 ? 'zero' : ''}`}>
             <span>Remaining Balance</span>
-            <span>Rs. {Math.max(0, remainingInvoiceBalance).toFixed(2)}</span>
+            <span>Rs. {Math.max(0, remainingInvoiceBalance).toFixed(4)}</span>
           </div>
         </div>
 

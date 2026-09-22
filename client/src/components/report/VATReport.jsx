@@ -3,7 +3,7 @@ import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
 import api from '../../api';
 import PurchaseDetailsModal from '../purchase/PurchaseDetailsModal';
-import { formatNumber } from '../../utils/formatters';
+import { formatNumber, toExportNumber } from '../../utils/formatters';
 import './VATReport.css';
 
 const VATReport = () => {
@@ -201,9 +201,9 @@ const VATReport = () => {
         item.supplierTIN,
         item.supplierName,
         item.description,
-        formatNumber(item.netAmount, 2, 2),
-        formatNumber(item.vatAmount, 2, 2),
-        formatNumber(item.disallowableVATAmount, 2, 2)
+        toExportNumber(item.netAmount, 2),
+        toExportNumber(item.vatAmount, 2),
+        toExportNumber(item.disallowableVATAmount, 2)
       ]);
     });
 
@@ -219,9 +219,9 @@ const VATReport = () => {
       '',
       '',
       '',
-      formatNumber(totalNetAmount, 2, 2),
-      formatNumber(totalVATAmount, 2, 2),
-      formatNumber(totalDisallowableVAT, 2, 2)
+      toExportNumber(totalNetAmount, 2),
+      toExportNumber(totalVATAmount, 2),
+      toExportNumber(totalDisallowableVAT, 2)
     ]);
 
     const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);

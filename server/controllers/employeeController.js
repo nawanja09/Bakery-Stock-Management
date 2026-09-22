@@ -8,6 +8,10 @@
 // this project, so it is stored as validated free text (see the note in
 // config/db.js ensureEmployeesSchema for how to later promote it to a
 // master table without restructuring this module).
+// Company follows the bank_details.company convention: the choices come
+// from the `company` master (JH/RR/RD - see companyController.js /
+// GET /api/companies) but the value itself is stored as plain text on the
+// employee row, not as a company_id FK.
 //
 // NOTE: Staff Loans is a future module and is NOT implemented here.
 
@@ -28,6 +32,7 @@ const validateEmployeeInput = (input) => {
   const nic = String(input.nic || '').trim();
   const contact_number = String(input.contact_number || '').trim();
   const designation = String(input.designation || '').trim();
+  const company = String(input.company || '').trim();
   const joining_date = String(input.joining_date || '').trim();
   const department_id = input.department_id !== undefined && input.department_id !== null && input.department_id !== ''
     ? Number(input.department_id)
@@ -47,6 +52,7 @@ const validateEmployeeInput = (input) => {
     return { error: 'Please select a valid Department' };
   }
   if (!designation) return { error: 'Designation is required' };
+  if (!company) return { error: 'Company is required' };
   if (!joining_date || !/^\d{4}-\d{2}-\d{2}$/.test(joining_date)) {
     return { error: 'A valid Joining Date is required' };
   }
@@ -58,6 +64,7 @@ const validateEmployeeInput = (input) => {
     contact_number,
     department_id,
     designation,
+    company,
     joining_date
   };
 };
@@ -79,6 +86,7 @@ const getAllEmployees = async (req, res) => {
         e.department_id,
         d.name AS department_name,
         e.designation,
+        e.company,
         e.joining_date,
         e.status,
         e.created_at,
@@ -99,10 +107,11 @@ const getAllEmployees = async (req, res) => {
         e.employee_name LIKE ? OR
         e.employee_code LIKE ? OR
         e.nic LIKE ? OR
-        e.contact_number LIKE ?
+        e.contact_number LIKE ? OR
+        e.company LIKE ?
       )`;
       const term = `%${search.trim()}%`;
-      params.push(term, term, term, term);
+      params.push(term, term, term, term, term);
     }
 
     query += ' ORDER BY e.employee_name ASC';
@@ -125,7 +134,7 @@ const getEmployeeById = async (req, res) => {
     const [rows] = await pool.query(
       `SELECT
         e.id, e.employee_code, e.employee_name, e.nic, e.contact_number,
-        e.department_id, d.name AS department_name, e.designation,
+        e.department_id, d.name AS department_name, e.designation, e.company,
         e.joining_date, e.status, e.created_at, e.updated_at
        FROM employees e
        LEFT JOIN departments d ON e.department_id = d.id
@@ -154,7 +163,7 @@ const createEmployee = async (req, res) => {
     return res.status(400).json({ error: validation.error });
   }
 
-  const { employee_code, employee_name, nic, contact_number, department_id, designation, joining_date } = validation;
+  const { employee_code, employee_name, nic, contact_number, department_id, designation, company, joining_date } = validation;
 
   try {
     // Explicit pre-checks give a clear, field-specific message; the DB-level
@@ -190,15 +199,15 @@ const createEmployee = async (req, res) => {
 
     const [result] = await pool.query(
       `INSERT INTO employees
-        (employee_code, employee_name, nic, contact_number, department_id, designation, joining_date, status, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'Active', ?)`,
-      [employee_code, employee_name, nic, contact_number, department_id, designation, joining_date, resolvedCreatedBy]
+        (employee_code, employee_name, nic, contact_number, department_id, designation, company, joining_date, status, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Active', ?)`,
+      [employee_code, employee_name, nic, contact_number, department_id, designation, company, joining_date, resolvedCreatedBy]
     );
 
     const [rows] = await pool.query(
       `SELECT
         e.id, e.employee_code, e.employee_name, e.nic, e.contact_number,
-        e.department_id, d.name AS department_name, e.designation,
+        e.department_id, d.name AS department_name, e.designation, e.company,
         e.joining_date, e.status, e.created_at, e.updated_at
        FROM employees e
        LEFT JOIN departments d ON e.department_id = d.id
@@ -238,7 +247,7 @@ const updateEmployee = async (req, res) => {
     return res.status(400).json({ error: validation.error });
   }
 
-  const { employee_code, employee_name, nic, contact_number, department_id, designation, joining_date } = validation;
+  const { employee_code, employee_name, nic, contact_number, department_id, designation, company, joining_date } = validation;
 
   try {
     const [existing] = await pool.query('SELECT id FROM employees WHERE id = ?', [id]);
@@ -272,15 +281,15 @@ const updateEmployee = async (req, res) => {
     await pool.query(
       `UPDATE employees
        SET employee_code = ?, employee_name = ?, nic = ?, contact_number = ?,
-           department_id = ?, designation = ?, joining_date = ?
+           department_id = ?, designation = ?, company = ?, joining_date = ?
        WHERE id = ?`,
-      [employee_code, employee_name, nic, contact_number, department_id, designation, joining_date, id]
+      [employee_code, employee_name, nic, contact_number, department_id, designation, company, joining_date, id]
     );
 
     const [rows] = await pool.query(
       `SELECT
         e.id, e.employee_code, e.employee_name, e.nic, e.contact_number,
-        e.department_id, d.name AS department_name, e.designation,
+        e.department_id, d.name AS department_name, e.designation, e.company,
         e.joining_date, e.status, e.created_at, e.updated_at
        FROM employees e
        LEFT JOIN departments d ON e.department_id = d.id
