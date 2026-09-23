@@ -117,7 +117,9 @@ const FundTransfer = () => {
     if (!currentUser?.id)      return setMessage({ type: 'error', text: 'Session expired — please log in again.' });
 
     // Client-side balance pre-check (server enforces this too, but gives
-    // faster UX feedback). Cheques are not deducted today, so we only check cash or non-cheque bank transfers.
+    // faster UX feedback). Cheque transfers now deduct the Bank Ledger
+    // immediately on the Transfer Date (same as a non-cheque transfer), so
+    // the balance check applies to both.
     const isCheque = formData.direction === 'BANK_TO_CASH' && !!formData.cheque_number?.trim();
 
     if (formData.direction === 'CASH_TO_BANK' && cashBalance !== null && amt > cashBalance) {
@@ -126,7 +128,7 @@ const FundTransfer = () => {
         text: `Insufficient cash balance. Available: Rs. ${fmt(cashBalance)}`
       });
     }
-    if (formData.direction === 'BANK_TO_CASH' && !isCheque && selectedBank && amt > parseFloat(selectedBank.current_balance || 0)) {
+    if (formData.direction === 'BANK_TO_CASH' && selectedBank && amt > parseFloat(selectedBank.current_balance || 0)) {
       return setMessage({
         type: 'error',
         text: `Insufficient bank balance. Available: Rs. ${fmt(selectedBank.current_balance)}`
@@ -150,11 +152,15 @@ const FundTransfer = () => {
       setMessage({
         type: 'success',
         text: res.data?.message || (isCheque
-          ? 'Cheque transfer recorded! Cheque is Pending / Unreleased in Expenses Cheque Registry.'
+          ? 'Cheque transfer recorded! Bank balance deducted today; Cash balance will update once the cheque is Released.'
           : 'Transfer completed successfully!')
       });
 
-      // Optimistically update displayed balances only if returned by server (non-cheque)
+      // Optimistically update displayed balances from whatever the server
+      // returned. Bank balance is always returned now (cheque transfers
+      // deduct the Bank Ledger immediately); Cash balance only comes back
+      // for non-cheque transfers, since a cheque's Cash leg isn't posted
+      // until it's Released.
       if (res.data?.cash_balance !== null && res.data?.cash_balance !== undefined) setCashBalance(res.data.cash_balance);
       if (res.data?.bank_balance !== null && res.data?.bank_balance !== undefined) {
         setBankAccounts(prev =>
@@ -204,41 +210,40 @@ const FundTransfer = () => {
         {/* ═══════════════════ LEFT — Form ═══════════════════ */}
         <div className="ft-form-card">
 
-          {/* Company selector and Transfer Direction toggle row */}
-          <div className="ft-section ft-top-row">
-            <div className="ft-top-field ft-company-group">
-              <label className="ft-label">Company <span className="ft-required">*</span></label>
-              <select
-                name="company_id"
-                className="ft-select"
-                value={formData.company_id}
-                onChange={handleChange}
-                required
-              >
-                {companies.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </div>
+          {/* Company selector */}
+          <div className="ft-section">
+            <label className="ft-label">Company <span className="ft-required">*</span></label>
+            <select
+              name="company_id"
+              className="ft-select"
+              value={formData.company_id}
+              onChange={handleChange}
+              required
+            >
+              {companies.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
 
-            <div className="ft-top-field ft-direction-group">
-              <label className="ft-label">Transfer Direction <span className="ft-required">*</span></label>
-              <div className="ft-direction-toggle">
-                {DIRECTIONS.map(d => (
-                  <button
-                    key={d.value}
-                    type="button"
-                    className={`ft-direction-btn ${formData.direction === d.value ? 'active' : ''}`}
-                    onClick={() => { setMessage(null); setFormData(prev => ({ ...prev, direction: d.value })); }}
-                  >
-                    <FontAwesomeIcon
-                      icon={d.value === 'CASH_TO_BANK' ? faCashRegister : faUniversity}
-                      className="ft-dir-icon"
-                    />
-                    {d.label}
-                  </button>
-                ))}
-              </div>
+          {/* Transfer Direction toggle */}
+          <div className="ft-section">
+            <label className="ft-label">Transfer Direction <span className="ft-required">*</span></label>
+            <div className="ft-direction-toggle">
+              {DIRECTIONS.map(d => (
+                <button
+                  key={d.value}
+                  type="button"
+                  className={`ft-direction-btn ${formData.direction === d.value ? 'active' : ''}`}
+                  onClick={() => { setMessage(null); setFormData(prev => ({ ...prev, direction: d.value })); }}
+                >
+                  <FontAwesomeIcon
+                    icon={d.value === 'CASH_TO_BANK' ? faCashRegister : faUniversity}
+                    className="ft-dir-icon"
+                  />
+                  {d.label}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -384,7 +389,7 @@ const FundTransfer = () => {
               />
               {formData.cheque_number?.trim() && (
                 <div style={{ fontSize: '12px', color: '#b45309', marginTop: '6px', fontWeight: 500 }}>
-                  ℹ️ Cheque payments remain Pending / Unreleased. The Bank Ledger is NOT deducted until the cheque is released.
+                  ℹ️ The Bank Ledger is deducted today, on this Transfer Date. The cheque stays Pending in the Expenses Cheque Registry, and the Cash Ledger is only credited once it's Released.
                 </div>
               )}
             </div>
