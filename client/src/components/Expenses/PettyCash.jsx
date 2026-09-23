@@ -17,6 +17,7 @@ const PettyCash = () => {
   const [isFetching, setIsFetching] = useState(false);
   const [vouchers, setVouchers] = useState([]);
   const [reimbursements, setReimbursements] = useState([]);
+  const [transactions, setTransactions] = useState([]);
   const { showPopup } = usePopup();
   const [isEditing, setIsEditing] = useState(false);
   const [user, setUser] = useState(null);
@@ -95,6 +96,10 @@ const PettyCash = () => {
       setVouchers(vouchersRes.data || []);
       const reimbursementRes = await api.get('/expenses/petty-cash/reimbursements');
       setReimbursements(reimbursementRes.data || []);
+      // Combined Debit/Credit ledger with running balance - always
+      // recalculated server-side from transaction history, never edited here.
+      const transactionsRes = await api.get('/expenses/petty-cash/transactions');
+      setTransactions(transactionsRes.data || []);
     } catch (error) {
       console.error('Error fetching petty cash data:', error);
       showPopup('error', 'Failed to load data from server');
@@ -523,6 +528,48 @@ const PettyCash = () => {
                     ))
                   ) : (
                     <tr><td colSpan="8" className="empty-row">No vouchers found</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
+            <div className="form-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
+              <div>
+                <h3>Petty Cash Transaction History</h3>
+                <small style={{ color: 'var(--color-text-secondary)' }}>Reimbursements (Debit) and Expenses (Credit), with a running balance calculated from the full transaction history.</small>
+              </div>
+              <div className="report-filter-actions">
+                <button className="btn btn-secondary" onClick={fetchPettyCashData} disabled={isFetching}><FontAwesomeIcon icon={isFetching ? faSpinner : faSync} spin={isFetching} /> Refresh</button>
+              </div>
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="report-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Remark</th>
+                    <th>Debit (Reimbursement)</th>
+                    <th>Credit (Expenses)</th>
+                    <th>Balance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {isFetching ? (
+                    <tr><td colSpan="5" className="loading-row"><FontAwesomeIcon icon={faSpinner} spin /> Loading transaction history...</td></tr>
+                  ) : transactions.length > 0 ? (
+                    transactions.map(t => (
+                      <tr key={`${t.source}-${t.id}`}>
+                        <td>{formatDate(t.date)}</td>
+                        <td>{t.remark}</td>
+                        <td className="amount-cell">{t.debit > 0 ? formatCurrency(t.debit) : '-'}</td>
+                        <td className="amount-cell">{t.credit > 0 ? formatCurrency(t.credit) : '-'}</td>
+                        <td className="amount-cell"><strong>{formatCurrency(t.balance)}</strong></td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr><td colSpan="5" className="empty-row">No transactions found</td></tr>
                   )}
                 </tbody>
               </table>
