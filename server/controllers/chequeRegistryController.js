@@ -21,12 +21,13 @@ const {
 // ─────────────────────────────────────────────────────────────────────────────
 const getChequeRegistry = async (req, res) => {
   try {
-    const { dateFrom, dateTo, name, status } = req.query;
+    const { dateFrom, dateTo, name, status, type } = req.query;
 
     let query = `
       SELECT
         ecr.id,
         ecr.source_type,
+        ecr.type,
         ecr.source_id,
         DATE_FORMAT(ecr.date, '%Y-%m-%d')         AS date,
         ecr.name,
@@ -61,6 +62,10 @@ const getChequeRegistry = async (req, res) => {
     if (status && status.trim()) {
       query += ' AND ecr.status = ?';
       params.push(status.trim());
+    }
+    if (type && type.trim() && type.trim() !== 'All') {
+      query += ' AND ecr.type = ?';
+      params.push(type.trim());
     }
 
     query += ' ORDER BY ecr.date DESC, ecr.created_at DESC';
