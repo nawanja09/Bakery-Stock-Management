@@ -538,7 +538,6 @@ const PettyCash = () => {
             <div className="form-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
               <div>
                 <h3>Petty Cash Transaction History</h3>
-                <small style={{ color: 'var(--color-text-secondary)' }}>Reimbursements (Debit) and Expenses (Credit), with a running balance calculated from the full transaction history.</small>
               </div>
               <div className="report-filter-actions">
                 <button className="btn btn-secondary" onClick={fetchPettyCashData} disabled={isFetching}><FontAwesomeIcon icon={isFetching ? faSpinner : faSync} spin={isFetching} /> Refresh</button>
