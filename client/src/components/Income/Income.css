@@ -8,10 +8,19 @@
 .income-header-actions button { height: 40px; display: inline-flex; align-items: center; gap: 8px; }
 .income-new-btn { font-weight: 700; box-shadow: var(--shadow-primary); }
 
+.income-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 14px; padding: 16px; }
+.income-filters label { display: flex; flex-direction: column; gap: 6px; min-width: 170px; color: var(--color-text-secondary); font-size: .8rem; font-weight: 700; }
+.income-filters input,
+.income-filters select { height: 40px; padding: 0 10px; border: 1px solid var(--color-border); border-radius: 6px; background: var(--color-surface); color: var(--color-text-primary); }
+.income-filters-actions { display: flex; gap: 8px; }
+.income-filters-actions button { height: 40px; display: inline-flex; align-items: center; gap: 7px; }
+
 .income-summary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .income-summary-card { min-height: 92px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between; border-top: 3px solid var(--color-primary); }
 .income-summary-card span { color: var(--color-text-secondary); font-size: .76rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
 .income-summary-card strong { color: var(--color-heading); font-size: 1.35rem; font-variant-numeric: tabular-nums; }
+.income-total-card { grid-column: 1 / -1; border-top-color: var(--color-primary); }
+.income-total-card strong { font-size: 1.6rem; color: var(--color-primary-dark, var(--color-primary)); }
 
 .income-error { padding: 12px 14px; border: 1px solid var(--color-danger); border-radius: 6px; color: var(--color-danger); background: var(--color-danger-light); }
 
@@ -31,6 +40,9 @@
   .income-header { flex-direction: column; align-items: stretch; }
   .income-header-actions { justify-content: flex-end; }
   .income-summary-grid { grid-template-columns: 1fr; }
+  .income-filters { flex-direction: column; align-items: stretch; }
+  .income-filters label { min-width: 0; }
+  .income-filters-actions { justify-content: flex-end; }
 }
 
 /* ===== New Income modal ===== */
