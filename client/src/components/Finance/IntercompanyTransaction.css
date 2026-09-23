@@ -1,0 +1,113 @@
+/* ============================================================================
+   FINANCE -> INTERCOMPANY TRANSACTION
+   Scoped with the `ict-` prefix, styled to match Staff Loans / Fund Transfer.
+   ============================================================================ */
+
+.ict-section-title {
+  margin: 0 0 var(--spacing-lg, 16px);
+  font-size: var(--font-size-lg, 1.125rem);
+  font-weight: var(--font-weight-semibold, 600);
+  color: var(--color-text-primary, #0f172a);
+  display: flex;
+  align-items: center;
+}
+
+.ict-history-card {
+  padding: var(--spacing-lg, 16px);
+}
+
+.ict-sides {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: var(--spacing-lg, 16px);
+  align-items: start;
+}
+
+.ict-side-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+
+.ict-side-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+  margin-bottom: 10px;
+}
+
+.ict-flow-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding-top: 40px;
+  color: var(--color-primary, #2563eb);
+  font-size: 1.25rem;
+}
+
+.ict-summary {
+  margin-top: var(--spacing-lg, 16px);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e3a8a;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 0.9rem;
+}
+
+.ict-table-wrap {
+  overflow-x: auto;
+}
+
+.ict-table {
+  width: 100%;
+}
+
+.ict-table .ict-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.ict-table .ict-desc {
+  max-width: 260px;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.ict-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #0f172a;
+  font-size: 0.75rem;
+  font-weight: 700;
+  margin-right: 6px;
+}
+
+.ict-empty {
+  text-align: center;
+  padding: var(--spacing-2xl, 32px);
+  color: var(--color-text-secondary, #64748b);
+}
+
+@media (max-width: 640px) {
+  .ict-sides {
+    grid-template-columns: 1fr;
+  }
+  .ict-flow-arrow {
+    padding-top: 0;
+    transform: rotate(90deg);
+    padding: 8px 0;
+  }
+  .ict-page .form-grid.two-col {
+    grid-template-columns: 1fr;
+  }
+}

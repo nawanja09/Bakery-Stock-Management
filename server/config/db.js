@@ -823,4 +823,52 @@ const ensureStaffLoansSchema = async () => {
 // file otherwise start concurrently).
 ensureEmployeesSchema().then(ensureStaffLoansSchema);
 
+// Finance -> Intercompany Transaction.
+// A pure fund movement between two companies' Cash/Bank accounts (e.g. JH
+// Bank -> RD Cash). This table is the audit trail: the actual balance
+// changes are posted as two ordinary finance_transactions rows (one CREDIT
+// on the From account, one DEBIT on the To account) via the existing
+// recordCashTransaction/recordBankTransaction helpers, tagged
+// reference_type = 'INTERCOMPANY_TRANSFER' and reference_id = this row's id.
+// It is intentionally NOT written to `expenses`, `petty_cash_vouchers` or
+// `bank_charges`, so it can never appear on the Expense Report (see
+// reportController.getExpensesReport, which only reads those three tables).
+const ensureIntercompanyTransactionsSchema = async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS intercompany_transactions (
+        id                  INT NOT NULL AUTO_INCREMENT,
+        from_company_id     INT NOT NULL,
+        from_account_type   ENUM('CASH','BANK') NOT NULL,
+        from_bank_id        INT NULL,
+        from_balance_after  DECIMAL(14,2) NULL,
+        to_company_id       INT NOT NULL,
+        to_account_type     ENUM('CASH','BANK') NOT NULL,
+        to_bank_id          INT NULL,
+        to_balance_after    DECIMAL(14,2) NULL,
+        amount              DECIMAL(14,2) NOT NULL,
+        transaction_date    DATE NOT NULL,
+        description         VARCHAR(255) NULL,
+        status              TINYINT(1) NOT NULL DEFAULT 1,
+        created_by          INT NULL,
+        created_at          TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        KEY idx_ict_from_company (from_company_id),
+        KEY idx_ict_to_company (to_company_id),
+        KEY idx_ict_date (transaction_date),
+        CONSTRAINT fk_ict_from_company FOREIGN KEY (from_company_id) REFERENCES company(id),
+        CONSTRAINT fk_ict_to_company FOREIGN KEY (to_company_id) REFERENCES company(id),
+        CONSTRAINT fk_ict_from_bank FOREIGN KEY (from_bank_id) REFERENCES bank_details(id),
+        CONSTRAINT fk_ict_to_bank FOREIGN KEY (to_bank_id) REFERENCES bank_details(id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    console.log('Intercompany Transactions schema ready');
+  } catch (error) {
+    console.warn('Intercompany Transactions schema check skipped:', error.message);
+  }
+};
+
+ensureIntercompanyTransactionsSchema();
+
 module.exports = pool;
