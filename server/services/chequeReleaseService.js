@@ -316,22 +316,25 @@ const postChequeRelease = async (connection, chequeOrId, releaseDate) => {
   }
 
   if (source.dualLeg) {
+    // Bank->Cash cheque transfers: the Bank Ledger leg is posted immediately
+    // when the transfer is created (see financeController.js transferFunds),
+    // dated the Transfer Date, and must stay untouched from here on -
+    // Release only ever posts the Cash Ledger leg, dated the Released Date.
+    // This is what keeps "Bank decreases on Transfer Date" and "Cash
+    // increases on Released Date" independent of each other.
     const companyId = await resolveCashCompany(connection, source);
     const bankPosted = await hasActiveLedgerEntry(connection, cheque.source_type, referenceId, 'BANK', source.bank_id);
     const cashPosted = await hasActiveLedgerEntry(connection, cheque.source_type, referenceId, 'CASH', companyId);
 
-    if (bankPosted) {
-      await connection.query(
-        `UPDATE finance_transactions
-         SET transaction_date = ?
-         WHERE status = 1 AND account_type = 'BANK' AND bank_id = ?
-           AND reference_type IN (?) AND reference_id = ?`,
-        [effectiveReleaseDate, source.bank_id, refTypes, referenceId]
-      );
-    } else {
+    if (!bankPosted) {
+      // Legacy safety net only: a Bank leg should already exist from
+      // creation time. If it's somehow missing (e.g. a cheque created
+      // before this Transfer-Date-deduction behavior existed), post it now
+      // dated the original Transfer Date - never the Release Date - so
+      // historical Bank Ledger timing is still correct.
       await recordBankTransaction(connection, {
         bankId: source.bank_id,
-        date: effectiveReleaseDate,
+        date: source.transfer_date ? String(source.transfer_date).slice(0, 10) : effectiveReleaseDate,
         remark: source.remark || `Transfer to Cash (Cheque ${referenceNumber})`,
         credit: amount,
         transactionType: 'Bank Withdrawal',
@@ -341,6 +344,7 @@ const postChequeRelease = async (connection, chequeOrId, releaseDate) => {
         referenceId,
         createdBy: source.created_by
       });
+      await rebuildAccountBalance(connection, 'BANK', source.bank_id);
     }
 
     if (cashPosted) {
@@ -366,7 +370,6 @@ const postChequeRelease = async (connection, chequeOrId, releaseDate) => {
       });
     }
 
-    await rebuildAccountBalance(connection, 'BANK', source.bank_id);
     if (companyId) {
       await rebuildAccountBalance(connection, 'CASH', companyId);
     }
@@ -447,10 +450,17 @@ const unreleaseCheque = async (connection, chequeOrId, newStatus = 'Pending') =>
   }
 
   const refTypes = getLedgerReferenceTypes(cheque.source_type);
+  // Bank->Cash cheque transfers post their Bank leg once, at creation
+  // (Transfer Date), and it must never be reversed by a later status
+  // change (Released -> Pending, or -> Returned) - per the fixed Transfer-
+  // Date-deduction behavior, only the Cash leg (posted at Release) is
+  // ever reversible here. Other cheque types (single-leg) are unaffected.
+  const accountTypeFilter = cheque.source_type === 'BANK_TO_CASH' ? "AND account_type = 'CASH'" : '';
+
   const [ledgerRows] = await connection.query(
     `SELECT id, account_type, bank_id, company_id
      FROM finance_transactions
-     WHERE status = 1 AND reference_type IN (?) AND reference_id = ? FOR UPDATE`,
+     WHERE status = 1 AND reference_type IN (?) AND reference_id = ? ${accountTypeFilter} FOR UPDATE`,
     [refTypes, cheque.source_id]
   );
 
@@ -458,7 +468,7 @@ const unreleaseCheque = async (connection, chequeOrId, newStatus = 'Pending') =>
     await connection.query(
       `UPDATE finance_transactions
        SET status = 0
-       WHERE status = 1 AND reference_type IN (?) AND reference_id = ?`,
+       WHERE status = 1 AND reference_type IN (?) AND reference_id = ? ${accountTypeFilter}`,
       [refTypes, cheque.source_id]
     );
 
@@ -525,6 +535,7 @@ module.exports = {
   rebuildAccountBalance,
   getLedgerReferenceTypes,
   getCanonicalReferenceType,
+  hasActiveLedgerEntry,
   postChequeRelease,
   unreleaseCheque,
   postChequeIfDue,

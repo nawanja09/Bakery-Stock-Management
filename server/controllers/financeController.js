@@ -10,6 +10,7 @@ const {
 } = require('../utils/financeLedger');
 const { checkDuplicateReference, DuplicateReferenceError } = require('../services/referenceValidationService');
 const { getActiveBankAccounts } = require('../services/bankAccountService');
+const { hasActiveLedgerEntry } = require('../services/chequeReleaseService');
 
 const LEDGER_SELECT = `
   SELECT
@@ -421,6 +422,31 @@ const transferFunds = async (req, res) => {
            date = VALUES(date), name = VALUES(name), amount = VALUES(amount), bank = VALUES(bank), bank_id = VALUES(bank_id), status = 'Pending', type = 'Transfer'`,
         [transferId, date, bankLabel, String(cheque_number).trim(), transferAmount, bankLabel, bank_id || null]
       );
+
+      // Bank Ledger is deducted immediately, on the Transfer Date - this is
+      // the only Bank Ledger posting this transfer will ever make. The Cash
+      // Ledger is only credited later, when the cheque is actually
+      // Released (see chequeReleaseService.js), using the Released Date -
+      // never here. hasActiveLedgerEntry guards against a duplicate Bank
+      // deduction if this same transfer is re-submitted (the cheque_number
+      // + bank_id unique key routes back to the same transferId above).
+      const bankAlreadyPosted = await hasActiveLedgerEntry(connection, 'BANK_TO_CASH', transferId, 'BANK', bank_id);
+      if (!bankAlreadyPosted) {
+        bankBalance = await recordBankTransaction(connection, {
+          bankId: bank_id,
+          date,
+          remark: remark || `Transfer to Cash (Cheque ${String(cheque_number).trim()})`,
+          credit: transferAmount,
+          transactionType: 'Bank Withdrawal',
+          referenceNumber: String(cheque_number).trim(),
+          partyName: bankLabel,
+          referenceType: 'CASH_BANK_TRANSFER',
+          referenceId: transferId,
+          createdBy: created_by
+        });
+      } else {
+        bankBalance = await getBankBalance(bank_id);
+      }
     } else if (from_account === 'CASH' && to_account === 'BANK') {
       // Depositing cash into the bank - same label on both ledger entries so
       // the two rows are recognizable as the same event.
@@ -468,7 +494,7 @@ const transferFunds = async (req, res) => {
 
     res.status(201).json({
       message: isChequeTransfer
-        ? 'Cheque transfer recorded. Cheque is Pending / Unreleased until release date.'
+        ? 'Cheque transfer recorded. Bank balance deducted on the Transfer Date; Cash balance will be credited when the cheque is Released.'
         : 'Transfer completed successfully!',
       is_cheque: !!isChequeTransfer,
       cash_balance: cashBalance,
