@@ -30,6 +30,7 @@ router.get('/', async (req, res) => {
     const [rows] = await pool.query(
       `SELECT e.id, DATE_FORMAT(e.bill_date, '%Y-%m-%d') as bill_date, e.bill_number,
               payee_id, payee_name, vat_reg_number, expense_type_id, expense_type,
+              sub_expense_type_id, sub_expense_type,
               without_vat_amount, vat_amount, total_bill_amount, paid_amount,
               balance, description, payment_status, e.company_id, c.name AS company_name,
               DATE_FORMAT(e.created_at, '%Y-%m-%d') as created_date
@@ -51,14 +52,14 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   const {
     bill_date, bill_number, payee_id, payee_name, vat_reg_number,
-    expense_type_id, expense_type, without_vat_amount, vat_amount,
+    expense_type_id, expense_type, sub_expense_type_id, sub_expense_type, without_vat_amount, vat_amount,
     total_bill_amount, description, company_id
   } = req.body;
 
   const userId = req.user.userId;
 
-  if (!bill_date || !payee_name || !expense_type || !company_id) {
-    return res.status(400).json({ error: 'Bill date, payee, expense type and company are required' });
+  if (!bill_date || !payee_name || !expense_type || !expense_type_id || !sub_expense_type_id || !company_id) {
+    return res.status(400).json({ error: 'Bill date, payee, expense type, sub expense type and company are required' });
   }
 
   const withoutVat = parseFloat(without_vat_amount) || 0;
@@ -76,16 +77,26 @@ router.post('/', async (req, res) => {
     if (companies.length === 0) {
       return res.status(400).json({ error: 'Selected company was not found' });
     }
+    const [subTypes] = await pool.query(
+      `SELECT st.id, st.name, et.name AS expense_type_name
+       FROM sub_expense_types st
+       JOIN expense_types et ON et.id = st.expense_type_id
+       WHERE st.id = ? AND st.expense_type_id = ? AND st.status = 1`,
+      [sub_expense_type_id, expense_type_id]
+    );
+    if (!subTypes.length) {
+      return res.status(400).json({ error: 'Selected sub expense type does not belong to the selected active expense type' });
+    }
 
     const [result] = await pool.query(
       `INSERT INTO expenses
        (bill_date, bill_number, payee_id, payee_name, vat_reg_number,
-        expense_type_id, expense_type, without_vat_amount, vat_amount,
+        expense_type_id, expense_type, sub_expense_type_id, sub_expense_type, without_vat_amount, vat_amount,
         total_bill_amount, paid_amount, balance, description, company_id, created_by, payment_status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, 'Pending')`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, 'Pending')`,
       [
         bill_date, bill_number || null, payee_id || null, payee_name,
-        vat_reg_number || null, expense_type_id || null, expense_type,
+        vat_reg_number || null, expense_type_id, subTypes[0].expense_type_name, sub_expense_type_id, subTypes[0].name,
         withoutVat, vat, totalBill, totalBill, description || null, company_id, userId
       ]
     );
@@ -104,18 +115,28 @@ router.put('/:id', async (req, res) => {
   const { id } = req.params;
   const {
     bill_date, bill_number, payee_id, payee_name, vat_reg_number,
-    expense_type_id, expense_type, without_vat_amount, vat_amount,
+    expense_type_id, expense_type, sub_expense_type_id, sub_expense_type, without_vat_amount, vat_amount,
     total_bill_amount, description, company_id
   } = req.body;
 
-  if (!bill_date || !payee_name || !expense_type || !company_id) {
-    return res.status(400).json({ error: 'Bill date, payee, expense type and company are required' });
+  if (!bill_date || !payee_name || !expense_type || !expense_type_id || !sub_expense_type_id || !company_id) {
+    return res.status(400).json({ error: 'Bill date, payee, expense type, sub expense type and company are required' });
   }
 
   try {
     const [companies] = await pool.query('SELECT id FROM company WHERE id = ?', [company_id]);
     if (companies.length === 0) {
       return res.status(400).json({ error: 'Selected company was not found' });
+    }
+    const [subTypes] = await pool.query(
+      `SELECT st.id, st.name, et.name AS expense_type_name
+       FROM sub_expense_types st
+       JOIN expense_types et ON et.id = st.expense_type_id
+       WHERE st.id = ? AND st.expense_type_id = ? AND st.status = 1`,
+      [sub_expense_type_id, expense_type_id]
+    );
+    if (!subTypes.length) {
+      return res.status(400).json({ error: 'Selected sub expense type does not belong to the selected active expense type' });
     }
 
     const [existingRows] = await pool.query(
@@ -138,12 +159,12 @@ router.put('/:id', async (req, res) => {
     const [result] = await pool.query(
       `UPDATE expenses
        SET bill_date = ?, bill_number = ?, payee_id = ?, payee_name = ?, vat_reg_number = ?,
-           expense_type_id = ?, expense_type = ?, without_vat_amount = ?, vat_amount = ?,
+           expense_type_id = ?, expense_type = ?, sub_expense_type_id = ?, sub_expense_type = ?, without_vat_amount = ?, vat_amount = ?,
            total_bill_amount = ?, balance = ?, description = ?, company_id = ?
        WHERE id = ?`,
       [
         bill_date, bill_number || null, payee_id || null, payee_name, vat_reg_number || null,
-        expense_type_id || null, expense_type, withoutVat, vat, totalBill, totalBill,
+        expense_type_id, subTypes[0].expense_type_name, sub_expense_type_id, subTypes[0].name, withoutVat, vat, totalBill, totalBill,
         description || null, company_id, id
       ]
     );

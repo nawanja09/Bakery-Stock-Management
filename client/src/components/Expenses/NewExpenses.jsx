@@ -44,6 +44,8 @@ const emptyBillForm = {
   vat_reg_number: '',
   expense_type_id: '',
   expense_type: '',
+  sub_expense_type_id: '',
+  sub_expense_type: '',
   without_vat_amount: '',
   vat_amount: '',
   total_bill_amount: '',
@@ -81,6 +83,7 @@ const NewExpenses = () => {
   // Lookups
   const [payees, setPayees] = useState([]);
   const [expenseTypes, setExpenseTypes] = useState([]);
+  const [subExpenseTypes, setSubExpenseTypes] = useState([]);
   const [paymentTypes, setPaymentTypes] = useState([]);
   const [banks, setBanks] = useState([]);
   const [companies, setCompanies] = useState([]);
@@ -243,6 +246,22 @@ const NewExpenses = () => {
     }
   }, []);
 
+  const fetchSubExpenseTypes = useCallback(async (expenseTypeId) => {
+    if (!expenseTypeId) {
+      setSubExpenseTypes([]);
+      return;
+    }
+    try {
+      const response = await api.get('/sub-expense-types', {
+        params: { expense_type_id: expenseTypeId, activeOnly: true }
+      });
+      setSubExpenseTypes(response.data || []);
+    } catch (error) {
+      console.error('Error fetching sub expense types:', error);
+      setSubExpenseTypes([]);
+    }
+  }, []);
+
   const fetchPaymentTypes = useCallback(async () => {
     try {
       const response = await api.get('/payment-methods');
@@ -362,7 +381,14 @@ const NewExpenses = () => {
       const response = await api.post('/expense-types', { name: newTypeName.trim() });
       const created = response.data;
       setExpenseTypes(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
-      setFormData(prev => ({ ...prev, expense_type_id: created.id, expense_type: created.name }));
+      setFormData(prev => ({
+        ...prev,
+        expense_type_id: created.id,
+        expense_type: created.name,
+        sub_expense_type_id: '',
+        sub_expense_type: ''
+      }));
+      setSubExpenseTypes([]);
       setShowAddType(false);
       setNewTypeName('');
       showPopup('success', 'Expense type added');
@@ -374,7 +400,24 @@ const NewExpenses = () => {
   const handleExpenseTypeChange = (e) => {
     const id = e.target.value;
     const type = expenseTypes.find(t => String(t.id) === String(id));
-    setFormData(prev => ({ ...prev, expense_type_id: id, expense_type: type ? type.name : '' }));
+    setFormData(prev => ({
+      ...prev,
+      expense_type_id: id,
+      expense_type: type ? type.name : '',
+      sub_expense_type_id: '',
+      sub_expense_type: ''
+    }));
+    fetchSubExpenseTypes(id);
+  };
+
+  const handleSubExpenseTypeChange = (e) => {
+    const id = e.target.value;
+    const type = subExpenseTypes.find(item => String(item.id) === String(id));
+    setFormData(prev => ({
+      ...prev,
+      sub_expense_type_id: id,
+      sub_expense_type: type ? type.name : ''
+    }));
   };
 
   const resetForm = () => {
@@ -386,7 +429,7 @@ const NewExpenses = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!formData.bill_date || !formData.company_id || !formData.payee_name || !formData.expense_type) {
+    if (!formData.bill_date || !formData.company_id || !formData.payee_name || !formData.expense_type || !formData.sub_expense_type_id) {
       showPopup('error', 'Please fill all required fields');
       return;
     }
@@ -406,6 +449,8 @@ const NewExpenses = () => {
         vat_reg_number: formData.vat_reg_number || null,
         expense_type_id: formData.expense_type_id || null,
         expense_type: formData.expense_type,
+        sub_expense_type_id: formData.sub_expense_type_id || null,
+        sub_expense_type: formData.sub_expense_type,
         without_vat_amount: parseFloat(formData.without_vat_amount),
         vat_amount: parseFloat(formData.vat_amount) || 0,
         total_bill_amount: parseFloat(formData.total_bill_amount),
@@ -441,11 +486,14 @@ const NewExpenses = () => {
       vat_reg_number: bill.vat_reg_number || '',
       expense_type_id: bill.expense_type_id || '',
       expense_type: bill.expense_type,
+      sub_expense_type_id: bill.sub_expense_type_id || '',
+      sub_expense_type: bill.sub_expense_type || '',
       without_vat_amount: String(bill.without_vat_amount),
       vat_amount: String(bill.vat_amount),
       total_bill_amount: String(bill.total_bill_amount),
       description: bill.description || ''
     });
+    fetchSubExpenseTypes(bill.expense_type_id);
     setPayeeSearch(bill.payee_name);
     document.querySelector('.form-card')?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -966,6 +1014,19 @@ const NewExpenses = () => {
 
           <div className="form-grid two-col">
             <div className="form-group">
+              <label>Sub Expenses Type <span className="required">*</span></label>
+              <select
+                name="sub_expense_type_id" value={formData.sub_expense_type_id}
+                onChange={handleSubExpenseTypeChange} required disabled={!formData.expense_type_id}
+                className="form-select"
+              >
+                <option value="">{formData.expense_type_id ? 'Select Sub Expense Type' : 'Select Expense Type First'}</option>
+                {subExpenseTypes.map(type => (
+                  <option key={type.id} value={type.id}>{type.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
               <label>Without VAT Amount <span className="required">*</span></label>
               <input
                 type="number" name="without_vat_amount" value={formData.without_vat_amount}
@@ -973,6 +1034,9 @@ const NewExpenses = () => {
                 className="form-input amount-input" placeholder="0.00"
               />
             </div>
+          </div>
+
+          <div className="form-row">
             <div className="form-group">
               <label>VAT Amount</label>
               <input
@@ -981,9 +1045,6 @@ const NewExpenses = () => {
                 className="form-input amount-input" placeholder="0.00"
               />
             </div>
-          </div>
-
-          <div className="form-row">
             <div className="form-group">
               <label>Total Bill Amount</label>
               <input
@@ -1089,6 +1150,7 @@ const NewExpenses = () => {
                 <th>Bill Number</th>
                 <th>Payee Name</th>
                 <th>Expenses Type</th>
+                <th>Sub Expenses Type</th>
                 <th>Company</th>
                 <th>VAT Reg No</th>
                 <th>Without VAT Amount</th>
@@ -1102,7 +1164,7 @@ const NewExpenses = () => {
             </thead>
             <tbody>
               {isFetching ? (
-                <tr><td colSpan="14" className="loading-row"><FontAwesomeIcon icon={faSpinner} spin /> Loading expenses...</td></tr>
+                <tr><td colSpan="15" className="loading-row"><FontAwesomeIcon icon={faSpinner} spin /> Loading expenses...</td></tr>
               ) : filteredBills.length > 0 ? (
                 filteredBills.map(bill => {
                   const isPaid = parseFloat(bill.balance || 0) <= 0;
@@ -1123,6 +1185,7 @@ const NewExpenses = () => {
                       </td>
                       <td className="payee-cell">{bill.payee_name}</td>
                       <td className="expense-type-cell">{bill.expense_type || '-'}</td>
+                      <td className="expense-type-cell">{bill.sub_expense_type || '-'}</td>
                       <td>{bill.company_name || '-'}</td>
                       <td className="vat-cell">{bill.vat_reg_number || '-'}</td>
                       <td className="amount-cell">{formatCurrency(bill.without_vat_amount)}</td>
@@ -1161,7 +1224,7 @@ const NewExpenses = () => {
                 })
               ) : (
                 <tr>
-                  <td colSpan="14" className="empty-row">
+                  <td colSpan="15" className="empty-row">
                     {viewFilter === 'paid' ? 'No paid expense bills found' : 'No pending expense bills found'}
                   </td>
                 </tr>

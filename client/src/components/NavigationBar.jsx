@@ -88,6 +88,7 @@ const NavigationBar = () => {
         path.startsWith('/companies') || path.startsWith('/adjustments/payment-methods') ||
         path.startsWith('/expenses/bank-details') ||
         path.startsWith('/expense-types-management') ||
+        path.startsWith('/sub-expense-types-management') ||
         path.startsWith('/expense-payees-management') ||
         path.startsWith('/bank-charges-type-management') ||
         path.startsWith('/finance/receive-types') ||
@@ -191,6 +192,7 @@ const NavigationBar = () => {
       <li><NavLink to="/adjustments/payment-methods" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faCreditCard} /></span><span>Payment Methods</span></NavLink></li>
       <li><NavLink to="/expenses/bank-details" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faBuildingColumns} /></span><span>Bank Details</span></NavLink></li>
       <li><NavLink to="/expense-types-management" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faFileInvoiceDollar} /></span><span>Expenses Type Management</span></NavLink></li>
+      <li><NavLink to="/sub-expense-types-management" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faFileInvoiceDollar} /></span><span>Sub Expenses Type Management</span></NavLink></li>
       <li><NavLink to="/expense-payees-management" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faIdCard} /></span><span>Expenses Payee Management</span></NavLink></li>
       <li><NavLink to="/bank-charges-type-management" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faUniversity} /></span><span>Bank Charges Type Management</span></NavLink></li>
       <li><NavLink to="/finance/receive-types" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faCashRegister} /></span><span>Receive Types</span></NavLink></li>
