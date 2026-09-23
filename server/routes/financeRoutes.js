@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const financeController = require('../controllers/financeController');
 const chequeRegistryController = require('../controllers/chequeRegistryController');
+const intercompanyController = require('../controllers/intercompanyController');
 const authenticate = require('../middleware/authenticate');
 const { financeReadAccess, financeWriteAccess } = require('../middleware/moduleAccess');
 
@@ -38,6 +39,11 @@ router.post('/transfer', ...financeOnly, financeController.transferFunds);
 
 // Bank-to-Bank transfer - Finance module page
 router.post('/bank/transfer', ...financeOnly, financeController.bankToBankTransfer);
+
+// Intercompany Transaction - Finance module page. Moves funds between two
+// companies' Cash/Bank accounts; NOT an expense, excluded from the Expense Report.
+router.get('/intercompany', ...financeReadOnly, intercompanyController.getIntercompanyTransactions);
+router.post('/intercompany', ...financeOnly, intercompanyController.createIntercompanyTransaction);
 
 // Expenses Cheque Registry - Finance module page
 router.get('/cheque-registry', ...financeReadOnly, chequeRegistryController.getChequeRegistry);
