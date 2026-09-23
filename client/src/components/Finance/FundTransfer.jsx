@@ -204,40 +204,41 @@ const FundTransfer = () => {
         {/* ═══════════════════ LEFT — Form ═══════════════════ */}
         <div className="ft-form-card">
 
-          {/* Company selector */}
-          <div className="ft-section">
-            <label className="ft-label">Company <span className="ft-required">*</span></label>
-            <select
-              name="company_id"
-              className="ft-select"
-              value={formData.company_id}
-              onChange={handleChange}
-              required
-            >
-              {companies.map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-          </div>
+          {/* Company selector and Transfer Direction toggle row */}
+          <div className="ft-section ft-top-row">
+            <div className="ft-top-field ft-company-group">
+              <label className="ft-label">Company <span className="ft-required">*</span></label>
+              <select
+                name="company_id"
+                className="ft-select"
+                value={formData.company_id}
+                onChange={handleChange}
+                required
+              >
+                {companies.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
 
-          {/* Transfer Direction toggle */}
-          <div className="ft-section">
-            <label className="ft-label">Transfer Direction <span className="ft-required">*</span></label>
-            <div className="ft-direction-toggle">
-              {DIRECTIONS.map(d => (
-                <button
-                  key={d.value}
-                  type="button"
-                  className={`ft-direction-btn ${formData.direction === d.value ? 'active' : ''}`}
-                  onClick={() => { setMessage(null); setFormData(prev => ({ ...prev, direction: d.value })); }}
-                >
-                  <FontAwesomeIcon
-                    icon={d.value === 'CASH_TO_BANK' ? faCashRegister : faUniversity}
-                    className="ft-dir-icon"
-                  />
-                  {d.label}
-                </button>
-              ))}
+            <div className="ft-top-field ft-direction-group">
+              <label className="ft-label">Transfer Direction <span className="ft-required">*</span></label>
+              <div className="ft-direction-toggle">
+                {DIRECTIONS.map(d => (
+                  <button
+                    key={d.value}
+                    type="button"
+                    className={`ft-direction-btn ${formData.direction === d.value ? 'active' : ''}`}
+                    onClick={() => { setMessage(null); setFormData(prev => ({ ...prev, direction: d.value })); }}
+                  >
+                    <FontAwesomeIcon
+                      icon={d.value === 'CASH_TO_BANK' ? faCashRegister : faUniversity}
+                      className="ft-dir-icon"
+                    />
+                    {d.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
