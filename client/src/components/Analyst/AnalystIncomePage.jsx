@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faEdit, faPlus, faSackDollar, faSpinner, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { faEdit, faPlus, faRotateLeft, faSackDollar, faSpinner, faTrash } from '@fortawesome/free-solid-svg-icons';
 import api from '../../api';
 import { formatCurrency } from '../../utils/formatters';
 import { usePopup } from '../context/PopupContext';
@@ -8,6 +8,7 @@ import NewIncomeModal from '../Income/NewIncomeModal';
 import '../Income/Income.css';
 
 const ALLOWED_COMPANY_NAMES = ['JH', 'RD'];
+const initialFilters = { fromDate: '', toDate: '', departmentId: 'all', companyId: 'all' };
 const formatDate = (value) => (value ? new Date(`${value}T00:00:00`).toLocaleDateString('en-GB') : '-');
 const sortRecords = (records) => [...records].sort((a, b) => (
   b.income_date.localeCompare(a.income_date) || Number(b.id) - Number(a.id)
@@ -16,29 +17,49 @@ const sortRecords = (records) => [...records].sort((a, b) => (
 const AnalystIncomePage = () => {
   const { showPopup } = usePopup();
   const [records, setRecords] = useState([]);
+  const [totalIncome, setTotalIncome] = useState(0);
   const [companies, setCompanies] = useState([]);
   const [departments, setDepartments] = useState([]);
+  const [filters, setFilters] = useState(initialFilters);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [editingRecord, setEditingRecord] = useState(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
 
-  const loadRecords = useCallback(async () => {
+  const loadRecords = useCallback(async (activeFilters) => {
+    const { fromDate, toDate, departmentId, companyId } = activeFilters;
+    if (fromDate && toDate && fromDate > toDate) {
+      setError('From Date cannot be after To Date.');
+      return;
+    }
     setLoading(true);
     setError('');
     try {
-      const response = await api.get('/incomes');
-      setRecords(sortRecords(response.data.records || []));
+      const response = await api.get('/analyst/incomes', {
+        params: {
+          ...(fromDate && { fromDate }),
+          ...(toDate && { toDate }),
+          ...(departmentId && departmentId !== 'all' && { department: departmentId }),
+          ...(companyId && companyId !== 'all' && { company: companyId })
+        }
+      });
+      const loaded = response.data.records || [];
+      setRecords(sortRecords(loaded));
+      setTotalIncome(Number(response.data.totalIncome) || 0);
     } catch (requestError) {
       setError(requestError.response?.data?.error || 'Unable to load income records.');
       setRecords([]);
+      setTotalIncome(0);
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadRecords();
+    loadRecords(filters);
+  }, [filters, loadRecords]);
+
+  useEffect(() => {
     Promise.all([api.get('/companies'), api.get('/departments')])
       .then(([companyResponse, departmentResponse]) => {
         setCompanies((companyResponse.data || []).filter((company) => (
@@ -47,7 +68,14 @@ const AnalystIncomePage = () => {
         setDepartments(departmentResponse.data || []);
       })
       .catch(() => showPopup('error', 'Unable to load companies or departments for the form.'));
-  }, [loadRecords, showPopup]);
+  }, [showPopup]);
+
+  const updateFilter = (event) => {
+    const { name, value } = event.target;
+    setFilters((current) => ({ ...current, [name]: value }));
+  };
+
+  const clearFilters = () => setFilters(initialFilters);
 
   const openCreateForm = () => {
     setEditingRecord(null);
@@ -65,11 +93,8 @@ const AnalystIncomePage = () => {
   };
 
   const handleSaved = (record, isEditing) => {
-    setRecords((current) => sortRecords(isEditing
-      ? current.map((item) => item.id === record.id ? record : item)
-      : [...current, record]
-    ));
     closeForm();
+    loadRecords(filters);
     showPopup('success', isEditing ? 'Income updated successfully.' : 'Income added successfully.');
   };
 
@@ -77,7 +102,7 @@ const AnalystIncomePage = () => {
     if (!window.confirm('Delete this income record?')) return;
     try {
       await api.delete(`/incomes/${record.id}`);
-      setRecords((current) => current.filter((item) => item.id !== record.id));
+      loadRecords(filters);
       showPopup('success', 'Income deleted successfully.');
     } catch (requestError) {
       showPopup('error', requestError.response?.data?.error || 'Unable to delete income record.');
@@ -92,6 +117,41 @@ const AnalystIncomePage = () => {
           <FontAwesomeIcon icon={faPlus} /> Add New Income
         </button>
       </header>
+
+      <div className="income-summary-grid">
+        <div className="card income-summary-card income-total-card">
+          <span>Total Income</span>
+          <strong>{formatCurrency(totalIncome)}</strong>
+        </div>
+      </div>
+
+      <div className="card income-filters">
+        <label>From Date<input type="date" name="fromDate" value={filters.fromDate} onChange={updateFilter} /></label>
+        <label>To Date<input type="date" name="toDate" value={filters.toDate} onChange={updateFilter} /></label>
+        <label>
+          Department
+          <select name="departmentId" value={filters.departmentId} onChange={updateFilter}>
+            <option value="all">All Departments</option>
+            {departments.map((department) => (
+              <option key={department.id} value={department.id}>{department.name}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Company
+          <select name="companyId" value={filters.companyId} onChange={updateFilter}>
+            <option value="all">All Companies</option>
+            {companies.map((company) => (
+              <option key={company.id} value={company.id}>{company.name}</option>
+            ))}
+          </select>
+        </label>
+        <div className="income-filters-actions">
+          <button className="btn btn-secondary" onClick={clearFilters} disabled={loading}>
+            <FontAwesomeIcon icon={faRotateLeft} /> Clear
+          </button>
+        </div>
+      </div>
 
       {error && <div className="income-error" role="alert">{error}</div>}
 
@@ -121,8 +181,8 @@ const AnalystIncomePage = () => {
         </div>
       ) : (
         <div className="income-empty-panel">
-          <strong>No income records yet</strong>
-          <span>Add your first income record to get started.</span>
+          <strong>No income records found</strong>
+          <span>No income records match the selected filters.</span>
           <button className="btn btn-primary income-new-btn" onClick={openCreateForm}>
             <FontAwesomeIcon icon={faPlus} /> Add New Income
           </button>

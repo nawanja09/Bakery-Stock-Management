@@ -11,7 +11,7 @@ const number = (value) => Number.parseFloat(value || 0) || 0;
 
 const getIncomes = async (req, res) => {
   try {
-    const { fromDate, toDate, company } = req.query;
+    const { fromDate, toDate, company, department } = req.query;
     dateFilters(fromDate, toDate);
     const clauses = ['i.status = 1'];
     const params = [];
@@ -27,10 +27,14 @@ const getIncomes = async (req, res) => {
       clauses.push('(c.name = ? OR i.company_id = ?)');
       params.push(company, company);
     }
+    if (department && department !== 'all') {
+      clauses.push('(d.name = ? OR i.department_id = ?)');
+      params.push(department, department);
+    }
     const [rows] = await pool.query(`
       SELECT i.id,
              DATE_FORMAT(i.income_date, '%Y-%m-%d') AS date,
-             i.income_date,
+             DATE_FORMAT(i.income_date, '%Y-%m-%d') AS income_date,
              CONCAT('INC-', i.id) AS reference,
              'Income' AS income_type,
              i.company_id,
@@ -52,7 +56,8 @@ const getIncomes = async (req, res) => {
       records,
       totalIncome: records.reduce((sum, row) => sum + row.amount, 0),
       transactionCount: records.length,
-      company: company || 'all'
+      company: company || 'all',
+      department: department || 'all'
     });
   } catch (error) {
     const status = error.message.startsWith('Invalid') || error.message.includes('cannot be') ? 400 : 500;
@@ -103,68 +108,38 @@ const getExpenses = async (req, res) => {
 //    e.g. CASH/BANK_TRANSFER paid in full at time of purchase) and therefore never got a
 //    payment_history row at all. Without this fallback these purchases were being treated as
 //    100% unpaid, which was inflating Outstanding Invoices / Purchasing Payable by tens of millions.
-// PERF FIX (Balance Sheet timeout): this used to be a single scalar correlated subquery
-// (PAID_TO_DATE_SQL) that MySQL re-executed once per purchase row — O(purchases x
-// payment_history) work, which was the dominant cost of the /analyst/balance-sheet endpoint
-// (verified: ~1.8s for this fragment alone on ~3.2k purchases / ~1.3k payment rows, and it is
-// used twice in this file). It is now computed as two pre-aggregated LEFT JOINs done once per
-// query instead of once per row — O(purchases + payment_history) — with byte-for-byte the same
-// arithmetic and the same three inputs: allocated amounts from purchase_payment_allocations,
-// unallocated (unsplit) payment_history rows, and the "settled at the counter" fallback for
-// purchases with payment_status = 'Paid' and no payment_history rows at all.
-// PAID_TO_DATE_JOINS must be placed directly after "FROM purchases p" (before any other JOIN/
-// WHERE on that query) and takes two `?` params, both the same balance-sheet date, for the two
-// "payment_date <= ?" filters below. PAID_TO_DATE_EXPR (0 params) then goes in the SELECT list.
-const PAID_TO_DATE_JOINS = `
-          LEFT JOIN (
-            SELECT ppa.purchase_id AS purchase_id, SUM(ppa.allocated_amount) AS allocated_total
-            FROM purchase_payment_allocations ppa
-            JOIN payment_history ph ON ph.id = ppa.payment_history_id
-            WHERE ph.payment_date <= ?
-            GROUP BY ppa.purchase_id
-          ) paid_alloc ON paid_alloc.purchase_id = p.id
-          LEFT JOIN (
-            SELECT ph.purchase_id AS purchase_id, SUM(ph.amount) AS unallocated_total
-            FROM payment_history ph
-            WHERE ph.payment_date <= ?
-              AND NOT EXISTS (
-                SELECT 1 FROM purchase_payment_allocations ppa2
-                WHERE ppa2.payment_history_id = ph.id
-              )
-            GROUP BY ph.purchase_id
-          ) paid_unalloc ON paid_unalloc.purchase_id = p.id
-          LEFT JOIN (
-            SELECT DISTINCT purchase_id FROM payment_history
-          ) has_payment ON has_payment.purchase_id = p.id`;
-const PAID_TO_DATE_EXPR = `
-            COALESCE(paid_alloc.allocated_total, 0) + COALESCE(paid_unalloc.unallocated_total, 0)
-            + CASE
-                WHEN p.payment_status = 'Paid' AND has_payment.purchase_id IS NULL
-                THEN COALESCE(NULLIF(p.total_with_vat, 0), NULLIF(p.bill_amount, 0), COALESCE(p.subtotal, 0) + COALESCE(p.vat_amount, 0))
-                ELSE 0
-              END`;
+const PAID_TO_DATE_SQL = `
+  COALESCE((
+    SELECT SUM(CASE
+      WHEN ppa.purchase_id IS NOT NULL THEN ppa.allocated_amount
+      ELSE ph.amount
+    END)
+    FROM payment_history ph
+    LEFT JOIN purchase_payment_allocations ppa
+      ON ppa.payment_history_id = ph.id AND ppa.purchase_id = p.id
+    WHERE ph.payment_date <= ?
+      AND (ppa.purchase_id = p.id OR (
+        ph.purchase_id = p.id AND NOT EXISTS (
+          SELECT 1 FROM purchase_payment_allocations ppa2
+          WHERE ppa2.payment_history_id = ph.id
+        )
+      ))
+  ), 0)
+  + CASE
+      WHEN p.payment_status = 'Paid'
+       AND NOT EXISTS (SELECT 1 FROM payment_history ph3 WHERE ph3.purchase_id = p.id)
+      THEN COALESCE(NULLIF(p.total_with_vat, 0), NULLIF(p.bill_amount, 0), COALESCE(p.subtotal, 0) + COALESCE(p.vat_amount, 0))
+      ELSE 0
+    END
+`;
 
 const getBalanceSheet = async (req, res) => {
   try {
     const { date } = req.query;
     if (!isValidDate(date)) return res.status(400).json({ error: 'A valid selected date is required' });
-    // The queries below are all independent of one another (none depends on another's result),
-    // so they are issued concurrently instead of one-by-one. This was the main cause of the
-    // Balance Sheet timing out: 7 queries were being awaited sequentially, so total wait time was
-    // the SUM of every query's latency instead of the MAX. Running them with Promise.all cuts
-    // that to roughly the slowest single query. No query text, params, or calculations changed.
-    const [
-      [cashRows],
-      [bankRows],
-      [storesRows],
-      [purchasingRows],
-      [advanceRows],
-      [excessPaymentRows],
-      [returnExcessRows]
-    ] = await Promise.all([
-      pool.query(`SELECT c.id AS company_id, c.name, COALESCE(SUM(ft.debit - ft.credit), 0) AS balance FROM company c LEFT JOIN finance_transactions ft ON ft.company_id = c.id AND ft.account_type = 'CASH' AND ft.status = 1 AND ft.transaction_date <= ? GROUP BY c.id, c.name ORDER BY c.id`, [date]),
-      pool.query(`SELECT bd.id, bd.bank_name, bd.account_number, bd.company, COALESCE(SUM(ft.debit - ft.credit), 0) AS balance FROM bank_details bd LEFT JOIN finance_transactions ft ON ft.bank_id = bd.id AND ft.account_type = 'BANK' AND ft.status = 1 AND ft.transaction_date <= ? WHERE bd.status = 'Active' AND COALESCE(bd.record_status, 1) = 1 GROUP BY bd.id, bd.bank_name, bd.account_number, bd.company ORDER BY bd.id`, [date]),
-      pool.query(`
+    const [cashRows] = await pool.query(`SELECT c.id AS company_id, c.name, COALESCE(SUM(ft.debit - ft.credit), 0) AS balance FROM company c LEFT JOIN finance_transactions ft ON ft.company_id = c.id AND ft.account_type = 'CASH' AND ft.status = 1 AND ft.transaction_date <= ? GROUP BY c.id, c.name ORDER BY c.id`, [date]);
+    const [bankRows] = await pool.query(`SELECT bd.id, bd.bank_name, bd.account_number, bd.company, COALESCE(SUM(ft.debit - ft.credit), 0) AS balance FROM bank_details bd LEFT JOIN finance_transactions ft ON ft.bank_id = bd.id AND ft.account_type = 'BANK' AND ft.status = 1 AND ft.transaction_date <= ? WHERE bd.status = 'Active' AND COALESCE(bd.record_status, 1) = 1 GROUP BY bd.id, bd.bank_name, bd.account_number, bd.company ORDER BY bd.id`, [date]);
+    const [storesRows] = await pool.query(`
       SELECT COALESCE(SUM(closing_balance * COALESCE(unit_price, 0)), 0) AS stores_value
       FROM (
         SELECT i.id,
@@ -234,8 +209,8 @@ const getBalanceSheet = async (req, res) => {
         WHERE i.auto_add_to_stock = 1
           AND i.deleted = FALSE
           AND i.is_active = TRUE
-      ) stock_values`, [date, date, date, date, date, date, date, date]),
-      pool.query(`
+      ) stock_values`, [date, date, date, date, date, date, date, date]);
+    const [purchasingRows] = await pool.query(`
       SELECT
         COALESCE(SUM(invoice_total), 0) AS total_purchasing_value,
         COALESCE(SUM(CASE WHEN outstanding <= 0 THEN invoice_total ELSE 0 END), 0) AS total_purchasing_completed,
@@ -257,13 +232,13 @@ const getBalanceSheet = async (req, res) => {
               ), 0),
               0
             ) AS invoice_total,
-            ${PAID_TO_DATE_EXPR} AS paid_to_date
-          FROM purchases p${PAID_TO_DATE_JOINS}
+            ${PAID_TO_DATE_SQL} AS paid_to_date
+          FROM purchases p
           WHERE DATE(p.purchase_date) <= ?
             AND COALESCE(p.deleted, 0) = 0
         ) invoice_positions
-      ) invoice_balances`, [date, date, date, date]),
-      pool.query(`
+      ) invoice_balances`, [date, date, date]);
+    const [advanceRows] = await pool.query(`
       SELECT COALESCE(SUM(GREATEST(so.original_amount - COALESCE(used.amount, 0), 0)), 0) AS advance_payment_balance
       FROM supplier_overpayments so
       LEFT JOIN (
@@ -272,8 +247,8 @@ const getBalanceSheet = async (req, res) => {
         WHERE credit_type = 'overpayment' AND settlement_date <= ?
         GROUP BY overpayment_id
       ) used ON used.overpayment_id = so.id
-      WHERE so.payment_date <= ?`, [date, date]),
-      pool.query(`
+      WHERE so.payment_date <= ?`, [date, date]);
+    const [excessPaymentRows] = await pool.query(`
       SELECT COALESCE(SUM(GREATEST(ph.amount - COALESCE(allocations.allocated_amount, 0), 0)), 0) AS payment_overpayment
       FROM payment_history ph
       INNER JOIN (
@@ -289,8 +264,8 @@ const getBalanceSheet = async (req, res) => {
           WHERE ppa.payment_history_id = ph.id
             AND DATE(p.purchase_date) <= ?
             AND COALESCE(p.deleted, 0) = 0
-        )`, [date, date]),
-      pool.query(`
+        )`, [date, date]);
+    const [returnExcessRows] = await pool.query(`
       SELECT COALESCE(SUM(GREATEST(paid_to_date - net_invoice_total, 0)), 0) AS return_overpayment
       FROM (
         SELECT p.id,
@@ -303,11 +278,10 @@ const getBalanceSheet = async (req, res) => {
             ), 0),
             0
           ) AS net_invoice_total,
-          ${PAID_TO_DATE_EXPR} AS paid_to_date
-        FROM purchases p${PAID_TO_DATE_JOINS}
+          ${PAID_TO_DATE_SQL} AS paid_to_date
+        FROM purchases p
         WHERE DATE(p.purchase_date) <= ? AND COALESCE(p.deleted, 0) = 0
-      ) invoice_positions`, [date, date, date, date])
-    ]);
+      ) invoice_positions`, [date, date, date]);
     const cashBooks = cashRows.map(row => ({ companyId: row.company_id, name: row.name, balance: number(row.balance) }));
     const cashBookJH = cashBooks.find(row => /jh/i.test(row.name))?.balance || 0;
     const cashBookRD = cashBooks.find(row => /rd/i.test(row.name))?.balance || 0;
