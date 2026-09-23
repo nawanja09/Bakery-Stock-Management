@@ -55,6 +55,39 @@ const ensureChequeReleaseSchema = async () => {
       await pool.query('ALTER TABLE expenses_cheque_registry ADD COLUMN bank_id INT NULL AFTER bank');
     } catch (_) {}
   }
+
+  // ── Type field: Expense vs Transfer ────────────────────────────────────
+  // 'Expense'  - a real business expense (RM Purchasing / New Expenses cheque
+  //              payments) - included in the Expense Report.
+  // 'Transfer' - an internal Bank<->Cash movement of funds (BANK_TO_CASH
+  //              cheque transfers) - NOT an expense, excluded from the
+  //              Expense Report. Ledger posting for these is already
+  //              dual-leg (Bank credit + Cash debit) via getChequeSource's
+  //              dualLeg branch above, so no release-logic change is needed
+  //              - this column only makes that classification explicit and
+  //              queryable instead of implicit in source_type.
+  try {
+    await pool.query(`
+      ALTER TABLE expenses_cheque_registry
+      ADD COLUMN IF NOT EXISTS type ENUM('Expense','Transfer') NOT NULL DEFAULT 'Expense' AFTER source_id
+    `);
+  } catch (_) {
+    try {
+      await pool.query(
+        "ALTER TABLE expenses_cheque_registry ADD COLUMN type ENUM('Expense','Transfer') NOT NULL DEFAULT 'Expense' AFTER source_id"
+      );
+    } catch (_) {}
+  }
+
+  // Backfill: any existing BANK_TO_CASH rows were inserted before this
+  // column existed and defaulted to 'Expense' - correct them to 'Transfer'.
+  // PURCHASING_PAYMENT / EXPENSE_PAYMENT rows are already correct as
+  // 'Expense' via the column default.
+  try {
+    await pool.query(
+      "UPDATE expenses_cheque_registry SET type = 'Transfer' WHERE source_type = 'BANK_TO_CASH' AND type != 'Transfer'"
+    );
+  } catch (_) {}
 };
 
 const rebuildAccountBalance = async (connection, accountType, accountId) => {

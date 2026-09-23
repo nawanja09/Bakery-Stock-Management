@@ -1481,6 +1481,14 @@ const getExpensesReport = async (req, res) => {
     const includeOther = normalizedType === 'other' || normalizedType === 'all';
     const includePettyCash = normalizedType === 'petty_cash' || normalizedType === 'all';
     const includeBankCharges = normalizedType === 'bank_charges' || normalizedType === 'all';
+    // RM Purchasing invoices paid by cheque are tracked in expenses_cheque_registry
+    // (source_type = 'PURCHASING_PAYMENT'), not in the `expenses` table, so they
+    // were never picked up by the "Other" query above. Cheque Registry rows are
+    // classified Expense/Transfer via ecr.type - only 'Expense' rows (real
+    // supplier payments) belong in this report; 'Transfer' rows (BANK_TO_CASH
+    // Bank<->Cash movements) must never appear here, and are simply never
+    // queried below.
+    const includeRmPurchasing = normalizedType === 'rm_purchasing' || normalizedType === 'all';
 
     // Resolve the selected payee's name once, so Petty Cash (which only
     // stores a free-text payee_name) can be filtered the same way as
@@ -1598,6 +1606,44 @@ const getExpensesReport = async (req, res) => {
       results = results.concat(bankChargeRows);
     }
 
+    // RM Purchasing cheque payments (Cheque Registry, type = 'Expense' only -
+    // 'Transfer' rows are deliberately excluded by this WHERE clause, since
+    // they're internal Bank<->Cash movements, not expenses). No payeeId
+    // filter here: payeeId refers to the New Expenses `payees` table, which
+    // is a different entity from RM Purchasing suppliers.
+    if (includeRmPurchasing && !payeeId) {
+      const rmPurchasingQuery = `
+        SELECT
+          ecr.id,
+          'RM Purchasing' AS type,
+          ecr.date AS date,
+          ecr.name AS payee_name,
+          'Cheque Payment' AS expense_type,
+          ecr.cheque_number AS reference,
+          ecr.amount AS amount,
+          ecr.status AS status,
+          p.company_id AS company_id,
+          comp.name AS company_name
+        FROM expenses_cheque_registry ecr
+        LEFT JOIN payment_history ph ON ph.id = ecr.source_id
+        LEFT JOIN purchases p ON p.id = ph.purchase_id
+        LEFT JOIN company comp ON comp.id = p.company_id
+        WHERE ecr.source_type = 'PURCHASING_PAYMENT'
+          AND ecr.type = 'Expense'
+          AND ecr.status != 'Deleted'
+        ${startDate ? 'AND ecr.date >= ?' : ''}
+        ${endDate ? 'AND ecr.date < DATE_ADD(?, INTERVAL 1 DAY)' : ''}
+        ${companyId ? 'AND p.company_id = ?' : ''}
+      `;
+      const rmPurchasingParams = [];
+      if (startDate) rmPurchasingParams.push(startDate);
+      if (endDate) rmPurchasingParams.push(endDate);
+      if (companyId) rmPurchasingParams.push(companyId);
+
+      const [rmPurchasingRows] = await pool.query(rmPurchasingQuery, rmPurchasingParams);
+      results = results.concat(rmPurchasingRows);
+    }
+
     results.sort((a, b) => new Date(b.date) - new Date(a.date));
 
     const expenses = results.map(row => ({
@@ -1616,8 +1662,9 @@ const getExpensesReport = async (req, res) => {
     const pettyCashTotal = expenses.filter(e => e.type === 'Petty Cash').reduce((sum, e) => sum + e.amount, 0);
     const otherTotal = expenses.filter(e => e.type === 'Other').reduce((sum, e) => sum + e.amount, 0);
     const bankChargesTotal = expenses.filter(e => e.type === 'Bank Charges').reduce((sum, e) => sum + e.amount, 0);
+    const rmPurchasingTotal = expenses.filter(e => e.type === 'RM Purchasing').reduce((sum, e) => sum + e.amount, 0);
 
-    res.json({ expenses, grandTotal, pettyCashTotal, otherTotal, bankChargesTotal });
+    res.json({ expenses, grandTotal, pettyCashTotal, otherTotal, bankChargesTotal, rmPurchasingTotal });
   } catch (error) {
     console.error('Error generating expenses report:', error);
     res.status(500).json({ error: 'Server error: ' + error.message });

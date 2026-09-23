@@ -31,6 +31,26 @@ const SOURCE_LABELS = {
   EXPENSE_PAYMENT: { label: 'New Expenses', badgeClass: 'ecr-badge-expense' }
 };
 
+// Business classification, independent of which module the cheque came
+// from. 'Expense' cheques are real outgoings (RM Purchasing / New
+// Expenses payments) and are included in the Expense Report. 'Transfer'
+// cheques are internal Bank<->Cash movements (Cash/Bank Transfer's
+// Bank->Cash cheque option) - not an expense, so they never appear in the
+// Expense Report, and their ledger posting on Release always updates both
+// the Bank and Cash balances. Derived automatically from the source
+// module, not manually editable, since it reflects what actually happened
+// to the money.
+const TYPE_LABELS = {
+  Expense: { label: 'Expense', badgeClass: 'ecr-type-expense' },
+  Transfer: { label: 'Transfer', badgeClass: 'ecr-type-transfer' }
+};
+
+const TYPE_FILTER_OPTIONS = [
+  { value: 'All', label: 'All Types' },
+  { value: 'Expense', label: 'Expense' },
+  { value: 'Transfer', label: 'Transfer' }
+];
+
 // Single source of truth for a row's status "bucket" - used by both the
 // metrics cards and the 3 tabs below, so they can never disagree.
 // Maps directly to the database `status` column values (Pending / Released
@@ -53,12 +73,14 @@ const ExpensesChequeRegistry = () => {
   const [filterInputs, setFilterInputs] = useState({
     dateFrom: '',
     dateTo: '',
-    name: ''
+    name: '',
+    type: 'All'
   });
   const [appliedFilters, setAppliedFilters] = useState({
     dateFrom: '',
     dateTo: '',
-    name: ''
+    name: '',
+    type: 'All'
   });
 
   // ── Status tabs (Pending Cheque / Completed Cheque / Returned Cheque) ─────
@@ -93,6 +115,7 @@ const ExpensesChequeRegistry = () => {
       if (filtersToUse.dateFrom) params.dateFrom = filtersToUse.dateFrom;
       if (filtersToUse.dateTo) params.dateTo = filtersToUse.dateTo;
       if (filtersToUse.name && filtersToUse.name.trim()) params.name = filtersToUse.name.trim();
+      if (filtersToUse.type && filtersToUse.type !== 'All') params.type = filtersToUse.type;
 
       const res = await api.get('/finance/cheque-registry', { params });
       setRecords(res.data || []);
@@ -121,7 +144,7 @@ const ExpensesChequeRegistry = () => {
   };
 
   const handleReset = () => {
-    const emptyFilters = { dateFrom: '', dateTo: '', name: '' };
+    const emptyFilters = { dateFrom: '', dateTo: '', name: '', type: 'All' };
     setFilterInputs(emptyFilters);
     setAppliedFilters(emptyFilters);
   };
@@ -244,6 +267,7 @@ const ExpensesChequeRegistry = () => {
     const headers = [
       'Date',
       'Name',
+      'Type',
       'Source',
       'Cheque Number',
       'Amount',
@@ -268,6 +292,7 @@ const ExpensesChequeRegistry = () => {
         return [
           escapeCSV(r.date),
           escapeCSV(r.name),
+          escapeCSV(TYPE_LABELS[r.type]?.label || r.type || 'Expense'),
           escapeCSV(sourceName),
           escapeCSV(r.cheque_number),
           parseFloat(r.amount || 0).toFixed(2),
@@ -302,6 +327,8 @@ const ExpensesChequeRegistry = () => {
     let pendingCount = 0;
     let releasedCount = 0;
     let returnedCount = 0;
+    let expenseAmount = 0;
+    let transferAmount = 0;
 
     records.forEach((r) => {
       const amt = parseFloat(r.amount || 0);
@@ -316,6 +343,11 @@ const ExpensesChequeRegistry = () => {
         pendingCount++;
         pendingAmount += amt;
       }
+      if (r.type === 'Transfer') {
+        transferAmount += amt;
+      } else {
+        expenseAmount += amt;
+      }
     });
 
     return {
@@ -326,7 +358,9 @@ const ExpensesChequeRegistry = () => {
       releasedCount,
       releasedAmount,
       returnedCount,
-      returnedAmount
+      returnedAmount,
+      expenseAmount,
+      transferAmount
     };
   }, [records]);
 
@@ -375,7 +409,9 @@ const ExpensesChequeRegistry = () => {
         <div className="card ecr-metric-card">
           <span className="ecr-metric-label">Total Cheques</span>
           <strong className="ecr-metric-value">{metrics.totalCount}</strong>
-          <span className="ecr-metric-sub">Rs. {fmt(metrics.totalAmount)}</span>
+          <span className="ecr-metric-sub">
+            Rs. {fmt(metrics.totalAmount)} &nbsp;•&nbsp; Expense Rs. {fmt(metrics.expenseAmount)} / Transfer Rs. {fmt(metrics.transferAmount)}
+          </span>
         </div>
 
         <div className="card ecr-metric-card ecr-metric-pending">
@@ -432,6 +468,20 @@ const ExpensesChequeRegistry = () => {
               placeholder="Search by supplier or payee name…"
               className="ecr-filter-input"
             />
+          </div>
+
+          <div className="ecr-filter-group">
+            <label className="ecr-filter-lbl">Type</label>
+            <select
+              name="type"
+              value={filterInputs.type}
+              onChange={handleInputChange}
+              className="ecr-filter-input"
+            >
+              {TYPE_FILTER_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
           </div>
 
           <div className="ecr-filter-actions">
@@ -508,6 +558,7 @@ const ExpensesChequeRegistry = () => {
                 <tr>
                   <th>Date</th>
                   <th>Name (Supplier / Payee)</th>
+                  <th className="ecr-center-col">Type</th>
                   <th>Cheque Number</th>
                   <th className="ecr-num-col">Amount</th>
                   <th>Cheque Date</th>
@@ -527,6 +578,7 @@ const ExpensesChequeRegistry = () => {
                     label: row.source_type,
                     badgeClass: 'ecr-badge-default'
                   };
+                  const typeConfig = TYPE_LABELS[row.type] || TYPE_LABELS.Expense;
 
                   const isPending = !row.returned && row.status !== 'Released' && row.status !== 'Returned';
                   const isReleased = !row.returned && row.status === 'Released';
@@ -548,6 +600,20 @@ const ExpensesChequeRegistry = () => {
                             {sourceConfig.label}
                           </span>
                         </div>
+                      </td>
+
+                      {/* Type (Expense / Transfer) */}
+                      <td className="ecr-center-col">
+                        <span
+                          className={`ecr-type-badge ${typeConfig.badgeClass}`}
+                          title={
+                            row.type === 'Transfer'
+                              ? 'Internal Bank ↔ Cash transfer — not an expense, excluded from the Expense Report'
+                              : 'Real business expense — included in the Expense Report'
+                          }
+                        >
+                          {typeConfig.label}
+                        </span>
                       </td>
 
                       {/* Cheque Number */}

@@ -390,6 +390,30 @@
   color: #475569;
 }
 
+/* Type Badges (Expense vs Transfer) */
+.ecr-type-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 3px 10px;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+
+.ecr-type-expense {
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.ecr-type-transfer {
+  background: #ede9fe;
+  color: #6d28d9;
+  border: 1px solid #ddd6fe;
+}
+
 .ecr-cheque-num {
   color: #0369a1;
   font-weight: 600;

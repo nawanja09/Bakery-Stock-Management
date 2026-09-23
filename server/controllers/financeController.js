@@ -415,10 +415,10 @@ const transferFunds = async (req, res) => {
 
       await connection.query(
         `INSERT INTO expenses_cheque_registry
-           (source_type, source_id, date, name, cheque_number, amount, bank, bank_id, release_date, status)
-         VALUES ('BANK_TO_CASH', ?, ?, ?, ?, ?, ?, ?, NULL, 'Pending')
+           (source_type, type, source_id, date, name, cheque_number, amount, bank, bank_id, release_date, status)
+         VALUES ('BANK_TO_CASH', 'Transfer', ?, ?, ?, ?, ?, ?, ?, NULL, 'Pending')
          ON DUPLICATE KEY UPDATE
-           date = VALUES(date), name = VALUES(name), amount = VALUES(amount), bank = VALUES(bank), bank_id = VALUES(bank_id), status = 'Pending'`,
+           date = VALUES(date), name = VALUES(name), amount = VALUES(amount), bank = VALUES(bank), bank_id = VALUES(bank_id), status = 'Pending', type = 'Transfer'`,
         [transferId, date, bankLabel, String(cheque_number).trim(), transferAmount, bankLabel, bank_id || null]
       );
     } else if (from_account === 'CASH' && to_account === 'BANK') {

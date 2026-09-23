@@ -414,8 +414,8 @@ router.post('/pay', async (req, res) => {
         }
         await pool.query(
           `INSERT INTO expenses_cheque_registry
-             (source_type, source_id, date, name, cheque_number, amount, bank, bank_id, status)
-           VALUES ('EXPENSE_PAYMENT', ?, ?, ?, ?, ?, ?, ?, 'Pending')
+             (source_type, type, source_id, date, name, cheque_number, amount, bank, bank_id, status)
+           VALUES ('EXPENSE_PAYMENT', 'Expense', ?, ?, ?, ?, ?, ?, ?, 'Pending')
            ON DUPLICATE KEY UPDATE
              date             = VALUES(date),
              name             = VALUES(name),
@@ -423,7 +423,8 @@ router.post('/pay', async (req, res) => {
              amount           = VALUES(amount),
              bank             = VALUES(bank),
              bank_id          = VALUES(bank_id),
-             status           = 'Pending'`,
+             status           = 'Pending',
+             type             = 'Expense'`,
           [
             paymentId,
             payment_date,

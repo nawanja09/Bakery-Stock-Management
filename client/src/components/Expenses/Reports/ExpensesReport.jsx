@@ -28,6 +28,7 @@ const ExpensesReport = () => {
   const [pettyCashTotal, setPettyCashTotal] = useState(0);
   const [otherTotal, setOtherTotal] = useState(0);
   const [bankChargesTotal, setBankChargesTotal] = useState(0);
+  const [rmPurchasingTotal, setRmPurchasingTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [hasSearched, setHasSearched] = useState(false);
@@ -82,6 +83,7 @@ const ExpensesReport = () => {
       setPettyCashTotal(res.data?.pettyCashTotal || 0);
       setOtherTotal(res.data?.otherTotal || 0);
       setBankChargesTotal(res.data?.bankChargesTotal || 0);
+      setRmPurchasingTotal(res.data?.rmPurchasingTotal || 0);
     } catch (err) {
       console.error('Error fetching expenses report:', err);
       setError('Failed to load expenses report. Please try again.');
@@ -90,6 +92,7 @@ const ExpensesReport = () => {
       setPettyCashTotal(0);
       setOtherTotal(0);
       setBankChargesTotal(0);
+      setRmPurchasingTotal(0);
     } finally {
       setLoading(false);
       setHasSearched(true);
@@ -169,7 +172,7 @@ const ExpensesReport = () => {
       if (p) parts.push(`Payee: ${p.payee_name}`);
     }
     if (type && type !== 'all') {
-      const typeLabels = { petty_cash: 'Petty Cash', other: 'Other', bank_charges: 'Bank Charges' };
+      const typeLabels = { petty_cash: 'Petty Cash', other: 'Other', bank_charges: 'Bank Charges', rm_purchasing: 'RM Purchasing' };
       parts.push(`Type: ${typeLabels[type]}`);
     }
     return parts.join(' | ');
@@ -305,6 +308,7 @@ const ExpensesReport = () => {
               <option value="petty_cash">Petty Cash</option>
               <option value="other">Other</option>
               <option value="bank_charges">Bank Charges</option>
+              <option value="rm_purchasing">RM Purchasing</option>
             </select>
           </div>
 
@@ -361,7 +365,7 @@ const ExpensesReport = () => {
                   <tr key={`${exp.type}-${exp.id}`}>
                     <td>{exp.date ? format(new Date(exp.date), 'MMM dd, yyyy') : 'N/A'}</td>
                     <td>
-                      <span className={`er-type-badge ${exp.type === 'Petty Cash' ? 'er-type-petty' : exp.type === 'Bank Charges' ? 'er-type-bank' : 'er-type-other'}`}>
+                      <span className={`er-type-badge ${exp.type === 'Petty Cash' ? 'er-type-petty' : exp.type === 'Bank Charges' ? 'er-type-bank' : exp.type === 'RM Purchasing' ? 'er-type-rm' : 'er-type-other'}`}>
                         {exp.type}
                       </span>
                     </td>
@@ -387,6 +391,7 @@ const ExpensesReport = () => {
             <span>Petty Cash: <strong style={{ color: 'var(--color-text-primary)' }}>{formatCurrency(pettyCashTotal)}</strong></span>
             <span>Other: <strong style={{ color: 'var(--color-text-primary)' }}>{formatCurrency(otherTotal)}</strong></span>
             <span>Bank Charges: <strong style={{ color: 'var(--color-text-primary)' }}>{formatCurrency(bankChargesTotal)}</strong></span>
+            <span>RM Purchasing: <strong style={{ color: 'var(--color-text-primary)' }}>{formatCurrency(rmPurchasingTotal)}</strong></span>
             <span style={{ marginLeft: 'auto', fontSize: 'var(--font-size-base)' }}>Grand Total: <strong style={{ color: 'var(--color-primary)' }}>{formatCurrency(grandTotal)}</strong></span>
           </div>
         </div>
