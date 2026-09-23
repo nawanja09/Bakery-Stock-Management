@@ -3,7 +3,7 @@ const router = express.Router();
 const pool = require('../config/db');
 const authenticate = require('../middleware/authenticate');
 const restrictRoles = require('../middleware/restrictRoles');
-const { recordCashTransaction, recordBankTransaction } = require('../utils/financeLedger');
+const { recordCashTransaction, recordBankTransaction, calculateRunningBalances } = require('../utils/financeLedger');
 const { checkDuplicateReference, DuplicateReferenceError } = require('../services/referenceValidationService');
 const { getActiveBankAccounts } = require('../services/bankAccountService');
 
@@ -160,6 +160,77 @@ router.get('/petty-cash/reimbursements', async (req, res) => {
 });
 
 // =============================================
+// GET Petty Cash Transaction History (running balance)
+// Combines Reimbursements (Debit) and Vouchers/Expenses (Credit) into a
+// single chronological ledger. The balance column is never stored - it is
+// always recalculated from the underlying transaction history on every
+// request, reusing the same running-balance formula the Finance Cash Book
+// ledger uses (balance = previous balance + debit - credit), so the two
+// stay consistent and the value can never be manually edited.
+// =============================================
+router.get('/petty-cash/transactions', async (req, res) => {
+  try {
+    const [reimbursementRows] = await pool.query(
+      `SELECT
+         r.id,
+         'REIMBURSEMENT' AS source,
+         DATE_FORMAT(r.reimbursement_date, '%Y-%m-%d') AS date,
+         CONCAT('Petty Cash Reimbursement - ', r.reference_number) AS remark,
+         r.reference_number,
+         r.amount AS debit,
+         0 AS credit,
+         r.created_at
+       FROM petty_cash_reimbursements r`
+    );
+
+    const [voucherRows] = await pool.query(
+      `SELECT
+         v.id,
+         'VOUCHER' AS source,
+         DATE_FORMAT(v.voucher_date, '%Y-%m-%d') AS date,
+         CONCAT('Petty Cash Expense - ', v.expense_type, ' (', v.payee_name, ')') AS remark,
+         v.voucher_number AS reference_number,
+         0 AS debit,
+         v.amount AS credit,
+         v.created_at
+       FROM petty_cash_vouchers v`
+    );
+
+    // Chronological order (oldest first) so the running balance builds up
+    // correctly, exactly like the Finance Cash Book ledger does.
+    const combined = [...reimbursementRows, ...voucherRows].sort((a, b) => {
+      const dateDiff = new Date(a.date) - new Date(b.date);
+      if (dateDiff !== 0) return dateDiff;
+      const createdDiff = new Date(a.created_at) - new Date(b.created_at);
+      if (createdDiff !== 0) return createdDiff;
+      return a.id - b.id;
+    });
+
+    const withBalances = calculateRunningBalances(combined, 0);
+
+    // Most recent transaction first, matching every other table on this page.
+    const transactions = withBalances
+      .slice()
+      .reverse()
+      .map((t) => ({
+        id: t.id,
+        source: t.source,
+        date: t.date,
+        remark: t.remark,
+        reference_number: t.reference_number,
+        debit: parseFloat(t.debit) || 0,
+        credit: parseFloat(t.credit) || 0,
+        balance: t.balance
+      }));
+
+    res.json(transactions);
+  } catch (error) {
+    console.error('Error fetching petty cash transaction history:', error);
+    res.status(500).json({ error: 'Failed to fetch petty cash transaction history' });
+  }
+});
+
+// =============================================
 // POST Create Voucher
 // =============================================
 router.post('/petty-cash/voucher', authenticate, async (req, res) => {
@@ -205,11 +276,15 @@ router.post('/petty-cash/voucher', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'Selected Company has no valid Cash Book' });
     }
 
+    // A Petty Cash Expense Voucher posts its Credit transaction to the Cash
+    // Book immediately (below), so the expense is already paid out of the
+    // float the moment it's submitted - it should show as Paid, not Pending,
+    // including in the Expenses Report.
     const [result] = await connection.query(
       `INSERT INTO petty_cash_vouchers 
        (voucher_number, voucher_date, employee_name, payee_name, company_id,
         expense_type, description, vehicle_number, amount, receipt_no, created_by, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending')`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Paid')`,
       [
         voucher_number, 
         voucher_date, 
