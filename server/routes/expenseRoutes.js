@@ -169,9 +169,31 @@ router.get('/petty-cash/reimbursements', async (req, res) => {
 // request, reusing the same running-balance formula the Finance Cash Book
 // ledger uses (balance = previous balance + debit - credit), so the two
 // stay consistent and the value can never be manually edited.
+//
+// This is the single data source of the Petty Cash page's Recent Vouchers
+// table (the separate Transaction History table was removed from the UI, its
+// logic lives on here). Optional query params:
+//   from_date / to_date (YYYY-MM-DD) - return every transaction in the range
+//                                      (any limit is ignored)
+//   limit                            - only used when NO date range is given
+//                                      (the page sends 10 -> latest 10 rows)
+// The running balance is always calculated over the FULL history first and
+// only then filtered, so a row's balance is the true petty cash balance at
+// that point - not one that restarts from zero inside the selected range.
 // =============================================
 router.get('/petty-cash/transactions', async (req, res) => {
   try {
+    const isIsoDate = (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
+    const fromDate = req.query.from_date || null;
+    const toDate = req.query.to_date || null;
+    if ((fromDate && !isIsoDate(fromDate)) || (toDate && !isIsoDate(toDate))) {
+      return res.status(400).json({ error: 'from_date and to_date must be in YYYY-MM-DD format' });
+    }
+    if (fromDate && toDate && fromDate > toDate) {
+      return res.status(400).json({ error: 'From Date cannot be after To Date' });
+    }
+    const limit = parseInt(req.query.limit, 10);
+
     const [reimbursementRows] = await pool.query(
       `SELECT
          r.id,
@@ -181,8 +203,12 @@ router.get('/petty-cash/transactions', async (req, res) => {
          r.reference_number,
          r.amount AS debit,
          0 AS credit,
-         r.created_at
-       FROM petty_cash_reimbursements r`
+         r.created_at,
+         r.company_id,
+         comp.name AS company_name,
+         r.status
+       FROM petty_cash_reimbursements r
+       LEFT JOIN company comp ON r.company_id = comp.id`
     );
 
     const [voucherRows] = await pool.query(
@@ -194,8 +220,18 @@ router.get('/petty-cash/transactions', async (req, res) => {
          v.voucher_number AS reference_number,
          0 AS debit,
          v.amount AS credit,
-         v.created_at
-       FROM petty_cash_vouchers v`
+         v.created_at,
+         v.employee_name,
+         v.payee_name,
+         v.expense_type,
+         v.description,
+         v.vehicle_number,
+         v.receipt_no,
+         v.status,
+         v.company_id,
+         comp.name AS company_name
+       FROM petty_cash_vouchers v
+       LEFT JOIN company comp ON v.company_id = comp.id`
     );
 
     // Chronological order (oldest first) so the running balance builds up
@@ -210,20 +246,41 @@ router.get('/petty-cash/transactions', async (req, res) => {
 
     const withBalances = calculateRunningBalances(combined, 0);
 
+    // Date-range filter (inclusive) - applied AFTER balances are calculated.
+    const hasRange = Boolean(fromDate || toDate);
+    let visible = withBalances.filter((t) =>
+      (!fromDate || t.date >= fromDate) && (!toDate || t.date <= toDate)
+    );
+
     // Most recent transaction first, matching every other table on this page.
-    const transactions = withBalances
-      .slice()
-      .reverse()
-      .map((t) => ({
-        id: t.id,
-        source: t.source,
-        date: t.date,
-        remark: t.remark,
-        reference_number: t.reference_number,
-        debit: parseFloat(t.debit) || 0,
-        credit: parseFloat(t.credit) || 0,
-        balance: t.balance
-      }));
+    visible = visible.slice().reverse();
+
+    // No date range -> latest N only. A date range always returns everything.
+    if (!hasRange && Number.isInteger(limit) && limit > 0) {
+      visible = visible.slice(0, limit);
+    }
+
+    const transactions = visible.map((t) => ({
+      id: t.id,
+      source: t.source,
+      date: t.date,
+      remark: t.remark,
+      reference_number: t.reference_number,
+      debit: parseFloat(t.debit) || 0,
+      credit: parseFloat(t.credit) || 0,
+      balance: t.balance,
+      // Extra fields so the Recent Vouchers table can render / edit rows
+      // without a second request (undefined for reimbursement rows).
+      employee_name: t.employee_name,
+      payee_name: t.payee_name,
+      expense_type: t.expense_type,
+      description: t.description,
+      vehicle_number: t.vehicle_number,
+      receipt_no: t.receipt_no,
+      status: t.status,
+      company_id: t.company_id,
+      company_name: t.company_name
+    }));
 
     res.json(transactions);
   } catch (error) {
