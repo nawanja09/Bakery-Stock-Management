@@ -38,6 +38,7 @@ const BankDetails = () => {
   const [isFetching, setIsFetching] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [baseTransactions, setBaseTransactions] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState(emptyForm);
@@ -62,16 +63,23 @@ const BankDetails = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => {
-      if (name === 'opening_balance') {
-        const openingBalance = value;
-        const currentBalance = prev.current_balance === '' || parseFloat(prev.current_balance) === parseFloat(prev.opening_balance)
-          ? openingBalance
-          : prev.current_balance;
-        return { ...prev, opening_balance: openingBalance, current_balance: currentBalance };
+    if (name === 'opening_balance') {
+      const parsed = parseFloat(value);
+      const op = Number.isFinite(parsed) ? parsed : 0;
+      let newCurrent;
+      if (editingId) {
+        newCurrent = value === '' ? baseTransactions : Number((op + baseTransactions).toFixed(2));
+      } else {
+        newCurrent = value;
       }
-      return { ...prev, [name]: value };
-    });
+      setFormData(prev => ({
+        ...prev,
+        opening_balance: value,
+        current_balance: newCurrent
+      }));
+      return;
+    }
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
@@ -82,11 +90,27 @@ const BankDetails = () => {
     }
     setIsLoading(true);
     try {
+      const parsedOpening = formData.opening_balance === '' || formData.opening_balance == null
+        ? 0
+        : parseFloat(formData.opening_balance);
+      const resolvedOpening = Number.isFinite(parsedOpening) ? parsedOpening : 0;
+
+      const parsedCurrent = formData.current_balance === '' || formData.current_balance == null
+        ? (editingId ? Number((resolvedOpening + baseTransactions).toFixed(2)) : resolvedOpening)
+        : parseFloat(formData.current_balance);
+      const resolvedCurrent = Number.isFinite(parsedCurrent) ? parsedCurrent : resolvedOpening;
+
+      const payload = {
+        ...formData,
+        opening_balance: resolvedOpening,
+        current_balance: resolvedCurrent
+      };
+
       if (editingId) {
-        await api.put(`/expenses/banks/${editingId}`, formData);
+        await api.put(`/expenses/banks/${editingId}`, payload);
         showPopup('success', 'Bank updated successfully!');
       } else {
-        await api.post('/expenses/banks', formData);
+        await api.post('/expenses/banks', payload);
         showPopup('success', 'Bank added successfully!');
       }
       resetForm();
@@ -101,6 +125,15 @@ const BankDetails = () => {
 
   const handleEdit = (bank) => {
     setEditingId(bank.id);
+    const op = bank.opening_balance !== null && bank.opening_balance !== undefined && bank.opening_balance !== ''
+      ? parseFloat(bank.opening_balance)
+      : 0;
+    const cur = bank.current_balance !== null && bank.current_balance !== undefined && bank.current_balance !== ''
+      ? parseFloat(bank.current_balance)
+      : op;
+    const transactions = Number((cur - op).toFixed(2));
+    setBaseTransactions(transactions);
+
     setFormData({
       bank_name: bank.bank_name || '',
       account_number: bank.account_number || '',
@@ -108,7 +141,7 @@ const BankDetails = () => {
       account_type: bank.account_type || 'Current',
       currency: bank.currency || 'LKR',
       opening_balance: bank.opening_balance ?? '',
-      current_balance: bank.current_balance ?? bank.opening_balance ?? '',
+      current_balance: cur,
       company: bank.company || 'JH',
       notes: bank.notes || '',
       status: bank.status || 'Active'
@@ -141,17 +174,20 @@ const BankDetails = () => {
 
   const resetForm = () => {
     setEditingId(null);
+    setBaseTransactions(0);
     setFormData(emptyForm);
     setShowForm(false);
   };
 
   const formatCurrency = (val) => {
     if (val == null || val === '') return '—';
-    return new Intl.NumberFormat('en-LK', {
-      style: 'currency',
-      currency: 'LKR',
-      minimumFractionDigits: 2
-    }).format(val);
+    const num = parseFloat(val);
+    if (!Number.isFinite(num)) return '—';
+    const formatted = Math.abs(num).toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+    return num < 0 ? `-${formatted}` : formatted;
   };
 
   const filtered = banks.filter(b =>
@@ -173,7 +209,7 @@ const BankDetails = () => {
         </div>
         <button
           className="btn btn-primary"
-          onClick={() => { setShowForm(true); setEditingId(null); setFormData(emptyForm); }}
+          onClick={() => { setShowForm(true); setEditingId(null); setBaseTransactions(0); setFormData(emptyForm); }}
         >
           <FontAwesomeIcon icon={faPlus} /> Add New Bank
         </button>
@@ -274,7 +310,6 @@ const BankDetails = () => {
                   value={formData.opening_balance}
                   onChange={handleChange}
                   placeholder="0.00"
-                  min="0"
                   step="0.01"
                 />
               </div>
@@ -372,9 +407,9 @@ const BankDetails = () => {
                     <td>
                       <span className="badge badge-primary">{bank.company || '—'}</span>
                     </td>
-                    <td style={{ textAlign: 'right', fontWeight: 'bold' }}>
+                    <td style={{ textAlign: 'right', fontWeight: 'bold', color: parseFloat(bank.current_balance) < 0 ? '#dc3545' : 'inherit' }}>
                       <span style={{ fontSize: '0.85em', color: 'var(--color-text-muted)', marginRight: '4px' }}>LKR</span>
-                      {formatCurrency(bank.current_balance).replace('LKR', '').trim()}
+                      {formatCurrency(bank.current_balance)}
                     </td>
                     <td>
                       <span className={`badge ${bank.status === 'Active' ? 'badge-success' : 'badge-neutral'}`}>

@@ -1597,8 +1597,8 @@ router.post('/banks', authenticate, async (req, res) => {
   }
 
   try {
-    const resolvedOpeningBalance = parseFloat(opening_balance) || 0;
-    const resolvedCurrentBalance = current_balance !== undefined && current_balance !== null
+    const resolvedOpeningBalance = Number.isFinite(parseFloat(opening_balance)) ? parseFloat(opening_balance) : 0;
+    const resolvedCurrentBalance = current_balance !== undefined && current_balance !== null && Number.isFinite(parseFloat(current_balance))
       ? parseFloat(current_balance)
       : resolvedOpeningBalance;
 
@@ -1621,18 +1621,18 @@ router.post('/banks', authenticate, async (req, res) => {
       ]
     );
 
-    // Record the opening balance as the first Finance ledger entry for this
-    // account. bank_details.current_balance is already set above, so this
-    // writes the ledger row directly rather than going through
-    // recordBankTransaction (which would add the opening balance a second
-    // time on top of what was just inserted).
-    if (resolvedOpeningBalance > 0) {
+    // Record the opening balance as the first Finance ledger entry for this account
+    if (resolvedOpeningBalance !== 0) {
       const [companyRows] = await pool.query('SELECT id FROM company WHERE name = ? LIMIT 1', [company || 'JH']);
+      const isPositive = resolvedOpeningBalance >= 0;
+      const debit = isPositive ? resolvedOpeningBalance : 0;
+      const credit = isPositive ? 0 : Math.abs(resolvedOpeningBalance);
+      const direction = isPositive ? 'IN' : 'OUT';
       await pool.query(
         `INSERT INTO finance_transactions
            (account_type, company_id, bank_id, transaction_date, transaction_type, transaction_direction, remark, debit, credit, balance_after, reference_type, created_by)
-         VALUES ('BANK', ?, ?, CURDATE(), 'Opening Balance', 'IN', 'Opening Balance', ?, 0, ?, 'OPENING_BALANCE', ?)`,
-        [companyRows[0]?.id || null, result.insertId, resolvedOpeningBalance, resolvedCurrentBalance, userId]
+         VALUES ('BANK', ?, ?, CURDATE(), 'Opening Balance', ?, 'Opening Balance', ?, ?, ?, 'OPENING_BALANCE', ?)`,
+        [companyRows[0]?.id || null, result.insertId, direction, debit, credit, resolvedCurrentBalance, userId]
       );
     }
     
@@ -1662,7 +1662,6 @@ router.put('/banks/:id', authenticate, async (req, res) => {
     account_type,
     currency,
     opening_balance,
-    current_balance,
     company,
     notes,
     status
@@ -1673,6 +1672,22 @@ router.put('/banks/:id', authenticate, async (req, res) => {
   }
 
   try {
+    const [existingRows] = await pool.query('SELECT * FROM bank_details WHERE id = ?', [id]);
+    if (existingRows.length === 0) {
+      return res.status(404).json({ error: 'Bank not found' });
+    }
+    const existingBank = existingRows[0];
+
+    const oldOpening = parseFloat(existingBank.opening_balance) || 0;
+    const oldCurrent = parseFloat(existingBank.current_balance) || 0;
+    const existingTransactions = Number((oldCurrent - oldOpening).toFixed(2));
+
+    const newOpening = opening_balance !== undefined && opening_balance !== null && Number.isFinite(parseFloat(opening_balance))
+      ? parseFloat(opening_balance)
+      : oldOpening;
+
+    const recalculatedCurrentBalance = Number((newOpening + existingTransactions).toFixed(2));
+
     const [result] = await pool.query(
       `UPDATE bank_details 
        SET bank_name = ?, account_number = ?, branch_name = ?, 
@@ -1685,9 +1700,9 @@ router.put('/banks/:id', authenticate, async (req, res) => {
         branch_name || null,
         account_type || 'Current',
         currency || 'LKR',
-        opening_balance || 0,
-        current_balance || 0,
-        company || 'JH',
+        newOpening,
+        recalculatedCurrentBalance,
+        company || existingBank.company || 'JH',
         notes || null,
         status || 'Active',
         id
@@ -1697,8 +1712,42 @@ router.put('/banks/:id', authenticate, async (req, res) => {
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'Bank not found' });
     }
+
+    const [opRows] = await pool.query(
+      "SELECT id FROM finance_transactions WHERE bank_id = ? AND reference_type = 'OPENING_BALANCE' AND status = 1 LIMIT 1",
+      [id]
+    );
+
+    const isPositive = newOpening >= 0;
+    const debit = isPositive ? newOpening : 0;
+    const credit = isPositive ? 0 : Math.abs(newOpening);
+    const direction = isPositive ? 'IN' : 'OUT';
+
+    if (opRows.length > 0) {
+      if (newOpening !== 0) {
+        await pool.query(
+          `UPDATE finance_transactions 
+           SET debit = ?, credit = ?, transaction_direction = ?, balance_after = ?
+           WHERE id = ?`,
+          [debit, credit, direction, recalculatedCurrentBalance, opRows[0].id]
+        );
+      } else {
+        await pool.query(
+          'UPDATE finance_transactions SET debit = 0, credit = 0, status = 0 WHERE id = ?',
+          [opRows[0].id]
+        );
+      }
+    } else if (newOpening !== 0) {
+      const [companyRows] = await pool.query('SELECT id FROM company WHERE name = ? LIMIT 1', [company || existingBank.company || 'JH']);
+      await pool.query(
+        `INSERT INTO finance_transactions
+           (account_type, company_id, bank_id, transaction_date, transaction_type, transaction_direction, remark, debit, credit, balance_after, reference_type, created_by)
+         VALUES ('BANK', ?, ?, CURDATE(), 'Opening Balance', ?, 'Opening Balance', ?, ?, ?, 'OPENING_BALANCE', ?)`,
+        [companyRows[0]?.id || null, id, direction, debit, credit, recalculatedCurrentBalance, req.user?.userId || null]
+      );
+    }
     
-    res.json({ message: 'Bank updated successfully' });
+    res.json({ message: 'Bank updated successfully', current_balance: recalculatedCurrentBalance });
   } catch (error) {
     console.error('Error updating bank:', error);
     if (error.code === 'ER_DUP_ENTRY') {
