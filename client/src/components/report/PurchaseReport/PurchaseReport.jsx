@@ -9,16 +9,39 @@ import { formatPurchasingCurrency, toPurchasingExportNumber } from '../../../uti
 const defaultFromDate = format(new Date(), 'yyyy-MM-01');
 const defaultToDate = format(new Date(), 'yyyy-MM-dd');
 
+const formatPaymentMethod = (method) => {
+  if (!method || method === 'N/A') return 'N/A';
+  const val = String(method).trim();
+  const upper = val.toUpperCase();
+  if (upper === 'CASH') return 'Cash';
+  if (upper === 'BANK_TRANSFER' || upper === 'BANK') return 'Bank Transfer';
+  if (upper === 'CHEQUE') return 'Cheque';
+  if (upper === 'CREDIT') return 'Credit';
+  return val.replace(/_/g, ' ');
+};
+
+const getPaymentMethodBadgeClass = (method) => {
+  if (!method || method === 'N/A') return 'pm-badge pm-badge--default';
+  const upper = String(method).trim().toUpperCase();
+  if (upper === 'CASH') return 'pm-badge pm-badge--cash';
+  if (upper === 'BANK_TRANSFER' || upper === 'BANK') return 'pm-badge pm-badge--bank';
+  if (upper === 'CHEQUE') return 'pm-badge pm-badge--cheque';
+  if (upper === 'CREDIT') return 'pm-badge pm-badge--credit';
+  return 'pm-badge pm-badge--default';
+};
+
 const PurchaseReport = () => {
   // Filter state (what the user is currently editing)
   const [fromDate, setFromDate] = useState(defaultFromDate);
   const [toDate, setToDate] = useState(defaultToDate);
   const [companyId, setCompanyId] = useState('');
   const [supplierId, setSupplierId] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('');
 
   // Dropdown source data
   const [companies, setCompanies] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
+  const [paymentMethods, setPaymentMethods] = useState([]);
 
   // Report results
   const [invoices, setInvoices] = useState([]);
@@ -31,15 +54,16 @@ const PurchaseReport = () => {
   const [sortField, setSortField] = useState('invoice_date');
   const [sortDirection, setSortDirection] = useState('desc');
 
-  // Load Company / Supplier dropdown options once on mount
+  // Load Company / Supplier / Payment Method dropdown options once on mount
   useEffect(() => {
     let mounted = true;
 
     const loadFilterOptions = async () => {
       try {
-        const [companiesRes, suppliersRes] = await Promise.all([
+        const [companiesRes, suppliersRes, paymentMethodsRes] = await Promise.all([
           api.get('/purchases/companies'),
-          api.get('/purchases/suppliers')
+          api.get('/purchases/suppliers'),
+          api.get('/payment-methods').catch(() => ({ data: [] }))
         ]);
 
         if (!mounted) return;
@@ -50,6 +74,32 @@ const PurchaseReport = () => {
             (a.name || '').localeCompare(b.name || '')
           )
         );
+
+        const rawMethods = paymentMethodsRes.data || [];
+        const methodList = rawMethods.map(m => ({
+          id: m.id,
+          name: m.name,
+          displayName: m.name === 'Bank' ? 'Bank Transfer' : m.name
+        }));
+
+        const standardDefaults = [
+          { id: 'CASH', name: 'Cash', displayName: 'Cash' },
+          { id: 'BANK_TRANSFER', name: 'Bank Transfer', displayName: 'Bank Transfer' },
+          { id: 'CHEQUE', name: 'Cheque', displayName: 'Cheque' },
+          { id: 'CREDIT', name: 'Credit', displayName: 'Credit' }
+        ];
+
+        standardDefaults.forEach(def => {
+          const exists = methodList.some(
+            m => m.name.toLowerCase() === def.name.toLowerCase() ||
+                 (def.id === 'BANK_TRANSFER' && m.name.toLowerCase() === 'bank')
+          );
+          if (!exists) {
+            methodList.push(def);
+          }
+        });
+
+        setPaymentMethods(methodList);
       } catch (err) {
         console.error('Error loading filter options:', err);
       }
@@ -68,6 +118,7 @@ const PurchaseReport = () => {
       if (filters.toDate) params.endDate = filters.toDate;
       if (filters.companyId) params.companyId = filters.companyId;
       if (filters.supplierId) params.supplierId = filters.supplierId;
+      if (filters.paymentMethod) params.paymentMethod = filters.paymentMethod;
 
       const res = await api.get('/reports/purchase-report', { params });
 
@@ -86,7 +137,7 @@ const PurchaseReport = () => {
 
   // Load the report once on mount using the default filters
   useEffect(() => {
-    fetchReport({ fromDate: defaultFromDate, toDate: defaultToDate, companyId: '', supplierId: '' });
+    fetchReport({ fromDate: defaultFromDate, toDate: defaultToDate, companyId: '', supplierId: '', paymentMethod: '' });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -95,7 +146,7 @@ const PurchaseReport = () => {
       setError('"From Date" cannot be after "To Date".');
       return;
     }
-    fetchReport({ fromDate, toDate, companyId, supplierId });
+    fetchReport({ fromDate, toDate, companyId, supplierId, paymentMethod });
   };
 
   const handleReset = () => {
@@ -103,8 +154,9 @@ const PurchaseReport = () => {
     setToDate(defaultToDate);
     setCompanyId('');
     setSupplierId('');
+    setPaymentMethod('');
     setError('');
-    fetchReport({ fromDate: defaultFromDate, toDate: defaultToDate, companyId: '', supplierId: '' });
+    fetchReport({ fromDate: defaultFromDate, toDate: defaultToDate, companyId: '', supplierId: '', paymentMethod: '' });
   };
 
   const handleSort = (field) => {
@@ -155,8 +207,11 @@ const PurchaseReport = () => {
       const s = suppliers.find(s => String(s.id) === String(supplierId));
       if (s) parts.push(`Supplier: ${s.name}`);
     }
+    if (paymentMethod) {
+      parts.push(`Payment Method: ${formatPaymentMethod(paymentMethod)}`);
+    }
     return parts.join(' | ');
-  }, [companyId, supplierId, companies, suppliers]);
+  }, [companyId, supplierId, paymentMethod, companies, suppliers]);
 
   const handleExportExcel = () => {
     if (sortedInvoices.length === 0) return;
@@ -170,7 +225,7 @@ const PurchaseReport = () => {
     }
     worksheetData.push([]);
 
-    worksheetData.push(['Invoice Number', 'Invoice Date', 'Company', 'Supplier', 'Total Amount (Rs.)']);
+    worksheetData.push(['Invoice Number', 'Invoice Date', 'Company', 'Supplier', 'Payment Method', 'Total Amount (Rs.)']);
 
     sortedInvoices.forEach((inv) => {
       worksheetData.push([
@@ -178,12 +233,13 @@ const PurchaseReport = () => {
         (inv.invoice_date || inv.purchase_date) ? format(new Date(inv.invoice_date || inv.purchase_date), 'yyyy-MM-dd') : 'N/A',
         inv.company_name || 'N/A',
         inv.supplier_name || 'N/A',
+        formatPaymentMethod(inv.payment_method),
         toPurchasingExportNumber(inv.total_amount || 0)
       ]);
     });
 
     worksheetData.push([]);
-    worksheetData.push(['', '', '', 'Grand Total', toPurchasingExportNumber(grandTotal || 0)]);
+    worksheetData.push(['', '', '', '', 'Grand Total', toPurchasingExportNumber(grandTotal || 0)]);
 
     const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
     worksheet['!cols'] = [
@@ -191,6 +247,7 @@ const PurchaseReport = () => {
       { wch: 14 }, // Invoice Date
       { wch: 16 }, // Company
       { wch: 28 }, // Supplier
+      { wch: 18 }, // Payment Method
       { wch: 18 }  // Total Amount
     ];
 
@@ -270,6 +327,20 @@ const PurchaseReport = () => {
           </select>
         </div>
 
+        <div className="report-filter-group">
+          <label className="report-filter-label">Payment Method</label>
+          <select
+            value={paymentMethod}
+            onChange={(e) => setPaymentMethod(e.target.value)}
+            className="report-filter-select"
+          >
+            <option value="">All Payment Methods</option>
+            {paymentMethods.map((pm) => (
+              <option key={pm.id || pm.name} value={pm.name}>{pm.displayName || pm.name}</option>
+            ))}
+          </select>
+        </div>
+
         <div className="report-filter-actions">
           <button onClick={handleApplyFilters} disabled={loading} className="btn btn-primary">
             {loading ? 'Searching...' : 'Search'}
@@ -304,6 +375,9 @@ const PurchaseReport = () => {
                   <th onClick={() => handleSort('supplier_name')} className="sortable">
                     Supplier{sortIndicator('supplier_name')}
                   </th>
+                  <th onClick={() => handleSort('payment_method')} className="sortable">
+                    Payment Method{sortIndicator('payment_method')}
+                  </th>
                   <th onClick={() => handleSort('total_amount')} className="sortable">
                     Total Amount{sortIndicator('total_amount')}
                   </th>
@@ -316,13 +390,14 @@ const PurchaseReport = () => {
                     <td className="report-table-date">{(inv.invoice_date || inv.purchase_date) ? format(new Date(inv.invoice_date || inv.purchase_date), 'MMM dd, yyyy') : 'N/A'}</td>
                     <td>{inv.company_name || 'N/A'}</td>
                     <td>{inv.supplier_name || 'N/A'}</td>
+                    <td><span className={getPaymentMethodBadgeClass(inv.payment_method)}>{formatPaymentMethod(inv.payment_method)}</span></td>
                     <td className="report-table-value-numeric">{formatPurchasingCurrency(inv.total_amount)}</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan="4"><strong>Grand Total</strong></td>
+                  <td colSpan="5"><strong>Grand Total</strong></td>
                   <td><strong>{formatPurchasingCurrency(grandTotal)}</strong></td>
                 </tr>
               </tfoot>

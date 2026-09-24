@@ -21,7 +21,7 @@ router.get('/department-return-item-wise', reportController.getDepartmentReturnI
 
 router.get('/last-issue-date', reportController.getLastIssueDateReport);
 
-// Purchase Report: invoice-level listing with date range / company / supplier filters
+// Purchase Report: invoice-level listing with date range / company / supplier / payment method filters
 router.get('/purchase-report', reportController.getPurchaseReport);
 
 // Expenses Report: unified Petty Cash + Other expenses with company / date range / payee / type filters

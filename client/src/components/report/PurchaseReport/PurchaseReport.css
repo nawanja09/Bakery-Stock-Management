@@ -1,64 +1,120 @@
 @import '../Report.css';
 
-.purchase-report-filter-bar { width: 100%; }
-.purchase-report-filter-bar .report-filter-group { min-width: 150px; }
-.purchase-report-filter-bar .report-filter-group,
-.purchase-report-filter-bar .report-filter-actions {
-	align-self: flex-end;
-}
+/* ============================================================================
+   PURCHASE REPORT — Component-scoped overrides & enhancements
+   Extends the shared Report.css foundation with purchase-specific refinements.
+   ============================================================================ */
+
+/* ── Filter bar ────────────────────────────────────────────────────────────── */
 
 .purchase-report-filter-bar {
 	box-sizing: border-box;
-	gap: 10px;
-	padding: 14px;
+	width: 100%;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-end;
+	gap: 12px;
+	padding: 18px 20px;
 	overflow: visible;
+	background: var(--color-surface);
+	border: 1px solid var(--color-border);
+	border-radius: 12px;
+	box-shadow: var(--shadow-sm);
+	margin-bottom: 20px;
 }
 
 .purchase-report-filter-bar .report-filter-group {
 	flex: 1 1 150px;
 	min-width: 136px;
+	align-self: flex-end;
 }
 
+.purchase-report-filter-bar .report-filter-label {
+	display: block;
+	margin-bottom: 6px;
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--color-text-secondary);
+}
+
+/* Input & select */
 .purchase-report-filter-bar .report-filter-input,
 .purchase-report-filter-bar .report-filter-select {
 	box-sizing: border-box;
+	width: 100%;
 	height: 38px;
-	min-height: 38px;
-	border-radius: 6px;
+	padding: 0 12px;
+	border: 1px solid var(--color-border);
+	border-radius: 8px;
+	background: var(--color-surface);
+	color: var(--color-text-primary);
+	font-size: 13px;
+	font-family: inherit;
+	transition: border-color 0.15s ease, box-shadow 0.15s ease;
+	appearance: auto;
 }
 
+.purchase-report-filter-bar .report-filter-select {
+	padding-right: 30px;
+	cursor: pointer;
+}
+
+.purchase-report-filter-bar .report-filter-input:hover,
+.purchase-report-filter-bar .report-filter-select:hover {
+	border-color: var(--color-border-strong);
+}
+
+.purchase-report-filter-bar .report-filter-input:focus,
+.purchase-report-filter-bar .report-filter-select:focus {
+	outline: none;
+	border-color: var(--color-primary);
+	box-shadow: 0 0 0 3px var(--color-focus-ring);
+}
+
+/* Action buttons */
 .purchase-report-filter-bar .report-filter-actions {
+	display: flex;
+	align-items: center;
 	gap: 8px;
 	margin-left: auto;
+	flex-shrink: 0;
+	align-self: flex-end;
 }
 
 .purchase-report-filter-bar .report-filter-actions .btn {
 	min-height: 38px;
 	white-space: nowrap;
+	border-radius: 8px;
+	font-size: 13px;
+	font-weight: 600;
 }
+
+/* ── Table shell ───────────────────────────────────────────────────────────── */
+
+.report-table-shell {
+	border-radius: 10px;
+	overflow: hidden;
+	border: 1px solid var(--color-border);
+	box-shadow: var(--shadow-xs);
+}
+
+/* ── Purchase report table ─────────────────────────────────────────────────── */
 
 .purchase-report-table {
 	display: table;
 	width: 100%;
-	min-width: 900px;
+	min-width: 820px;
 	table-layout: fixed;
+	border-collapse: separate;
+	border-spacing: 0;
 }
 
-.purchase-report-table thead {
-	display: table-header-group;
-}
-
-.purchase-report-table tbody {
-	display: table-row-group;
-}
-
-.purchase-report-table tfoot {
-	display: table-footer-group;
-}
-
-.purchase-report-table tr {
-	display: table-row;
-}
+.purchase-report-table thead { display: table-header-group; }
+.purchase-report-table tbody { display: table-row-group; }
+.purchase-report-table tfoot { display: table-footer-group; }
+.purchase-report-table tr    { display: table-row; }
 
 .purchase-report-table th,
 .purchase-report-table td {
@@ -66,30 +122,133 @@
 	box-sizing: border-box;
 }
 
+/* Column widths — 6 columns */
+.purchase-report-table th:nth-child(1),
+.purchase-report-table td:nth-child(1) { width: 17%; }
+.purchase-report-table th:nth-child(2),
+.purchase-report-table td:nth-child(2) { width: 14%; }
+.purchase-report-table th:nth-child(3),
+.purchase-report-table td:nth-child(3) { width: 16%; }
+.purchase-report-table th:nth-child(4),
+.purchase-report-table td:nth-child(4) { width: 24%; }
+.purchase-report-table th:nth-child(5),
+.purchase-report-table td:nth-child(5) { width: 16%; }
+.purchase-report-table th:nth-child(6),
+.purchase-report-table td:nth-child(6) { width: 13%; }
+
+/* Header */
 .purchase-report-table th {
-	height: 40px;
+	height: 44px;
 	padding: 0 14px;
-	background: #f8fafc;
+	background: var(--color-gray-50);
+	border-bottom: 1px solid var(--color-border);
 	color: var(--color-text-secondary);
 	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
 	line-height: 1.2;
 	white-space: nowrap;
+	text-align: left;
+	user-select: none;
 }
 
+.purchase-report-table th:last-child { text-align: right; }
+
+/* Body cells */
 .purchase-report-table td {
-	height: 42px;
-	padding: 11px 14px;
+	height: 46px;
+	padding: 10px 14px;
+	border-bottom: 1px solid var(--color-border-light);
+	color: var(--color-text-primary);
 	font-size: 13px;
+	vertical-align: middle;
+}
+
+.purchase-report-table td:last-child {
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+	font-weight: 600;
+}
+
+/* Striped rows */
+.purchase-report-table tbody tr:nth-child(even) td {
+	background: var(--color-gray-50);
+}
+
+/* Hover effect */
+.purchase-report-table tbody tr {
+	transition: background 0.12s ease;
 }
 
 .purchase-report-table tbody tr:hover td {
+	background: var(--color-primary-lighter) !important;
+}
+
+/* Remove bottom border on last body row */
+.purchase-report-table tbody tr:last-child td {
+	border-bottom: none;
+}
+
+/* Reference & date — no wrap */
+.purchase-report-table .report-table-reference,
+.purchase-report-table .report-table-date {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* Footer / grand total */
+.purchase-report-table tfoot td {
+	height: 46px;
+	padding: 12px 14px;
+	background: var(--color-gray-50);
+	border-top: 2px solid var(--color-border);
+	color: var(--color-heading);
+	font-weight: 700;
+	font-size: 13px;
+}
+
+.purchase-report-table tfoot td:last-child {
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+	color: var(--color-primary-dark);
+	font-size: 14px;
+}
+
+/* ── Sortable columns ──────────────────────────────────────────────────────── */
+
+.purchase-report-table th.sortable {
+	cursor: pointer;
+	transition: color 0.12s ease, background 0.12s ease;
+}
+
+.purchase-report-table th.sortable:hover {
+	color: var(--color-primary);
 	background: var(--color-primary-lighter);
 }
 
-.purchase-report-table tfoot td {
-	height: 42px;
-	background: #f8fafc;
+/* ── Payment method badges ─────────────────────────────────────────────────── */
+
+.pm-badge {
+	display: inline-flex;
+	align-items: center;
+	padding: 3px 10px;
+	border-radius: 999px;
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.03em;
+	white-space: nowrap;
+	line-height: 1.4;
 }
+
+.pm-badge--cash     { background: #dcfce7; color: #15803d; }
+.pm-badge--bank     { background: #dbeafe; color: #1d4ed8; }
+.pm-badge--cheque   { background: #fef9c3; color: #92400e; }
+.pm-badge--credit   { background: #ede9fe; color: #6d28d9; }
+.pm-badge--default  { background: var(--color-surface-strong); color: var(--color-text-secondary); }
+
+/* ── Responsive ────────────────────────────────────────────────────────────── */
 
 @media (max-width: 1024px) {
 	.purchase-report-filter-bar {
@@ -98,29 +257,39 @@
 	}
 
 	.purchase-report-filter-bar .report-filter-group {
-		flex-basis: calc(50% - 5px);
+		flex-basis: calc(50% - 6px);
 	}
 
 	.purchase-report-filter-bar .report-filter-actions {
 		margin-left: 0;
+		width: 100%;
+		justify-content: flex-end;
 	}
 }
 
 @media (max-width: 640px) {
 	.purchase-report-filter-bar {
-		gap: 8px;
-		padding: 12px 14px;
+		gap: 10px;
+		padding: 14px 16px;
 	}
 
 	.purchase-report-filter-bar .report-filter-group {
 		flex-basis: 100%;
+		min-width: 0;
 	}
 
 	.purchase-report-filter-bar .report-filter-actions {
 		width: 100%;
+		justify-content: stretch;
 	}
 
 	.purchase-report-filter-bar .report-filter-actions .btn {
 		flex: 1;
 	}
+}
+
+/* ── Print ─────────────────────────────────────────────────────────────────── */
+
+@media print {
+	.purchase-report-filter-bar { display: none !important; }
 }

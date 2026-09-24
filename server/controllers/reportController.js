@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { normalizePaymentMethodValue } = require('../utils/paymentMethodUtils');
 
 const getStockReport = async (req, res) => {
   try {
@@ -1394,11 +1395,11 @@ const getLastIssueDateReport = async (req, res) => {
 // Purchase Report (invoice-level listing)
 // =============================================
 // Returns one row per purchase invoice with Invoice Number, Invoice Date,
-// Company, Supplier and Total Amount, plus a serverGrandTotal so the
-// frontend/export always match. Supports optional date range, company and
-// supplier filters, all of which can be combined.
+// Company, Supplier, Payment Method and Total Amount, plus a serverGrandTotal so
+// the frontend/export always match. Supports optional date range, company,
+// supplier and payment method filters, all of which can be combined.
 const getPurchaseReport = async (req, res) => {
-  const { startDate, endDate, companyId, supplierId } = req.query;
+  const { startDate, endDate, companyId, supplierId, paymentMethod } = req.query;
 
   try {
     let query = `
@@ -1411,6 +1412,7 @@ const getPurchaseReport = async (req, res) => {
         COALESCE(c.name, 'N/A') AS company_name,
         p.supplier_id,
         s.name AS supplier_name,
+        p.payment_method,
         CASE
           WHEN p.total_with_vat IS NOT NULL AND p.total_with_vat > 0 THEN p.total_with_vat
           WHEN p.bill_amount IS NOT NULL AND p.bill_amount > 0 THEN p.bill_amount
@@ -1444,6 +1446,35 @@ const getPurchaseReport = async (req, res) => {
       params.push(supplierId);
     }
 
+    if (paymentMethod && paymentMethod.trim()) {
+      const trimmed = paymentMethod.trim();
+      const normalized = normalizePaymentMethodValue(trimmed);
+
+      const variations = new Set([trimmed, normalized]);
+
+      if (normalized === 'CASH') {
+        variations.add('CASH');
+        variations.add('Cash');
+      } else if (normalized === 'BANK_TRANSFER') {
+        variations.add('BANK_TRANSFER');
+        variations.add('Bank');
+        variations.add('Bank Transfer');
+        variations.add('BANK');
+      } else if (normalized === 'CHEQUE') {
+        variations.add('CHEQUE');
+        variations.add('Cheque');
+      } else if (normalized === 'CREDIT') {
+        variations.add('CREDIT');
+        variations.add('Credit');
+        variations.add('Card');
+        variations.add('Credit Card');
+      }
+
+      const varList = Array.from(variations).filter(Boolean);
+      query += ` AND (p.payment_method IN (${varList.map(() => '?').join(', ')}) OR UPPER(p.payment_method) = ?)`;
+      params.push(...varList, normalized);
+    }
+
     query += ' ORDER BY COALESCE(p.invoice_date, p.purchase_date) DESC, p.id DESC';
 
     const [rows] = await pool.query(query, params);
@@ -1457,6 +1488,7 @@ const getPurchaseReport = async (req, res) => {
       company_name: row.company_name,
       supplier_id: row.supplier_id,
       supplier_name: row.supplier_name,
+      payment_method: row.payment_method || 'N/A',
       total_amount: parseFloat(row.total_amount) || 0
     }));
 
