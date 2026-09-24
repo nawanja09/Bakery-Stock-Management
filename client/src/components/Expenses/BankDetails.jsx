@@ -278,18 +278,6 @@ const BankDetails = () => {
                   step="0.01"
                 />
               </div>
-              <div>
-                <label>Current Balance (LKR)</label>
-                <input
-                  type="number"
-                  name="current_balance"
-                  value={formData.current_balance}
-                  onChange={handleChange}
-                  placeholder="0.00"
-                  min="0"
-                  step="0.01"
-                />
-              </div>
             </div>
 
             <div style={{ marginBottom: '24px' }}>
