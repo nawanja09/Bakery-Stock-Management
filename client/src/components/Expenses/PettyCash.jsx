@@ -9,15 +9,22 @@ import './Expenses.css';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
 
+const RECENT_LIMIT = 10;
+
 const PettyCash = () => {
   const [activeTab, setActiveTab] = useState('voucher');
   const [balance, setBalance] = useState(0);
   const [balanceData, setBalanceData] = useState({ totalReimbursements: 0, totalVouchers: 0 });
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
-  const [vouchers, setVouchers] = useState([]);
   const [reimbursements, setReimbursements] = useState([]);
+  // Recent Vouchers table rows: vouchers (Credit) + reimbursements (Debit)
+  // with a server-calculated running balance.
   const [transactions, setTransactions] = useState([]);
+  // Optional Date Range for the Recent Vouchers table.
+  // Empty = latest RECENT_LIMIT rows; set = every row in the range.
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
   const { showPopup } = usePopup();
   const [isEditing, setIsEditing] = useState(false);
   const [user, setUser] = useState(null);
@@ -87,18 +94,27 @@ const PettyCash = () => {
   }, []);
 
   const fetchPettyCashData = useCallback(async () => {
+    if (fromDate && toDate && fromDate > toDate) {
+      showPopup('error', 'From Date cannot be after To Date');
+      return;
+    }
     setIsFetching(true);
     try {
       const balanceRes = await api.get('/expenses/petty-cash/balance');
       setBalance(balanceRes.data.balance || 0);
       setBalanceData(balanceRes.data);
-      const vouchersRes = await api.get('/expenses/petty-cash/vouchers');
-      setVouchers(vouchersRes.data || []);
       const reimbursementRes = await api.get('/expenses/petty-cash/reimbursements');
       setReimbursements(reimbursementRes.data || []);
-      // Combined Debit/Credit ledger with running balance - always
-      // recalculated server-side from transaction history, never edited here.
-      const transactionsRes = await api.get('/expenses/petty-cash/transactions');
+      // Combined Debit (Reimbursement) / Credit (Expenses) list with running
+      // balance - always recalculated server-side from the full transaction
+      // history, never edited here. No date range -> latest RECENT_LIMIT
+      // rows; a date range returns every row in it (no limit).
+      const hasRange = Boolean(fromDate || toDate);
+      const transactionsRes = await api.get('/expenses/petty-cash/transactions', {
+        params: hasRange
+          ? { from_date: fromDate || undefined, to_date: toDate || undefined }
+          : { limit: RECENT_LIMIT }
+      });
       setTransactions(transactionsRes.data || []);
     } catch (error) {
       console.error('Error fetching petty cash data:', error);
@@ -106,7 +122,7 @@ const PettyCash = () => {
     } finally {
       setIsFetching(false);
     }
-  }, [showPopup]);
+  }, [showPopup, fromDate, toDate]);
 
   useEffect(() => {
     const loggedInUser = localStorage.getItem('user');
@@ -387,9 +403,12 @@ const PettyCash = () => {
   };
 
   const handleExportVouchers = () => {
-    if (!vouchers.length) { showPopup('error', 'No voucher data to export'); return; }
-    const headers = ['Date', 'Voucher No.', 'Payee', 'Expense Type', 'Company', 'Receipt No.', 'Amount (LKR)'];
-    const rows = vouchers.map(v => [formatDate(v.voucher_date || v.date), v.voucher_number, v.payee_name || v.payee, v.expense_type, v.company_name || '-', v.receipt_no || '-', v.amount]);
+    if (!transactions.length) { showPopup('error', 'No voucher data to export'); return; }
+    const headers = ['Date', 'Voucher / Reference No.', 'Payee', 'Expense Type', 'Company', 'Receipt No.', 'Amount (LKR)', 'Debits - Reimbursement (LKR)', 'Credits - Expenses (LKR)', 'Balance (LKR)'];
+    const rows = transactions.map(t => {
+      const isReimb = t.source === 'REIMBURSEMENT';
+      return [formatDate(t.date), t.reference_number, isReimb ? '-' : (t.payee_name || '-'), isReimb ? 'Reimbursement' : t.expense_type, t.company_name || '-', t.receipt_no || '-', isReimb ? t.debit : t.credit, t.debit > 0 ? t.debit : '', t.credit > 0 ? t.credit : '', t.balance];
+    });
     const csvContent = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -420,11 +439,6 @@ const PettyCash = () => {
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', fontWeight: 'var(--font-weight-medium)' }}>Current Petty Cash Balance</div>
           <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'var(--color-text-primary)', margin: 'var(--spacing-xs) 0' }}>{formatCurrency(balance)}</div>
-          <div style={{ display: 'flex', gap: 'var(--spacing-md)', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-            <span>Total Reimbursement: <strong style={{ color: 'var(--color-text-primary)' }}>{formatCurrency(balanceData.totalReimbursements || 0)}</strong></span>
-            <span>|</span>
-            <span>Total Vouchers: <strong style={{ color: 'var(--color-text-primary)' }}>{formatCurrency(balanceData.totalVouchers || 0)}</strong></span>
-          </div>
         </div>
         <div>
           <button className="btn btn-secondary" onClick={fetchPettyCashData} disabled={isFetching} title="Refresh Balance">
@@ -493,81 +507,78 @@ const PettyCash = () => {
                 <button className="btn btn-success" onClick={handleExportVouchers}><FontAwesomeIcon icon={faFileExcel} /> Export</button>
               </div>
             </div>
-            <div style={{ overflowX: 'auto' }} id="vouchers-table-container">
-              <table className="report-table">
-                <thead>
-                  <tr><th>Date</th><th>Voucher No.</th><th>Payee</th><th>Expense Type</th><th>Company</th><th>Receipt No.</th><th>Amount (LKR)</th><th>Actions</th></tr>
-                </thead>
-                <tbody>
-                  {isFetching ? (
-                    <tr><td colSpan="8" className="loading-row"><FontAwesomeIcon icon={faSpinner} spin /> Loading vouchers...</td></tr>
-                  ) : vouchers.length > 0 ? (
-                    vouchers.map(v => (
-                      <tr key={v.id}>
-                        <td>{formatDate(v.voucher_date || v.date)}</td>
-                        <td className="voucher-number">{v.voucher_number}</td>
-                        <td>{v.payee_name || v.payee}</td>
-                        <td>{v.expense_type}</td>
-                        <td>{v.company_name || '-'}</td>
-                        <td className="receipt-no">{v.receipt_no || '-'}</td>
-                        <td className="amount-cell">{formatCurrency(v.amount)}</td>
-                        <td>
-                          <div className="action-buttons">
-                            <button className="action-btn view-btn" title="View"><FontAwesomeIcon icon={faEye} /></button>
-                            <button className="action-btn edit-btn" title="Edit" onClick={() => handleEdit(v)}><FontAwesomeIcon icon={faEdit} /></button>
-                            {/* ✅ Fixed: case‑insensitive admin check with fallback */}
-                            {isAdmin() && (
-                              <button className="action-btn delete-btn" title="Delete" onClick={() => handleDelete(v.id)}>
-                                <FontAwesomeIcon icon={faTrash} />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr><td colSpan="8" className="empty-row">No vouchers found</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
 
-          <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
-            <div className="form-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
-              <div>
-                <h3>Petty Cash Transaction History</h3>
+            {/* Date Range filter */}
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 'var(--spacing-md)', flexWrap: 'wrap', marginBottom: 'var(--spacing-md)' }}>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label>From Date</label>
+                <input type="date" className="form-input" value={fromDate} max={toDate || undefined} onChange={(e) => setFromDate(e.target.value)} />
               </div>
-              <div className="report-filter-actions">
-                <button className="btn btn-secondary" onClick={fetchPettyCashData} disabled={isFetching}><FontAwesomeIcon icon={isFetching ? faSpinner : faSync} spin={isFetching} /> Refresh</button>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label>To Date</label>
+                <input type="date" className="form-input" value={toDate} min={fromDate || undefined} onChange={(e) => setToDate(e.target.value)} />
               </div>
+              {(fromDate || toDate) && (
+                <button className="btn btn-secondary" onClick={() => { setFromDate(''); setToDate(''); }}>
+                  <FontAwesomeIcon icon={faTimes} /> Clear
+                </button>
+              )}
+              <small style={{ color: 'var(--color-text-secondary)', marginLeft: 'auto' }}>
+                {fromDate || toDate
+                  ? `Showing all transactions ${fromDate ? `from ${formatDate(fromDate)} ` : ''}${toDate ? `to ${formatDate(toDate)}` : ''}`
+                  : `Showing the latest ${RECENT_LIMIT} transactions`}
+              </small>
             </div>
-            <div style={{ overflowX: 'auto' }}>
+
+            <div style={{ overflowX: 'auto' }} id="vouchers-table-container">
               <table className="report-table">
                 <thead>
                   <tr>
                     <th>Date</th>
-                    <th>Remark</th>
-                    <th>Debit (Reimbursement)</th>
-                    <th>Credit (Expenses)</th>
+                    <th>Voucher No.</th>
+                    <th>Payee</th>
+                    <th>Expense Type</th>
+                    <th>Amount (LKR)</th>
+                    <th>Debits - Reimbursement</th>
+                    <th>Credits - Expenses</th>
                     <th>Balance</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {isFetching ? (
-                    <tr><td colSpan="5" className="loading-row"><FontAwesomeIcon icon={faSpinner} spin /> Loading transaction history...</td></tr>
+                    <tr><td colSpan="11" className="loading-row"><FontAwesomeIcon icon={faSpinner} spin /> Loading vouchers...</td></tr>
                   ) : transactions.length > 0 ? (
-                    transactions.map(t => (
-                      <tr key={`${t.source}-${t.id}`}>
-                        <td>{formatDate(t.date)}</td>
-                        <td>{t.remark}</td>
-                        <td className="amount-cell">{t.debit > 0 ? formatCurrency(t.debit) : '-'}</td>
-                        <td className="amount-cell">{t.credit > 0 ? formatCurrency(t.credit) : '-'}</td>
-                        <td className="amount-cell"><strong>{formatCurrency(t.balance)}</strong></td>
-                      </tr>
-                    ))
+                    transactions.map(t => {
+                      const isReimbursement = t.source === 'REIMBURSEMENT';
+                      return (
+                        <tr key={`${t.source}-${t.id}`}>
+                          <td>{formatDate(t.date)}</td>
+                          <td className="voucher-number">{t.reference_number}</td>
+                          <td>{isReimbursement ? '-' : t.payee_name}</td>
+                          <td>{isReimbursement ? 'Reimbursement' : t.expense_type}</td>
+                          <td className="amount-cell">{formatCurrency(isReimbursement ? t.debit : t.credit)}</td>
+                          <td className="amount-cell">{t.debit > 0 ? formatCurrency(t.debit) : '-'}</td>
+                          <td className="amount-cell">{t.credit > 0 ? formatCurrency(t.credit) : '-'}</td>
+                          <td className="amount-cell"><strong>{formatCurrency(t.balance)}</strong></td>
+                          <td>
+                            {!isReimbursement && (
+                              <div className="action-buttons">
+                                <button className="action-btn view-btn" title="View"><FontAwesomeIcon icon={faEye} /></button>
+                                <button className="action-btn edit-btn" title="Edit" onClick={() => handleEdit({ ...t, voucher_number: t.reference_number, payee: t.payee_name, amount: t.credit })}><FontAwesomeIcon icon={faEdit} /></button>
+                                {isAdmin() && (
+                                  <button className="action-btn delete-btn" title="Delete" onClick={() => handleDelete(t.id)}>
+                                    <FontAwesomeIcon icon={faTrash} />
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
                   ) : (
-                    <tr><td colSpan="5" className="empty-row">No transactions found</td></tr>
+                    <tr><td colSpan="11" className="empty-row">No vouchers found</td></tr>
                   )}
                 </tbody>
               </table>
