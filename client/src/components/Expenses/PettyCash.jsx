@@ -54,7 +54,7 @@ const PettyCash = () => {
   // Bank accounts are intentionally never offered here (Petty Cash is
   // Cash-only), so this list is Companies only.
   const [companies, setCompanies] = useState([]);
-  const cashBookOptions = companies.map(c => ({ value: String(c.id), label: `${c.name} - Cash Book` }));
+  const cashBookOptions = companies.map(c => ({ value: String(c.id), label: c.name }));
 
   const [payees, setPayees] = useState([]);
 
@@ -248,7 +248,7 @@ const PettyCash = () => {
       return;
     }
     if (!isEditing && !voucherForm.company_id) {
-      showPopup('error', 'Please select which Company\'s Cash Book this voucher is paid from');
+      showPopup('error', 'Please select the Company for this voucher');
       return;
     }
     setIsLoading(true);
@@ -264,8 +264,8 @@ const PettyCash = () => {
         amount: parseFloat(voucherForm.amount),
         receipt_no: voucherForm.receipt_no || null
       };
-      // Company (Cash Book) only applies at creation time - this is the
-      // moment the money actually leaves that company's cash account.
+      // Company is only set at creation time (used for per-company
+      // reporting; it does not link to the Cash Ledger).
       if (!isEditing) {
         payload.company_id = voucherForm.company_id;
       }
@@ -290,7 +290,7 @@ const PettyCash = () => {
       return;
     }
     if (!isEditingReimbursement && !reimbursementForm.company_id) {
-      showPopup('error', 'Please select a Cash Book');
+      showPopup('error', 'Please select a Company');
       return;
     }
     setIsLoading(true);
@@ -301,9 +301,8 @@ const PettyCash = () => {
         amount: parseFloat(reimbursementForm.amount)
       };
 
-      // Cash Book only applies at creation time - this is the moment the
-      // money actually leaves the selected company's Cash Book. Bank
-      // accounts are never valid here, so the value is always a company id.
+      // Company is only set at creation time (used for per-company
+      // reporting; nothing is posted to the Cash Ledger).
       if (!isEditingReimbursement) {
         payload.company_id = reimbursementForm.company_id;
       }
@@ -590,7 +589,7 @@ const PettyCash = () => {
               <div className="form-grid two-col">
                 <div className="form-group left-align"><label>Amount (LKR) <span className="required">*</span></label><input type="number" name="amount" value={reimbursementForm.amount} onChange={handleReimbursementChange} required min="0.01" step="0.01" className="form-input amount-input" placeholder="0.00" /></div>
                 <div className="form-group">
-                  <label>Cash Book {!isEditingReimbursement && <span className="required">*</span>}</label>
+                  <label>Company {!isEditingReimbursement && <span className="required">*</span>}</label>
                   {isEditingReimbursement ? (
                     <input
                       type="text"
@@ -600,7 +599,7 @@ const PettyCash = () => {
                     />
                   ) : (
                     <select name="company_id" value={reimbursementForm.company_id} onChange={handleReimbursementChange} required className="form-select">
-                      <option value="">Select Cash Book</option>
+                      <option value="">Select Company</option>
                       {cashBookOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                     </select>
                   )}
@@ -630,7 +629,7 @@ const PettyCash = () => {
               </div>
             </div>
             <div style={{ overflowX: 'auto' }}>
-              <table className="report-table"><thead><tr><th>Date</th><th>Reference Number</th><th>Cash Book</th><th>Amount (LKR)</th><th>Status</th><th>Actions</th></tr></thead><tbody>
+              <table className="report-table"><thead><tr><th>Date</th><th>Reference Number</th><th>Company</th><th>Amount (LKR)</th><th>Status</th><th>Actions</th></tr></thead><tbody>
                 {isFetching ? <tr><td colSpan="6" className="loading-row"><FontAwesomeIcon icon={faSpinner} spin /> Loading reimbursements...</td></tr> : reimbursements.length > 0 ? reimbursements.map(r => (<tr key={r.id}><td>{formatDate(r.reimbursement_date || r.date)}</td><td className="reference-number">{r.reference_number}</td><td>{r.company_name || r.bank_name || '-'}</td><td className="amount-cell">{formatCurrency(r.amount)}</td><td><span className={`status-badge status-${(r.status || 'Completed').toLowerCase()}`}>{r.status || 'Completed'}</span></td><td><div className="action-buttons"><button className="action-btn view-btn" title="View Details" onClick={() => handleViewReimbursement(r)}><FontAwesomeIcon icon={faEye} /></button><button className="action-btn edit-btn" title="Edit Reimbursement" onClick={() => handleEditReimbursement(r)}><FontAwesomeIcon icon={faEdit} /></button></div></td></tr>)) : <tr><td colSpan="6" className="empty-row">No reimbursements found</td></tr>}
               </tbody></table>
             </div>
@@ -649,7 +648,7 @@ const PettyCash = () => {
             <div className="modal-body">
               <div className="detail-row"><strong>Reference Number:</strong> {selectedReimbursement.reference_number}</div>
               <div className="detail-row"><strong>Date:</strong> {formatDate(selectedReimbursement.reimbursement_date || selectedReimbursement.date)}</div>
-              <div className="detail-row"><strong>Cash Book:</strong> {selectedReimbursement.company_name || selectedReimbursement.bank_name || 'Not recorded'}</div>
+              <div className="detail-row"><strong>Company:</strong> {selectedReimbursement.company_name || selectedReimbursement.bank_name || 'Not recorded'}</div>
               <div className="detail-row"><strong>Amount:</strong> {formatCurrency(selectedReimbursement.amount)}</div>
               <div className="detail-row"><strong>Status:</strong> <span className={`status-badge status-${(selectedReimbursement.status || 'Completed').toLowerCase()}`}>{selectedReimbursement.status || 'Completed'}</span></div>
               <div className="detail-row"><strong>Created Date:</strong> {selectedReimbursement.created_date || '-'}</div>
