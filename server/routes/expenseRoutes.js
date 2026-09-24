@@ -3,7 +3,9 @@ const router = express.Router();
 const pool = require('../config/db');
 const authenticate = require('../middleware/authenticate');
 const restrictRoles = require('../middleware/restrictRoles');
-const { recordCashTransaction, recordBankTransaction, calculateRunningBalances } = require('../utils/financeLedger');
+// NOTE: Petty Cash never touches the Finance Cash Ledger, so recordCashTransaction
+// is intentionally not imported here.
+const { recordBankTransaction, calculateRunningBalances } = require('../utils/financeLedger');
 const { checkDuplicateReference, DuplicateReferenceError } = require('../services/referenceValidationService');
 const { getActiveBankAccounts } = require('../services/bankAccountService');
 
@@ -252,10 +254,11 @@ router.post('/petty-cash/voucher', authenticate, async (req, res) => {
   if (!voucher_number || !voucher_date || !payee_name || !expense_type || !amount) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
-  // Every voucher spends a specific Company's Cash Book - required so the
-  // ledger deduction always hits the right company's cash, never a bank.
+  // Petty Cash is tracked entirely inside the Petty Cash module. The company
+  // is kept only so vouchers can be reported per company - it does NOT link
+  // the voucher to any Cash Ledger / Cash Book.
   if (!company_id) {
-    return res.status(400).json({ error: 'Company (Cash Book) is required' });
+    return res.status(400).json({ error: 'Company is required' });
   }
 
   const connection = await pool.getConnection();
@@ -264,22 +267,16 @@ router.post('/petty-cash/voucher', authenticate, async (req, res) => {
 
     await checkDuplicateReference(connection, voucher_number);
 
-    // The selected Company's Cash Book must actually exist as a valid
-    // Cash account - this is what keeps Company and Cash Book consistent
-    // and guarantees a Bank account can never be used here.
-    const [cashAccRows] = await connection.query(
-      'SELECT company_id FROM cash_accounts WHERE company_id = ?',
-      [company_id]
-    );
-    if (cashAccRows.length === 0) {
+    // Only confirm the company exists (no Cash Ledger / cash_accounts lookup).
+    const [companyRows] = await connection.query('SELECT id, name FROM company WHERE id = ?', [company_id]);
+    if (companyRows.length === 0) {
       await connection.rollback();
-      return res.status(400).json({ error: 'Selected Company has no valid Cash Book' });
+      return res.status(400).json({ error: 'Selected Company is not valid' });
     }
 
-    // A Petty Cash Expense Voucher posts its Credit transaction to the Cash
-    // Book immediately (below), so the expense is already paid out of the
-    // float the moment it's submitted - it should show as Paid, not Pending,
-    // including in the Expenses Report.
+    // A Petty Cash voucher is paid out of the petty cash float the moment it
+    // is submitted, so it is stored as Paid (also what the Expenses Report
+    // shows). Nothing is posted to the main Cash Ledger.
     const [result] = await connection.query(
       `INSERT INTO petty_cash_vouchers 
        (voucher_number, voucher_date, employee_name, payee_name, company_id,
@@ -300,21 +297,6 @@ router.post('/petty-cash/voucher', authenticate, async (req, res) => {
       ]
     );
 
-    // Automatically create a Credit Ledger Entry in that Company's Cash
-    // Ledger (Expense = Credit to Cash) - always Cash, never Bank.
-    await recordCashTransaction(connection, {
-      companyId: company_id,
-      date: voucher_date,
-      remark: `Petty Cash Payment - ${expense_type}`,
-      credit: parseFloat(amount),
-      transactionType: 'Petty Cash Payment',
-      referenceNumber: voucher_number,
-      partyName: payee_name,
-      referenceType: 'PETTY_CASH_VOUCHER',
-      referenceId: result.insertId,
-      createdBy: userId
-    });
-    
     await connection.commit();
     await updatePettyCashBalance();
     
@@ -393,35 +375,6 @@ router.put('/petty-cash/voucher/:id', authenticate, async (req, res) => {
       ]
     );
     
-    // Sync ledger entry
-    const [finRows] = await connection.query(
-      'SELECT id, credit, company_id FROM finance_transactions WHERE reference_type = "PETTY_CASH_VOUCHER" AND reference_id = ?',
-      [id]
-    );
-    
-    if (finRows.length > 0) {
-      const finId = finRows[0].id;
-      const oldCredit = parseFloat(finRows[0].credit) || 0;
-      const newCredit = parseFloat(amount) || 0;
-      const difference = newCredit - oldCredit;
-      
-      if (difference !== 0) {
-        await connection.query(
-          'UPDATE cash_accounts SET current_balance = current_balance - ? WHERE company_id = ?',
-          [difference, finRows[0].company_id]
-        );
-        await connection.query(
-          'UPDATE finance_transactions SET credit = ?, transaction_date = ?, remark = ? WHERE id = ?',
-          [newCredit, voucher_date, `Petty Cash Payment - ${expense_type}`, finId]
-        );
-      } else {
-        await connection.query(
-          'UPDATE finance_transactions SET transaction_date = ?, remark = ? WHERE id = ?',
-          [voucher_date, `Petty Cash Payment - ${expense_type}`, finId]
-        );
-      }
-    }
-
     await connection.commit();
     await updatePettyCashBalance();
     
@@ -460,20 +413,6 @@ router.delete('/petty-cash/voucher/:id', authenticate, async (req, res) => {
       [id]
     );
 
-    // Revert ledger entry
-    const [finRows] = await connection.query(
-      'SELECT id, credit, company_id FROM finance_transactions WHERE reference_type = "PETTY_CASH_VOUCHER" AND reference_id = ?',
-      [id]
-    );
-    if (finRows.length > 0) {
-      const oldCredit = parseFloat(finRows[0].credit) || 0;
-      await connection.query(
-        'UPDATE cash_accounts SET current_balance = current_balance + ? WHERE company_id = ?',
-        [oldCredit, finRows[0].company_id]
-      );
-      await connection.query('DELETE FROM finance_transactions WHERE id = ?', [finRows[0].id]);
-    }
-
     await connection.commit();
     await updatePettyCashBalance();
 
@@ -497,10 +436,11 @@ router.post('/petty-cash/reimbursement', authenticate, async (req, res) => {
   if (!reference_number || !reimbursement_date || !amount) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
-  // Petty Cash is Cash-only: reimbursement must always come from a real
-  // Cash Book (a company's cash_accounts row), never a Bank account.
+  // Reimbursements only top up the Petty Cash float inside the Petty Cash
+  // module. The company is kept for reporting; nothing is posted to the
+  // main Cash Ledger.
   if (!company_id) {
-    return res.status(400).json({ error: 'Cash Book (Company) is required for reimbursement' });
+    return res.status(400).json({ error: 'Company is required for reimbursement' });
   }
   const funding_source = 'CASH';
 
@@ -510,12 +450,10 @@ router.post('/petty-cash/reimbursement', authenticate, async (req, res) => {
 
     await checkDuplicateReference(connection, reference_number);
 
-    // Confirm the selected Cash Book (Company) is a real, valid company -
-    // and by construction it can only ever be a Cash Book, never a Bank.
     const [companyRows] = await connection.query('SELECT id, name FROM company WHERE id = ?', [company_id]);
     if (companyRows.length === 0) {
       await connection.rollback();
-      return res.status(400).json({ error: 'Selected Cash Book is not a valid company' });
+      return res.status(400).json({ error: 'Selected Company is not valid' });
     }
 
     const [result] = await connection.query(
@@ -524,24 +462,6 @@ router.post('/petty-cash/reimbursement', authenticate, async (req, res) => {
        VALUES (?, ?, ?, ?, ?, NULL, ?, 'Completed')`,
       [reference_number, reimbursement_date, amount, company_id, funding_source, userId]
     );
-
-    // A reimbursement tops up the petty cash float from the company's real
-    // Cash Book - that's the point where money actually leaves Finance's
-    // books. Spending the float later (Vouchers) doesn't touch Finance
-    // again, since this is where that money already left. The selected
-    // Cash Book and Company stay consistent throughout: both resolve to
-    // the same company_id, from validation through to the ledger post.
-    await recordCashTransaction(connection, {
-      companyId: company_id,
-      date: reimbursement_date,
-      remark: `Petty cash reimbursement - ${reference_number}`,
-      credit: parseFloat(amount),
-      transactionType: 'Petty Cash Reimbursement',
-      referenceNumber: reference_number,
-      referenceType: 'PETTY_CASH_REIMBURSEMENT',
-      referenceId: result.insertId,
-      createdBy: userId
-    });
 
     await connection.commit();
     await updatePettyCashBalance();

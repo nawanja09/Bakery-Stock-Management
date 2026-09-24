@@ -423,9 +423,9 @@ ensurePaymentHistorySchema();
 //   - Cheque Expenses: at REALISE time (cheque_expenses.bank_id)
 //   - Bank Charges: at creation (bank_charges.bank_id)
 //   - Online Expenses: at payment time (online_expense_payments.bank_id)
-//   - Petty Cash: at REIMBURSEMENT time only (petty_cash_reimbursements) -
-//     Vouchers (spending from the float) don't touch Finance, since that
-//     money already left Cash/Bank when the float was last topped up.
+//   - Petty Cash: NEVER posted to Finance. Vouchers and reimbursements are
+//     tracked only inside the Petty Cash module (petty_cash_vouchers /
+//     petty_cash_reimbursements); the Cash Ledger is not read or written.
 const ensureExpenseFinanceLinkSchema = async () => {
   const alterations = [
     ["cheque_expenses", "ADD COLUMN IF NOT EXISTS company_id INT NULL AFTER bill_date"],

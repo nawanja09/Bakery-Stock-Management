@@ -33,7 +33,7 @@ const Reimbursement = () => {
   // so this list is Companies only - Bank accounts are never valid for
   // Petty Cash. JH is the default.
   const [companies, setCompanies] = useState([]);
-  const cashBookOptions = companies.map(c => ({ value: String(c.id), label: `${c.name} - Cash Book` }));
+  const cashBookOptions = companies.map(c => ({ value: String(c.id), label: c.name }));
 
   useEffect(() => {
     const loadCompanies = async () => {
@@ -126,7 +126,7 @@ const Reimbursement = () => {
       return;
     }
     if (!reimbursementForm.company_id) {
-      showPopup('error', 'Please select a Cash Book');
+      showPopup('error', 'Please select a Company');
       return;
     }
 
@@ -243,7 +243,7 @@ const Reimbursement = () => {
                 />
               </div>
               <div className="form-group">
-                <label htmlFor="company_id">Cash Book *</label>
+                <label htmlFor="company_id">Company *</label>
                 <select
                   id="company_id"
                   name="company_id"
@@ -251,7 +251,7 @@ const Reimbursement = () => {
                   onChange={handleReimbursementChange}
                   required
                 >
-                  <option value="">Select Cash Book</option>
+                  <option value="">Select Company</option>
                   {cashBookOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
               </div>
@@ -296,7 +296,7 @@ const Reimbursement = () => {
                 <tr>
                   <th>Reference Number</th>
                   <th>Date</th>
-                  <th>Cash Book</th>
+                  <th>Company</th>
                   <th>Amount</th>
                   <th>Status</th>
                   <th>Created By</th>
