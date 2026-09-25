@@ -33,7 +33,9 @@ const emptyForm = {
   expense_date: today(),
   amount:       '',
   type:         '',
-  description:  ''
+  description:  '',
+  company_id:   '',
+  reference_number: ''
 };
 
 // ── component ─────────────────────────────────────────────────────────────────
@@ -50,6 +52,7 @@ const HiddenExpenses = () => {
 
   // Data
   const [records, setRecords] = useState([]);
+  const [companies, setCompanies] = useState([]);
 
   // Form
   const [formData, setFormData] = useState(emptyForm);
@@ -73,6 +76,19 @@ const HiddenExpenses = () => {
     fetchRecords();
   }, [fetchRecords]);
 
+  useEffect(() => {
+    const fetchCompanies = async () => {
+      try {
+        const res = await api.get('/companies');
+        setCompanies(res.data || []);
+      } catch (err) {
+        console.error('Error fetching companies:', err);
+        showPopup('error', 'Failed to load companies');
+      }
+    };
+    fetchCompanies();
+  }, [showPopup]);
+
   // ── form handlers ─────────────────────────────────────────────────────────
 
   const handleChange = (e) => {
@@ -91,7 +107,9 @@ const HiddenExpenses = () => {
       expense_date: record.expense_date || today(),
       amount:       String(record.amount || ''),
       type:         record.type || '',
-      description:  record.description || ''
+      description:  record.description || '',
+      company_id: record.company_id ? String(record.company_id) : '',
+      reference_number: record.reference_number || ''
     });
     setIsEditing(true);
     setEditingId(record.id);
@@ -102,10 +120,10 @@ const HiddenExpenses = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const { expense_date, amount, type } = formData;
+    const { expense_date, amount, type, company_id } = formData;
 
-    if (!expense_date || !amount || !type) {
-      showPopup('error', 'Please fill all required fields: Date, Amount and Type');
+    if (!expense_date || !amount || !type || !company_id) {
+      showPopup('error', 'Please fill all required fields: Date, Amount, Type and Company');
       return;
     }
     if (parseFloat(amount) <= 0) {
@@ -119,7 +137,9 @@ const HiddenExpenses = () => {
         expense_date: formData.expense_date,
         amount:       parseFloat(formData.amount),
         type:         formData.type,
-        description:  formData.description || null
+        description:  formData.description || null,
+        company_id: formData.company_id,
+        reference_number: formData.reference_number || null
       };
 
       if (isEditing) {
@@ -179,11 +199,6 @@ const HiddenExpenses = () => {
         </div>
       </div>
 
-      <p style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem', marginTop: -6, marginBottom: 16 }}>
-        Report-only records — Hidden Expenses never post to the Cash Ledger or Bank Ledger.
-        They only appear on the Expenses Report, clearly marked as Hidden Expenses.
-      </p>
-
       {/* ── Entry Form ── */}
       {showForm && (
         <div className="form-container">
@@ -241,6 +256,20 @@ const HiddenExpenses = () => {
               </div>
 
               {/* Description (full-width) */}
+              <div className="form-group">
+                <label className="form-label required-label">Company</label>
+                <select name="company_id" className="form-control" value={formData.company_id} onChange={handleChange} required>
+                  <option value="">-- Select Company --</option>
+                  {companies.map(company => <option key={company.id} value={company.id}>{company.name}</option>)}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Reference Number</label>
+                <input type="text" name="reference_number" className="form-control" value={formData.reference_number} onChange={handleChange} maxLength={100} />
+              </div>
+
+              {/* Description (full-width) */}
               <div className="form-group form-group-full">
                 <label className="form-label">Description</label>
                 <textarea
@@ -290,6 +319,8 @@ const HiddenExpenses = () => {
             <thead>
               <tr>
                 <th>Date</th>
+                <th>Company</th>
+                <th>Reference Number</th>
                 <th>Type</th>
                 <th>Description</th>
                 <th className="text-right">Amount</th>
@@ -299,7 +330,7 @@ const HiddenExpenses = () => {
             <tbody>
               {records.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="text-center text-muted" style={{ padding: '24px' }}>
+                  <td colSpan={7} className="text-center text-muted" style={{ padding: '24px' }}>
                     {isFetching ? 'Loading…' : 'No hidden expense records found.'}
                   </td>
                 </tr>
@@ -307,6 +338,8 @@ const HiddenExpenses = () => {
                 records.map(rec => (
                   <tr key={rec.id}>
                     <td className="date-cell">{rec.expense_date}</td>
+                    <td>{rec.company_name || '—'}</td>
+                    <td>{rec.reference_number || '—'}</td>
                     <td>{rec.type}</td>
                     <td style={{ maxWidth: 260, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {rec.description || '—'}
