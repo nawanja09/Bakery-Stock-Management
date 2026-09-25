@@ -47,7 +47,8 @@ import {
   faRightLeft,
   faFileInvoiceDollar,
   faIdCard,
-  faSackDollar
+  faSackDollar,
+  faUserSecret
 } from '@fortawesome/free-solid-svg-icons';
 import bakeryLogo from '../images/icon.jpeg';
 import './NavigationBar.css';
@@ -358,6 +359,7 @@ const NavigationBar = () => {
       <li><NavLink to="/expenses/bank-charges" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faUniversity} /></span><span>Bank Charges</span></NavLink></li>
       <li><NavLink to="/expenses/new" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faMoneyCheck} /></span><span>New Expenses</span></NavLink></li>
       <li><NavLink to="/expenses/cash-expenses" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faWallet} /></span><span>Cash Expenses</span></NavLink></li>
+      <li><NavLink to="/expenses/hidden" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faUserSecret} /></span><span>Hidden Expenses</span></NavLink></li>
       <li><NavLink to="/expenses/reports" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faChartBar} /></span><span>Expenses Reports</span></NavLink></li>
     </>
   );

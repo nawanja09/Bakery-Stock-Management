@@ -63,6 +63,7 @@ const analystRoutes = require('./routes/analystRoutes');
 const incomeRoutes = require('./routes/incomeRoutes');
 const readOnly = require('./middleware/readOnly');
 const cashExpenseRoutes = require('./routes/cashExpenseRoutes');
+const hiddenExpenseRoutes = require('./routes/hiddenExpenseRoutes');
 const { ensureChequeReleaseSchema, startChequeReleaseProcessor } = require('./services/chequeReleaseService');
 
 
@@ -170,6 +171,7 @@ app.use('/api/receive-types', receiveTypeRoutes);
 app.use('/api/analyst', analystRoutes);
 app.use('/api/incomes', incomeRoutes);
 app.use('/api/cash-expenses', cashExpenseRoutes);
+app.use('/api/hidden-expenses', hiddenExpenseRoutes);
 
 
 // Error handling middleware for file uploads
