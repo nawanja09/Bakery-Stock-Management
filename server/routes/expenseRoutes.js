@@ -3,9 +3,12 @@ const router = express.Router();
 const pool = require('../config/db');
 const authenticate = require('../middleware/authenticate');
 const restrictRoles = require('../middleware/restrictRoles');
-// NOTE: Petty Cash never touches the Finance Cash Ledger, so recordCashTransaction
-// is intentionally not imported here.
-const { recordBankTransaction, calculateRunningBalances } = require('../utils/financeLedger');
+// NOTE: Only a Petty Cash Reimbursement touches the Finance Cash Ledger (as a
+// Credit - cash moving out of the company's main Cash Book into the petty
+// cash float). Petty Cash Vouchers/Expenses and standalone Petty Cash
+// Payments are paid out of the petty cash float itself and must never post
+// to the Cash Ledger.
+const { recordBankTransaction, recordCashTransaction, calculateRunningBalances } = require('../utils/financeLedger');
 const { checkDuplicateReference, DuplicateReferenceError } = require('../services/referenceValidationService');
 const { getActiveBankAccounts } = require('../services/bankAccountService');
 const { isRmAdjustmentRequest, recordFinancialAdjustment, sameValue } = require('../utils/rmAdjustmentAudit');
@@ -506,9 +509,10 @@ router.post('/petty-cash/reimbursement', authenticate, async (req, res) => {
   if (!reference_number || !reimbursement_date || !amount) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
-  // Reimbursements only top up the Petty Cash float inside the Petty Cash
-  // module. The company is kept for reporting; nothing is posted to the
-  // main Cash Ledger.
+  // A Reimbursement tops up the Petty Cash float, funded out of the
+  // Company's main Cash Book - so it is posted to the Cash Ledger as a
+  // Credit (cash out of the company). The company is required both for
+  // reporting and so the correct Cash Ledger is debited/credited.
   if (!company_id) {
     return res.status(400).json({ error: 'Company is required for reimbursement' });
   }
@@ -532,6 +536,20 @@ router.post('/petty-cash/reimbursement', authenticate, async (req, res) => {
        VALUES (?, ?, ?, ?, ?, NULL, ?, 'Completed')`,
       [reference_number, reimbursement_date, amount, company_id, funding_source, userId]
     );
+
+    // Post the Credit to the Company's Cash Ledger. This is the only Petty
+    // Cash transaction type that ever touches finance_transactions.
+    await recordCashTransaction(connection, {
+      companyId: company_id,
+      date: reimbursement_date,
+      remark: `Petty Cash Reimbursement - ${reference_number}`,
+      credit: parseFloat(amount),
+      transactionType: 'Petty Cash Reimbursement',
+      referenceNumber: reference_number,
+      referenceType: 'PETTY_CASH_REIMBURSEMENT',
+      referenceId: result.insertId,
+      createdBy: userId
+    });
 
     await connection.commit();
     await updatePettyCashBalance();
@@ -572,6 +590,17 @@ router.put('/petty-cash/reimbursement/:id', authenticate, async (req, res) => {
   try {
     await connection.beginTransaction();
     await checkDuplicateReference(connection, reference_number, { table: 'petty_cash_reimbursements', id });
+
+    const [oldRows] = await connection.query(
+      'SELECT company_id, amount FROM petty_cash_reimbursements WHERE id = ? FOR UPDATE',
+      [id]
+    );
+    if (oldRows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ error: 'Reimbursement not found' });
+    }
+    const companyId = oldRows[0].company_id;
+
     const [result] = await connection.query(
       `UPDATE petty_cash_reimbursements 
        SET reference_number = ?, reimbursement_date = ?, amount = ?, updated_by = ?
@@ -583,6 +612,42 @@ router.put('/petty-cash/reimbursement/:id', authenticate, async (req, res) => {
       await connection.rollback();
       return res.status(404).json({ error: 'Reimbursement not found' });
     }
+
+    // Keep the mirrored Cash Ledger Credit in sync with the edited amount/date.
+    if (companyId) {
+      const [finRows] = await connection.query(
+        'SELECT id, credit FROM finance_transactions WHERE reference_type = "PETTY_CASH_REIMBURSEMENT" AND reference_id = ? FOR UPDATE',
+        [id]
+      );
+      const newCredit = parseFloat(amount) || 0;
+
+      if (finRows.length > 0) {
+        const finId = finRows[0].id;
+        const oldCredit = parseFloat(finRows[0].credit) || 0;
+        const difference = newCredit - oldCredit;
+        if (difference !== 0) {
+          await connection.query('UPDATE cash_accounts SET current_balance = current_balance - ? WHERE company_id = ?', [difference, companyId]);
+        }
+        await connection.query(
+          'UPDATE finance_transactions SET credit = ?, transaction_date = ?, remark = ?, reference_number = ? WHERE id = ?',
+          [newCredit, reimbursement_date, `Petty Cash Reimbursement - ${reference_number}`, reference_number, finId]
+        );
+      } else {
+        // Legacy reimbursement created before the Cash Ledger link existed.
+        await recordCashTransaction(connection, {
+          companyId,
+          date: reimbursement_date,
+          remark: `Petty Cash Reimbursement - ${reference_number}`,
+          credit: newCredit,
+          transactionType: 'Petty Cash Reimbursement',
+          referenceNumber: reference_number,
+          referenceType: 'PETTY_CASH_REIMBURSEMENT',
+          referenceId: id,
+          createdBy: userId
+        });
+      }
+    }
+
     await connection.commit();
     await updatePettyCashBalance();
     
