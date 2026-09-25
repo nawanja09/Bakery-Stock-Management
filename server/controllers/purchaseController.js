@@ -1500,9 +1500,9 @@ const addSettlementToReturn = async (req, res) => {
 // (RM Adjustment -> "Purchasing Payment Adjustment" tab)
 //
 // Adjusts a payment that was already recorded against a purchasing
-// invoice. Only Payment Date and Payment Amount can change; everything
-// else about the payment (supplier, company, method, voucher, bank
-// account, invoice) is fixed and read-only. Reuses the same reconciliation
+// invoice. Payment identity fields (supplier, company, invoice, check number)
+// remain fixed; transaction details such as date, amount, method, voucher,
+// bank account, and notes can be corrected. Reuses the same reconciliation
 // helpers and ledger functions as a normal payment so the invoice balance
 // and Cash/Bank ledger stay correct, and preserves the existing behavior
 // of treating any amount above the invoice's balance as supplier credit.
@@ -1549,7 +1549,7 @@ const getPaymentAdjustmentDetail = async (req, res) => {
 
   try {
     const [paymentRows] = await pool.query(
-      `SELECT ph.id AS payment_id, ph.payment_date, ph.amount AS transaction_amount,
+      `SELECT ph.id AS payment_id, ph.payment_date, ph.amount AS transaction_amount, ph.bank_id,
               ph.payment_method, ph.voucher_number, ph.check_number, ph.notes,
               ph.created_at, u.name AS created_by_name
        FROM payment_history ph
@@ -1606,12 +1606,13 @@ const getPaymentAdjustmentDetail = async (req, res) => {
       invoice_no: purchase.invoice_no,
       supplier_name: purchase.supplier_name,
       company_name: purchase.company_name,
+      company_id: purchase.company_id,
       payment_date: payment.payment_date,
       payment_method: payment.payment_method,
       voucher_number: payment.voucher_number,
       reference_number: payment.check_number,
       amount: allocatedAmount,
-      bank_id: bankInfo.bank_id || null,
+      bank_id: payment.bank_id || bankInfo.bank_id || null,
       bank_name: bankInfo.bank_name || null,
       account_number: bankInfo.account_number || null,
       notes: payment.notes,
@@ -1629,10 +1630,11 @@ const getPaymentAdjustmentDetail = async (req, res) => {
   }
 };
 
-// PUT Save / Confirm Adjustment - only Payment Date and Payment Amount change.
+// PUT Save / Confirm Adjustment. Invoice identity, supplier/company, and
+// check_number remain immutable; other payment details may be corrected.
 const adjustPurchasePayment = async (req, res) => {
   const [paymentId, purchaseId] = String(req.params.id).split('-').map(Number);
-  const { payment_date, amount } = req.body;
+  const { payment_date, amount, payment_method, voucher_number, bank_id, notes } = req.body;
 
   if (!paymentId || !purchaseId) {
     return res.status(400).json({ error: 'Invalid payment adjustment reference' });
@@ -1643,6 +1645,14 @@ const adjustPurchasePayment = async (req, res) => {
   const newAmount = parseFloat(amount);
   if (!Number.isFinite(newAmount) || newAmount <= 0) {
     return res.status(400).json({ error: 'Payment Amount must be a valid amount greater than 0' });
+  }
+  const normalizedMethod = normalizePaymentMethodValue(payment_method);
+  const validMethods = ['CASH', 'BANK_TRANSFER', 'CHEQUE', 'CREDIT'];
+  if (!normalizedMethod || !validMethods.includes(normalizedMethod)) {
+    return res.status(400).json({ error: 'Payment Method is invalid' });
+  }
+  if (normalizedMethod === 'BANK_TRANSFER' && !bank_id) {
+    return res.status(400).json({ error: 'Bank Account is required for bank payments' });
   }
 
   const connection = await pool.getConnection();
@@ -1666,6 +1676,27 @@ const adjustPurchasePayment = async (req, res) => {
       return res.status(404).json({ error: 'Invoice not found' });
     }
     const purchase = purchaseRows[0];
+    const methodForHistory = normalizePaymentMethodForHistory(normalizedMethod);
+    if (voucher_number && voucher_number !== payment.voucher_number) {
+      try { await checkDuplicateReference(connection, voucher_number, { table: 'payment_history', id: paymentId }); }
+      catch (err) {
+        if (err instanceof DuplicateReferenceError) {
+          await connection.rollback();
+          return res.status(400).json({ error: err.message });
+        }
+        throw err;
+      }
+    }
+    if (normalizedMethod === 'BANK_TRANSFER') {
+      const [bankRows] = await connection.query(
+        "SELECT id FROM bank_details WHERE id = ? AND status = 'Active' AND COALESCE(record_status, 1) = 1 AND company = (SELECT name FROM company WHERE id = ?) LIMIT 1",
+        [bank_id, purchase.company_id]
+      );
+      if (!bankRows.length) {
+        await connection.rollback();
+        return res.status(400).json({ error: 'Selected bank account is invalid for this company' });
+      }
+    }
     const invoiceTotal = resolveInvoiceTotalAmount(purchase);
 
     const [allocRows] = await connection.query(
@@ -1708,8 +1739,10 @@ const adjustPurchasePayment = async (req, res) => {
     const newTransactionAmount = Number((oldTransactionAmount + totalDelta).toFixed(2));
 
     await connection.query(
-      'UPDATE payment_history SET payment_date = ?, amount = ? WHERE id = ?',
-      [payment_date, newTransactionAmount, paymentId]
+      `UPDATE payment_history SET payment_date = ?, amount = ?, payment_method = ?,
+       voucher_number = ?, bank_id = ?, notes = ? WHERE id = ?`,
+      [payment_date, newTransactionAmount, methodForHistory, voucher_number || null,
+       normalizedMethod === 'BANK_TRANSFER' ? bank_id : null, notes || null, paymentId]
     );
 
     // Recompute this invoice's paid/balance/status from the real allocations.
@@ -1723,24 +1756,76 @@ const adjustPurchasePayment = async (req, res) => {
        WHERE reference_type = 'PURCHASE_PAYMENT' AND reference_id = ? LIMIT 1`,
       [paymentId]
     );
-    if (finRows.length > 0) {
+    const targetAccountType = normalizedMethod === 'CASH' ? 'CASH'
+      : normalizedMethod === 'BANK_TRANSFER' ? 'BANK' : null;
+    if (finRows.length > 0 && targetAccountType) {
       const fin = finRows[0];
       const newCredit = Number((parseFloat(fin.credit) + totalDelta).toFixed(2));
+      const targetBankId = targetAccountType === 'BANK' ? Number(bank_id) : null;
       await connection.query(
-        'UPDATE finance_transactions SET credit = ?, transaction_date = ? WHERE id = ?',
-        [newCredit, payment_date, fin.id]
+        `UPDATE finance_transactions SET credit = ?, transaction_date = ?, account_type = ?,
+         company_id = ?, bank_id = ?, reference_number = ? WHERE id = ?`,
+        [newCredit, payment_date, targetAccountType, purchase.company_id, targetBankId,
+         voucher_number || payment.check_number || null, fin.id]
       );
-      if (fin.account_type === 'CASH' && fin.company_id) {
+      const sameCashAccount = fin.account_type === 'CASH' && targetAccountType === 'CASH'
+        && Number(fin.company_id) === Number(purchase.company_id);
+      const sameBankAccount = fin.account_type === 'BANK' && targetAccountType === 'BANK'
+        && Number(fin.bank_id) === targetBankId;
+      if (fin.account_type === 'CASH' && fin.company_id && !sameCashAccount) {
+        await connection.query(
+          'UPDATE cash_accounts SET current_balance = current_balance + ? WHERE company_id = ?',
+          [parseFloat(fin.credit) || 0, fin.company_id]
+        );
+      } else if (sameCashAccount) {
+        await connection.query('UPDATE cash_accounts SET current_balance = current_balance - ? WHERE company_id = ?', [totalDelta, fin.company_id]);
+      }
+      if (fin.account_type === 'BANK' && fin.bank_id && !sameBankAccount) {
+        await connection.query(
+          'UPDATE bank_details SET current_balance = current_balance + ? WHERE id = ?',
+          [parseFloat(fin.credit) || 0, fin.bank_id]
+        );
+      } else if (sameBankAccount) {
+        await connection.query('UPDATE bank_details SET current_balance = current_balance - ? WHERE id = ?', [totalDelta, fin.bank_id]);
+      }
+      if (targetAccountType === 'CASH' && !sameCashAccount) {
         await connection.query(
           'UPDATE cash_accounts SET current_balance = current_balance - ? WHERE company_id = ?',
-          [totalDelta, fin.company_id]
+          [newCredit, purchase.company_id]
         );
-      } else if (fin.account_type === 'BANK' && fin.bank_id) {
+      } else if (targetAccountType === 'BANK' && !sameBankAccount) {
         await connection.query(
           'UPDATE bank_details SET current_balance = current_balance - ? WHERE id = ?',
-          [totalDelta, fin.bank_id]
+          [newCredit, targetBankId]
         );
       }
+      ledgerUpdated = true;
+    } else if (finRows.length > 0 && !targetAccountType) {
+      const fin = finRows[0];
+      await connection.query("UPDATE finance_transactions SET status = 0 WHERE id = ?", [fin.id]);
+      if (fin.account_type === 'CASH' && fin.company_id) {
+        await connection.query('UPDATE cash_accounts SET current_balance = current_balance + ? WHERE company_id = ?', [parseFloat(fin.credit) || 0, fin.company_id]);
+      } else if (fin.account_type === 'BANK' && fin.bank_id) {
+        await connection.query('UPDATE bank_details SET current_balance = current_balance + ? WHERE id = ?', [parseFloat(fin.credit) || 0, fin.bank_id]);
+      }
+      ledgerUpdated = true;
+    } else if (finRows.length === 0 && targetAccountType === 'CASH' && purchase.company_id) {
+      await recordCashTransaction(connection, {
+        companyId: purchase.company_id, date: payment_date,
+        remark: `Supplier payment - Invoice ${purchase.invoice_no}`, credit: newTransactionAmount,
+        transactionType: 'RM Purchase Payment', referenceNumber: voucher_number || payment.check_number || null,
+        invoiceNumber: purchase.invoice_no, partyName: null, referenceType: 'PURCHASE_PAYMENT',
+        referenceId: paymentId, createdBy: payment.created_by
+      });
+      ledgerUpdated = true;
+    } else if (finRows.length === 0 && targetAccountType === 'BANK') {
+      await recordBankTransaction(connection, {
+        bankId: Number(bank_id), date: payment_date,
+        remark: `Supplier payment - Invoice ${purchase.invoice_no}`, credit: newTransactionAmount,
+        transactionType: 'RM Purchase Payment', referenceNumber: voucher_number || payment.check_number || null,
+        invoiceNumber: purchase.invoice_no, partyName: null, referenceType: 'PURCHASE_PAYMENT',
+        referenceId: paymentId, createdBy: payment.created_by
+      });
       ledgerUpdated = true;
     }
 
@@ -1755,7 +1840,7 @@ const adjustPurchasePayment = async (req, res) => {
       const datePart = String(payment_date).replace(/-/g, '');
       const rand = Math.floor(Math.random() * 9000) + 1000;
       const overpaymentNumber = `ADJ-${datePart}-${rand}`;
-      const overpaymentMethod = payment.payment_method === 'BANK_TRANSFER' ? 'BANK_TRANSFER' : 'CASH';
+      const overpaymentMethod = normalizedMethod === 'BANK_TRANSFER' ? 'BANK_TRANSFER' : 'CASH';
 
       const [overpayResult] = await connection.query(
         `INSERT INTO supplier_overpayments
@@ -1764,7 +1849,7 @@ const adjustPurchasePayment = async (req, res) => {
          VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?, 'Active', ?, ?)`,
         [
           overpaymentNumber, purchase.supplier_id, purchase.company_id || null, payment_date, overpaymentMethod,
-          payment.voucher_number || null, excessAmount, excessAmount,
+          voucher_number || null, excessAmount, excessAmount,
           `Supplier credit from Purchasing Payment Adjustment on invoice ${purchase.invoice_no} (Payment #${paymentId})`,
           await resolveUserId(connection, req.user?.id)
         ]
@@ -1781,7 +1866,7 @@ const adjustPurchasePayment = async (req, res) => {
           adjustment_difference, status, notes, updated_by)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Adjusted', ?, ?)`,
       [
-        paymentId, purchaseId, purchase.invoice_no, purchase.supplier_id, supplierName, payment.voucher_number || null,
+        paymentId, purchaseId, purchase.invoice_no, purchase.supplier_id, supplierName, voucher_number || null,
         payment.payment_date, payment_date, oldAllocatedAmount, newAmount,
         Number((newAmount - oldAllocatedAmount).toFixed(2)),
         excessAmount > 0 ? `Rs. ${excessAmount.toFixed(2)} recorded as supplier credit${overpaymentRecord ? ` (${overpaymentRecord.overpayment_number})` : ''}` : null,

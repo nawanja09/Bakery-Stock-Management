@@ -2,8 +2,8 @@
 //
 // "Record Payment Details" view for adjusting a payment that was already
 // recorded against a purchasing invoice. Follows the existing Record
-// Payment UI as its visual reference, but only Payment Date and Payment
-// Amount are editable - every other field is read-only.
+// Payment UI as its visual reference. Invoice, supplier, company, and cheque
+// reference stay fixed; editable transaction fields follow payment rules.
 //
 // props.embeddedId / props.onSaved / props.onCancel follow the same
 // contract as EditPurchase / EditIssuance / EditWastage so it drops
@@ -16,6 +16,7 @@ import {
 import api from '../../api';
 import { usePopup } from '../context/PopupContext';
 import { formatCurrency } from '../../utils/formatters';
+import usePaymentMethods from '../../utils/usePaymentMethods';
 import './Adjustments.css';
 
 const ReadOnlyField = ({ label, value }) => (
@@ -27,12 +28,25 @@ const ReadOnlyField = ({ label, value }) => (
   </div>
 );
 
+const normalizeMethod = value => {
+  const normalized = String(value || '').trim().toUpperCase();
+  if (normalized === 'BANK' || normalized === 'BANK TRANSFER') return 'BANK_TRANSFER';
+  if (normalized === 'CREDIT CARD' || normalized === 'CARD') return 'CREDIT';
+  return normalized;
+};
+
 const PurchasingPaymentAdjustmentEditor = ({ embeddedId, onCancel, onSaved }) => {
   const { showPopup } = usePopup();
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState(null);
   const [paymentDate, setPaymentDate] = useState('');
   const [amount, setAmount] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('');
+  const [voucherNumber, setVoucherNumber] = useState('');
+  const [bankId, setBankId] = useState('');
+  const [notes, setNotes] = useState('');
+  const [bankAccounts, setBankAccounts] = useState([]);
+  const { paymentMethods } = usePaymentMethods();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [validationError, setValidationError] = useState('');
 
@@ -47,6 +61,10 @@ const PurchasingPaymentAdjustmentEditor = ({ embeddedId, onCancel, onSaved }) =>
         setDetail(data);
         setPaymentDate((data.payment_date || '').slice(0, 10));
         setAmount(String(data.amount ?? ''));
+        setPaymentMethod(normalizeMethod(data.payment_method));
+        setVoucherNumber(data.voucher_number || '');
+        setBankId(data.bank_id ? String(data.bank_id) : '');
+        setNotes(data.notes || '');
       } catch (err) {
         console.error('Error loading payment adjustment detail:', err);
         showPopup('error', err.response?.data?.error || 'Failed to load payment details');
@@ -58,6 +76,13 @@ const PurchasingPaymentAdjustmentEditor = ({ embeddedId, onCancel, onSaved }) =>
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [embeddedId]);
+
+  useEffect(() => {
+    if (!detail?.company_id) return;
+    api.get('/finance/bank/accounts', { params: { companyId: detail.company_id } })
+      .then(res => setBankAccounts(res.data || []))
+      .catch(() => setBankAccounts([]));
+  }, [detail?.company_id]);
 
   if (loading) {
     return (
@@ -82,11 +107,15 @@ const PurchasingPaymentAdjustmentEditor = ({ embeddedId, onCancel, onSaved }) =>
   const availableBalance = parseFloat(detail.invoice_available_balance) || 0;
   const willCreateCredit = Number.isFinite(parsedAmount) && parsedAmount > availableBalance;
   const excessAmount = willCreateCredit ? Number((parsedAmount - availableBalance).toFixed(2)) : 0;
+  const methodCode = normalizeMethod(paymentMethod);
+  const usesBank = ['BANK', 'BANK_TRANSFER', 'BANK TRANSFER'].includes(methodCode);
 
   const validate = () => {
     if (!paymentDate) return 'Payment Date is required.';
     if (!amount || Number.isNaN(parsedAmount)) return 'Payment Amount is required.';
     if (parsedAmount <= 0) return 'Payment Amount must be greater than 0.';
+    if (!paymentMethod) return 'Payment Method is required.';
+    if (usesBank && !bankId) return 'Bank Account is required for bank payments.';
     return '';
   };
 
@@ -99,7 +128,11 @@ const PurchasingPaymentAdjustmentEditor = ({ embeddedId, onCancel, onSaved }) =>
     try {
       await api.put(`/purchases/payments/${embeddedId}/adjust`, {
         payment_date: paymentDate,
-        amount: parsedAmount
+        amount: parsedAmount,
+        payment_method: paymentMethod,
+        voucher_number: voucherNumber,
+        bank_id: usesBank ? bankId : null,
+        notes
       });
       showPopup('success', 'Payment adjustment saved successfully!');
       if (onSaved) onSaved();
@@ -117,21 +150,38 @@ const PurchasingPaymentAdjustmentEditor = ({ embeddedId, onCancel, onSaved }) =>
 
       <div className="alert-message info" style={{ marginBottom: 'var(--spacing-md)' }}>
         <FontAwesomeIcon icon={faExclamationTriangle} style={{ marginRight: '8px' }} />
-        Only <strong>Payment Date</strong> and <strong>Payment Amount</strong> can be changed. All other details are read-only.
+        Invoice, supplier, company, and reference / cheque number are fixed. Other payment details can be changed.
       </div>
 
       <div className="form-grid">
-        <ReadOnlyField label="Invoice" value={detail.invoice_no} />
+        <ReadOnlyField label="Invoice No" value={detail.invoice_no} />
         <ReadOnlyField label="Supplier Name" value={detail.supplier_name} />
         <ReadOnlyField label="Company" value={detail.company_name} />
-        <ReadOnlyField label="Payment Method" value={detail.payment_method} />
-        <ReadOnlyField label="Voucher Number" value={detail.voucher_number} />
+        <div className="form-group">
+          <label>Payment Method <span className="required">*</span></label>
+          <select className="form-input" value={paymentMethod} onChange={e => { setPaymentMethod(e.target.value); setBankId(''); }}>
+            {paymentMethods.map(method => {
+              const code = normalizeMethod(method.name);
+              return <option key={method.id || method.name} value={code}>{method.name}</option>;
+            })}
+          </select>
+        </div>
+        <div className="form-group">
+          <label>Voucher Number</label>
+          <input className="form-input" value={voucherNumber} onChange={e => setVoucherNumber(e.target.value)} />
+        </div>
         <ReadOnlyField label="Reference / Cheque No." value={detail.reference_number} />
-        <ReadOnlyField
-          label="Bank Account"
-          value={detail.bank_name ? `${detail.bank_name}${detail.account_number ? ` - ${detail.account_number}` : ''}` : 'N/A (Cash)'}
-        />
-        <ReadOnlyField label="Total Balance Due / Invoice Balance" value={formatCurrency(detail.invoice_total)} />
+        {usesBank && <div className="form-group">
+          <label>Bank Account <span className="required">*</span></label>
+          <select className="form-input" value={bankId} onChange={e => setBankId(e.target.value)}>
+            <option value="">Select bank account</option>
+            {bankAccounts.map(bank => <option key={bank.id} value={bank.id}>{bank.bank_name}{bank.account_number ? ` - ${bank.account_number}` : ''}</option>)}
+          </select>
+        </div>}
+        <div className="form-group">
+          <label>Invoice Balance</label>
+          <output className="form-input">{formatCurrency(detail.invoice_total)}</output>
+        </div>
       </div>
 
       <div className="form-grid two-col">
@@ -157,12 +207,10 @@ const PurchasingPaymentAdjustmentEditor = ({ embeddedId, onCancel, onSaved }) =>
         </div>
       </div>
 
-      {detail.notes && (
-        <div className="form-group full-width">
+      <div className="form-group full-width">
           <label>Notes</label>
-          <textarea className="form-textarea" rows="2" value={detail.notes} disabled readOnly />
-        </div>
-      )}
+          <textarea className="form-textarea" rows="2" value={notes} onChange={e => setNotes(e.target.value)} />
+      </div>
 
       {willCreateCredit && (
         <div className="alert-message info">
