@@ -79,37 +79,4 @@ const changePassword = async (req, res) => {
   }
 };
 
-const registerUser = async (req, res) => {
-  const { name, username, password } = req.body;
-
-  if (!name || !username || !password) {
-    return res.status(400).json({ error: 'Name, username and password are required' });
-  }
-
-  try {
-    const [existing] = await pool.query(
-      'SELECT * FROM users WHERE username = ?',
-      [username]
-    );
-
-    if (existing.length > 0) {
-      return res.status(400).json({ error: 'Username already exists' });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const [result] = await pool.query(
-      'INSERT INTO users (name, username, password) VALUES (?, ?, ?)',
-      [name, username, hashedPassword]
-    );
-
-    res.status(201).json({
-      message: 'User registered successfully',
-      userId: result.insertId
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Server error' });
-  }
-};
-
-module.exports = { loginUser, changePassword, registerUser };
+module.exports = { loginUser, changePassword };
