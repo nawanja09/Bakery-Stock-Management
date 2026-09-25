@@ -13,6 +13,7 @@ const TRANSACTION_TYPES = [
   { value: 'Customer Payment', label: 'Customer Payment' },
   { value: 'Owner Capital', label: 'Owner Capital' },
   { value: 'Other Income', label: 'Other Income' },
+  { value: 'Petty Cash Reimbursement', label: 'Petty Cash Reimbursement' },
   { value: 'Adjustment', label: 'Adjustment' },
   { value: 'Bank Deposit', label: 'Bank Deposit' },
   { value: 'Bank Withdrawal', label: 'Bank Withdrawal' }
