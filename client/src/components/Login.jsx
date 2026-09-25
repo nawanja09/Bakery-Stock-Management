@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import bakeryLogo from '../images/icon.jpeg';
 import { usePopup } from './context/PopupContext';
-import { Link } from 'react-router-dom';
 import './Login.css';
 import api from '../api';
 
@@ -103,9 +102,6 @@ const Login = () => {
           >
             {isLoading ? 'Logging in...' : 'Login'}
           </button>
-          <div className="register-link">
-            <h4>Don't have an account? <Link to="/register">Register</Link></h4>
-          </div>
         </form>
       </div>
     </div>

@@ -21,13 +21,11 @@ import IssuanceHistory from './components/issuance/IssuanceHistory';
 import AddWastage from './components/wastage/AddWastage';
 import WastageHistory from './components/wastage/WastageHistory';
 import StockReport from './components/report/StockReport';
-import Register from './components/Register';
 import DepartmentIssuesReport from './components/report/DepartmentIssuesReport';
 import PurchasingReport from './components/report/PurchasingReport/PurchasingReport';
 import PurchaseReport from './components/report/PurchaseReport/PurchaseReport';
 import WastageReport from './components/report/WastageReport/WastageReport';
 import ItemWiseStockReport from './components/report/StockReportByRangeAndItem';
-import ManageUsers from './components/admin/ManageUsers';
 import EmployeeManagement from './components/Employees/EmployeeManagement';
 
 import ItemTypes from './components/RawMaterial/ItemTypes/ItemTypes';
@@ -236,7 +234,7 @@ const AuthCheck = () => {
   return token ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />;
 };
 
-// Prevents already-logged-in users from accessing /login or /register.
+// Prevents already-logged-in users from accessing /login.
 const PublicOnlyRoute = ({ children }) => {
   const token = localStorage.getItem('token');
   const location = useLocation();
@@ -261,7 +259,6 @@ function App() {
       <div className="app">
         <Routes>
           <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
-          <Route path='/register' element={<PublicOnlyRoute><Register /></PublicOnlyRoute>} />
           <Route path="/auth-check" element={<AuthCheck />} />
 
           {/* Protected Routes */}  
@@ -306,7 +303,6 @@ function App() {
             <Route path="reports/purchasing" element={<PurchasingReport />} />
             <Route path="reports/purchase-report" element={<PurchaseReport />} />
             <Route path="reports/wastage" element={<WastageReport />} />
-            <Route path="admin/users" element={<ManageUsers />} />
             <Route path="admin/employees" element={<RoleRoute roles={['Admin', 'Super Admin']}><EmployeeManagement /></RoleRoute>} />
             <Route path="reports/stock/items" element={<ItemWiseStockReport/>} />
 

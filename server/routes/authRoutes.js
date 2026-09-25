@@ -3,12 +3,11 @@
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken')
-const { loginUser,changePassword, registerUser } = require('../controllers/authController');
+const { loginUser,changePassword } = require('../controllers/authController');
 const authenticate = require('../middleware/authenticate');
 
 router.post('/login', loginUser);
 router.post('/change-password', authenticate,changePassword);
-router.post('/register', registerUser);
 
 router.post('/refresh-token', (req, res) => {
   const token = req.body.token;

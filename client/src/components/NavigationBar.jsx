@@ -15,7 +15,6 @@ import {
   faFileInvoice,
   faTruckLoading,
   faTrash,
-  faUsers,
   faKey,
   faTruck,
   faBars,
@@ -94,7 +93,7 @@ const NavigationBar = () => {
         path.startsWith('/finance/receive-types') ||
         path.startsWith('/admin/employees')) {
       setActiveModule('management');
-    } else if (path.startsWith('/admin/users') || path.startsWith('/admin/password')) {
+    } else if (path.startsWith('/admin/password')) {
       setActiveModule('admin');
     } else if (path.startsWith('/adjustments')) {
       setActiveModule('adjustments');
@@ -459,7 +458,6 @@ const NavigationBar = () => {
   // ============================================================
   const renderAdminContent = () => (
     <>
-      <li><NavLink to="/admin/users" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faUsers} /></span><span>Manage Users</span></NavLink></li>
       <li><NavLink to="/admin/password" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faKey} /></span><span>Change Password</span></NavLink></li>
     </>
   );
