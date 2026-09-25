@@ -565,7 +565,6 @@ const PettyCash = () => {
                             {!isReimbursement && (
                               <div className="action-buttons">
                                 <button className="action-btn view-btn" title="View"><FontAwesomeIcon icon={faEye} /></button>
-                                <button className="action-btn edit-btn" title="Edit" onClick={() => handleEdit({ ...t, voucher_number: t.reference_number, payee: t.payee_name, amount: t.credit })}><FontAwesomeIcon icon={faEdit} /></button>
                                 {isAdmin() && (
                                   <button className="action-btn delete-btn" title="Delete" onClick={() => handleDelete(t.id)}>
                                     <FontAwesomeIcon icon={faTrash} />
