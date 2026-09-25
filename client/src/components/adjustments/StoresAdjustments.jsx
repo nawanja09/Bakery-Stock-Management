@@ -14,6 +14,7 @@ import InvoiceAdjustmentsTab from './tabs/InvoiceAdjustmentsTab';
 import IssuanceAdjustmentsTab from './tabs/IssuanceAdjustmentsTab';
 import WastageAdjustmentsTab from './tabs/WastageAdjustmentsTab';
 import PurchasingPaymentAdjustmentsTab from './tabs/PurchasingPaymentAdjustmentsTab';
+import RecordAdjustmentsTab from './tabs/RecordAdjustmentsTab';
 
 const SUMMARY_TABS = [
   { key: 'Department', label: 'Department Adjustments' },
@@ -21,6 +22,8 @@ const SUMMARY_TABS = [
   { key: 'Issuance', label: 'Issuance Adjustments' },
   { key: 'Wastage', label: 'Wastage Adjustments' },
   { key: 'Purchasing Payment', label: 'Purchasing Payment' },
+  { key: 'Petty Cash Voucher', label: 'Petty Cash Adjustment' },
+  { key: 'Expense Bill', label: 'Expense Adjustment' },
 ];
 
 // Reusable Skeleton Component
@@ -335,6 +338,9 @@ const StoresAdjustments = () => {
       {activeTab === 'Issuance' && <IssuanceAdjustmentsTab />}
       {activeTab === 'Wastage' && <WastageAdjustmentsTab />}
       {activeTab === 'Purchasing Payment' && <PurchasingPaymentAdjustmentsTab />}
+      {['Petty Cash Voucher', 'Expense Bill'].includes(activeTab) && (
+        <RecordAdjustmentsTab key={activeTab} category={activeTab} />
+      )}
 
       {activeTab === 'Department' && (
       <>
@@ -389,7 +395,7 @@ const StoresAdjustments = () => {
               />
             </div>
             <div className="filter-group">
-              <label><FontAwesomeIcon icon={faCalendarAlt} /> Start Date</label>
+              <label><FontAwesomeIcon icon={faCalendarAlt} /> From Date</label>
               <input
                 type="date"
                 name="startDate"
@@ -398,7 +404,7 @@ const StoresAdjustments = () => {
               />
             </div>
             <div className="filter-group">
-              <label><FontAwesomeIcon icon={faCalendarAlt} /> End Date</label>
+              <label><FontAwesomeIcon icon={faCalendarAlt} /> To Date</label>
               <input
                 type="date"
                 name="endDate"

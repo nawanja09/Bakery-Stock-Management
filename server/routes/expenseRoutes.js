@@ -8,6 +8,7 @@ const restrictRoles = require('../middleware/restrictRoles');
 const { recordBankTransaction, calculateRunningBalances } = require('../utils/financeLedger');
 const { checkDuplicateReference, DuplicateReferenceError } = require('../services/referenceValidationService');
 const { getActiveBankAccounts } = require('../services/bankAccountService');
+const { isRmAdjustmentRequest, recordFinancialAdjustment, sameValue } = require('../utils/rmAdjustmentAudit');
 
 router.use(authenticate, restrictRoles('Store Keeper', 'Stores'));
 
@@ -405,13 +406,18 @@ router.put('/petty-cash/voucher/:id', authenticate, async (req, res) => {
 
     await checkDuplicateReference(connection, voucher_number, { table: 'petty_cash_vouchers', id });
 
-    const [oldRows] = await connection.query('SELECT amount FROM petty_cash_vouchers WHERE id = ? FOR UPDATE', [id]);
+    const [oldRows] = await connection.query('SELECT * FROM petty_cash_vouchers WHERE id = ? FOR UPDATE', [id]);
     if (oldRows.length === 0) {
       await connection.rollback();
       return res.status(404).json({ error: 'Voucher not found' });
     }
 
-    const [result] = await connection.query(
+    const old = oldRows[0];
+    const updated = { ...old, voucher_number, voucher_date, employee_name: employee_name || null, payee_name,
+      expense_type, description: description || null, vehicle_number: vehicle_number || null,
+      amount, receipt_no: receipt_no || null };
+    const changed = Object.keys(updated).some((key) => !sameValue(old[key], updated[key]));
+    await connection.query(
       `UPDATE petty_cash_vouchers 
        SET voucher_number = ?, voucher_date = ?, employee_name = ?, payee_name = ?, 
            expense_type = ?, description = ?, vehicle_number = ?, 
@@ -431,6 +437,13 @@ router.put('/petty-cash/voucher/:id', authenticate, async (req, res) => {
         id
       ]
     );
+
+    if (changed && isRmAdjustmentRequest(req)) {
+      await recordFinancialAdjustment(connection, {
+        category: 'Petty Cash Voucher', sourceRecordId: id, referenceId: voucher_number,
+        updatedBy: userId, originalValues: old, updatedValues: updated
+      });
+    }
     
     await connection.commit();
     await updatePettyCashBalance();

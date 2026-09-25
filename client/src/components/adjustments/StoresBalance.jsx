@@ -11,7 +11,20 @@ import api from '../../api';
 import './Adjustments.css';
 import CategoryAdjustmentPanel from './CategoryAdjustmentPanel';
 
-const ADJUSTMENT_CATEGORIES = ['Department', 'Invoice', 'Issuance', 'Wastage', 'Purchasing Payment'];
+// Internal category values match rm_adjustment_records.category / the
+// existing backend routes exactly (see CategoryAdjustmentPanel). The label
+// is what the user sees - "Petty Cash Adjustment" and "Expense Adjustment"
+// are the two new categories; their underlying value stays the historical
+// 'Petty Cash Voucher' / 'Expense Bill' so no data model change is needed.
+const ADJUSTMENT_CATEGORIES = [
+  { value: 'Department', label: 'Department' },
+  { value: 'Invoice', label: 'Invoice' },
+  { value: 'Issuance', label: 'Issuance' },
+  { value: 'Wastage', label: 'Wastage' },
+  { value: 'Purchasing Payment', label: 'Purchasing Payment' },
+  { value: 'Petty Cash Voucher', label: 'Petty Cash Adjustment' },
+  { value: 'Expense Bill', label: 'Expense Adjustment' },
+];
 
 // Reusable Modal Component
 const Modal = ({ isOpen, onClose, title, message, type = 'info', onConfirm, confirmText = 'Confirm', cancelText = 'Cancel' }) => {
@@ -322,13 +335,13 @@ const StoresBalance = () => {
             className="form-select"
           >
             {ADJUSTMENT_CATEGORIES.map((cat) => (
-              <option key={cat} value={cat}>{cat}</option>
+              <option key={cat.value} value={cat.value}>{cat.label}</option>
             ))}
           </select>
           <span className="help-text" style={{ display: 'block', marginTop: 'var(--spacing-xs)', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
             {adjustmentCategory === 'Department'
               ? 'Stock count adjustment using General Information + Stock Count Details below.'
-              : `Select an existing ${adjustmentCategory.toLowerCase()} record to view and modify.`}
+              : `Select an existing ${(ADJUSTMENT_CATEGORIES.find((c) => c.value === adjustmentCategory)?.label || adjustmentCategory).toLowerCase()} record to view and modify.`}
           </span>
         </div>
       </div>

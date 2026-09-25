@@ -12,6 +12,8 @@ import EditPurchase from '../purchase/EditPurchase';
 import EditIssuance from '../issuance/EditIssuance';
 import EditWastage from '../wastage/EditWastage';
 import PurchasingPaymentAdjustmentEditor from './PurchasingPaymentAdjustmentEditor';
+import PettyCashVoucherAdjustmentEditor from './PettyCashVoucherAdjustmentEditor';
+import ExpenseBillAdjustmentEditor from './ExpenseBillAdjustmentEditor';
 import './Adjustments.css';
 
 // Category -> { endpoint, columns, editor }
@@ -83,6 +85,53 @@ const CATEGORY_CONFIG = {
       row.voucher_number?.toLowerCase().includes(term),
     Editor: PurchasingPaymentAdjustmentEditor,
   },
+  // ---- Petty Cash / Expenses ------------------------------------------
+  // Editing moved here from the Petty Cash page. Every save is logged in the
+  // Adjustment Summary (the editors send X-RM-Adjustment).
+  'Petty Cash Voucher': {
+    endpoint: '/expenses/petty-cash/vouchers?limit=1000',
+    // Internal key/value stays 'Petty Cash Voucher' (matches the backend
+    // category and rm_adjustment_records rows); only the displayed label is
+    // "Petty Cash Adjustment".
+    label: 'Petty Cash Adjustment',
+    getRows: (data) => data,
+    columns: [
+      { key: 'voucher_number', label: 'Voucher No.' },
+      { key: 'date', label: 'Date', format: (v) => (v ? new Date(v).toLocaleDateString() : '-') },
+      { key: 'payee', label: 'Payee' },
+      { key: 'expense_type', label: 'Expense Type' },
+      { key: 'amount', label: 'Amount', format: (v) => `Rs. ${parseFloat(v || 0).toFixed(2)}` },
+    ],
+    matches: (row, term) =>
+      row.voucher_number?.toLowerCase().includes(term) ||
+      row.payee?.toLowerCase().includes(term) ||
+      row.expense_type?.toLowerCase().includes(term),
+    Editor: PettyCashVoucherAdjustmentEditor,
+  },
+  'Expense Bill': {
+    endpoint: '/new-expenses',
+    // Internal key/value stays 'Expense Bill' (matches the backend category
+    // and rm_adjustment_records rows); only the displayed label is
+    // "Expense Adjustment".
+    label: 'Expense Adjustment',
+    getRows: (data) => data,
+    columns: [
+      { key: 'bill_number', label: 'Bill No.' },
+      { key: 'bill_date', label: 'Date', format: (v) => (v ? new Date(v).toLocaleDateString() : '-') },
+      { key: 'payee_name', label: 'Payee' },
+      { key: 'expense_type', label: 'Expense Type' },
+      { key: 'total_bill_amount', label: 'Total', format: (v) => `Rs. ${parseFloat(v || 0).toFixed(2)}` },
+      { key: 'payment_status', label: 'Status' },
+    ],
+    matches: (row, term) =>
+      row.bill_number?.toLowerCase().includes(term) ||
+      row.payee_name?.toLowerCase().includes(term) ||
+      row.expense_type?.toLowerCase().includes(term),
+    // A bill with payments recorded is locked by the expense module itself.
+    canEdit: (row) => !(parseFloat(row.paid_amount) > 0),
+    lockedReason: 'Payments are recorded against this bill, so it cannot be edited',
+    Editor: ExpenseBillAdjustmentEditor,
+  },
 };
 
 const CategoryAdjustmentPanel = ({ category, onAdjustmentSaved }) => {
@@ -119,7 +168,7 @@ const CategoryAdjustmentPanel = ({ category, onAdjustmentSaved }) => {
   if (!config) return null;
 
   // ---- Editing an existing record ----
-  if (selectedId) {
+  if (selectedId !== null) {
     const { Editor } = config;
     return (
       <div className="form-section">
@@ -198,7 +247,9 @@ const CategoryAdjustmentPanel = ({ category, onAdjustmentSaved }) => {
                     <button
                       type="button"
                       className="btn btn-sm btn-primary"
-                      onClick={() => setSelectedId(row.id)}
+                      onClick={() => setSelectedId(String(row.id))}
+                      disabled={config.canEdit ? !config.canEdit(row) : false}
+                      title={config.canEdit && !config.canEdit(row) ? config.lockedReason : undefined}
                     >
                       Edit
                     </button>

@@ -19,6 +19,7 @@ const authenticate = require('../middleware/authenticate');
 const restrictRoles = require('../middleware/restrictRoles');
 const { recordCashTransaction, recordBankTransaction } = require('../utils/financeLedger');
 const { checkDuplicateReference, DuplicateReferenceError } = require('../services/referenceValidationService');
+const { isRmAdjustmentRequest, recordFinancialAdjustment, sameValue } = require('../utils/rmAdjustmentAudit');
 
 router.use(authenticate, restrictRoles('Store Keeper', 'Stores'));
 
@@ -123,12 +124,15 @@ router.put('/:id', async (req, res) => {
     return res.status(400).json({ error: 'Bill date, payee, expense type, sub expense type and company are required' });
   }
 
+  const connection = await pool.getConnection();
   try {
-    const [companies] = await pool.query('SELECT id FROM company WHERE id = ?', [company_id]);
+    await connection.beginTransaction();
+    const [companies] = await connection.query('SELECT id FROM company WHERE id = ?', [company_id]);
     if (companies.length === 0) {
+      await connection.rollback();
       return res.status(400).json({ error: 'Selected company was not found' });
     }
-    const [subTypes] = await pool.query(
+    const [subTypes] = await connection.query(
       `SELECT st.id, st.name, et.name AS expense_type_name
        FROM sub_expense_types st
        JOIN expense_types et ON et.id = st.expense_type_id
@@ -136,17 +140,20 @@ router.put('/:id', async (req, res) => {
       [sub_expense_type_id, expense_type_id]
     );
     if (!subTypes.length) {
+      await connection.rollback();
       return res.status(400).json({ error: 'Selected sub expense type does not belong to the selected active expense type' });
     }
 
-    const [existingRows] = await pool.query(
-      'SELECT paid_amount FROM expenses WHERE id = ? AND is_deleted = 0',
+    const [existingRows] = await connection.query(
+      'SELECT * FROM expenses WHERE id = ? AND is_deleted = 0 FOR UPDATE',
       [id]
     );
     if (existingRows.length === 0) {
+      await connection.rollback();
       return res.status(404).json({ error: 'Expense bill not found' });
     }
     if (parseFloat(existingRows[0].paid_amount) > 0) {
+      await connection.rollback();
       return res.status(400).json({ error: 'This bill already has payments recorded against it and cannot be edited' });
     }
 
@@ -156,7 +163,7 @@ router.put('/:id', async (req, res) => {
       ? parseFloat(total_bill_amount)
       : withoutVat + vat;
 
-    const [result] = await pool.query(
+    await connection.query(
       `UPDATE expenses
        SET bill_date = ?, bill_number = ?, payee_id = ?, payee_name = ?, vat_reg_number = ?,
            expense_type_id = ?, expense_type = ?, sub_expense_type_id = ?, sub_expense_type = ?, without_vat_amount = ?, vat_amount = ?,
@@ -169,14 +176,51 @@ router.put('/:id', async (req, res) => {
       ]
     );
 
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ error: 'Expense bill not found' });
+    const old = existingRows[0];
+    const updated = { ...old, bill_date, bill_number: bill_number || null, payee_id: payee_id || null,
+      payee_name, vat_reg_number: vat_reg_number || null, expense_type_id,
+      expense_type: subTypes[0].expense_type_name, sub_expense_type_id,
+      sub_expense_type: subTypes[0].name, without_vat_amount: withoutVat, vat_amount: vat,
+      total_bill_amount: totalBill, description: description || null, company_id };
+    const changed = Object.keys(updated).some((key) => !sameValue(old[key], updated[key]));
+    if (changed && isRmAdjustmentRequest(req)) {
+      await recordFinancialAdjustment(connection, {
+        category: 'Expense Bill', sourceRecordId: id, referenceId: bill_number,
+        updatedBy: req.user?.userId, originalValues: old, updatedValues: updated
+      });
     }
+    await connection.commit();
 
     res.json({ message: 'Expense bill updated successfully' });
   } catch (error) {
+    await connection.rollback();
     console.error('Error updating expense bill:', error);
     res.status(500).json({ error: 'Failed to update expense bill' });
+  } finally {
+    connection.release();
+  }
+});
+
+// Get one active expense bill for the adjustment editor. Keeping this as a
+// dedicated lookup avoids relying on the list payload or searching a stale list.
+router.get('/:id', async (req, res, next) => {
+  if (!/^\d+$/.test(String(req.params.id))) return next();
+  try {
+    const [rows] = await pool.query(
+      `SELECT e.id, DATE_FORMAT(e.bill_date, '%Y-%m-%d') AS bill_date, e.bill_number,
+              e.payee_id, e.payee_name, e.vat_reg_number, e.expense_type_id, e.expense_type,
+              e.sub_expense_type_id, e.sub_expense_type, e.without_vat_amount, e.vat_amount,
+              e.total_bill_amount, e.paid_amount, e.balance, e.description, e.payment_status,
+              e.company_id, c.name AS company_name
+       FROM expenses e LEFT JOIN company c ON c.id = e.company_id
+       WHERE e.id = ? AND e.is_deleted = 0 LIMIT 1`,
+      [req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Expense bill not found' });
+    res.json(rows[0]);
+  } catch (error) {
+    console.error('Error fetching expense bill:', error);
+    res.status(500).json({ error: 'Failed to fetch expense bill' });
   }
 });
 

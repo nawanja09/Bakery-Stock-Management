@@ -9,6 +9,16 @@ const recordRmAdjustment = async (connection, { category, sourceRecordId, refere
   );
 };
 
+const recordFinancialAdjustment = async (connection, { category, sourceRecordId, referenceId, updatedBy, originalValues, updatedValues }) => {
+  await connection.query(
+    `INSERT INTO rm_adjustment_records
+       (category, source_record_id, reference_id, updated_by, original_values, updated_values)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [category, sourceRecordId, referenceId || null, updatedBy || null,
+      JSON.stringify(originalValues), JSON.stringify(updatedValues)]
+  );
+};
+
 const dateText = (value) => {
   if (!(value instanceof Date)) return null;
   const pad = (part) => String(part).padStart(2, '0');
@@ -45,4 +55,4 @@ const sameItems = (existing = [], submitted = [], fields) => {
   return normalize(existing) === normalize(submitted);
 };
 
-module.exports = { isRmAdjustmentRequest, recordRmAdjustment, sameValue, sameItems };
+module.exports = { isRmAdjustmentRequest, recordRmAdjustment, recordFinancialAdjustment, sameValue, sameItems };

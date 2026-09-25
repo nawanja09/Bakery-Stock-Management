@@ -163,7 +163,8 @@ const getRmAdjustmentSummary = async (req, res) => {
         JOIN items i ON i.id = sa.item_id
         WHERE rar.category = 'Department'`;
       const params = [];
-      if (startDate && endDate) { query += ' AND DATE(sa.date) BETWEEN ? AND ?'; params.push(startDate, endDate); }
+      if (startDate) { query += ' AND DATE(rar.updated_at) >= ?'; params.push(startDate); }
+      if (endDate) { query += ' AND DATE(rar.updated_at) <= ?'; params.push(endDate); }
       if (item_id && item_id !== 'all') { query += ' AND sa.item_id = ?'; params.push(item_id); }
       query += ' ORDER BY rar.updated_at DESC';
       [rows] = await pool.query(query, params);
@@ -178,7 +179,8 @@ const getRmAdjustmentSummary = async (req, res) => {
       const params = [];
       if (supplier_id && supplier_id !== 'all') { query += ' AND p.supplier_id = ?'; params.push(supplier_id); }
       if (invoice_no) { query += ' AND p.invoice_no LIKE ?'; params.push(`%${invoice_no}%`); }
-      if (startDate && endDate) { query += ' AND DATE(p.purchase_date) BETWEEN ? AND ?'; params.push(startDate, endDate); }
+      if (startDate) { query += ' AND DATE(rar.updated_at) >= ?'; params.push(startDate); }
+      if (endDate) { query += ' AND DATE(rar.updated_at) <= ?'; params.push(endDate); }
       if (payment_status && payment_status !== 'all') { query += ' AND p.payment_status = ?'; params.push(payment_status); }
       query += ' ORDER BY rar.updated_at DESC';
       [rows] = await pool.query(query, params);
@@ -193,7 +195,8 @@ const getRmAdjustmentSummary = async (req, res) => {
         WHERE rar.category = 'Issuance'`;
       const params = [];
       if (department_id && department_id !== 'all') { query += ' AND iss.department_id = ?'; params.push(department_id); }
-      if (startDate && endDate) { query += ' AND DATE(iss.issuance_date) BETWEEN ? AND ?'; params.push(startDate, endDate); }
+      if (startDate) { query += ' AND DATE(rar.updated_at) >= ?'; params.push(startDate); }
+      if (endDate) { query += ' AND DATE(rar.updated_at) <= ?'; params.push(endDate); }
       if (item_id && item_id !== 'all') { query += ' AND EXISTS (SELECT 1 FROM issuance_items ii2 WHERE ii2.issuance_id = iss.id AND ii2.item_id = ?)'; params.push(item_id); }
       query += ' GROUP BY iss.id ORDER BY rar.updated_at DESC';
       [rows] = await pool.query(query, params);
@@ -206,9 +209,40 @@ const getRmAdjustmentSummary = async (req, res) => {
         WHERE rar.category = 'Wastage' AND COALESCE(w.status, 1) = 1`;
       const params = [];
       if (reason && reason !== 'all') { query += ' AND w.reason = ?'; params.push(reason); }
-      if (startDate && endDate) { query += ' AND DATE(w.date) BETWEEN ? AND ?'; params.push(startDate, endDate); }
+      if (startDate) { query += ' AND DATE(rar.updated_at) >= ?'; params.push(startDate); }
+      if (endDate) { query += ' AND DATE(rar.updated_at) <= ?'; params.push(endDate); }
       if (item_id && item_id !== 'all') { query += ' AND EXISTS (SELECT 1 FROM wastage_items wi2 WHERE wi2.wastage_id = w.id AND wi2.item_id = ?)'; params.push(item_id); }
       query += ' GROUP BY w.id ORDER BY rar.updated_at DESC';
+      [rows] = await pool.query(query, params);
+    } else if (category === 'Petty Cash Voucher') {
+      let query = `SELECT rar.id AS adjustment_id, rar.created_at AS adjustment_date,
+          rar.reference_id, rar.original_values, rar.updated_values, rar.updated_by, au.name AS adjusted_by,
+          v.id, v.voucher_number, v.voucher_date, v.payee_name, v.expense_type, v.amount,
+          c.name AS company_name
+        FROM rm_adjustment_records rar
+        JOIN petty_cash_vouchers v ON v.id = rar.source_record_id
+        LEFT JOIN company c ON c.id = v.company_id
+        LEFT JOIN users au ON au.id = rar.updated_by
+        WHERE rar.category = 'Petty Cash Voucher'`;
+      const params = [];
+      if (startDate) { query += ' AND DATE(rar.created_at) >= ?'; params.push(startDate); }
+      if (endDate) { query += ' AND DATE(rar.created_at) <= ?'; params.push(endDate); }
+      query += ' ORDER BY rar.created_at DESC';
+      [rows] = await pool.query(query, params);
+    } else if (category === 'Expense Bill') {
+      let query = `SELECT rar.id AS adjustment_id, rar.created_at AS adjustment_date,
+          rar.reference_id, rar.original_values, rar.updated_values, rar.updated_by, au.name AS adjusted_by,
+          e.id AS expense_id, e.bill_number, e.bill_date, e.payee_name, e.expense_type, e.sub_expense_type,
+          e.total_bill_amount, e.paid_amount, e.payment_status, c.name AS company_name
+        FROM rm_adjustment_records rar
+        JOIN expenses e ON e.id = rar.source_record_id
+        LEFT JOIN company c ON c.id = e.company_id
+        LEFT JOIN users au ON au.id = rar.updated_by
+        WHERE rar.category = 'Expense Bill' AND e.is_deleted = 0`;
+      const params = [];
+      if (startDate) { query += ' AND DATE(rar.created_at) >= ?'; params.push(startDate); }
+      if (endDate) { query += ' AND DATE(rar.created_at) <= ?'; params.push(endDate); }
+      query += ' ORDER BY rar.created_at DESC';
       [rows] = await pool.query(query, params);
     } else {
       return res.status(400).json({ error: 'Invalid RM adjustment category' });
