@@ -1521,6 +1521,11 @@ const getExpensesReport = async (req, res) => {
     // Bank<->Cash movements) must never appear here, and are simply never
     // queried below.
     const includeRmPurchasing = normalizedType === 'rm_purchasing' || normalizedType === 'all';
+    // Hidden Expenses (PickMe / Credit Card Charge) are report-only records —
+    // they never post to hidden_expenses' own table's Cash/Bank ledger, so this
+    // is purely a display join; nothing here touches cash_transactions /
+    // bank_transactions / finance_transactions.
+    const includeHiddenExpenses = normalizedType === 'hidden' || normalizedType === 'all';
 
     // Resolve the selected payee's name once, so Petty Cash (which only
     // stores a free-text payee_name) can be filtered the same way as
@@ -1676,6 +1681,38 @@ const getExpensesReport = async (req, res) => {
       results = results.concat(rmPurchasingRows);
     }
 
+    // Hidden Expenses have no payee, no company, and no reference/status in
+    // the way the other expense types do — they're kept out of every
+    // company/payee filter above and just added straight into the mix here,
+    // clearly labelled with type 'Hidden Expense' so the report can badge
+    // them distinctly. They are never affected by companyId/payeeId filters
+    // (Hidden Expenses aren't scoped to a company or payee).
+    if (includeHiddenExpenses) {
+      let hiddenQuery = `
+        SELECT
+          id,
+          'Hidden Expense' AS type,
+          expense_date AS date,
+          'Hidden Expense' AS payee_name,
+          type AS expense_type,
+          NULL AS reference,
+          amount,
+          'Hidden' AS status,
+          NULL AS company_id,
+          NULL AS company_name
+        FROM hidden_expenses
+        WHERE is_deleted = 0
+        ${startDate ? 'AND expense_date >= ?' : ''}
+        ${endDate ? 'AND expense_date < DATE_ADD(?, INTERVAL 1 DAY)' : ''}
+      `;
+      const hiddenParams = [];
+      if (startDate) hiddenParams.push(startDate);
+      if (endDate) hiddenParams.push(endDate);
+
+      const [hiddenRows] = await pool.query(hiddenQuery, hiddenParams);
+      results = results.concat(hiddenRows);
+    }
+
     results.sort((a, b) => new Date(b.date) - new Date(a.date));
 
     const expenses = results.map(row => ({
@@ -1695,8 +1732,9 @@ const getExpensesReport = async (req, res) => {
     const otherTotal = expenses.filter(e => e.type === 'Other').reduce((sum, e) => sum + e.amount, 0);
     const bankChargesTotal = expenses.filter(e => e.type === 'Bank Charges').reduce((sum, e) => sum + e.amount, 0);
     const rmPurchasingTotal = expenses.filter(e => e.type === 'RM Purchasing').reduce((sum, e) => sum + e.amount, 0);
+    const hiddenExpensesTotal = expenses.filter(e => e.type === 'Hidden Expense').reduce((sum, e) => sum + e.amount, 0);
 
-    res.json({ expenses, grandTotal, pettyCashTotal, otherTotal, bankChargesTotal, rmPurchasingTotal });
+    res.json({ expenses, grandTotal, pettyCashTotal, otherTotal, bankChargesTotal, rmPurchasingTotal, hiddenExpensesTotal });
   } catch (error) {
     console.error('Error generating expenses report:', error);
     res.status(500).json({ error: 'Server error: ' + error.message });
