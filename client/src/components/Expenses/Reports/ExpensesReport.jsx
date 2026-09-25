@@ -28,6 +28,7 @@ const ExpensesReport = () => {
   const [pettyCashTotal, setPettyCashTotal] = useState(0);
   const [otherTotal, setOtherTotal] = useState(0);
   const [bankChargesTotal, setBankChargesTotal] = useState(0);
+  const [cashExpensesTotal, setCashExpensesTotal] = useState(0);
   const [rmPurchasingTotal, setRmPurchasingTotal] = useState(0);
   const [hiddenExpensesTotal, setHiddenExpensesTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -84,6 +85,7 @@ const ExpensesReport = () => {
       setPettyCashTotal(res.data?.pettyCashTotal || 0);
       setOtherTotal(res.data?.otherTotal || 0);
       setBankChargesTotal(res.data?.bankChargesTotal || 0);
+      setCashExpensesTotal(res.data?.cashExpensesTotal || 0);
       setRmPurchasingTotal(res.data?.rmPurchasingTotal || 0);
       setHiddenExpensesTotal(res.data?.hiddenExpensesTotal || 0);
     } catch (err) {
@@ -94,6 +96,7 @@ const ExpensesReport = () => {
       setPettyCashTotal(0);
       setOtherTotal(0);
       setBankChargesTotal(0);
+      setCashExpensesTotal(0);
       setRmPurchasingTotal(0);
       setHiddenExpensesTotal(0);
     } finally {
@@ -175,7 +178,7 @@ const ExpensesReport = () => {
       if (p) parts.push(`Payee: ${p.payee_name}`);
     }
     if (type && type !== 'all') {
-      const typeLabels = { petty_cash: 'Petty Cash', other: 'Other', bank_charges: 'Bank Charges', rm_purchasing: 'RM Purchasing', hidden: 'Hidden Expenses' };
+      const typeLabels = { petty_cash: 'Petty Cash', other: 'Other', bank_charges: 'Bank Charges', cash_expenses: 'Cash Expenses', rm_purchasing: 'RM Purchasing', hidden: 'Hidden Expenses' };
       parts.push(`Type: ${typeLabels[type]}`);
     }
     return parts.join(' | ');
@@ -311,6 +314,7 @@ const ExpensesReport = () => {
               <option value="petty_cash">Petty Cash</option>
               <option value="other">Other</option>
               <option value="bank_charges">Bank Charges</option>
+              <option value="cash_expenses">Cash Expenses</option>
               <option value="rm_purchasing">RM Purchasing</option>
               <option value="hidden">Hidden Expenses</option>
             </select>
@@ -369,7 +373,7 @@ const ExpensesReport = () => {
                   <tr key={`${exp.type}-${exp.id}`}>
                     <td>{exp.date ? format(new Date(exp.date), 'MMM dd, yyyy') : 'N/A'}</td>
                     <td>
-                      <span className={`er-type-badge ${exp.type === 'Petty Cash' ? 'er-type-petty' : exp.type === 'Bank Charges' ? 'er-type-bank' : exp.type === 'RM Purchasing' ? 'er-type-rm' : exp.type === 'Hidden Expense' ? 'er-type-hidden' : 'er-type-other'}`}>
+                      <span className={`er-type-badge ${exp.type === 'Petty Cash' ? 'er-type-petty' : exp.type === 'Bank Charges' || exp.type === 'Cash Expenses' ? 'er-type-bank' : exp.type === 'RM Purchasing' ? 'er-type-rm' : exp.type === 'Hidden Expense' ? 'er-type-hidden' : 'er-type-other'}`}>
                         {exp.type}
                       </span>
                     </td>
@@ -395,6 +399,7 @@ const ExpensesReport = () => {
             <span>Petty Cash: <strong style={{ color: 'var(--color-text-primary)' }}>{formatCurrency(pettyCashTotal)}</strong></span>
             <span>Other: <strong style={{ color: 'var(--color-text-primary)' }}>{formatCurrency(otherTotal)}</strong></span>
             <span>Bank Charges: <strong style={{ color: 'var(--color-text-primary)' }}>{formatCurrency(bankChargesTotal)}</strong></span>
+            <span>Cash Expenses: <strong style={{ color: 'var(--color-text-primary)' }}>{formatCurrency(cashExpensesTotal)}</strong></span>
             <span>RM Purchasing: <strong style={{ color: 'var(--color-text-primary)' }}>{formatCurrency(rmPurchasingTotal)}</strong></span>
             <span>Hidden Expenses: <strong style={{ color: 'var(--color-text-primary)' }}>{formatCurrency(hiddenExpensesTotal)}</strong></span>
             <span style={{ marginLeft: 'auto', fontSize: 'var(--font-size-base)' }}>Grand Total: <strong style={{ color: 'var(--color-primary)' }}>{formatCurrency(grandTotal)}</strong></span>
