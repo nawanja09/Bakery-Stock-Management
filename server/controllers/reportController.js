@@ -1513,6 +1513,7 @@ const getExpensesReport = async (req, res) => {
     const includeOther = normalizedType === 'other' || normalizedType === 'all';
     const includePettyCash = normalizedType === 'petty_cash' || normalizedType === 'all';
     const includeBankCharges = normalizedType === 'bank_charges' || normalizedType === 'all';
+    const includeCashExpenses = normalizedType === 'cash_expenses' || normalizedType === 'all';
     // RM Purchasing invoices paid by cheque are tracked in expenses_cheque_registry
     // (source_type = 'PURCHASING_PAYMENT'), not in the `expenses` table, so they
     // were never picked up by the "Other" query above. Cheque Registry rows are
@@ -1643,6 +1644,35 @@ const getExpensesReport = async (req, res) => {
       results = results.concat(bankChargeRows);
     }
 
+    if (includeCashExpenses && !payeeId) {
+      const cashExpensesQuery = `
+        SELECT
+          ce.id,
+          'Cash Expenses' AS type,
+          ce.expense_date AS date,
+          'Cash Expense' AS payee_name,
+          ce.expense_type,
+          ce.voucher_number AS reference,
+          ce.amount,
+          'Recorded' AS status,
+          ce.company_id,
+          comp.name AS company_name
+        FROM cash_expenses ce
+        LEFT JOIN company comp ON comp.id = ce.company_id
+        WHERE ce.status = 1
+        ${startDate ? 'AND ce.expense_date >= ?' : ''}
+        ${endDate ? 'AND ce.expense_date < DATE_ADD(?, INTERVAL 1 DAY)' : ''}
+        ${companyId ? 'AND ce.company_id = ?' : ''}
+      `;
+      const cashExpensesParams = [];
+      if (startDate) cashExpensesParams.push(startDate);
+      if (endDate) cashExpensesParams.push(endDate);
+      if (companyId) cashExpensesParams.push(companyId);
+
+      const [cashExpenseRows] = await pool.query(cashExpensesQuery, cashExpensesParams);
+      results = results.concat(cashExpenseRows);
+    }
+
     // RM Purchasing cheque payments (Cheque Registry, type = 'Expense' only -
     // 'Transfer' rows are deliberately excluded by this WHERE clause, since
     // they're internal Bank<->Cash movements, not expenses). No payeeId
@@ -1730,10 +1760,11 @@ const getExpensesReport = async (req, res) => {
     const pettyCashTotal = expenses.filter(e => e.type === 'Petty Cash').reduce((sum, e) => sum + e.amount, 0);
     const otherTotal = expenses.filter(e => e.type === 'Other').reduce((sum, e) => sum + e.amount, 0);
     const bankChargesTotal = expenses.filter(e => e.type === 'Bank Charges').reduce((sum, e) => sum + e.amount, 0);
+    const cashExpensesTotal = expenses.filter(e => e.type === 'Cash Expenses').reduce((sum, e) => sum + e.amount, 0);
     const rmPurchasingTotal = expenses.filter(e => e.type === 'RM Purchasing').reduce((sum, e) => sum + e.amount, 0);
     const hiddenExpensesTotal = expenses.filter(e => e.type === 'Hidden Expense').reduce((sum, e) => sum + e.amount, 0);
 
-    res.json({ expenses, grandTotal, pettyCashTotal, otherTotal, bankChargesTotal, rmPurchasingTotal, hiddenExpensesTotal });
+    res.json({ expenses, grandTotal, pettyCashTotal, otherTotal, bankChargesTotal, cashExpensesTotal, rmPurchasingTotal, hiddenExpensesTotal });
   } catch (error) {
     console.error('Error generating expenses report:', error);
     res.status(500).json({ error: 'Server error: ' + error.message });
