@@ -1681,33 +1681,32 @@ const getExpensesReport = async (req, res) => {
       results = results.concat(rmPurchasingRows);
     }
 
-    // Hidden Expenses have no payee, no company, and no reference/status in
-    // the way the other expense types do — they're kept out of every
-    // company/payee filter above and just added straight into the mix here,
-    // clearly labelled with type 'Hidden Expense' so the report can badge
-    // them distinctly. They are never affected by companyId/payeeId filters
-    // (Hidden Expenses aren't scoped to a company or payee).
+    // Hidden Expenses remain report-only, and now carry an optional company
+    // and reference number. Company filtering applies to these records too.
     if (includeHiddenExpenses) {
       let hiddenQuery = `
         SELECT
-          id,
+          hidden_expenses.id,
           'Hidden Expense' AS type,
-          expense_date AS date,
+          hidden_expenses.expense_date AS date,
           'Hidden Expense' AS payee_name,
-          type AS expense_type,
-          NULL AS reference,
-          amount,
+          hidden_expenses.type AS expense_type,
+          hidden_expenses.reference_number AS reference,
+          hidden_expenses.amount,
           'Hidden' AS status,
-          NULL AS company_id,
-          NULL AS company_name
+          hidden_expenses.company_id,
+          c.name AS company_name
         FROM hidden_expenses
-        WHERE is_deleted = 0
-        ${startDate ? 'AND expense_date >= ?' : ''}
-        ${endDate ? 'AND expense_date < DATE_ADD(?, INTERVAL 1 DAY)' : ''}
+        LEFT JOIN company c ON c.id = hidden_expenses.company_id
+        WHERE hidden_expenses.is_deleted = 0
+        ${startDate ? 'AND hidden_expenses.expense_date >= ?' : ''}
+        ${endDate ? 'AND hidden_expenses.expense_date < DATE_ADD(?, INTERVAL 1 DAY)' : ''}
+        ${companyId ? 'AND hidden_expenses.company_id = ?' : ''}
       `;
       const hiddenParams = [];
       if (startDate) hiddenParams.push(startDate);
       if (endDate) hiddenParams.push(endDate);
+      if (companyId) hiddenParams.push(companyId);
 
       const [hiddenRows] = await pool.query(hiddenQuery, hiddenParams);
       results = results.concat(hiddenRows);
