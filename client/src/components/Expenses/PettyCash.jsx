@@ -538,9 +538,8 @@ const PettyCash = () => {
                     <th>Voucher No.</th>
                     <th>Payee</th>
                     <th>Expense Type</th>
-                    <th>Amount (LKR)</th>
-                    <th>Debits - Reimbursement</th>
-                    <th>Credits - Expenses</th>
+                    <th>Debits</th>
+                    <th>Credits</th>
                     <th>Balance</th>
                     <th>Actions</th>
                   </tr>
@@ -557,7 +556,6 @@ const PettyCash = () => {
                           <td className="voucher-number">{t.reference_number}</td>
                           <td>{isReimbursement ? '-' : t.payee_name}</td>
                           <td>{isReimbursement ? 'Reimbursement' : t.expense_type}</td>
-                          <td className="amount-cell">{formatCurrency(isReimbursement ? t.debit : t.credit)}</td>
                           <td className="amount-cell">{t.debit > 0 ? formatCurrency(t.debit) : '-'}</td>
                           <td className="amount-cell">{t.credit > 0 ? formatCurrency(t.credit) : '-'}</td>
                           <td className="amount-cell"><strong>{formatCurrency(t.balance)}</strong></td>

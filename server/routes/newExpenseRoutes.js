@@ -152,27 +152,36 @@ router.put('/:id', async (req, res) => {
       await connection.rollback();
       return res.status(404).json({ error: 'Expense bill not found' });
     }
-    if (parseFloat(existingRows[0].paid_amount) > 0) {
-      await connection.rollback();
-      return res.status(400).json({ error: 'This bill already has payments recorded against it and cannot be edited' });
-    }
+    // Editable for both Paid and Non-Paid bills. Editing a bill that already
+    // has payments recorded does NOT touch paid_amount, payment_status, or
+    // any expense_payments/allocation rows - only the bill's own fields
+    // (Expense Type, Sub Expense Type, Total Bill Amount, Company, etc.)
+    // change. balance is recalculated as the new total minus what has
+    // already been paid, instead of being overwritten with the raw total,
+    // so a Paid bill whose total is edited doesn't silently reopen or
+    // misstate its balance.
+    const paidSoFar = parseFloat(existingRows[0].paid_amount) || 0;
 
     const withoutVat = parseFloat(without_vat_amount) || 0;
     const vat = parseFloat(vat_amount) || 0;
     const totalBill = total_bill_amount !== undefined && total_bill_amount !== null && total_bill_amount !== ''
       ? parseFloat(total_bill_amount)
       : withoutVat + vat;
+    const newBalance = Number((totalBill - paidSoFar).toFixed(2));
+    const newPaymentStatus = newBalance <= 0
+      ? 'Paid'
+      : (paidSoFar > 0 ? 'Partially Paid' : 'Pending');
 
     await connection.query(
       `UPDATE expenses
        SET bill_date = ?, bill_number = ?, payee_id = ?, payee_name = ?, vat_reg_number = ?,
            expense_type_id = ?, expense_type = ?, sub_expense_type_id = ?, sub_expense_type = ?, without_vat_amount = ?, vat_amount = ?,
-           total_bill_amount = ?, balance = ?, description = ?, company_id = ?
+           total_bill_amount = ?, balance = ?, payment_status = ?, description = ?, company_id = ?
        WHERE id = ?`,
       [
         bill_date, bill_number || null, payee_id || null, payee_name, vat_reg_number || null,
-        expense_type_id, subTypes[0].expense_type_name, sub_expense_type_id, subTypes[0].name, withoutVat, vat, totalBill, totalBill,
-        description || null, company_id, id
+        expense_type_id, subTypes[0].expense_type_name, sub_expense_type_id, subTypes[0].name, withoutVat, vat, totalBill, newBalance,
+        newPaymentStatus, description || null, company_id, id
       ]
     );
 

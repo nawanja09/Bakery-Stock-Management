@@ -21,6 +21,7 @@ const CATEGORY_CONFIG = {
   Invoice: {
     endpoint: '/purchases',
     label: 'Invoice',
+    dateKey: 'purchase_date',
     getRows: (data) => data,
     columns: [
       { key: 'invoice_no', label: 'Invoice No.' },
@@ -36,6 +37,7 @@ const CATEGORY_CONFIG = {
   Issuance: {
     endpoint: '/issuances',
     label: 'Issuance',
+    dateKey: 'issuance_date',
     getRows: (data) => data,
     columns: [
       { key: 'id', label: 'ID' },
@@ -52,6 +54,7 @@ const CATEGORY_CONFIG = {
   Wastage: {
     endpoint: '/wastages',
     label: 'Wastage',
+    dateKey: 'date',
     getRows: (data) => data,
     columns: [
       { key: 'wastage_note_number', label: 'Note #' },
@@ -71,6 +74,7 @@ const CATEGORY_CONFIG = {
   'Purchasing Payment': {
     endpoint: '/purchases/payments/adjustable',
     label: 'Purchasing Payment',
+    dateKey: 'payment_date',
     getRows: (data) => data,
     columns: [
       { key: 'invoice_no', label: 'Invoice No.' },
@@ -94,6 +98,7 @@ const CATEGORY_CONFIG = {
     // category and rm_adjustment_records rows); only the displayed label is
     // "Petty Cash Adjustment".
     label: 'Petty Cash Adjustment',
+    dateKey: 'date',
     getRows: (data) => data,
     columns: [
       { key: 'voucher_number', label: 'Voucher No.' },
@@ -114,6 +119,7 @@ const CATEGORY_CONFIG = {
     // and rm_adjustment_records rows); only the displayed label is
     // "Expense Adjustment".
     label: 'Expense Adjustment',
+    dateKey: 'bill_date',
     getRows: (data) => data,
     columns: [
       { key: 'bill_number', label: 'Bill No.' },
@@ -127,9 +133,8 @@ const CATEGORY_CONFIG = {
       row.bill_number?.toLowerCase().includes(term) ||
       row.payee_name?.toLowerCase().includes(term) ||
       row.expense_type?.toLowerCase().includes(term),
-    // A bill with payments recorded is locked by the expense module itself.
-    canEdit: (row) => !(parseFloat(row.paid_amount) > 0),
-    lockedReason: 'Payments are recorded against this bill, so it cannot be edited',
+    // Editable for both Paid and Non-Paid bills - see server/routes/newExpenseRoutes.js
+    // PUT /:id, which now allows edits regardless of paid_amount.
     Editor: ExpenseBillAdjustmentEditor,
   },
 };
@@ -142,6 +147,8 @@ const CategoryAdjustmentPanel = ({ category, onAdjustmentSaved }) => {
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState(null);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
   const fetchRecords = useCallback(async () => {
     if (!config) return;
@@ -161,6 +168,8 @@ const CategoryAdjustmentPanel = ({ category, onAdjustmentSaved }) => {
   useEffect(() => {
     setSelectedId(null);
     setSearch('');
+    setDateFrom('');
+    setDateTo('');
     fetchRecords();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [category]);
@@ -196,9 +205,21 @@ const CategoryAdjustmentPanel = ({ category, onAdjustmentSaved }) => {
 
   // ---- Picking a record ----
   const term = search.trim().toLowerCase();
-  const filtered = term
+  let filtered = term
     ? records.filter((row) => config.matches(row, term))
     : records;
+
+  // Date range filter, keyed off whichever date field this category uses.
+  if (config.dateKey && (dateFrom || dateTo)) {
+    filtered = filtered.filter((row) => {
+      const raw = row[config.dateKey];
+      if (!raw) return false;
+      const rowDate = String(raw).slice(0, 10);
+      if (dateFrom && rowDate < dateFrom) return false;
+      if (dateTo && rowDate > dateTo) return false;
+      return true;
+    });
+  }
 
   return (
     <div className="form-section">
@@ -206,13 +227,44 @@ const CategoryAdjustmentPanel = ({ category, onAdjustmentSaved }) => {
         <FontAwesomeIcon icon={faSearch} /> Select {config.label} Record to Adjust
       </h3>
 
-      <div className="form-group" style={{ maxWidth: '420px', marginBottom: '16px' }}>
-        <input
-          type="text"
-          placeholder={`Search ${config.label.toLowerCase()} records...`}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'flex-end', marginBottom: '16px' }}>
+        <div className="form-group" style={{ maxWidth: '420px', marginBottom: 0 }}>
+          <input
+            type="text"
+            placeholder={`Search ${config.label.toLowerCase()} records...`}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        {config.dateKey && (
+          <>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label style={{ display: 'block', fontSize: '12px', marginBottom: '4px' }}>From</label>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+              />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label style={{ display: 'block', fontSize: '12px', marginBottom: '4px' }}>To</label>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+              />
+            </div>
+            {(dateFrom || dateTo) && (
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => { setDateFrom(''); setDateTo(''); }}
+              >
+                Clear Dates
+              </button>
+            )}
+          </>
+        )}
       </div>
 
       {loading ? (
