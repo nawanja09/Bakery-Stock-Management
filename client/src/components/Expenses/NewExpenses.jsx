@@ -1447,7 +1447,7 @@ const NewExpenses = () => {
       {/* Payment history for one bill */}
       {historyBill && (
         <div className="payment-modal-overlay" onClick={handleClosePaymentHistory}>
-          <div className="payment-modal-content" style={{ maxWidth: '760px' }} onClick={(e) => e.stopPropagation()}>
+          <div className="payment-modal-content payment-history-modal" onClick={(e) => e.stopPropagation()}>
             <div className="payment-modal-header">
               <h3><FontAwesomeIcon icon={faHistory} /> Payment History
                 <span className="payment-count">{historyBill.bill_number || `#${historyBill.id}`} - {historyBill.payee_name}</span>
@@ -1467,8 +1467,8 @@ const NewExpenses = () => {
                 <span className="summary-label">Remaining</span>
                 <span className="summary-value balance-amount">{formatCurrency(historyBill.balance)}</span>
               </div>
-              <div style={{ overflowX: 'auto', marginTop: '12px' }}>
-                <table className="report-table">
+              <div className="payment-history-table-wrap">
+                <table className="report-table payment-history-table">
                   <thead>
                     <tr>
                       <th>Date</th>
