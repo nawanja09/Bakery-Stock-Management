@@ -8,8 +8,15 @@
 //   GET  /             list expense bills (Expenses Details table)
 //   PUT  /:id          edit a bill (only while nothing has been paid on it)
 //   DELETE /:id        remove a bill (only while nothing has been paid on it)
-//   POST /pay          Payment Details form submit - settles one or more
-//                       bills for the same payee in a single payment
+//   POST /pay          Payment Details form submit - pays one or more bills
+//                       for the same payee in a single payment. The amount is
+//                       free: less than the outstanding total = Partial
+//                       Payment (bills stay in Pending Payment), equal = Full
+//                       Payment, more = Overpayment (excess is kept as a
+//                       payee credit). An existing payee overpayment can be
+//                       settled against the new payment.
+//   GET  /overpayments            payee overpayment credits (all / per payee)
+//   GET  /overpayments/available  usable overpayment balance for one payee
 //   GET  /:id/payments payment history for one bill
 //
 const express = require('express');
@@ -260,6 +267,107 @@ router.delete('/:id', async (req, res) => {
 });
 
 // =============================================
+// Money helpers - all payment maths is done in whole cents so partial
+// payments / overpayments never drift by a fraction of a cent.
+// =============================================
+const toCents = (v) => Math.round((parseFloat(v) || 0) * 100);
+const fromCents = (c) => Number((c / 100).toFixed(2));
+
+// Overpayment rows for a payee that still have credit left. Matches on
+// payee_id when both sides have one, otherwise on the payee name (legacy
+// rows). Oldest first so credit is consumed FIFO.
+const OVERPAYMENT_PAYEE_MATCH = '(po.payee_id = ? OR (po.payee_id IS NULL AND po.payee_name = ?))';
+
+// =============================================
+// GET Overpayments (payee credit created by paying more than owed)
+//   ?payee_id= / ?payee_name=   limit to one payee
+//   ?available=1                only credit that is still usable
+// =============================================
+router.get('/overpayments', async (req, res) => {
+  const { payee_id, payee_name, available } = req.query;
+  try {
+    const clauses = [];
+    const params = [];
+    if (payee_id) {
+      clauses.push(OVERPAYMENT_PAYEE_MATCH);
+      params.push(payee_id, payee_name || '');
+    } else if (payee_name) {
+      clauses.push('po.payee_name = ?');
+      params.push(payee_name);
+    }
+    if (String(available) === '1' || String(available).toLowerCase() === 'true') {
+      clauses.push("po.remaining_credit > 0 AND po.status <> 'Fully Used'");
+    }
+    const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+
+    const [rows] = await pool.query(
+      `SELECT po.id, po.payee_id, po.payee_name, po.payment_id, po.amount,
+              po.remaining_credit, po.status,
+              DATE_FORMAT(ep.payment_date, '%Y-%m-%d') AS payment_date,
+              ep.payment_type, ep.cheque_number, ep.voucher_number, ep.reference_number
+       FROM payee_overpayments po
+       LEFT JOIN expense_payments ep ON ep.id = po.payment_id
+       ${where}
+       ORDER BY po.created_at ASC, po.id ASC`,
+      params
+    );
+
+    const items = rows.map((r) => ({
+      ...r,
+      amount: formatAmt(r.amount),
+      remaining_credit: formatAmt(r.remaining_credit),
+      used_amount: fromCents(toCents(r.amount) - toCents(r.remaining_credit))
+    }));
+    res.json(items);
+  } catch (error) {
+    console.error('Error fetching overpayments:', error);
+    res.status(500).json({ error: 'Failed to fetch overpayments' });
+  }
+});
+
+// =============================================
+// GET the overpayment balance available to one payee (used by the
+// Payment Details form to offer "settle from overpayment")
+// =============================================
+router.get('/overpayments/available', async (req, res) => {
+  const { payee_id, payee_name } = req.query;
+  if (!payee_id && !payee_name) {
+    return res.status(400).json({ error: 'payee is required' });
+  }
+  try {
+    const clauses = ['po.remaining_credit > 0', "po.status <> 'Fully Used'"];
+    const params = [];
+    if (payee_id) {
+      clauses.push(OVERPAYMENT_PAYEE_MATCH);
+      params.push(payee_id, payee_name || '');
+    } else {
+      clauses.push('po.payee_name = ?');
+      params.push(payee_name);
+    }
+    const [rows] = await pool.query(
+      `SELECT po.id, po.payee_id, po.payee_name, po.amount, po.remaining_credit, po.status,
+              DATE_FORMAT(ep.payment_date, '%Y-%m-%d') AS payment_date
+       FROM payee_overpayments po
+       LEFT JOIN expense_payments ep ON ep.id = po.payment_id
+       WHERE ${clauses.join(' AND ')}
+       ORDER BY po.created_at ASC, po.id ASC`,
+      params
+    );
+    const items = rows.map((r) => ({ ...r, amount: formatAmt(r.amount), remaining_credit: formatAmt(r.remaining_credit) }));
+    const totalCents = items.reduce((sum, r) => sum + toCents(r.remaining_credit), 0);
+    res.json({
+      payee_id: payee_id || null,
+      payee_name: payee_name || (items[0] && items[0].payee_name) || null,
+      total_available: fromCents(totalCents),
+      items
+    });
+  } catch (error) {
+    console.error('Error fetching available overpayment:', error);
+    res.status(500).json({ error: 'Failed to fetch available overpayment' });
+  }
+});
+
+// =============================================
 // GET payment history for a bill
 // =============================================
 router.get('/:id/payments', async (req, res) => {
@@ -268,7 +376,8 @@ router.get('/:id/payments', async (req, res) => {
     const [rows] = await pool.query(
       `SELECT epa.amount, ep.id as payment_id, DATE_FORMAT(ep.payment_date, '%Y-%m-%d') as payment_date,
               ep.payment_type, ep.cheque_number, ep.voucher_number, ep.reference_number,
-              ep.transfer_amount, ep.overpayment_amount
+              ep.total_bill_amount, ep.transfer_amount, ep.overpayment_amount,
+              ep.overpayment_used_amount, ep.description
        FROM expense_payment_allocations epa
        JOIN expense_payments ep ON ep.id = epa.payment_id
        WHERE epa.expense_id = ?
@@ -284,6 +393,22 @@ router.get('/:id/payments', async (req, res) => {
 
 // =============================================
 // POST Pay selected bills (Payment Details form submit)
+//
+// The user may enter ANY amount:
+//   payment <  outstanding -> Partial Payment. Oldest bills are settled first;
+//                            whatever is still owed stays in Pending Payment
+//                            (status 'Partially Paid').
+//   payment == outstanding -> Full Payment. Bills become Paid.
+//   payment >  outstanding -> Overpayment. Bills become Paid and the excess is
+//                            kept as a payee_overpayments credit for the same
+//                            payee, usable on a future payment.
+//
+// "Payment" = transfer_amount (cash / bank / cheque leaving the company)
+//           + use_overpayment_amount (credit taken from that payee's existing
+//             overpayment balance - no cash moves for this part).
+//   Remaining   = Outstanding - Payment            (kept in Pending if > 0)
+//   Overpayment = Payment - Outstanding            (only when > 0)
+// Only transfer_amount is posted to the Cash / Bank ledger.
 // =============================================
 router.post('/pay', async (req, res) => {
   const {
@@ -298,41 +423,50 @@ router.post('/pay', async (req, res) => {
     voucher_number,
     reference_number,
     transfer_amount,
+    use_overpayment_amount,
     description
   } = req.body;
 
   const userId = req.user.userId;
 
-  if (!expense_ids || expense_ids.length === 0) {
+  if (!Array.isArray(expense_ids) || expense_ids.length === 0) {
     return res.status(400).json({ error: 'No bills selected for payment' });
   }
   if (!payment_date) {
     return res.status(400).json({ error: 'Payment date is required' });
   }
-  if (!payment_type || !payment_type.trim()) {
+
+  const transferCents = toCents(transfer_amount);
+  const useOverpaymentCents = toCents(use_overpayment_amount);
+  if (transferCents < 0 || useOverpaymentCents < 0) {
+    return res.status(400).json({ error: 'Payment amounts cannot be negative' });
+  }
+  if (transferCents + useOverpaymentCents <= 0) {
+    return res.status(400).json({ error: 'A valid payment amount is required' });
+  }
+
+  // Payment method details only matter when money actually leaves an account.
+  // A payment settled entirely from an existing overpayment moves no cash.
+  const movesMoney = transferCents > 0;
+  const rawType = (payment_type || '').trim();
+  if (movesMoney && !rawType) {
     return res.status(400).json({ error: 'Payment type is required' });
   }
+  const normalizedType = rawType.toLowerCase();
+  const isCheque = movesMoney && normalizedType === 'cheque';
+  const isBank = movesMoney && (normalizedType === 'bank' || normalizedType === 'online');
 
-  const normalizedType = payment_type.trim().toLowerCase();
-  const isCheque = normalizedType === 'cheque';
-  const isBank = normalizedType === 'bank' || normalizedType === 'online';
-
-  if (isCheque && (!cheque_number || !cheque_number.trim())) {
+  if (isCheque && (!cheque_number || !String(cheque_number).trim())) {
     return res.status(400).json({ error: 'Cheque number is required for cheque payments' });
   }
-  if (isBank && (!voucher_number || !voucher_number.trim())) {
+  if (isBank && (!voucher_number || !String(voucher_number).trim())) {
     return res.status(400).json({ error: 'Voucher number is required for online/bank payments' });
   }
   if ((isCheque || isBank) && !bank_id) {
     return res.status(400).json({ error: 'Please select a bank account' });
   }
 
-  const transferAmount = parseFloat(transfer_amount) || 0;
-  if (transferAmount <= 0) {
-    return res.status(400).json({ error: 'A valid transfer amount is required' });
-  }
-
-  const referenceToCheck = isCheque ? cheque_number : voucher_number;
+  const referenceToCheck = isCheque ? cheque_number : (isBank ? voucher_number : null);
 
   const connection = await pool.getConnection();
   try {
@@ -347,8 +481,8 @@ router.post('/pay', async (req, res) => {
 
     const placeholders = expense_ids.map(() => '?').join(',');
     const [bills] = await connection.query(
-            `SELECT id, balance, total_bill_amount, paid_amount, payee_id, payee_name, bill_number,
-              company_id, expense_type
+      `SELECT id, DATE_FORMAT(bill_date, '%Y-%m-%d') AS bill_date, balance, total_bill_amount,
+              paid_amount, payee_id, payee_name, bill_number, company_id, expense_type
        FROM expenses
        WHERE id IN (${placeholders}) AND is_deleted = 0 FOR UPDATE`,
       expense_ids
@@ -371,60 +505,146 @@ router.post('/pay', async (req, res) => {
       return res.status(400).json({ error: 'All selected bills must belong to the same company' });
     }
 
-    const totalBillAmount = bills.reduce((sum, b) => sum + parseFloat(b.balance || 0), 0);
-
-    if (transferAmount < totalBillAmount) {
+    // Only bills that still owe something take part in the payment.
+    const openBills = bills
+      .filter(b => toCents(b.balance) > 0)
+      .sort((a, b) => (a.bill_date < b.bill_date ? -1 : a.bill_date > b.bill_date ? 1 : a.id - b.id));
+    if (openBills.length === 0) {
       await connection.rollback();
-      return res.status(400).json({
-        error: `Transfer amount (${transferAmount}) is less than the total bill amount (${totalBillAmount})`
-      });
+      return res.status(400).json({ error: 'The selected bills have no outstanding balance' });
     }
 
-    const overpayment = parseFloat((transferAmount - totalBillAmount).toFixed(2));
+    const payeeNameForRecord = payee_name || bills[0].payee_name;
+    const payeeIdForRecord = payee_id || bills[0].payee_id || null;
+
+    // Outstanding = what the selected bills still owe.
+    const outstandingCents = openBills.reduce((sum, b) => sum + toCents(b.balance), 0);
+
+    // Settling from an existing overpayment: same payee only, never more than
+    // the credit available and never more than what is actually owed.
+    let overpaymentRows = [];
+    if (useOverpaymentCents > 0) {
+      const matchParams = [];
+      let matchSql;
+      if (payeeIdForRecord) {
+        matchSql = OVERPAYMENT_PAYEE_MATCH;
+        matchParams.push(payeeIdForRecord, payeeNameForRecord);
+      } else {
+        matchSql = 'po.payee_name = ?';
+        matchParams.push(payeeNameForRecord);
+      }
+      [overpaymentRows] = await connection.query(
+        `SELECT po.id, po.amount, po.remaining_credit
+         FROM payee_overpayments po
+         WHERE ${matchSql} AND po.remaining_credit > 0 AND po.status <> 'Fully Used'
+         ORDER BY po.created_at ASC, po.id ASC FOR UPDATE`,
+        matchParams
+      );
+      const availableCents = overpaymentRows.reduce((sum, r) => sum + toCents(r.remaining_credit), 0);
+      if (useOverpaymentCents > availableCents) {
+        await connection.rollback();
+        return res.status(400).json({
+          error: `Overpayment to settle (${fromCents(useOverpaymentCents)}) exceeds the available overpayment balance (${fromCents(availableCents)}) for ${payeeNameForRecord}`
+        });
+      }
+      if (useOverpaymentCents > outstandingCents) {
+        await connection.rollback();
+        return res.status(400).json({
+          error: `Overpayment to settle (${fromCents(useOverpaymentCents)}) cannot exceed the outstanding amount (${fromCents(outstandingCents)})`
+        });
+      }
+    }
+
+    // Remaining = Outstanding - Payment  |  Overpayment = Payment - Outstanding
+    const paymentCents = transferCents + useOverpaymentCents;
+    const appliedCents = Math.min(paymentCents, outstandingCents);
+    const remainingCents = outstandingCents - appliedCents;
+    const overpaymentCents = Math.max(0, paymentCents - outstandingCents);
+
+    const transferAmount = fromCents(transferCents);
+    const overpaymentUsed = fromCents(useOverpaymentCents);
+    const totalBillAmount = fromCents(outstandingCents);
+    const overpayment = fromCents(overpaymentCents);
 
     // Record the payment header
     const [paymentResult] = await connection.query(
       `INSERT INTO expense_payments
        (payment_date, payee_id, payee_name, payment_type_id, payment_type, bank_id,
         cheque_number, voucher_number, reference_number, total_bill_amount,
-        transfer_amount, overpayment_amount, description, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        transfer_amount, overpayment_amount, overpayment_used_amount, description, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        payment_date, payee_id || bills[0].payee_id || null, payee_name || bills[0].payee_name,
-        payment_type_id || null, payment_type.trim(), (isCheque || isBank) ? bank_id : null,
-        isCheque ? cheque_number.trim() : null, isBank ? voucher_number.trim() : null,
-        reference_number || null, totalBillAmount, transferAmount, overpayment,
+        payment_date, payeeIdForRecord, payeeNameForRecord,
+        movesMoney ? (payment_type_id || null) : null,
+        movesMoney ? rawType : 'Overpayment Settlement',
+        (isCheque || isBank) ? bank_id : null,
+        isCheque ? String(cheque_number).trim() : null, isBank ? String(voucher_number).trim() : null,
+        reference_number || null, totalBillAmount, transferAmount, overpayment, overpaymentUsed,
         description || null, userId
       ]
     );
     const paymentId = paymentResult.insertId;
 
-    // Settle each bill in full (Transfer Amount must cover the whole
-    // selected balance - see Section 7 of the spec) and record the
-    // allocation for traceability.
-    for (const bill of bills) {
-      const payAmount = parseFloat(bill.balance);
-      const newPaidAmount = parseFloat(bill.paid_amount || 0) + payAmount;
+    // Apply the payment to the bills, oldest first. A bill that is not fully
+    // covered keeps its unpaid remainder and stays 'Partially Paid' (it keeps
+    // showing in the Pending Payment tab); fully covered bills become 'Paid'.
+    let moneyLeftCents = appliedCents;
+    const billResults = [];
+    for (const bill of openBills) {
+      if (moneyLeftCents <= 0) break;
+      const balanceCents = toCents(bill.balance);
+      const allocCents = Math.min(balanceCents, moneyLeftCents);
+      moneyLeftCents -= allocCents;
+
+      const newBalanceCents = balanceCents - allocCents;
+      const newPaidAmount = fromCents(toCents(bill.paid_amount) + allocCents);
+      const newBalance = fromCents(newBalanceCents);
+      const newStatus = newBalanceCents <= 0 ? 'Paid' : 'Partially Paid';
 
       await connection.query(
-        `UPDATE expenses SET balance = 0, paid_amount = ?, payment_status = 'Paid' WHERE id = ?`,
-        [newPaidAmount, bill.id]
+        'UPDATE expenses SET balance = ?, paid_amount = ?, payment_status = ? WHERE id = ?',
+        [newBalance, newPaidAmount, newStatus, bill.id]
       );
-
       await connection.query(
-        `INSERT INTO expense_payment_allocations (payment_id, expense_id, amount) VALUES (?, ?, ?)`,
-        [paymentId, bill.id, payAmount]
+        'INSERT INTO expense_payment_allocations (payment_id, expense_id, amount) VALUES (?, ?, ?)',
+        [paymentId, bill.id, fromCents(allocCents)]
+      );
+      billResults.push({
+        id: bill.id, bill_number: bill.bill_number,
+        paid_now: fromCents(allocCents), paid_amount: newPaidAmount,
+        remaining: newBalance, payment_status: newStatus
+      });
+    }
+
+    // Consume the payee's existing overpayment credit (oldest first) and keep
+    // a trace of exactly which credit paid for this payment.
+    let creditToUseCents = useOverpaymentCents;
+    for (const row of overpaymentRows) {
+      if (creditToUseCents <= 0) break;
+      const rowCents = toCents(row.remaining_credit);
+      const takeCents = Math.min(rowCents, creditToUseCents);
+      creditToUseCents -= takeCents;
+      const leftCents = rowCents - takeCents;
+      await connection.query(
+        'UPDATE payee_overpayments SET remaining_credit = ?, status = ? WHERE id = ?',
+        [fromCents(leftCents), computeCreditStatus(fromCents(leftCents), row.amount), row.id]
+      );
+      await connection.query(
+        'INSERT INTO payee_overpayment_settlements (overpayment_id, payment_id, amount) VALUES (?, ?, ?)',
+        [row.id, paymentId, fromCents(takeCents)]
       );
     }
 
-    // Ledger posting - the actual amount transferred leaves the
-    // selected Cash or Bank account.
-    const billNumbers = bills.map(b => b.bill_number).filter(Boolean).join(', ');
-    const remark = `New Expenses payment - ${payee_name || bills[0].payee_name}${billNumbers ? ` (Bill ${billNumbers})` : ''}`;
+    // Ledger posting - only the money that actually leaves an account
+    // (transfer_amount). Overpayment credit that is being used was already
+    // paid out when it was created, so it never posts again.
+    const billNumbers = openBills.map(b => b.bill_number).filter(Boolean).join(', ');
+    const remark = `New Expenses payment - ${payeeNameForRecord}${billNumbers ? ` (Bill ${billNumbers})` : ''}`;
 
-    // Ledger posting - Only online/bank transfers and cash payments deduct immediately.
-    // Cheque payments are NOT deducted before the cheque is released (deducted on release date via Cheque Registry).
-    if (isBank) {
+    // Only online/bank transfers and cash payments deduct immediately.
+    // Cheque payments are NOT deducted before the cheque is released (deducted
+    // on release date via Cheque Registry).
+    if (movesMoney && isBank) {
       await recordBankTransaction(connection, {
         bankId: bank_id,
         date: payment_date,
@@ -433,12 +653,12 @@ router.post('/pay', async (req, res) => {
         transactionType: 'Online Expense Payment',
         referenceNumber: referenceToCheck,
         invoiceNumber: billNumbers || null,
-        partyName: payee_name || bills[0].payee_name,
+        partyName: payeeNameForRecord,
         referenceType: 'EXPENSE_PAYMENT',
         referenceId: paymentId,
         createdBy: userId
       });
-    } else if (!isCheque) {
+    } else if (movesMoney && !isCheque) {
       // Use the selected bill company. Historical bills without a company retain
       // the previous behaviour of using the first configured cash account.
       let companyId = distinctCompanies[0];
@@ -454,25 +674,44 @@ router.post('/pay', async (req, res) => {
         transactionType: 'Cash Expense Payment',
         referenceNumber: reference_number || null,
         invoiceNumber: billNumbers || null,
-        partyName: payee_name || bills[0].payee_name,
+        partyName: payeeNameForRecord,
         referenceType: 'EXPENSE_PAYMENT',
         referenceId: paymentId,
         createdBy: userId
       });
     }
 
-    // Overpayment - recorded against the payee as spendable credit.
-    if (overpayment > 0) {
-      await connection.query(
+    // Overpayment - the excess is kept, separate from the bill payment, as
+    // spendable credit for the SAME payee.
+    let createdOverpaymentId = null;
+    if (overpaymentCents > 0) {
+      const [opResult] = await connection.query(
         `INSERT INTO payee_overpayments (payee_id, payee_name, payment_id, amount, remaining_credit, status)
          VALUES (?, ?, ?, ?, ?, 'Active')`,
-        [payee_id || bills[0].payee_id || null, payee_name || bills[0].payee_name, paymentId, overpayment, overpayment]
+        [payeeIdForRecord, payeeNameForRecord, paymentId, overpayment, overpayment]
       );
+      createdOverpaymentId = opResult.insertId;
     }
+
+    // What this payee can still draw on after this payment.
+    const availParams = [];
+    let availSql;
+    if (payeeIdForRecord) {
+      availSql = OVERPAYMENT_PAYEE_MATCH;
+      availParams.push(payeeIdForRecord, payeeNameForRecord);
+    } else {
+      availSql = 'po.payee_name = ?';
+      availParams.push(payeeNameForRecord);
+    }
+    const [[availRow]] = await connection.query(
+      `SELECT COALESCE(SUM(po.remaining_credit), 0) AS total
+       FROM payee_overpayments po WHERE ${availSql} AND po.status <> 'Fully Used'`,
+      availParams
+    );
 
     await connection.commit();
 
-    // ── Auto-register in Expenses Cheque Registry (New Expenses Payment + Cheque) ──
+    //  Auto-register in Expenses Cheque Registry (New Expenses Payment + Cheque) 
     // Recorded with release_status = 'Pending'. Ledger deduction occurs on release date.
     if (isCheque && cheque_number && String(cheque_number).trim()) {
       try {
@@ -502,7 +741,7 @@ router.post('/pay', async (req, res) => {
           [
             paymentId,
             payment_date,
-            payee_name || bills[0]?.payee_name || 'Payee',
+            payeeNameForRecord || 'Payee',
             String(cheque_number).trim(),
             transferAmount,
             bankName,
@@ -514,12 +753,25 @@ router.post('/pay', async (req, res) => {
       }
     }
 
+    const paymentKind = overpaymentCents > 0 ? 'Overpayment' : (remainingCents > 0 ? 'Partial' : 'Full');
     res.status(201).json({
       message: 'Payment submitted successfully',
       payment_id: paymentId,
+      payment_kind: paymentKind,
+      payee_name: payeeNameForRecord,
+      // total_bill_amount / transfer_amount / overpayment keep their original
+      // meaning for existing callers.
       total_bill_amount: totalBillAmount,
+      outstanding_amount: totalBillAmount,
       transfer_amount: transferAmount,
-      overpayment
+      overpayment_used: overpaymentUsed,
+      payment_amount: fromCents(paymentCents),
+      applied_amount: fromCents(appliedCents),
+      remaining_amount: fromCents(remainingCents),
+      overpayment,
+      overpayment_id: createdOverpaymentId,
+      payee_overpayment_balance: fromCents(toCents(availRow.total)),
+      bills: billResults
     });
   } catch (error) {
     await connection.rollback();
