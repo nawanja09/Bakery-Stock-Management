@@ -3,8 +3,10 @@
 // Replaces the old Online Expenses / Cheque Expenses screens with a
 // single New Expenses workflow: enter a bill -> pick bills for the
 // same payee -> Pay -> choose Payment Type (Cash / Cheque / Bank) ->
-// submit. Transfer Amount must cover the Total Bill Amount; anything
-// extra is recorded as an overpayment credit for that payee.
+// submit. The payment amount is free: less than the outstanding total is a
+// Partial Payment (the unpaid remainder stays in Pending), equal is a Full
+// Payment, and more is an Overpayment - the excess is recorded as a credit for
+// that payee, which can be settled against a later payment for the same payee.
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import * as XLSX from 'xlsx';
@@ -29,7 +31,8 @@ import {
   faFileInvoiceDollar,
   faFileInvoice,
   faRightLeft,
-  faEllipsisV
+  faEllipsisV,
+  faHistory
 } from '@fortawesome/free-solid-svg-icons';
 import './OnlineExpenses.css';
 import { usePopup } from '../context/PopupContext';
@@ -64,7 +67,9 @@ const emptyPaymentForm = {
   voucher_number: '',
   reference_number: '',
   description: '',
-  transfer_amount: '0.00'
+  transfer_amount: '0.00',
+  // Amount of the payee's existing overpayment credit to settle in this payment
+  use_overpayment: ''
 };
 
 const NewExpenses = () => {
@@ -110,6 +115,15 @@ const NewExpenses = () => {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedForPayment, setSelectedForPayment] = useState([]);
   const [paymentForm, setPaymentForm] = useState(emptyPaymentForm);
+  // Overpayment credit the selected payee can still draw on (this payment form)
+  const [payeeOverpayment, setPayeeOverpayment] = useState({ total_available: 0, isLoading: false });
+  // All payee overpayments (panel under the bills table)
+  const [overpayments, setOverpayments] = useState([]);
+  const [showUsedOverpayments, setShowUsedOverpayments] = useState(false);
+  // Payment history modal
+  const [historyBill, setHistoryBill] = useState(null);
+  const [historyRows, setHistoryRows] = useState([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
   const [formData, setFormData] = useState(emptyBillForm);
 
@@ -181,10 +195,10 @@ const NewExpenses = () => {
       const btn = e.currentTarget;
       actionMenuTriggerRef.current = btn;
       const rect = btn.getBoundingClientRect();
-      const dropdownHeight = 145;
+      const dropdownHeight = 190;
       const spaceBelow = window.innerHeight - rect.bottom;
       const spaceAbove = rect.top;
-      const openUpward = spaceBelow < 155 && spaceAbove > spaceBelow;
+      const openUpward = spaceBelow < 200 && spaceAbove > spaceBelow;
 
       setMenuPosition({
         top: openUpward ? Math.max(10, rect.top - dropdownHeight - 6) : rect.bottom + 6,
@@ -227,6 +241,20 @@ const NewExpenses = () => {
   useEffect(() => {
     fetchCreditNotesIndex();
   }, [fetchCreditNotesIndex]);
+
+  const fetchOverpayments = useCallback(async () => {
+    try {
+      const response = await api.get('/new-expenses/overpayments');
+      setOverpayments(response.data || []);
+    } catch (error) {
+      console.error('Error fetching overpayments:', error);
+      setOverpayments([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchOverpayments();
+  }, [fetchOverpayments]);
 
   const fetchPayees = useCallback(async () => {
     try {
@@ -570,11 +598,20 @@ const NewExpenses = () => {
     });
     setBankSearchTerm('');
     setShowPaymentModal(true);
+
+    // Offer any overpayment credit this payee already has.
+    setPayeeOverpayment({ total_available: 0, isLoading: true });
+    api.get('/new-expenses/overpayments/available', {
+      params: { payee_id: selectedBills[0].payee_id || undefined, payee_name: selectedPayeeNames[0] }
+    })
+      .then((res) => setPayeeOverpayment({ total_available: parseFloat(res.data?.total_available) || 0, isLoading: false }))
+      .catch(() => setPayeeOverpayment({ total_available: 0, isLoading: false }));
   };
 
   const handleClosePaymentModal = () => {
     setShowPaymentModal(false);
     setSelectedForPayment([]);
+    setPayeeOverpayment({ total_available: 0, isLoading: false });
     setBankSearchTerm('');
     setIsBankDropdownOpen(false);
   };
@@ -612,23 +649,69 @@ const NewExpenses = () => {
   const isBankLike = paymentTypeLower === 'bank' || paymentTypeLower === 'online';
   const needsBank = isCheque || isBankLike;
 
-  const totalBillAmountForPayment = selectedForPayment.reduce((sum, b) => sum + parseFloat(b.balance || 0), 0);
-  const transferAmountValue = parseFloat(paymentForm.transfer_amount) || 0;
-  const overpayment = Math.max(0, transferAmountValue - totalBillAmountForPayment);
+  // Everything is worked out in whole cents so partial payments and
+  // overpayments never show a stray fraction of a cent.
+  const toCents = (v) => Math.round((parseFloat(v) || 0) * 100);
+  const fromCents = (c) => c / 100;
+
+  // Outstanding = what the selected bills still owe.
+  const outstandingCents = selectedForPayment.reduce((sum, b) => sum + toCents(b.balance), 0);
+  const totalBillAmountForPayment = fromCents(outstandingCents);
+  const transferCents = Math.max(0, toCents(paymentForm.transfer_amount));
+  const transferAmountValue = fromCents(transferCents);
+
+  // Existing overpayment credit being settled in this payment (never more than
+  // the credit available or the amount that is actually owed).
+  const availableOverpaymentCents = toCents(payeeOverpayment.total_available);
+  const maxUsableOverpaymentCents = Math.min(availableOverpaymentCents, outstandingCents);
+  const useOverpaymentCents = Math.max(0, toCents(paymentForm.use_overpayment));
+  const overpaymentUsedInvalid = useOverpaymentCents > maxUsableOverpaymentCents;
+
+  // Payment = money leaving an account + overpayment credit used.
+  //   Remaining   = Outstanding - Payment      (> 0 stays in Pending Payment)
+  //   Overpayment = Payment - Outstanding      (> 0 becomes payee credit)
+  const paymentCents = transferCents + useOverpaymentCents;
+  const remainingCents = Math.max(0, outstandingCents - paymentCents);
+  const overpaymentCents = Math.max(0, paymentCents - outstandingCents);
+  const overpayment = fromCents(overpaymentCents);
+  const remainingAmount = fromCents(remainingCents);
+  const paymentKind = paymentCents <= 0 ? null : overpaymentCents > 0 ? 'overpayment' : remainingCents > 0 ? 'partial' : 'full';
+
+  // Preview how the payment lands on each bill (oldest bill first - the same
+  // order the server uses).
+  const billAllocationPreview = (() => {
+    let left = Math.min(paymentCents, outstandingCents);
+    const map = {};
+    [...selectedForPayment]
+      .sort((a, b) => (a.bill_date < b.bill_date ? -1 : a.bill_date > b.bill_date ? 1 : a.id - b.id))
+      .forEach((b) => {
+        const bal = toCents(b.balance);
+        const alloc = Math.min(bal, left);
+        left -= alloc;
+        map[b.id] = { paying: fromCents(alloc), remaining: fromCents(bal - alloc) };
+      });
+    return map;
+  })();
+
+  // Payment method details are only needed when money actually leaves an
+  // account; a payment settled wholly from overpayment credit moves no cash.
+  const movesMoney = transferCents > 0;
 
   const paymentValid =
     !!paymentForm.payment_date &&
-    !!paymentForm.payment_type &&
-    (!needsBank || !!paymentForm.bank_id) &&
-    (!isCheque || !!paymentForm.cheque_number.trim()) &&
-    (!isBankLike || !!paymentForm.voucher_number.trim()) &&
-    transferAmountValue >= totalBillAmountForPayment &&
-    transferAmountValue > 0;
+    paymentCents > 0 &&
+    !overpaymentUsedInvalid &&
+    (!movesMoney || !!paymentForm.payment_type) &&
+    (!movesMoney || !needsBank || !!paymentForm.bank_id) &&
+    (!movesMoney || !isCheque || !!paymentForm.cheque_number.trim()) &&
+    (!movesMoney || !isBankLike || !!paymentForm.voucher_number.trim());
 
   const handleProcessPayment = async () => {
     if (!paymentValid) {
-      if (transferAmountValue < totalBillAmountForPayment) {
-        showPopup('error', 'Transfer amount must be equal to or greater than the total bill amount');
+      if (paymentCents <= 0) {
+        showPopup('error', 'Enter a payment amount greater than zero');
+      } else if (overpaymentUsedInvalid) {
+        showPopup('error', `Overpayment to settle cannot exceed ${formatCurrency(fromCents(maxUsableOverpaymentCents))} (the available overpayment balance or the outstanding amount)`);
       } else {
         showPopup('error', 'Please fill all required payment fields');
       }
@@ -642,35 +725,60 @@ const NewExpenses = () => {
         payment_date: paymentForm.payment_date,
         payee_id: paymentForm.payee_id || null,
         payee_name: paymentForm.payee_name,
-        payment_type_id: paymentForm.payment_type_id || null,
-        payment_type: paymentForm.payment_type,
-        bank_id: needsBank ? paymentForm.bank_id : null,
-        cheque_number: isCheque ? paymentForm.cheque_number : null,
-        voucher_number: isBankLike ? paymentForm.voucher_number : null,
+        payment_type_id: movesMoney ? (paymentForm.payment_type_id || null) : null,
+        payment_type: movesMoney ? paymentForm.payment_type : null,
+        bank_id: movesMoney && needsBank ? paymentForm.bank_id : null,
+        cheque_number: movesMoney && isCheque ? paymentForm.cheque_number : null,
+        voucher_number: movesMoney && isBankLike ? paymentForm.voucher_number : null,
         reference_number: paymentForm.reference_number || null,
         transfer_amount: transferAmountValue,
+        use_overpayment_amount: fromCents(useOverpaymentCents),
         description: paymentForm.description || null
       };
 
       const response = await api.post('/new-expenses/pay', payload);
-      const paidOverpayment = response.data?.overpayment || 0;
+      const data = response.data || {};
+      const createdOverpayment = data.overpayment || 0;
+      const remaining = data.remaining_amount || 0;
 
-      showPopup(
-        'success',
-        paidOverpayment > 0
-          ? `Payment submitted. Overpayment of ${formatCurrency(paidOverpayment)} recorded for ${paymentForm.payee_name}.`
-          : 'Payment submitted successfully!'
-      );
+      let message = 'Payment submitted successfully!';
+      if (createdOverpayment > 0) {
+        message = `Payment submitted. Overpayment of ${formatCurrency(createdOverpayment)} recorded for ${data.payee_name || paymentForm.payee_name}.`;
+      } else if (remaining > 0) {
+        message = `Partial payment of ${formatCurrency(data.applied_amount)} recorded. ${formatCurrency(remaining)} remains in Pending Payment.`;
+      }
+      showPopup('success', message);
 
       setSelectedIds([]);
       handleClosePaymentModal();
-      await fetchBills();
+      await Promise.all([fetchBills(), fetchOverpayments()]);
     } catch (error) {
       console.error('Error submitting payment:', error);
       showPopup('error', error.response?.data?.error || 'Failed to submit payment');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // ---------- Payment history (per bill) ----------
+  const handleOpenPaymentHistory = async (bill) => {
+    setHistoryBill(bill);
+    setHistoryRows([]);
+    setIsLoadingHistory(true);
+    try {
+      const response = await api.get(`/new-expenses/${bill.id}/payments`);
+      setHistoryRows(response.data || []);
+    } catch (error) {
+      console.error('Error loading payment history:', error);
+      showPopup('error', 'Failed to load payment history');
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
+  const handleClosePaymentHistory = () => {
+    setHistoryBill(null);
+    setHistoryRows([]);
   };
 
   // ---------- Credit Note: create / view (one per Expense Detail) ----------
@@ -861,6 +969,7 @@ const NewExpenses = () => {
       'Without VAT Amount',
       'VAT Amount',
       'Total Bill Amount',
+      'Paid Amount',
       'Balance',
       'Status',
       'Description'
@@ -877,6 +986,7 @@ const NewExpenses = () => {
         parseFloat(b.without_vat_amount) || 0,
         parseFloat(b.vat_amount) || 0,
         parseFloat(b.total_bill_amount) || 0,
+        parseFloat(b.paid_amount) || 0,
         parseFloat(b.balance) || 0,
         b.payment_status || (parseFloat(b.balance) <= 0 ? 'Paid' : 'Pending'),
         b.description || ''
@@ -894,6 +1004,7 @@ const NewExpenses = () => {
       { wch: 18 },
       { wch: 16 },
       { wch: 18 },
+      { wch: 16 },
       { wch: 16 },
       { wch: 14 },
       { wch: 25 }
@@ -1156,6 +1267,7 @@ const NewExpenses = () => {
                 <th>Without VAT Amount</th>
                 <th>VAT Amount</th>
                 <th>Total Bill Amount</th>
+                <th>Paid Amount</th>
                 <th>Balance</th>
                 <th>Status</th>
                 <th>Description</th>
@@ -1164,7 +1276,7 @@ const NewExpenses = () => {
             </thead>
             <tbody>
               {isFetching ? (
-                <tr><td colSpan="15" className="loading-row"><FontAwesomeIcon icon={faSpinner} spin /> Loading expenses...</td></tr>
+                <tr><td colSpan="16" className="loading-row"><FontAwesomeIcon icon={faSpinner} spin /> Loading expenses...</td></tr>
               ) : filteredBills.length > 0 ? (
                 filteredBills.map(bill => {
                   const isPaid = parseFloat(bill.balance || 0) <= 0;
@@ -1191,6 +1303,7 @@ const NewExpenses = () => {
                       <td className="amount-cell">{formatCurrency(bill.without_vat_amount)}</td>
                       <td className="amount-cell">{formatCurrency(bill.vat_amount)}</td>
                       <td className="amount-cell total">{formatCurrency(bill.total_bill_amount)}</td>
+                      <td className="amount-cell">{formatCurrency(bill.paid_amount)}</td>
                       <td className="balance-cell">
                         <span className={parseFloat(bill.balance) > 0 ? 'balance-positive' : 'balance-zero'}>
                           {formatCurrency(bill.balance)}
@@ -1217,14 +1330,23 @@ const NewExpenses = () => {
                               <FontAwesomeIcon icon={faEllipsisV} />
                             </button>
                           </div>
-                        ) : '-'}
+                        ) : (
+                          <button
+                            type="button"
+                            className="action-menu-trigger"
+                            onClick={() => handleOpenPaymentHistory(bill)}
+                            title="Payment History"
+                          >
+                            <FontAwesomeIcon icon={faHistory} />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );
                 })
               ) : (
                 <tr>
-                  <td colSpan="15" className="empty-row">
+                  <td colSpan="16" className="empty-row">
                     {viewFilter === 'paid' ? 'No paid expense bills found' : 'No pending expense bills found'}
                   </td>
                 </tr>
@@ -1271,6 +1393,119 @@ const NewExpenses = () => {
           </div>
         )}
       </div>
+
+      {/* Payee overpayments - credit kept for a payee until it is settled */}
+      {(() => {
+        const visible = overpayments.filter(o => showUsedOverpayments || parseFloat(o.remaining_credit) > 0);
+        const totalAvailable = overpayments.reduce((sum, o) => sum + (parseFloat(o.remaining_credit) || 0), 0);
+        if (overpayments.length === 0) return null;
+        return (
+          <div className="card" style={{ padding: 'var(--spacing-lg)', marginTop: 'var(--spacing-lg)' }}>
+            <div className="form-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
+              <span><FontAwesomeIcon icon={faMoneyBillWave} /> Overpayments <small style={{ color: '#6b7280' }}>| Available: {formatCurrency(totalAvailable)}</small></span>
+              <label style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                <input type="checkbox" checked={showUsedOverpayments} onChange={(e) => setShowUsedOverpayments(e.target.checked)} />
+                Show fully used
+              </label>
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="report-table">
+                <thead>
+                  <tr>
+                    <th>Payee / Supplier</th>
+                    <th>Payment Date</th>
+                    <th>Overpayment</th>
+                    <th>Used</th>
+                    <th>Available Balance</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visible.length > 0 ? visible.map(o => (
+                    <tr key={o.id}>
+                      <td className="payee-cell">{o.payee_name}</td>
+                      <td className="date-cell">{o.payment_date || '-'}</td>
+                      <td className="amount-cell">{formatCurrency(o.amount)}</td>
+                      <td className="amount-cell">{formatCurrency(o.used_amount)}</td>
+                      <td className="amount-cell total">{formatCurrency(o.remaining_credit)}</td>
+                      <td>
+                        <span className={`payment-status-badge ${parseFloat(o.remaining_credit) > 0 ? 'pending' : 'paid'}`}>
+                          <span className="status-dot"></span>{o.status}
+                        </span>
+                      </td>
+                    </tr>
+                  )) : (
+                    <tr><td colSpan="6" className="empty-row">No available overpayments</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Payment history for one bill */}
+      {historyBill && (
+        <div className="payment-modal-overlay" onClick={handleClosePaymentHistory}>
+          <div className="payment-modal-content" style={{ maxWidth: '760px' }} onClick={(e) => e.stopPropagation()}>
+            <div className="payment-modal-header">
+              <h3><FontAwesomeIcon icon={faHistory} /> Payment History
+                <span className="payment-count">{historyBill.bill_number || `#${historyBill.id}`} - {historyBill.payee_name}</span>
+              </h3>
+              <button className="payment-modal-close" onClick={handleClosePaymentHistory}></button>
+            </div>
+            <div className="payment-modal-body">
+              <div className="expense-summary-row">
+                <span className="summary-label">Total Bill Amount</span>
+                <span className="summary-value">{formatCurrency(historyBill.total_bill_amount)}</span>
+              </div>
+              <div className="expense-summary-row">
+                <span className="summary-label">Paid</span>
+                <span className="summary-value">{formatCurrency(historyBill.paid_amount)}</span>
+              </div>
+              <div className="expense-summary-row balance-row">
+                <span className="summary-label">Remaining</span>
+                <span className="summary-value balance-amount">{formatCurrency(historyBill.balance)}</span>
+              </div>
+              <div style={{ overflowX: 'auto', marginTop: '12px' }}>
+                <table className="report-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Type</th>
+                      <th>Reference</th>
+                      <th>Applied to Bill</th>
+                      <th>Overpayment Used</th>
+                      <th>Overpayment Created</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {isLoadingHistory ? (
+                      <tr><td colSpan="6" className="loading-row"><FontAwesomeIcon icon={faSpinner} spin /> Loading...</td></tr>
+                    ) : historyRows.length > 0 ? historyRows.map(h => (
+                      <tr key={`${h.payment_id}-${h.amount}`}>
+                        <td className="date-cell">{h.payment_date}</td>
+                        <td>{h.payment_type}</td>
+                        <td>{h.cheque_number || h.voucher_number || h.reference_number || '-'}</td>
+                        <td className="amount-cell">{formatCurrency(h.amount)}</td>
+                        <td className="amount-cell">{parseFloat(h.overpayment_used_amount) > 0 ? formatCurrency(h.overpayment_used_amount) : '-'}</td>
+                        <td className="amount-cell">{parseFloat(h.overpayment_amount) > 0 ? formatCurrency(h.overpayment_amount) : '-'}</td>
+                      </tr>
+                    )) : (
+                      <tr><td colSpan="6" className="empty-row">No payments recorded yet</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div className="payment-modal-footer">
+              <button type="button" className="btn-secondary" onClick={handleClosePaymentHistory}>
+                <FontAwesomeIcon icon={faTimes} /> Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Payment Details Modal */}
       {showPaymentModal && (
@@ -1406,9 +1641,23 @@ const NewExpenses = () => {
                           <span className="summary-value">{bill.bill_number || '-'}</span>
                         </div>
                         <div className="expense-summary-row">
-                          <span className="summary-label">Balance</span>
+                          <span className="summary-label">Outstanding</span>
                           <span className="summary-value">{formatCurrency(bill.balance)}</span>
                         </div>
+                        {paymentCents > 0 && (
+                          <>
+                            <div className="expense-summary-row">
+                              <span className="summary-label">This Payment</span>
+                              <span className="summary-value">{formatCurrency(billAllocationPreview[bill.id]?.paying || 0)}</span>
+                            </div>
+                            <div className="expense-summary-row">
+                              <span className="summary-label">Remaining</span>
+                              <span className="summary-value" style={(billAllocationPreview[bill.id]?.remaining || 0) > 0 ? { color: '#b45309' } : undefined}>
+                                {formatCurrency(billAllocationPreview[bill.id]?.remaining || 0)}
+                              </span>
+                            </div>
+                          </>
+                        )}
                         {index < selectedForPayment.length - 1 && <hr className="expense-divider" />}
                       </div>
                     ))}
@@ -1416,31 +1665,85 @@ const NewExpenses = () => {
                 )}
 
                 <div className="expense-summary-row total-row">
-                  <span className="summary-label">Total Bill Amount</span>
+                  <span className="summary-label">Outstanding Amount</span>
                   <span className="summary-value total-amount">{formatCurrency(totalBillAmountForPayment)}</span>
                 </div>
 
+                {payeeOverpayment.total_available > 0 && (
+                  <div style={{ margin: '10px 0', padding: '10px 12px', background: '#ecfdf5', border: '1px solid #a7f3d0', borderLeft: '4px solid #10b981', borderRadius: '6px' }}>
+                    <div className="expense-summary-row" style={{ marginBottom: '6px' }}>
+                      <span className="summary-label">Available Overpayment Balance <small>({paymentForm.payee_name})</small></span>
+                      <span className="summary-value" style={{ color: '#047857', fontWeight: 600 }}>{formatCurrency(payeeOverpayment.total_available)}</span>
+                    </div>
+                    <div className="payment-form-group" style={{ margin: 0 }}>
+                      <label>Settle from Overpayment</label>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <input
+                          type="number" name="use_overpayment" value={paymentForm.use_overpayment}
+                          onChange={handlePaymentFormChange} className="payment-input"
+                          placeholder="0.00" min="0" max={fromCents(maxUsableOverpaymentCents)} step="0.01"
+                        />
+                        <button
+                          type="button" className="btn-secondary"
+                          onClick={() => setPaymentForm(prev => ({
+                            ...prev,
+                            use_overpayment: fromCents(maxUsableOverpaymentCents).toFixed(2),
+                            // Overpayment covers what it can; only the rest needs to be paid.
+                            transfer_amount: fromCents(Math.max(0, outstandingCents - maxUsableOverpaymentCents)).toFixed(2)
+                          }))}
+                        >
+                          Use max
+                        </button>
+                      </div>
+                      {overpaymentUsedInvalid && (
+                        <small style={{ color: '#dc3545', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                          Cannot exceed {formatCurrency(fromCents(maxUsableOverpaymentCents))} (available overpayment / outstanding amount)
+                        </small>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 <div className="payment-form-group transfer-row">
-                  <label>Transfer Amount <span className="required">*</span></label>
+                  <label>Payment Amount (Transfer) <span className="required">*</span></label>
                   <input
                     type="number" name="transfer_amount" value={paymentForm.transfer_amount}
                     onChange={handlePaymentFormChange} className="payment-input transfer-input"
                     placeholder="0.00" min="0" step="0.01" required
                   />
-                  {transferAmountValue > 0 && transferAmountValue < totalBillAmountForPayment && (
-                    <small style={{ color: '#dc3545', fontSize: '12px', marginTop: '4px', display: 'block' }}>
-                      Transfer amount cannot be less than the total bill amount
-                    </small>
-                  )}
+                  <small style={{ color: '#6b7280', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                    Enter any amount: less than the outstanding amount is a partial payment, more is recorded as an overpayment.
+                  </small>
                 </div>
 
-                {overpayment > 0 && (
-                  <div className="expense-summary-row balance-row">
-                    <span className="summary-label">Overpayment</span>
-                    <span className="summary-value balance-amount" style={{ color: '#856404' }}>
-                      {formatCurrency(overpayment)}
-                    </span>
+                {paymentKind === 'partial' && (
+                  <>
+                    <div className="expense-summary-row balance-row">
+                      <span className="summary-label">Remaining Amount</span>
+                      <span className="summary-value balance-amount" style={{ color: '#b45309' }}>{formatCurrency(remainingAmount)}</span>
+                    </div>
+                    <div style={{ padding: '6px 10px', background: '#fef3c7', color: '#92400e', borderRadius: '6px', fontSize: '12px', marginTop: '6px', borderLeft: '4px solid #f59e0b' }}>
+                      <strong>Partial Payment:</strong> {formatCurrency(remainingAmount)} stays in the <strong>Pending Payment</strong> tab. Payment is applied to the oldest bills first.
+                    </div>
+                  </>
+                )}
+                {paymentKind === 'full' && (
+                  <div style={{ padding: '6px 10px', background: '#ecfdf5', color: '#065f46', borderRadius: '6px', fontSize: '12px', marginTop: '6px', borderLeft: '4px solid #10b981' }}>
+                    <strong>Full Payment:</strong> outstanding amount becomes {formatCurrency(0)} and the bill(s) are marked Paid.
                   </div>
+                )}
+                {paymentKind === 'overpayment' && (
+                  <>
+                    <div className="expense-summary-row balance-row">
+                      <span className="summary-label">Overpayment <small>({paymentForm.payee_name})</small></span>
+                      <span className="summary-value balance-amount" style={{ color: '#856404' }}>
+                        {formatCurrency(overpayment)}
+                      </span>
+                    </div>
+                    <div style={{ padding: '6px 10px', background: '#fef3c7', color: '#92400e', borderRadius: '6px', fontSize: '12px', marginTop: '6px', borderLeft: '4px solid #f59e0b' }}>
+                      <strong>Overpayment:</strong> the bill(s) are settled in full and {formatCurrency(overpayment)} is kept as credit for <strong>{paymentForm.payee_name}</strong>, ready to settle against a future payment for the same payee.
+                    </div>
+                  </>
                 )}
               </div>
             </div>
@@ -1734,6 +2037,19 @@ const NewExpenses = () => {
               const targetBill = menuPosition.bill;
               setOpenActionMenuId(null);
               setMenuPosition(null);
+              handleOpenPaymentHistory(targetBill);
+            }}
+          >
+            <FontAwesomeIcon icon={faHistory} />
+            <span>Payment History</span>
+          </button>
+          <button
+            type="button"
+            className="action-menu-item"
+            onClick={() => {
+              const targetBill = menuPosition.bill;
+              setOpenActionMenuId(null);
+              setMenuPosition(null);
               handleEdit(targetBill);
             }}
           >
@@ -1754,8 +2070,6 @@ const NewExpenses = () => {
             <span>Delete</span>
           </button>
         </div>,
-
-        
         document.body
       )}
     </div>

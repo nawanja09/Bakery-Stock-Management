@@ -1398,6 +1398,27 @@ const getLastIssueDateReport = async (req, res) => {
 // Company, Supplier, Payment Method and Total Amount, plus a serverGrandTotal so
 // the frontend/export always match. Supports optional date range, company,
 // supplier and payment method filters, all of which can be combined.
+//
+// PAYMENT METHOD SOURCE
+// The Payment Method shown here is the one saved on the invoice's payment
+// record(s) in payment_history - exactly what the Purchase Details page lists
+// under "Payment History" (purchaseController.getPurchaseById). It is NOT read
+// from purchases.payment_method: that column only holds the method chosen when
+// the invoice was created, is never updated when a payment is recorded later,
+// and its enum cannot even hold CHEQUE, so it drifts away from the real payment.
+//
+// A payment record belongs to an invoice by the same rule Purchase Details
+// uses: an allocation row (purchase_payment_allocations) for that invoice, or -
+// for older / single-invoice payments with no allocation rows - payment_history.purchase_id.
+//
+// Nothing is defaulted or recalculated:
+//  - one payment method on the invoice  -> that value
+//  - several different methods           -> all of them, in payment order
+//                                           (payment_method = "CASH, BANK_TRANSFER",
+//                                            payment_methods = ["CASH","BANK_TRANSFER"])
+//  - no payment record at all (e.g. a credit invoice not yet paid, or legacy
+//    data) -> the method saved on the purchase record itself, flagged with
+//    payment_method_source = 'PURCHASE' so it can be told apart.
 const getPurchaseReport = async (req, res) => {
   const { startDate, endDate, companyId, supplierId, paymentMethod } = req.query;
 
@@ -1412,7 +1433,7 @@ const getPurchaseReport = async (req, res) => {
         COALESCE(c.name, 'N/A') AS company_name,
         p.supplier_id,
         s.name AS supplier_name,
-        p.payment_method,
+        p.payment_method AS purchase_payment_method,
         CASE
           WHEN p.total_with_vat IS NOT NULL AND p.total_with_vat > 0 THEN p.total_with_vat
           WHEN p.bill_amount IS NOT NULL AND p.bill_amount > 0 THEN p.bill_amount
@@ -1446,51 +1467,73 @@ const getPurchaseReport = async (req, res) => {
       params.push(supplierId);
     }
 
-    if (paymentMethod && paymentMethod.trim()) {
-      const trimmed = paymentMethod.trim();
-      const normalized = normalizePaymentMethodValue(trimmed);
-
-      const variations = new Set([trimmed, normalized]);
-
-      if (normalized === 'CASH') {
-        variations.add('CASH');
-        variations.add('Cash');
-      } else if (normalized === 'BANK_TRANSFER') {
-        variations.add('BANK_TRANSFER');
-        variations.add('Bank');
-        variations.add('Bank Transfer');
-        variations.add('BANK');
-      } else if (normalized === 'CHEQUE') {
-        variations.add('CHEQUE');
-        variations.add('Cheque');
-      } else if (normalized === 'CREDIT') {
-        variations.add('CREDIT');
-        variations.add('Credit');
-        variations.add('Card');
-        variations.add('Credit Card');
-      }
-
-      const varList = Array.from(variations).filter(Boolean);
-      query += ` AND (p.payment_method IN (${varList.map(() => '?').join(', ')}) OR UPPER(p.payment_method) = ?)`;
-      params.push(...varList, normalized);
-    }
-
     query += ' ORDER BY COALESCE(p.invoice_date, p.purchase_date) DESC, p.id DESC';
 
     const [rows] = await pool.query(query, params);
 
-    const invoices = rows.map(row => ({
-      id: row.id,
-      invoice_no: row.invoice_no,
-      purchase_date: row.purchase_date,
-      invoice_date: row.invoice_date,
-      company_id: row.company_id,
-      company_name: row.company_name,
-      supplier_id: row.supplier_id,
-      supplier_name: row.supplier_name,
-      payment_method: row.payment_method || 'N/A',
-      total_amount: parseFloat(row.total_amount) || 0
-    }));
+    // Payment records for these invoices, using the same invoice <-> payment
+    // association as Purchase Details.
+    const methodsByPurchase = new Map();
+    if (rows.length > 0) {
+      const purchaseIds = rows.map((row) => row.id);
+      const [paymentRows] = await pool.query(
+        `
+        SELECT ppa.purchase_id AS purchase_id, ph.id AS payment_id, ph.payment_date, ph.payment_method
+        FROM payment_history ph
+        JOIN purchase_payment_allocations ppa ON ppa.payment_history_id = ph.id
+        WHERE ppa.purchase_id IN (?)
+        UNION ALL
+        SELECT ph.purchase_id AS purchase_id, ph.id AS payment_id, ph.payment_date, ph.payment_method
+        FROM payment_history ph
+        WHERE ph.purchase_id IN (?)
+          AND NOT EXISTS (
+            SELECT 1 FROM purchase_payment_allocations ppa2 WHERE ppa2.payment_history_id = ph.id
+          )
+        ORDER BY payment_date ASC, payment_id ASC
+        `,
+        [purchaseIds, purchaseIds]
+      );
+
+      paymentRows.forEach((pay) => {
+        const method = pay.payment_method ? String(pay.payment_method).trim() : '';
+        if (!method) return; // an unreadable/blank stored value is not a method
+        if (!methodsByPurchase.has(pay.purchase_id)) methodsByPurchase.set(pay.purchase_id, []);
+        const list = methodsByPurchase.get(pay.purchase_id);
+        if (!list.includes(method)) list.push(method);
+      });
+    }
+
+    let invoices = rows.map((row) => {
+      const paymentMethods = methodsByPurchase.get(row.id) || [];
+      const hasPaymentRecord = paymentMethods.length > 0;
+      const methods = hasPaymentRecord
+        ? paymentMethods
+        : (row.purchase_payment_method ? [String(row.purchase_payment_method).trim()] : []);
+
+      return {
+        id: row.id,
+        invoice_no: row.invoice_no,
+        purchase_date: row.purchase_date,
+        invoice_date: row.invoice_date,
+        company_id: row.company_id,
+        company_name: row.company_name,
+        supplier_id: row.supplier_id,
+        supplier_name: row.supplier_name,
+        payment_method: methods.length > 0 ? methods.join(', ') : 'N/A',
+        payment_methods: methods,
+        payment_method_source: hasPaymentRecord ? 'PAYMENT_RECORD' : 'PURCHASE',
+        total_amount: parseFloat(row.total_amount) || 0
+      };
+    });
+
+    // Payment Method filter runs against the resolved value above, so filtering
+    // by "Bank Transfer" returns exactly the invoices that display Bank Transfer.
+    if (paymentMethod && paymentMethod.trim()) {
+      const wanted = normalizePaymentMethodValue(paymentMethod.trim());
+      invoices = invoices.filter((inv) =>
+        inv.payment_methods.some((m) => normalizePaymentMethodValue(m) === wanted)
+      );
+    }
 
     const grandTotal = invoices.reduce((sum, inv) => sum + inv.total_amount, 0);
 
