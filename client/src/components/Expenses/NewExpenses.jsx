@@ -1754,6 +1754,8 @@ const NewExpenses = () => {
             <span>Delete</span>
           </button>
         </div>,
+
+        
         document.body
       )}
     </div>

@@ -133,22 +133,15 @@ const EmployeeManagement = () => {
     if (!form.employee_name.trim()) errors.employee_name = 'Employee Name is required';
     if (!form.employee_code.trim()) errors.employee_code = 'Employee Code is required';
 
-    if (!form.nic.trim()) {
-      errors.nic = 'NIC is required';
-    } else if (!NIC_REGEX.test(form.nic.trim())) {
+    if (form.nic.trim() && !NIC_REGEX.test(form.nic.trim())) {
       errors.nic = 'Enter a valid NIC (9 digits + V/X, or 12 digits)';
     }
 
-    if (!form.contact_number.trim()) {
-      errors.contact_number = 'Contact Number is required';
-    } else if (!/^\d{10}$/.test(form.contact_number.trim())) {
+    if (form.contact_number.trim() && !/^\d{10}$/.test(form.contact_number.trim())) {
       errors.contact_number = 'Contact Number must be exactly 10 digits';
     }
 
-    if (!form.department_id) errors.department_id = 'Department is required';
-    if (!form.designation.trim()) errors.designation = 'Designation is required';
     if (!form.company) errors.company = 'Company is required';
-    if (!form.joining_date) errors.joining_date = 'Joining Date is required';
 
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -490,7 +483,7 @@ const EmployeeManagement = () => {
                 </div>
 
                 <div className="em-form-group">
-                  <label>NIC *</label>
+                  <label>NIC</label>
                   <input
                     type="text"
                     name="nic"
@@ -504,7 +497,7 @@ const EmployeeManagement = () => {
                 </div>
 
                 <div className="em-form-group">
-                  <label>Contact Number *</label>
+                  <label>Contact Number</label>
                   <input
                     type="tel"
                     name="contact_number"
@@ -518,7 +511,7 @@ const EmployeeManagement = () => {
                 </div>
 
                 <div className="em-form-group">
-                  <label>Department *</label>
+                  <label>Department</label>
                   <select
                     name="department_id"
                     value={form.department_id}
@@ -534,7 +527,7 @@ const EmployeeManagement = () => {
                 </div>
 
                 <div className="em-form-group">
-                  <label>Designation *</label>
+                  <label>Designation</label>
                   <input
                     type="text"
                     name="designation"
@@ -563,7 +556,7 @@ const EmployeeManagement = () => {
                 </div>
 
                 <div className="em-form-group">
-                  <label>Joining Date *</label>
+                  <label>Joining Date</label>
                   <input
                     type="date"
                     name="joining_date"
@@ -631,7 +624,7 @@ const EmployeeManagement = () => {
                 </div>
 
                 <div className="em-form-group">
-                  <label>NIC *</label>
+                  <label>NIC</label>
                   <input
                     type="text"
                     name="nic"
@@ -644,7 +637,7 @@ const EmployeeManagement = () => {
                 </div>
 
                 <div className="em-form-group">
-                  <label>Contact Number *</label>
+                  <label>Contact Number</label>
                   <input
                     type="tel"
                     name="contact_number"
@@ -657,7 +650,7 @@ const EmployeeManagement = () => {
                 </div>
 
                 <div className="em-form-group">
-                  <label>Department *</label>
+                  <label>Department</label>
                   <select
                     name="department_id"
                     value={form.department_id}
@@ -673,7 +666,7 @@ const EmployeeManagement = () => {
                 </div>
 
                 <div className="em-form-group">
-                  <label>Designation *</label>
+                  <label>Designation</label>
                   <input
                     type="text"
                     name="designation"
@@ -701,7 +694,7 @@ const EmployeeManagement = () => {
                 </div>
 
                 <div className="em-form-group">
-                  <label>Joining Date *</label>
+                  <label>Joining Date</label>
                   <input
                     type="date"
                     name="joining_date"

@@ -23,6 +23,7 @@ import {
 import './Expenses.css';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
+import useExpenseTypes, { withSavedOption, findExpenseTypeId } from './useExpenseTypes';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -32,7 +33,10 @@ const emptyForm = {
   expense_date:   today(),
   voucher_number: '',
   company_id:     '',
-  expense_type:   '',
+  expense_type_id:     '',
+  expense_type:        '',
+  sub_expense_type_id: '',
+  sub_expense_type:    '',
   description:    '',
   amount:         ''
 };
@@ -52,7 +56,9 @@ const CashExpenses = () => {
   // Data
   const [records,      setRecords]      = useState([]);
   const [companies,    setCompanies]    = useState([]);
-  const [expenseTypes, setExpenseTypes] = useState([]);
+  // Expenses Type / Sub Expenses Type come from Expenses Type Management.
+  // Sub types are loaded per selected Expenses Type.
+  const { expenseTypes, subExpenseTypes, loadSubExpenseTypes, setSubExpenseTypes } = useExpenseTypes();
   const [suggestedVoucherNo, setSuggestedVoucherNo] = useState('');
 
   // Form
@@ -97,21 +103,11 @@ const CashExpenses = () => {
     }
   }, []);
 
-  const fetchExpenseTypes = useCallback(async () => {
-    try {
-      const res = await api.get('/expense-types');
-      setExpenseTypes(res.data || []);
-    } catch (err) {
-      console.error('Error fetching expense types:', err);
-    }
-  }, []);
-
   useEffect(() => {
     fetchRecords();
     fetchCompanies();
-    fetchExpenseTypes();
     fetchVoucherSuggestion();
-  }, [fetchRecords, fetchCompanies, fetchExpenseTypes, fetchVoucherSuggestion]);
+  }, [fetchRecords, fetchCompanies, fetchVoucherSuggestion]);
 
   // Pre-fill voucher number once the suggestion loads (and form is empty)
   useEffect(() => {
@@ -127,8 +123,34 @@ const CashExpenses = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  // Changing the Expenses Type clears the Sub Expenses Type and loads only
+  // that type's sub types.
+  const handleExpenseTypeChange = (e) => {
+    const id = e.target.value;
+    const type = expenseTypes.find(t => String(t.id) === String(id));
+    setFormData(prev => ({
+      ...prev,
+      expense_type_id: id,
+      expense_type: type ? type.name : '',
+      sub_expense_type_id: '',
+      sub_expense_type: ''
+    }));
+    loadSubExpenseTypes(id);
+  };
+
+  const handleSubExpenseTypeChange = (e) => {
+    const id = e.target.value;
+    const sub = subExpenseTypes.find(s => String(s.id) === String(id));
+    setFormData(prev => ({
+      ...prev,
+      sub_expense_type_id: id,
+      sub_expense_type: sub ? sub.name : ''
+    }));
+  };
+
   const resetForm = useCallback(async () => {
     setFormData({ ...emptyForm, expense_date: today() });
+    setSubExpenseTypes([]);
     setIsEditing(false);
     setEditingId(null);
     // Re-fetch next voucher number
@@ -139,14 +161,19 @@ const CashExpenses = () => {
         setSuggestedVoucherNo(res.data.voucher_number);
       }
     } catch (_) {}
-  }, []);
+  }, [setSubExpenseTypes]);
 
   const handleEdit = (record) => {
+    const savedTypeId = findExpenseTypeId(expenseTypes, record.expense_type_id, record.expense_type);
+    loadSubExpenseTypes(savedTypeId);
     setFormData({
       expense_date:   record.expense_date   || today(),
       voucher_number: record.voucher_number || '',
       company_id:     String(record.company_id || ''),
-      expense_type:   record.expense_type   || '',
+      expense_type_id:     savedTypeId,
+      expense_type:        record.expense_type || '',
+      sub_expense_type_id: record.sub_expense_type_id ? String(record.sub_expense_type_id) : '',
+      sub_expense_type:    record.sub_expense_type || '',
       description:    record.description    || '',
       amount:         String(record.amount  || '')
     });
@@ -159,10 +186,14 @@ const CashExpenses = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const { expense_date, voucher_number, company_id, expense_type, amount } = formData;
+    const { expense_date, voucher_number, company_id, expense_type_id, amount } = formData;
 
-    if (!expense_date || !voucher_number.trim() || !company_id || !expense_type || !amount) {
+    if (!expense_date || !voucher_number.trim() || !company_id || !expense_type_id || !amount) {
       showPopup('error', 'Please fill all required fields: Date, Voucher No., Company, Expense Type and Amount');
+      return;
+    }
+    if (subExpenseTypes.length > 0 && !formData.sub_expense_type_id) {
+      showPopup('error', 'Please select a Sub Expenses Type');
       return;
     }
     if (parseFloat(amount) <= 0) {
@@ -176,7 +207,9 @@ const CashExpenses = () => {
         expense_date:   formData.expense_date,
         voucher_number: formData.voucher_number.trim(),
         company_id:     formData.company_id,
-        expense_type:   formData.expense_type,
+        expense_type_id:     formData.expense_type_id,
+        expense_type:        formData.expense_type,
+        sub_expense_type_id: formData.sub_expense_type_id || null,
         description:    formData.description || null,
         amount:         parseFloat(formData.amount)
       };
@@ -320,17 +353,35 @@ const CashExpenses = () => {
 
               {/* Expense Type */}
               <div className="form-group">
-                <label className="form-label required-label">Expense Type</label>
+                <label className="form-label required-label">Expenses Type</label>
                 <select
-                  name="expense_type"
+                  name="expense_type_id"
                   className="form-control"
-                  value={formData.expense_type}
-                  onChange={handleChange}
+                  value={formData.expense_type_id}
+                  onChange={handleExpenseTypeChange}
                   required
                 >
                   <option value="">-- Select Expense Type --</option>
-                  {expenseTypes.map(et => (
-                    <option key={et.id} value={et.name}>{et.name}</option>
+                  {withSavedOption(expenseTypes, formData.expense_type_id, formData.expense_type).map(et => (
+                    <option key={et.id} value={et.id}>{et.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Sub Expenses Type — options depend on the selected Expenses Type */}
+              <div className="form-group">
+                <label className={`form-label${subExpenseTypes.length > 0 ? ' required-label' : ''}`}>Sub Expenses Type</label>
+                <select
+                  name="sub_expense_type_id"
+                  className="form-control"
+                  value={formData.sub_expense_type_id}
+                  onChange={handleSubExpenseTypeChange}
+                  required={subExpenseTypes.length > 0}
+                  disabled={!formData.expense_type_id}
+                >
+                  <option value="">{formData.expense_type_id ? '-- Select Sub Expense Type --' : 'Select Expense Type First'}</option>
+                  {withSavedOption(subExpenseTypes, formData.sub_expense_type_id, formData.sub_expense_type).map(st => (
+                    <option key={st.id} value={st.id}>{st.name}</option>
                   ))}
                 </select>
               </div>
@@ -405,6 +456,7 @@ const CashExpenses = () => {
                 <th>Company</th>
                 <th>Cashbook</th>
                 <th>Expense Type</th>
+                <th>Sub Expense Type</th>
                 <th>Description</th>
                 <th className="text-right">Amount</th>
                 <th>Actions</th>
@@ -413,7 +465,7 @@ const CashExpenses = () => {
             <tbody>
               {records.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="text-center text-muted" style={{ padding: '24px' }}>
+                  <td colSpan={9} className="text-center text-muted" style={{ padding: '24px' }}>
                     {isFetching ? 'Loading…' : 'No cash expense records found.'}
                   </td>
                 </tr>
@@ -427,6 +479,7 @@ const CashExpenses = () => {
                       {rec.company_name ? `${rec.company_name} - Cash Book` : '—'}
                     </td>
                     <td>{rec.expense_type}</td>
+                    <td>{rec.sub_expense_type || '—'}</td>
                     <td style={{ maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {rec.description || '—'}
                     </td>

@@ -17,9 +17,10 @@ const initialRange = { fromDate: '', toDate: '' };
 const formatDate = (value) => {
   if (!value) return '-';
   const raw = String(value);
-  const datePart = raw.slice(0, 10);
-  if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
-    const [year, month, day] = datePart.split('-');
+  // Plain 'YYYY-MM-DD' (what the API returns) is formatted as-is, never via
+  // Date, so no timezone conversion can move it to another day.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    const [year, month, day] = raw.split('-');
     return `${day}/${month}/${year}`;
   }
   const parsed = new Date(value);
@@ -42,13 +43,19 @@ const AnalystPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const balanceRequestRef = useRef(0);
+  const reportRequestRef = useRef(0);
 
   const updateRange = (event) => setRange(current => ({ ...current, [event.target.name]: event.target.value }));
   const validateRange = () => range.fromDate && range.toDate && range.fromDate > range.toDate ? 'From Date cannot be after To Date.' : '';
 
   const loadReport = useCallback(async () => {
+    const requestId = ++reportRequestRef.current;
     const validation = validateRange();
-    if (validation) return setError(validation);
+    if (validation) {
+      setError(validation);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError('');
     try {
@@ -63,14 +70,16 @@ const AnalystPage = () => {
         params.method = method;
       }
       const response = await api.get(endpoint, { params });
+      if (requestId !== reportRequestRef.current) return;
       setRecords(response.data.records || []);
       setSummary(response.data);
     } catch (requestError) {
+      if (requestId !== reportRequestRef.current) return;
       setError(requestError.response?.data?.error || 'Unable to load the report. Please try again.');
       setRecords([]);
       setSummary(null);
     } finally {
-      setLoading(false);
+      if (requestId === reportRequestRef.current) setLoading(false);
     }
   }, [range, isIncome, company, method]);
 
@@ -81,22 +90,28 @@ const AnalystPage = () => {
       setCompany('all');
       setError('');
       const endpoint = isIncome ? '/analyst/incomes' : '/analyst/expenses';
+      const requestId = ++reportRequestRef.current;
       setLoading(true);
       api.get(endpoint)
         .then(res => {
+          if (requestId !== reportRequestRef.current) return;
           setRecords(res.data.records || []);
           setSummary(res.data);
         })
         .catch(err => {
+          if (requestId !== reportRequestRef.current) return;
           setError(err.response?.data?.error || 'Unable to load the report. Please try again.');
           setRecords([]);
           setSummary(null);
         })
-        .finally(() => setLoading(false));
+        .finally(() => {
+          if (requestId === reportRequestRef.current) setLoading(false);
+        });
     }
   }, [isIncome, isBalanceSheet]);
 
   const clearReport = () => {
+    const requestId = ++reportRequestRef.current;
     setRange(initialRange);
     setMethod('all');
     setCompany('all');
@@ -105,15 +120,19 @@ const AnalystPage = () => {
     setLoading(true);
     api.get(endpoint)
       .then(res => {
+        if (requestId !== reportRequestRef.current) return;
         setRecords(res.data.records || []);
         setSummary(res.data);
       })
       .catch(err => {
+        if (requestId !== reportRequestRef.current) return;
         setError(err.response?.data?.error || 'Unable to load the report. Please try again.');
         setRecords([]);
         setSummary(null);
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (requestId === reportRequestRef.current) setLoading(false);
+      });
   };
 
   const loadBalance = useCallback(async () => {

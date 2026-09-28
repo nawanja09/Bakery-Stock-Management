@@ -79,16 +79,54 @@ const ensureRmAdjustmentRecordsSchema = async () => {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS rm_adjustment_records (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        category ENUM('Department', 'Invoice', 'Issuance', 'Wastage') NOT NULL,
+        category ENUM('Department', 'Invoice', 'Issuance', 'Wastage', 'Petty Cash Voucher', 'Expense Bill') NOT NULL,
         source_record_id INT NOT NULL,
         reference_id VARCHAR(100) NULL,
         updated_by INT NULL,
+        original_values JSON NULL,
+        updated_values JSON NULL,
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        UNIQUE KEY uq_rm_adjustment_source (category, source_record_id),
+        KEY idx_rm_adjustment_source (category, source_record_id),
         KEY idx_rm_adjustment_category_updated (category, updated_at)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
     `);
+
+    // Upgrade installations where this table was created by migration 012 or
+    // by an older version of this bootstrap. CREATE TABLE IF NOT EXISTS does
+    // not update existing tables.
+    await pool.query(`
+      ALTER TABLE rm_adjustment_records
+        MODIFY COLUMN category ENUM('Department', 'Invoice', 'Issuance', 'Wastage', 'Petty Cash Voucher', 'Expense Bill') NOT NULL,
+        ADD COLUMN IF NOT EXISTS original_values JSON NULL,
+        ADD COLUMN IF NOT EXISTS updated_values JSON NULL
+    `);
+
+    // Financial edits need multiple immutable snapshots for one source row.
+    // Remove the old uniqueness constraint when upgrading from migration 012.
+    const [uniqueIndexes] = await pool.query(`
+      SELECT INDEX_NAME
+      FROM information_schema.STATISTICS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'rm_adjustment_records'
+        AND INDEX_NAME = 'uq_rm_adjustment_source'
+      LIMIT 1
+    `);
+    if (uniqueIndexes.length) {
+      await pool.query('ALTER TABLE rm_adjustment_records DROP INDEX uq_rm_adjustment_source');
+    }
+
+    const [sourceIndexes] = await pool.query(`
+      SELECT INDEX_NAME
+      FROM information_schema.STATISTICS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'rm_adjustment_records'
+        AND INDEX_NAME = 'idx_rm_adjustment_source'
+      LIMIT 1
+    `);
+    if (!sourceIndexes.length) {
+      await pool.query('ALTER TABLE rm_adjustment_records ADD KEY idx_rm_adjustment_source (category, source_record_id)');
+    }
     console.log('RM adjustment summary schema ready');
   } catch (error) {
     console.warn('RM adjustment summary schema check skipped:', error.message);
@@ -665,6 +703,41 @@ const ensureSubExpenseTypesSchema = async () => {
   } catch (error) {
     console.warn('Sub expense type schema check skipped:', error.message);
   }
+
+  // Petty Cash Vouchers and Cash Expenses now use the same managed Expenses
+  // Type / Sub Expenses Type lists. The existing expense_type name column is
+  // kept (reports and ledger remarks read it); the id / sub type columns are
+  // nullable so historical rows stay valid until they are edited.
+  const classificationColumns = [
+    ['petty_cash_vouchers', 'ADD COLUMN IF NOT EXISTS expense_type_id INT NULL AFTER expense_type'],
+    ['petty_cash_vouchers', 'ADD COLUMN IF NOT EXISTS sub_expense_type_id INT NULL AFTER expense_type_id'],
+    ['petty_cash_vouchers', 'ADD COLUMN IF NOT EXISTS sub_expense_type VARCHAR(100) NULL AFTER sub_expense_type_id'],
+    ['cash_expenses', 'ADD COLUMN IF NOT EXISTS expense_type_id INT NULL AFTER expense_type'],
+    ['cash_expenses', 'ADD COLUMN IF NOT EXISTS sub_expense_type_id INT NULL AFTER expense_type_id'],
+    ['cash_expenses', 'ADD COLUMN IF NOT EXISTS sub_expense_type VARCHAR(100) NULL AFTER sub_expense_type_id']
+  ];
+  for (const [table, clause] of classificationColumns) {
+    try {
+      await pool.query(`ALTER TABLE ${table} ${clause}`);
+    } catch (error) {
+      console.warn(`Expense classification column check skipped for ${table}:`, error.message);
+    }
+  }
+  // Link historical rows to the managed Expenses Type by exact name (only rows
+  // not linked yet). The explicit collation avoids a mix-collation error
+  // between tables created with different collations.
+  for (const table of ['petty_cash_vouchers', 'cash_expenses']) {
+    try {
+      await pool.query(
+        `UPDATE ${table} t
+         JOIN expense_types et ON et.name = t.expense_type COLLATE utf8mb4_unicode_ci
+         SET t.expense_type_id = et.id
+         WHERE t.expense_type_id IS NULL`
+      );
+    } catch (error) {
+      console.warn(`Expense type back-fill skipped for ${table}:`, error.message);
+    }
+  }
 };
 
 ensureSubExpenseTypesSchema();
@@ -772,6 +845,14 @@ const ensureEmployeesSchema = async () => {
     // have the column yet - add it in place, same "ADD COLUMN IF NOT
     // EXISTS" pattern used everywhere else in this file.
     await pool.query("ALTER TABLE employees ADD COLUMN IF NOT EXISTS company VARCHAR(100) NULL AFTER designation");
+    // Older installs used NOT NULL for employee details that are now optional.
+    await pool.query(`ALTER TABLE employees
+      MODIFY COLUMN nic VARCHAR(20) NULL,
+      MODIFY COLUMN contact_number VARCHAR(15) NULL,
+      MODIFY COLUMN department_id INT NULL,
+      MODIFY COLUMN designation VARCHAR(100) NULL,
+      MODIFY COLUMN joining_date DATE NULL,
+      MODIFY COLUMN company VARCHAR(100) NULL`);
 
     console.log('Employees schema ready');
   } catch (error) {

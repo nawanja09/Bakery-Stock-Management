@@ -40,32 +40,29 @@ const validateEmployeeInput = (input) => {
 
   if (!employee_code) return { error: 'Employee Code is required' };
   if (!employee_name) return { error: 'Employee Name is required' };
-  if (!nic) return { error: 'NIC is required' };
-  if (!NIC_REGEX.test(nic)) {
+  if (nic && !NIC_REGEX.test(nic)) {
     return { error: 'Please enter a valid Sri Lankan NIC (9 digits + V/X, or 12 digits)' };
   }
-  if (!contact_number) return { error: 'Contact Number is required' };
-  if (!PHONE_REGEX.test(contact_number)) {
+  if (contact_number && !PHONE_REGEX.test(contact_number)) {
     return { error: 'Contact Number must be exactly 10 digits' };
   }
   if (department_id !== null && (!Number.isInteger(department_id) || department_id <= 0)) {
     return { error: 'Please select a valid Department' };
   }
-  if (!designation) return { error: 'Designation is required' };
   if (!company) return { error: 'Company is required' };
-  if (!joining_date || !/^\d{4}-\d{2}-\d{2}$/.test(joining_date)) {
-    return { error: 'A valid Joining Date is required' };
+  if (joining_date && !/^\d{4}-\d{2}-\d{2}$/.test(joining_date)) {
+    return { error: 'Please enter a valid Joining Date' };
   }
 
   return {
     employee_code,
     employee_name,
-    nic: nic.toUpperCase(),
-    contact_number,
+    nic: nic ? nic.toUpperCase() : null,
+    contact_number: contact_number || null,
     department_id,
-    designation,
+    designation: designation || null,
     company,
-    joining_date
+    joining_date: joining_date || null
   };
 };
 
@@ -178,12 +175,14 @@ const createEmployee = async (req, res) => {
       return res.status(400).json({ error: 'Employee Code already exists' });
     }
 
-    const [dupNic] = await pool.query(
-      'SELECT id FROM employees WHERE nic = ?',
-      [nic]
-    );
-    if (dupNic.length > 0) {
-      return res.status(400).json({ error: 'An employee with this NIC already exists' });
+    if (nic) {
+      const [dupNic] = await pool.query(
+        'SELECT id FROM employees WHERE nic = ?',
+        [nic]
+      );
+      if (dupNic.length > 0) {
+        return res.status(400).json({ error: 'An employee with this NIC already exists' });
+      }
     }
 
     if (department_id !== null) {
@@ -263,12 +262,14 @@ const updateEmployee = async (req, res) => {
       return res.status(400).json({ error: 'Employee Code already exists' });
     }
 
-    const [dupNic] = await pool.query(
-      'SELECT id FROM employees WHERE nic = ? AND id != ?',
-      [nic, id]
-    );
-    if (dupNic.length > 0) {
-      return res.status(400).json({ error: 'An employee with this NIC already exists' });
+    if (nic) {
+      const [dupNic] = await pool.query(
+        'SELECT id FROM employees WHERE nic = ? AND id != ?',
+        [nic, id]
+      );
+      if (dupNic.length > 0) {
+        return res.status(400).json({ error: 'An employee with this NIC already exists' });
+      }
     }
 
     if (department_id !== null) {

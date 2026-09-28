@@ -11,6 +11,7 @@ const authenticate = require('../middleware/authenticate');
 const restrictRoles = require('../middleware/restrictRoles');
 const { recordCashTransaction } = require('../utils/financeLedger');
 const { checkDuplicateReference } = require('../services/referenceValidationService');
+const { resolveExpenseClassification, ExpenseClassificationError } = require('../utils/expenseClassification');
 
 // Block Store Keeper / Stores from the Expenses module (same guard as other expense routes)
 router.use(authenticate, restrictRoles('Store Keeper', 'Stores'));
@@ -53,6 +54,9 @@ router.get('/', async (req, res) => {
          DATE_FORMAT(ce.expense_date, '%Y-%m-%d') AS expense_date,
          ce.voucher_number,
          ce.expense_type,
+         ce.expense_type_id,
+         ce.sub_expense_type_id,
+         ce.sub_expense_type,
          ce.description,
          ce.amount,
          ce.company_id,
@@ -80,6 +84,8 @@ router.post('/', async (req, res) => {
     voucher_number,
     company_id,
     expense_type,
+    expense_type_id,
+    sub_expense_type_id,
     description,
     amount
   } = req.body;
@@ -87,7 +93,7 @@ router.post('/', async (req, res) => {
   const userId = req.user.userId;
 
   // --- Validation ---
-  if (!expense_date || !voucher_number || !company_id || !expense_type || !amount) {
+  if (!expense_date || !voucher_number || !company_id || !(expense_type || expense_type_id) || !amount) {
     return res.status(400).json({ error: 'Date, Voucher No., Company, Expense Type and Amount are required' });
   }
   if (parseFloat(amount) <= 0) {
@@ -111,17 +117,25 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Selected Company has no valid Cash Book' });
     }
 
+    // Expenses Type / Sub Expenses Type come from Expenses Type Management;
+    // the stored names are taken from those tables, not from the request.
+    const classification = await resolveExpenseClassification(connection, { expense_type, expense_type_id, sub_expense_type_id });
+    const expenseTypeName = classification.expenseTypeName;
+
     // Insert the expense record
     const [result] = await connection.query(
       `INSERT INTO cash_expenses
-         (expense_date, voucher_number, company_id, expense_type,
-          description, amount, created_by, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
+         (expense_date, voucher_number, company_id, expense_type, expense_type_id,
+          sub_expense_type_id, sub_expense_type, description, amount, created_by, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
       [
         expense_date,
         voucher_number,
         company_id,
-        expense_type,
+        expenseTypeName,
+        classification.expenseTypeId,
+        classification.subExpenseTypeId,
+        classification.subExpenseTypeName,
         description || null,
         amount,
         userId
@@ -132,7 +146,7 @@ router.post('/', async (req, res) => {
     await recordCashTransaction(connection, {
       companyId:       company_id,
       date:            expense_date,
-      remark:          `Cash Expense - ${expense_type}`,
+      remark:          `Cash Expense - ${expenseTypeName}`,
       credit:          parseFloat(amount),
       transactionType: 'Cash Expense',
       referenceNumber: voucher_number,
@@ -150,6 +164,9 @@ router.post('/', async (req, res) => {
   } catch (error) {
     await connection.rollback();
     console.error('Error creating cash expense:', error);
+    if (error instanceof ExpenseClassificationError) {
+      return res.status(400).json({ error: error.message });
+    }
     if (error.code === 'ER_DUP_ENTRY' || error.name === 'DuplicateReferenceError') {
       return res.status(400).json({
         error: error.name === 'DuplicateReferenceError'
@@ -176,13 +193,15 @@ router.put('/:id', async (req, res) => {
     voucher_number,
     company_id,
     expense_type,
+    expense_type_id,
+    sub_expense_type_id,
     description,
     amount
   } = req.body;
 
   const userId = req.user.userId;
 
-  if (!expense_date || !voucher_number || !company_id || !expense_type || !amount) {
+  if (!expense_date || !voucher_number || !company_id || !(expense_type || expense_type_id) || !amount) {
     return res.status(400).json({ error: 'Date, Voucher No., Company, Expense Type and Amount are required' });
   }
   if (parseFloat(amount) <= 0) {
@@ -198,13 +217,20 @@ router.put('/:id', async (req, res) => {
 
     // Fetch old amount to compute the ledger adjustment
     const [oldRows] = await connection.query(
-      'SELECT amount, company_id, voucher_number FROM cash_expenses WHERE id = ? AND status = 1 FOR UPDATE',
+      `SELECT amount, company_id, voucher_number, expense_type, expense_type_id,
+              sub_expense_type_id, sub_expense_type
+       FROM cash_expenses WHERE id = ? AND status = 1 FOR UPDATE`,
       [id]
     );
     if (oldRows.length === 0) {
       await connection.rollback();
       return res.status(404).json({ error: 'Cash expense not found' });
     }
+
+    const classification = await resolveExpenseClassification(
+      connection, { expense_type, expense_type_id, sub_expense_type_id }, oldRows[0]
+    );
+    const expenseTypeName = classification.expenseTypeName;
 
     const oldAmount    = parseFloat(oldRows[0].amount);
     const newAmount    = parseFloat(amount);
@@ -214,9 +240,11 @@ router.put('/:id', async (req, res) => {
     await connection.query(
       `UPDATE cash_expenses
        SET expense_date = ?, voucher_number = ?, company_id = ?,
-           expense_type = ?, description = ?, amount = ?
+           expense_type = ?, expense_type_id = ?, sub_expense_type_id = ?, sub_expense_type = ?,
+           description = ?, amount = ?
        WHERE id = ?`,
-      [expense_date, voucher_number, company_id, expense_type, description || null, amount, id]
+      [expense_date, voucher_number, company_id, expenseTypeName, classification.expenseTypeId,
+        classification.subExpenseTypeId, classification.subExpenseTypeName, description || null, amount, id]
     );
 
     // Adjust the Cash ledger by the delta (avoids reversing and re-posting the full amount)
@@ -226,7 +254,7 @@ router.put('/:id', async (req, res) => {
         await recordCashTransaction(connection, {
           companyId:       company_id,
           date:            expense_date,
-          remark:          `Cash Expense Edit (increase) - ${expense_type}`,
+          remark:          `Cash Expense Edit (increase) - ${expenseTypeName}`,
           credit:          amountDelta,
           transactionType: 'Cash Expense Edit',
           referenceNumber: voucher_number,
@@ -239,7 +267,7 @@ router.put('/:id', async (req, res) => {
         await recordCashTransaction(connection, {
           companyId:       company_id,
           date:            expense_date,
-          remark:          `Cash Expense Edit (decrease) - ${expense_type}`,
+          remark:          `Cash Expense Edit (decrease) - ${expenseTypeName}`,
           debit:           Math.abs(amountDelta),
           transactionType: 'Cash Expense Edit',
           referenceNumber: voucher_number,
@@ -255,6 +283,9 @@ router.put('/:id', async (req, res) => {
   } catch (error) {
     await connection.rollback();
     console.error('Error updating cash expense:', error);
+    if (error instanceof ExpenseClassificationError) {
+      return res.status(400).json({ error: error.message });
+    }
     if (error.code === 'ER_DUP_ENTRY' || error.name === 'DuplicateReferenceError') {
       return res.status(400).json({
         error: error.name === 'DuplicateReferenceError'
