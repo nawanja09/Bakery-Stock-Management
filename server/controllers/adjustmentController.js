@@ -217,7 +217,8 @@ const getRmAdjustmentSummary = async (req, res) => {
     } else if (category === 'Petty Cash Voucher') {
       let query = `SELECT rar.id AS adjustment_id, rar.created_at AS adjustment_date,
           rar.reference_id, rar.original_values, rar.updated_values, rar.updated_by, au.name AS adjusted_by,
-          v.id, v.voucher_number, v.voucher_date, v.payee_name, v.expense_type, v.amount,
+          v.id, v.voucher_number, v.voucher_date, v.payee_name, v.expense_type,
+          v.expense_type_id, v.sub_expense_type_id, v.sub_expense_type, v.amount,
           c.name AS company_name
         FROM rm_adjustment_records rar
         JOIN petty_cash_vouchers v ON v.id = rar.source_record_id

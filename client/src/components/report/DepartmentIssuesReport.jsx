@@ -239,7 +239,7 @@ const DepartmentIssuesReport = () => {
 
         <div className="report-filter-actions">
           <button
-            onClick={generateReport}
+            onClick={() => generateReport()}
             disabled={loading}
             className="btn btn-primary"
           >

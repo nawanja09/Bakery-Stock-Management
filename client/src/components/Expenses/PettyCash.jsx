@@ -8,6 +8,7 @@ import {
 import './Expenses.css';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
+import useExpenseTypes, { withSavedOption, findExpenseTypeId } from './useExpenseTypes';
 
 const RECENT_LIMIT = 10;
 
@@ -41,7 +42,10 @@ const PettyCash = () => {
     voucher_number: '',
     employee_name: '',
     payee_name: '',
+    expense_type_id: '',
     expense_type: '',
+    sub_expense_type_id: '',
+    sub_expense_type: '',
     description: '',
     vehicle_number: '',
     amount: '',
@@ -65,7 +69,9 @@ const PettyCash = () => {
 
   const [payees, setPayees] = useState([]);
 
-  const [expenseTypes, setExpenseTypes] = useState([]);
+  // Expenses Type / Sub Expenses Type come from Expenses Type Management.
+  // Sub types are loaded per selected Expenses Type.
+  const { expenseTypes, subExpenseTypes, loadSubExpenseTypes, setSubExpenseTypes } = useExpenseTypes();
 
   // Helper to get user role directly from localStorage (fallback)
   const getUserRole = () => {
@@ -177,20 +183,6 @@ const PettyCash = () => {
     loadPayees();
   }, []);
 
-  // Load the real, managed list of expense accounts (Expenses Type
-  // Management) so a voucher is posted to a real expense account,
-  // same list used by the New Expenses module.
-  useEffect(() => {
-    const loadExpenseTypes = async () => {
-      try {
-        const res = await api.get('/expense-types');
-        setExpenseTypes(res.data || []);
-      } catch (error) {
-        console.error('Error loading expense types:', error);
-      }
-    };
-    loadExpenseTypes();
-  }, []);
   useEffect(() => {
     if (activeTab === 'voucher') fetchVoucherSuggestion();
     else if (activeTab === 'reimbursement') fetchReferenceSuggestion();
@@ -201,6 +193,31 @@ const PettyCash = () => {
     setVoucherForm(prev => ({ ...prev, [name]: value }));
   };
 
+  // Changing the Expenses Type clears the Sub Expenses Type and loads only
+  // that type's sub types.
+  const handleExpenseTypeChange = (e) => {
+    const id = e.target.value;
+    const type = expenseTypes.find(t => String(t.id) === String(id));
+    setVoucherForm(prev => ({
+      ...prev,
+      expense_type_id: id,
+      expense_type: type ? type.name : '',
+      sub_expense_type_id: '',
+      sub_expense_type: ''
+    }));
+    loadSubExpenseTypes(id);
+  };
+
+  const handleSubExpenseTypeChange = (e) => {
+    const id = e.target.value;
+    const sub = subExpenseTypes.find(s => String(s.id) === String(id));
+    setVoucherForm(prev => ({
+      ...prev,
+      sub_expense_type_id: id,
+      sub_expense_type: sub ? sub.name : ''
+    }));
+  };
+
   const handleReimbursementChange = (e) => {
     const { name, value } = e.target;
     setReimbursementForm(prev => ({ ...prev, [name]: value }));
@@ -209,12 +226,17 @@ const PettyCash = () => {
   const handleEdit = (voucher) => {
     setIsEditing(true);
     setEditingId(voucher.id);
+    const savedTypeId = findExpenseTypeId(expenseTypes, voucher.expense_type_id, voucher.expense_type);
+    loadSubExpenseTypes(savedTypeId);
     setVoucherForm({
       date: voucher.date || (voucher.voucher_date ? new Date(voucher.voucher_date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]),
       voucher_number: voucher.voucher_number,
       employee_name: voucher.employee_name || '',
       payee_name: voucher.payee_name || voucher.payee || '',
+      expense_type_id: savedTypeId,
       expense_type: voucher.expense_type,
+      sub_expense_type_id: voucher.sub_expense_type_id ? String(voucher.sub_expense_type_id) : '',
+      sub_expense_type: voucher.sub_expense_type || '',
       description: voucher.description || '',
       vehicle_number: voucher.vehicle_number || '',
       amount: voucher.amount,
@@ -228,9 +250,11 @@ const PettyCash = () => {
     setIsEditing(false);
     setEditingId(null);
     const jh = companies.find(c => (c.name || '').toUpperCase() === 'JH');
+    setSubExpenseTypes([]);
     setVoucherForm({
       date: new Date().toISOString().split('T')[0],
-      voucher_number: '', employee_name: '', payee_name: '', expense_type: '',
+      voucher_number: '', employee_name: '', payee_name: '',
+      expense_type_id: '', expense_type: '', sub_expense_type_id: '', sub_expense_type: '',
       description: '', vehicle_number: '', amount: '', receipt_no: '',
       company_id: jh ? String(jh.id) : ''
     });
@@ -259,8 +283,12 @@ const PettyCash = () => {
 
   const handleVoucherSubmit = async (e) => {
     e.preventDefault();
-    if (!voucherForm.voucher_number || !voucherForm.payee_name || !voucherForm.expense_type || !voucherForm.amount || parseFloat(voucherForm.amount) <= 0) {
+    if (!voucherForm.voucher_number || !voucherForm.payee_name || !voucherForm.expense_type_id || !voucherForm.amount || parseFloat(voucherForm.amount) <= 0) {
       showPopup('error', 'Please fill all required fields with valid amount');
+      return;
+    }
+    if (subExpenseTypes.length > 0 && !voucherForm.sub_expense_type_id) {
+      showPopup('error', 'Please select a Sub Expenses Type');
       return;
     }
     if (!isEditing && !voucherForm.company_id) {
@@ -274,7 +302,9 @@ const PettyCash = () => {
         voucher_date: voucherForm.date,
         employee_name: voucherForm.employee_name || null,
         payee_name: voucherForm.payee_name,
+        expense_type_id: voucherForm.expense_type_id,
         expense_type: voucherForm.expense_type,
+        sub_expense_type_id: voucherForm.sub_expense_type_id || null,
         description: voucherForm.description || null,
         vehicle_number: voucherForm.vehicle_number || null,
         amount: parseFloat(voucherForm.amount),
@@ -404,10 +434,10 @@ const PettyCash = () => {
 
   const handleExportVouchers = () => {
     if (!transactions.length) { showPopup('error', 'No voucher data to export'); return; }
-    const headers = ['Date', 'Voucher / Reference No.', 'Payee', 'Expense Type', 'Company', 'Receipt No.', 'Amount (LKR)', 'Debits - Reimbursement (LKR)', 'Credits - Expenses (LKR)', 'Balance (LKR)'];
+    const headers = ['Date', 'Voucher / Reference No.', 'Payee', 'Expense Type', 'Sub Expense Type', 'Company', 'Receipt No.', 'Amount (LKR)', 'Debits - Reimbursement (LKR)', 'Credits - Expenses (LKR)', 'Balance (LKR)'];
     const rows = transactions.map(t => {
       const isReimb = t.source === 'REIMBURSEMENT';
-      return [formatDate(t.date), t.reference_number, isReimb ? '-' : (t.payee_name || '-'), isReimb ? 'Reimbursement' : t.expense_type, t.company_name || '-', t.receipt_no || '-', isReimb ? t.debit : t.credit, t.debit > 0 ? t.debit : '', t.credit > 0 ? t.credit : '', t.balance];
+      return [formatDate(t.date), t.reference_number, isReimb ? '-' : (t.payee_name || '-'), isReimb ? 'Reimbursement' : t.expense_type, isReimb ? '-' : (t.sub_expense_type || '-'), t.company_name || '-', t.receipt_no || '-', isReimb ? t.debit : t.credit, t.debit > 0 ? t.debit : '', t.credit > 0 ? t.credit : '', t.balance];
     });
     const csvContent = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -474,15 +504,24 @@ const PettyCash = () => {
               <div className="form-grid two-col">
                 <div className="form-group">
                   <label>Expenses Type <span className="required">*</span></label>
-                  <select name="expense_type" value={voucherForm.expense_type} onChange={handleVoucherChange} required className="form-select">
+                  <select name="expense_type_id" value={voucherForm.expense_type_id} onChange={handleExpenseTypeChange} required className="form-select">
                     <option value="">Select Expense Type</option>
-                    {expenseTypes.map(type => <option key={type.id} value={type.name}>{type.name}</option>)}
+                    {withSavedOption(expenseTypes, voucherForm.expense_type_id, voucherForm.expense_type).map(type => <option key={type.id} value={type.id}>{type.name}</option>)}
                   </select>
                 </div>
-                <div className="form-group"><label>Vehicle Number</label><input type="text" name="vehicle_number" value={voucherForm.vehicle_number} onChange={handleVoucherChange} className="form-input" placeholder="If applicable" /></div>
+                <div className="form-group">
+                  <label>Sub Expenses Type {subExpenseTypes.length > 0 && <span className="required">*</span>}</label>
+                  <select name="sub_expense_type_id" value={voucherForm.sub_expense_type_id} onChange={handleSubExpenseTypeChange} required={subExpenseTypes.length > 0} disabled={!voucherForm.expense_type_id} className="form-select">
+                    <option value="">{voucherForm.expense_type_id ? 'Select Sub Expense Type' : 'Select Expense Type First'}</option>
+                    {withSavedOption(subExpenseTypes, voucherForm.sub_expense_type_id, voucherForm.sub_expense_type).map(type => <option key={type.id} value={type.id}>{type.name}</option>)}
+                  </select>
+                </div>
               </div>
               <div className="form-grid two-col">
+                <div className="form-group"><label>Vehicle Number</label><input type="text" name="vehicle_number" value={voucherForm.vehicle_number} onChange={handleVoucherChange} className="form-input" placeholder="If applicable" /></div>
                 <div className="form-group"><label>Receipt Number</label><input type="text" name="receipt_no" value={voucherForm.receipt_no} onChange={handleVoucherChange} className="form-input" placeholder="Optional" /></div>
+              </div>
+              <div className="form-grid two-col">
                 <div className="form-group"><label>Amount (LKR) <span className="required">*</span></label><input type="number" name="amount" value={voucherForm.amount} onChange={handleVoucherChange} required min="0.01" step="0.01" className="form-input amount-input" placeholder="0.00" /></div>
               </div>
               <div className="form-grid two-col">
@@ -491,7 +530,8 @@ const PettyCash = () => {
               <div className="form-actions">
                 <button type="button" onClick={isEditing ? handleCancelEdit : () => {
                   const jh = companies.find(c => (c.name || '').toUpperCase() === 'JH');
-                  setVoucherForm({ date: new Date().toISOString().split('T')[0], voucher_number: '', employee_name: '', payee_name: '', expense_type: '', description: '', vehicle_number: '', amount: '', receipt_no: '', company_id: jh ? String(jh.id) : '' });
+                  setSubExpenseTypes([]);
+                  setVoucherForm({ date: new Date().toISOString().split('T')[0], voucher_number: '', employee_name: '', payee_name: '', expense_type_id: '', expense_type: '', sub_expense_type_id: '', sub_expense_type: '', description: '', vehicle_number: '', amount: '', receipt_no: '', company_id: jh ? String(jh.id) : '' });
                 }} className="btn-secondary" disabled={isLoading}><FontAwesomeIcon icon={faTimes} /> {isEditing ? 'Cancel' : 'Clear'}</button>
                 <button type="submit" className="btn-primary" disabled={isLoading}><FontAwesomeIcon icon={isLoading ? faSpinner : faSave} spin={isLoading} /> {isLoading ? (isEditing ? 'Updating...' : 'Submitting...') : (isEditing ? 'Update Voucher' : 'Submit Voucher')}</button>
               </div>
@@ -538,6 +578,7 @@ const PettyCash = () => {
                     <th>Voucher No.</th>
                     <th>Payee</th>
                     <th>Expense Type</th>
+                    <th>Sub Expense Type</th>
                     <th>Debits</th>
                     <th>Credits</th>
                     <th>Balance</th>
@@ -556,6 +597,7 @@ const PettyCash = () => {
                           <td className="voucher-number">{t.reference_number}</td>
                           <td>{isReimbursement ? '-' : t.payee_name}</td>
                           <td>{isReimbursement ? 'Reimbursement' : t.expense_type}</td>
+                          <td>{isReimbursement ? '-' : (t.sub_expense_type || '-')}</td>
                           <td className="amount-cell">{t.debit > 0 ? formatCurrency(t.debit) : '-'}</td>
                           <td className="amount-cell">{t.credit > 0 ? formatCurrency(t.credit) : '-'}</td>
                           <td className="amount-cell"><strong>{formatCurrency(t.balance)}</strong></td>

@@ -12,6 +12,7 @@ const { recordBankTransaction, recordCashTransaction, calculateRunningBalances }
 const { checkDuplicateReference, DuplicateReferenceError } = require('../services/referenceValidationService');
 const { getActiveBankAccounts } = require('../services/bankAccountService');
 const { isRmAdjustmentRequest, recordFinancialAdjustment, sameValue } = require('../utils/rmAdjustmentAudit');
+const { resolveExpenseClassification, ExpenseClassificationError } = require('../utils/expenseClassification');
 
 router.use(authenticate, restrictRoles('Store Keeper', 'Stores'));
 
@@ -110,6 +111,9 @@ router.get('/petty-cash/vouchers', async (req, res) => {
         v.employee_name, 
         v.payee_name as payee, 
         v.expense_type, 
+        v.expense_type_id,
+        v.sub_expense_type_id,
+        v.sub_expense_type,
         v.description, 
         v.vehicle_number, 
         v.amount,
@@ -228,6 +232,9 @@ router.get('/petty-cash/transactions', async (req, res) => {
          v.employee_name,
          v.payee_name,
          v.expense_type,
+         v.expense_type_id,
+         v.sub_expense_type_id,
+         v.sub_expense_type,
          v.description,
          v.vehicle_number,
          v.receipt_no,
@@ -278,6 +285,9 @@ router.get('/petty-cash/transactions', async (req, res) => {
       employee_name: t.employee_name,
       payee_name: t.payee_name,
       expense_type: t.expense_type,
+      expense_type_id: t.expense_type_id,
+      sub_expense_type_id: t.sub_expense_type_id,
+      sub_expense_type: t.sub_expense_type,
       description: t.description,
       vehicle_number: t.vehicle_number,
       receipt_no: t.receipt_no,
@@ -303,6 +313,8 @@ router.post('/petty-cash/voucher', authenticate, async (req, res) => {
     employee_name, 
     payee_name, 
     expense_type, 
+    expense_type_id,
+    sub_expense_type_id,
     description, 
     vehicle_number, 
     amount,
@@ -312,7 +324,7 @@ router.post('/petty-cash/voucher', authenticate, async (req, res) => {
   
   const userId = req.user.userId;
 
-  if (!voucher_number || !voucher_date || !payee_name || !expense_type || !amount) {
+  if (!voucher_number || !voucher_date || !payee_name || !(expense_type || expense_type_id) || !amount) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
   // Petty Cash is tracked entirely inside the Petty Cash module. The company
@@ -335,21 +347,29 @@ router.post('/petty-cash/voucher', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'Selected Company is not valid' });
     }
 
+    // Expenses Type / Sub Expenses Type come from Expenses Type Management;
+    // the stored names are taken from those tables, not from the request.
+    const classification = await resolveExpenseClassification(connection, { expense_type, expense_type_id, sub_expense_type_id });
+
     // A Petty Cash voucher is paid out of the petty cash float the moment it
     // is submitted, so it is stored as Paid (also what the Expenses Report
     // shows). Nothing is posted to the main Cash Ledger.
     const [result] = await connection.query(
       `INSERT INTO petty_cash_vouchers 
        (voucher_number, voucher_date, employee_name, payee_name, company_id,
-        expense_type, description, vehicle_number, amount, receipt_no, created_by, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Paid')`,
+        expense_type, expense_type_id, sub_expense_type_id, sub_expense_type,
+        description, vehicle_number, amount, receipt_no, created_by, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Paid')`,
       [
         voucher_number, 
         voucher_date, 
         employee_name || null, 
         payee_name, 
         company_id,
-        expense_type, 
+        classification.expenseTypeName,
+        classification.expenseTypeId,
+        classification.subExpenseTypeId,
+        classification.subExpenseTypeName,
         description || null, 
         vehicle_number || null, 
         amount,
@@ -368,7 +388,9 @@ router.post('/petty-cash/voucher', authenticate, async (req, res) => {
   } catch (error) {
     await connection.rollback();
     console.error('Error creating voucher:', error);
-    if (error.code === 'ER_DUP_ENTRY' || error.name === 'DuplicateReferenceError') {
+    if (error instanceof ExpenseClassificationError) {
+      res.status(400).json({ error: error.message });
+    } else if (error.code === 'ER_DUP_ENTRY' || error.name === 'DuplicateReferenceError') {
       res.status(400).json({ error: error.name === 'DuplicateReferenceError' ? error.message : 'Voucher number already exists' });
     } else if (error.name === 'InsufficientBalanceError') {
       res.status(400).json({ error: error.message });
@@ -391,6 +413,8 @@ router.put('/petty-cash/voucher/:id', authenticate, async (req, res) => {
     employee_name, 
     payee_name, 
     expense_type, 
+    expense_type_id,
+    sub_expense_type_id,
     description, 
     vehicle_number, 
     amount,
@@ -399,7 +423,7 @@ router.put('/petty-cash/voucher/:id', authenticate, async (req, res) => {
   
   const userId = req.user.userId;
 
-  if (!voucher_number || !voucher_date || !payee_name || !expense_type || !amount) {
+  if (!voucher_number || !voucher_date || !payee_name || !(expense_type || expense_type_id) || !amount) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
@@ -416,14 +440,20 @@ router.put('/petty-cash/voucher/:id', authenticate, async (req, res) => {
     }
 
     const old = oldRows[0];
+    const classification = await resolveExpenseClassification(
+      connection, { expense_type, expense_type_id, sub_expense_type_id }, old
+    );
     const updated = { ...old, voucher_number, voucher_date, employee_name: employee_name || null, payee_name,
-      expense_type, description: description || null, vehicle_number: vehicle_number || null,
+      expense_type: classification.expenseTypeName, expense_type_id: classification.expenseTypeId,
+      sub_expense_type_id: classification.subExpenseTypeId, sub_expense_type: classification.subExpenseTypeName,
+      description: description || null, vehicle_number: vehicle_number || null,
       amount, receipt_no: receipt_no || null };
     const changed = Object.keys(updated).some((key) => !sameValue(old[key], updated[key]));
     await connection.query(
       `UPDATE petty_cash_vouchers 
        SET voucher_number = ?, voucher_date = ?, employee_name = ?, payee_name = ?, 
-           expense_type = ?, description = ?, vehicle_number = ?, 
+           expense_type = ?, expense_type_id = ?, sub_expense_type_id = ?, sub_expense_type = ?,
+           description = ?, vehicle_number = ?, 
            amount = ?, receipt_no = ?, updated_by = ?
        WHERE id = ?`,
       [
@@ -431,7 +461,10 @@ router.put('/petty-cash/voucher/:id', authenticate, async (req, res) => {
         voucher_date, 
         employee_name || null, 
         payee_name, 
-        expense_type, 
+        classification.expenseTypeName,
+        classification.expenseTypeId,
+        classification.subExpenseTypeId,
+        classification.subExpenseTypeName,
         description || null, 
         vehicle_number || null, 
         amount, 
@@ -455,7 +488,9 @@ router.put('/petty-cash/voucher/:id', authenticate, async (req, res) => {
   } catch (error) {
     await connection.rollback();
     console.error('Error updating voucher:', error);
-    if (error.code === 'ER_DUP_ENTRY' || error.name === 'DuplicateReferenceError') {
+    if (error instanceof ExpenseClassificationError) {
+      res.status(400).json({ error: error.message });
+    } else if (error.code === 'ER_DUP_ENTRY' || error.name === 'DuplicateReferenceError') {
       res.status(400).json({ error: error.name === 'DuplicateReferenceError' ? error.message : 'Voucher number already exists' });
     } else {
       res.status(500).json({ error: 'Failed to update voucher' });

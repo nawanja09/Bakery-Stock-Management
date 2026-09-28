@@ -105,12 +105,14 @@ const CATEGORY_CONFIG = {
       { key: 'date', label: 'Date', format: (v) => (v ? new Date(v).toLocaleDateString() : '-') },
       { key: 'payee', label: 'Payee' },
       { key: 'expense_type', label: 'Expense Type' },
+      { key: 'sub_expense_type', label: 'Sub Expense Type' },
       { key: 'amount', label: 'Amount', format: (v) => `Rs. ${parseFloat(v || 0).toFixed(2)}` },
     ],
     matches: (row, term) =>
       row.voucher_number?.toLowerCase().includes(term) ||
       row.payee?.toLowerCase().includes(term) ||
-      row.expense_type?.toLowerCase().includes(term),
+      row.expense_type?.toLowerCase().includes(term) ||
+      row.sub_expense_type?.toLowerCase().includes(term),
     Editor: PettyCashVoucherAdjustmentEditor,
   },
   'Expense Bill': {
@@ -126,13 +128,15 @@ const CATEGORY_CONFIG = {
       { key: 'bill_date', label: 'Date', format: (v) => (v ? new Date(v).toLocaleDateString() : '-') },
       { key: 'payee_name', label: 'Payee' },
       { key: 'expense_type', label: 'Expense Type' },
+      { key: 'sub_expense_type', label: 'Sub Expense Type' },
       { key: 'total_bill_amount', label: 'Total', format: (v) => `Rs. ${parseFloat(v || 0).toFixed(2)}` },
       { key: 'payment_status', label: 'Status' },
     ],
     matches: (row, term) =>
       row.bill_number?.toLowerCase().includes(term) ||
       row.payee_name?.toLowerCase().includes(term) ||
-      row.expense_type?.toLowerCase().includes(term),
+      row.expense_type?.toLowerCase().includes(term) ||
+      row.sub_expense_type?.toLowerCase().includes(term),
     // Editable for both Paid and Non-Paid bills - see server/routes/newExpenseRoutes.js
     // PUT /:id, which now allows edits regardless of paid_amount.
     Editor: ExpenseBillAdjustmentEditor,
