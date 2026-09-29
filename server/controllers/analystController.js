@@ -1,6 +1,6 @@
 const pool = require('../config/db');
 
-const VALID_METHODS = new Set(['all', 'petty_cash', 'bank_charges', 'purchasing', 'other_expenses']);
+const VALID_METHODS = new Set(['all', 'petty_cash', 'bank_charges', 'cash_expenses', 'hidden_expenses', 'purchasing', 'other_expenses']);
 const isValidDate = (value) => /^\d{4}-\d{2}-\d{2}$/.test(value || '') && !Number.isNaN(Date.parse(`${value}T00:00:00Z`));
 const dateFilters = (fromDate, toDate) => {
   if (fromDate && !isValidDate(fromDate)) throw new Error('Invalid from date');
@@ -82,17 +82,31 @@ const getExpenses = async (req, res) => {
     // as 2026-09-19T18:30:00Z and shown as the 19th).
     const day = (column) => `DATE_FORMAT(${column}, '%Y-%m-%d')`;
 
+    // Every source below is a distinct "id" namespace (each table restarts at
+    // 1), so the frontend key and the sort tiebreak both use a per-method
+    // composite id ("petty_cash-14"), not the raw row id.
     if (method === 'all' || method === 'petty_cash') {
-      sources.push({ sql: `SELECT pv.id, ${day('pv.voucher_date')} AS date, pv.voucher_number AS reference, 'Petty Cash' AS expense_method, COALESCE(pv.description, pv.expense_type, '') AS description, 'Petty Cash' AS payment_source, pv.amount FROM petty_cash_vouchers pv WHERE COALESCE(pv.status, '') NOT IN ('Cancelled', 'Deleted', 'Voided')${range('pv.voucher_date')}`, params: rangeParams() });
+      // Match the Petty Cash voucher source: include every stored voucher and
+      // report its status as data instead of filtering it out here.
+      sources.push({ sql: `SELECT pv.id, ${day('pv.voucher_date')} AS date, pv.voucher_number AS reference, 'Petty Cash' AS expense_method, pv.expense_type, pv.sub_expense_type, COALESCE(pv.description, '') AS description, 'Petty Cash' AS payment_source, pv.amount, COALESCE(pv.status, 'Pending') AS status, pv.company_id, comp.name AS company_name FROM petty_cash_vouchers pv LEFT JOIN company comp ON comp.id = pv.company_id WHERE 1 = 1${range('pv.voucher_date')}`, params: rangeParams() });
     }
     if (method === 'all' || method === 'bank_charges') {
-      sources.push({ sql: `SELECT bc.id, ${day('bc.charge_date')} AS date, bc.reference_number AS reference, 'Bank Charges' AS expense_method, COALESCE(bc.charges_type, '') AS description, COALESCE(bc.bank_name, 'Bank Account') AS payment_source, bc.amount FROM bank_charges bc WHERE 1 = 1${range('bc.charge_date')}`, params: rangeParams() });
+      sources.push({ sql: `SELECT bc.id, ${day('bc.charge_date')} AS date, bc.reference_number AS reference, 'Bank Charges' AS expense_method, bc.charges_type AS expense_type, NULL AS sub_expense_type, COALESCE(bc.description, '') AS description, COALESCE(bc.bank_name, 'Bank Account') AS payment_source, bc.amount, 'Recorded' AS status, bc.company_id, comp.name AS company_name FROM bank_charges bc LEFT JOIN company comp ON comp.id = bc.company_id WHERE 1 = 1${range('bc.charge_date')}`, params: rangeParams() });
+    }
+    if (method === 'all' || method === 'cash_expenses') {
+      sources.push({ sql: `SELECT ce.id, ${day('ce.expense_date')} AS date, ce.voucher_number AS reference, 'Cash Expenses' AS expense_method, ce.expense_type, ce.sub_expense_type, COALESCE(ce.description, '') AS description, 'Cash Expense' AS payment_source, ce.amount, 'Recorded' AS status, ce.company_id, comp.name AS company_name FROM cash_expenses ce LEFT JOIN company comp ON comp.id = ce.company_id WHERE ce.status = 1${range('ce.expense_date')}`, params: rangeParams() });
     }
     if (method === 'all' || method === 'other_expenses') {
-      sources.push({ sql: `SELECT e.id, ${day('e.bill_date')} AS date, COALESCE(e.bill_number, CONCAT('EXP-', e.id)) AS reference, 'Other Expenses' AS expense_method, COALESCE(e.description, e.expense_type, '') AS description, COALESCE(e.payee_name, 'Other Expense') AS payment_source, e.total_bill_amount AS amount FROM expenses e WHERE e.is_deleted = 0${range('e.bill_date')}`, params: rangeParams() });
+      sources.push({ sql: `SELECT e.id, ${day('e.bill_date')} AS date, COALESCE(e.bill_number, CONCAT('EXP-', e.id)) AS reference, 'Other Expenses' AS expense_method, e.expense_type, e.sub_expense_type, COALESCE(e.description, '') AS description, COALESCE(e.payee_name, 'Other Expense') AS payment_source, e.total_bill_amount AS amount, COALESCE(e.payment_status, 'Recorded') AS status, e.company_id, comp.name AS company_name FROM expenses e LEFT JOIN company comp ON comp.id = e.company_id WHERE e.is_deleted = 0${range('e.bill_date')}`, params: rangeParams() });
+    }
+    // Hidden Expenses are report-only (PickMe / Credit Card Charge): they
+    // never post to a ledger, but they are still real expenses and must be
+    // included here, not just in the dedicated Expenses Report.
+    if (method === 'all' || method === 'hidden_expenses') {
+      sources.push({ sql: `SELECT he.id, ${day('he.expense_date')} AS date, COALESCE(he.reference_number, '') AS reference, 'Hidden Expenses' AS expense_method, he.type AS expense_type, NULL AS sub_expense_type, COALESCE(he.description, '') AS description, 'Hidden Expense' AS payment_source, he.amount, 'Hidden' AS status, he.company_id, comp.name AS company_name FROM hidden_expenses he LEFT JOIN company comp ON comp.id = he.company_id WHERE he.is_deleted = 0${range('he.expense_date')}`, params: rangeParams() });
     }
     if (method === 'all' || method === 'purchasing') {
-      sources.push({ sql: `SELECT p.id, ${day('p.purchase_date')} AS date, COALESCE(p.invoice_no, CONCAT('PUR-', p.id)) AS reference, 'Purchasing' AS expense_method, COALESCE(s.name, 'Purchase') AS description, COALESCE(p.payment_method, 'Purchasing') AS payment_source, COALESCE(NULLIF(p.total_with_vat, 0), p.bill_amount, 0) AS amount FROM purchases p LEFT JOIN supplier s ON s.id = p.supplier_id WHERE COALESCE(p.deleted, 0) = 0 AND COALESCE(p.status, 1) = 1${range('p.purchase_date')}`, params: rangeParams() });
+      sources.push({ sql: `SELECT p.id, ${day('p.purchase_date')} AS date, COALESCE(p.invoice_no, CONCAT('PUR-', p.id)) AS reference, 'Purchasing' AS expense_method, 'Purchasing' AS expense_type, NULL AS sub_expense_type, COALESCE(s.name, 'Purchase') AS description, COALESCE(p.payment_method, 'Purchasing') AS payment_source, COALESCE(NULLIF(p.total_with_vat, 0), p.bill_amount, 0) AS amount, COALESCE(p.payment_status, 'Recorded') AS status, p.company_id, comp.name AS company_name FROM purchases p LEFT JOIN supplier s ON s.id = p.supplier_id LEFT JOIN company comp ON comp.id = p.company_id WHERE COALESCE(p.deleted, 0) = 0 AND COALESCE(p.status, 1) = 1${range('p.purchase_date')}`, params: rangeParams() });
     }
 
     const records = [];
@@ -100,7 +114,12 @@ const getExpenses = async (req, res) => {
       const [rows] = await pool.query(source.sql, source.params);
       records.push(...rows);
     }
-    records.sort((a, b) => String(a.date).localeCompare(String(b.date)) || Number(a.id) - Number(b.id));
+    // Each source restarts its own id sequence at 1, so the tiebreak for
+    // same-day rows is scoped by expense_method + id, not the raw id alone.
+    records.sort((a, b) =>
+      String(a.date).localeCompare(String(b.date)) ||
+      `${a.expense_method}-${a.id}`.localeCompare(`${b.expense_method}-${b.id}`)
+    );
     res.json({ records, totalExpenses: records.reduce((sum, row) => sum + number(row.amount), 0), transactionCount: records.length, method });
   } catch (error) {
     const status = error.message.startsWith('Invalid') || error.message.includes('cannot be') ? 400 : 500;

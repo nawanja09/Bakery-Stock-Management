@@ -7,7 +7,8 @@ import { formatCurrency } from '../../utils/formatters';
 import './AnalystPage.css';
 
 const METHODS = [
-  ['all', 'All'], ['petty_cash', 'Petty Cash'], ['bank_charges', 'Bank Charges'],
+  ['all', 'All'], ['petty_cash', 'Petty Cash'], ['cash_expenses', 'Cash Expenses'],
+  ['bank_charges', 'Bank Charges'], ['hidden_expenses', 'Hidden Expenses'],
   ['purchasing', 'Purchasing'], ['other_expenses', 'Other Expenses']
 ];
 const COMPANIES = [
@@ -229,8 +230,12 @@ const AnalystPage = () => {
                 ) : (
                   <>
                     <th>Expense Method</th>
+                    <th>Expense Type</th>
+                    <th>Sub Expense Type</th>
+                    <th>Company</th>
+                    <th>Payment Type</th>
                     <th>Description</th>
-                    <th>Payment Source</th>
+                    <th>Status</th>
                   </>
                 )}
                 <th className="analyst-amount">Amount</th>
@@ -249,15 +254,19 @@ const AnalystPage = () => {
                   ) : (
                     <>
                       <td><span className="analyst-badge">{record.expense_method}</span></td>
-                      <td>{record.description || '-'}</td>
+                      <td>{record.expense_type || '-'}</td>
+                      <td>{record.sub_expense_type || '-'}</td>
+                      <td>{record.company_name || '-'}</td>
                       <td>{record.payment_source || '-'}</td>
+                      <td>{record.description || '-'}</td>
+                      <td>{record.status || '-'}</td>
                     </>
                   )}
                   <td className="analyst-amount">{formatCurrency(record.amount)}</td>
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan={isIncome ? 5 : 6} className="analyst-empty">
+                  <td colSpan={isIncome ? 5 : 10} className="analyst-empty">
                     {isIncome ? 'No income records found for the selected filters.' : 'No expense records found for the selected filters.'}
                   </td>
                 </tr>
