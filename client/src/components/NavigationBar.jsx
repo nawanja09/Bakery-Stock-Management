@@ -429,7 +429,7 @@ const NavigationBar = () => {
   const renderAdjustmentsContent = () => (
     <>
       <li><NavLink to="/adjustments/stores-balance" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faWarehouse} /></span><span>Adjustments</span></NavLink></li>
-      <li><NavLink to="/adjustments/stores-adjustments" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faTools} /></span><span>Adjustment Summary Report</span></NavLink></li>
+      <li><NavLink to="/adjustments/stores-adjustments" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faTools} /></span><span>Adjustment Summary</span></NavLink></li>
       <li><NavLink to="/adjustments/inhand" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faHandHoldingDollar} /></span><span>Inhand (Cash / Cheque)</span></NavLink></li>
     </>
   );
