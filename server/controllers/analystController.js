@@ -49,7 +49,7 @@ const getIncomes = async (req, res) => {
       JOIN company c ON c.id = i.company_id
       JOIN departments d ON d.id = i.department_id
       WHERE ${clauses.join(' AND ')}
-      ORDER BY i.income_date DESC, i.id DESC
+      ORDER BY i.income_date ASC, i.id ASC
     `, params);
     const records = rows.map(row => ({ ...row, amount: number(row.amount) }));
     res.json({
@@ -100,7 +100,7 @@ const getExpenses = async (req, res) => {
       const [rows] = await pool.query(source.sql, source.params);
       records.push(...rows);
     }
-    records.sort((a, b) => String(b.date).localeCompare(String(a.date)) || Number(b.id) - Number(a.id));
+    records.sort((a, b) => String(a.date).localeCompare(String(b.date)) || Number(a.id) - Number(b.id));
     res.json({ records, totalExpenses: records.reduce((sum, row) => sum + number(row.amount), 0), transactionCount: records.length, method });
   } catch (error) {
     const status = error.message.startsWith('Invalid') || error.message.includes('cannot be') ? 400 : 500;

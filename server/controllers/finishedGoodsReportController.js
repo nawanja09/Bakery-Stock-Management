@@ -41,7 +41,7 @@ const getProductionReport = async (req, res) => {
 
     query += `
       GROUP BY p.id
-      ORDER BY p.production_date DESC, p.created_at DESC
+      ORDER BY p.production_date ASC, p.created_at ASC, p.id ASC
     `;
 
     const [rows] = await pool.query(query, params);
@@ -99,7 +99,7 @@ const getWastageReport = async (req, res) => {
 
     query += `
       GROUP BY w.id
-      ORDER BY w.date DESC, w.created_at DESC
+      ORDER BY w.date ASC, w.created_at ASC, w.id ASC
     `;
 
     const [rows] = await pool.query(query, params);
@@ -152,7 +152,7 @@ const getTransferReport = async (req, res) => {
 
     query += `
       GROUP BY t.id
-      ORDER BY t.transfer_date DESC, t.created_at DESC
+      ORDER BY t.transfer_date ASC, t.created_at ASC, t.id ASC
     `;
 
     const [rows] = await pool.query(query, params);
