@@ -17,7 +17,6 @@ const formatPaymentMethod = (method) => {
   if (upper === 'BANK_TRANSFER' || upper === 'BANK') return 'Bank Transfer';
   if (upper === 'CHEQUE') return 'Cheque';
   if (upper === 'CREDIT') return 'Credit';
-  if (upper === 'CREDIT_CARD') return 'Credit Card';
   return val.replace(/_/g, ' ');
 };
 
@@ -27,21 +26,8 @@ const getPaymentMethodBadgeClass = (method) => {
   if (upper === 'CASH') return 'pm-badge pm-badge--cash';
   if (upper === 'BANK_TRANSFER' || upper === 'BANK') return 'pm-badge pm-badge--bank';
   if (upper === 'CHEQUE') return 'pm-badge pm-badge--cheque';
-  if (upper === 'CREDIT' || upper === 'CREDIT_CARD') return 'pm-badge pm-badge--credit';
+  if (upper === 'CREDIT') return 'pm-badge pm-badge--credit';
   return 'pm-badge pm-badge--default';
-};
-
-// The API returns the invoice's payment method(s) exactly as saved on its
-// payment record(s) (the same ones Purchase Details lists). Nothing is defaulted
-// here: show what was returned. An invoice paid with several methods has several.
-const getInvoiceMethods = (inv) => {
-  if (Array.isArray(inv.payment_methods) && inv.payment_methods.length > 0) return inv.payment_methods;
-  return inv.payment_method && inv.payment_method !== 'N/A' ? [inv.payment_method] : [];
-};
-
-const formatInvoicePaymentMethods = (inv) => {
-  const methods = getInvoiceMethods(inv);
-  return methods.length > 0 ? methods.map(formatPaymentMethod).join(', ') : 'N/A';
 };
 
 const PurchaseReport = () => {
@@ -66,7 +52,7 @@ const PurchaseReport = () => {
 
   // Sorting
   const [sortField, setSortField] = useState('invoice_date');
-  const [sortDirection, setSortDirection] = useState('desc');
+  const [sortDirection, setSortDirection] = useState('asc');
 
   // Load Company / Supplier / Payment Method dropdown options once on mount
   useEffect(() => {
@@ -247,7 +233,7 @@ const PurchaseReport = () => {
         (inv.invoice_date || inv.purchase_date) ? format(new Date(inv.invoice_date || inv.purchase_date), 'yyyy-MM-dd') : 'N/A',
         inv.company_name || 'N/A',
         inv.supplier_name || 'N/A',
-        formatInvoicePaymentMethods(inv),
+        formatPaymentMethod(inv.payment_method),
         toPurchasingExportNumber(inv.total_amount || 0)
       ]);
     });
@@ -404,11 +390,7 @@ const PurchaseReport = () => {
                     <td className="report-table-date">{(inv.invoice_date || inv.purchase_date) ? format(new Date(inv.invoice_date || inv.purchase_date), 'MMM dd, yyyy') : 'N/A'}</td>
                     <td>{inv.company_name || 'N/A'}</td>
                     <td>{inv.supplier_name || 'N/A'}</td>
-                    <td>
-                      {getInvoiceMethods(inv).length > 0 ? getInvoiceMethods(inv).map((method) => (
-                        <span key={method} className={getPaymentMethodBadgeClass(method)} style={{ marginRight: 4 }}>{formatPaymentMethod(method)}</span>
-                      )) : <span className={getPaymentMethodBadgeClass('N/A')}>N/A</span>}
-                    </td>
+                    <td><span className={getPaymentMethodBadgeClass(inv.payment_method)}>{formatPaymentMethod(inv.payment_method)}</span></td>
                     <td className="report-table-value-numeric">{formatPurchasingCurrency(inv.total_amount)}</td>
                   </tr>
                 ))}

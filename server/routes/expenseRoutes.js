@@ -184,7 +184,8 @@ router.get('/petty-cash/reimbursements', async (req, res) => {
 //   from_date / to_date (YYYY-MM-DD) - return every transaction in the range
 //                                      (any limit is ignored)
 //   limit                            - only used when NO date range is given
-//                                      (the page sends 10 -> latest 10 rows)
+//                                      (the page sends 10 -> latest 10 rows,
+//                                      displayed oldest-to-newest)
 // The running balance is always calculated over the FULL history first and
 // only then filtered, so a row's balance is the true petty cash balance at
 // that point - not one that restarts from zero inside the selected range.
@@ -263,12 +264,10 @@ router.get('/petty-cash/transactions', async (req, res) => {
       (!fromDate || t.date >= fromDate) && (!toDate || t.date <= toDate)
     );
 
-    // Most recent transaction first, matching every other table on this page.
-    visible = visible.slice().reverse();
-
-    // No date range -> latest N only. A date range always returns everything.
+    // No date range -> select the latest N, then retain chronological order
+    // for display. A date range always returns everything, oldest first.
     if (!hasRange && Number.isInteger(limit) && limit > 0) {
-      visible = visible.slice(0, limit);
+      visible = visible.slice(-limit);
     }
 
     const transactions = visible.map((t) => ({

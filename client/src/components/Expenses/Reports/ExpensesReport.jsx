@@ -37,7 +37,7 @@ const ExpensesReport = () => {
 
   // Sorting
   const [sortField, setSortField] = useState('date');
-  const [sortDirection, setSortDirection] = useState('desc');
+  const [sortDirection, setSortDirection] = useState('asc');
 
   // Load Company / Payee dropdown options once on mount
   useEffect(() => {

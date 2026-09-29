@@ -31,7 +31,7 @@ const DepartmentReturnItemWiseReport = () => {
     departmentId: 'all',
     searchTerm: '',
     sortBy: 'return_date',
-    sortOrder: 'DESC'
+    sortOrder: 'ASC'
   });
 
   // Pagination
@@ -90,13 +90,13 @@ const DepartmentReturnItemWiseReport = () => {
       departmentId: 'all',
       searchTerm: '',
       sortBy: 'return_date',
-      sortOrder: 'DESC'
+      sortOrder: 'ASC'
     });
     setTimeout(() => generateReport(), 100);
   };
 
   const handleSort = (sortBy) => {
-    const newSortOrder = filters.sortBy === sortBy && filters.sortOrder === 'DESC' ? 'ASC' : 'DESC';
+    const newSortOrder = filters.sortBy === sortBy && filters.sortOrder === 'ASC' ? 'DESC' : 'ASC';
     setFilters(prev => ({
       ...prev,
       sortBy,

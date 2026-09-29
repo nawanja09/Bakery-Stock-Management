@@ -11,7 +11,7 @@ const ALLOWED_COMPANY_NAMES = ['JH', 'RD'];
 const initialFilters = { fromDate: '', toDate: '', departmentId: 'all', companyId: 'all' };
 const formatDate = (value) => (value ? new Date(`${value}T00:00:00`).toLocaleDateString('en-GB') : '-');
 const sortRecords = (records) => [...records].sort((a, b) => (
-  b.income_date.localeCompare(a.income_date) || Number(b.id) - Number(a.id)
+  a.income_date.localeCompare(b.income_date) || Number(a.id) - Number(b.id)
 ));
 
 const AnalystIncomePage = () => {

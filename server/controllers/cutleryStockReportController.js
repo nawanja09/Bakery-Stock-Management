@@ -498,7 +498,7 @@ const getStockReportByAsset = async (req, res) => {
         WHERE cdi.asset_id = ?
         AND DATE(cd.damage_date) <= ?
       )
-      ORDER BY date DESC
+      ORDER BY date ASC
     `, [asset_id, targetDateStr, asset_id, targetDateStr, asset_id, targetDateStr]);
     
     // Calculate stock at each location
