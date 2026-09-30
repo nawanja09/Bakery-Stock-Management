@@ -5,6 +5,7 @@ import FgMarginChart from './FgMarginChart';
 import TopItemsChart from './TopItemsChart';
 import './Dashboard.css';
 import api from '../api';
+import usePermissions from '../hooks/usePermissions';
 import { formatNumber } from '../utils/formatters';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -32,16 +33,6 @@ const emptyChartData = {
   issuesVsWastageData: { labels: [], issues: [], wastage: [] }
 };
 
-const getUserRole = () => {
-  const storedUser = localStorage.getItem('user');
-  if (!storedUser) return null;
-  try {
-    return JSON.parse(storedUser).role;
-  } catch (e) {
-    return null;
-  }
-};
-
 const formatDateInput = date => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -61,9 +52,9 @@ const getPeriodDates = period => {
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const userRole = getUserRole();
-  const canSeeFinance = userRole === 'Admin' || userRole === 'Accountant';
-  const canRecordActivity = userRole !== 'View Only';
+  // Role rules live in config/rolePermissions.js (single source of truth).
+  const { canWrite: canRecordActivity, canAccessPath, hasModule } = usePermissions();
+  const canSeeFinance = hasModule('finance');
 
   const [overview, setOverview] = useState(emptyOverview);
   const [chartData, setChartData] = useState(emptyChartData);
@@ -156,6 +147,7 @@ const Dashboard = () => {
       value: overview.lowStock.count,
       icon: faTriangleExclamation,
       tone: overview.lowStock.count > 0 ? 'danger' : 'success',
+      path: '/items',
       onClick: () => navigate('/items')
     },
     {
@@ -165,6 +157,7 @@ const Dashboard = () => {
       sub: `Rs. ${formatNumber(overview.purchases7d.totalAmount, 0, 0)}`,
       icon: faTruckLoading,
       tone: 'primary',
+      path: '/purchase/history',
       onClick: () => navigate('/purchase/history')
     },
     canSeeFinance && {
@@ -174,6 +167,7 @@ const Dashboard = () => {
       sub: `Rs. ${formatNumber(overview.pendingPayments.totalAmount, 0, 0)}`,
       icon: faMoneyCheckDollar,
       tone: overview.pendingPayments.count > 0 ? 'warning' : 'success',
+      path: '/purchase/non-paid',
       onClick: () => navigate('/purchase/non-paid')
     },
     {
@@ -182,6 +176,7 @@ const Dashboard = () => {
       value: overview.issues7d,
       icon: faArrowRightArrowLeft,
       tone: 'info',
+      path: '/issuance/history',
       onClick: () => navigate('/issuance/history')
     },
     {
@@ -190,6 +185,7 @@ const Dashboard = () => {
       value: wastageTotal7d,
       icon: faTrash,
       tone: wastageTotal7d > 0 ? 'warning' : 'success',
+      path: '/wastage/history',
       onClick: () => navigate('/wastage/history')
     },
     {
@@ -199,9 +195,10 @@ const Dashboard = () => {
       sub: `${formatNumber(overview.production7d.totalUnits)} units`,
       icon: faIndustry,
       tone: 'primary',
+      path: '/finished-goods/production',
       onClick: () => navigate('/finished-goods/production')
     }
-  ].filter(Boolean);
+  ].filter((card) => card && canAccessPath(card.path));
 
   const quickActions = [
     { label: 'New Purchase', icon: faTruckLoading, path: '/purchase/new' },
@@ -266,7 +263,7 @@ const Dashboard = () => {
             </div>
           </div>
           <div className="quick-actions-row">
-            {quickActions.map(action => (
+            {quickActions.filter(action => canAccessPath(action.path)).map(action => (
               <button
                 type="button"
                 key={action.label}

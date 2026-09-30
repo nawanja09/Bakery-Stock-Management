@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
 const authenticate = require('../middleware/authenticate');
-const restrictRoles = require('../middleware/restrictRoles');
 
 // Fetch all bank charge types
 router.get('/', authenticate, async (req, res) => {
@@ -18,7 +17,7 @@ router.get('/', authenticate, async (req, res) => {
 });
 
 // Create a new bank charge type
-router.post('/', authenticate, restrictRoles('Admin', 'Accountant', 'Manager'), async (req, res) => {
+router.post('/', authenticate, async (req, res) => {
   const { type_name } = req.body;
   if (!type_name || !type_name.trim()) {
     return res.status(400).json({ error: 'Type name is required' });
@@ -50,7 +49,7 @@ router.post('/', authenticate, restrictRoles('Admin', 'Accountant', 'Manager'), 
 });
 
 // Update a bank charge type
-router.put('/:id', authenticate, restrictRoles('Admin', 'Accountant', 'Manager'), async (req, res) => {
+router.put('/:id', authenticate, async (req, res) => {
   const { id } = req.params;
   const { type_name } = req.body;
 
@@ -85,7 +84,7 @@ router.put('/:id', authenticate, restrictRoles('Admin', 'Accountant', 'Manager')
 });
 
 // Delete (soft delete) a bank charge type
-router.delete('/:id', authenticate, restrictRoles('Admin', 'Accountant', 'Manager'), async (req, res) => {
+router.delete('/:id', authenticate, async (req, res) => {
   const { id } = req.params;
 
   try {

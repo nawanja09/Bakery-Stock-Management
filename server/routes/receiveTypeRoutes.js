@@ -5,9 +5,9 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
 const authenticate = require('../middleware/authenticate');
-const requireRoles = require('../middleware/requireRoles');
 
-const adminOrAccountant = requireRoles('Admin', 'Accountant');
+// Who may read/manage receive types is decided centrally (config/rolePermissions.js,
+// applied to all of /api by server.js): Finance module roles, QB read-only.
 
 // GET all active receive types (used by Cash Receive / Bank Receive dropdowns)
 router.get('/', authenticate, async (req, res) => {
@@ -23,7 +23,7 @@ router.get('/', authenticate, async (req, res) => {
 });
 
 // GET all receive types including inactive (for management UI)
-router.get('/all', authenticate, adminOrAccountant, async (req, res) => {
+router.get('/all', authenticate, async (req, res) => {
   try {
     const [rows] = await pool.query(
       'SELECT id, type_name, status FROM receive_types ORDER BY type_name ASC'
@@ -36,7 +36,7 @@ router.get('/all', authenticate, adminOrAccountant, async (req, res) => {
 });
 
 // POST create a new receive type
-router.post('/', authenticate, adminOrAccountant, async (req, res) => {
+router.post('/', authenticate, async (req, res) => {
   const { type_name } = req.body;
   if (!type_name || !type_name.trim()) {
     return res.status(400).json({ error: 'Type name is required' });
@@ -69,7 +69,7 @@ router.post('/', authenticate, adminOrAccountant, async (req, res) => {
 });
 
 // PUT update a receive type name
-router.put('/:id', authenticate, adminOrAccountant, async (req, res) => {
+router.put('/:id', authenticate, async (req, res) => {
   const { id } = req.params;
   const { type_name } = req.body;
 
@@ -104,7 +104,7 @@ router.put('/:id', authenticate, adminOrAccountant, async (req, res) => {
 });
 
 // DELETE (soft-delete) a receive type — sets status = 0
-router.delete('/:id', authenticate, adminOrAccountant, async (req, res) => {
+router.delete('/:id', authenticate, async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -125,7 +125,7 @@ router.delete('/:id', authenticate, adminOrAccountant, async (req, res) => {
 });
 
 // PATCH /:id/restore — re-activate a deactivated receive type
-router.patch('/:id/restore', authenticate, adminOrAccountant, async (req, res) => {
+router.patch('/:id/restore', authenticate, async (req, res) => {
   const { id } = req.params;
 
   try {

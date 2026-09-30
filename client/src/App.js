@@ -135,6 +135,7 @@ import './css/page-design-system.css';
 import './css/purchasing-page-ui.css';
 import './css/fg-finance-ui.css';
 import RouteModal from './components/common/RouteModal';
+import RouteAccessGuard from './components/common/RouteAccessGuard';
 
 const RootRedirect = () => {
   localStorage.removeItem('token');
@@ -155,80 +156,23 @@ const ProtectedRoute = ({ children }) => {
   return children;
 };
 
-const getStoredUserRole = () => {
-  try {
-    const storedUser = localStorage.getItem('user');
-    const role = storedUser ? JSON.parse(storedUser).role : null;
-    return role === 'QB' ? 'View Only' : role;
-  } catch (e) {
-    return null;
-  }
-};
-
-const isRestrictedStoreRole = (role) => {
-  if (!role) return false;
-  return role === 'Store Keeper' || role === 'Stores';
-};
-
-const isViewOnlyRole = (role) => role === 'View Only';
-
-const AnalystRoute = ({ children }) => {
+// Route wrappers. Every role rule lives in config/rolePermissions.js (the same
+// table the sidebar and the API use): a wrapper only checks that the user is
+// logged in and then asks the central rules whether this role may open the
+// current URL. The named wrappers are kept so the route table below is unchanged.
+const PermittedRoute = ({ children }) => {
   const token = localStorage.getItem('token');
   const location = useLocation();
   if (!token) return <Navigate to="/login" state={{ from: location }} replace />;
-  if (getStoredUserRole() !== 'Super Admin') return <Navigate to="/dashboard" replace />;
-  return children;
+  return <RouteAccessGuard>{children}</RouteAccessGuard>;
 };
 
-const RawMaterialRoute = ({ children }) => (
-  <RoleRoute roles={['Admin', 'Super Admin', 'Store Keeper', 'Stores', 'View Only']}>
-    {children}
-  </RoleRoute>
-);
-
-const FgProductionRoute = ({ children }) => (
-  <RoleRoute roles={['Admin', 'Super Admin', 'Accountant', 'Store Keeper', 'Stores', 'View Only']}>
-    {children}
-  </RoleRoute>
-);
-
-const RoleRoute = ({ children, roles }) => {
-  const token = localStorage.getItem('token');
-  const location = useLocation();
-  if (!token) return <Navigate to="/login" state={{ from: location }} replace />;
-  if (!roles.includes(getStoredUserRole())) return <Navigate to="/dashboard" replace />;
-  return children;
-};
-
-// Blocks direct URL navigation into the Adjustments module for restricted users
-// accounts (the API itself also rejects these requests server-side).
-const AdjustmentsRoute = ({ children }) => {
-  const token = localStorage.getItem('token');
-  const location = useLocation();
-  if (!token) return <Navigate to="/login" state={{ from: location }} replace />;
-  const role = getStoredUserRole();
-  if (role !== 'Admin' && role !== 'Super Admin') return <Navigate to="/dashboard" replace />;
-  return children;
-};
-
-// Blocks direct URL navigation into the Finance module for non-Admin/Accountant roles
-const FinanceRoute = ({ children }) => {
-  const token = localStorage.getItem('token');
-  const location = useLocation();
-  if (!token) return <Navigate to="/login" state={{ from: location }} replace />;
-  const role = getStoredUserRole();
-  if (!['Admin', 'Super Admin', 'Accountant', 'View Only'].includes(role)) return <Navigate to="/dashboard" replace />;
-  return children;
-};
-
-// Stores users cannot access the Expenses module directly.
-const ExpensesRoute = ({ children }) => {
-  const token = localStorage.getItem('token');
-  const location = useLocation();
-  if (!token) return <Navigate to="/login" state={{ from: location }} replace />;
-  if (isRestrictedStoreRole(getStoredUserRole())) return <Navigate to="/dashboard" replace />;
-  return children;
-};
+const AnalystRoute = PermittedRoute;
+const RawMaterialRoute = PermittedRoute;
+const FgProductionRoute = PermittedRoute;
+const AdjustmentsRoute = PermittedRoute;
+const FinanceRoute = PermittedRoute;
+const ExpensesRoute = PermittedRoute;
 
 const AuthCheck = () => {
   const token = localStorage.getItem('token');
@@ -273,7 +217,7 @@ function App() {
           >
             
             <Route path="dashboard" element={<Dashboard />} />
-            <Route path="purchase/new" element={<RoleRoute roles={['Admin', 'Super Admin', 'Store Keeper']}><ModalRoute title="Add New Purchase"><AddPurchase /></ModalRoute></RoleRoute>} />
+            <Route path="purchase/new" element={<PermittedRoute><ModalRoute title="Add New Purchase"><AddPurchase /></ModalRoute></PermittedRoute>} />
             <Route path="purchase/edit/:id" element={<RawMaterialRoute><ModalRoute title="Edit Purchase"><EditPurchase /></ModalRoute></RawMaterialRoute>} />
             <Route path="purchase/history" element={<RawMaterialRoute><PurchaseHistory /></RawMaterialRoute>} />
             <Route path="purchase/orders" element={<RawMaterialRoute><OrdersPage /></RawMaterialRoute>} />
@@ -282,7 +226,7 @@ function App() {
             <Route path="purchase/:id" element={<RawMaterialRoute><ModalRoute title="Purchase Details"><PurchaseDetails /></ModalRoute></RawMaterialRoute>} />
             <Route path="suppliers" element={<RawMaterialRoute><Suppliers /></RawMaterialRoute>} />
             <Route path="items/add" element={<RawMaterialRoute><ModalRoute title="Add New Item" size="medium"><AddItem /></ModalRoute></RawMaterialRoute>} />
-            <Route path="items" element={<RoleRoute roles={['Admin', 'Super Admin', 'Store Keeper', 'View Only']}><ViewItems /></RoleRoute>} />
+            <Route path="items" element={<PermittedRoute><ViewItems /></PermittedRoute>} />
             <Route path="items/edit/:id" element={<RawMaterialRoute><ModalRoute title="Edit Item" size="medium"><EditItem /></ModalRoute></RawMaterialRoute>} />
             <Route path="item-types" element={<RawMaterialRoute><ItemTypes /></RawMaterialRoute>} />
             <Route path="departments" element={<RawMaterialRoute><Departments /></RawMaterialRoute>} />
@@ -304,7 +248,7 @@ function App() {
             <Route path="reports/purchasing" element={<PurchasingReport />} />
             <Route path="reports/purchase-report" element={<PurchaseReport />} />
             <Route path="reports/wastage" element={<WastageReport />} />
-            <Route path="admin/employees" element={<RoleRoute roles={['Admin', 'Super Admin']}><EmployeeManagement /></RoleRoute>} />
+            <Route path="admin/employees" element={<PermittedRoute><EmployeeManagement /></PermittedRoute>} />
             <Route path="reports/stock/items" element={<ItemWiseStockReport/>} />
 
             <Route path="finished-goods/items/add" element={<ModalRoute title="Add New Finished Goods Item"><AddFinishedGoodsItem /></ModalRoute>} />

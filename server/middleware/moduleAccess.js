@@ -1,45 +1,29 @@
+// server/middleware/moduleAccess.js
+//
+// Per-router guards. Access rules are NOT defined here any more: every guard
+// delegates to the central RBAC table in config/rolePermissions.js (through
+// authorizeApi), so a role change only ever needs to be made in one place.
+//
+// server.js already applies `authenticate + authorizeApi` to all of /api; these
+// arrays keep each router protected on its own too (defence in depth) and keep
+// the existing `router.use(...rawMaterialAccess)` call sites unchanged.
+
 const authenticate = require('./authenticate');
-const requireRoles = require('./requireRoles');
+const authorizeApi = require('./authorizeApi');
+const { requireWriteCapability } = authorizeApi;
 
-const rawMaterialAccess = [
-  authenticate,
-  requireRoles('Admin', 'Super Admin', 'Store Keeper', 'Stores', 'View Only')
-];
+const moduleGate = [authenticate, authorizeApi];
 
-const fgProductionAccess = [
-  authenticate,
-  requireRoles('Admin', 'Super Admin', 'Accountant', 'Store Keeper', 'Stores', 'View Only')
-];
+const rawMaterialAccess = moduleGate;
+const fgProductionAccess = moduleGate;
+const financeReadAccess = moduleGate;
+const staffLoanReadAccess = moduleGate;
+const adjustmentsAccess = moduleGate;
+const employeeAccess = moduleGate;
 
-const financeReadAccess = [
-  authenticate,
-  requireRoles('Admin', 'Super Admin', 'Accountant', 'Store Keeper', 'Stores', 'View Only')
-];
-
-const financeWriteAccess = [
-  authenticate,
-  requireRoles('Admin', 'Super Admin', 'Accountant')
-];
-
-// Staff Loans (Finance -> Staff Loans) hold personal loan balances, so reads are
-// limited to the same roles that can open the Finance pages in the client.
-// Store Keeper / Stores are intentionally excluded.
-const staffLoanReadAccess = [
-  authenticate,
-  requireRoles('Admin', 'Super Admin', 'Accountant', 'View Only')
-];
-
-const adjustmentsAccess = [
-  authenticate,
-  requireRoles('Admin', 'Super Admin')
-];
-
-// Employee Management holds HR/personal data (NIC, contact number, etc.),
-// so it is locked down the same way as Adjustments - Admin/Super Admin only.
-const employeeAccess = [
-  authenticate,
-  requireRoles('Admin', 'Super Admin')
-];
+// Finance write endpoints and write-only look-ups: module rule + view-only
+// roles (QB) are refused even on GET, as before.
+const financeWriteAccess = [authenticate, authorizeApi, requireWriteCapability];
 
 module.exports = {
   rawMaterialAccess,
