@@ -62,6 +62,8 @@ const receiveTypeRoutes = require('./routes/receiveTypeRoutes');
 const analystRoutes = require('./routes/analystRoutes');
 const incomeRoutes = require('./routes/incomeRoutes');
 const readOnly = require('./middleware/readOnly');
+const authenticate = require('./middleware/authenticate');
+const authorizeApi = require('./middleware/authorizeApi');
 const cashExpenseRoutes = require('./routes/cashExpenseRoutes');
 const hiddenExpenseRoutes = require('./routes/hiddenExpenseRoutes');
 const { ensureChequeReleaseSchema, startChequeReleaseProcessor } = require('./services/chequeReleaseService');
@@ -105,6 +107,10 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.use('/api', authRoutes);
 app.use('/api', readOnly);
+// Central RBAC gate: every /api route below this line requires a valid token AND
+// a role that is allowed to use that path/method (see config/rolePermissions.js).
+// View-only roles (QB) are rejected on every POST/PUT/PATCH/DELETE.
+app.use('/api', authenticate, authorizeApi);
 // Payment adjustment routes must be mounted before purchaseRoutes: the latter
 // has a generic GET /:id route, which would otherwise treat
 // "/payment-adjustments" as a purchase ID and return 404.
