@@ -11,6 +11,7 @@ const cardLedgerController = require('../controllers/cardLedgerController');
 const { financeReadAccess, financeWriteAccess } = require('../middleware/moduleAccess');
 
 router.get('/', ...financeReadAccess, cardLedgerController.getCardTransactions);
-router.post('/:id/realise', ...financeWriteAccess, cardLedgerController.realiseTransaction);
+// Batch realise: one request realises every selected card transaction in ONE DB transaction.
+router.post('/realise', ...financeWriteAccess, cardLedgerController.realiseTransactions);
 
 module.exports = router;

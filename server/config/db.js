@@ -982,9 +982,12 @@ ensureIntercompanyTransactionsSchema();
 
 // Finance -> Card Ledger.
 // A card transaction stays PENDING (no bank posting at all) until it is
-// realised; realising posts one bank debit and stores the Realise Date.
-// finance_transaction_id is UNIQUE so one Bank Ledger row can never be linked
-// to two card transactions. See migrations/024_card_ledger.sql.
+// realised. Realising one or more Pending rows creates ONE card_realisations
+// record (total, Realise Amount, Remaining Balance), ONE Bank Ledger debit for
+// the Realise Amount and ONE Hidden Expense ("Visa Card Payment") for the
+// Remaining Balance; the card rows only point at the realisation. The unique
+// links on card_realisations stop one ledger / hidden-expense row from being
+// attached to two realisations. See migrations/024_card_ledger.sql.
 const ensureCardLedgerSchema = async () => {
   try {
     await pool.query(`
@@ -998,21 +1001,96 @@ const ensureCardLedgerSchema = async () => {
         remark                 VARCHAR(255) NULL,
         status                 ENUM('Pending','Completed') NOT NULL DEFAULT 'Pending',
         realise_date           DATE NULL,
+        realise_amount         DECIMAL(14,2) NULL,
+        remaining_balance      DECIMAL(14,2) NULL,
         finance_transaction_id INT NULL,
+        hidden_expense_id      INT NULL,
+        realisation_id         INT NULL,
         realised_by            INT NULL,
         realised_at            TIMESTAMP NULL,
         created_by             INT NULL,
         created_at             TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at             TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         PRIMARY KEY (id),
-        UNIQUE KEY uq_card_tx_finance_tx (finance_transaction_id),
         KEY idx_card_tx_status_date (status, transaction_date),
         KEY idx_card_tx_bank (bank_id),
         KEY idx_card_tx_company (company_id),
+        KEY idx_card_tx_realisation (realisation_id),
         CONSTRAINT fk_card_tx_company FOREIGN KEY (company_id) REFERENCES company(id),
         CONSTRAINT fk_card_tx_bank FOREIGN KEY (bank_id) REFERENCES bank_details(id)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS card_realisations (
+        id                     INT NOT NULL AUTO_INCREMENT,
+        company_id             INT NOT NULL,
+        bank_id                INT NOT NULL,
+        realise_date           DATE NOT NULL,
+        total_amount           DECIMAL(14,2) NOT NULL,
+        realise_amount         DECIMAL(14,2) NOT NULL,
+        remaining_balance      DECIMAL(14,2) NOT NULL,
+        reference_number       VARCHAR(100) NULL,
+        finance_transaction_id INT NULL,
+        hidden_expense_id      INT NULL,
+        created_by             INT NULL,
+        created_at             TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        UNIQUE KEY uq_card_real_finance_tx (finance_transaction_id),
+        UNIQUE KEY uq_card_real_hidden_exp (hidden_expense_id),
+        KEY idx_card_real_bank_date (bank_id, realise_date),
+        KEY idx_card_real_company (company_id),
+        CONSTRAINT fk_card_real_company FOREIGN KEY (company_id) REFERENCES company(id),
+        CONSTRAINT fk_card_real_bank FOREIGN KEY (bank_id) REFERENCES bank_details(id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    // Installs created by earlier versions of this module (additive / safe to re-run).
+    for (const ddl of [
+      "ALTER TABLE card_transactions ADD COLUMN IF NOT EXISTS realise_amount DECIMAL(14,2) NULL AFTER realise_date",
+      "ALTER TABLE card_transactions ADD COLUMN IF NOT EXISTS remaining_balance DECIMAL(14,2) NULL AFTER realise_amount",
+      "ALTER TABLE card_transactions ADD COLUMN IF NOT EXISTS hidden_expense_id INT NULL AFTER finance_transaction_id",
+      "ALTER TABLE card_transactions ADD COLUMN IF NOT EXISTS realisation_id INT NULL AFTER hidden_expense_id",
+      "ALTER TABLE card_transactions ADD KEY idx_card_tx_realisation (realisation_id)",
+      // One realisation now covers several card rows, so the per-row unique links of
+      // the earlier version must go (the unique links live on card_realisations).
+      "ALTER TABLE card_transactions DROP INDEX uq_card_tx_finance_tx",
+      "ALTER TABLE card_transactions DROP INDEX uq_card_tx_hidden_expense"
+    ]) {
+      try { await pool.query(ddl); } catch (ddlErr) { /* already applied / not present */ }
+    }
+
+    // Rows realised before batch realisation existed: give each its own
+    // card_realisations record so the Completed tab reads one source. Rows
+    // realised in full by the very first version had no Realise Amount:
+    // they count as realised in full (remaining 0). Idempotent.
+    await pool.query(`
+      INSERT INTO card_realisations
+        (company_id, bank_id, realise_date, total_amount, realise_amount, remaining_balance,
+         reference_number, finance_transaction_id, hidden_expense_id, created_by, created_at)
+      SELECT company_id, bank_id, realise_date, amount, COALESCE(realise_amount, amount),
+             COALESCE(remaining_balance, 0), reference_number, finance_transaction_id,
+             hidden_expense_id, realised_by, COALESCE(realised_at, created_at)
+      FROM card_transactions
+      WHERE status = 'Completed' AND realisation_id IS NULL
+        AND finance_transaction_id IS NOT NULL AND realise_date IS NOT NULL
+    `);
+    await pool.query(`
+      UPDATE card_transactions ct
+        JOIN card_realisations cr ON cr.finance_transaction_id = ct.finance_transaction_id
+         SET ct.realisation_id = cr.id
+       WHERE ct.status = 'Completed' AND ct.realisation_id IS NULL
+    `);
+
+    // Hidden Expenses gain the "Visa Card Payment" type (existing values are kept).
+    try {
+      await pool.query(
+        "ALTER TABLE hidden_expenses MODIFY COLUMN `type` ENUM('PickMe','Credit Card Charge','Visa Card Payment') NOT NULL"
+      );
+    } catch (enumErr) {
+      console.warn('Hidden Expenses type update skipped:', enumErr.message);
+    }
+
     console.log('Card Ledger schema ready');
   } catch (error) {
     console.warn('Card Ledger schema check skipped:', error.message);

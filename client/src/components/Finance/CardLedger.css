@@ -45,6 +45,8 @@
   margin-bottom: var(--spacing-md, 12px);
 }
 
+.cl-filters-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
 .cl-note {
   margin: 0 0 var(--spacing-md, 12px);
   padding: 10px 12px;
@@ -59,7 +61,28 @@
 .cl-table { width: 100%; }
 .cl-table .cl-num { text-align: right; font-variant-numeric: tabular-nums; }
 .cl-realise-date { font-weight: 600; color: #166534; }
-.cl-realise-btn { padding: 6px 12px; font-size: 0.85rem; white-space: nowrap; }
+.cl-check-col { width: 40px; text-align: center; }
+.cl-check-col input { width: 16px; height: 16px; cursor: pointer; }
+.cl-table tbody tr { cursor: default; }
+.cl-page .cl-table tbody tr:has(.cl-check-col) { cursor: pointer; }
+.cl-row-selected td { background: #eff6ff; }
+.cl-row-dim td { opacity: 0.5; }
+
+.cl-realise-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: var(--spacing-md, 12px);
+  padding-top: var(--spacing-md, 12px);
+  border-top: 1px solid var(--color-border, #e2e8f0);
+}
+.cl-selection-info { font-size: 0.9rem; color: var(--color-text-secondary, #64748b); }
+.cl-link-btn {
+  margin-left: 12px; background: transparent; border: none; padding: 0;
+  color: var(--color-primary, #2563eb); cursor: pointer; font-size: 0.85rem; text-decoration: underline;
+}
 .cl-total-label { text-align: right; font-weight: 700; }
 .cl-total { font-weight: 700; }
 
@@ -72,27 +95,30 @@
 /* Modal */
 .cl-modal-overlay {
   position: fixed; inset: 0;
-  background: rgba(15, 23, 42, 0.6);
-  backdrop-filter: blur(4px);
+  background: rgba(15, 23, 42, 0.58);
+  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter: blur(5px);
   display: flex; align-items: center; justify-content: center;
   padding: 16px;
   z-index: 99999;
 }
 .cl-modal {
-  background: #fff; border-radius: 12px; width: 100%; max-width: 440px; max-height: 90vh;
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; width: 100%; max-width: 440px; max-height: 90vh;
   display: flex; flex-direction: column; overflow: hidden;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 24px 60px -18px rgba(15, 23, 42, 0.38), 0 8px 20px rgba(15, 23, 42, 0.1);
 }
 .cl-modal form { display: flex; flex-direction: column; min-height: 0; }
 .cl-modal-header {
   display: flex; justify-content: space-between; align-items: center;
-  padding: 16px 20px; border-bottom: 1px solid #e2e8f0; background: #f8fafc;
+  padding: 19px 22px; border-bottom: 1px solid #e8edf3; background: #fff;
 }
-.cl-modal-header h3 { margin: 0; font-size: 1.125rem; font-weight: 700; color: #0f172a; }
-.cl-modal-close { background: transparent; border: none; font-size: 1.1rem; color: #64748b; cursor: pointer; line-height: 1; }
-.cl-modal-close:hover { color: #0f172a; }
-.cl-modal-body { padding: 20px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
-.cl-modal-footer { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 20px; border-top: 1px solid #e2e8f0; background: #f8fafc; }
+.cl-modal-header h3 { margin: 0; font-size: 1.18rem; line-height: 1.35; font-weight: 700; letter-spacing: -0.02em; color: #172033; }
+.cl-modal-close { display: grid; place-items: center; flex: 0 0 34px; width: 34px; height: 34px; border: 1px solid #e2e8f0; border-radius: 9px; background: #fff; font-size: 1rem; color: #64748b; cursor: pointer; line-height: 1; transition: background .16s ease, color .16s ease, border-color .16s ease, transform .16s ease; }
+.cl-modal-close:hover { color: #172033; background: #f1f5f9; border-color: #cbd5e1; }
+.cl-modal-close:active { transform: scale(.96); }
+.cl-modal-close:focus-visible { outline: 3px solid rgba(37, 99, 235, .25); outline-offset: 2px; }
+.cl-modal-body { padding: 18px 22px 20px; display: flex; flex-direction: column; gap: 15px; overflow-y: auto; }
+.cl-modal-footer { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 22px 17px; border-top: 1px solid #e8edf3; background: #fff; }
 
 .cl-summary-card {
   background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
@@ -101,11 +127,59 @@
 .cl-summary-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; font-size: 0.875rem; }
 .cl-summary-lbl { color: #64748b; font-weight: 500; white-space: nowrap; }
 
+.cl-modal-wide { max-width: 540px; }
+.cl-modal-sub { margin-top: 4px; font-size: 0.82rem; color: #64748b; }
+.cl-section-label { margin: 0 0 8px; font-size: 0.9rem; font-weight: 700; color: #0f172a; }
+.cl-stack div + div { margin-top: 4px; }
+.cl-stack { line-height: 1.4; }
+.cl-realise-table th, .cl-realise-table td { vertical-align: top; }
+.cl-amount-input { text-align: right; width: 100%; font-variant-numeric: tabular-nums; }
+.cl-readonly { background: #f1f5f9; color: #334155; font-weight: 600; cursor: not-allowed; }
+.cl-input-invalid { border-color: #dc2626 !important; }
+.cl-helper { margin: 0; font-size: 0.8rem; color: #64748b; }
+
+/* Realisation dialog controls are scoped to this modal. */
+.cl-modal .form-group { display: flex; flex-direction: column; gap: 7px; margin: 0; }
+.cl-modal .form-group > label { margin: 0; color: #334155; font-size: .84rem; font-weight: 600; }
+.cl-modal .form-input {
+  box-sizing: border-box; width: 100%; height: 48px; padding: 0 13px;
+  border: 1px solid #cbd5e1; border-radius: 9px; background: #fff;
+  color: #172033; font: inherit; font-size: .94rem; outline: none;
+  transition: border-color .16s ease, box-shadow .16s ease, background .16s ease;
+}
+.cl-modal .form-input:hover:not([readonly]) { border-color: #94a3b8; }
+.cl-modal .form-input:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, .15); }
+.cl-modal .form-input.cl-readonly { background: #f1f5f9; border-color: #e2e8f0; color: #334155; cursor: default; }
+.cl-modal .form-input.cl-readonly:focus { box-shadow: none; }
+.cl-modal .cl-realise-table { border-collapse: separate; border-spacing: 0; border: 1px solid #e2e8f0; border-radius: 9px; overflow: hidden; font-size: .82rem; }
+.cl-modal .cl-realise-table th { padding: 9px 11px; background: #f1f5f9; color: #475569; border-bottom: 1px solid #e2e8f0; font-size: .74rem; font-weight: 700; white-space: nowrap; }
+.cl-modal .cl-realise-table td { padding: 9px 11px; border-bottom: 1px solid #edf1f5; color: #334155; }
+.cl-modal .cl-realise-table tbody tr:last-child td { border-bottom: 0; }
+.cl-modal .cl-realise-table .cl-num { font-variant-numeric: tabular-nums; }
+.cl-modal .form-helper { color: #64748b; font-size: .77rem; line-height: 1.45; }
+.cl-modal .form-error { color: #b91c1c; font-size: .8rem; }
+.cl-modal .cl-modal-footer .btn { min-height: 42px; padding: 0 16px; border-radius: 9px; font-weight: 600; transition: background .16s ease, border-color .16s ease, box-shadow .16s ease, transform .16s ease; }
+.cl-modal .cl-modal-footer .btn:active { transform: translateY(1px); }
+.cl-modal .cl-modal-footer .btn:focus-visible { outline: 3px solid rgba(37, 99, 235, .25); outline-offset: 2px; }
+.cl-modal .cl-modal-footer .btn-primary { background: #2563eb; border-color: #2563eb; box-shadow: 0 1px 2px rgba(37, 99, 235, .2); }
+.cl-modal .cl-modal-footer .btn-primary:hover:not(:disabled) { background: #1d4ed8; border-color: #1d4ed8; }
+.cl-modal .cl-modal-footer .btn-secondary { background: #fff; border-color: #cbd5e1; color: #334155; }
+.cl-modal .cl-modal-footer .btn-secondary:hover:not(:disabled) { background: #f8fafc; border-color: #94a3b8; }
+
 .cl-modal-error {
   padding: 10px 12px; border-radius: 6px; background: #fef2f2;
   border: 1px solid #fecaca; color: #b91c1c; font-size: 0.875rem;
 }
 
+@media (max-width: 900px) {
+  .cl-filters-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 @media (max-width: 640px) {
-  .cl-filters { grid-template-columns: 1fr; }
+  .cl-filters, .cl-filters-4 { grid-template-columns: 1fr; }
+  .cl-realise-bar { flex-direction: column; align-items: stretch; }
+  .cl-modal-overlay { align-items: flex-end; padding: 0; }
+  .cl-modal, .cl-modal.cl-modal-wide { width: 100%; max-width: none; max-height: min(92vh, 760px); border-radius: 16px 16px 0 0; border-bottom: 0; }
+  .cl-modal-header { padding: 17px 18px; }
+  .cl-modal-body { padding: 16px 18px 18px; gap: 14px; }
+  .cl-modal-footer { padding: 13px 18px max(16px, env(safe-area-inset-bottom)); }
 }

@@ -15,7 +15,7 @@ const pool = require('../config/db');
 const authenticate = require('../middleware/authenticate');
 const restrictRoles = require('../middleware/restrictRoles');
 
-const ALLOWED_TYPES = ['PickMe', 'Credit Card Charge'];
+const ALLOWED_TYPES = ['PickMe', 'Credit Card Charge', 'Visa Card Payment'];
 
 router.use(authenticate, restrictRoles('Store Keeper', 'Stores'));
 
