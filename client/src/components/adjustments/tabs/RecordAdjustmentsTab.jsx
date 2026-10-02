@@ -16,6 +16,7 @@ import {
 import api from '../../../api';
 import { formatCurrency, formatNumber } from '../../../utils/formatters';
 import ExpenseBillAdjustmentEditor from '../ExpenseBillAdjustmentEditor';
+import FinancialReceiptAdjustmentEditor from '../FinancialReceiptAdjustmentEditor';
 
 const EMPTY_FILTERS = { startDate: '', endDate: '', search: '' };
 
@@ -67,6 +68,38 @@ export const RECORD_TAB_CONFIG = {
       { key: 'adjusted_by', label: 'Adjusted By', render: (r) => r.adjusted_by || '-' },
     ],
   },
+  'Cash Receive': {
+    title: 'Cash Receive Adjustments',
+    searchPlaceholder: 'Reference no., company, receive type...',
+    columns: [
+      { key: 'adjustment_date', label: 'Adjustment Date', render: (r) => formatDateTime(r.adjustment_date) },
+      { key: 'date', label: 'Receipt Date', render: (r) => formatDate(r.date) },
+      { key: 'reference_number', label: 'Reference No.' },
+      { key: 'company_name', label: 'Company' },
+      { key: 'receive_type', label: 'Receive Type' },
+      { key: 'amount', label: 'Amount', className: 'text-right font-mono', render: (r) => formatCurrency(r.amount) },
+      { key: 'remark', label: 'Description / Remark' },
+      { key: 'changes', label: 'Changes', render: renderChanges },
+      { key: 'adjusted_by', label: 'Adjusted By', render: (r) => r.adjusted_by || '-' },
+    ],
+  },
+  'Bank Receive': {
+    title: 'Bank Receive Adjustments',
+    searchPlaceholder: 'Reference no., company, bank account...',
+    columns: [
+      { key: 'adjustment_date', label: 'Adjustment Date', render: (r) => formatDateTime(r.adjustment_date) },
+      { key: 'date', label: 'Receipt Date', render: (r) => formatDate(r.date) },
+      { key: 'reference_number', label: 'Reference No.' },
+      { key: 'company_name', label: 'Company' },
+      { key: 'bank_name', label: 'Bank Account', render: (r) => `${r.bank_name || '-'}${r.account_number ? ` — ${r.account_number}` : ''}` },
+      { key: 'receive_type', label: 'Receive Type' },
+      { key: 'amount', label: 'Amount', className: 'text-right font-mono', render: (r) => formatCurrency(r.amount) },
+      { key: 'remark', label: 'Description / Remark' },
+      { key: 'card_status', label: 'Status', render: (r) => r.card_status || '-' },
+      { key: 'changes', label: 'Changes', render: renderChanges },
+      { key: 'adjusted_by', label: 'Adjusted By', render: (r) => r.adjusted_by || '-' },
+    ],
+  },
 };
 
 const RecordAdjustmentsTab = ({ category }) => {
@@ -77,6 +110,7 @@ const RecordAdjustmentsTab = ({ category }) => {
   const [showFilters, setShowFilters] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [editingExpenseId, setEditingExpenseId] = useState(null);
+  const [editingFinancialRecord, setEditingFinancialRecord] = useState(null);
   const itemsPerPage = 10;
 
   const invalidRange = Boolean(filters.startDate && filters.endDate && filters.startDate > filters.endDate);
@@ -109,8 +143,9 @@ const RecordAdjustmentsTab = ({ category }) => {
   if (!config) return null;
 
   const hasExpenseEdit = category === 'Expense Bill';
-  const hasLegacyAuditColumns = !['Petty Cash Voucher', 'Expense Bill'].includes(category);
-  const colCount = config.columns.length + (hasExpenseEdit ? 1 : 0) + (hasLegacyAuditColumns ? 2 : 0);
+  const hasFinancialEdit = ['Cash Receive', 'Bank Receive'].includes(category);
+  const hasLegacyAuditColumns = !['Petty Cash Voucher', 'Expense Bill', 'Cash Receive', 'Bank Receive'].includes(category);
+  const colCount = config.columns.length + (hasExpenseEdit || hasFinancialEdit ? 1 : 0) + (hasLegacyAuditColumns ? 2 : 0);
   const searchTerm = filters.search.trim().toLowerCase();
   const visibleRows = searchTerm ? rows.filter((row) => config.columns.some((column) =>
     String(row[column.key] ?? '').toLowerCase().includes(searchTerm))) : rows;
@@ -196,7 +231,7 @@ const RecordAdjustmentsTab = ({ category }) => {
                     {config.columns.map((col) => (
                       <th key={col.key} className={col.className && col.className.includes('text-right') ? 'text-right' : undefined}>{col.label}</th>
                     ))}
-                    {hasExpenseEdit && <th>Actions</th>}
+                    {(hasExpenseEdit || hasFinancialEdit) && <th>Actions</th>}
                     {hasLegacyAuditColumns && <th>Adjusted By</th>}
                     {hasLegacyAuditColumns && <th>Adjusted On</th>}
                   </tr>
@@ -215,6 +250,16 @@ const RecordAdjustmentsTab = ({ category }) => {
                         disabled={Number(r.paid_amount) > 0}
                         title={Number(r.paid_amount) > 0 ? 'Payments are recorded against this bill, so it cannot be edited' : 'Edit this expense'}
                         onClick={() => setEditingExpenseId(String(r.expense_id))}
+                      >Edit</button></td>}
+                      {hasFinancialEdit && <td><button
+                        type="button"
+                        className="btn btn-sm btn-primary"
+                        disabled={r.source === 'card' && r.card_status !== 'Pending'}
+                        title={r.source === 'card' && r.card_status !== 'Pending' ? 'Completed card receipts cannot be edited' : 'Edit this receive record'}
+                        onClick={() => setEditingFinancialRecord({
+                          id: String(r.source_record_id),
+                          source: r.source
+                        })}
                       >Edit</button></td>}
                       {hasLegacyAuditColumns && <td>{r.updated_by_name || '-'}</td>}
                       {hasLegacyAuditColumns && <td>{formatDateTime(r.rm_adjusted_at)}</td>}
@@ -275,6 +320,19 @@ const RecordAdjustmentsTab = ({ category }) => {
               embeddedId={editingExpenseId}
               onCancel={() => setEditingExpenseId(null)}
               onSaved={() => { setEditingExpenseId(null); fetchRows(); }}
+            />
+          </div>
+        </div>
+      )}
+      {editingFinancialRecord !== null && (
+        <div role="dialog" aria-modal="true" aria-label="Edit financial receive adjustment" className="modal-overlay" onClick={() => setEditingFinancialRecord(null)}>
+          <div className="modal-content" style={{ width: 'min(960px, 96vw)', maxWidth: '960px', maxHeight: '90vh', overflowY: 'auto' }} onClick={(event) => event.stopPropagation()}>
+            <FinancialReceiptAdjustmentEditor
+              embeddedId={editingFinancialRecord.id}
+              category={category}
+              source={editingFinancialRecord.source}
+              onCancel={() => setEditingFinancialRecord(null)}
+              onSaved={() => { setEditingFinancialRecord(null); fetchRows(); }}
             />
           </div>
         </div>

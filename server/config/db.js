@@ -79,7 +79,7 @@ const ensureRmAdjustmentRecordsSchema = async () => {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS rm_adjustment_records (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        category ENUM('Department', 'Invoice', 'Issuance', 'Wastage', 'Petty Cash Voucher', 'Expense Bill') NOT NULL,
+        category ENUM('Department', 'Invoice', 'Issuance', 'Wastage', 'Petty Cash Voucher', 'Expense Bill', 'Cash Receive', 'Bank Receive') NOT NULL,
         source_record_id INT NOT NULL,
         reference_id VARCHAR(100) NULL,
         updated_by INT NULL,
@@ -97,7 +97,7 @@ const ensureRmAdjustmentRecordsSchema = async () => {
     // not update existing tables.
     await pool.query(`
       ALTER TABLE rm_adjustment_records
-        MODIFY COLUMN category ENUM('Department', 'Invoice', 'Issuance', 'Wastage', 'Petty Cash Voucher', 'Expense Bill') NOT NULL,
+        MODIFY COLUMN category ENUM('Department', 'Invoice', 'Issuance', 'Wastage', 'Petty Cash Voucher', 'Expense Bill', 'Cash Receive', 'Bank Receive') NOT NULL,
         ADD COLUMN IF NOT EXISTS original_values JSON NULL,
         ADD COLUMN IF NOT EXISTS updated_values JSON NULL
     `);

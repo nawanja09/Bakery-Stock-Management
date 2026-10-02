@@ -14,6 +14,11 @@ router.get('/', adjustmentController.getAdjustments);
 // Must be before /:id so "summary" is never treated as an adjustment ID.
 router.get('/summary/:category', adjustmentController.getRmAdjustmentSummary);
 
+// Financial receive records remain in their original finance/card ledger tables.
+router.get('/records/:category', adjustmentController.getFinancialAdjustmentRecords);
+router.get('/records/:category/:source/:id', adjustmentController.getFinancialAdjustmentRecordDetail);
+router.put('/records/:category/:source/:id', adjustmentController.updateFinancialAdjustmentRecord);
+
 // Create a new adjustment
 router.post('/', adjustmentController.createAdjustment);
 

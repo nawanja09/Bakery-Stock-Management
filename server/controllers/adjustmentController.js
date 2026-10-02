@@ -1,5 +1,263 @@
 const pool = require('../config/db');
-const { recordRmAdjustment } = require('../utils/rmAdjustmentAudit');
+const { recordRmAdjustment, recordFinancialAdjustment, sameValue } = require('../utils/rmAdjustmentAudit');
+const { checkDuplicateReference } = require('../services/referenceValidationService');
+
+const FINANCIAL_ADJUSTMENT_CATEGORIES = new Set(['Cash Receive', 'Bank Receive']);
+const FINANCIAL_ADJUSTMENT_SOURCES = new Set(['finance', 'card']);
+
+const getFinancialAdjustmentRecord = async (connection, category, source, id, forUpdate = false) => {
+  if (!FINANCIAL_ADJUSTMENT_CATEGORIES.has(category) || !FINANCIAL_ADJUSTMENT_SOURCES.has(source)) {
+    return [];
+  }
+
+  const isCash = category === 'Cash Receive';
+  if (source === 'card' && isCash) return [];
+
+  const query = source === 'card'
+    ? `SELECT ct.id, 'card' AS source, ct.transaction_date AS date, ct.company_id,
+         c.name AS company_name, ct.bank_id, bd.bank_name, bd.account_number,
+         'Visa Card Payment' AS receive_type, ct.reference_number, ct.amount,
+         ct.remark, ct.status, ct.transaction_date AS transaction_date,
+         u.name AS created_by_name
+       FROM card_transactions ct
+       LEFT JOIN company c ON c.id = ct.company_id
+       LEFT JOIN bank_details bd ON bd.id = ct.bank_id
+       LEFT JOIN users u ON u.id = ct.created_by
+       WHERE ct.id = ?${forUpdate ? ' FOR UPDATE' : ''}`
+    : `SELECT ft.id, 'finance' AS source, ft.transaction_date AS date, ft.company_id,
+         c.name AS company_name, ft.bank_id, bd.bank_name, bd.account_number,
+         ft.transaction_type AS receive_type, ft.reference_number, ft.debit AS amount,
+         ft.remark, ft.status, ft.transaction_date AS transaction_date,
+         u.name AS created_by_name
+       FROM finance_transactions ft
+       LEFT JOIN company c ON c.id = ft.company_id
+       LEFT JOIN bank_details bd ON bd.id = ft.bank_id
+       LEFT JOIN users u ON u.id = ft.created_by
+       WHERE ft.id = ? AND ft.status = 1
+         AND ft.account_type = ? AND ft.reference_type = ?
+         AND ft.transaction_direction = 'IN' AND ft.debit > 0${forUpdate ? ' FOR UPDATE' : ''}`;
+  const params = source === 'card'
+    ? [id]
+    : [id, isCash ? 'CASH' : 'BANK', isCash ? 'CASH_RECEIVE' : 'BANK_RECEIVE'];
+  const [rows] = await connection.query(query, params);
+  return rows;
+};
+
+const getFinancialAdjustmentRecords = async (req, res) => {
+  const { category } = req.params;
+  if (!FINANCIAL_ADJUSTMENT_CATEGORIES.has(category)) {
+    return res.status(400).json({ error: 'Invalid financial adjustment category' });
+  }
+
+  try {
+    const isCash = category === 'Cash Receive';
+    const [ledgerRows] = await pool.query(
+      `SELECT ft.id, 'finance' AS source, DATE_FORMAT(ft.transaction_date, '%Y-%m-%d') AS date,
+          ft.company_id, c.name AS company_name, ft.bank_id, bd.bank_name, bd.account_number,
+          ft.transaction_type AS receive_type, ft.reference_number, ft.debit AS amount,
+          ft.remark, ft.status, u.name AS created_by_name, 1 AS can_edit
+       FROM finance_transactions ft
+       LEFT JOIN company c ON c.id = ft.company_id
+       LEFT JOIN bank_details bd ON bd.id = ft.bank_id
+       LEFT JOIN users u ON u.id = ft.created_by
+       WHERE ft.status = 1 AND ft.account_type = ? AND ft.reference_type = ?
+         AND ft.transaction_direction = 'IN' AND ft.debit > 0
+       ORDER BY ft.transaction_date DESC, ft.id DESC`,
+      [isCash ? 'CASH' : 'BANK', isCash ? 'CASH_RECEIVE' : 'BANK_RECEIVE']
+    );
+
+    let cardRows = [];
+    if (!isCash) {
+      [cardRows] = await pool.query(
+        `SELECT ct.id, 'card' AS source, DATE_FORMAT(ct.transaction_date, '%Y-%m-%d') AS date,
+            ct.company_id, c.name AS company_name, ct.bank_id, bd.bank_name, bd.account_number,
+            'Visa Card Payment' AS receive_type, ct.reference_number, ct.amount, ct.remark,
+            ct.status, u.name AS created_by_name, (ct.status = 'Pending') AS can_edit
+         FROM card_transactions ct
+         LEFT JOIN company c ON c.id = ct.company_id
+         LEFT JOIN bank_details bd ON bd.id = ct.bank_id
+         LEFT JOIN users u ON u.id = ct.created_by
+         ORDER BY ct.transaction_date DESC, ct.id DESC`
+      );
+    }
+
+    res.json([...ledgerRows, ...cardRows].sort((left, right) =>
+      String(right.date).localeCompare(String(left.date)) || Number(right.id) - Number(left.id)));
+  } catch (error) {
+    console.error('Error fetching financial adjustment records:', error);
+    res.status(500).json({ error: 'Unable to fetch financial adjustment records' });
+  }
+};
+
+const getFinancialAdjustmentRecordDetail = async (req, res) => {
+  const { category, source, id } = req.params;
+  if (!FINANCIAL_ADJUSTMENT_CATEGORIES.has(category) || !FINANCIAL_ADJUSTMENT_SOURCES.has(source)) {
+    return res.status(400).json({ error: 'Invalid financial adjustment record' });
+  }
+
+  try {
+    const rows = await getFinancialAdjustmentRecord(pool, category, source, id);
+    if (!rows.length) return res.status(404).json({ error: 'Receive record not found' });
+    res.json(rows[0]);
+  } catch (error) {
+    console.error('Error fetching financial adjustment record:', error);
+    res.status(500).json({ error: 'Unable to fetch receive record' });
+  }
+};
+
+const updateFinancialAdjustmentRecord = async (req, res) => {
+  const { category, source, id } = req.params;
+  const { date, amount, receive_type, reference_number, remark } = req.body;
+  if (!FINANCIAL_ADJUSTMENT_CATEGORIES.has(category) || !FINANCIAL_ADJUSTMENT_SOURCES.has(source) ||
+      (source === 'card' && category !== 'Bank Receive')) {
+    return res.status(400).json({ error: 'Invalid financial adjustment record' });
+  }
+  const parsedDate = new Date(`${date}T00:00:00Z`);
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(String(date)) ||
+      Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== String(date)) {
+    return res.status(400).json({ error: 'A valid date is required' });
+  }
+  const parsedAmount = Number(amount);
+  const normalizedAmount = Number.isFinite(parsedAmount) ? Number(parsedAmount.toFixed(2)) : NaN;
+  if (!Number.isFinite(normalizedAmount) || normalizedAmount <= 0 || normalizedAmount > 999999999999.99) {
+    return res.status(400).json({ error: 'Enter an amount greater than 0 within the supported limit' });
+  }
+  if (typeof receive_type !== 'string' || !receive_type.trim()) {
+    return res.status(400).json({ error: 'Receive type is required' });
+  }
+  const normalizedReference = reference_number == null || String(reference_number).trim() === ''
+    ? null : String(reference_number).trim();
+  const normalizedRemark = remark == null || String(remark).trim() === ''
+    ? null : String(remark).trim();
+  if (normalizedReference && normalizedReference.length > 100) {
+    return res.status(400).json({ error: 'Reference number cannot exceed 100 characters' });
+  }
+  if (normalizedRemark && normalizedRemark.length > 255) {
+    return res.status(400).json({ error: 'Remark cannot exceed 255 characters' });
+  }
+  if (String(receive_type).trim().length > 50) {
+    return res.status(400).json({ error: 'Receive type cannot exceed 50 characters' });
+  }
+
+  let connection;
+  try {
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+    const rows = await getFinancialAdjustmentRecord(connection, category, source, id, true);
+    if (!rows.length) {
+      await connection.rollback();
+      return res.status(404).json({ error: 'Receive record not found' });
+    }
+    const existing = rows[0];
+    if (source === 'card' && existing.status !== 'Pending') {
+      await connection.rollback();
+      return res.status(409).json({ error: 'Only pending card receive records can be adjusted' });
+    }
+
+    if (normalizedReference) {
+      if (source === 'finance') {
+        await checkDuplicateReference(connection, normalizedReference, {
+          includeLedger: true, table: 'finance_transactions', id
+        });
+      } else {
+        await checkDuplicateReference(connection, normalizedReference, {
+          includeLedger: true, table: 'card_transactions', id
+        });
+        const [duplicates] = await connection.query(
+          'SELECT id FROM card_transactions WHERE LOWER(TRIM(reference_number)) = LOWER(?) AND id <> ? LIMIT 1',
+          [normalizedReference, id]
+        );
+        if (duplicates.length) throw new Error('Duplicate reference number. This number is already used by another card transaction.');
+      }
+    }
+
+    const originalDate = existing.date instanceof Date
+      ? `${existing.date.getFullYear()}-${String(existing.date.getMonth() + 1).padStart(2, '0')}-${String(existing.date.getDate()).padStart(2, '0')}`
+      : String(existing.date || '').slice(0, 10);
+    const originalValues = {
+      date: originalDate,
+      receive_type: existing.receive_type,
+      reference_number: existing.reference_number,
+      amount: Number(Number(existing.amount || 0).toFixed(2)),
+      remark: existing.remark
+    };
+    const updatedValues = {
+      date,
+      receive_type: String(receive_type).trim(),
+      reference_number: normalizedReference,
+      amount: normalizedAmount,
+      remark: normalizedRemark
+    };
+    const changed = Object.keys(updatedValues).some((key) => !sameValue(originalValues[key], updatedValues[key]));
+    if (source === 'finance') {
+      await connection.query(
+        `UPDATE finance_transactions
+         SET transaction_date = ?, transaction_type = ?, reference_number = ?, debit = ?,
+             credit = 0, remark = ?, balance_after = 0
+         WHERE id = ?`,
+        [updatedValues.date, updatedValues.receive_type, updatedValues.reference_number,
+          updatedValues.amount, updatedValues.remark, id]
+      );
+      await recalculateFinanceAccountBalance(connection, category === 'Cash Receive' ? 'CASH' : 'BANK',
+        category === 'Cash Receive' ? existing.company_id : existing.bank_id);
+    } else {
+      await connection.query(
+        `UPDATE card_transactions
+         SET transaction_date = ?, reference_number = ?, amount = ?, remark = ?
+         WHERE id = ? AND status = 'Pending'`,
+        [updatedValues.date, updatedValues.reference_number, updatedValues.amount, updatedValues.remark, id]
+      );
+    }
+
+    if (changed) {
+      await recordFinancialAdjustment(connection, {
+        category,
+        sourceRecordId: id,
+        referenceId: `${source}:${id}`,
+        updatedBy: req.user?.userId || null,
+        originalValues,
+        updatedValues
+      });
+    }
+    await connection.commit();
+    res.json({ message: `${category} adjustment saved successfully` });
+  } catch (error) {
+    if (connection) await connection.rollback();
+    console.error('Error updating financial adjustment record:', error);
+    const duplicate = error.name === 'DuplicateReferenceError' || /duplicate reference/i.test(error.message);
+    res.status(duplicate ? 400 : 500).json({ error: error.message || 'Unable to update receive record' });
+  } finally {
+    if (connection) connection.release();
+  }
+};
+
+const recalculateFinanceAccountBalance = async (connection, accountType, accountId) => {
+  const isCash = accountType === 'CASH';
+  const keyColumn = isCash ? 'company_id' : 'bank_id';
+  await connection.query(
+    isCash
+      ? 'SELECT id FROM cash_accounts WHERE company_id = ? FOR UPDATE'
+      : 'SELECT id FROM bank_details WHERE id = ? FOR UPDATE',
+    [accountId]
+  );
+  const [rows] = await connection.query(
+    `SELECT id, debit, credit FROM finance_transactions
+     WHERE account_type = ? AND ${keyColumn} = ? AND status = 1
+     ORDER BY transaction_date ASC, created_at ASC, id ASC FOR UPDATE`,
+    [accountType, accountId]
+  );
+  let balance = 0;
+  for (const row of rows) {
+    balance = Number((balance + Number(row.debit || 0) - Number(row.credit || 0)).toFixed(2));
+    await connection.query('UPDATE finance_transactions SET balance_after = ? WHERE id = ?', [balance, row.id]);
+  }
+  await connection.query(
+    isCash
+      ? 'UPDATE cash_accounts SET current_balance = ? WHERE company_id = ?'
+      : 'UPDATE bank_details SET current_balance = ? WHERE id = ?',
+    [balance, accountId]
+  );
+};
 
 const getAdjustmentValues = ({ system_qty, actual_qty, unit_price }) => {
   const systemQuantity = Number(system_qty);
@@ -150,7 +408,7 @@ const getAdjustments = async (req, res) => {
 // RM Adjustment page (tracked by rm_adjustment_records).
 const getRmAdjustmentSummary = async (req, res) => {
   const { category } = req.params;
-  const { startDate, endDate, item_id, department_id, supplier_id, invoice_no, payment_status, reason } = req.query;
+  const { startDate, endDate, item_id, department_id, supplier_id, invoice_no, payment_status, reason, search } = req.query;
 
   try {
     let rows;
@@ -244,6 +502,44 @@ const getRmAdjustmentSummary = async (req, res) => {
       if (startDate) { query += ' AND DATE(rar.created_at) >= ?'; params.push(startDate); }
       if (endDate) { query += ' AND DATE(rar.created_at) <= ?'; params.push(endDate); }
       query += ' ORDER BY rar.created_at DESC';
+      [rows] = await pool.query(query, params);
+    } else if (FINANCIAL_ADJUSTMENT_CATEGORIES.has(category)) {
+      const isCash = category === 'Cash Receive';
+      let query = `SELECT rar.id AS adjustment_id, rar.created_at AS adjustment_date,
+          rar.reference_id, rar.source_record_id, rar.original_values, rar.updated_values,
+          rar.updated_by, au.name AS adjusted_by,
+          CASE WHEN rar.reference_id LIKE 'card:%' THEN 'card' ELSE 'finance' END AS source,
+          COALESCE(ft.transaction_date, ct.transaction_date) AS date,
+          COALESCE(ft.reference_number, ct.reference_number) AS reference_number,
+          COALESCE(ft.transaction_type, 'Visa Card Payment') AS receive_type,
+          COALESCE(ft.debit, ct.amount) AS amount,
+          COALESCE(ft.remark, ct.remark) AS remark,
+          c.name AS company_name, bd.bank_name, bd.account_number,
+          ct.status AS card_status
+        FROM rm_adjustment_records rar
+        LEFT JOIN finance_transactions ft
+          ON rar.reference_id = CONCAT('finance:', ft.id)
+          AND ft.reference_type = ?
+        LEFT JOIN card_transactions ct
+          ON rar.reference_id = CONCAT('card:', ct.id)
+        LEFT JOIN company c ON c.id = COALESCE(ft.company_id, ct.company_id)
+        LEFT JOIN bank_details bd ON bd.id = COALESCE(ft.bank_id, ct.bank_id)
+        LEFT JOIN users au ON au.id = rar.updated_by
+        WHERE rar.category = ?
+          AND (ft.id IS NOT NULL OR ct.id IS NOT NULL)`;
+      const params = [isCash ? 'CASH_RECEIVE' : 'BANK_RECEIVE', category];
+      if (startDate) { query += ' AND DATE(rar.created_at) >= ?'; params.push(startDate); }
+      if (endDate) { query += ' AND DATE(rar.created_at) <= ?'; params.push(endDate); }
+      if (search) {
+        query += ` AND (COALESCE(ft.reference_number, ct.reference_number, '') LIKE ?
+          OR COALESCE(c.name, '') LIKE ?
+          OR COALESCE(bd.bank_name, '') LIKE ?
+          OR COALESCE(ft.transaction_type, 'Visa Card Payment') LIKE ?
+          OR COALESCE(ft.remark, ct.remark, '') LIKE ?)`;
+        const term = `%${search}%`;
+        params.push(term, term, term, term, term);
+      }
+      query += ' ORDER BY rar.created_at DESC, rar.id DESC';
       [rows] = await pool.query(query, params);
     } else {
       return res.status(400).json({ error: 'Invalid RM adjustment category' });
@@ -492,6 +788,9 @@ const deleteAdjustment = async (req, res) => {
 module.exports = {
   createAdjustment,
   getAdjustments,
+  getFinancialAdjustmentRecords,
+  getFinancialAdjustmentRecordDetail,
+  updateFinancialAdjustmentRecord,
   getRmAdjustmentSummary,
   getSystemQuantity,
   getAdjustmentById,
