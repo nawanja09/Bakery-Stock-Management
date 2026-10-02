@@ -1,7 +1,6 @@
 // src/components/adjustments/CategoryAdjustmentPanel.jsx
 //
-// Renders the record picker + embedded edit workflow for the "Invoice",
-// "Issuance", and "Wastage" adjustment categories on the RM Adjustments page.
+// Renders the record picker + embedded edit workflow for adjustment categories.
 // Reuses the existing list APIs and existing Edit* components -- no new
 // tables, no new routes, no duplicated save/validation logic.
 import React, { useEffect, useState, useCallback } from 'react';
@@ -14,6 +13,7 @@ import EditWastage from '../wastage/EditWastage';
 import PurchasingPaymentAdjustmentEditor from './PurchasingPaymentAdjustmentEditor';
 import PettyCashVoucherAdjustmentEditor from './PettyCashVoucherAdjustmentEditor';
 import ExpenseBillAdjustmentEditor from './ExpenseBillAdjustmentEditor';
+import FinancialReceiptAdjustmentEditor from './FinancialReceiptAdjustmentEditor';
 import './Adjustments.css';
 
 // Category -> { endpoint, columns, editor }
@@ -141,6 +141,53 @@ const CATEGORY_CONFIG = {
     // PUT /:id, which now allows edits regardless of paid_amount.
     Editor: ExpenseBillAdjustmentEditor,
   },
+  'Cash Receive': {
+    endpoint: '/adjustments/records/Cash%20Receive',
+    label: 'Cash Receive',
+    dateKey: 'date',
+    getRows: (data) => data,
+    columns: [
+      { key: 'date', label: 'Date', format: (v) => v ? new Date(v).toLocaleDateString() : '-' },
+      { key: 'reference_number', label: 'Reference No.' },
+      { key: 'company_name', label: 'Company' },
+      { key: 'receive_type', label: 'Receive Type' },
+      { key: 'amount', label: 'Amount', format: (v) => `Rs. ${parseFloat(v || 0).toFixed(2)}` },
+      { key: 'remark', label: 'Description / Remark' },
+      { key: 'created_by_name', label: 'Entered By' },
+    ],
+    matches: (row, term) =>
+      row.reference_number?.toLowerCase().includes(term) ||
+      row.company_name?.toLowerCase().includes(term) ||
+      row.receive_type?.toLowerCase().includes(term) ||
+      row.remark?.toLowerCase().includes(term),
+    Editor: FinancialReceiptAdjustmentEditor,
+  },
+  'Bank Receive': {
+    endpoint: '/adjustments/records/Bank%20Receive',
+    label: 'Bank Receive',
+    dateKey: 'date',
+    getRows: (data) => data,
+    columns: [
+      { key: 'date', label: 'Date', format: (v) => v ? new Date(v).toLocaleDateString() : '-' },
+      { key: 'reference_number', label: 'Reference No.' },
+      { key: 'company_name', label: 'Company' },
+      { key: 'bank_name', label: 'Bank Account', format: (v, row) => `${v || '-'}${row.account_number ? ` — ${row.account_number}` : ''}` },
+      { key: 'receive_type', label: 'Receive Type' },
+      { key: 'amount', label: 'Amount', format: (v) => `Rs. ${parseFloat(v || 0).toFixed(2)}` },
+      { key: 'remark', label: 'Description / Remark' },
+      { key: 'status', label: 'Status', format: (v, row) => row.source === 'card' ? v : 'Posted' },
+      { key: 'created_by_name', label: 'Entered By' },
+    ],
+    matches: (row, term) =>
+      row.reference_number?.toLowerCase().includes(term) ||
+      row.company_name?.toLowerCase().includes(term) ||
+      row.bank_name?.toLowerCase().includes(term) ||
+      row.receive_type?.toLowerCase().includes(term) ||
+      row.remark?.toLowerCase().includes(term),
+    canEdit: (row) => row.source !== 'card' || row.can_edit === 1 || row.can_edit === true,
+    lockedReason: 'Only pending card receive records can be adjusted.',
+    Editor: FinancialReceiptAdjustmentEditor,
+  },
 };
 
 const CategoryAdjustmentPanel = ({ category, onAdjustmentSaved }) => {
@@ -151,6 +198,7 @@ const CategoryAdjustmentPanel = ({ category, onAdjustmentSaved }) => {
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState(null);
+  const [selectedSource, setSelectedSource] = useState(null);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 
@@ -171,6 +219,7 @@ const CategoryAdjustmentPanel = ({ category, onAdjustmentSaved }) => {
 
   useEffect(() => {
     setSelectedId(null);
+    setSelectedSource(null);
     setSearch('');
     setDateFrom('');
     setDateTo('');
@@ -189,16 +238,19 @@ const CategoryAdjustmentPanel = ({ category, onAdjustmentSaved }) => {
           type="button"
           className="btn btn-secondary"
           style={{ marginBottom: '16px' }}
-          onClick={() => setSelectedId(null)}
+          onClick={() => { setSelectedId(null); setSelectedSource(null); }}
         >
           <FontAwesomeIcon icon={faArrowLeft} /> Back to {config.label} List
         </button>
         <Editor
           embeddedId={selectedId}
+          category={category}
+          source={selectedSource}
           isRmAdjustment
-          onCancel={() => setSelectedId(null)}
+          onCancel={() => { setSelectedId(null); setSelectedSource(null); }}
           onSaved={() => {
             setSelectedId(null);
+            setSelectedSource(null);
             fetchRecords();
             if (onAdjustmentSaved) onAdjustmentSaved(category);
           }}
@@ -293,17 +345,17 @@ const CategoryAdjustmentPanel = ({ category, onAdjustmentSaved }) => {
             </thead>
             <tbody>
               {filtered.slice(0, 50).map((row) => (
-                <tr key={row.id}>
+                <tr key={`${row.source || category}-${row.id}`}>
                   {config.columns.map((col) => (
                     <td key={col.key}>
-                      {col.format ? col.format(row[col.key]) : (row[col.key] ?? '-')}
+                      {col.format ? col.format(row[col.key], row) : (row[col.key] ?? '-')}
                     </td>
                   ))}
                   <td>
                     <button
                       type="button"
                       className="btn btn-sm btn-primary"
-                      onClick={() => setSelectedId(String(row.id))}
+                      onClick={() => { setSelectedId(String(row.id)); setSelectedSource(row.source || 'finance'); }}
                       disabled={config.canEdit ? !config.canEdit(row) : false}
                       title={config.canEdit && !config.canEdit(row) ? config.lockedReason : undefined}
                     >

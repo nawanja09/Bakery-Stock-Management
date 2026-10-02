@@ -24,6 +24,8 @@ const ADJUSTMENT_CATEGORIES = [
   { value: 'Purchasing Payment', label: 'Purchasing Payment' },
   { value: 'Petty Cash Voucher', label: 'Petty Cash Adjustment' },
   { value: 'Expense Bill', label: 'Expense Adjustment' },
+  { value: 'Cash Receive', label: 'Cash Receive' },
+  { value: 'Bank Receive', label: 'Bank Receive' },
 ];
 
 // Reusable Modal Component

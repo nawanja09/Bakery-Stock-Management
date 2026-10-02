@@ -24,6 +24,8 @@ const SUMMARY_TABS = [
   { key: 'Purchasing Payment', label: 'Purchasing Payment' },
   { key: 'Petty Cash Voucher', label: 'Petty Cash Adjustment' },
   { key: 'Expense Bill', label: 'Expense Adjustment' },
+  { key: 'Cash Receive', label: 'Cash Receive Adjustments' },
+  { key: 'Bank Receive', label: 'Bank Receive Adjustments' },
 ];
 
 // Reusable Skeleton Component
@@ -338,7 +340,7 @@ const StoresAdjustments = () => {
       {activeTab === 'Issuance' && <IssuanceAdjustmentsTab />}
       {activeTab === 'Wastage' && <WastageAdjustmentsTab />}
       {activeTab === 'Purchasing Payment' && <PurchasingPaymentAdjustmentsTab />}
-      {['Petty Cash Voucher', 'Expense Bill'].includes(activeTab) && (
+      {['Petty Cash Voucher', 'Expense Bill', 'Cash Receive', 'Bank Receive'].includes(activeTab) && (
         <RecordAdjustmentsTab key={activeTab} category={activeTab} />
       )}
 
