@@ -6,6 +6,7 @@ import TopItemsChart from './TopItemsChart';
 import './Dashboard.css';
 import api from '../api';
 import usePermissions from '../hooks/usePermissions';
+import { ROLES } from '../config/rolePermissions';
 import { formatNumber } from '../utils/formatters';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -33,6 +34,19 @@ const emptyChartData = {
   issuesVsWastageData: { labels: [], issues: [], wastage: [] }
 };
 
+const emptyFinanceOverview = {
+  management: { companies: 0, payees: 0, expenseTypes: 0, subExpenseTypes: 0 },
+  expenses: {
+    total: { count: 0, amount: 0 },
+    paid: { count: 0, amount: 0 },
+    pendingPayments: { count: 0, amount: 0 },
+    outstanding: { count: 0, amount: 0 },
+    pettyCash: { count: 0, amount: 0 },
+    adjustments: { count: 0, recent: [] },
+    recent: []
+  }
+};
+
 const formatDateInput = date => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -53,9 +67,14 @@ const getPeriodDates = period => {
 const Dashboard = () => {
   const navigate = useNavigate();
   // Role rules live in config/rolePermissions.js (single source of truth).
-  const { canWrite: canRecordActivity, canAccessPath, hasModule } = usePermissions();
+  const { canWrite: canRecordActivity, canAccessPath, hasModule, role, username } = usePermissions();
+  const isFinanceUser = role === ROLES.FINANCE_USER;
+  const canSeeFgProduction = hasModule('fgProduction');
   const canSeeFinance = hasModule('finance');
 
+  const [financeOverview, setFinanceOverview] = useState(emptyFinanceOverview);
+  const [financeLoading, setFinanceLoading] = useState(true);
+  const [financeError, setFinanceError] = useState('');
   const [overview, setOverview] = useState(emptyOverview);
   const [chartData, setChartData] = useState(emptyChartData);
   const [fgRecipes, setFgRecipes] = useState([]);
@@ -70,6 +89,20 @@ const Dashboard = () => {
 
   useEffect(() => {
     let active = true;
+
+    if (isFinanceUser) {
+      api.get('/dashboard/finance-overview')
+        .then((response) => {
+          if (active) setFinanceOverview({ ...emptyFinanceOverview, ...response.data });
+        })
+        .catch(() => {
+          if (active) setFinanceError('Unable to load Finance dashboard data.');
+        })
+        .finally(() => {
+          if (active) setFinanceLoading(false);
+        });
+      return () => { active = false; };
+    }
 
     const loadDashboard = async () => {
       try {
@@ -107,12 +140,18 @@ const Dashboard = () => {
     };
 
     loadDashboard();
-    loadFgRecipes();
+    if (canSeeFgProduction) loadFgRecipes();
+    else setFgLoading(false);
     return () => { active = false; };
-  }, []);
+  }, [isFinanceUser, canSeeFgProduction]);
 
   useEffect(() => {
     let active = true;
+    if (isFinanceUser) {
+      setTopItems([]);
+      setTopItemsLoading(false);
+      return () => { active = false; };
+    }
     const dates = topItemsPeriod === 'custom' ? customDates : getPeriodDates(topItemsPeriod);
 
     const loadTopItems = async () => {
@@ -136,9 +175,142 @@ const Dashboard = () => {
       setTopItemsLoading(false);
     }
     return () => { active = false; };
-  }, [topItemsType, topItemsPeriod, customDates]);
+  }, [topItemsType, topItemsPeriod, customDates, isFinanceUser]);
 
   const wastageTotal7d = (overview.wastage7d?.rawCount || 0) + (overview.wastage7d?.fgCount || 0);
+  const financeMetrics = financeOverview.expenses;
+
+  if (isFinanceUser) {
+    const managementCards = [
+      ['Companies', financeOverview.management.companies],
+      ['Expense Payees', financeOverview.management.payees],
+      ['Expense Types', financeOverview.management.expenseTypes],
+      ['Sub Expense Types', financeOverview.management.subExpenseTypes]
+    ];
+    const expenseCards = [
+      { label: 'Total Expenses', metric: financeMetrics.total, amount: financeMetrics.total.amount },
+      { label: 'Paid Expenses', metric: financeMetrics.paid, amount: financeMetrics.paid.amount },
+      { label: 'Pending Payments', metric: financeMetrics.pendingPayments, amount: financeMetrics.pendingPayments.amount },
+      { label: 'Outstanding Expenses', metric: financeMetrics.outstanding, amount: financeMetrics.outstanding.amount },
+      { label: 'Petty Cash Expenses', metric: financeMetrics.pettyCash, amount: financeMetrics.pettyCash.amount },
+      { label: 'Expense Adjustments', metric: financeMetrics.adjustments, amount: null }
+    ];
+
+    return (
+      <div className="dashboard-container page-shell finance-dashboard">
+        <header className="dashboard-header">
+          <div>
+            <h1>Dashboard</h1>
+            {username && <p className="page-subtitle">Welcome, {username}</p>}
+          </div>
+          <div className="dashboard-date">
+            <span className="dashboard-date-label">Today</span>
+            <strong>{new Date().toLocaleDateString(undefined, { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}</strong>
+          </div>
+        </header>
+
+        {financeError && <div className="dashboard-error" role="alert">{financeError}</div>}
+
+        <section className="dashboard-section" aria-labelledby="finance-management-heading">
+          <div className="section-heading">
+            <div>
+              <p className="section-eyebrow">Management</p>
+              <h2 id="finance-management-heading">Management overview</h2>
+            </div>
+          </div>
+          <div className="finance-management-grid">
+            {managementCards.map(([label, value]) => (
+              <article className="finance-management-card" key={label}>
+                <span>{label}</span>
+                <strong>{financeLoading ? '—' : formatNumber(value)}</strong>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="dashboard-section" aria-labelledby="finance-expenses-heading">
+          <div className="section-heading">
+            <div>
+              <p className="section-eyebrow">Expenses</p>
+              <h2 id="finance-expenses-heading">Expense summary</h2>
+            </div>
+          </div>
+          <div className="finance-expense-grid">
+            {expenseCards.map(({ label, metric, amount }) => (
+              <article className="finance-expense-card" key={label}>
+                <span className="finance-expense-label">{label}</span>
+                <strong>{financeLoading ? '—' : amount === null
+                  ? formatNumber(metric.count)
+                  : `Rs. ${formatNumber(amount, 0, 0)}`}</strong>
+                <span className="finance-expense-count">
+                  {financeLoading ? 'Loading…' : `${formatNumber(metric.count)} records`}
+                </span>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="dashboard-section finance-dashboard-lower">
+          <div className="finance-dashboard-panel">
+            <div className="section-heading">
+              <div>
+                <p className="section-eyebrow">Activity</p>
+                <h2>Recent Expenses</h2>
+              </div>
+            </div>
+            {financeLoading ? <p className="finance-dashboard-empty">Loading recent expenses…</p> :
+              financeMetrics.recent.length === 0 ? <p className="finance-dashboard-empty">No expenses recorded yet.</p> : (
+                <div className="finance-dashboard-table-wrap">
+                  <table className="finance-dashboard-table">
+                    <thead>
+                      <tr><th>Date</th><th>Type</th><th>Payee</th><th>Reference</th><th>Amount</th><th>Status</th></tr>
+                    </thead>
+                    <tbody>
+                      {financeMetrics.recent.map((expense) => (
+                        <tr key={`${expense.type}-${expense.id}`}>
+                          <td>{new Date(expense.date).toLocaleDateString()}</td>
+                          <td>{expense.type}</td>
+                          <td>{expense.payee || '—'}</td>
+                          <td>{expense.reference || '—'}</td>
+                          <td>Rs. {formatNumber(expense.amount, 0, 0)}</td>
+                          <td>{expense.status || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+          </div>
+
+          <div className="finance-dashboard-panel">
+            <div className="section-heading">
+              <div>
+                <p className="section-eyebrow">Management activity</p>
+                <h2>Recent Expense Adjustments</h2>
+              </div>
+            </div>
+            {financeLoading ? <p className="finance-dashboard-empty">Loading adjustments…</p> :
+              financeMetrics.adjustments.recent.length === 0 ? <p className="finance-dashboard-empty">No expense adjustments recorded.</p> : (
+                <ul className="finance-adjustment-list">
+                  {financeMetrics.adjustments.recent.map((adjustment) => (
+                    <li key={`${adjustment.category}-${adjustment.reference}-${adjustment.date}`}>
+                      <span>{adjustment.category}</span>
+                      <strong>{adjustment.reference || 'Record updated'}</strong>
+                      <time>{new Date(adjustment.date).toLocaleDateString()}</time>
+                    </li>
+                  ))}
+                </ul>
+              )}
+          </div>
+        </section>
+
+        <footer className="dashboard-footer">
+          <p>© {new Date().getFullYear()} Bakery Stock Management System. All rights reserved.</p>
+          <p>Developed by <span className="dev-name">Nawanjana Nethmini</span></p>
+        </footer>
+      </div>
+    );
+  }
 
   const kpiCards = [
     {
@@ -213,6 +385,7 @@ const Dashboard = () => {
       <header className="dashboard-header">
         <div>
           <h1>Dashboard</h1>
+          {username && <p className="page-subtitle">Welcome, {username}</p>}
         </div>
         <div className="dashboard-date">
           <span className="dashboard-date-label">Today</span>

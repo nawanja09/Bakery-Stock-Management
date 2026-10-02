@@ -3,6 +3,7 @@
 const pool = require('../config/db');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const { getRoleModules } = require('../config/rolePermissions');
 
 if (!process.env.JWT_SECRET) {
   console.error('FATAL: JWT_SECRET is not defined. Authentication will fail.');
@@ -26,11 +27,16 @@ const loginUser = async (req, res) => {
     }
 
     const user = rows[0];
+    if (Number(user.status) !== 1) {
+      return res.status(403).json({ error: 'This account is inactive' });
+    }
+
     const match = await bcrypt.compare(password, user.password);
 
     if (match) {
+      const permissions = ['dashboard', ...getRoleModules(user.role)];
       const token = jwt.sign(
-        { userId: user.id, username: user.username, role: user.role },
+        { userId: user.id, username: user.username, role: user.role, permissions },
         process.env.JWT_SECRET,
         { expiresIn: '24h' }
       );
@@ -38,7 +44,8 @@ const loginUser = async (req, res) => {
       res.json({
         message: 'Login successful!',
         token,
-        user: { id: user.id, name: user.name, username: user.username, role: user.role }
+        permissions,
+        user: { id: user.id, name: user.name, username: user.username, role: user.role, permissions }
       });
     } else {
       res.status(401).json({ error: 'Invalid credentials' });
