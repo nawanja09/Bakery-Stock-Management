@@ -92,8 +92,13 @@ const BankReceive = () => {
         reference_number: formData.reference_number || null,
         remark: formData.remark || null
       });
-      setMessage({ type: 'success', text: 'Bank receipt recorded successfully!' });
-      setBankAccounts(prev => prev.map(b => String(b.id) === String(formData.bank_id) ? { ...b, current_balance: res.data?.balance ?? b.current_balance } : b));
+      if (res.data?.pending) {
+        // Card payment: filed as Pending in the Card Ledger, so the bank balance is unchanged.
+        setMessage({ type: 'success', text: res.data.message });
+      } else {
+        setMessage({ type: 'success', text: 'Bank receipt recorded successfully!' });
+        setBankAccounts(prev => prev.map(b => String(b.id) === String(formData.bank_id) ? { ...b, current_balance: res.data?.balance ?? b.current_balance } : b));
+      }
       setFormData(prev => ({ ...prev, amount: '', receive_type: '', reference_number: '', remark: '' }));
     } catch (err) {
       setMessage({ type: 'error', text: err.response?.data?.error || 'Failed to record bank receipt' });
