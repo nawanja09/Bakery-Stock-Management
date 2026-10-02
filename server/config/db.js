@@ -205,17 +205,16 @@ ensureSoftDeleteStatusSchema();
 //   2. Backfill username from the existing email's local-part for any row
 //      that doesn't have one yet, de-duplicating collisions by id suffix.
 //   3. Lock it down: NOT NULL + UNIQUE.
-//   4. Extend the `role` enum with 'Store Keeper' (existing values untouched).
+//   4. Extend the `role` enum with the app's newer roles.
 //   5. Drop the old `email` column (also removes its unique key).
-//   6. Seed the two required accounts, but only if a user with that username
-//      doesn't already exist — this never overwrites a real, already-migrated
-//      admin password with the sample "Admin123" credential.
+//   6. Seed default accounts only when their usernames do not already exist.
 const ensureUsernameAuthSchema = async () => {
   const bcrypt = require('bcrypt');
 
   try {
     // 1. Add the column if it isn't there yet.
     await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS username VARCHAR(100) NULL AFTER name");
+    await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS status TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=Active, 0=Deleted (soft delete)'");
 
     // 2. Backfill from email where possible (no-op once email is dropped).
     try {
@@ -253,7 +252,7 @@ const ensureUsernameAuthSchema = async () => {
     // 4. Extend role enum (existing values/order preserved, only appending).
     await pool.query(`
       ALTER TABLE users MODIFY COLUMN role
-      ENUM('Admin','Staff','Manager','User','Store Keeper','Accountant','View Only','Super Admin')
+      ENUM('Admin','Staff','Manager','User','Store Keeper','Accountant','View Only','Super Admin','Finance')
       NOT NULL DEFAULT 'Staff'
     `);
 
@@ -266,6 +265,7 @@ const ensureUsernameAuthSchema = async () => {
       { name: 'Store Keeper', username: 'stores', password: 'password', role: 'Store Keeper' },
       { name: 'Accountant', username: 'accountant', password: 'password', role: 'Accountant' },
       { name: 'QB', username: 'QB', password: 'password', role: 'View Only' },
+      { name: 'Finance', username: 'finance', password: 'thaniya123', role: 'Finance' },
       { name: 'Super Admin', username: 'superadmin', password: 'SuperAdmin123', role: 'Super Admin' }
     ];
 
@@ -278,6 +278,11 @@ const ensureUsernameAuthSchema = async () => {
           [seed.name, seed.username, hashedPassword, seed.role]
         );
         console.log(`Seeded default user "${seed.username}" (${seed.role})`);
+      } else if (seed.username === 'finance') {
+        await pool.query(
+          "UPDATE users SET role = 'Finance', status = 1 WHERE username = ? AND (role <> 'Finance' OR COALESCE(status, 0) <> 1)",
+          [seed.username]
+        );
       }
     }
 

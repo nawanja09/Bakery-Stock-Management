@@ -260,6 +260,150 @@ exports.getDashboardOverview = async (req, res) => {
   }
 };
 
+exports.getFinanceDashboardOverview = async (req, res) => {
+  try {
+    const [
+      managementResultSets,
+      [expenseRows],
+      [totalExpenseRows],
+      [pettyCashRows],
+      [adjustmentRows],
+      [recentAdjustmentRows],
+      [recentExpenseRows]
+    ] = await Promise.all([
+      Promise.all([
+        pool.query('SELECT COUNT(*) AS count FROM company'),
+        pool.query('SELECT COUNT(*) AS count FROM payees'),
+        pool.query('SELECT COUNT(*) AS count FROM expense_types'),
+        pool.query('SELECT COUNT(*) AS count FROM sub_expense_types')
+      ]),
+      pool.query(`
+        SELECT
+          COALESCE(SUM(CASE WHEN payment_status = 'Paid' THEN 1 ELSE 0 END), 0) AS paidCount,
+          COALESCE(SUM(CASE WHEN payment_status = 'Paid' THEN total_bill_amount ELSE 0 END), 0) AS paidAmount,
+          COALESCE(SUM(CASE WHEN payment_status IN ('Pending', 'Partially Paid') THEN 1 ELSE 0 END), 0) AS pendingCount,
+          COALESCE(SUM(CASE WHEN payment_status IN ('Pending', 'Partially Paid') THEN balance ELSE 0 END), 0) AS pendingAmount,
+          COALESCE(SUM(CASE WHEN balance > 0 THEN 1 ELSE 0 END), 0) AS outstandingCount,
+          COALESCE(SUM(balance), 0) AS outstandingAmount
+        FROM expenses
+        WHERE is_deleted = 0
+      `),
+      pool.query(`
+        SELECT
+          (SELECT COUNT(*) FROM expenses WHERE is_deleted = 0) +
+          (SELECT COUNT(*) FROM petty_cash_vouchers) +
+          (SELECT COUNT(*) FROM cash_expenses WHERE status = 1) +
+          (SELECT COUNT(*) FROM bank_charges) +
+          (SELECT COUNT(*) FROM hidden_expenses WHERE is_deleted = 0) AS totalCount,
+          (SELECT COALESCE(SUM(total_bill_amount), 0) FROM expenses WHERE is_deleted = 0) +
+          (SELECT COALESCE(SUM(amount), 0) FROM petty_cash_vouchers) +
+          (SELECT COALESCE(SUM(amount), 0) FROM cash_expenses WHERE status = 1) +
+          (SELECT COALESCE(SUM(amount), 0) FROM bank_charges) +
+          (SELECT COALESCE(SUM(amount), 0) FROM hidden_expenses WHERE is_deleted = 0) AS totalAmount
+      `),
+      pool.query(`
+        SELECT COUNT(*) AS count, COALESCE(SUM(amount), 0) AS amount
+        FROM petty_cash_vouchers
+      `),
+      pool.query(`
+        SELECT COUNT(*) AS count
+        FROM rm_adjustment_records
+        WHERE category IN ('Expense Bill', 'Petty Cash Voucher')
+      `),
+      pool.query(`
+        SELECT category, reference_id AS reference, updated_at AS date
+        FROM rm_adjustment_records
+        WHERE category IN ('Expense Bill', 'Petty Cash Voucher')
+        ORDER BY updated_at DESC, id DESC
+        LIMIT 5
+      `),
+      pool.query(`
+        SELECT * FROM (
+          SELECT e.id, 'Expense Bill' AS type, e.bill_date AS date,
+                 COALESCE(p.payee_name, e.payee_name) AS payee,
+                 e.bill_number AS reference, e.total_bill_amount AS amount,
+                 e.payment_status AS status
+          FROM expenses e
+          LEFT JOIN payees p ON p.id = e.payee_id
+          WHERE e.is_deleted = 0
+          UNION ALL
+          SELECT pv.id, 'Petty Cash' AS type, pv.voucher_date AS date,
+                 pv.payee_name AS payee, pv.voucher_number AS reference,
+                 pv.amount, pv.status
+          FROM petty_cash_vouchers pv
+          UNION ALL
+          SELECT ce.id, 'Cash Expense' AS type, ce.expense_date AS date,
+                 'Cash Expense' AS payee, ce.voucher_number AS reference,
+                 ce.amount, 'Recorded' AS status
+          FROM cash_expenses ce
+          WHERE ce.status = 1
+          UNION ALL
+          SELECT bc.id, 'Bank Charge' AS type, bc.charge_date AS date,
+                 bc.bank_name AS payee, bc.reference_number AS reference,
+                 bc.amount, 'Recorded' AS status
+          FROM bank_charges bc
+          UNION ALL
+          SELECT he.id, 'Hidden Expense' AS type, he.expense_date AS date,
+                 'Hidden Expense' AS payee, he.reference_number AS reference,
+                 he.amount, 'Recorded' AS status
+          FROM hidden_expenses he
+          WHERE he.is_deleted = 0
+        ) recent_expenses
+        ORDER BY date DESC, id DESC
+        LIMIT 8
+      `)
+    ]);
+
+    const expenseSummary = expenseRows[0] || {};
+    const totalExpenseSummary = totalExpenseRows[0] || {};
+    const pettyCashSummary = pettyCashRows[0] || {};
+    const adjustmentSummary = adjustmentRows[0] || {};
+    const managementCounts = managementResultSets.map(([rows]) => Number(rows[0].count) || 0);
+
+    res.json({
+      management: {
+        companies: managementCounts[0],
+        payees: managementCounts[1],
+        expenseTypes: managementCounts[2],
+        subExpenseTypes: managementCounts[3]
+      },
+      expenses: {
+        total: {
+          count: Number(totalExpenseSummary.totalCount) || 0,
+          amount: Number(totalExpenseSummary.totalAmount) || 0
+        },
+        paid: {
+          count: Number(expenseSummary.paidCount) || 0,
+          amount: Number(expenseSummary.paidAmount) || 0
+        },
+        pendingPayments: {
+          count: Number(expenseSummary.pendingCount) || 0,
+          amount: Number(expenseSummary.pendingAmount) || 0
+        },
+        outstanding: {
+          count: Number(expenseSummary.outstandingCount) || 0,
+          amount: Number(expenseSummary.outstandingAmount) || 0
+        },
+        pettyCash: {
+          count: Number(pettyCashSummary.count) || 0,
+          amount: Number(pettyCashSummary.amount) || 0
+        },
+        adjustments: {
+          count: Number(adjustmentSummary.count) || 0,
+          recent: recentAdjustmentRows
+        },
+        recent: recentExpenseRows.map((row) => ({
+          ...row,
+          amount: Number(row.amount) || 0
+        }))
+      }
+    });
+  } catch (error) {
+    console.error('Error in getFinanceDashboardOverview:', error);
+    res.status(500).json({ error: 'Unable to load Finance dashboard data' });
+  }
+};
+
 // ==========================
 // Top Issued / Wasted Items Endpoint
 // ==========================

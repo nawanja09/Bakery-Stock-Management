@@ -8,6 +8,7 @@
 import { useEffect, useReducer } from 'react';
 import {
   getAuthRole,
+  getAuthUsername,
   getRawAuthRole,
   getRoleModules,
   hasModule,
@@ -34,6 +35,7 @@ export const usePermissions = () => {
 
   return {
     role,                                   // canonical role, e.g. 'QB' (null if unknown)
+    username: getAuthUsername(),
     rawRole: getRawAuthRole(),              // as stored, e.g. 'View Only'
     modules: getRoleModules(role),
     isViewOnly: isViewOnlyRole(role),

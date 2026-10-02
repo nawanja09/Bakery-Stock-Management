@@ -137,6 +137,7 @@ import './css/purchasing-page-ui.css';
 import './css/fg-finance-ui.css';
 import RouteModal from './components/common/RouteModal';
 import RouteAccessGuard from './components/common/RouteAccessGuard';
+import usePermissions from './hooks/usePermissions';
 
 const RootRedirect = () => {
   localStorage.removeItem('token');
@@ -180,6 +181,11 @@ const AuthCheck = () => {
   return token ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />;
 };
 
+const ManagementLanding = () => {
+  const { getModuleLanding } = usePermissions();
+  return <Navigate to={getModuleLanding('management') || '/dashboard'} replace />;
+};
+
 // Prevents already-logged-in users from accessing /login.
 const PublicOnlyRoute = ({ children }) => {
   const token = localStorage.getItem('token');
@@ -218,6 +224,7 @@ function App() {
           >
             
             <Route path="dashboard" element={<Dashboard />} />
+            <Route path="management" element={<ManagementLanding />} />
             <Route path="purchase/new" element={<PermittedRoute><ModalRoute title="Add New Purchase"><AddPurchase /></ModalRoute></PermittedRoute>} />
             <Route path="purchase/edit/:id" element={<RawMaterialRoute><ModalRoute title="Edit Purchase"><EditPurchase /></ModalRoute></RawMaterialRoute>} />
             <Route path="purchase/history" element={<RawMaterialRoute><PurchaseHistory /></RawMaterialRoute>} />

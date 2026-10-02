@@ -27,6 +27,7 @@ const ROLES = Object.freeze({
   STORES: 'STORES',
   ACCOUNTANT: 'ACCOUNTANT',
   QB: 'QB',
+  FINANCE_USER: 'FINANCE_USER',
   ADMIN: 'ADMIN',
   SUPER_ADMIN: 'SUPER_ADMIN'
 });
@@ -57,12 +58,12 @@ const ADMIN_MODULES = [
 ];
 
 // NOTE: `settings` is the "Settings / Admin" group, which only contains Change
-// Password. It is granted to every role so every user can change their own
-// password. Remove it from a role's list to hide the group for that role.
+// Password. It is granted to roles that should see the settings navigation.
 const ROLE_MODULES = Object.freeze({
   [ROLES.STORES]: [M.MANAGEMENT, M.RAW_MATERIAL, M.FG_PRODUCTION, M.SETTINGS],
   [ROLES.ACCOUNTANT]: [M.MANAGEMENT, M.RAW_MATERIAL, M.FINANCE, M.EXPENSES, M.FG_PRODUCTION, M.VAT, M.SETTINGS],
   [ROLES.QB]: [M.MANAGEMENT, M.RAW_MATERIAL, M.FG_PRODUCTION, M.FINANCE, M.EXPENSES, M.VAT, M.SETTINGS],
+  [ROLES.FINANCE_USER]: [M.MANAGEMENT, M.EXPENSES],
   [ROLES.ADMIN]: ADMIN_MODULES,
   [ROLES.SUPER_ADMIN]: [...ADMIN_MODULES, M.ANALYST]
 });
@@ -80,6 +81,7 @@ const ROLE_ALIASES = Object.freeze({
   'super_admin': ROLES.SUPER_ADMIN,
   'admin': ROLES.ADMIN,
   'accountant': ROLES.ACCOUNTANT,
+  'finance': ROLES.FINANCE_USER,
   'store keeper': ROLES.STORES,
   'storekeeper': ROLES.STORES,
   'stores': ROLES.STORES,
@@ -93,7 +95,9 @@ const ROLE_ALIASES = Object.freeze({
 // definition (Staff, Manager, User) resolve to null and get NO module access.
 const normalizeRole = (role) => {
   if (!role || typeof role !== 'string') return null;
-  return ROLE_ALIASES[role.trim().toLowerCase()] || null;
+  const normalized = role.trim().toLowerCase();
+  return ROLE_ALIASES[normalized] ||
+    (Object.values(ROLES).includes(role.trim().toUpperCase()) ? role.trim().toUpperCase() : null);
 };
 
 const getRoleModules = (role) => ROLE_MODULES[normalizeRole(role)] || [];
@@ -108,9 +112,11 @@ const canWrite = (role) => !!normalizeRole(role) && !isViewOnlyRole(role);
 const ANY = '*';
 
 const API_RULES = [
-  // Available to every signed-in user
-  { prefix: '/dashboard', modules: [ANY] },
-  { prefix: '/stats', modules: [ANY] },
+  // General dashboard data is available to signed-in users other than Finance.
+  // Finance uses the separate, permission-scoped overview below.
+  { prefix: '/dashboard', modules: [ANY], denyRoles: [ROLES.FINANCE_USER] },
+  { prefix: '/dashboard/finance-overview', modules: [], read: [M.EXPENSES] },
+  { prefix: '/stats', modules: [ANY], denyRoles: [ROLES.FINANCE_USER] },
 
   // ---- Raw Materials --------------------------------------------------------
   { prefix: '/purchases', modules: [M.RAW_MATERIAL] },
@@ -225,6 +231,9 @@ const evaluateApiAccess = (role, method, url) => {
   if (!rule) return { allowed: false, reason: 'no-rule' };
 
   const isRead = READ_METHODS.includes(String(method || 'GET').toUpperCase());
+  if ((rule.denyRoles || []).includes(canonical)) {
+    return { allowed: false, reason: 'module' };
+  }
   const granted = isRead ? [...rule.modules, ...(rule.read || [])] : rule.modules;
   const roleModules = ROLE_MODULES[canonical];
 

@@ -12,6 +12,7 @@ export const ROLES = Object.freeze({
   STORES: 'STORES',
   ACCOUNTANT: 'ACCOUNTANT',
   QB: 'QB',
+  FINANCE_USER: 'FINANCE_USER',
   ADMIN: 'ADMIN',
   SUPER_ADMIN: 'SUPER_ADMIN'
 });
@@ -39,12 +40,13 @@ const ADMIN_MODULES = [
   M.CUTLERY, M.FG_PRODUCTION, M.ADJUSTMENTS, M.VAT, M.SETTINGS, M.EMPLOYEES
 ];
 
-// `settings` = the "Settings / Admin" group (only holds Change Password), so it
-// is granted to every role. Remove it from a role to hide the group for them.
+// `settings` = the "Settings / Admin" group (only holds Change Password).
+// It is granted only to roles that should see that navigation group.
 export const ROLE_MODULES = Object.freeze({
   [ROLES.STORES]: [M.MANAGEMENT, M.RAW_MATERIAL, M.FG_PRODUCTION, M.SETTINGS],
   [ROLES.ACCOUNTANT]: [M.MANAGEMENT, M.RAW_MATERIAL, M.FINANCE, M.EXPENSES, M.FG_PRODUCTION, M.VAT, M.SETTINGS],
   [ROLES.QB]: [M.MANAGEMENT, M.RAW_MATERIAL, M.FG_PRODUCTION, M.FINANCE, M.EXPENSES, M.VAT, M.SETTINGS],
+  [ROLES.FINANCE_USER]: [M.MANAGEMENT, M.EXPENSES],
   [ROLES.ADMIN]: ADMIN_MODULES,
   [ROLES.SUPER_ADMIN]: [...ADMIN_MODULES, M.ANALYST]
 });
@@ -60,6 +62,7 @@ const ROLE_ALIASES = Object.freeze({
   'super_admin': ROLES.SUPER_ADMIN,
   'admin': ROLES.ADMIN,
   'accountant': ROLES.ACCOUNTANT,
+  'finance': ROLES.FINANCE_USER,
   'store keeper': ROLES.STORES,
   'storekeeper': ROLES.STORES,
   'stores': ROLES.STORES,
@@ -73,7 +76,9 @@ const ROLE_ALIASES = Object.freeze({
 // for roles that have no navigation/privilege definition (Staff, Manager, User).
 export const normalizeRole = (role) => {
   if (!role || typeof role !== 'string') return null;
-  return ROLE_ALIASES[role.trim().toLowerCase()] || null;
+  const normalized = role.trim().toLowerCase();
+  return ROLE_ALIASES[normalized] ||
+    (Object.values(ROLES).includes(role.trim().toUpperCase()) ? role.trim().toUpperCase() : null);
 };
 
 export const getRoleModules = (role) => ROLE_MODULES[normalizeRole(role)] || [];
@@ -114,6 +119,18 @@ export const getRawAuthRole = () => {
 // Canonical role of the logged-in user (or null).
 export const getAuthRole = () => normalizeRole(getRawAuthRole());
 
+export const getAuthUsername = () => {
+  try {
+    const token = localStorage.getItem('token');
+    const usernameFromToken = token ? decodeJwtPayload(token)?.username : null;
+    if (usernameFromToken) return usernameFromToken;
+    const storedUser = localStorage.getItem('user');
+    return storedUser ? JSON.parse(storedUser).username || null : null;
+  } catch (e) {
+    return null;
+  }
+};
+
 // ---------------------------------------------------------------------------
 // Page (URL) rules. The longest matching prefix wins, matched on path-segment
 // boundaries. A rule grants access when the role holds ALL of `all` and ANY
@@ -127,6 +144,7 @@ const FIN_MASTER = [M.EXPENSES, M.FINANCE]; // finance-side master data
 
 export const ROUTE_RULES = [
   rule('/dashboard', { any: ['*'] }),
+  rule('/management', { all: [M.MANAGEMENT] }),
   rule('/admin/password', { any: [M.SETTINGS] }),
   rule('/admin/employees', { all: [M.MANAGEMENT, M.EMPLOYEES] }),
 
