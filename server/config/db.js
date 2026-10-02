@@ -980,4 +980,45 @@ const ensureIntercompanyTransactionsSchema = async () => {
 
 ensureIntercompanyTransactionsSchema();
 
+// Finance -> Card Ledger.
+// A card transaction stays PENDING (no bank posting at all) until it is
+// realised; realising posts one bank debit and stores the Realise Date.
+// finance_transaction_id is UNIQUE so one Bank Ledger row can never be linked
+// to two card transactions. See migrations/024_card_ledger.sql.
+const ensureCardLedgerSchema = async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS card_transactions (
+        id                     INT NOT NULL AUTO_INCREMENT,
+        company_id             INT NOT NULL,
+        bank_id                INT NOT NULL,
+        transaction_date       DATE NOT NULL,
+        amount                 DECIMAL(14,2) NOT NULL,
+        reference_number       VARCHAR(100) NULL,
+        remark                 VARCHAR(255) NULL,
+        status                 ENUM('Pending','Completed') NOT NULL DEFAULT 'Pending',
+        realise_date           DATE NULL,
+        finance_transaction_id INT NULL,
+        realised_by            INT NULL,
+        realised_at            TIMESTAMP NULL,
+        created_by             INT NULL,
+        created_at             TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at             TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        UNIQUE KEY uq_card_tx_finance_tx (finance_transaction_id),
+        KEY idx_card_tx_status_date (status, transaction_date),
+        KEY idx_card_tx_bank (bank_id),
+        KEY idx_card_tx_company (company_id),
+        CONSTRAINT fk_card_tx_company FOREIGN KEY (company_id) REFERENCES company(id),
+        CONSTRAINT fk_card_tx_bank FOREIGN KEY (bank_id) REFERENCES bank_details(id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log('Card Ledger schema ready');
+  } catch (error) {
+    console.warn('Card Ledger schema check skipped:', error.message);
+  }
+};
+
+ensureCardLedgerSchema();
+
 module.exports = pool;

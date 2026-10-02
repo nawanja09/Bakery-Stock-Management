@@ -11,6 +11,7 @@ const {
 const { checkDuplicateReference, DuplicateReferenceError } = require('../services/referenceValidationService');
 const { getActiveBankAccounts } = require('../services/bankAccountService');
 const { hasActiveLedgerEntry } = require('../services/chequeReleaseService');
+const { isCardReceiveType, createPendingCardTransaction } = require('../services/cardLedgerService');
 
 const LEDGER_SELECT = `
   SELECT
@@ -346,6 +347,28 @@ const receiveBank = async (req, res) => {
       return res.status(400).json({ error: 'Selected bank account is not active for the selected company' });
     }
     await checkDuplicateReference(connection, reference_number, { includeLedger: true });
+
+    // Card payments are not in the bank until the card settlement is realised.
+    // File them as a PENDING card transaction (Finance -> Card Ledger) instead of
+    // posting to the bank; the Bank Balance only rises when it is realised there.
+    if (isCardReceiveType(receive_type)) {
+      const cardId = await createPendingCardTransaction(connection, {
+        companyId: company_id,
+        bankId: bank_id,
+        date,
+        amount: parseFloat(amount),
+        referenceNumber: reference_number || null,
+        remark: remark || null,
+        createdBy: created_by
+      });
+      await connection.commit();
+      return res.status(201).json({
+        message: 'Card payment recorded as Pending. The bank balance will increase when it is realised in the Card Ledger.',
+        pending: true,
+        card_transaction_id: cardId
+      });
+    }
+
     const balance = await recordBankTransaction(connection, {
       bankId: bank_id,
       date,
@@ -361,7 +384,7 @@ const receiveBank = async (req, res) => {
   } catch (error) {
     await connection.rollback();
     console.error('Error recording bank receipt:', error);
-    res.status(error.name === 'InsufficientBalanceError' || error.name === 'DuplicateReferenceError' ? 400 : 500).json({ error: error.message });
+    res.status(error.name === 'InsufficientBalanceError' || error.name === 'DuplicateReferenceError' || error.name === 'HttpError' ? 400 : 500).json({ error: error.message });
   } finally {
     connection.release();
   }
