@@ -113,7 +113,7 @@
   padding: 19px 22px; border-bottom: 1px solid #e8edf3; background: #fff;
 }
 .cl-modal-header h3 { margin: 0; font-size: 1.18rem; line-height: 1.35; font-weight: 700; letter-spacing: -0.02em; color: #172033; }
-.cl-modal-close { display: grid; place-items: center; flex: 0 0 34px; width: 34px; height: 34px; border: 1px solid #e2e8f0; border-radius: 9px; background: #fff; font-size: 1rem; color: #64748b; cursor: pointer; line-height: 1; transition: background .16s ease, color .16s ease, border-color .16s ease, transform .16s ease; }
+.cl-modal-close { display: grid; place-items: center; flex: 0 0 34px; width: 34px; height: 34px; border-radius: 9px; background: #fff; font-size: 1rem; color: #64748b; cursor: pointer; line-height: 1; transition: background .16s ease, color .16s ease, border-color .16s ease, transform .16s ease; }
 .cl-modal-close:hover { color: #172033; background: #f1f5f9; border-color: #cbd5e1; }
 .cl-modal-close:active { transform: scale(.96); }
 .cl-modal-close:focus-visible { outline: 3px solid rgba(37, 99, 235, .25); outline-offset: 2px; }
