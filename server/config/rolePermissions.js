@@ -165,6 +165,7 @@ const API_RULES = [
   { prefix: '/finance/cash/balance', modules: [M.FINANCE], read: [M.RAW_MATERIAL, M.EXPENSES, M.ADJUSTMENTS] },
   { prefix: '/staff-loans', modules: [M.FINANCE] },
   { prefix: '/receive-types', modules: [M.FINANCE] },
+  { prefix: '/other-ledgers', modules: [M.FINANCE] },
   { prefix: '/incomes', modules: [M.FINANCE, M.ANALYST] },
 
   // ---- Finished Goods -------------------------------------------------------

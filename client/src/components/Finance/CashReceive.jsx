@@ -1,24 +1,35 @@
 // src/components/finance/CashReceive.jsx
+//
+// Cash Receive. Reached from Finance -> Cash Ledger -> [ Cash Received ] (modal);
+// the standalone page layout is kept for backwards compatibility.
+//
+// A receipt is classified EITHER by an existing Receive Type (original
+// behaviour, unchanged) OR by an Other Ledger (Cash Ledger debit + Other Ledger
+// credit, posted by the server as one linked transaction). The two are mutually
+// exclusive: choosing one disables the other, and one of them is required.
 import React, { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faHandHoldingDollar, faSpinner, faCheckCircle } from '@fortawesome/free-solid-svg-icons';
+import { faHandHoldingDollar, faSpinner, faCheckCircle, faTimes, faCheck } from '@fortawesome/free-solid-svg-icons';
 import api from '../../api';
 import './FinanceForm.css';
+import './StaffLoans.css'; // shared modal look (sl-modal*)
 
-const CashReceive = () => {
+const CashReceive = ({ modal = false, defaultCompanyId = '', onClose, onSaved }) => {
   const currentUser = JSON.parse(localStorage.getItem('user') || 'null');
   const [companies, setCompanies] = useState([]);
   const [receiveTypes, setReceiveTypes] = useState([]);
+  const [otherLedgers, setOtherLedgers] = useState([]);
   const [balance, setBalance] = useState(null);
   const [loadingBalance, setLoadingBalance] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState(null);
 
   const [formData, setFormData] = useState({
-    company_id: '',
+    company_id: defaultCompanyId ? String(defaultCompanyId) : '',
     date: new Date().toISOString().slice(0, 10),
     amount: '',
     receive_type: '',
+    other_ledger_id: '',
     reference_number: '',
     remark: ''
   });
@@ -28,7 +39,7 @@ const CashReceive = () => {
       .then(res => {
         const list = res.data || [];
         setCompanies(list);
-        if (list.length > 0) setFormData(prev => ({ ...prev, company_id: String(list[0].id) }));
+        setFormData(prev => (prev.company_id || list.length === 0 ? prev : { ...prev, company_id: String(list[0].id) }));
       })
       .catch(() => setCompanies([]));
   }, []);
@@ -37,6 +48,13 @@ const CashReceive = () => {
     api.get('/receive-types')
       .then(res => setReceiveTypes(Array.isArray(res.data) ? res.data : []))
       .catch(() => setReceiveTypes([]));
+  }, []);
+
+  // Only ACTIVE Other Ledgers can be chosen for a new transaction.
+  useEffect(() => {
+    api.get('/other-ledgers/active')
+      .then(res => setOtherLedgers(Array.isArray(res.data) ? res.data : []))
+      .catch(() => setOtherLedgers([]));
   }, []);
 
   useEffect(() => {
@@ -55,6 +73,9 @@ const CashReceive = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const usingOtherLedger = !!formData.other_ledger_id;
+  const usingReceiveType = !!formData.receive_type;
+
   const handleSubmit = async e => {
     e.preventDefault();
     setMessage(null);
@@ -63,29 +84,135 @@ const CashReceive = () => {
     if (!formData.date) return setMessage({ type: 'error', text: 'Date is required' });
     const amt = parseFloat(formData.amount);
     if (!amt || amt <= 0) return setMessage({ type: 'error', text: 'Amount must be greater than 0' });
-    if (!formData.receive_type) return setMessage({ type: 'error', text: 'Please select a receive type' });
+    if (usingReceiveType && usingOtherLedger) return setMessage({ type: 'error', text: 'Select either a Receive Type or an Other Ledger, not both' });
+    if (!usingReceiveType && !usingOtherLedger) return setMessage({ type: 'error', text: 'Please select a Receive Type or an Other Ledger' });
     if (!currentUser?.id) return setMessage({ type: 'error', text: 'Please login again' });
 
     setSubmitting(true);
     try {
-      const res = await api.post('/finance/cash/receive', {
+      const payload = {
         company_id: formData.company_id,
         date: formData.date,
         amount: amt,
-        receive_type: formData.receive_type,
         reference_number: formData.reference_number || null,
         remark: formData.remark || null,
-        created_by: currentUser.id
-      });
-      setMessage({ type: 'success', text: 'Cash receipt recorded successfully!' });
+        created_by: currentUser.id,
+        classification: usingOtherLedger ? 'other_ledger' : 'receive_type'
+      };
+      if (usingOtherLedger) payload.other_ledger_id = formData.other_ledger_id;
+      else payload.receive_type = formData.receive_type;
+
+      const res = await api.post('/finance/cash/receive', payload);
       setBalance(res.data?.balance ?? balance);
-      setFormData(prev => ({ ...prev, amount: '', receive_type: '', reference_number: '', remark: '' }));
+      setFormData(prev => ({ ...prev, amount: '', receive_type: '', other_ledger_id: '', reference_number: '', remark: '' }));
+      if (modal) {
+        if (onSaved) onSaved('Cash receipt recorded successfully!');
+        return;
+      }
+      setMessage({ type: 'success', text: 'Cash receipt recorded successfully!' });
     } catch (err) {
       setMessage({ type: 'error', text: err.response?.data?.error || 'Failed to record cash receipt' });
     } finally {
       setSubmitting(false);
     }
   };
+
+  const gridClass = modal ? 'form-grid' : 'form-grid two-col';
+
+  const alertBox = message && (
+    <div className={`alert ${message.type === 'success' ? 'alert-success' : 'alert-error'}`} role="alert" style={{ padding: 'var(--spacing-md)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--spacing-md)', backgroundColor: message.type === 'success' ? '#d4edda' : '#f8d7da', color: message.type === 'success' ? '#155724' : '#721c24' }}>
+      {message.type === 'success' && <FontAwesomeIcon icon={faCheckCircle} style={{ marginRight: '8px' }} />} {message.text}
+    </div>
+  );
+
+  const fields = (
+    <>
+      <div className={gridClass}>
+        <div className="form-group">
+          <label>Company <span className="required">*</span></label>
+          <select name="company_id" value={formData.company_id} onChange={handleChange} required className="form-select">
+            <option value="">Select Company</option>
+            {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </div>
+        <div className="form-group">
+          <label>Date <span className="required">*</span></label>
+          <input type="date" name="date" value={formData.date} onChange={handleChange} required className="form-input" />
+        </div>
+      </div>
+      <div className={gridClass}>
+        <div className="form-group">
+          <label>Receive Type {!usingOtherLedger && <span className="required">*</span>}</label>
+          <select name="receive_type" value={formData.receive_type} onChange={handleChange} disabled={usingOtherLedger} className="form-select">
+            <option value="">Select type</option>
+            {receiveTypes.map(type => (
+              <option key={type.id} value={type.type_name}>{type.type_name}</option>
+            ))}
+          </select>
+        </div>
+        <div className="form-group">
+          <label>Other Ledger {!usingReceiveType && <span className="required">*</span>}</label>
+          <select name="other_ledger_id" value={formData.other_ledger_id} onChange={handleChange} disabled={usingReceiveType} className="form-select">
+            <option value="">Select Other Ledger</option>
+            {otherLedgers.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+          </select>
+        </div>
+      </div>
+      <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', margin: '-4px 0 var(--spacing-sm)' }}>
+        Choose a Receive Type <strong>or</strong> an Other Ledger. To switch, clear the one already selected.
+      </div>
+      <div className={gridClass}>
+        <div className="form-group">
+          <label>Amount (Rs.) <span className="required">*</span></label>
+          <input type="number" name="amount" min="0.01" step="0.01" value={formData.amount} onChange={handleChange} placeholder="0.00" required className="form-input" />
+        </div>
+        <div className="form-group">
+          <label>Reference No (Optional)</label>
+          <input type="text" name="reference_number" value={formData.reference_number} onChange={handleChange} placeholder="e.g. receipt number" className="form-input" />
+        </div>
+      </div>
+      <div className="form-group">
+        <label>Remark</label>
+        <textarea name="remark" rows={2} value={formData.remark} onChange={handleChange} placeholder="Add a note..." className="form-textarea" />
+      </div>
+    </>
+  );
+
+  if (modal) {
+    return (
+      <div className="sl-modal-overlay" onClick={onClose}>
+        <div className="sl-modal" role="dialog" aria-modal="true" aria-labelledby="cr-title" onClick={(e) => e.stopPropagation()}>
+          <div className="sl-modal-header">
+            <h3 id="cr-title">
+              <FontAwesomeIcon icon={faHandHoldingDollar} style={{ color: '#059669', marginRight: '8px' }} />
+              Cash Received
+            </h3>
+            <button type="button" className="sl-modal-close" onClick={onClose} aria-label="Close"><FontAwesomeIcon icon={faTimes} /></button>
+          </div>
+          <form onSubmit={handleSubmit} noValidate>
+            <div className="sl-modal-body">
+              {formData.company_id && (
+                <div className="sl-summary-card">
+                  <div className="sl-summary-row">
+                    <span className="sl-summary-lbl">Current Cash In Hand</span>
+                    <strong>{loadingBalance ? '…' : `Rs. ${parseFloat(balance || 0).toFixed(2)}`}</strong>
+                  </div>
+                </div>
+              )}
+              {fields}
+              {message && message.type === 'error' && <div className="sl-modal-error" role="alert">{message.text}</div>}
+            </div>
+            <div className="sl-modal-footer">
+              <button type="button" className="btn btn-secondary" onClick={onClose} disabled={submitting}>Cancel</button>
+              <button type="submit" className="btn btn-primary" disabled={submitting}>
+                {submitting ? <><FontAwesomeIcon icon={faSpinner} spin /> Saving...</> : <><FontAwesomeIcon icon={faCheck} /> Save Receipt</>}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="page-container">
@@ -107,52 +234,11 @@ const CashReceive = () => {
         </div>
       )}
 
-      {message && (
-        <div className={`alert ${message.type === 'success' ? 'alert-success' : 'alert-error'}`} style={{ padding: 'var(--spacing-md)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--spacing-md)', backgroundColor: message.type === 'success' ? '#d4edda' : '#f8d7da', color: message.type === 'success' ? '#155724' : '#721c24' }}>
-          {message.type === 'success' && <FontAwesomeIcon icon={faCheckCircle} style={{ marginRight: '8px' }} />} {message.text}
-        </div>
-      )}
+      {alertBox}
 
       <div className="card form-container" style={{ padding: 'var(--spacing-lg)' }}>
         <form onSubmit={handleSubmit}>
-          <div className="form-grid two-col">
-            <div className="form-group">
-              <label>Company <span className="required">*</span></label>
-              <select name="company_id" value={formData.company_id} onChange={handleChange} required className="form-select">
-                <option value="">Select Company</option>
-                {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-            </div>
-            <div className="form-group">
-              <label>Date <span className="required">*</span></label>
-              <input type="date" name="date" value={formData.date} onChange={handleChange} required className="form-input" />
-            </div>
-          </div>
-          <div className="form-grid two-col">
-            <div className="form-group">
-              <label>Amount (Rs.) <span className="required">*</span></label>
-              <input type="number" name="amount" min="0.01" step="0.01" value={formData.amount} onChange={handleChange} placeholder="0.00" required className="form-input" />
-            </div>
-            <div className="form-group">
-              <label>Receive Type <span className="required">*</span></label>
-              <select name="receive_type" value={formData.receive_type} onChange={handleChange} required className="form-select">
-                <option value="">Select type</option>
-                {receiveTypes.map(type => (
-                  <option key={type.id} value={type.type_name}>{type.type_name}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div className="form-grid two-col">
-            <div className="form-group">
-              <label>Reference No (Optional)</label>
-              <input type="text" name="reference_number" value={formData.reference_number} onChange={handleChange} placeholder="e.g. receipt number" className="form-input" />
-            </div>
-            <div className="form-group">
-              <label>Remark</label>
-              <textarea name="remark" rows={2} value={formData.remark} onChange={handleChange} placeholder="Add a note..." className="form-textarea" />
-            </div>
-          </div>
+          {fields}
           <div className="form-actions">
             <button className="btn btn-primary" type="submit" disabled={submitting}>
               {submitting ? <><FontAwesomeIcon icon={faSpinner} spin /> Saving...</> : 'Save Receipt'}

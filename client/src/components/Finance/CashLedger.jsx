@@ -1,8 +1,12 @@
 // src/components/finance/CashLedger.jsx
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faMoneyBillWave, faSpinner, faFilter, faFlagCheckered } from '@fortawesome/free-solid-svg-icons';
+import { faMoneyBillWave, faSpinner, faFilter, faFlagCheckered, faHandHoldingDollar, faMoneyBillTransfer, faPen, faBan } from '@fortawesome/free-solid-svg-icons';
 import api from '../../api';
+import usePermissions from '../../hooks/usePermissions';
+import { usePopup } from '../context/PopupContext';
+import CashReceive from './CashReceive';
+import CashIssuedModal from './CashIssuedModal';
 import './FinanceLedger.css';
 
 const TRANSACTION_TYPES = [
@@ -16,11 +20,17 @@ const TRANSACTION_TYPES = [
   { value: 'Petty Cash Reimbursement', label: 'Petty Cash Reimbursement' },
   { value: 'Adjustment', label: 'Adjustment' },
   { value: 'Bank Deposit', label: 'Bank Deposit' },
-  { value: 'Bank Withdrawal', label: 'Bank Withdrawal' }
+  { value: 'Bank Withdrawal', label: 'Bank Withdrawal' },
+  { value: 'Other Ledger', label: 'Other Ledger (Cash Received)' },
+  { value: 'Cash Issued', label: 'Cash Issued' }
 ];
 
 const CashLedger = () => {
   const currentUser = JSON.parse(localStorage.getItem('user') || 'null');
+  const { canWrite } = usePermissions();
+  const { showPopup } = usePopup();
+  const [showReceiveModal, setShowReceiveModal] = useState(false);
+  const [issuedModal, setIssuedModal] = useState({ open: false, record: null });
   const [companies, setCompanies] = useState([]);
   const [companyId, setCompanyId] = useState('');
   const [transactions, setTransactions] = useState([]);
@@ -76,6 +86,39 @@ const CashLedger = () => {
   }, [companyId, filters]);
 
   useEffect(() => { fetchLedger(); }, [fetchLedger]);
+
+  // Rows created by the Other Ledger feature: Cash Issued, or a Cash Receive
+  // classified as an Other Ledger. Every other row is untouched.
+  const isIssuedRow = (t) => t.reference_type === 'CASH_ISSUED';
+  const isOtherLedgerReceiveRow = (t) => t.reference_type === 'CASH_RECEIVE' && t.transaction_type === 'Other Ledger';
+
+  const handleSaved = (text) => {
+    setShowReceiveModal(false);
+    setIssuedModal({ open: false, record: null });
+    if (text) showPopup('success', text);
+    fetchLedger();
+  };
+
+  const handleEditIssued = async (t) => {
+    try {
+      const res = await api.get(`/finance/cash/issued/${t.id}`);
+      setIssuedModal({ open: true, record: res.data });
+    } catch (err) {
+      showPopup('error', err.response?.data?.error || 'Failed to load cash issued');
+    }
+  };
+
+  const handleVoid = async (t) => {
+    const issued = isIssuedRow(t);
+    if (!window.confirm(`Void this ${issued ? 'Cash Issued' : 'Cash Received'} transaction? Its Other Ledger entry will be reversed as well.`)) return;
+    try {
+      await api.delete(issued ? `/finance/cash/issued/${t.id}` : `/finance/cash/receive/${t.id}`);
+      showPopup('success', 'Transaction voided');
+      fetchLedger();
+    } catch (err) {
+      showPopup('error', err.response?.data?.error || 'Failed to void transaction');
+    }
+  };
 
   const handleFilterChange = e => {
     const { name, value } = e.target;
@@ -143,6 +186,8 @@ const CashLedger = () => {
     return acc;
   }, { debit: 0, credit: 0 }), [transactions]);
 
+  const showActions = canWrite && transactions.some((t) => isIssuedRow(t) || isOtherLedgerReceiveRow(t));
+
   const fmt = (v) => parseFloat(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const fmtDebit = (v) => {
@@ -165,9 +210,19 @@ const CashLedger = () => {
             <FontAwesomeIcon icon={faMoneyBillWave} style={{ marginRight: '8px' }} /> Cash Ledger
           </h2>
         </div>
-        <div className="report-filter-group" style={{ alignItems: 'center' }}>
-          <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)' }}>Company:</label>
-          <select value={companyId} onChange={e => setCompanyId(e.target.value)} className="report-filter-select">
+        <div className="cash-ledger-header-actions">
+          {canWrite && (
+            <>
+              <button type="button" className="btn btn-primary" onClick={() => setShowReceiveModal(true)}>
+                <FontAwesomeIcon icon={faHandHoldingDollar} /> Cash Received
+              </button>
+              <button type="button" className="btn btn-secondary" onClick={() => setIssuedModal({ open: true, record: null })}>
+                <FontAwesomeIcon icon={faMoneyBillTransfer} /> Cash Issued
+              </button>
+            </>
+          )}
+          <label htmlFor="cash-ledger-company" style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)', whiteSpace: 'nowrap' }}>Company:</label>
+          <select id="cash-ledger-company" value={companyId} onChange={e => setCompanyId(e.target.value)} className="report-filter-select">
             {companies.map(c => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
@@ -296,6 +351,18 @@ const CashLedger = () => {
           </table>
         )}
       </div>
+
+      {showReceiveModal && (
+        <CashReceive modal defaultCompanyId={companyId} onClose={() => setShowReceiveModal(false)} onSaved={handleSaved} />
+      )}
+      {issuedModal.open && (
+        <CashIssuedModal
+          defaultCompanyId={companyId}
+          record={issuedModal.record}
+          onClose={() => setIssuedModal({ open: false, record: null })}
+          onSaved={handleSaved}
+        />
+      )}
     </div>
   );
 };

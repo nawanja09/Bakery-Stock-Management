@@ -43,6 +43,7 @@ import {
   faClock,
   faWallet,
   faHandHoldingDollar,
+  faBookOpen,
   faLandmark,
   faRightLeft,
   faFileInvoiceDollar,
@@ -81,6 +82,7 @@ const NavigationBar = () => {
         path.startsWith('/expense-payees-management') ||
         path.startsWith('/bank-charges-type-management') ||
         path.startsWith('/finance/receive-types') ||
+        path.startsWith('/other-ledgers-management') ||
         path.startsWith('/admin/employees')) {
       setActiveModule('management');
     } else if (path.startsWith('/admin/password')) {
@@ -175,6 +177,7 @@ const NavigationBar = () => {
       {can('/expense-payees-management') && <li><NavLink to="/expense-payees-management" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faIdCard} /></span><span>Expenses Payee Management</span></NavLink></li>}
       {can('/bank-charges-type-management') && <li><NavLink to="/bank-charges-type-management" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faUniversity} /></span><span>Bank Charges Type Management</span></NavLink></li>}
       {can('/finance/receive-types') && <li><NavLink to="/finance/receive-types" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faCashRegister} /></span><span>Receive Types</span></NavLink></li>}
+      {can('/other-ledgers-management') && <li><NavLink to="/other-ledgers-management" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faBookOpen} /></span><span>Other Ledgers</span></NavLink></li>}
       {can('/admin/employees') && <li><NavLink to="/admin/employees" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faIdCard} /></span><span>Employee Management</span></NavLink></li>}
     </>
   );
@@ -361,7 +364,7 @@ const NavigationBar = () => {
   const renderFinanceContent = () => (
     <>
       {can('/finance/cash') && <li><NavLink to="/finance/cash" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faCashRegister} /></span><span>Cash Ledger</span></NavLink></li>}
-      {can('/finance/cash-receive') && <li><NavLink to="/finance/cash-receive" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faHandHoldingDollar} /></span><span>Cash Receive</span></NavLink></li>}
+      {can('/finance/other-ledgers') && <li><NavLink to="/finance/other-ledgers" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faBookOpen} /></span><span>Other Ledgers</span></NavLink></li>}
       {can('/finance/bank') && <li><NavLink to="/finance/bank" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faUniversity} /></span><span>Bank Ledger</span></NavLink></li>}
       {can('/finance/bank-receive') && <li><NavLink to="/finance/bank-receive" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faLandmark} /></span><span>Bank Receive</span></NavLink></li>}
       {can('/finance/card-ledger') && <li><NavLink to="/finance/card-ledger" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faCreditCard} /></span><span>Card Ledger</span></NavLink></li>}
