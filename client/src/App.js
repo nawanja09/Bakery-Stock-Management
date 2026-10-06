@@ -113,13 +113,14 @@ import DepartmentReturnItemWiseReport from './components/report/DepartmentReturn
 import LastIssueDateReport from './components/Analysis/LastIssueDateReport';
 
 import CashLedger from './components/Finance/CashLedger';
-import CashReceive from './components/Finance/CashReceive';
 import BankLedger from './components/Finance/BankLedger';
 import BankReceive from './components/Finance/BankReceive';
 import FundTransfer from './components/Finance/FundTransfer';
 
 import BankTransfer from './components/Finance/BankTransfer';
 import ReceiveTypeManagement from './components/Finance/ReceiveTypeManagement';
+import OtherLedgerManagement from './components/Finance/OtherLedgerManagement';
+import OtherLedgers from './components/Finance/OtherLedgers';
 import ExpensesChequeRegistry from './components/Finance/ExpensesChequeRegistry';
 import StaffLoans from './components/Finance/StaffLoans';
 import CardLedger from './components/Finance/CardLedger';
@@ -321,7 +322,7 @@ function App() {
 
 
             <Route path="finance/cash" element={<FinanceRoute><CashLedger /></FinanceRoute>} />
-            <Route path="finance/cash-receive" element={<FinanceRoute><CashReceive /></FinanceRoute>} />
+            <Route path="finance/cash-receive" element={<Navigate to="/finance/cash" replace />} />
             <Route path="finance/bank" element={<FinanceRoute><BankLedger /></FinanceRoute>} />
             <Route path="finance/bank-receive" element={<FinanceRoute><BankReceive /></FinanceRoute>} />
             <Route path="finance/transfer" element={<FinanceRoute><FundTransfer /></FinanceRoute>} />
@@ -337,6 +338,8 @@ function App() {
             <Route path="/analysis/last-issued-date" element={<LastIssueDateReport />} />
             <Route path="/finance/bank-transfer" element={<FinanceRoute><BankTransfer /></FinanceRoute>} />
             <Route path="/finance/receive-types" element={<FinanceRoute><ReceiveTypeManagement /></FinanceRoute>} />
+            <Route path="/other-ledgers-management" element={<FinanceRoute><OtherLedgerManagement /></FinanceRoute>} />
+            <Route path="/finance/other-ledgers" element={<FinanceRoute><OtherLedgers /></FinanceRoute>} />
             <Route path="/finance/cheque-registry" element={<FinanceRoute><ExpensesChequeRegistry /></FinanceRoute>} />
             <Route path="/finance/staff-loans" element={<FinanceRoute><StaffLoans /></FinanceRoute>} />
             <Route path="/finance/card-ledger" element={<FinanceRoute><CardLedger /></FinanceRoute>} />

@@ -4,6 +4,7 @@ const router = express.Router();
 const financeController = require('../controllers/financeController');
 const chequeRegistryController = require('../controllers/chequeRegistryController');
 const intercompanyController = require('../controllers/intercompanyController');
+const cashOtherLedgerController = require('../controllers/cashOtherLedgerController');
 const authenticate = require('../middleware/authenticate');
 const { financeReadAccess, financeWriteAccess } = require('../middleware/moduleAccess');
 
@@ -27,6 +28,16 @@ router.get('/bank/accounts', ...financeReadOnly, financeController.getBankAccoun
 // Cash ledger (per company) - Finance module page
 router.get('/cash/ledger/:companyId', ...financeReadOnly, financeController.getCashLedger); // ?dateFrom=&dateTo=&referenceNumber=&transactionType=
 router.post('/cash/receive', ...financeOnly, financeController.receiveCash);
+// Other Ledger extensions: Cash Issued (cash out to an Other Ledger) and
+// edit/void of Cash Receives classified as an Other Ledger. Plain Receive-Type
+// receipts are untouched by these routes.
+router.get('/cash/issued', ...financeReadOnly, cashOtherLedgerController.getCashIssuedList);
+router.get('/cash/issued/:id', ...financeReadOnly, cashOtherLedgerController.getCashIssuedById);
+router.post('/cash/issued', ...financeOnly, cashOtherLedgerController.createCashIssued);
+router.put('/cash/issued/:id', ...financeOnly, cashOtherLedgerController.updateCashIssued);
+router.delete('/cash/issued/:id', ...financeOnly, cashOtherLedgerController.voidCashIssued);
+router.put('/cash/receive/:id', ...financeOnly, cashOtherLedgerController.updateOtherLedgerCashReceive);
+router.delete('/cash/receive/:id', ...financeOnly, cashOtherLedgerController.voidOtherLedgerCashReceive);
 router.post('/cash/opening-balance', ...financeOnly, financeController.setCashOpeningBalance);
 
 // Bank ledger (per bank account) - Finance module page

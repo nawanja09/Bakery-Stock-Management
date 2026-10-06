@@ -16,14 +16,23 @@
 }
 
 .cash-ledger-page .page-header { min-height: 46px; margin-bottom: 2px; }
+.cash-ledger-page .cash-ledger-header-actions {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 12px;
+	flex-wrap: nowrap;
+}
+.cash-ledger-page .cash-ledger-header-actions > .btn { flex: 0 0 auto; }
+.cash-ledger-page .cash-ledger-header-actions > .report-filter-select { min-width: 190px; flex: 0 0 190px; }
 .cash-ledger-page .page-header h2 {
 	color: var(--cash-navy) !important;
 	font-size: clamp(1.35rem, 2vw, 1.7rem);
 	letter-spacing: -0.01em;
 }
 .cash-ledger-page .page-header h2 svg { color: var(--cash-blue); }
-.cash-ledger-page .report-filter-group > label { color: var(--cash-muted) !important; }
-.cash-ledger-page .report-filter-group > .report-filter-select { min-width: 190px; }
+.cash-ledger-page .cash-ledger-header-actions > label { color: var(--cash-muted) !important; }
 
 .cash-ledger-page .card {
 	border-color: var(--cash-border);
@@ -201,6 +210,23 @@
 	font-feature-settings: 'tnum';
 }
 .cash-ledger-table-card .report-table .fl-balance-cell { color: var(--cash-navy); font-weight: 700; }
+
+.cash-ledger-table-card .other-ledger-table th:nth-child(1),
+.cash-ledger-table-card .other-ledger-table td:nth-child(1) { width: 10%; }
+.cash-ledger-table-card .other-ledger-table th:nth-child(2),
+.cash-ledger-table-card .other-ledger-table td:nth-child(2) { width: 13%; }
+.cash-ledger-table-card .other-ledger-table th:nth-child(3),
+.cash-ledger-table-card .other-ledger-table td:nth-child(3) { width: 15%; }
+.cash-ledger-table-card .other-ledger-table th:nth-child(4),
+.cash-ledger-table-card .other-ledger-table td:nth-child(4) { width: 12%; }
+.cash-ledger-table-card .other-ledger-table th:nth-child(5),
+.cash-ledger-table-card .other-ledger-table td:nth-child(5) { width: 17%; }
+.cash-ledger-table-card .other-ledger-table th:nth-child(6),
+.cash-ledger-table-card .other-ledger-table td:nth-child(6),
+.cash-ledger-table-card .other-ledger-table th:nth-child(7),
+.cash-ledger-table-card .other-ledger-table td:nth-child(7),
+.cash-ledger-table-card .other-ledger-table th:nth-child(8),
+.cash-ledger-table-card .other-ledger-table td:nth-child(8) { width: 11%; }
 
 .cash-ledger-page .fl-direction,
 .cash-ledger-page .fl-type-chip {
@@ -475,8 +501,7 @@
 		flex-direction: column;
 		gap: 12px;
 	}
-	.cash-ledger-page .page-header .report-filter-group { width: 100%; }
-	.cash-ledger-page .page-header .report-filter-select { min-width: 0; width: 100%; }
+	.cash-ledger-page .cash-ledger-header-actions { width: 100%; overflow-x: auto; }
 	.cash-ledger-balance-card { gap: 14px !important; padding: 18px !important; }
 	.cash-ledger-balance-icon {
 		width: 56px;

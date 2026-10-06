@@ -12,12 +12,14 @@ const { checkDuplicateReference, DuplicateReferenceError } = require('../service
 const { getActiveBankAccounts } = require('../services/bankAccountService');
 const { hasActiveLedgerEntry } = require('../services/chequeReleaseService');
 const { isCardReceiveType, createPendingCardTransaction } = require('../services/cardLedgerService');
+const otherLedger = require('../services/otherLedgerService');
 
 const LEDGER_SELECT = `
   SELECT
     ft.id,
     DATE_FORMAT(ft.transaction_date, '%Y-%m-%d') AS date,
     ft.transaction_type,
+    ft.reference_type,
     ft.transaction_direction AS direction,
     ft.reference_number,
     ft.invoice_number,
@@ -149,17 +151,71 @@ const getCashLedger = async (req, res) => {
 // POST /api/finance/cash/receive - Cash Receive (Cash In)
 const receiveCash = async (req, res) => {
   const { company_id, date, amount, receive_type, reference_number, remark, created_by } = req.body;
+  // classification: 'receive_type' (default - the original behaviour, so existing
+  // API callers that never send it keep working) or 'other_ledger'.
+  const classification = req.body.classification || 'receive_type';
+  const otherLedgerId = req.body.other_ledger_id;
+  const hasOtherLedger = otherLedgerId !== undefined && otherLedgerId !== null && otherLedgerId !== '';
+  const hasReceiveType = receive_type !== undefined && receive_type !== null && String(receive_type).trim() !== '';
 
   if (!company_id) return res.status(400).json({ error: 'Company is required' });
   if (!date) return res.status(400).json({ error: 'Date is required' });
   if (!amount || parseFloat(amount) <= 0) return res.status(400).json({ error: 'Amount must be greater than 0' });
-  if (!receive_type) return res.status(400).json({ error: 'Receive type is required' });
+  if (!['receive_type', 'other_ledger'].includes(classification)) {
+    return res.status(400).json({ error: 'Classification must be receive_type or other_ledger' });
+  }
+  // Receive Type and Other Ledger are mutually exclusive - exactly one is required.
+  if (hasReceiveType && hasOtherLedger) {
+    return res.status(400).json({ error: 'Select either a Receive Type or an Other Ledger, not both' });
+  }
+  if (classification === 'receive_type') {
+    if (!receive_type) {
+      return res.status(400).json({ error: hasOtherLedger ? 'Classification does not match the selected Other Ledger' : 'Receive type is required' });
+    }
+  } else if (!hasOtherLedger) {
+    return res.status(400).json({ error: 'Other Ledger is required' });
+  } else if (hasReceiveType) {
+    return res.status(400).json({ error: 'Select either a Receive Type or an Other Ledger, not both' });
+  }
   if (!created_by) return res.status(400).json({ error: 'Created by is required' });
 
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
     await checkDuplicateReference(connection, reference_number, { includeLedger: true });
+
+    if (classification === 'other_ledger') {
+      // Cash Receive + Other Ledger: Cash Ledger DEBIT (the one primary
+      // transaction) + a linked Other Ledger CREDIT for the same source row.
+      const ledger = await otherLedger.requireActiveLedger(connection, otherLedgerId);
+      const balance = await recordCashTransaction(connection, {
+        companyId: company_id,
+        date,
+        remark: remark || null,
+        debit: parseFloat(amount),
+        transactionType: otherLedger.OTHER_LEDGER_RECEIVE_TYPE,
+        referenceNumber: reference_number || null,
+        partyName: ledger.name,
+        referenceType: 'CASH_RECEIVE',
+        createdBy: created_by
+      });
+      const sourceId = await otherLedger.lastInsertId(connection);
+      if (!sourceId) throw new Error('Cash Ledger entry was not created for the Other Ledger receipt');
+      await otherLedger.createImpact(connection, {
+        otherLedgerId: ledger.id,
+        sourceType: otherLedger.SOURCE_CASH_RECEIVE,
+        sourceId,
+        date,
+        amount: parseFloat(amount),
+        companyId: company_id,
+        referenceNo: reference_number || null,
+        remark: remark || null,
+        createdBy: created_by
+      });
+      await connection.commit();
+      return res.status(201).json({ message: 'Cash receipt recorded successfully!', balance, id: sourceId });
+    }
+
     const balance = await recordCashTransaction(connection, {
       companyId: company_id,
       date,
@@ -175,7 +231,8 @@ const receiveCash = async (req, res) => {
   } catch (error) {
     await connection.rollback();
     console.error('Error recording cash receipt:', error);
-    res.status(error.name === 'InsufficientBalanceError' || error.name === 'DuplicateReferenceError' ? 400 : 500).json({ error: error.message });
+    const clientError = error.name === 'InsufficientBalanceError' || error.name === 'DuplicateReferenceError' || error.name === 'OtherLedgerError';
+    res.status(error.name === 'OtherLedgerError' ? error.statusCode : (clientError ? 400 : 500)).json({ error: error.message });
   } finally {
     connection.release();
   }

@@ -1,6 +1,7 @@
 const pool = require('../config/db');
 const { recordRmAdjustment, recordFinancialAdjustment, sameValue } = require('../utils/rmAdjustmentAudit');
 const { checkDuplicateReference } = require('../services/referenceValidationService');
+const otherLedgerService = require('../services/otherLedgerService');
 
 const FINANCIAL_ADJUSTMENT_CATEGORIES = new Set(['Cash Receive', 'Bank Receive']);
 const FINANCIAL_ADJUSTMENT_SOURCES = new Set(['finance', 'card']);
@@ -188,6 +189,26 @@ const updateFinancialAdjustmentRecord = async (req, res) => {
       amount: normalizedAmount,
       remark: normalizedRemark
     };
+    // Cash Receives classified as an Other Ledger keep that classification: the
+    // Other Ledger entry is linked to this row, so the type cannot be swapped to
+    // a Receive Type here (and no plain receipt may take the reserved type).
+    let linkedOtherLedgerImpact = null;
+    if (source === 'finance' && category === 'Cash Receive') {
+      linkedOtherLedgerImpact = await otherLedgerService.getImpactBySource(
+        connection, otherLedgerService.SOURCE_CASH_RECEIVE, id, { forUpdate: true }
+      );
+      const reserved = otherLedgerService.OTHER_LEDGER_RECEIVE_TYPE;
+      const typeChanged = String(updatedValues.receive_type) !== String(originalValues.receive_type);
+      if ((linkedOtherLedgerImpact && typeChanged) ||
+          (!linkedOtherLedgerImpact && typeChanged && updatedValues.receive_type === reserved)) {
+        await connection.rollback();
+        return res.status(400).json({
+          error: linkedOtherLedgerImpact
+            ? 'The classification of an Other Ledger receipt cannot be changed here'
+            : `"${reserved}" is reserved for Other Ledger receipts`
+        });
+      }
+    }
     const changed = Object.keys(updatedValues).some((key) => !sameValue(originalValues[key], updatedValues[key]));
     if (source === 'finance') {
       await connection.query(
@@ -200,6 +221,14 @@ const updateFinancialAdjustmentRecord = async (req, res) => {
       );
       await recalculateFinanceAccountBalance(connection, category === 'Cash Receive' ? 'CASH' : 'BANK',
         category === 'Cash Receive' ? existing.company_id : existing.bank_id);
+      // Keep the linked Other Ledger entry (if any) in step with its source row:
+      // updated in place, never duplicated. No-op for every other receipt.
+      if (linkedOtherLedgerImpact) {
+        await otherLedgerService.syncImpactFromSource(connection, otherLedgerService.SOURCE_CASH_RECEIVE, id, {
+          date: updatedValues.date, amount: updatedValues.amount,
+          referenceNo: updatedValues.reference_number, remark: updatedValues.remark
+        });
+      }
     } else {
       await connection.query(
         `UPDATE card_transactions

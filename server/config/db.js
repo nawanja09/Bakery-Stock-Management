@@ -1104,4 +1104,57 @@ const ensureCardLedgerSchema = async () => {
 
 ensureCardLedgerSchema();
 
+// Management / Finance -> Other Ledgers (Director, AR, Short, Excess, ...).
+// Additive only. The source transaction (a finance_transactions row with
+// reference_type CASH_RECEIVE or CASH_ISSUED) stays the primary record;
+// other_ledger_transactions holds its linked ledger impact, one row per
+// source (UNIQUE source_type + source_id). Balances are always derived
+// (credit - debit); nothing is stored as a balance. See
+// migrations/026_other_ledgers.sql.
+const ensureOtherLedgersSchema = async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS other_ledgers (
+        id         INT NOT NULL AUTO_INCREMENT,
+        name       VARCHAR(100) NOT NULL,
+        status     TINYINT(1) NOT NULL DEFAULT 1,
+        created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        KEY idx_other_ledgers_status (status),
+        KEY idx_other_ledgers_name (name)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS other_ledger_transactions (
+        id               INT NOT NULL AUTO_INCREMENT,
+        other_ledger_id  INT NOT NULL,
+        transaction_date DATE NOT NULL,
+        debit            DECIMAL(14,2) NOT NULL DEFAULT 0,
+        credit           DECIMAL(14,2) NOT NULL DEFAULT 0,
+        source_type      ENUM('CASH_RECEIVE','CASH_ISSUED') NOT NULL,
+        source_id        INT NOT NULL,
+        company_id       INT NULL,
+        reference_no     VARCHAR(100) NULL,
+        remark           VARCHAR(255) NULL,
+        status           TINYINT(1) NOT NULL DEFAULT 1,
+        created_by       INT NULL,
+        created_at       TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at       TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        UNIQUE KEY uq_olt_source (source_type, source_id),
+        KEY idx_olt_ledger_date (other_ledger_id, transaction_date),
+        CONSTRAINT fk_olt_other_ledger FOREIGN KEY (other_ledger_id) REFERENCES other_ledgers(id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    console.log('Other Ledgers schema ready');
+  } catch (error) {
+    console.warn('Other Ledgers schema check skipped:', error.message);
+  }
+};
+
+ensureOtherLedgersSchema();
+
 module.exports = pool;
