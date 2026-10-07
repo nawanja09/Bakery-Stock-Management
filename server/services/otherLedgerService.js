@@ -13,11 +13,21 @@
 //   Cash Issued  + Other Ledger : Cash CREDIT, Other Ledger DEBIT
 //   Balance = SUM(credit) - SUM(debit)   (never stored)
 //
+// Collection (see collectionService.js) adds two SYSTEM accounts, "AR Account"
+// and "Short/Excess Account" (other_ledgers.is_system = 1). They are
+// debit-normal (other_ledgers.normal_balance = 'DEBIT'): their balance is
+// SUM(debit) - SUM(credit). Every other ledger keeps normal_balance 'CREDIT', so
+// the convention above - and every existing balance - is unchanged.
+//
 // Every function that writes takes an open transaction `connection`; none of
 // them commit, so they join the caller's DB transaction.
 
 const SOURCE_CASH_RECEIVE = 'CASH_RECEIVE';
 const SOURCE_CASH_ISSUED = 'CASH_ISSUED';
+const SOURCE_COLLECTION_AR = 'COLLECTION_AR';
+const SOURCE_COLLECTION_SHORT_EXCESS = 'COLLECTION_SHORT_EXCESS';
+const AR_ACCOUNT_NAME = 'AR Account';
+const SHORT_EXCESS_ACCOUNT_NAME = 'Short/Excess Account';
 const OTHER_LEDGER_RECEIVE_TYPE = 'Other Ledger'; // finance_transactions.transaction_type for receipts
 const CASH_ISSUED_TYPE = 'Cash Issued'; // finance_transactions.transaction_type for payments out
 
@@ -43,7 +53,7 @@ const impactForSource = (sourceType, amount) => {
 
 const getLedgerById = async (connection, id, { forUpdate = false } = {}) => {
   const [rows] = await connection.query(
-    `SELECT id, name, status FROM other_ledgers WHERE id = ?${forUpdate ? ' FOR UPDATE' : ''}`,
+    `SELECT id, name, status, is_system, normal_balance FROM other_ledgers WHERE id = ?${forUpdate ? ' FOR UPDATE' : ''}`,
     [id]
   );
   return rows[0] || null;
@@ -90,13 +100,57 @@ const createImpact = async (connection, {
   if (existing) throw new OtherLedgerError('This transaction already has an Other Ledger entry', 409);
 
   const { debit, credit } = impactForSource(sourceType, amount);
-  await connection.query(
+  return insertImpactRow(connection, {
+    otherLedgerId, date, debit, credit, sourceType, sourceId, companyId, referenceNo, remark, createdBy
+  });
+};
+
+/**
+ * Creates a linked entry with an explicit debit/credit. Used by Collection,
+ * where the side depends on the collection component (e.g. Short vs Excess).
+ * Same one-entry-per-source guarantee as createImpact.
+ * @returns {Promise<number>} the new other_ledger_transactions id
+ */
+const createImpactEntry = async (connection, {
+  otherLedgerId, sourceType, sourceId, date, debit = 0, credit = 0, companyId = null,
+  referenceNo = null, remark = null, createdBy = null
+}) => {
+  if (!sourceId) throw new OtherLedgerError('Source transaction id is required for an Other Ledger entry', 500);
+  const d = round2(debit);
+  const c = round2(credit);
+  if (d < 0 || c < 0 || (d === 0) === (c === 0)) {
+    throw new OtherLedgerError('An Other Ledger entry needs exactly one positive debit or credit', 500);
+  }
+  const existing = await getImpactBySource(connection, sourceType, sourceId, { forUpdate: true });
+  if (existing) throw new OtherLedgerError('This transaction already has an Other Ledger entry', 409);
+  return insertImpactRow(connection, {
+    otherLedgerId, date, debit: d, credit: c, sourceType, sourceId, companyId, referenceNo, remark, createdBy
+  });
+};
+
+const insertImpactRow = async (connection, {
+  otherLedgerId, date, debit, credit, sourceType, sourceId, companyId, referenceNo, remark, createdBy
+}) => {
+  const [result] = await connection.query(
     `INSERT INTO other_ledger_transactions
        (other_ledger_id, transaction_date, debit, credit, source_type, source_id,
         company_id, reference_no, remark, status, created_by)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
     [otherLedgerId, date, debit, credit, sourceType, sourceId, companyId, referenceNo, remark, createdBy]
   );
+  return result?.insertId ?? null;
+};
+
+/** The active system account with this name (AR Account / Short/Excess Account), locked. */
+const requireSystemLedger = async (connection, name) => {
+  const [rows] = await connection.query(
+    `SELECT id, name, status, is_system, normal_balance FROM other_ledgers
+      WHERE is_system = 1 AND LOWER(TRIM(name)) = LOWER(?) ORDER BY id ASC LIMIT 1 FOR UPDATE`,
+    [name]
+  );
+  if (!rows.length) throw new OtherLedgerError(`The "${name}" Other Ledger account is missing`, 500);
+  if (Number(rows[0].status) !== 1) throw new OtherLedgerError(`The "${name}" Other Ledger account is inactive`, 500);
+  return rows[0];
 };
 
 /**
@@ -154,22 +208,38 @@ const recalculateCashBalance = async (connection, companyId) => {
   return balance;
 };
 
-/** Balance = credits - debits over active rows, optionally up to a date. */
+/** SQL for one row's signed effect on its ledger's balance (needs aliases olt + ol). */
+const BALANCE_EFFECT_SQL = `CASE WHEN ol.normal_balance = 'DEBIT'
+       THEN CAST(olt.debit AS DECIMAL(14,2)) - CAST(olt.credit AS DECIMAL(14,2))
+       ELSE CAST(olt.credit AS DECIMAL(14,2)) - CAST(olt.debit AS DECIMAL(14,2)) END`;
+
+/**
+ * Balance over active rows. normal_balance 'CREDIT' (default, every ledger that
+ * existed before Collection) = credits - debits; 'DEBIT' = debits - credits.
+ */
 const getLedgerBalance = async (queryable, otherLedgerId) => {
   const [rows] = await queryable.query(
-    `SELECT COALESCE(SUM(CAST(credit AS DECIMAL(14,2)) - CAST(debit AS DECIMAL(14,2))), 0) AS balance
-       FROM other_ledger_transactions
-      WHERE other_ledger_id = ? AND status = 1`,
+    `SELECT COALESCE(SUM(${BALANCE_EFFECT_SQL}), 0) AS balance
+       FROM other_ledger_transactions olt
+       JOIN other_ledgers ol ON ol.id = olt.other_ledger_id
+      WHERE olt.other_ledger_id = ? AND olt.status = 1`,
     [otherLedgerId]
   );
   return round2(rows[0]?.balance);
 };
 
+/** Signed effect of one row on a ledger with this normal balance. */
+const balanceEffect = (row, normalBalance = 'CREDIT') => {
+  const debit = Number(row.debit) || 0;
+  const credit = Number(row.credit) || 0;
+  return normalBalance === 'DEBIT' ? debit - credit : credit - debit;
+};
+
 /** Running balance, oldest first; same-date rows ordered by created_at then id. */
-const withRunningBalance = (rows) => {
-  let running = 0;
+const withRunningBalance = (rows, normalBalance = 'CREDIT', opening = 0) => {
+  let running = round2(opening);
   return rows.map((row) => {
-    running = Number((running + (Number(row.credit) || 0) - (Number(row.debit) || 0)).toFixed(2));
+    running = Number((running + balanceEffect(row, normalBalance)).toFixed(2));
     return { ...row, balance: running };
   });
 };
@@ -177,6 +247,10 @@ const withRunningBalance = (rows) => {
 module.exports = {
   SOURCE_CASH_RECEIVE,
   SOURCE_CASH_ISSUED,
+  SOURCE_COLLECTION_AR,
+  SOURCE_COLLECTION_SHORT_EXCESS,
+  AR_ACCOUNT_NAME,
+  SHORT_EXCESS_ACCOUNT_NAME,
   OTHER_LEDGER_RECEIVE_TYPE,
   CASH_ISSUED_TYPE,
   OtherLedgerError,
@@ -188,9 +262,13 @@ module.exports = {
   getImpactBySource,
   lastInsertId,
   createImpact,
+  createImpactEntry,
+  requireSystemLedger,
   syncImpactFromSource,
   voidImpactForSource,
   recalculateCashBalance,
+  BALANCE_EFFECT_SQL,
   getLedgerBalance,
+  balanceEffect,
   withRunningBalance
 };

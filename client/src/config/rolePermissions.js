@@ -30,22 +30,24 @@ export const MODULES = Object.freeze({
   ANALYST: 'analyst',
   SETTINGS: 'settings',
   // Inside Management, but HR data - Admin / Super Admin only.
-  EMPLOYEES: 'employees'
+  EMPLOYEES: 'employees',
+  // Collection: Accountant, Admin, Super Admin (full) and QB (view only).
+  COLLECTION: 'collection'
 });
 
 const M = MODULES;
 
 const ADMIN_MODULES = [
   M.MANAGEMENT, M.RAW_MATERIAL, M.FINISHED_GOODS, M.EXPENSES, M.FINANCE,
-  M.CUTLERY, M.FG_PRODUCTION, M.ADJUSTMENTS, M.VAT, M.SETTINGS, M.EMPLOYEES
+  M.CUTLERY, M.FG_PRODUCTION, M.ADJUSTMENTS, M.VAT, M.SETTINGS, M.EMPLOYEES, M.COLLECTION
 ];
 
 // `settings` = the "Settings / Admin" group (only holds Change Password).
 // It is granted only to roles that should see that navigation group.
 export const ROLE_MODULES = Object.freeze({
   [ROLES.STORES]: [M.MANAGEMENT, M.RAW_MATERIAL, M.FG_PRODUCTION, M.SETTINGS],
-  [ROLES.ACCOUNTANT]: [M.MANAGEMENT, M.RAW_MATERIAL, M.FINANCE, M.EXPENSES, M.FG_PRODUCTION, M.VAT, M.SETTINGS],
-  [ROLES.QB]: [M.MANAGEMENT, M.RAW_MATERIAL, M.FG_PRODUCTION, M.FINANCE, M.EXPENSES, M.VAT, M.SETTINGS],
+  [ROLES.ACCOUNTANT]: [M.MANAGEMENT, M.RAW_MATERIAL, M.FINANCE, M.EXPENSES, M.FG_PRODUCTION, M.VAT, M.SETTINGS, M.COLLECTION],
+  [ROLES.QB]: [M.MANAGEMENT, M.RAW_MATERIAL, M.FG_PRODUCTION, M.FINANCE, M.EXPENSES, M.VAT, M.SETTINGS, M.COLLECTION],
   [ROLES.FINANCE_USER]: [M.MANAGEMENT, M.EXPENSES],
   [ROLES.ADMIN]: ADMIN_MODULES,
   [ROLES.SUPER_ADMIN]: [...ADMIN_MODULES, M.ANALYST]
@@ -205,6 +207,9 @@ export const ROUTE_RULES = [
   rule('/finance/bank-receive', { all: [M.FINANCE], write: true }),
   rule('/finance/transfer', { all: [M.FINANCE], write: true }),
   rule('/finance/bank-transfer', { all: [M.FINANCE], write: true }),
+
+  // ---- Collection (POS collections -> ledgers; Finance roles) ----
+  rule('/collection', { all: [M.COLLECTION] }),
 
   // ---- Cutlery / FG Production / Adjustments / VAT / Analyst ----
   rule('/cutlery', { all: [M.CUTLERY] }),

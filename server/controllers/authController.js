@@ -4,6 +4,7 @@ const pool = require('../config/db');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { getRoleModules } = require('../config/rolePermissions');
+const { warmUp: warmUpPos } = require('../services/posAuthService');
 
 if (!process.env.JWT_SECRET) {
   console.error('FATAL: JWT_SECRET is not defined. Authentication will fail.');
@@ -47,6 +48,11 @@ const loginUser = async (req, res) => {
         permissions,
         user: { id: user.id, name: user.name, username: user.username, role: user.role, permissions }
       });
+
+      // Collection users: have the backend's shared POS integration login ready
+      // (one cached token for everyone - not a per-user POS session). Runs after
+      // the response and never affects the Stock Management login.
+      if (permissions.includes('collection')) warmUpPos();
     } else {
       res.status(401).json({ error: 'Invalid credentials' });
     }

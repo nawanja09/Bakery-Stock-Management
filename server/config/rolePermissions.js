@@ -46,7 +46,10 @@ const MODULES = Object.freeze({
   SETTINGS: 'settings',
   // Not a sidebar module of its own: Employee Management sits inside
   // Management but holds HR data, so it is limited to Admin / Super Admin.
-  EMPLOYEES: 'employees'
+  EMPLOYEES: 'employees',
+  // Collection (POS collections -> ledgers). Its own module so access is
+  // exactly: Accountant, Admin, Super Admin (full) and QB (view only).
+  COLLECTION: 'collection'
 });
 
 const M = MODULES;
@@ -54,15 +57,15 @@ const M = MODULES;
 // Everything except Analyst.
 const ADMIN_MODULES = [
   M.MANAGEMENT, M.RAW_MATERIAL, M.FINISHED_GOODS, M.EXPENSES, M.FINANCE,
-  M.CUTLERY, M.FG_PRODUCTION, M.ADJUSTMENTS, M.VAT, M.SETTINGS, M.EMPLOYEES
+  M.CUTLERY, M.FG_PRODUCTION, M.ADJUSTMENTS, M.VAT, M.SETTINGS, M.EMPLOYEES, M.COLLECTION
 ];
 
 // NOTE: `settings` is the "Settings / Admin" group, which only contains Change
 // Password. It is granted to roles that should see the settings navigation.
 const ROLE_MODULES = Object.freeze({
   [ROLES.STORES]: [M.MANAGEMENT, M.RAW_MATERIAL, M.FG_PRODUCTION, M.SETTINGS],
-  [ROLES.ACCOUNTANT]: [M.MANAGEMENT, M.RAW_MATERIAL, M.FINANCE, M.EXPENSES, M.FG_PRODUCTION, M.VAT, M.SETTINGS],
-  [ROLES.QB]: [M.MANAGEMENT, M.RAW_MATERIAL, M.FG_PRODUCTION, M.FINANCE, M.EXPENSES, M.VAT, M.SETTINGS],
+  [ROLES.ACCOUNTANT]: [M.MANAGEMENT, M.RAW_MATERIAL, M.FINANCE, M.EXPENSES, M.FG_PRODUCTION, M.VAT, M.SETTINGS, M.COLLECTION],
+  [ROLES.QB]: [M.MANAGEMENT, M.RAW_MATERIAL, M.FG_PRODUCTION, M.FINANCE, M.EXPENSES, M.VAT, M.SETTINGS, M.COLLECTION],
   [ROLES.FINANCE_USER]: [M.MANAGEMENT, M.EXPENSES],
   [ROLES.ADMIN]: ADMIN_MODULES,
   [ROLES.SUPER_ADMIN]: [...ADMIN_MODULES, M.ANALYST]
@@ -166,6 +169,9 @@ const API_RULES = [
   { prefix: '/staff-loans', modules: [M.FINANCE] },
   { prefix: '/receive-types', modules: [M.FINANCE] },
   { prefix: '/other-ledgers', modules: [M.FINANCE] },
+  // Collection: Accountant / Admin / Super Admin full, QB read-only (view-only rule
+  // refuses every POST), every other role 403.
+  { prefix: '/collections', modules: [M.COLLECTION] },
   { prefix: '/incomes', modules: [M.FINANCE, M.ANALYST] },
 
   // ---- Finished Goods -------------------------------------------------------

@@ -25,11 +25,18 @@ const employeeAccess = moduleGate;
 // roles (QB) are refused even on GET, as before.
 const financeWriteAccess = [authenticate, authorizeApi, requireWriteCapability];
 
+// Collection: the /collections rule grants the `collection` module (Accountant,
+// Admin, Super Admin, QB); write = the same minus view-only roles (QB).
+const collectionReadAccess = moduleGate;
+const collectionWriteAccess = [authenticate, authorizeApi, requireWriteCapability];
+
 module.exports = {
   rawMaterialAccess,
   fgProductionAccess,
   financeReadAccess,
   financeWriteAccess,
+  collectionReadAccess,
+  collectionWriteAccess,
   staffLoanReadAccess,
   adjustmentsAccess,
   employeeAccess

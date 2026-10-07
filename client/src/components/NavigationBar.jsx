@@ -557,6 +557,21 @@ const NavigationBar = () => {
             </>
           )}
 
+          {/* Collection - directly below Finance (Accountant, Admin, Super Admin; QB view only) */}
+          {can('/collection') && (
+            <li>
+              <NavLink
+                to="/collection"
+                className={({ isActive }) => `nav-link module-item ${isActive ? 'active active-module' : ''}`}
+                title="Collection"
+                onClick={() => { setActiveModule(null); setActiveDropdown(null); }}
+              >
+                <span className="icon-container"><FontAwesomeIcon icon={faHandHoldingDollar} /></span>
+                <span>Collection</span>
+              </NavLink>
+            </li>
+          )}
+
           {/* Cutlery */}
           {canSeeNavModule('cutlery') && (
             <>

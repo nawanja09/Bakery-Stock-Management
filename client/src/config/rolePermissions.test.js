@@ -18,6 +18,7 @@ describe('Finance role permissions', () => {
     expect(canAccessPath(ROLES.FINANCE_USER, '/dashboard')).toBe(true);
     expect(canAccessPath(ROLES.FINANCE_USER, '/management')).toBe(true);
     expect(canAccessPath(ROLES.FINANCE_USER, '/expenses/petty-cash')).toBe(true);
+    expect(canAccessPath(ROLES.FINANCE_USER, '/collection')).toBe(false);
 
     expect(canSeeNavModule(ROLES.FINANCE_USER, 'management')).toBe(true);
     expect(canSeeNavModule(ROLES.FINANCE_USER, 'expenses')).toBe(true);
@@ -27,5 +28,17 @@ describe('Finance role permissions', () => {
     ].forEach((moduleName) => {
       expect(canSeeNavModule(ROLES.FINANCE_USER, moduleName)).toBe(false);
     });
+  });
+});
+
+describe('Collection navigation', () => {
+  test('only Accountant, Admin, Super Admin and QB see Collection', () => {
+    expect(canAccessPath('Finance', '/collection')).toBe(false);
+    expect(canAccessPath('Admin', '/collection')).toBe(true);
+    expect(canAccessPath('Super Admin', '/collection')).toBe(true);
+    expect(canAccessPath('View Only', '/collection')).toBe(true); // QB, view only
+    expect(canAccessPath('Accountant', '/collection')).toBe(true);
+    expect(canAccessPath('Store Keeper', '/collection')).toBe(false);
+    expect(canAccessPath('Staff', '/collection')).toBe(false);
   });
 });

@@ -124,6 +124,7 @@ import OtherLedgers from './components/Finance/OtherLedgers';
 import ExpensesChequeRegistry from './components/Finance/ExpensesChequeRegistry';
 import StaffLoans from './components/Finance/StaffLoans';
 import CardLedger from './components/Finance/CardLedger';
+import Collection from './components/Collection/Collection';
 import IntercompanyTransaction from './components/Finance/IntercompanyTransaction';
 
 import FGRecipes from './components/FGProduction/Recipes';
@@ -343,6 +344,7 @@ function App() {
             <Route path="/finance/cheque-registry" element={<FinanceRoute><ExpensesChequeRegistry /></FinanceRoute>} />
             <Route path="/finance/staff-loans" element={<FinanceRoute><StaffLoans /></FinanceRoute>} />
             <Route path="/finance/card-ledger" element={<FinanceRoute><CardLedger /></FinanceRoute>} />
+            <Route path="/collection" element={<PermittedRoute><Collection /></PermittedRoute>} />
             <Route path="/finance/intercompany" element={<FinanceRoute><IntercompanyTransaction /></FinanceRoute>} />
 
             <Route path="analyst/income" element={<AnalystRoute><AnalystIncomePage /></AnalystRoute>} />
