@@ -132,12 +132,12 @@ test('approve: every POS card payment becomes its own Card Ledger entry; the tot
   assert.deepEqual(cardRows.map((r) => r.amount), [810, 900, 5950, 1740]);
   assert.equal(cardRows.some((r) => r.amount === CARD_TOTAL), false);
   assert.deepEqual(cardRows.map((r) => r.ref), [
-    'SHIFT-211-0104/RCP2610060142', 'SHIFT-211-0104/RCP2610060149', 'SHIFT-211-0104/ORDER-614', 'SHIFT-211-0104/RCP2610060153'
+    'SHIFT-211-0104/SALE-21127', 'SHIFT-211-0104/SALE-21138', 'SHIFT-211-0104/ORDER-614', 'SHIFT-211-0104/SALE-21142'
   ]);
   assert.ok(cardRows.every((r) => r.company === 1 && r.bank === 3));
   assert.deepEqual(cardRows.map((r) => r.date), ['2026-10-06', '2026-10-06', '2026-10-06', '2026-10-06']);
-  assert.match(cardRows[0].remark, /Sale RCP2610060142, sale #21127 14:07 - SHIFT-211-0104 - Cafe - M/);
-  assert.match(cardRows[2].remark, /Order advance order #614/);
+  assert.match(cardRows[0].remark, /Sale #21127, receipt RCP2610060142 14:07 - SHIFT-211-0104 - Cafe - M/);
+  assert.match(cardRows[2].remark, /Order advance #614/);
   assert.match(cardRows[3].remark, /\(card_and_cash\)/);
 
   // Each linked by its unique POS key (source + shift + POS payment id).
@@ -177,9 +177,42 @@ test('approve: a card payment already in the Card Ledger -> 409, nothing written
 });
 
 test('approve: the existing Card Ledger reference check still guards duplicates', async () => {
-  const { connection } = makeConnection({ payload: shiftPayload(), usedRefs: ['shift-211-0104/rcp2610060149'] });
+  const { connection } = makeConnection({ payload: shiftPayload(), usedRefs: ['shift-211-0104/sale-21138'] });
   await assert.rejects(
     approveCollections(connection, { items: [{ id: 7, card_bank_account_id: 3 }], userId: 9 }),
-    /Reference number "SHIFT-211-0104\/RCP2610060149" is already used/
+    /Reference number "SHIFT-211-0104\/SALE-21138" is already used/
   );
+});
+
+test('receipt numbers such as "CASH" (sent by the live POS, not unique) never clash: references use the POS sale id', async () => {
+  const payments = [payment({ sale_id: 20835, receipt_no: 'CASH', amount: 660 }), payment({ sale_id: 20836, receipt_no: 'CASH', amount: 340 })];
+  const { connection, writes } = makeConnection({ payload: shiftPayload(payments, 1000), cardAmount: 1000 });
+  await approveCollections(connection, { items: [{ id: 7, card_bank_account_id: 3 }], userId: 9 });
+  assert.deepEqual(writes.card.map((c) => c.params[4]), ['SHIFT-211-0104/SALE-20835', 'SHIFT-211-0104/SALE-20836']);
+  assert.match(writes.card[0].params[5], /receipt CASH/);
+});
+
+test('atomic: a Card Ledger failure part-way through rolls the whole approval back (never Completed with partial cards)', async () => {
+  const { connection, writes } = makeConnection({ payload: shiftPayload(), usedRefs: ['shift-211-0104/order-614'] });
+  const tx = { begun: 0, commits: 0, rollbacks: 0, released: 0 };
+  Object.assign(connection, {
+    beginTransaction: async () => { tx.begun += 1; },
+    commit: async () => { tx.commits += 1; },
+    rollback: async () => { tx.rollbacks += 1; },
+    release: () => { tx.released += 1; }
+  });
+  const db = require('../config/db');
+  db.getConnection = async () => connection;
+  db.collectionsSchemaReady = Promise.resolve();
+  const controller = require('../controllers/collectionController');
+  const res = { statusCode: 200, body: null, status(c) { this.statusCode = c; return this; }, json(b) { this.body = b; return this; } };
+  await controller.approve({ user: { userId: 9, role: 'Accountant' }, body: { items: [{ id: 7, card_bank_account_id: 3 }] } }, res);
+
+  // Two card rows were written before the third failed - and the transaction was
+  // rolled back, not committed: never Completed with a partial Card Ledger.
+  assert.equal(writes.card.length, 2);
+  assert.equal(writes.statusUpdates, 0);
+  assert.deepEqual(tx, { begun: 1, commits: 0, rollbacks: 1, released: 1 });
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error, /ORDER-614" is already used/);
 });

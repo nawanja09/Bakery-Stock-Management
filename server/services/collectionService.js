@@ -175,9 +175,14 @@ const postBank = async (connection, ctx) => {
 // Unique key of one POS card payment across all collections.
 const posCardKey = (row, payment) => `${row.source_type}:${row.source_id}:${payment.key}`.slice(0, 191);
 
-// Card Ledger reference of one card payment: "SHIFT-211-0104/RCP2610060142".
+// Card Ledger reference of one card payment, from its POS transaction id:
+// "SHIFT-211-0104/SALE-20834", "SHIFT-211-0104/ORDER-614". The receipt number is
+// NOT used here: the live POS sends non-unique values such as "CASH" (verified:
+// 16 payments, and a receipt repeated within one shift); sale / order ids are
+// unique. The receipt number is kept in the remark.
 const cardPaymentReference = (ref, p) => {
-  const id = p.receipt_no || (p.order_id ? `ORDER-${p.order_id}` : null) || (p.sale_id ? `SALE-${p.sale_id}` : p.key);
+  const id = (p.sale_id ? `SALE-${p.sale_id}` : null) || (p.order_id ? `ORDER-${p.order_id}` : null)
+    || (p.receipt_no ? `RCPT-${p.receipt_no}` : p.key);
   return `${ref}/${id}${p.occurrence > 1 ? `-${p.occurrence}` : ''}`.slice(0, REFERENCE_MAX);
 };
 
@@ -193,7 +198,8 @@ const businessTime = (value) => {
 };
 const cardPaymentRemark = (ctx, p) => {
   const what = TYPE_LABELS[p.pos_type] || p.pos_type || 'Card payment';
-  const ids = [p.receipt_no, p.sale_id && `sale #${p.sale_id}`, p.order_id && `order #${p.order_id}`].filter(Boolean).join(', ');
+  const ids = [p.sale_id && `#${p.sale_id}`, p.order_id && `#${p.order_id}`, p.receipt_no && `receipt ${p.receipt_no}`]
+    .filter(Boolean).join(', ');
   const time = businessTime(p.date_time);
   return `Collection card - ${what}${ids ? ` ${ids}` : ''}${p.payment_method && p.payment_method !== 'card' ? ` (${p.payment_method})` : ''}`
     + `${time ? ` ${time}` : ''} - ${ctx.ref}${ctx.row.pos_branch_name ? ` - ${ctx.row.pos_branch_name}` : ''}`;

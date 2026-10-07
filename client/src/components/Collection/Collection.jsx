@@ -435,7 +435,10 @@ const Collection = () => {
   };
 
   // ------------------------------------------------------------- render helpers
-  const syncProblems = (sync?.sources || []).filter((s) => s.error || s.invalid > 0 || s.duplicate > 0 || s.unmapped > 0);
+  // A source the POS could not be reached for is not reported on this page
+  // (the server logs it); the records already in Pending are simply shown.
+  const loadedSources = (sync?.sources || []).filter((s) => !s.error);
+  const syncProblems = loadedSources.filter((s) => s.invalid > 0 || s.duplicate > 0 || s.unmapped > 0);
 
   // The POS only returns the branches its integration account may see
   // (/api/me branch_ids); Stock Management itself applies no department filter.
@@ -445,14 +448,14 @@ const Collection = () => {
   };
 
   const renderSyncBanner = () => {
-    if (!sync) return null;
+    if (!sync || loadedSources.length === 0) return null;
     if (syncProblems.length === 0) {
-      const fetched = sync.sources.reduce((n, s) => n + s.fetched, 0);
-      const added = sync.sources.reduce((n, s) => n + s.inserted + s.updated, 0);
+      const fetched = loadedSources.reduce((n, s) => n + s.fetched, 0);
+      const added = loadedSources.reduce((n, s) => n + s.inserted + s.updated, 0);
       return (
         <p className="cl-note">
           POS checked: {fetched} record{fetched === 1 ? '' : 's'} read from all branches
-          {' '}({sync.sources.map((s) => `${SOURCE_LABELS[s.source]} ${s.fetched}`).join(', ')}), {added} new or updated.
+          {' '}({loadedSources.map((s) => `${SOURCE_LABELS[s.source]} ${s.fetched}`).join(', ')}), {added} new or updated.
         </p>
       );
     }
@@ -463,15 +466,14 @@ const Collection = () => {
           {syncProblems.map((s) => (
             <div key={s.source}>
               <strong>{SOURCE_LABELS[s.source]}:</strong>{' '}
-              {s.error ? `could not be loaded from the POS - ${s.error}` : null}
-              {!s.error && s.invalid > 0 && (
+              {s.invalid > 0 && (
                 <>
                   {s.invalid} record{s.invalid === 1 ? '' : 's'} could not be read and {s.invalid === 1 ? 'was' : 'were'} skipped
                   {s.invalidSamples?.[0] && <> ({s.invalidSamples[0].reason}{s.invalidSamples[0].fields?.length ? `; fields: ${s.invalidSamples[0].fields.join(', ')}` : ''})</>}.
                 </>
               )}
-              {!s.error && s.duplicate > 0 && <> {s.duplicate} already-approved reference{s.duplicate === 1 ? '' : 's'} ignored.</>}
-              {!s.error && s.unmapped > 0 && (
+              {s.duplicate > 0 && <> {s.duplicate} already-approved reference{s.duplicate === 1 ? '' : 's'} ignored.</>}
+              {s.unmapped > 0 && (
                 <>
                   {' '}{s.unmapped} record{s.unmapped === 1 ? '' : 's'} from POS branches without a matching department
                   {' '}(shown as <em>Unmapped</em>; they cannot be approved until the branch maps):
@@ -485,8 +487,6 @@ const Collection = () => {
               )}
             </div>
           ))}
-          {posStatus && !posStatus.configured && <div>An administrator must set the POS finance account as the server's POS login.</div>}
-          <div className="col-sync-note">Records already in Pending are still shown below.</div>
         </div>
       </div>
     );
@@ -501,13 +501,6 @@ const Collection = () => {
             placeholder="Shift ref / no, reference, cashier, employee, department, branch, amount, method"
             value={draft.search} onChange={setDraftField('search')} />
         </div>
-      </div>
-      <div className="form-group">
-        <label htmlFor="col-source">Source</label>
-        <select id="col-source" value={draft.source} onChange={setDraftField('source')} className="form-select">
-          <option value="">All Sources</option>
-          {Object.entries(SOURCE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-        </select>
       </div>
       <div className="form-group">
         <label htmlFor="col-department">Department</label>
@@ -601,7 +594,6 @@ const Collection = () => {
                       )}
                       <th>Date</th>
                       <th>Shift / Reference No</th>
-                      <th>Source</th>
                       <th>Department</th>
                       <th>Payment Method</th>
                       <th className="cl-num">Cash</th>
@@ -634,7 +626,6 @@ const Collection = () => {
                             {displayRef(r)}
                             {isDeduction && linkedRefOf(r) && <div className="col-sub">for {linkedRefOf(r)}</div>}
                           </td>
-                          <td>{SOURCE_LABELS[r.source_type]}</td>
                           <td>{departmentCell(r)}</td>
                           <td>
                             {methodsOf(r).map((m) => <span key={m} className="col-chip">{METHOD_LABELS[m]}</span>)}
