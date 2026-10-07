@@ -233,6 +233,8 @@ const linkDeductionsToShifts = async (queryable) => {
   );
 };
 
+const loggedErrors = new Set();
+
 const syncSource = async (source, endpoint, { companyByName, matchDepartment, window }) => {
   const result = {
     source, fetched: 0, inserted: 0, updated: 0, unchanged: 0, duplicate: 0,
@@ -278,6 +280,11 @@ const syncSource = async (source, endpoint, { companyByName, matchDepartment, wi
       result[outcome] += 1;
     }
   } catch (error) {
+    // Not shown on the Collection page; kept in the server log (once per message).
+    if (!loggedErrors.has(`${source}:${error.message}`)) {
+      loggedErrors.add(`${source}:${error.message}`);
+      console.warn(`Collection sync - ${source} could not be loaded from the POS: ${error.message}`);
+    }
     result.error = error.message;
     result.errorType = error.name;
   }
