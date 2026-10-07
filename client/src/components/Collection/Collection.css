@@ -1,0 +1,106 @@
+/* ============================================================================
+   COLLECTION
+   Builds on the Card Ledger `cl-` layout (tabs, tables, modal); everything
+   specific to this page uses the `col-` prefix.
+   ============================================================================ */
+
+.col-filters { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto; align-items: end; }
+.col-refresh { justify-content: flex-end; }
+
+.col-table th, .col-table td { white-space: nowrap; }
+.col-table td.col-reason { white-space: normal; min-width: 180px; }
+
+.col-chip {
+  display: inline-block;
+  margin: 1px 4px 1px 0;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #3730a3;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.col-sub { font-size: 0.75rem; color: var(--color-text-secondary, #64748b); }
+.col-zero { color: var(--color-text-secondary, #94a3b8); }
+.col-short { color: #b91c1c; font-weight: 600; }
+.col-excess { color: #047857; font-weight: 600; }
+.col-warn { font-size: 0.75rem; color: #b45309; font-weight: 600; }
+
+.col-status {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.col-status-pending { background: #fef3c7; color: #92400e; }
+.col-status-completed { background: #d1fae5; color: #065f46; }
+.col-status-rejected { background: #fee2e2; color: #991b1b; }
+
+.col-sync-alert {
+  display: flex;
+  gap: 10px;
+  margin: 0 0 var(--spacing-md, 12px);
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  font-size: 0.875rem;
+}
+.col-sync-alert > svg { margin-top: 3px; }
+.col-sync-note { margin-top: 4px; color: #7f1d1d; opacity: 0.85; }
+
+.col-actions { display: flex; gap: 8px; }
+.col-reject-btn { color: #b91c1c; }
+.btn-primary.col-reject-btn { background: #dc2626; border-color: #dc2626; color: #fff; }
+
+.col-modal { max-width: 1100px; width: 95vw; }
+.col-approve-table td { vertical-align: top; white-space: normal; }
+.col-approve-table .form-select { min-width: 180px; }
+.col-posts div { font-size: 0.8rem; white-space: nowrap; }
+
+@media (max-width: 768px) {
+  .col-filters { grid-template-columns: 1fr; }
+  .col-actions { width: 100%; justify-content: flex-end; }
+}
+
+.col-map-errors { margin: 4px 0 4px 18px; padding: 0; }
+.col-map-errors li { margin: 2px 0; }
+
+/* Shared filter bar: Search + Source + Department + From / To (all tabs) */
+.col-filter-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 2.2fr) repeat(4, minmax(0, 1fr)) auto;
+  gap: var(--spacing-md, 12px);
+  align-items: end;
+  margin-bottom: var(--spacing-md, 12px);
+}
+.col-filter-actions { display: flex; gap: 8px; justify-content: flex-end; flex-direction: row; }
+.col-pager { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 12px 0; font-size: 0.875rem; }
+
+@media (max-width: 1100px) {
+  .col-filter-bar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .col-search { grid-column: 1 / -1; }
+}
+@media (max-width: 600px) {
+  .col-filter-bar { grid-template-columns: 1fr; }
+}
+
+/* Search box with its Search button (applies every filter at once) */
+.col-search-row { display: flex; gap: 8px; }
+.col-search-row .form-input { flex: 1; min-width: 0; }
+.col-search-row .btn { white-space: nowrap; }
+
+/* Individual card payments of a shift (each one is its own Card Ledger entry) */
+.col-card-table td { white-space: nowrap; }
+.col-link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #2563eb;
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+}

@@ -1155,6 +1155,242 @@ const ensureOtherLedgersSchema = async () => {
   }
 };
 
-ensureOtherLedgersSchema();
+const otherLedgersReady = ensureOtherLedgersSchema();
+
+// Collection module (POS -> Pending -> Completed / Rejected) and the two system
+// Other Ledger accounts it posts to. Additive only - see
+// migrations/027_collections.sql for the design notes.
+const SYSTEM_OTHER_LEDGERS = ['AR Account', 'Short/Excess Account'];
+
+// An earlier, never-released draft of this module created `collections` with a
+// different layout (source / source_reference ...). CREATE TABLE IF NOT EXISTS
+// would keep that table, so it is moved aside (renamed, nothing deleted) when it
+// holds only pending staging rows. Pending rows are simply re-read from the POS.
+const retireDraftCollectionsTable = async () => {
+  const [cols] = await pool.query(
+    `SELECT column_name AS name FROM information_schema.columns
+      WHERE table_schema = DATABASE() AND table_name = 'collections'`
+  );
+  const names = new Set(cols.map((c) => String(c.name).toLowerCase()));
+  if (names.size === 0 || names.has('source_type') || !names.has('source_reference')) return;
+
+  const [[{ settled }]] = await pool.query("SELECT COUNT(*) AS settled FROM collections WHERE status <> 'pending'");
+  if (Number(settled) > 0) {
+    throw new Error('the old draft `collections` table has completed/rejected rows - migrate it by hand (see migrations/027_collections.sql)');
+  }
+  const [[ct]] = await pool.query(
+    `SELECT COUNT(*) AS n FROM information_schema.tables
+      WHERE table_schema = DATABASE() AND table_name = 'collection_transactions'`
+  );
+  if (Number(ct.n) > 0) {
+    const [[{ line_count: lineCount }]] = await pool.query('SELECT COUNT(*) AS line_count FROM collection_transactions');
+    if (Number(lineCount) > 0) throw new Error('collection_transactions is not empty - migrate the old draft `collections` table by hand');
+    // Its foreign key points at `collections`; recreate it after the rename.
+    await pool.query('DROP TABLE collection_transactions');
+  }
+  const [[legacy]] = await pool.query(
+    `SELECT COUNT(*) AS n FROM information_schema.tables
+      WHERE table_schema = DATABASE() AND table_name = 'collections_legacy_draft'`
+  );
+  const target = Number(legacy.n) > 0 ? `collections_legacy_draft_${Date.now()}` : 'collections_legacy_draft';
+  await pool.query(`RENAME TABLE collections TO ${target}`);
+  console.warn(`Collections: old draft table renamed to ${target}; pending records will be re-read from the POS`);
+};
+
+const ensureCollectionsSchema = async () => {
+  try {
+    await retireDraftCollectionsTable();
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS collections (
+        id                   INT NOT NULL AUTO_INCREMENT,
+        source_type          ENUM('SHIFT','CREDIT_PAYMENT','EMPLOYEE_DEDUCTION') NOT NULL,
+        source_id            VARCHAR(100) NOT NULL,
+        reference_no         VARCHAR(100) NULL,
+        collection_date      DATE NOT NULL,
+        shift_id             VARCHAR(100) NULL,
+        shift_no             VARCHAR(50) NULL,
+        shift_reference      VARCHAR(100) NULL,
+        cashier_name         VARCHAR(255) NULL,
+        employee_id          VARCHAR(100) NULL,
+        employee_name        VARCHAR(255) NULL,
+        pos_company          VARCHAR(255) NULL,
+        company_id           INT NULL,
+        pos_branch_id        VARCHAR(50) NULL,
+        pos_branch_name      VARCHAR(255) NULL,
+        department_id        INT NULL,
+        pos_payment_method   VARCHAR(50) NULL,
+        pos_bank_account     VARCHAR(100) NULL,
+        cash_amount          DECIMAL(14,2) NOT NULL DEFAULT 0,
+        card_amount          DECIMAL(14,2) NOT NULL DEFAULT 0,
+        bank_amount          DECIMAL(14,2) NOT NULL DEFAULT 0,
+        ar_amount            DECIMAL(14,2) NOT NULL DEFAULT 0,
+        short_excess_amount  DECIMAL(14,2) NOT NULL DEFAULT 0,
+        deduction_amount     DECIMAL(14,2) NOT NULL DEFAULT 0,
+        total_amount         DECIMAL(14,2) NOT NULL DEFAULT 0,
+        pos_total_amount     DECIMAL(14,2) NULL,
+        linked_collection_id INT NULL,
+        status               ENUM('pending','completed','rejected') NOT NULL DEFAULT 'pending',
+        approved_by          INT NULL,
+        approved_at          DATETIME NULL,
+        rejected_by          INT NULL,
+        rejected_at          DATETIME NULL,
+        rejection_reason     VARCHAR(255) NULL,
+        raw_payload          LONGTEXT NULL,
+        last_synced_at       DATETIME NULL,
+        created_at           TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at           TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        UNIQUE KEY uq_collections_source (source_type, source_id),
+        KEY idx_collections_reference (source_type, reference_no),
+        KEY idx_collections_status_date (status, collection_date),
+        KEY idx_collections_company (company_id),
+        KEY idx_collections_shift (shift_id),
+        KEY idx_collections_department (department_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    // Shift reference + POS branch -> department (added after the first release).
+    for (const stmt of [
+      'ALTER TABLE collections ADD COLUMN IF NOT EXISTS shift_no VARCHAR(50) NULL AFTER shift_id',
+      'ALTER TABLE collections ADD COLUMN IF NOT EXISTS shift_reference VARCHAR(100) NULL AFTER shift_no',
+      'ALTER TABLE collections ADD COLUMN IF NOT EXISTS pos_branch_id VARCHAR(50) NULL AFTER company_id',
+      'ALTER TABLE collections ADD COLUMN IF NOT EXISTS pos_branch_name VARCHAR(255) NULL AFTER pos_branch_id',
+      'ALTER TABLE collections ADD COLUMN IF NOT EXISTS department_id INT NULL AFTER pos_branch_name',
+      'ALTER TABLE collections ADD KEY IF NOT EXISTS idx_collections_department (department_id)',
+      // Individual card payments of a shift (count / sum of card.transactions[]).
+      'ALTER TABLE collections ADD COLUMN IF NOT EXISTS card_txn_count INT NULL AFTER card_amount',
+      'ALTER TABLE collections ADD COLUMN IF NOT EXISTS card_txn_total DECIMAL(14,2) NULL AFTER card_txn_count'
+    ]) {
+      try { await pool.query(stmt); } catch (alterErr) { console.warn('Collections schema alter skipped:', alterErr.message); }
+    }
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS collection_transactions (
+        id                          INT NOT NULL AUTO_INCREMENT,
+        collection_id               INT NOT NULL,
+        transaction_date            DATE NOT NULL,
+        reference_no                VARCHAR(100) NULL,
+        payment_method              ENUM('CASH','CARD','BANK','AR','SHORT_EXCESS') NOT NULL,
+        amount                      DECIMAL(14,2) NOT NULL,
+        company_id                  INT NOT NULL,
+        bank_account_id             INT NULL,
+        finance_transaction_id      INT NULL,
+        card_transaction_id         INT NULL,
+        other_ledger_id             INT NULL,
+        other_ledger_transaction_id INT NULL,
+        related_collection_id       INT NULL,
+        source_type                 ENUM('SHIFT','CREDIT_PAYMENT','EMPLOYEE_DEDUCTION') NOT NULL,
+        source_id                   VARCHAR(100) NOT NULL,
+        created_by                  INT NULL,
+        created_at                  TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at                  TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        UNIQUE KEY uq_ct_collection_method (collection_id, payment_method),
+        KEY idx_ct_method_date (payment_method, transaction_date),
+        KEY idx_ct_source (source_type, source_id),
+        CONSTRAINT fk_ct_collection FOREIGN KEY (collection_id) REFERENCES collections(id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    // One row per individual POS card payment posted to the Card Ledger: the
+    // shift's CARD line in collection_transactions is only the summary. The
+    // UNIQUE POS key (source + shift + POS payment id) makes posting the same
+    // card payment twice impossible, whichever collection tries it.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS collection_card_payments (
+        id                          INT NOT NULL AUTO_INCREMENT,
+        collection_id               INT NOT NULL,
+        collection_transaction_id   INT NOT NULL,
+        pos_card_key                VARCHAR(191) NOT NULL,
+        pos_type                    VARCHAR(30) NULL,
+        pos_sale_id                 VARCHAR(50) NULL,
+        pos_order_id                VARCHAR(50) NULL,
+        pos_receipt_no              VARCHAR(100) NULL,
+        pos_payment_method          VARCHAR(50) NULL,
+        pos_date_time               VARCHAR(40) NULL,
+        transaction_date            DATE NOT NULL,
+        amount                      DECIMAL(14,2) NOT NULL,
+        card_transaction_id         INT NOT NULL,
+        created_by                  INT NULL,
+        created_at                  TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        UNIQUE KEY uq_ccp_pos_card (pos_card_key),
+        UNIQUE KEY uq_ccp_card_tx (card_transaction_id),
+        KEY idx_ccp_collection (collection_id),
+        CONSTRAINT fk_ccp_collection FOREIGN KEY (collection_id) REFERENCES collections(id),
+        CONSTRAINT fk_ccp_line FOREIGN KEY (collection_transaction_id) REFERENCES collection_transactions(id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    // Other Ledger additions need the Other Ledger tables first.
+    await otherLedgersReady;
+    for (const stmt of [
+      'ALTER TABLE other_ledgers ADD COLUMN IF NOT EXISTS is_system TINYINT(1) NOT NULL DEFAULT 0',
+      "ALTER TABLE other_ledgers ADD COLUMN IF NOT EXISTS normal_balance ENUM('CREDIT','DEBIT') NOT NULL DEFAULT 'CREDIT'",
+      "ALTER TABLE other_ledger_transactions MODIFY COLUMN source_type ENUM('CASH_RECEIVE','CASH_ISSUED','COLLECTION_AR','COLLECTION_SHORT_EXCESS') NOT NULL"
+    ]) {
+      try { await pool.query(stmt); } catch (alterErr) { console.warn('Collections schema alter skipped:', alterErr.message); }
+    }
+
+    // The two system accounts. An existing ledger with exactly that name is
+    // adopted (marked system); its balance side is only switched to DEBIT when
+    // it has no transactions yet, so no existing balance can flip sign.
+    for (const name of SYSTEM_OTHER_LEDGERS) {
+      const [rows] = await pool.query(
+        'SELECT id FROM other_ledgers WHERE LOWER(TRIM(name)) = LOWER(?) ORDER BY status DESC, id ASC LIMIT 1', [name]
+      );
+      if (rows.length === 0) {
+        await pool.query("INSERT INTO other_ledgers (name, status, is_system, normal_balance) VALUES (?, 1, 1, 'DEBIT')", [name]);
+      } else {
+        const [used] = await pool.query('SELECT 1 FROM other_ledger_transactions WHERE other_ledger_id = ? LIMIT 1', [rows[0].id]);
+        await pool.query('UPDATE other_ledgers SET is_system = 1, status = 1 WHERE id = ?', [rows[0].id]);
+        if (used.length === 0) await pool.query("UPDATE other_ledgers SET normal_balance = 'DEBIT' WHERE id = ?", [rows[0].id]);
+      }
+    }
+
+    // POS "MASActive" is the "MAS Intimo" department (departmentMapper
+    // normalizePosBranchName). Rows staged before that rule get the Stock
+    // Management name; the original POS name stays in raw_payload. Pending rows
+    // that were unmapped because of it are mapped. Idempotent.
+    try {
+      await pool.query(
+        "UPDATE collections SET pos_branch_name = REPLACE(pos_branch_name, 'MASActive', 'MAS Intimo') WHERE pos_branch_name LIKE BINARY '%MASActive%'"
+      );
+      await pool.query(
+        `UPDATE collections c JOIN departments d ON d.name = 'MAS Intimo'
+            SET c.department_id = d.id
+          WHERE c.status = 'pending' AND c.department_id IS NULL
+            AND (c.pos_branch_name = 'MAS Intimo' OR c.pos_branch_name LIKE 'MAS Intimo -%' OR c.pos_branch_name LIKE 'MAS Intimo (%')`
+      );
+    } catch (renameErr) {
+      console.warn('Collections MASActive -> MAS Intimo update skipped:', renameErr.message);
+    }
+
+    // Card payment summary for shifts staged before it existed (read from the
+    // stored POS payload; nothing is invented). Summary columns only, once each.
+    try {
+      const { cardPaymentsOf } = require('../services/collectionMapper');
+      const [shifts] = await pool.query(
+        "SELECT id, raw_payload FROM collections WHERE source_type = 'SHIFT' AND card_txn_count IS NULL AND card_amount <> 0"
+      );
+      for (const row of shifts) {
+        const details = cardPaymentsOf(row.raw_payload);
+        if (!details.available) continue;
+        await pool.query(
+          'UPDATE collections SET card_txn_count = ?, card_txn_total = ? WHERE id = ? AND card_txn_count IS NULL',
+          [details.count, details.total, row.id]
+        );
+      }
+    } catch (backfillErr) {
+      console.warn('Collections card payment summary backfill skipped:', backfillErr.message);
+    }
+
+    console.log('Collections schema ready');
+  } catch (error) {
+    console.warn('Collections schema check skipped:', error.message);
+  }
+};
+
+pool.collectionsSchemaReady = ensureCollectionsSchema();
 
 module.exports = pool;

@@ -7,7 +7,9 @@
 // or manages an FG Item master of its own - it reads the live item list
 // from the POS `/api/items-list` endpoint through this service.
 //
-// Only this file is allowed to know about the POS API URL/credentials.
+// Only the POS services (this file, posAuthService.js for the login/token and
+// collectionSyncService.js for the Collection endpoints) know about the POS
+// API URL/credentials.
 // Controllers must always go through the functions exported here -
 // the BSMS frontend must never call the POS API directly.
 //
@@ -23,10 +25,13 @@
 // names differ, only `mapPosItem()` needs to change.
 // ----------------------------------------------------------------------
 
+// Authentication (background /api/login + Bearer token) lives in posAuthService.
+const { posGet, PosConfigError, PosResponseError } = require('./posAuthService');
+
 const RAVON_POS_API_URL = process.env.RAVON_POS_API_URL || '';
-const RAVON_POS_ITEMS_ENDPOINT = process.env.RAVON_POS_ITEMS_ENDPOINT || '/api/items-list';
-const RAVON_POS_API_KEY = process.env.RAVON_POS_API_KEY || '';
-const RAVON_POS_TIMEOUT_MS = Number(process.env.RAVON_POS_TIMEOUT_MS) || 8000;
+// One endpoint. If several are listed ("a,b,c"), the first is the items list -
+// the Collection endpoints have their own settings (collectionSyncService.js).
+const RAVON_POS_ITEMS_ENDPOINT = (process.env.RAVON_POS_ITEMS_ENDPOINT || '').split(',')[0].trim() || '/api/items-list';
 
 class RavonPosConfigError extends Error {
   constructor(message) {
@@ -126,37 +131,18 @@ const mapPosItem = (raw) => {
 const fetchRavonPosItems = async ({ includeInactive = false } = {}) => {
   const url = buildItemsUrl();
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), RAVON_POS_TIMEOUT_MS);
-
-  let response;
-  try {
-    response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-        ...(RAVON_POS_API_KEY ? { Authorization: `Bearer ${RAVON_POS_API_KEY}` } : {})
-      },
-      signal: controller.signal
-    });
-  } catch (err) {
-    if (err.name === 'AbortError') {
-      throw new RavonPosUnavailableError('Ravon POS request timed out');
-    }
-    throw new RavonPosUnavailableError(`Unable to connect to Ravon POS: ${err.message}`);
-  } finally {
-    clearTimeout(timeout);
-  }
-
-  if (!response.ok) {
-    throw new RavonPosUnavailableError(`Ravon POS API responded with status ${response.status}`);
-  }
-
+  // Authenticated through the shared background POS login (posAuthService);
+  // its errors are mapped onto this module's existing error classes.
   let payload;
   try {
-    payload = await response.json();
+    payload = await posGet(url);
   } catch (err) {
-    throw new RavonPosResponseError('Ravon POS API returned an invalid response');
+    if (err instanceof PosConfigError) throw new RavonPosConfigError(err.message);
+    if (err instanceof PosResponseError && err.status) {
+      throw new RavonPosUnavailableError(`Ravon POS API responded with status ${err.status}`);
+    }
+    if (err instanceof PosResponseError) throw new RavonPosResponseError('Ravon POS API returned an invalid response');
+    throw new RavonPosUnavailableError(err.message);
   }
 
   const rawItems = extractItemsArray(payload);

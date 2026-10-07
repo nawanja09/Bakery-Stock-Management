@@ -1,0 +1,447 @@
+// Collection module tests that need no MySQL:
+//   * collectionMapper: POS record -> collections row, postings per payment method
+//   * posAuthService:   background POS login against a local mock POS server -
+//                       token reuse, single-flight login, expired / invalid token
+//                       (401 -> one re-login + retry), rejected credentials.
+// The approve / reject / ledger flow is exercised against a real database by
+// the end-to-end script described in the project notes.
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const http = require('node:http');
+
+const { mapPosRecord, extractRecords, postingsOf, toPaymentMethod, SOURCES } = require('../services/collectionMapper');
+
+// ---------------------------------------------------------------------------
+// Mapper
+// ---------------------------------------------------------------------------
+// Shape verified against the live POS /api/completed-shifts/collection (transactions trimmed).
+const liveShift = (over = {}) => ({
+  shift_id: 211,
+  shift_no: '0104',
+  branch: { id: 6, name: 'Cafe - M' },
+  cashier: { id: 2, name: 'Imasha' },
+  opened_at: '2026-10-06T00:36:51.000000Z',
+  closed_at: '2026-10-06T08:36:35.000000Z',
+  completed_at: '2026-10-06T10:19:28.000000Z',
+  cash: { declared: 44560, actual: 44560, counted: 44560 },
+  card: { total: 32929, count: 33, transactions: [{ type: 'sale', amount: 710, payment_method: 'card' }] },
+  online: { total: 12380, count: 2, transactions: [] },
+  credit: { total: 5440 },
+  short_excess: { by_method: { cash: -120, card: 0, credit: 0, online: 0, pickme: 0 }, total: -120, status: 'short' },
+  collection: 95309,
+  ...over
+});
+
+test('live shift record: nested amounts, shift reference 211-0104, branch kept for department mapping', () => {
+  const raw = liveShift();
+  const result = mapPosRecord(SOURCES.SHIFT, raw);
+  assert.equal(result.ok, true, result.reason);
+  const r = result.record;
+  assert.equal(r.source_id, '211');
+  assert.equal(r.shift_id, '211');
+  assert.equal(r.shift_no, '0104');
+  assert.equal(r.shift_reference, '211-0104');
+  assert.equal(r.reference_no, '211-0104');
+  assert.equal(r.pos_branch_id, '6');
+  assert.equal(r.pos_branch_name, 'Cafe - M');
+  assert.equal(r.pos_company, null); // a branch is a department, not a company
+  assert.equal(r.cashier_name, 'Imasha');
+  assert.equal(r.collection_date, '2026-10-06'); // closed_at in Asia/Colombo
+  assert.deepEqual(
+    [r.cash_amount, r.card_amount, r.bank_amount, r.ar_amount, r.short_excess_amount, r.total_amount, r.pos_total_amount],
+    [44560, 32929, 12380, 5440, 120, 95309, 95309] // short 120 stored +; total = POS collection
+  );
+  assert.deepEqual(JSON.parse(r.raw_payload), raw);
+  assert.deepEqual(postingsOf(r).map((p) => [p.method, p.amount]),
+    [['CASH', 44560], ['CARD', 32929], ['BANK', 12380], ['AR', 5440], ['SHORT_EXCESS', 120]]);
+});
+
+test('live shift: cash.actual null falls back to cash.counted; excess stored negative', () => {
+  const r = mapPosRecord(SOURCES.SHIFT, liveShift({
+    shift_id: 205, shift_no: '0101',
+    cash: { declared: 24244, actual: null, counted: 24244 },
+    card: { total: 28960 }, online: { total: 0 }, credit: { total: 66 },
+    short_excess: { total: 332, status: 'excess' }, collection: 53270
+  })).record;
+  assert.equal(r.cash_amount, 24244);
+  assert.equal(r.short_excess_amount, -332);
+  assert.equal(r.total_amount, 53270);
+  assert.equal(r.shift_reference, '205-0101');
+});
+
+test('short/excess without a status: POS sign (negative = short) is used', () => {
+  const short = mapPosRecord(SOURCES.SHIFT, liveShift({ short_excess: { total: -750 } })).record;
+  assert.equal(short.short_excess_amount, 750);
+  const excess = mapPosRecord(SOURCES.SHIFT, liveShift({ short_excess: { total: 90 } })).record;
+  assert.equal(excess.short_excess_amount, -90);
+});
+
+test('a shift without shift_no is refused (shift reference must combine both)', () => {
+  const raw = liveShift();
+  delete raw.shift_no;
+  const result = mapPosRecord(SOURCES.SHIFT, raw);
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /No shift number/);
+});
+
+test('UTC timestamps are dated in Sri Lanka time', () => {
+  const late = mapPosRecord(SOURCES.SHIFT, liveShift({ closed_at: '2026-10-06T20:10:00.000000Z' })).record;
+  assert.equal(late.collection_date, '2026-10-07');
+});
+
+test('separate short / excess fields become one signed amount (+ short, - excess)', () => {
+  const excess = mapPosRecord(SOURCES.SHIFT, { id: 1, shift_no: '1', date: '2026-10-06', cash: 100, excess_amount: 40 });
+  assert.equal(excess.record.short_excess_amount, -40);
+  const short = mapPosRecord(SOURCES.SHIFT, { id: 2, shift_no: '2', date: '2026-10-06', cash: 100, short_amount: 25 });
+  assert.equal(short.record.short_excess_amount, 25);
+});
+
+// ---------------------------------------------------------------------------
+// POS branch -> existing department
+// ---------------------------------------------------------------------------
+const { createDepartmentMatcher, branchCandidates } = require('../services/departmentMapper');
+const DEPARTMENTS = [
+  { id: 1, name: 'Cake' }, { id: 2, name: 'Bakery' }, { id: 3, name: 'Pastry' }, { id: 4, name: 'Restaurant' },
+  { id: 5, name: 'Savory' }, { id: 7, name: 'Cafe' }, { id: 8, name: 'Juice Bar' }, { id: 11, name: 'MAS Ayathi brew bar' }
+];
+
+test('branch "<Department> - <code>" maps to the existing department', () => {
+  const match = createDepartmentMatcher(DEPARTMENTS, new Map());
+  for (const [branch, id] of [['Cafe - M', 7], ['Bakery - M', 2], ['Cake - M', 1], ['Pastry - M', 3],
+    ['Restaurant - M', 4], ['cafe-m', undefined], ['Juice Bar - KD', 8], ['CAFE – M', 7], ['Cafe (M)', 7], ['Cafe', 7]]) {
+    const result = match(branch);
+    if (id === undefined) assert.equal(result.ok, false, branch);
+    else assert.equal(result.ok && result.department.id, id, branch);
+  }
+  assert.deepEqual(branchCandidates('Cafe - M'), ['Cafe - M', 'Cafe']);
+});
+
+test('no matching department -> clear error, never a guess', () => {
+  const match = createDepartmentMatcher(DEPARTMENTS, new Map());
+  const result = match('Savoury - M'); // DB spells it "Savory"
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /No department matches POS branch "Savoury - M"/);
+  assert.equal(match('').ok, false);
+  assert.equal(match(null).ok, false);
+});
+
+test('configured alias handles spelling differences; alias to a missing department is an error', () => {
+  const { parseAliases } = require('../services/departmentMapper');
+  const match = createDepartmentMatcher(DEPARTMENTS, parseAliases('{"Savoury": "Savory", "Kitchen - M": "Nope"}'));
+  assert.equal(match('Savoury - M').department.id, 5);
+  assert.equal(match('Kitchen - M').ok, false);
+});
+
+test('ambiguous department names are refused', () => {
+  const match = createDepartmentMatcher([{ id: 1, name: 'Cafe' }, { id: 2, name: 'CAFE' }], new Map());
+  assert.match(match('Cafe - M').reason, /more than one department/);
+});
+
+test('credit payment: payment type decides the method; unknown types are refused', () => {
+  const bank = mapPosRecord(SOURCES.CREDIT_PAYMENT, {
+    id: 9, reference_no: 'CR-9', payment_date: '2026-10-05', payment_type: 'Bank Transfer', amount: '2500.00', account_no: '0000456783'
+  });
+  assert.equal(bank.ok, true);
+  assert.equal(bank.record.bank_amount, 2500);
+  assert.equal(bank.record.cash_amount, 0);
+  assert.equal(bank.record.pos_bank_account, '0000456783');
+  assert.deepEqual(postingsOf(bank.record), [{ method: 'BANK', amount: 2500 }]);
+
+  const unknown = mapPosRecord(SOURCES.CREDIT_PAYMENT, { id: 10, date: '2026-10-05', payment_type: 'Gift voucher', amount: 5 });
+  assert.equal(unknown.ok, false);
+  assert.match(unknown.reason, /Unknown payment type/);
+
+  assert.equal(toPaymentMethod('Cash'), 'CASH');
+  assert.equal(toPaymentMethod('VISA'), 'CARD');
+  assert.equal(toPaymentMethod('Credit Card'), 'CARD');
+  assert.equal(toPaymentMethod('Online'), 'BANK');
+  assert.equal(toPaymentMethod('AR'), 'AR');
+  assert.equal(toPaymentMethod('credit'), 'AR');
+});
+
+test('employee deduction posts one Short/Excess CREDIT (negative signed amount)', () => {
+  const ded = mapPosRecord(SOURCES.EMPLOYEE_DEDUCTION, {
+    id: 5, date: '2026-10-07', employee_name: 'Kamal', employee_id: 'E12', shift_id: '77', amount: '500'
+  });
+  assert.equal(ded.ok, true);
+  assert.equal(ded.record.deduction_amount, 500);
+  assert.equal(ded.record.shift_id, '77');
+  assert.deepEqual(postingsOf({ ...ded.record }), [{ method: 'SHORT_EXCESS', amount: -500 }]);
+});
+
+test('records that cannot be understood are reported with their real field names, never guessed', () => {
+  const noId = mapPosRecord(SOURCES.SHIFT, { foo: 1, date: '2026-10-06', cash: 5 });
+  assert.equal(noId.ok, false);
+  assert.match(noId.reason, /No unique id/);
+  assert.deepEqual(noId.fields, ['foo', 'date', 'cash']);
+
+  const noDate = mapPosRecord(SOURCES.SHIFT, { id: 1, cash: 5 });
+  assert.match(noDate.reason, /date/);
+
+  const noAmounts = mapPosRecord(SOURCES.SHIFT, { id: 1, date: '2026-10-06' });
+  assert.match(noAmounts.reason, /No cash/);
+
+  const badNumber = mapPosRecord(SOURCES.SHIFT, { id: 1, date: '2026-10-06', cash: 'abc' });
+  assert.match(badNumber.reason, /not a valid number/);
+});
+
+test('record lists are found in the usual envelopes', () => {
+  assert.equal(extractRecords([{ id: 1 }]).length, 1);
+  assert.equal(extractRecords({ data: [{ id: 1 }, { id: 2 }] }).length, 2);
+  assert.equal(extractRecords({ success: true, data: { current_page: 1, data: [{ id: 1 }] } }).length, 1);
+  assert.equal(extractRecords({ message: 'nothing' }), null);
+});
+
+// ---------------------------------------------------------------------------
+// POS authentication against a local mock POS
+// ---------------------------------------------------------------------------
+const startMockPos = (handler) => new Promise((resolve) => {
+  const server = http.createServer((req, res) => {
+    let body = '';
+    req.on('data', (c) => { body += c; });
+    req.on('end', () => handler(req, res, body));
+  });
+  server.listen(0, '127.0.0.1', () => resolve(server));
+});
+
+const json = (res, status, payload) => {
+  res.writeHead(status, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify(payload));
+};
+
+const UNAUTH = { error: true, message: 'Unauthenticated.', status: 401 };
+
+const setupPos = async (options = {}) => {
+  const stats = { logins: 0, dataCalls: 0, tokensSeen: [] };
+  let validToken = null;
+  const server = await startMockPos((req, res, body) => {
+    if (req.method === 'POST' && req.url === '/api/login') {
+      stats.logins += 1;
+      const { username, password } = JSON.parse(body || '{}');
+      if (username !== 'svc-user' || password !== 'svc-pass') return json(res, 401, { message: 'Invalid credentials' });
+      validToken = `tok-${stats.logins}`;
+      return json(res, 200, { status: true, data: { token: validToken, expires_in: options.expiresIn } });
+    }
+    stats.dataCalls += 1;
+    const auth = req.headers.authorization || '';
+    stats.tokensSeen.push(auth);
+    if (auth !== `Bearer ${validToken}`) return json(res, 401, UNAUTH);
+    return json(res, 200, { data: [{ id: 1 }] });
+  });
+  const { port } = server.address();
+  process.env.RAVON_POS_API_URL = `http://127.0.0.1:${port}`;
+  process.env.RAVON_POS_USERNAME = 'svc-user';
+  process.env.RAVON_POS_PASSWORD = 'svc-pass';
+  delete process.env.RAVON_POS_API_KEY;
+  const auth = require('../services/posAuthService');
+  auth.resetAuthState();
+  return {
+    auth, stats, server,
+    expireServerToken: () => { validToken = 'rotated-on-server'; },
+    close: () => new Promise((r) => server.close(r))
+  };
+};
+
+test('logs in once in the background and reuses the token', async () => {
+  const pos = await setupPos();
+  try {
+    await pos.auth.posGet('/api/completed-shifts/collection');
+    await pos.auth.posGet('/api/credit-payments/collection');
+    await pos.auth.posGet('/api/employee-deductions');
+    assert.equal(pos.stats.logins, 1);
+    assert.deepEqual(pos.stats.tokensSeen, ['Bearer tok-1', 'Bearer tok-1', 'Bearer tok-1']);
+  } finally { await pos.close(); }
+});
+
+test('concurrent requests share ONE login (POS allows only 5 logins per minute)', async () => {
+  const pos = await setupPos();
+  try {
+    await Promise.all(Array.from({ length: 8 }, () => pos.auth.posGet('/api/employee-deductions')));
+    assert.equal(pos.stats.logins, 1);
+  } finally { await pos.close(); }
+});
+
+test('expired / invalid token: 401 Unauthenticated -> logs in again once and retries', async () => {
+  const pos = await setupPos();
+  try {
+    await pos.auth.posGet('/api/employee-deductions');
+    pos.expireServerToken(); // the POS no longer accepts tok-1
+    const payload = await pos.auth.posGet('/api/employee-deductions');
+    assert.deepEqual(payload, { data: [{ id: 1 }] });
+    assert.equal(pos.stats.logins, 2);
+    assert.deepEqual(pos.stats.tokensSeen.slice(-2), ['Bearer tok-1', 'Bearer tok-2']);
+  } finally { await pos.close(); }
+});
+
+test('token that the POS says has expired is refreshed before use', async () => {
+  const pos = await setupPos({ expiresIn: 30 }); // expires inside the safety margin
+  try {
+    await pos.auth.posGet('/api/employee-deductions');
+    await pos.auth.posGet('/api/employee-deductions');
+    assert.equal(pos.stats.logins, 2);
+    assert.equal(pos.stats.dataCalls, 2);
+  } finally { await pos.close(); }
+});
+
+test('rejected credentials -> clear error, and no login retry storm', async () => {
+  const pos = await setupPos();
+  process.env.RAVON_POS_PASSWORD = 'wrong';
+  try {
+    await assert.rejects(pos.auth.posGet('/api/employee-deductions'), (e) => e.name === 'PosAuthError' && /RAVON_POS_USERNAME/.test(e.message));
+    await assert.rejects(pos.auth.posGet('/api/employee-deductions'), { name: 'PosAuthError' });
+    assert.equal(pos.stats.logins, 1); // second call answered from the cool-down, POS not hit again
+    assert.equal(pos.stats.dataCalls, 0);
+  } finally { await pos.close(); }
+});
+
+test('POS keeps answering Unauthenticated -> PosAuthError after exactly one retry', async () => {
+  const stats = { logins: 0, dataCalls: 0 };
+  const server = await startMockPos((req, res) => {
+    if (req.url === '/api/login') { stats.logins += 1; return json(res, 200, { token: `t${stats.logins}` }); }
+    stats.dataCalls += 1;
+    return json(res, 401, UNAUTH);
+  });
+  process.env.RAVON_POS_API_URL = `http://127.0.0.1:${server.address().port}`;
+  process.env.RAVON_POS_USERNAME = 'svc-user';
+  process.env.RAVON_POS_PASSWORD = 'svc-pass';
+  const auth = require('../services/posAuthService');
+  auth.resetAuthState();
+  try {
+    await assert.rejects(auth.posGet('/api/completed-shifts/collection'), { name: 'PosAuthError' });
+    assert.equal(stats.logins, 2);
+    assert.equal(stats.dataCalls, 2);
+  } finally { await new Promise((r) => server.close(r)); }
+});
+
+test('missing configuration is reported without calling the POS; status never exposes the token', async () => {
+  const auth = require('../services/posAuthService');
+  auth.resetAuthState();
+  delete process.env.RAVON_POS_USERNAME;
+  delete process.env.RAVON_POS_PASSWORD;
+  delete process.env.RAVON_POS_API_KEY;
+  await assert.rejects(auth.posGet('/api/employee-deductions'), { name: 'PosConfigError' });
+  const status = auth.getAuthStatus();
+  assert.deepEqual(Object.keys(status).sort(), ['configured', 'hasToken', 'lastError', 'mode']);
+  assert.equal(status.configured, false);
+});
+
+test('login token is found in the common response shapes', () => {
+  const { extractToken } = require('../services/posAuthService');
+  assert.equal(extractToken({ token: 'a' }), 'a');
+  assert.equal(extractToken({ access_token: 'b', token_type: 'Bearer' }), 'b');
+  assert.equal(extractToken({ data: { token: 'c' } }), 'c');
+  assert.equal(extractToken({ authorisation: { token: 'd' } }), 'd');
+  assert.equal(extractToken({ message: 'ok' }), null);
+});
+
+// ---------------------------------------------------------------------------
+// Collection role access (backend rule, independent of the UI)
+// ---------------------------------------------------------------------------
+test('Collection API: Accountant / Admin / Super Admin full, QB view only, everyone else 403', () => {
+  const { evaluateApiAccess } = require('../config/rolePermissions');
+  const reads = ['/api/collections/pending', '/api/collections/completed', '/api/collections/rejected', '/api/collections/12'];
+  const writes = ['/api/collections/approve', '/api/collections/reject', '/api/collections/restore'];
+  const can = (role, method, url) => evaluateApiAccess(role, method, url).allowed;
+
+  for (const role of ['Accountant', 'Admin', 'Super Admin', 'SuperAdmin']) {
+    for (const url of reads) assert.equal(can(role, 'GET', url), true, `${role} GET ${url}`);
+    for (const url of writes) assert.equal(can(role, 'POST', url), true, `${role} POST ${url}`);
+  }
+  for (const role of ['View Only', 'QB']) {
+    for (const url of reads) assert.equal(can(role, 'GET', url), true, `${role} GET ${url}`);
+    for (const url of writes) {
+      const result = evaluateApiAccess(role, 'POST', url);
+      assert.equal(result.allowed, false, `${role} POST ${url}`);
+      assert.equal(result.reason, 'view-only');
+    }
+  }
+  for (const role of ['Finance', 'Store Keeper', 'Staff', 'Manager', 'User', null]) {
+    for (const url of reads) assert.equal(can(role, 'GET', url), false, `${role} GET ${url}`);
+    for (const url of writes) assert.equal(can(role, 'POST', url), false, `${role} POST ${url}`);
+  }
+});
+
+test('client and server role tables agree on Collection', async () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const src = fs.readFileSync(path.join(__dirname, '../../client/src/config/rolePermissions.js'), 'utf8');
+  assert.match(src, /COLLECTION: 'collection'/);
+  assert.match(src, /\[ROLES\.ACCOUNTANT\]: \[[^\]]*M\.COLLECTION\]/);
+  assert.match(src, /\[ROLES\.QB\]: \[[^\]]*M\.COLLECTION\]/);
+  assert.doesNotMatch(src.match(/\[ROLES\.FINANCE_USER\]: \[[^\]]*\]/)[0], /COLLECTION/);
+  assert.doesNotMatch(src.match(/\[ROLES\.STORES\]: \[[^\]]*\]/)[0], /COLLECTION/);
+  assert.match(src, /rule\('\/collection', \{ all: \[M\.COLLECTION\] \}\)/);
+});
+
+// ---------------------------------------------------------------------------
+// POS error handling: meaningful messages, bounded retries
+// ---------------------------------------------------------------------------
+const posWithStatus = async (sequence) => {
+  const stats = { logins: 0, dataCalls: 0 };
+  const server = await startMockPos((req, res) => {
+    if (req.url === '/api/login') { stats.logins += 1; return json(res, 200, { token: 'tok' }); }
+    const step = sequence[Math.min(stats.dataCalls, sequence.length - 1)];
+    stats.dataCalls += 1;
+    if (step.headers) Object.entries(step.headers).forEach(([k, v]) => res.setHeader(k, v));
+    return json(res, step.status, step.body ?? {});
+  });
+  process.env.RAVON_POS_API_URL = `http://127.0.0.1:${server.address().port}`;
+  process.env.RAVON_POS_USERNAME = 'svc-user';
+  process.env.RAVON_POS_PASSWORD = 'svc-pass';
+  const auth = require('../services/posAuthService');
+  auth.resetAuthState();
+  return { auth, stats, close: () => new Promise((r) => server.close(r)) };
+};
+
+test('POS 403 / 422 / 429 / 500 -> meaningful errors, no endless retries', async () => {
+  const cases = [
+    [{ status: 403, body: { message: 'Forbidden' } }, /not allowed to read/, 1],
+    [{ status: 422, body: { message: 'The start date is invalid.' } }, /request parameters \(422: The start date is invalid\.\)/, 1],
+    [{ status: 429, headers: { 'Retry-After': '30' } }, /rate limit .* in 30 seconds/, 1],
+    [{ status: 500, body: { message: 'Server Error' } }, /POS server had an error \(500\)/, 1]
+  ];
+  for (const [step, pattern, calls] of cases) {
+    const pos = await posWithStatus([step]);
+    try {
+      await assert.rejects(pos.auth.posGet('/api/completed-shifts/collection'), (e) => e.name === 'PosResponseError' && pattern.test(e.message));
+      assert.equal(pos.stats.dataCalls, calls, `status ${step.status}`);
+    } finally { await pos.close(); }
+  }
+});
+
+test('POS 503 is retried once, then succeeds; a second 503 is reported', async () => {
+  const ok = await posWithStatus([{ status: 503 }, { status: 200, body: { data: [] } }]);
+  try {
+    assert.deepEqual(await ok.auth.posGet('/api/employee-deductions'), { data: [] });
+    assert.equal(ok.stats.dataCalls, 2);
+  } finally { await ok.close(); }
+  const bad = await posWithStatus([{ status: 503 }]);
+  try {
+    await assert.rejects(bad.auth.posGet('/api/employee-deductions'), /POS server had an error \(503\)/);
+    assert.equal(bad.stats.dataCalls, 2);
+  } finally { await bad.close(); }
+});
+
+test('POS network failure -> PosUnavailableError after one retry', async () => {
+  const auth = require('../services/posAuthService');
+  auth.resetAuthState();
+  process.env.RAVON_POS_API_URL = 'http://127.0.0.1:1'; // nothing listens here
+  process.env.RAVON_POS_USERNAME = 'svc-user';
+  process.env.RAVON_POS_PASSWORD = 'svc-pass';
+  await assert.rejects(auth.posGet('/api/employee-deductions'), { name: 'PosUnavailableError' });
+});
+
+test('POS_USERNAME / POS_PASSWORD / POS_BASE_URL are accepted as alternative names', async () => {
+  const pos = await posWithStatus([{ status: 200, body: { data: [] } }]);
+  const base = process.env.RAVON_POS_API_URL;
+  delete process.env.RAVON_POS_API_URL; delete process.env.RAVON_POS_USERNAME; delete process.env.RAVON_POS_PASSWORD;
+  process.env.POS_BASE_URL = base; process.env.POS_USERNAME = 'svc-user'; process.env.POS_PASSWORD = 'svc-pass';
+  try {
+    pos.auth.resetAuthState();
+    assert.deepEqual(await pos.auth.posGet('/api/employee-deductions'), { data: [] });
+    assert.equal(pos.stats.logins, 1);
+  } finally {
+    delete process.env.POS_BASE_URL; delete process.env.POS_USERNAME; delete process.env.POS_PASSWORD;
+    await pos.close();
+  }
+});

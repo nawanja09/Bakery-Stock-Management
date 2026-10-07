@@ -2,7 +2,10 @@
 //
 // Finance -> Other Ledgers: the statement for one Other Ledger.
 // Transactions are the linked impact of Cash Receive (Credit) and Cash Issued
-// (Debit); they are listed oldest first and Balance = previous + Credit - Debit.
+// (Debit), plus approved Collections for the two system accounts (AR Account,
+// Short/Excess Account). They are listed oldest first; Balance = previous +
+// Credit - Debit, or previous + Debit - Credit for those debit-normal accounts
+// (the API computes it).
 // Everything shown here is read back from the API - nothing is computed as the
 // source of truth in the browser.
 import React, { useState, useEffect, useCallback } from 'react';
@@ -19,7 +22,12 @@ const fmtDate = (iso) => {
   return m ? `${m[3]}/${m[2]}/${m[1]}` : (iso || '');
 };
 
-const SOURCE_LABELS = { CASH_RECEIVE: 'Cash Received', CASH_ISSUED: 'Cash Issued' };
+const SOURCE_LABELS = {
+  CASH_RECEIVE: 'Cash Received',
+  CASH_ISSUED: 'Cash Issued',
+  COLLECTION_AR: 'AR Collection',
+  COLLECTION_SHORT_EXCESS: 'Short / Excess'
+};
 
 const OtherLedgers = () => {
   const [ledgers, setLedgers] = useState([]);

@@ -172,10 +172,13 @@ const OtherLedgerManagement = () => {
               <tbody>
                 {filteredRecords.map((rec) => (
                   <tr key={rec.id} style={rec.status === 1 ? undefined : { opacity: 0.65 }}>
-                    <td><strong>{rec.name}</strong></td>
+                    <td>
+                      <strong>{rec.name}</strong>
+                      {rec.is_system && <span className="badge badge-neutral" style={{ marginLeft: '8px' }} title="Used by Collection - cannot be renamed or made inactive">System</span>}
+                    </td>
                     <td style={{ textAlign: 'right' }}>{fmt(rec.balance)}</td>
                     <td style={{ textAlign: 'center' }}>
-                      {canWrite ? (
+                      {canWrite && !rec.is_system ? (
                         <button type="button" className="btn-icon edit" onClick={() => openEdit(rec)} title="Edit"><FiEdit size={14} /></button>
                       ) : '—'}
                     </td>
@@ -184,7 +187,7 @@ const OtherLedgerManagement = () => {
                         <span className={`badge ${rec.status === 1 ? 'badge-success' : 'badge-neutral'}`}>
                           {rec.status === 1 ? 'Active' : 'Inactive'}
                         </span>
-                        {canWrite && (
+                        {canWrite && !rec.is_system && (
                           <button
                             type="button"
                             className={`btn-icon ${rec.status === 1 ? 'delete' : 'edit'}`}

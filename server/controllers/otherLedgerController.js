@@ -9,6 +9,8 @@ const {
   OtherLedgerError,
   normalizeName,
   getLedgerBalance,
+  withRunningBalance,
+  BALANCE_EFFECT_SQL,
   round2
 } = require('../services/otherLedgerService');
 
@@ -23,10 +25,8 @@ const sendError = (res, error, fallback) => {
 };
 
 const LEDGER_WITH_BALANCE = `
-  SELECT ol.id, ol.name, ol.status,
-         COALESCE(SUM(CASE WHEN olt.status = 1
-                           THEN CAST(olt.credit AS DECIMAL(14,2)) - CAST(olt.debit AS DECIMAL(14,2))
-                           ELSE 0 END), 0) AS balance
+  SELECT ol.id, ol.name, ol.status, ol.is_system, ol.normal_balance,
+         COALESCE(SUM(CASE WHEN olt.status = 1 THEN ${BALANCE_EFFECT_SQL} ELSE 0 END), 0) AS balance
     FROM other_ledgers ol
     LEFT JOIN other_ledger_transactions olt ON olt.other_ledger_id = ol.id
 `;
@@ -35,8 +35,18 @@ const toLedgerRow = (row) => ({
   id: row.id,
   name: row.name,
   status: Number(row.status),
+  is_system: Number(row.is_system) === 1,
+  normal_balance: row.normal_balance || 'CREDIT',
   balance: round2(row.balance)
 });
+
+// The Collection module's system accounts (AR Account, Short/Excess Account)
+// are posted to by name, so they cannot be renamed or made inactive.
+const assertNotSystem = (row, action) => {
+  if (Number(row.is_system) === 1) {
+    throw new OtherLedgerError(`"${row.name}" is a system account used by Collection and cannot be ${action}`);
+  }
+};
 
 // Case/whitespace-insensitive duplicate check among ACTIVE ledgers only.
 const activeNameExists = async (queryable, name, excludeId = null) => {
@@ -60,7 +70,7 @@ const validateName = (raw) => {
 const getOtherLedgers = async (req, res) => {
   try {
     const [rows] = await pool.query(
-      `${LEDGER_WITH_BALANCE} GROUP BY ol.id, ol.name, ol.status ORDER BY ol.status DESC, ol.name ASC`
+      `${LEDGER_WITH_BALANCE} GROUP BY ol.id, ol.name, ol.status, ol.is_system, ol.normal_balance ORDER BY ol.status DESC, ol.name ASC`
     );
     res.json(rows.map(toLedgerRow));
   } catch (error) {
@@ -72,9 +82,9 @@ const getOtherLedgers = async (req, res) => {
 const getActiveOtherLedgers = async (req, res) => {
   try {
     const [rows] = await pool.query(
-      'SELECT id, name, status FROM other_ledgers WHERE status = 1 ORDER BY name ASC'
+      'SELECT id, name, status, is_system FROM other_ledgers WHERE status = 1 ORDER BY name ASC'
     );
-    res.json(rows.map((r) => ({ id: r.id, name: r.name, status: Number(r.status) })));
+    res.json(rows.map((r) => ({ id: r.id, name: r.name, status: Number(r.status), is_system: Number(r.is_system) === 1 })));
   } catch (error) {
     sendError(res, error, 'Failed to fetch active Other Ledgers');
   }
@@ -100,8 +110,9 @@ const updateOtherLedger = async (req, res) => {
   try {
     await connection.beginTransaction();
     const name = validateName(req.body?.name);
-    const [rows] = await connection.query('SELECT id, status FROM other_ledgers WHERE id = ? FOR UPDATE', [req.params.id]);
+    const [rows] = await connection.query('SELECT id, name, status, is_system FROM other_ledgers WHERE id = ? FOR UPDATE', [req.params.id]);
     if (!rows.length) throw new OtherLedgerError('Other Ledger not found', 404);
+    assertNotSystem(rows[0], 'renamed');
     if (Number(rows[0].status) === 1 && await activeNameExists(connection, name, req.params.id)) {
       throw new OtherLedgerError('An active Other Ledger with this name already exists');
     }
@@ -135,8 +146,9 @@ const setOtherLedgerStatus = async (req, res) => {
     await connection.beginTransaction();
     const status = Number(req.body?.status);
     if (![0, 1].includes(status)) throw new OtherLedgerError('Status must be 1 (Active) or 0 (Inactive)');
-    const [rows] = await connection.query('SELECT id, name FROM other_ledgers WHERE id = ? FOR UPDATE', [req.params.id]);
+    const [rows] = await connection.query('SELECT id, name, is_system FROM other_ledgers WHERE id = ? FOR UPDATE', [req.params.id]);
     if (!rows.length) throw new OtherLedgerError('Other Ledger not found', 404);
+    if (status === 0) assertNotSystem(rows[0], 'made inactive');
     if (status === 1 && await activeNameExists(connection, rows[0].name, req.params.id)) {
       throw new OtherLedgerError('Another active Other Ledger already uses this name');
     }
@@ -164,11 +176,15 @@ const getOtherLedgerBalance = async (req, res) => {
 
 // GET /api/other-ledgers/:id/transactions?dateFrom=&dateTo=
 // Oldest first; same-date rows by created_at then id. Running balance =
-// previous + credit - debit, seeded with everything before dateFrom.
+// previous + credit - debit (debit - credit for a debit-normal ledger such as
+// AR Account / Short/Excess Account), seeded with everything before dateFrom.
 const getOtherLedgerTransactions = async (req, res) => {
   try {
-    const [ledgers] = await pool.query('SELECT id, name, status FROM other_ledgers WHERE id = ?', [req.params.id]);
+    const [ledgers] = await pool.query(
+      'SELECT id, name, status, is_system, normal_balance FROM other_ledgers WHERE id = ?', [req.params.id]
+    );
     if (!ledgers.length) throw new OtherLedgerError('Other Ledger not found', 404);
+    const normalBalance = ledgers[0].normal_balance || 'CREDIT';
 
     const { dateFrom, dateTo } = req.query;
     const clauses = [];
@@ -192,22 +208,25 @@ const getOtherLedgerTransactions = async (req, res) => {
     let opening = 0;
     if (dateFrom) {
       const [openRows] = await pool.query(
-        `SELECT COALESCE(SUM(CAST(credit AS DECIMAL(14,2)) - CAST(debit AS DECIMAL(14,2))), 0) AS opening
-           FROM other_ledger_transactions
-          WHERE other_ledger_id = ? AND status = 1 AND transaction_date < ?`,
+        `SELECT COALESCE(SUM(${BALANCE_EFFECT_SQL}), 0) AS opening
+           FROM other_ledger_transactions olt
+           JOIN other_ledgers ol ON ol.id = olt.other_ledger_id
+          WHERE olt.other_ledger_id = ? AND olt.status = 1 AND olt.transaction_date < ?`,
         [req.params.id, dateFrom]
       );
       opening = round2(openRows[0]?.opening);
     }
 
-    let running = opening;
-    const transactions = rows.map((row) => {
-      running = round2(running + (Number(row.credit) || 0) - (Number(row.debit) || 0));
-      return { ...row, balance: running };
-    });
+    const transactions = withRunningBalance(rows, normalBalance, opening);
 
     res.json({
-      ledger: { id: ledgers[0].id, name: ledgers[0].name, status: Number(ledgers[0].status) },
+      ledger: {
+        id: ledgers[0].id,
+        name: ledgers[0].name,
+        status: Number(ledgers[0].status),
+        is_system: Number(ledgers[0].is_system) === 1,
+        normal_balance: normalBalance
+      },
       opening_balance: opening,
       balance: await getLedgerBalance(pool, req.params.id),
       transactions
