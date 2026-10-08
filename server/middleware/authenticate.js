@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const { runWithUser } = require('../services/posAuthService');
 
 const authenticate = (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -12,7 +13,8 @@ const authenticate = (req, res, next) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET); // Make sure you have JWT_SECRET in your .env
     req.user = decoded;
-    next();
+    // Lets POS calls made for this request use the user's own POS session.
+    runWithUser(decoded.userId, next);
   } catch (err) {
     if (err.name === 'TokenExpiredError') {
       console.warn('JWT Expired:', err.expiredAt);

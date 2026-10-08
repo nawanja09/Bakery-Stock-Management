@@ -9,6 +9,9 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
 
+// No MySQL here: keep the Finance POS session in memory only (posSessionStore).
+process.env.POS_SESSION_PERSIST = '0';
+
 const { mapPosRecord, extractRecords, postingsOf, toPaymentMethod, SOURCES } = require('../services/collectionMapper');
 
 // ---------------------------------------------------------------------------
@@ -321,7 +324,7 @@ test('missing configuration is reported without calling the POS; status never ex
   delete process.env.RAVON_POS_API_KEY;
   await assert.rejects(auth.posGet('/api/employee-deductions'), { name: 'PosConfigError' });
   const status = auth.getAuthStatus();
-  assert.deepEqual(Object.keys(status).sort(), ['configured', 'hasToken', 'lastError', 'mode']);
+  assert.deepEqual(Object.keys(status).sort(), ['configured', 'financeUser', 'hasToken', 'lastError', 'mode']);
   assert.equal(status.configured, false);
 });
 

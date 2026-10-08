@@ -28,8 +28,21 @@
 //   * A rejected login (wrong credentials) is not retried for LOGIN_COOLDOWN_MS,
 //     so a misconfiguration cannot lock the POS account by hammering /api/login.
 //
-// Legacy: if RAVON_POS_USERNAME / RAVON_POS_PASSWORD are not set but
-// RAVON_POS_API_KEY is, that static token is used as before (no login).
+// POS sessions from Stock Management logins (preferred token sources)
+//   At login every user's username / password is checked against the POS
+//   (authController.loginUser -> authenticateUser). When the POS accepts it,
+//   the POS token is kept on the server (memory + encrypted in pos_sessions, see
+//   posSessionStore.js; the password is never stored). Token used for a POS call
+//   (/api/items-list, /api/completed-shifts/collection,
+//   /api/credit-payments/collection, /api/employee-deductions), in order:
+//     1. the Finance user's POS session - an all-branch account, shared by
+//        every user (Collection needs every branch);
+//     2. the requesting user's own POS session (runWithUser, set per request by
+//        middleware/authenticate);
+//     3. the RAVON_POS_USERNAME / RAVON_POS_PASSWORD service login described above;
+//     4. the legacy static RAVON_POS_API_KEY (no login).
+//   A session the POS rejects (401) is dropped and the next source is tried;
+//   with none left the error asks for a new login.
 //
 // Branch scope: the POS limits every data endpoint to the branches of the
 // account that owns the token (GET /api/me -> branch_ids); asking for another
@@ -37,7 +50,10 @@
 // Collection screen can warn when the account cannot see every department.
 // ----------------------------------------------------------------------
 
+const sessionStore = require('./posSessionStore');
+
 const DEFAULT_TIMEOUT_MS = 8000;
+const SESSION_RELOAD_MS = 15 * 1000; // re-check pos_sessions for a newer Finance login (other server process)
 const LOGIN_COOLDOWN_MS = 60 * 1000;
 const EXPIRY_SAFETY_MS = 60 * 1000; // refresh a little before the POS says the token expires
 
@@ -133,19 +149,23 @@ const describeLoginFailure = (status, payload) => {
   const posMessage = isPlainObject(payload) && typeof payload.message === 'string' ? payload.message : '';
   if (status === 429) return 'POS login is rate limited (5 per minute). Try again in a minute.';
   if (status === 401 || status === 403 || status === 422) {
-    return `POS login was rejected${posMessage ? ` (${posMessage})` : ''}. Check RAVON_POS_USERNAME / RAVON_POS_PASSWORD on the server.`;
+    return `POS login was rejected${posMessage ? ` (${posMessage})` : ''}. No POS session from a Stock Management login is available - log in as the Finance user with the POS username / password, or check RAVON_POS_USERNAME / RAVON_POS_PASSWORD on the server.`;
   }
   return `POS login failed with status ${status}`;
 };
 
-const performLogin = async () => {
-  const { username, password, loginPath } = config();
-  const response = await timedFetch(buildUrl(loginPath), {
+const requestLogin = async (username, password) => {
+  const response = await timedFetch(buildUrl(config().loginPath), {
     method: 'POST',
     headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password })
   });
-  const payload = await readJson(response);
+  return { response, payload: await readJson(response) };
+};
+
+const performLogin = async () => {
+  const { username, password } = config();
+  const { response, payload } = await requestLogin(username, password);
   if (!response.ok) {
     const message = describeLoginFailure(response.status, payload);
     // Only rejected credentials start the cool-down; 429 / 5xx may be retried next time.
@@ -194,6 +214,135 @@ const getToken = async ({ forceRefresh = false } = {}) => {
     state.loginPromise = performLogin().finally(() => { state.loginPromise = null; });
   }
   return state.loginPromise;
+};
+
+// ---- POS sessions from BSMS logins ------------------------------------------
+// A user whose BSMS login was accepted by the POS (authController.loginUser)
+// gets a POS session here. The Finance user's session (an all-branch POS account)
+// is shared for every POS call; every other user's session is used for the POS
+// calls of their own requests (requestContext, set by middleware/authenticate).
+const { AsyncLocalStorage } = require('async_hooks');
+
+const requestContext = new AsyncLocalStorage();
+
+/** Runs `fn` (the rest of an API request) with the BSMS user id available to posGet. */
+const runWithUser = (userId, fn) => requestContext.run({ userId: userId ?? null }, fn);
+const currentUserId = () => requestContext.getStore()?.userId ?? null;
+
+const finance = {
+  session: null, // { userId, posUsername, token, expiresAt, createdAt, finance }
+  lastLoadAt: 0,
+  loadPromise: null,
+  expired: null // { at, posUsername } - the last Finance session the POS rejected
+};
+const userSessions = new Map(); // BSMS userId -> session
+const userLoads = new Map(); // BSMS userId -> { at, promise }
+
+const sessionUsable = (s) =>
+  Boolean(s && s.token) && (s.expiresAt === null || Date.now() < s.expiresAt - EXPIRY_SAFETY_MS);
+
+/** The current Finance POS session (memory, else the latest one in pos_sessions), or null. */
+const getFinanceSession = async () => {
+  if (sessionUsable(finance.session)) return finance.session;
+  if (Date.now() - finance.lastLoadAt >= SESSION_RELOAD_MS) {
+    if (!finance.loadPromise) {
+      finance.loadPromise = sessionStore.loadLatest({ finance: true })
+        .then((stored) => {
+          finance.lastLoadAt = Date.now();
+          if (sessionUsable(stored) && !sessionUsable(finance.session)) finance.session = stored;
+        })
+        .finally(() => { finance.loadPromise = null; });
+    }
+    await finance.loadPromise;
+  }
+  return sessionUsable(finance.session) ? finance.session : null;
+};
+
+/** A BSMS user's own POS session (memory, else pos_sessions), or null. */
+const getUserSession = async (userId) => {
+  if (userId === null || userId === undefined) return null;
+  const key = String(userId);
+  if (sessionUsable(userSessions.get(key))) return userSessions.get(key);
+  const load = userLoads.get(key) || { at: 0, promise: null };
+  if (Date.now() - load.at >= SESSION_RELOAD_MS) {
+    if (!load.promise) {
+      load.promise = sessionStore.loadLatest({ userId })
+        .then((stored) => {
+          load.at = Date.now();
+          if (sessionUsable(stored) && !sessionUsable(userSessions.get(key))) userSessions.set(key, stored);
+        })
+        .finally(() => { load.promise = null; });
+      userLoads.set(key, load);
+    }
+    await load.promise;
+  }
+  return sessionUsable(userSessions.get(key)) ? userSessions.get(key) : null;
+};
+
+/**
+ * Checks a user's POS username / password against POST /api/login.
+ * Returns { token, expiresAt }; never stores the password. Throws PosAuthError
+ * when the POS rejects the credentials, PosUnavailableError / PosResponseError
+ * when the POS cannot answer, PosConfigError when the POS URL is not set.
+ */
+const authenticateUser = async (username, password) => {
+  const { response, payload } = await requestLogin(username, password);
+  if (!response.ok) {
+    if ([401, 403, 422].includes(response.status)) throw new PosAuthError('Invalid POS username or password');
+    if (response.status === 429) {
+      throw new PosResponseError('Too many POS login attempts (5 per minute). Try again in a minute.', 429);
+    }
+    throw new PosUnavailableError(`The POS login is not available right now (status ${response.status}). Try again later.`);
+  }
+  const token = extractToken(payload);
+  if (!token) throw new PosResponseError('The POS login succeeded but returned no token', response.status);
+  return { token, expiresAt: extractExpiry(payload) };
+};
+
+/**
+ * Keeps the POS token of a user whose login the POS accepted (memory + encrypted
+ * in pos_sessions). `finance: true` also makes it the shared token for every POS call.
+ */
+const startPosSession = async ({ userId, posUsername, token, expiresAt = null, finance: isFinance = false }) => {
+  const session = { userId, posUsername, token, expiresAt, createdAt: Date.now(), finance: isFinance };
+  userSessions.set(String(userId), session);
+  if (isFinance) {
+    finance.session = session;
+    finance.expired = null;
+  }
+  await sessionStore.save({ userId, posUsername, token, expiresAt, finance: isFinance });
+};
+
+/** Forgets a session the POS rejected (401), in memory and in pos_sessions. */
+const dropSession = async (session) => {
+  const key = String(session.userId);
+  if (userSessions.get(key)?.token === session.token) userSessions.delete(key);
+  userLoads.set(key, { at: Date.now(), promise: null }); // do not immediately reload the row being invalidated
+  if (finance.session && finance.session.token === session.token) {
+    finance.session = null;
+    finance.expired = { at: Date.now(), posUsername: session.posUsername };
+    finance.lastLoadAt = Date.now();
+  }
+  await sessionStore.invalidate(session.userId);
+};
+
+/**
+ * Token for the next POS call, in order: the Finance session (all branches),
+ * the requesting user's own POS session, the service login, the static key.
+ * `skip` lists sessions already rejected during this call.
+ */
+const resolveCredential = async ({ forceRefresh = false, skip = [] } = {}) => {
+  const rejected = (session) => skip.some((s) => s.token === session.token);
+  const shared = await getFinanceSession();
+  if (shared && !rejected(shared)) return { token: shared.token, source: 'session', session: shared };
+  const own = await getUserSession(currentUserId());
+  if (own && !rejected(own)) return { token: own.token, source: 'session', session: own };
+  if (hasCredentials()) return { token: await getToken({ forceRefresh }), source: 'login' };
+  if (config().staticToken) return { token: config().staticToken, source: 'static' };
+  if (skip.length || finance.expired) {
+    throw new PosAuthError('The POS session has expired or was rejected by the POS. Log in to Stock Management again with your POS username and password.');
+  }
+  throw new PosConfigError('No POS session: log in to Stock Management with a POS username and password (or set RAVON_POS_USERNAME and RAVON_POS_PASSWORD on the server)');
 };
 
 const invalidateToken = (rejectedToken) => {
@@ -252,16 +401,20 @@ const fetchWithTransientRetry = async (url, options) => {
 
 /**
  * Authenticated GET against the POS. Returns the parsed JSON body.
- * Handles token reuse, expiry, one re-login on 401, and one retry on a
- * transient failure. Every other failure is thrown with a meaningful message;
- * nothing loops.
+ * Uses the Finance POS session, else the requesting user's own POS session; a
+ * 401 on one drops that session and falls back to the next source
+ * (resolveCredential). The service login gets one re-login on 401, and every
+ * request one retry on a transient failure. Every other failure is thrown with
+ * a meaningful message; nothing loops.
  */
 const posGet = async (pathOrUrl) => {
   const url = buildUrl(pathOrUrl);
-  const usingLogin = hasCredentials();
+  const skip = [];
+  let reloggedIn = false;
 
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    const token = await getToken({ forceRefresh: attempt > 0 });
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const credential = await resolveCredential({ forceRefresh: reloggedIn, skip });
+    const { token, source } = credential;
     const response = await fetchWithTransientRetry(url, {
       method: 'GET',
       headers: { Accept: 'application/json', Authorization: `Bearer ${token}` }
@@ -269,13 +422,19 @@ const posGet = async (pathOrUrl) => {
     const payload = await readJson(response);
 
     if (isUnauthenticated(response.status, payload)) {
-      if (usingLogin && attempt === 0) {
+      if (source === 'session') {
+        await dropSession(credential.session);
+        skip.push(credential.session);
+        continue; // try the next token source, if any
+      }
+      if (source === 'login' && !reloggedIn) {
         invalidateToken(token);
+        reloggedIn = true;
         continue; // log in again and retry once
       }
-      throw new PosAuthError(usingLogin
+      throw new PosAuthError(source === 'login'
         ? 'The POS rejected the token even after logging in again (Unauthenticated)'
-        : 'The POS rejected RAVON_POS_API_KEY (Unauthenticated). Configure RAVON_POS_USERNAME / RAVON_POS_PASSWORD instead.');
+        : 'The POS rejected RAVON_POS_API_KEY (Unauthenticated). A Finance user must log in to BSMS with their POS username and password, or configure RAVON_POS_USERNAME / RAVON_POS_PASSWORD.');
     }
     if (!response.ok) {
       throw new PosResponseError(describeDataFailure(response.status, payload, response), response.status);
@@ -310,7 +469,7 @@ let integrationScope = { token: null, scope: null };
  */
 const getIntegrationScope = async () => {
   try {
-    const token = await getToken();
+    const { token } = await resolveCredential();
     if (integrationScope.token === token && integrationScope.scope) return integrationScope.scope;
     const user = toPosUser(await posGet('/api/me'));
     const scope = { name: user?.name ?? null, branchIds: user?.branchIds ?? null, allBranches: user ? user.allBranches : null };
@@ -332,12 +491,20 @@ const warmUp = () => {
 };
 
 /** Safe-to-display status (never includes the token or credentials). */
-const getAuthStatus = () => ({
-  configured: hasCredentials() || Boolean(config().staticToken),
-  mode: hasCredentials() ? 'login' : (config().staticToken ? 'static-token' : 'none'),
-  hasToken: tokenIsFresh(),
-  lastError: state.lastLoginFailure ? state.lastLoginFailure.message : null
-});
+const getAuthStatus = () => {
+  const financeActive = sessionUsable(finance.session);
+  const ownActive = sessionUsable(userSessions.get(String(currentUserId())));
+  const fallbackMode = hasCredentials() ? 'login' : (config().staticToken ? 'static-token' : 'none');
+  return {
+    configured: financeActive || ownActive || hasCredentials() || Boolean(config().staticToken),
+    mode: financeActive ? 'finance-session' : (ownActive ? 'user-session' : fallbackMode),
+    financeUser: financeActive ? finance.session.posUsername : null,
+    hasToken: financeActive || ownActive || tokenIsFresh(),
+    lastError: (!financeActive && !ownActive && finance.expired)
+      ? 'The Finance POS session has expired. A Finance user must log in to Stock Management again.'
+      : (state.lastLoginFailure ? state.lastLoginFailure.message : null)
+  };
+};
 
 // Test helper.
 const resetAuthState = () => {
@@ -346,6 +513,12 @@ const resetAuthState = () => {
   state.expiresAt = null;
   state.loginPromise = null;
   state.lastLoginFailure = null;
+  finance.session = null;
+  finance.lastLoadAt = 0;
+  finance.loadPromise = null;
+  finance.expired = null;
+  userSessions.clear();
+  userLoads.clear();
 };
 
 module.exports = {
@@ -355,6 +528,10 @@ module.exports = {
   getToken,
   invalidateToken,
   getAuthStatus,
+  authenticateUser,
+  startPosSession,
+  runWithUser,
+  getFinanceSession,
   extractToken,
   extractExpiry,
   resetAuthState,

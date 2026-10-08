@@ -2,10 +2,10 @@
 //
 // Collection module API (mounted at /api/collections; `collection` module access).
 //
-// POS authentication is a backend integration: the server logs in to the POS
-// with its POS "finance" account (posAuthService - RAVON_POS_USERNAME /
-// RAVON_POS_PASSWORD), shares that token between all Stock Management users and
-// renews it by itself. Users only log in to Stock Management; their role decides
+// POS authentication is handled by the backend (posAuthService): it uses the POS
+// token from the latest Finance user login (Finance users sign in with their POS
+// account), else its own POS "finance" account (RAVON_POS_USERNAME /
+// RAVON_POS_PASSWORD), shared between all Stock Management users. Their role decides
 // what they may do here (rolePermissions.js: Accountant / Admin / Super Admin
 // full, QB view only). Neither the user's department nor any POS branch is used
 // as a filter - every POS department is imported.
