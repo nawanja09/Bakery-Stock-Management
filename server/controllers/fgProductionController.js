@@ -34,7 +34,8 @@ const {
   findRavonPosItem,
   RavonPosConfigError,
   RavonPosUnavailableError,
-  RavonPosResponseError
+  RavonPosResponseError,
+  RavonPosAuthError
 } = require('../services/ravonPosService');
 const { isValidUnit, areCompatibleUnits, convertQuantity } = require('../utils/unitConversion');
 
@@ -71,9 +72,16 @@ const validateFgProductionInput = ({ external_item_id, fg_item_name, department_
 // Maps a Ravon POS integration error to an { status, error } pair that is
 // safe to send to the frontend (no stack traces / internal config).
 const posErrorResponse = (error) => {
+  if (error instanceof RavonPosAuthError) {
+    // The automatic RAVON POS Finance login failed. The message says whether the
+    // configured credentials are invalid or the POS login service is unavailable
+    // (never 401, which would log the Stock Management user out).
+    console.warn('[FG Production] Ravon POS authentication failed:', error.message);
+    return { status: error.code === 'POS_CREDENTIALS_INVALID' ? 502 : 503, error: error.message, code: error.code };
+  }
   if (error instanceof RavonPosConfigError) {
     console.error('[FG Production] Ravon POS is not configured:', error.message);
-    return { status: 503, error: 'Ravon POS integration is not configured. Please contact an administrator.' };
+    return { status: 503, error: `Ravon POS integration is not configured: ${error.message}. Please contact an administrator.`, code: 'POS_NOT_CONFIGURED' };
   }
   if (error instanceof RavonPosUnavailableError) {
     console.error('[FG Production] Ravon POS unavailable:', error.message);
@@ -118,8 +126,8 @@ const getPosItems = async (req, res) => {
     const items = await fetchRavonPosItems();
     res.json(items);
   } catch (error) {
-    const { status, error: message } = posErrorResponse(error);
-    res.status(status).json({ error: message });
+    const { status, error: message, code } = posErrorResponse(error);
+    res.status(status).json({ error: message, ...(code ? { code } : {}) });
   }
 };
 
@@ -198,8 +206,8 @@ const createFgProduction = async (req, res) => {
   try {
     posItem = await findRavonPosItem(external_item_id);
   } catch (error) {
-    const { status, error: message } = posErrorResponse(error);
-    return res.status(status).json({ error: message });
+    const { status, error: message, code } = posErrorResponse(error);
+    return res.status(status).json({ error: message, ...(code ? { code } : {}) });
   }
   if (!posItem) {
     return res.status(400).json({ error: 'Selected FG Item does not exist in Ravon POS.' });
@@ -255,8 +263,8 @@ const updateFgProduction = async (req, res) => {
       try {
         posItem = await findRavonPosItem(external_item_id);
       } catch (error) {
-        const { status, error: message } = posErrorResponse(error);
-        return res.status(status).json({ error: message });
+        const { status, error: message, code } = posErrorResponse(error);
+        return res.status(status).json({ error: message, ...(code ? { code } : {}) });
       }
       if (!posItem) {
         return res.status(400).json({ error: 'Selected FG Item does not exist in Ravon POS.' });
