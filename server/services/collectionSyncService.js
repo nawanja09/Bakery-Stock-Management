@@ -8,10 +8,10 @@
 //   SHIFT               /api/completed-shifts/collection   RAVON_POS_SHIFT_COLLECTION_URL
 //   CREDIT_PAYMENT      /api/credit-payments/collection    RAVON_POS_CREDIT_PAYMENTS_URL
 //   EMPLOYEE_DEDUCTION  /api/employee-deductions           RAVON_POS_EMPLOYEE_DEDUCTIONS_URL
-// Every call goes through posAuthService.posGet: the backend's POS integration
-// account (the POS "finance" account in RAVON_POS_USERNAME / RAVON_POS_PASSWORD),
-// logged in once and shared by every Stock Management user. Users never sign in
-// to the POS. The POS only returns the branches of that account
+// Every call goes through posAuthService.posGet: the POS token from the latest
+// Finance user login (Finance users sign in to BSMS with their POS account),
+// else the POS integration account in RAVON_POS_USERNAME / RAVON_POS_PASSWORD -
+// shared by every Stock Management user. The POS only returns the branches of that account
 // (/api/me branch_ids), so it must be an all-branch account. The browser never
 // talks to the POS.
 //
