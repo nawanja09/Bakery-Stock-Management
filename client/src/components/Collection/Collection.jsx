@@ -493,41 +493,42 @@ const Collection = () => {
   };
 
   const renderFilters = () => (
-    <form className="col-filter-bar" onSubmit={runSearch}>
-      <div className="form-group col-search">
-        <label htmlFor="col-search">Search</label>
-        <div className="col-search-row">
+    <form className="col-filter-card" onSubmit={runSearch} role="search" aria-labelledby="col-filter-title">
+      <h3 id="col-filter-title" className="col-filter-title">Search</h3>
+      <div className="col-filter-grid">
+        <div className="form-group">
+          <label htmlFor="col-search">Search Bar</label>
           <input id="col-search" type="search" className="form-input"
-            placeholder="Shift ref / no, reference, cashier, employee, department, branch, amount, method"
+            placeholder="Shift ref / no, reference, cashier, employee, amount..."
             value={draft.search} onChange={setDraftField('search')} />
         </div>
+        <div className="form-group">
+          <label htmlFor="col-department">Department</label>
+          <select id="col-department" value={draft.department} onChange={setDraftField('department')} className="form-select">
+            <option value="">All Departments</option>
+            {departmentOptions.departments.map((d) => (
+              <option key={`d${d.id}`} value={`d:${d.id}`}>{d.name}</option>
+            ))}
+            {departmentOptions.unmapped.length > 0 && (
+              <optgroup label="Unmapped POS branches">
+                <option value="unmapped">All unmapped</option>
+                {departmentOptions.unmapped.map((u) => (
+                  <option key={`u${u.branch}`} value={`u:${u.branch}`}>{u.branch}</option>
+                ))}
+              </optgroup>
+            )}
+          </select>
+        </div>
+        <div className="form-group">
+          <label htmlFor="col-from">From Date</label>
+          <input id="col-from" type="date" className="form-input" value={draft.fromDate} max={draft.toDate || undefined} onChange={setDraftField('fromDate')} />
+        </div>
+        <div className="form-group">
+          <label htmlFor="col-to">To Date</label>
+          <input id="col-to" type="date" className="form-input" value={draft.toDate} min={draft.fromDate || undefined} onChange={setDraftField('toDate')} />
+        </div>
       </div>
-      <div className="form-group">
-        <label htmlFor="col-department">Department</label>
-        <select id="col-department" value={draft.department} onChange={setDraftField('department')} className="form-select">
-          <option value="">All Departments</option>
-          {departmentOptions.departments.map((d) => (
-            <option key={`d${d.id}`} value={`d:${d.id}`}>{d.name}</option>
-          ))}
-          {departmentOptions.unmapped.length > 0 && (
-            <optgroup label="Unmapped POS branches">
-              <option value="unmapped">All unmapped</option>
-              {departmentOptions.unmapped.map((u) => (
-                <option key={`u${u.branch}`} value={`u:${u.branch}`}>{u.branch}</option>
-              ))}
-            </optgroup>
-          )}
-        </select>
-      </div>
-      <div className="form-group">
-        <label htmlFor="col-from">From Date</label>
-        <input id="col-from" type="date" className="form-input" value={draft.fromDate} max={draft.toDate || undefined} onChange={setDraftField('fromDate')} />
-      </div>
-      <div className="form-group">
-        <label htmlFor="col-to">To Date</label>
-        <input id="col-to" type="date" className="form-input" value={draft.toDate} min={draft.fromDate || undefined} onChange={setDraftField('toDate')} />
-      </div>
-      <div className="form-group col-filter-actions">
+      <div className="col-filter-actions">
         <button type="submit" className="btn btn-primary" disabled={loading}>
           <FontAwesomeIcon icon={loading ? faSpinner : faMagnifyingGlass} spin={loading} /> Search
         </button>

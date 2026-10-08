@@ -105,7 +105,7 @@
 .purchase-report-table {
 	display: table;
 	width: 100%;
-	min-width: 820px;
+	min-width: 1040px;
 	table-layout: fixed;
 	border-collapse: separate;
 	border-spacing: 0;
@@ -122,19 +122,37 @@
 	box-sizing: border-box;
 }
 
-/* Column widths — 6 columns */
+/* Column widths — 8 columns */
 .purchase-report-table th:nth-child(1),
-.purchase-report-table td:nth-child(1) { width: 17%; }
+.purchase-report-table td:nth-child(1) { width: 13%; }
 .purchase-report-table th:nth-child(2),
-.purchase-report-table td:nth-child(2) { width: 14%; }
+.purchase-report-table td:nth-child(2) { width: 11%; }
 .purchase-report-table th:nth-child(3),
-.purchase-report-table td:nth-child(3) { width: 16%; }
+.purchase-report-table td:nth-child(3) { width: 11%; }
 .purchase-report-table th:nth-child(4),
-.purchase-report-table td:nth-child(4) { width: 24%; }
+.purchase-report-table td:nth-child(4) { width: 12%; }
 .purchase-report-table th:nth-child(5),
-.purchase-report-table td:nth-child(5) { width: 16%; }
+.purchase-report-table td:nth-child(5) { width: 18%; }
 .purchase-report-table th:nth-child(6),
 .purchase-report-table td:nth-child(6) { width: 13%; }
+.purchase-report-table th:nth-child(7),
+.purchase-report-table td:nth-child(7) { width: 10%; }
+.purchase-report-table th:nth-child(8),
+.purchase-report-table td:nth-child(8) { width: 12%; }
+
+/* Amount columns (Without VAT, VAT, Total) */
+.purchase-report-table th:nth-child(n+6),
+.purchase-report-table td:nth-child(n+6) {
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+}
+
+/* Paid Date placeholder for invoices that are not fully paid */
+.purchase-report-table .pr-unpaid {
+	color: var(--color-text-secondary);
+	font-size: 12px;
+	font-style: italic;
+}
 
 /* Header */
 .purchase-report-table th {
@@ -207,6 +225,11 @@
 	color: var(--color-heading);
 	font-weight: 700;
 	font-size: 13px;
+}
+
+.purchase-report-table tfoot td.pr-amount {
+	text-align: right;
+	font-variant-numeric: tabular-nums;
 }
 
 .purchase-report-table tfoot td:last-child {

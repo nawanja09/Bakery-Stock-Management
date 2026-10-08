@@ -99,6 +99,7 @@ import HiddenExpenses from './components/Expenses/HiddenExpenses';
 import BankDetails from './components/Expenses/BankDetails';
 import Payees from './components/Expenses/Payees';
 import ExpensesReport from './components/Expenses/Reports/ExpensesReport';
+import ExpenseSummaryReport from './components/Expenses/Reports/ExpenseSummaryReport';
 
 import EditWastage from './components/wastage/EditWastage';
 
@@ -318,6 +319,7 @@ function App() {
             <Route path="expenses/new" element={<ExpensesRoute><NewExpenses /></ExpensesRoute>} />
             <Route path="expenses/bank-details" element={<ExpensesRoute><BankDetails /></ExpensesRoute>} />
             <Route path="expenses/reports" element={<ExpensesRoute><ExpensesReport /></ExpensesRoute>} />
+            <Route path="expenses/summary-report" element={<ExpensesRoute><ExpenseSummaryReport /></ExpensesRoute>} />
             <Route path="expenses/cash-expenses" element={<ExpensesRoute><CashExpenses /></ExpensesRoute>} />
             <Route path="expenses/hidden" element={<ExpensesRoute><HiddenExpenses /></ExpensesRoute>} />
 
