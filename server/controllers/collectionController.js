@@ -2,10 +2,10 @@
 //
 // Collection module API (mounted at /api/collections; `collection` module access).
 //
-// POS authentication is handled by the backend (posAuthService): it uses the POS
-// token from the latest Finance user login (Finance users sign in with their POS
-// account), else its own POS "finance" account (RAVON_POS_USERNAME /
-// RAVON_POS_PASSWORD), shared between all Stock Management users. Their role decides
+// POS authentication is handled by the backend (posAuthService): every POS call
+// uses the shared RAVON POS Finance session the backend logs in to (and renews)
+// automatically with RAVON_POS_USERNAME / RAVON_POS_PASSWORD. Users only log in
+// to Stock Management, never to the POS. Their role decides
 // what they may do here (rolePermissions.js: Accountant / Admin / Super Admin
 // full, QB view only). Neither the user's department nor any POS branch is used
 // as a filter - every POS department is imported.
@@ -301,7 +301,12 @@ const getPending = async (req, res) => {
     }
     const list = await listByStatus('pending', req.query);
     const pos = getAuthStatus();
-    if (sync) pos.scope = await getIntegrationScope(); // which POS branches the integration account sees
+    // The automatic POS Finance login failed (invalid credentials / POS login
+    // unavailable / not configured): say so on the page - the records already
+    // staged are still listed.
+    const authFailure = (sync?.sources || []).find((s) => s.errorCode);
+    if (authFailure) Object.assign(pos, { authError: true, code: authFailure.errorCode, message: authFailure.error });
+    if (sync && !authFailure) pos.scope = await getIntegrationScope(); // which POS branches the Finance account sees
     res.json({ ...list, sync, viewOnly: !canWrite(req.user?.role), pos });
   } catch (error) {
     sendError(res, error, 'Failed to load pending collections');

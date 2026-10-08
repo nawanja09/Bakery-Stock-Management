@@ -26,7 +26,7 @@
 // ----------------------------------------------------------------------
 
 // Authentication (background /api/login + Bearer token) lives in posAuthService.
-const { posGet, PosConfigError, PosResponseError } = require('./posAuthService');
+const { posGet, PosConfigError, PosAuthError, PosUnavailableError, PosResponseError } = require('./posAuthService');
 
 const RAVON_POS_API_URL = process.env.RAVON_POS_API_URL || '';
 // One endpoint. If several are listed ("a,b,c"), the first is the items list -
@@ -51,6 +51,16 @@ class RavonPosResponseError extends Error {
   constructor(message) {
     super(message);
     this.name = 'RavonPosResponseError';
+  }
+}
+
+// The automatic RAVON POS Finance login failed: code POS_CREDENTIALS_INVALID
+// (credentials rejected) or POS_AUTH_UNAVAILABLE (POS login service unreachable).
+class RavonPosAuthError extends Error {
+  constructor(message, code) {
+    super(message);
+    this.name = 'RavonPosAuthError';
+    this.code = code;
   }
 }
 
@@ -138,6 +148,9 @@ const fetchRavonPosItems = async ({ includeInactive = false } = {}) => {
     payload = await posGet(url);
   } catch (err) {
     if (err instanceof PosConfigError) throw new RavonPosConfigError(err.message);
+    if (err instanceof PosAuthError || (err instanceof PosUnavailableError && err.code)) {
+      throw new RavonPosAuthError(err.message, err.code);
+    }
     if (err instanceof PosResponseError && err.status) {
       throw new RavonPosUnavailableError(`Ravon POS API responded with status ${err.status}`);
     }
@@ -174,5 +187,6 @@ module.exports = {
   findRavonPosItem,
   RavonPosConfigError,
   RavonPosUnavailableError,
-  RavonPosResponseError
+  RavonPosResponseError,
+  RavonPosAuthError
 };

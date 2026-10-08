@@ -447,6 +447,22 @@ const Collection = () => {
     if (!ids || ids.length === 0) return null;
   };
 
+  // The backend logs in to RAVON POS automatically with its configured Finance
+  // account; this only shows when that automatic login failed.
+  const renderPosSessionWarning = () => {
+    if (!posStatus?.authError) return null;
+    return (
+      <div className="col-sync-alert" role="alert">
+        <FontAwesomeIcon icon={faTriangleExclamation} />
+        <div>
+          <strong>Could not sign in to RAVON POS.</strong>{' '}
+          {posStatus.message}
+          {' '}The records below are the ones already loaded; new POS collections cannot be read until this is resolved.
+        </div>
+      </div>
+    );
+  };
+
   const renderSyncBanner = () => {
     if (!sync || loadedSources.length === 0) return null;
     if (syncProblems.length === 0) {
@@ -577,6 +593,7 @@ const Collection = () => {
             {!canWrite && (
               <p className="cl-note">View only: these are the collections already loaded from the POS. Approving and rejecting are not available for your role.</p>
             )}
+            {renderPosSessionWarning()}
             {renderScopeWarning()}
             {renderSyncBanner()}
             <p className="cl-note">Pending collections are <strong>not</strong> posted to any ledger. Only approved records update the ledgers.</p>
