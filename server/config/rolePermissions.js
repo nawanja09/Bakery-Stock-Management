@@ -143,6 +143,7 @@ const API_RULES = [
   { prefix: '/department-usage-report', modules: [M.RAW_MATERIAL] },
   { prefix: '/reports', modules: [M.RAW_MATERIAL], read: [M.VAT] },
   { prefix: '/reports/expenses-report', modules: [M.EXPENSES] },
+  { prefix: '/reports/expense-summary', modules: [M.EXPENSES] },
   { prefix: '/reports/bakery-stock', modules: [M.FINISHED_GOODS] },
 
   // ---- Shared master data ---------------------------------------------------

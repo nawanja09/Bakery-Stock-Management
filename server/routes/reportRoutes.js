@@ -27,4 +27,8 @@ router.get('/purchase-report', reportController.getPurchaseReport);
 // Expenses Report: unified Petty Cash + Other expenses with company / date range / payee / type filters
 router.get('/expenses-report', reportController.getExpensesReport);
 
+// Expense Report Summary: totals per Expense Type, plus the transactions behind one type
+router.get('/expense-summary', reportController.getExpenseSummaryReport);
+router.get('/expense-summary/details', reportController.getExpenseSummaryDetails);
+
 module.exports = router;

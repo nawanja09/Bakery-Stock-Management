@@ -9,6 +9,22 @@ import { formatPurchasingCurrency, toPurchasingExportNumber } from '../../../uti
 const defaultFromDate = format(new Date(), 'yyyy-MM-01');
 const defaultToDate = format(new Date(), 'yyyy-MM-dd');
 
+// Which date the From/To range filters on (applied server-side)
+const DATE_TYPE_OPTIONS = [
+  { value: 'invoice', label: 'Invoice' },
+  { value: 'delivery', label: 'Delivery' },
+  { value: 'paid', label: 'Paid' }
+];
+const defaultDateType = 'invoice';
+
+const DATE_SORT_FIELDS = ['invoice_date', 'delivery_date', 'paid_date'];
+const AMOUNT_SORT_FIELDS = ['without_vat_amount', 'vat_amount', 'total_amount'];
+
+const getInvoiceDate = (inv) => inv.invoice_date || inv.purchase_date;
+
+const formatDisplayDate = (value) => (value ? format(new Date(value), 'MMM dd, yyyy') : null);
+const formatExportDate = (value) => (value ? format(new Date(value), 'yyyy-MM-dd') : '');
+
 const formatPaymentMethod = (method) => {
   if (!method || method === 'N/A') return 'N/A';
   const val = String(method).trim();
@@ -20,18 +36,9 @@ const formatPaymentMethod = (method) => {
   return val.replace(/_/g, ' ');
 };
 
-const getPaymentMethodBadgeClass = (method) => {
-  if (!method || method === 'N/A') return 'pm-badge pm-badge--default';
-  const upper = String(method).trim().toUpperCase();
-  if (upper === 'CASH') return 'pm-badge pm-badge--cash';
-  if (upper === 'BANK_TRANSFER' || upper === 'BANK') return 'pm-badge pm-badge--bank';
-  if (upper === 'CHEQUE') return 'pm-badge pm-badge--cheque';
-  if (upper === 'CREDIT') return 'pm-badge pm-badge--credit';
-  return 'pm-badge pm-badge--default';
-};
-
 const PurchaseReport = () => {
   // Filter state (what the user is currently editing)
+  const [dateType, setDateType] = useState(defaultDateType);
   const [fromDate, setFromDate] = useState(defaultFromDate);
   const [toDate, setToDate] = useState(defaultToDate);
   const [companyId, setCompanyId] = useState('');
@@ -46,6 +53,10 @@ const PurchaseReport = () => {
   // Report results
   const [invoices, setInvoices] = useState([]);
   const [grandTotal, setGrandTotal] = useState(0);
+  const [vatTotal, setVatTotal] = useState(0);
+  const [withoutVatTotal, setWithoutVatTotal] = useState(0);
+  // Filters behind the rows currently shown (used by Refresh and the export)
+  const [appliedFilters, setAppliedFilters] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [hasSearched, setHasSearched] = useState(false);
@@ -113,7 +124,7 @@ const PurchaseReport = () => {
     setLoading(true);
     setError('');
     try {
-      const params = {};
+      const params = { dateType: filters.dateType || defaultDateType };
       if (filters.fromDate) params.startDate = filters.fromDate;
       if (filters.toDate) params.endDate = filters.toDate;
       if (filters.companyId) params.companyId = filters.companyId;
@@ -124,11 +135,16 @@ const PurchaseReport = () => {
 
       setInvoices(res.data?.invoices || []);
       setGrandTotal(res.data?.grandTotal || 0);
+      setVatTotal(res.data?.vatTotal || 0);
+      setWithoutVatTotal(res.data?.withoutVatTotal || 0);
+      setAppliedFilters(filters);
     } catch (err) {
       console.error('Error fetching purchase report:', err);
       setError('Failed to load purchase report. Please try again.');
       setInvoices([]);
       setGrandTotal(0);
+      setVatTotal(0);
+      setWithoutVatTotal(0);
     } finally {
       setLoading(false);
       setHasSearched(true);
@@ -137,7 +153,7 @@ const PurchaseReport = () => {
 
   // Load the report once on mount using the default filters
   useEffect(() => {
-    fetchReport({ fromDate: defaultFromDate, toDate: defaultToDate, companyId: '', supplierId: '', paymentMethod: '' });
+    fetchReport({ dateType: defaultDateType, fromDate: defaultFromDate, toDate: defaultToDate, companyId: '', supplierId: '', paymentMethod: '' });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -146,17 +162,23 @@ const PurchaseReport = () => {
       setError('"From Date" cannot be after "To Date".');
       return;
     }
-    fetchReport({ fromDate, toDate, companyId, supplierId, paymentMethod });
+    fetchReport({ dateType, fromDate, toDate, companyId, supplierId, paymentMethod });
+  };
+
+  // Re-run the last search to pick up newly recorded invoices/payments
+  const handleRefresh = () => {
+    if (appliedFilters) fetchReport(appliedFilters);
   };
 
   const handleReset = () => {
+    setDateType(defaultDateType);
     setFromDate(defaultFromDate);
     setToDate(defaultToDate);
     setCompanyId('');
     setSupplierId('');
     setPaymentMethod('');
     setError('');
-    fetchReport({ fromDate: defaultFromDate, toDate: defaultToDate, companyId: '', supplierId: '', paymentMethod: '' });
+    fetchReport({ dateType: defaultDateType, fromDate: defaultFromDate, toDate: defaultToDate, companyId: '', supplierId: '', paymentMethod: '' });
   };
 
   const handleSort = (field) => {
@@ -174,10 +196,17 @@ const PurchaseReport = () => {
       let valA = a[sortField];
       let valB = b[sortField];
 
-      if (sortField === 'purchase_date' || sortField === 'invoice_date') {
-        valA = new Date(valA || a.purchase_date || a.invoice_date).getTime();
-        valB = new Date(valB || b.purchase_date || b.invoice_date).getTime();
-      } else if (sortField === 'total_amount') {
+      if (sortField === 'invoice_date') {
+        valA = new Date(getInvoiceDate(a)).getTime();
+        valB = new Date(getInvoiceDate(b)).getTime();
+      } else if (DATE_SORT_FIELDS.includes(sortField)) {
+        // Missing dates (e.g. not yet paid) always sort to the bottom
+        if (!valA && !valB) return 0;
+        if (!valA) return 1;
+        if (!valB) return -1;
+        valA = new Date(valA).getTime();
+        valB = new Date(valB).getTime();
+      } else if (AMOUNT_SORT_FIELDS.includes(sortField)) {
         valA = Number(valA) || 0;
         valB = Number(valB) || 0;
       } else {
@@ -218,36 +247,55 @@ const PurchaseReport = () => {
 
     const worksheetData = [];
 
+    const exportFilters = appliedFilters || { dateType, fromDate, toDate };
+    const dateTypeLabel = (DATE_TYPE_OPTIONS.find(o => o.value === exportFilters.dateType) || DATE_TYPE_OPTIONS[0]).label;
+
     worksheetData.push(['Purchase Report']);
-    worksheetData.push([`Period: ${fromDate || 'All'} to ${toDate || 'All'}`]);
+    worksheetData.push([`${dateTypeLabel} Date Period: ${exportFilters.fromDate || 'All'} to ${exportFilters.toDate || 'All'}`]);
     if (activeFilterLabel) {
       worksheetData.push([activeFilterLabel]);
     }
     worksheetData.push([]);
 
-    worksheetData.push(['Invoice Number', 'Invoice Date', 'Company', 'Supplier', 'Payment Method', 'Total Amount (Rs.)']);
+    worksheetData.push([
+      'Invoice Number', 'Invoice Date', 'Delivery Date', 'Paid Date', 'Supplier', 'Company', 'Payment Method',
+      'Amount Without VAT (Rs.)', 'VAT (Rs.)', 'Total Amount (Rs.)'
+    ]);
 
     sortedInvoices.forEach((inv) => {
       worksheetData.push([
         inv.invoice_no || 'N/A',
-        (inv.invoice_date || inv.purchase_date) ? format(new Date(inv.invoice_date || inv.purchase_date), 'yyyy-MM-dd') : 'N/A',
-        inv.company_name || 'N/A',
+        formatExportDate(getInvoiceDate(inv)) || 'N/A',
+        formatExportDate(inv.delivery_date) || 'N/A',
+        formatExportDate(inv.paid_date) || (inv.payment_status || 'Not Paid'),
         inv.supplier_name || 'N/A',
+        inv.company_name || 'N/A',
         formatPaymentMethod(inv.payment_method),
+        toPurchasingExportNumber(inv.without_vat_amount || 0),
+        toPurchasingExportNumber(inv.vat_amount || 0),
         toPurchasingExportNumber(inv.total_amount || 0)
       ]);
     });
 
     worksheetData.push([]);
-    worksheetData.push(['', '', '', '', 'Grand Total', toPurchasingExportNumber(grandTotal || 0)]);
+    worksheetData.push([
+      '', '', '', '', '', '', 'Grand Total',
+      toPurchasingExportNumber(withoutVatTotal || 0),
+      toPurchasingExportNumber(vatTotal || 0),
+      toPurchasingExportNumber(grandTotal || 0)
+    ]);
 
     const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
     worksheet['!cols'] = [
       { wch: 18 }, // Invoice Number
       { wch: 14 }, // Invoice Date
-      { wch: 16 }, // Company
+      { wch: 14 }, // Delivery Date
+      { wch: 14 }, // Paid Date
       { wch: 28 }, // Supplier
+      { wch: 16 }, // Company
       { wch: 18 }, // Payment Method
+      { wch: 22 }, // Amount Without VAT
+      { wch: 14 }, // VAT
       { wch: 18 }  // Total Amount
     ];
 
@@ -277,6 +325,20 @@ const PurchaseReport = () => {
 
       {/* Filters */}
       <div className="filters-section report-filter-bar purchase-report-filter-bar">
+        <div className="report-filter-group">
+          <label className="report-filter-label">Date Type</label>
+          <select
+            value={dateType}
+            onChange={(e) => setDateType(e.target.value)}
+            className="report-filter-select"
+            title="Which date the From / To range applies to"
+          >
+            {DATE_TYPE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        </div>
+
         <div className="report-filter-group">
           <label className="report-filter-label">From Date</label>
           <input
@@ -345,6 +407,14 @@ const PurchaseReport = () => {
           <button onClick={handleApplyFilters} disabled={loading} className="btn btn-primary">
             {loading ? 'Searching...' : 'Search'}
           </button>
+          <button
+            onClick={handleRefresh}
+            disabled={loading || !appliedFilters}
+            className="btn btn-secondary"
+            title="Reload the last search with the latest data"
+          >
+            Refresh
+          </button>
           <button onClick={handleReset} disabled={loading} className="btn btn-secondary">
             Reset
           </button>
@@ -364,19 +434,25 @@ const PurchaseReport = () => {
               <thead>
                 <tr>
                   <th onClick={() => handleSort('invoice_no')} className="sortable">
-                    Invoice Number{sortIndicator('invoice_no')}
+                    Invoice No.{sortIndicator('invoice_no')}
                   </th>
                   <th onClick={() => handleSort('invoice_date')} className="sortable">
                     Invoice Date{sortIndicator('invoice_date')}
                   </th>
-                  <th onClick={() => handleSort('company_name')} className="sortable">
-                    Company{sortIndicator('company_name')}
+                  <th onClick={() => handleSort('delivery_date')} className="sortable">
+                    Delivery Date{sortIndicator('delivery_date')}
+                  </th>
+                  <th onClick={() => handleSort('paid_date')} className="sortable">
+                    Paid Date{sortIndicator('paid_date')}
                   </th>
                   <th onClick={() => handleSort('supplier_name')} className="sortable">
                     Supplier{sortIndicator('supplier_name')}
                   </th>
-                  <th onClick={() => handleSort('payment_method')} className="sortable">
-                    Payment Method{sortIndicator('payment_method')}
+                  <th onClick={() => handleSort('without_vat_amount')} className="sortable">
+                    Amount Without VAT{sortIndicator('without_vat_amount')}
+                  </th>
+                  <th onClick={() => handleSort('vat_amount')} className="sortable">
+                    VAT{sortIndicator('vat_amount')}
                   </th>
                   <th onClick={() => handleSort('total_amount')} className="sortable">
                     Total Amount{sortIndicator('total_amount')}
@@ -386,18 +462,26 @@ const PurchaseReport = () => {
               <tbody>
                 {sortedInvoices.map((inv) => (
                   <tr key={inv.id}>
-                    <td className="report-table-reference">{inv.invoice_no || 'N/A'}</td>
-                    <td className="report-table-date">{(inv.invoice_date || inv.purchase_date) ? format(new Date(inv.invoice_date || inv.purchase_date), 'MMM dd, yyyy') : 'N/A'}</td>
-                    <td>{inv.company_name || 'N/A'}</td>
-                    <td>{inv.supplier_name || 'N/A'}</td>
-                    <td><span className={getPaymentMethodBadgeClass(inv.payment_method)}>{formatPaymentMethod(inv.payment_method)}</span></td>
+                    <td className="report-table-reference" title={inv.invoice_no || ''}>{inv.invoice_no || 'N/A'}</td>
+                    <td className="report-table-date">{formatDisplayDate(getInvoiceDate(inv)) || 'N/A'}</td>
+                    <td className="report-table-date">{formatDisplayDate(inv.delivery_date) || 'N/A'}</td>
+                    <td className="report-table-date">
+                      {formatDisplayDate(inv.paid_date) || <span className="pr-unpaid">{inv.payment_status || 'Not Paid'}</span>}
+                    </td>
+                    <td title={[inv.company_name, formatPaymentMethod(inv.payment_method)].filter(Boolean).join(' • ')}>
+                      {inv.supplier_name || 'N/A'}
+                    </td>
+                    <td>{formatPurchasingCurrency(inv.without_vat_amount)}</td>
+                    <td>{formatPurchasingCurrency(inv.vat_amount)}</td>
                     <td className="report-table-value-numeric">{formatPurchasingCurrency(inv.total_amount)}</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan="5"><strong>Grand Total</strong></td>
+                  <td colSpan="5"><strong>Grand Total ({sortedInvoices.length} invoice{sortedInvoices.length !== 1 ? 's' : ''})</strong></td>
+                  <td className="pr-amount"><strong>{formatPurchasingCurrency(withoutVatTotal)}</strong></td>
+                  <td className="pr-amount"><strong>{formatPurchasingCurrency(vatTotal)}</strong></td>
                   <td><strong>{formatPurchasingCurrency(grandTotal)}</strong></td>
                 </tr>
               </tfoot>

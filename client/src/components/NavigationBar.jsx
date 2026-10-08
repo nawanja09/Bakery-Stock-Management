@@ -355,6 +355,7 @@ const NavigationBar = () => {
       {can('/expenses/cash-expenses') && <li><NavLink to="/expenses/cash-expenses" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faWallet} /></span><span>Cash Expenses</span></NavLink></li>}
       {can('/expenses/hidden') && <li><NavLink to="/expenses/hidden" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faUserSecret} /></span><span>Hidden Expenses</span></NavLink></li>}
       {can('/expenses/reports') && <li><NavLink to="/expenses/reports" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faChartBar} /></span><span>Expenses Reports</span></NavLink></li>}
+      {can('/expenses/summary-report') && <li><NavLink to="/expenses/summary-report" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faFileInvoiceDollar} /></span><span>Expense Report Summary</span></NavLink></li>}
     </>
   );
 

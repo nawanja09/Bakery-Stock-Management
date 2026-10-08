@@ -1,5 +1,6 @@
 const pool = require('../config/db');
 const { normalizePaymentMethodValue } = require('../utils/paymentMethodUtils');
+const { loadExpenseRecords, dateFilters } = require('./analystController');
 
 const getStockReport = async (req, res) => {
   try {
@@ -1401,15 +1402,50 @@ const getLastIssueDateReport = async (req, res) => {
   }
 };
 
+const roundMoney = (value) => Math.round((Number(value) || 0) * 100) / 100;
+
+// Total is authoritative; Without VAT is derived from it so the three columns
+// always add up, even for legacy rows whose subtotal was never stored.
+const splitVat = (total, vat) => {
+  const total_amount = roundMoney(total);
+  const vat_amount = roundMoney(vat);
+  return { without_vat_amount: roundMoney(total_amount - vat_amount), vat_amount, total_amount };
+};
+
 // =============================================
 // Purchase Report (invoice-level listing)
 // =============================================
 // Returns one row per purchase invoice with Invoice Number, Invoice Date,
-// Company, Supplier, Payment Method and Total Amount, plus a serverGrandTotal so
-// the frontend/export always match. Supports optional date range, company,
-// supplier and payment method filters, all of which can be combined.
+// Delivery Date, Paid Date, Company, Supplier, Payment Method and the
+// Without VAT / VAT / Total split, plus grand totals so the frontend/export
+// always match. Supports optional date range, company, supplier and payment
+// method filters, all of which can be combined.
+//
+// `dateType` picks which date the From/To range applies to:
+//   invoice (default) -> COALESCE(invoice_date, purchase_date), as before
+//   delivery          -> purchase_date (labelled "Delivery Date" on the purchase forms)
+//   paid              -> paid date (below); invoices not fully Paid never match
+//
+// Paid Date is the date of the latest payment recorded against the invoice once
+// it is fully Paid. Payments resolve the same way as elsewhere in purchasing:
+// purchase_payment_allocations when a payment was split across invoices,
+// otherwise the legacy payment_history.purchase_id. Legacy invoices marked Paid
+// with no payment record at all were paid on delivery, so they fall back to the
+// delivery date.
+const PURCHASE_REPORT_DATE_EXPRESSIONS = {
+  invoice: 'COALESCE(p.invoice_date, p.purchase_date)',
+  delivery: 'p.purchase_date',
+  paid: "CASE WHEN p.payment_status = 'Paid' THEN COALESCE(pay.last_payment_date, DATE(p.purchase_date)) END"
+};
+
 const getPurchaseReport = async (req, res) => {
   const { startDate, endDate, companyId, supplierId, paymentMethod } = req.query;
+  const dateType = String(req.query.dateType || 'invoice').toLowerCase();
+  const filterDateExpr = PURCHASE_REPORT_DATE_EXPRESSIONS[dateType];
+
+  if (!filterDateExpr) {
+    return res.status(400).json({ error: 'Invalid dateType. Use invoice, delivery or paid.' });
+  }
 
   try {
     let query = `
@@ -1418,11 +1454,14 @@ const getPurchaseReport = async (req, res) => {
         p.invoice_no,
         p.purchase_date,
         p.invoice_date,
+        ${PURCHASE_REPORT_DATE_EXPRESSIONS.paid} AS paid_date,
+        p.payment_status,
         p.company_id,
         COALESCE(c.name, 'N/A') AS company_name,
         p.supplier_id,
         s.name AS supplier_name,
         p.payment_method,
+        COALESCE(p.vat_amount, 0) AS vat_amount,
         CASE
           WHEN p.total_with_vat IS NOT NULL AND p.total_with_vat > 0 THEN p.total_with_vat
           WHEN p.bill_amount IS NOT NULL AND p.bill_amount > 0 THEN p.bill_amount
@@ -1431,18 +1470,26 @@ const getPurchaseReport = async (req, res) => {
       FROM purchases p
       JOIN supplier s ON p.supplier_id = s.id
       LEFT JOIN company c ON p.company_id = c.id
+      LEFT JOIN (
+        SELECT
+          COALESCE(ppa.purchase_id, ph.purchase_id) AS purchase_id,
+          MAX(ph.payment_date) AS last_payment_date
+        FROM payment_history ph
+        LEFT JOIN purchase_payment_allocations ppa ON ppa.payment_history_id = ph.id
+        GROUP BY COALESCE(ppa.purchase_id, ph.purchase_id)
+      ) pay ON pay.purchase_id = p.id
       WHERE (p.deleted = FALSE OR p.deleted IS NULL)
     `;
 
     const params = [];
 
     if (startDate) {
-      query += ' AND COALESCE(p.invoice_date, p.purchase_date) >= ?';
+      query += ` AND ${filterDateExpr} >= ?`;
       params.push(startDate);
     }
 
     if (endDate) {
-      query += ' AND COALESCE(p.invoice_date, p.purchase_date) < DATE_ADD(?, INTERVAL 1 DAY)';
+      query += ` AND ${filterDateExpr} < DATE_ADD(?, INTERVAL 1 DAY)`;
       params.push(endDate);
     }
 
@@ -1485,7 +1532,7 @@ const getPurchaseReport = async (req, res) => {
       params.push(...varList, normalized);
     }
 
-    query += ' ORDER BY COALESCE(p.invoice_date, p.purchase_date) ASC, p.id ASC';
+    query += ` ORDER BY ${filterDateExpr} ASC, p.id ASC`;
 
     const [rows] = await pool.query(query, params);
 
@@ -1494,17 +1541,22 @@ const getPurchaseReport = async (req, res) => {
       invoice_no: row.invoice_no,
       purchase_date: row.purchase_date,
       invoice_date: row.invoice_date,
+      delivery_date: row.purchase_date,
+      paid_date: row.paid_date,
+      payment_status: row.payment_status,
       company_id: row.company_id,
       company_name: row.company_name,
       supplier_id: row.supplier_id,
       supplier_name: row.supplier_name,
       payment_method: row.payment_method || 'N/A',
-      total_amount: parseFloat(row.total_amount) || 0
+      ...splitVat(row.total_amount, row.vat_amount)
     }));
 
-    const grandTotal = invoices.reduce((sum, inv) => sum + inv.total_amount, 0);
+    const grandTotal = roundMoney(invoices.reduce((sum, inv) => sum + inv.total_amount, 0));
+    const vatTotal = roundMoney(invoices.reduce((sum, inv) => sum + inv.vat_amount, 0));
+    const withoutVatTotal = roundMoney(invoices.reduce((sum, inv) => sum + inv.without_vat_amount, 0));
 
-    res.json({ invoices, grandTotal });
+    res.json({ invoices, grandTotal, vatTotal, withoutVatTotal, dateType });
   } catch (error) {
     console.error('Error generating purchase report:', error);
     res.status(500).json({ error: 'Server error: ' + error.message });
@@ -1786,6 +1838,280 @@ const getExpensesReport = async (req, res) => {
   }
 };
 
+// =============================================
+// Expense Report Summary: an analytical summary of Analyst -> Expenses.
+//
+// Source of truth: analystController.loadExpenseRecords - the exact function
+// Analyst -> Expenses runs - so the same transactions are included/excluded,
+// with the same Expense Type / Sub Expense Type, dates, status, company and
+// amount. Only the five Expenses-module methods are loaded; Analyst's
+// 'purchasing' method (purchase invoices) is never requested, so Purchasing /
+// RM / supplier transactions cannot appear here.
+//
+// This report only adds, read-only, on top of those records:
+//   - VAT: Other Expenses bills store vat_amount on the expenses row (the
+//     Analyst amount is that bill's total_bill_amount). The other methods carry
+//     no VAT, so their whole amount is "Without VAT". No VAT is ever derived
+//     from a percentage, and nothing is read from purchasing tables.
+//   - Payment Method: Other Expenses bills use their actual expense_payments;
+//     the other methods are paid one fixed way.
+// =============================================
+
+// Analyst -> Expenses "Expense Method" values, minus Purchasing
+const EXPENSE_SUMMARY_GROUPS = {
+  petty_cash: 'Petty Cash',
+  cash_expenses: 'Cash Expenses',
+  bank_charges: 'Bank Charges',
+  hidden_expenses: 'Hidden Expenses',
+  other_expenses: 'Other Expenses'
+};
+const EXPENSE_SUMMARY_GROUP_BY_LABEL = Object.fromEntries(
+  Object.entries(EXPENSE_SUMMARY_GROUPS).map(([key, label]) => [label, key])
+);
+
+const FIXED_PAYMENT_METHODS = {
+  petty_cash: 'Petty Cash',
+  cash_expenses: 'Cash',
+  bank_charges: 'Bank',
+  hidden_expenses: null // report-only, never posts to Cash/Bank
+};
+
+const normalizeName = (name) => String(name || '').trim().toLowerCase();
+
+// One summary row per Expense Type + Sub Expense Type exactly as Analyst shows
+// them (case/whitespace-insensitive). A missing Sub Expense Type is its own
+// row, never merged with a named one.
+const expenseSummaryKey = (expenseType, subExpenseType) =>
+  `${normalizeName(expenseType)}\u0000${normalizeName(subExpenseType)}`;
+
+const collectExpenseSummaryTransactions = async ({ fromDate, toDate, group }) => {
+  const methods = group ? [group] : Object.keys(EXPENSE_SUMMARY_GROUPS);
+  const records = await loadExpenseRecords({ methods, fromDate, toDate });
+
+  // Defensive: the scope is Expenses-module methods only.
+  const transactions = records
+    .filter(record => EXPENSE_SUMMARY_GROUP_BY_LABEL[record.expense_method])
+    .map(record => ({
+      id: record.id,
+      group: EXPENSE_SUMMARY_GROUP_BY_LABEL[record.expense_method],
+      group_label: record.expense_method,
+      date: record.date,
+      reference: record.reference || null,
+      expense_type: String(record.expense_type || '').trim() || null,
+      sub_expense_type: String(record.sub_expense_type || '').trim() || null,
+      description: record.description || null,
+      company_id: record.company_id || null,
+      company_name: record.company_name || null,
+      payment_source: record.payment_source || null,
+      status: record.status || null,
+      amount: record.amount
+    }));
+
+  // VAT + payments for Other Expenses bills
+  const billIds = transactions.filter(tx => tx.group === 'other_expenses').map(tx => tx.id);
+  const vatByBill = new Map();
+  const paymentsByBill = new Map();
+  if (billIds.length > 0) {
+    const [[vatRows], [paymentRows]] = await Promise.all([
+      pool.query('SELECT id, vat_amount FROM expenses WHERE id IN (?)', [billIds]),
+      pool.query(`
+        SELECT
+          epa.expense_id,
+          epa.amount,
+          DATE_FORMAT(ep.payment_date, '%Y-%m-%d') AS payment_date,
+          ep.payment_type,
+          ep.cheque_number,
+          ep.voucher_number,
+          ep.reference_number
+        FROM expense_payment_allocations epa
+        JOIN expense_payments ep ON ep.id = epa.payment_id
+        WHERE epa.expense_id IN (?)
+        ORDER BY ep.payment_date ASC, ep.id ASC
+      `, [billIds])
+    ]);
+
+    vatRows.forEach(row => vatByBill.set(row.id, row.vat_amount));
+    paymentRows.forEach(p => {
+      if (!paymentsByBill.has(p.expense_id)) paymentsByBill.set(p.expense_id, []);
+      paymentsByBill.get(p.expense_id).push({
+        payment_date: p.payment_date,
+        payment_type: p.payment_type,
+        amount: roundMoney(p.amount),
+        cheque_number: p.cheque_number || null,
+        voucher_number: p.voucher_number || null,
+        reference_number: p.reference_number || null
+      });
+    });
+  }
+
+  return transactions.map(tx => {
+    const isBill = tx.group === 'other_expenses';
+    const payments = isBill ? (paymentsByBill.get(tx.id) || []) : undefined;
+    const fixedMethod = FIXED_PAYMENT_METHODS[tx.group];
+    const paymentMethods = isBill
+      ? [...new Set(payments.map(p => p.payment_type).filter(Boolean))]
+      : (fixedMethod ? [fixedMethod] : []);
+    const { amount, ...rest } = tx;
+
+    return {
+      ...rest,
+      ...(isBill && { payments }),
+      payment_methods: paymentMethods,
+      payment_method: paymentMethods.length ? paymentMethods.join(', ') : (isBill ? 'Unpaid' : 'N/A'),
+      ...splitVat(amount, isBill ? vatByBill.get(tx.id) : 0)
+    };
+  });
+};
+
+// Payment Method / Expense Type / Sub Expense Type filters. Types are picked
+// from Expense Type Management and matched by name, because Analyst records
+// (and therefore this report's rows) carry the saved type names.
+const applyExpenseSummaryFilters = async (transactions, { paymentMethod, expenseTypeId, subExpenseTypeId }) => {
+  let filtered = transactions;
+
+  if (paymentMethod) {
+    const wanted = normalizeName(paymentMethod);
+    filtered = filtered.filter(tx => tx.payment_methods.some(m => normalizeName(m) === wanted));
+  }
+
+  if (expenseTypeId) {
+    const [[type]] = await pool.query('SELECT name FROM expense_types WHERE id = ?', [expenseTypeId]);
+    const typeName = normalizeName(type?.name);
+    filtered = filtered.filter(tx => Boolean(typeName) && normalizeName(tx.expense_type) === typeName);
+  }
+
+  if (subExpenseTypeId) {
+    const [[subType]] = await pool.query('SELECT name FROM sub_expense_types WHERE id = ?', [subExpenseTypeId]);
+    const subName = normalizeName(subType?.name);
+    filtered = filtered.filter(tx => Boolean(subName) && normalizeName(tx.sub_expense_type) === subName);
+  }
+
+  return filtered;
+};
+
+const parseExpenseSummaryFilters = (query) => {
+  const { fromDate, toDate, group, paymentMethod, expenseTypeId, subExpenseTypeId } = query;
+  dateFilters(fromDate, toDate); // same validation as Analyst -> Expenses
+  if (group && !EXPENSE_SUMMARY_GROUPS[group]) {
+    throw new Error(`Invalid expense group. Use one of: ${Object.keys(EXPENSE_SUMMARY_GROUPS).join(', ')}.`);
+  }
+  return {
+    fromDate: fromDate || undefined,
+    toDate: toDate || undefined,
+    group: group || null,
+    paymentMethod: paymentMethod ? String(paymentMethod).trim() : null,
+    expenseTypeId: expenseTypeId || null,
+    subExpenseTypeId: subExpenseTypeId || null
+  };
+};
+
+const loadFilteredExpenseSummaryTransactions = async (query) => {
+  const filters = parseExpenseSummaryFilters(query);
+  const transactions = await collectExpenseSummaryTransactions(filters);
+  return applyExpenseSummaryFilters(transactions, filters);
+};
+
+// Distinct non-empty values of one field across a group's transactions, in
+// first-seen order (case/whitespace-insensitive, original spelling kept).
+const distinctValues = (rows, field) => {
+  const seen = new Map();
+  rows.forEach(r => {
+    const value = String(r[field] || '').trim();
+    const key = normalizeName(value);
+    if (value && !seen.has(key)) seen.set(key, value);
+  });
+  return Array.from(seen.values());
+};
+
+// Display-only details of a summary row (Date, Reference No, Expenses Method,
+// Company, Payment Type, Description). Does not affect grouping or totals.
+const describeExpenseGroup = (rows) => {
+  const dates = rows.map(r => r.date).filter(Boolean).sort();
+  return {
+    date_from: dates[0] || null,
+    date_to: dates[dates.length - 1] || null,
+    references: distinctValues(rows, 'reference'),
+    expense_methods: distinctValues(rows, 'group_label'),
+    companies: distinctValues(rows, 'company_name'),
+    payment_types: distinctValues(rows, 'payment_source'),
+    descriptions: distinctValues(rows, 'description')
+  };
+};
+
+const sumExpenseTotals = (rows) => ({
+  transaction_count: rows.length,
+  without_vat_amount: roundMoney(rows.reduce((sum, r) => sum + r.without_vat_amount, 0)),
+  vat_amount: roundMoney(rows.reduce((sum, r) => sum + r.vat_amount, 0)),
+  total_amount: roundMoney(rows.reduce((sum, r) => sum + r.total_amount, 0))
+});
+
+// Same 400/500 split as Analyst -> Expenses
+const sendExpenseSummaryError = (res, error, label) => {
+  const isBadRequest = error.message.startsWith('Invalid') || error.message.includes('cannot be');
+  if (!isBadRequest) console.error(`Error generating ${label}:`, error);
+  res.status(isBadRequest ? 400 : 500).json({ error: isBadRequest ? error.message : 'Server error: ' + error.message });
+};
+
+const getExpenseSummaryReport = async (req, res) => {
+  try {
+    const transactions = await loadFilteredExpenseSummaryTransactions(req.query);
+
+    const groups = new Map();
+    transactions.forEach(tx => {
+      const key = expenseSummaryKey(tx.expense_type, tx.sub_expense_type);
+      if (!groups.has(key)) {
+        groups.set(key, { expense_type: tx.expense_type, sub_expense_type: tx.sub_expense_type, rows: [] });
+      }
+      groups.get(key).rows.push(tx);
+    });
+
+    // Expense Type A-Z, then Sub Expense Type A-Z; missing values last.
+    const byName = (a, b) => (!a) - (!b) || String(a || '').localeCompare(String(b || ''));
+    const summary = Array.from(groups.values())
+      .map(g => ({
+        expense_type: g.expense_type,
+        sub_expense_type: g.sub_expense_type,
+        ...describeExpenseGroup(g.rows),
+        ...sumExpenseTotals(g.rows)
+      }))
+      .sort((a, b) => byName(a.expense_type, b.expense_type) || byName(a.sub_expense_type, b.sub_expense_type));
+
+    res.json({ summary, totals: sumExpenseTotals(transactions) });
+  } catch (error) {
+    sendExpenseSummaryError(res, error, 'expense summary report');
+  }
+};
+
+// Transactions behind one summary row: same filters + same grouping key as the
+// summary, so the totals here always equal that row. expenseType /
+// subExpenseType are the row's values ('' = none).
+const getExpenseSummaryDetails = async (req, res) => {
+  const { expenseType, subExpenseType } = req.query;
+
+  if (expenseType === undefined) {
+    return res.status(400).json({ error: 'expenseType is required' });
+  }
+
+  try {
+    const key = expenseSummaryKey(expenseType, subExpenseType);
+    const transactions = (await loadFilteredExpenseSummaryTransactions(req.query))
+      .filter(tx => expenseSummaryKey(tx.expense_type, tx.sub_expense_type) === key)
+      // Same order as Analyst -> Expenses
+      .sort((a, b) =>
+        String(a.date).localeCompare(String(b.date)) ||
+        `${a.group_label}-${a.id}`.localeCompare(`${b.group_label}-${b.id}`));
+
+    res.json({
+      expense_type: transactions[0]?.expense_type ?? (String(expenseType).trim() || null),
+      sub_expense_type: transactions[0]?.sub_expense_type ?? (String(subExpenseType || '').trim() || null),
+      transactions,
+      totals: sumExpenseTotals(transactions)
+    });
+  } catch (error) {
+    sendExpenseSummaryError(res, error, 'expense summary details');
+  }
+};
+
 module.exports = {
   getStockReport,
   getLatestUnitPrice,
@@ -1803,5 +2129,7 @@ module.exports = {
   getDailyPurchaseReturnTransactions,
   getDepartmentReturnItemWiseReport,
   getPurchaseReport,
-  getExpensesReport
+  getExpensesReport,
+  getExpenseSummaryReport,
+  getExpenseSummaryDetails
 };

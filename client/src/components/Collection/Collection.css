@@ -69,29 +69,90 @@
 .col-map-errors { margin: 4px 0 4px 18px; padding: 0; }
 .col-map-errors li { margin: 2px 0; }
 
-/* Shared filter bar: Search + Source + Department + From / To (all tabs) */
-.col-filter-bar {
-  display: grid;
-  grid-template-columns: minmax(0, 2.2fr) repeat(4, minmax(0, 1fr)) auto;
-  gap: var(--spacing-md, 12px);
-  align-items: end;
-  margin-bottom: var(--spacing-md, 12px);
+/* Search card (all tabs): Search Bar, Department, From / To Date + Search /
+   Refresh from POS. 4 columns on desktop, 2 on tablet, 1 on mobile. */
+.col-filter-card {
+  background: var(--color-surface, #fff);
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px rgba(15, 23, 42, 0.05);
+  padding: 20px;
+  margin-bottom: var(--spacing-md, 16px);
 }
-.col-filter-actions { display: flex; gap: 8px; justify-content: flex-end; flex-direction: row; }
+.col-filter-title {
+  margin: 0 0 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--color-border-light, #eff1f5);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-heading, #0f172a);
+}
+.col-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  align-items: end;
+}
+.col-filter-grid .form-group { margin: 0; min-width: 0; }
+.col-filter-grid label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-secondary, #64748b);
+}
+.col-filter-grid .form-input,
+.col-filter-grid .form-select {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border-strong, #cbd5e1);
+  border-radius: 8px;
+  background: var(--color-surface, #fff);
+  color: var(--color-text, #1e293b);
+  font-size: 0.875rem;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+.col-filter-grid .form-input::placeholder { color: var(--color-text-placeholder, #94a3b8); }
+.col-filter-grid .form-input:hover,
+.col-filter-grid .form-select:hover { border-color: var(--color-gray-400, #94a3b8); }
+.col-filter-grid .form-input:focus,
+.col-filter-grid .form-select:focus {
+  outline: none;
+  border-color: var(--color-primary, #2D6CDF);
+  box-shadow: 0 0 0 3px var(--color-focus-ring, rgba(45, 108, 223, 0.2));
+}
+.col-filter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+.col-filter-actions .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 18px;
+  border-radius: 8px;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+.col-filter-actions .btn:hover:not(:disabled) { box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12); transform: translateY(-1px); }
+.col-filter-actions .btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--color-focus-ring, rgba(45, 108, 223, 0.2)); }
+.col-filter-actions .btn:disabled { opacity: 0.6; cursor: not-allowed; }
 .col-pager { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 12px 0; font-size: 0.875rem; }
 
-@media (max-width: 1100px) {
-  .col-filter-bar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .col-search { grid-column: 1 / -1; }
+@media (max-width: 1024px) {
+  .col-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 600px) {
-  .col-filter-bar { grid-template-columns: 1fr; }
+  .col-filter-card { padding: 16px; }
+  .col-filter-grid { grid-template-columns: 1fr; }
+  .col-filter-actions .btn { flex: 1 1 100%; justify-content: center; }
 }
 
-/* Search box with its Search button (applies every filter at once) */
-.col-search-row { display: flex; gap: 8px; }
-.col-search-row .form-input { flex: 1; min-width: 0; }
-.col-search-row .btn { white-space: nowrap; }
 
 /* Individual card payments of a shift (each one is its own Card Ledger entry) */
 .col-card-table td { white-space: nowrap; }

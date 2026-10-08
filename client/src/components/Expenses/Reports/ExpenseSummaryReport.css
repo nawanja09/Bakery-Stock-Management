@@ -1,0 +1,154 @@
+/* ============================================================
+   Expense Report Summary — extends ExpensesReport.css
+   ============================================================ */
+
+.esr-filter-row {
+  flex-wrap: wrap;
+}
+
+.esr-filter-row .report-filter-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Headline totals (same card language as Analyst / Expenses summary) */
+.esr-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: var(--spacing-lg);
+}
+
+.esr-summary-grid--compact {
+  margin: var(--spacing-lg) 0 0;
+}
+
+.esr-summary-card {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 3px solid var(--color-border-strong, var(--color-border));
+}
+
+.esr-summary-card--primary {
+  border-top-color: var(--color-primary);
+}
+
+.esr-summary-card span {
+  color: var(--color-text-secondary);
+  font-size: .76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.esr-summary-card strong {
+  color: var(--color-heading);
+  font-size: 1.25rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.esr-filter-label {
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+/* Tables */
+.esr-table .esr-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.esr-table .esr-index {
+  width: 48px;
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.esr-table .esr-action {
+  width: 1%;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.esr-table .esr-action .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.esr-table .esr-nowrap {
+  white-space: nowrap;
+}
+
+.esr-muted {
+  margin-top: 2px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.esr-footnote {
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+/* View Details modal */
+.esr-modal {
+  width: min(1320px, 100%);
+}
+
+.esr-modal-arrow {
+  color: var(--color-text-secondary);
+  font-weight: 400;
+}
+
+.esr-modal-sub {
+  margin-top: 4px;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.esr-detail-table {
+  min-width: 1150px;
+}
+
+.esr-detail-table td {
+  vertical-align: top;
+}
+
+@media (max-width: 1024px) {
+  .esr-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .esr-summary-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Summary table: 12 data columns + Action, scrolls horizontally on narrow screens */
+.esr-summary-table {
+  min-width: 1400px;
+}
+
+.esr-summary-table td {
+  vertical-align: top;
+}
+
+.esr-table .esr-desc {
+  min-width: 180px;
+  max-width: 280px;
+}
+
+.esr-more {
+  margin-left: 4px;
+  white-space: nowrap;
+}
