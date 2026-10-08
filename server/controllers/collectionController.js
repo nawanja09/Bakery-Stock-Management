@@ -82,7 +82,8 @@ const POSTED_SELECT = `
          MAX(CASE WHEN ct.payment_method = 'BANK' THEN CONCAT_WS(' - ', bd.bank_name, bd.account_number) END) AS bank_account_name,
          MAX(CASE WHEN ct.payment_method = 'CARD' THEN CONCAT_WS(' - ', bd.bank_name, bd.account_number) END) AS card_bank_account_name,
          MAX(CASE WHEN ct.payment_method = 'CARD' THEN cdt.status END) AS card_ledger_status,
-         GROUP_CONCAT(ct.payment_method ORDER BY ct.id SEPARATOR ',') AS payment_methods
+         -- AR_SETTLEMENT (Credit Payment AR Account credit) is a ledger effect, not a payment method
+         GROUP_CONCAT(CASE WHEN ct.payment_method <> 'AR_SETTLEMENT' THEN ct.payment_method END ORDER BY ct.id SEPARATOR ',') AS payment_methods
     FROM collection_transactions ct
     LEFT JOIN bank_details bd ON bd.id = ct.bank_account_id
     LEFT JOIN card_transactions cdt ON cdt.id = ct.card_transaction_id

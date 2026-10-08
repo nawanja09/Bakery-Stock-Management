@@ -1270,7 +1270,7 @@ const ensureCollectionsSchema = async () => {
         collection_id               INT NOT NULL,
         transaction_date            DATE NOT NULL,
         reference_no                VARCHAR(100) NULL,
-        payment_method              ENUM('CASH','CARD','BANK','AR','SHORT_EXCESS') NOT NULL,
+        payment_method              ENUM('CASH','CARD','BANK','AR','SHORT_EXCESS','AR_SETTLEMENT') NOT NULL,
         amount                      DECIMAL(14,2) NOT NULL,
         company_id                  INT NOT NULL,
         bank_account_id             INT NULL,
@@ -1327,7 +1327,10 @@ const ensureCollectionsSchema = async () => {
     for (const stmt of [
       'ALTER TABLE other_ledgers ADD COLUMN IF NOT EXISTS is_system TINYINT(1) NOT NULL DEFAULT 0',
       "ALTER TABLE other_ledgers ADD COLUMN IF NOT EXISTS normal_balance ENUM('CREDIT','DEBIT') NOT NULL DEFAULT 'CREDIT'",
-      "ALTER TABLE other_ledger_transactions MODIFY COLUMN source_type ENUM('CASH_RECEIVE','CASH_ISSUED','COLLECTION_AR','COLLECTION_SHORT_EXCESS') NOT NULL"
+      "ALTER TABLE other_ledger_transactions MODIFY COLUMN source_type ENUM('CASH_RECEIVE','CASH_ISSUED','COLLECTION_AR','COLLECTION_SHORT_EXCESS','COLLECTION_AR_SETTLEMENT') NOT NULL",
+      // Credit Payment approval also credits the AR Account (collectionService
+      // AR_SETTLEMENT line). Adding an ENUM value keeps every existing row.
+      "ALTER TABLE collection_transactions MODIFY COLUMN payment_method ENUM('CASH','CARD','BANK','AR','SHORT_EXCESS','AR_SETTLEMENT') NOT NULL"
     ]) {
       try { await pool.query(stmt); } catch (alterErr) { console.warn('Collections schema alter skipped:', alterErr.message); }
     }
@@ -1364,6 +1367,31 @@ const ensureCollectionsSchema = async () => {
       );
     } catch (renameErr) {
       console.warn('Collections MASActive -> MAS Intimo update skipped:', renameErr.message);
+    }
+
+    // POS "MASBrew" is the existing "MAS Ayathi Brew Bar" department (same rule).
+    // Rows staged before it get the Stock Management name (also fixing any stored
+    // as "MAS Ayathi brew bar"); not-yet-approved rows left unmapped because of
+    // it get the department - only when exactly one such department exists.
+    // Completed rows and every other branch are untouched. Idempotent.
+    try {
+      await pool.query(
+        "UPDATE collections SET pos_branch_name = REPLACE(pos_branch_name, 'MASBrew', 'MAS Ayathi Brew Bar') WHERE pos_branch_name LIKE BINARY '%MASBrew%'"
+      );
+      await pool.query(
+        "UPDATE collections SET pos_branch_name = REPLACE(pos_branch_name, 'MAS Ayathi brew bar', 'MAS Ayathi Brew Bar') WHERE pos_branch_name LIKE BINARY '%MAS Ayathi brew bar%'"
+      );
+      const [brewDepartments] = await pool.query("SELECT id FROM departments WHERE name = 'MAS Ayathi Brew Bar'");
+      if (brewDepartments.length === 1) {
+        await pool.query(
+          `UPDATE collections SET department_id = ?
+            WHERE status IN ('pending', 'rejected') AND department_id IS NULL
+              AND (pos_branch_name = 'MAS Ayathi Brew Bar' OR pos_branch_name LIKE 'MAS Ayathi Brew Bar -%' OR pos_branch_name LIKE 'MAS Ayathi Brew Bar (%')`,
+          [brewDepartments[0].id]
+        );
+      }
+    } catch (renameErr) {
+      console.warn('Collections MASBrew -> MAS Ayathi Brew Bar update skipped:', renameErr.message);
     }
 
     // Card payment summary for shifts staged before it existed (read from the

@@ -42,7 +42,7 @@ const SOURCE_LABELS = {
   EMPLOYEE_DEDUCTION: 'Employee Deduction'
 };
 const REF_PREFIX = { SHIFT: 'SHIFT', CREDIT_PAYMENT: 'CP', EMPLOYEE_DEDUCTION: 'DED' };
-const METHOD_LABELS = { CASH: 'Cash', CARD: 'Card', BANK: 'Bank / Online', AR: 'AR', SHORT_EXCESS: 'Short / Excess' };
+const METHOD_LABELS = { CASH: 'Cash', CARD: 'Card', BANK: 'Bank / Online', AR: 'AR', SHORT_EXCESS: 'Short / Excess', AR_SETTLEMENT: 'AR settled' };
 const REASON_MAX = 255;
 
 const num = (v) => Number.parseFloat(v) || 0;
@@ -99,6 +99,10 @@ const methodsOf = (row) => {
     ['AR', row.ar_amount], ['SHORT_EXCESS', row.short_excess_amount]
   ].filter(([, v]) => num(v) !== 0).map(([m]) => m);
 };
+
+// Credit Payment: AR Account CREDIT of the money received (mirrors collectionService.settlementsOf).
+const arSettlementOf = (row) => (row.source_type === 'CREDIT_PAYMENT'
+  ? Number((num(row.cash_amount) + num(row.card_amount) + num(row.bank_amount)).toFixed(2)) : 0);
 
 // Why a shift's card cannot be posted as individual payments, or null.
 const cardIssue = (row) => {
@@ -463,6 +467,21 @@ const Collection = () => {
     );
   };
 
+  // Valid POS records that are deliberately not collections (overpayment
+  // set-offs, voided deductions): an information line, not a warning.
+  const renderExcludedNote = () => {
+    const withExcluded = loadedSources.filter((s) => s.excluded > 0);
+    if (withExcluded.length === 0) return null;
+    return (
+      <p className="cl-note">
+        Not imported (not collections):{' '}
+        {withExcluded.map((s) => (
+          `${SOURCE_LABELS[s.source]} - ${(s.excludedReasons || []).map((e) => `${e.records} ${e.reason}`).join('; ')}`
+        )).join(' | ')}.
+      </p>
+    );
+  };
+
   const renderSyncBanner = () => {
     if (!sync || loadedSources.length === 0) return null;
     if (syncProblems.length === 0) {
@@ -517,6 +536,13 @@ const Collection = () => {
           <input id="col-search" type="search" className="form-input"
             placeholder="Shift ref / no, reference, cashier, employee, amount..."
             value={draft.search} onChange={setDraftField('search')} />
+        </div>
+        <div className="form-group">
+          <label htmlFor="col-type">Collection Type</label>
+          <select id="col-type" value={draft.source} onChange={setDraftField('source')} className="form-select">
+            <option value="">All</option>
+            {Object.entries(SOURCE_LABELS).map(([value, text]) => <option key={value} value={value}>{text}</option>)}
+          </select>
         </div>
         <div className="form-group">
           <label htmlFor="col-department">Department</label>
@@ -596,6 +622,7 @@ const Collection = () => {
             {renderPosSessionWarning()}
             {renderScopeWarning()}
             {renderSyncBanner()}
+            {renderExcludedNote()}
             <p className="cl-note">Pending collections are <strong>not</strong> posted to any ledger. Only approved records update the ledgers.</p>
 
             {loading && records.length === 0 ? (
@@ -612,6 +639,7 @@ const Collection = () => {
                       )}
                       <th>Date</th>
                       <th>Shift / Reference No</th>
+                      <th>Collection Type</th>
                       <th>Department</th>
                       <th>Payment Method</th>
                       <th className="cl-num">Cash</th>
@@ -644,6 +672,7 @@ const Collection = () => {
                             {displayRef(r)}
                             {isDeduction && linkedRefOf(r) && <div className="col-sub">for {linkedRefOf(r)}</div>}
                           </td>
+                          <td>{SOURCE_LABELS[r.source_type]}</td>
                           <td>{departmentCell(r)}</td>
                           <td>
                             {methodsOf(r).map((m) => <span key={m} className="col-chip">{METHOD_LABELS[m]}</span>)}
@@ -724,7 +753,7 @@ const Collection = () => {
                 <tr>
                   <th>Date</th>
                   <th>Shift / Reference</th>
-                  <th>Source</th>
+                  <th>Collection Type</th>
                   <th>Department</th>
                   <th>Payment Method</th>
                   <th className="cl-num">Cash</th>
@@ -795,7 +824,7 @@ const Collection = () => {
                     {canWrite && <th className="cl-check-col" aria-label="Select" />}
                     <th>Date</th>
                     <th>Shift / Reference</th>
-                    <th>Source</th>
+                    <th>Collection Type</th>
                     <th>Department</th>
                     <th className="cl-num">Amount</th>
                     <th>Company</th>
@@ -904,6 +933,9 @@ const Collection = () => {
                                 ? ` - ${r.card_txn_count} individual entr${Number(r.card_txn_count) === 1 ? 'y' : 'ies'}` : '';
                               return <div key={m}>{METHOD_LABELS[m]} {fmtMoney(Math.abs(num(amount)))} &rarr; {target}{cardEntries}</div>;
                             })}
+                            {arSettlementOf(r) > 0 && (
+                              <div>AR settled {fmtMoney(arSettlementOf(r))} &rarr; AR Account (Credit)</div>
+                            )}
                           </td>
                           <td className="cl-num">{fmtMoney(r.total_amount)}</td>
                           <td>

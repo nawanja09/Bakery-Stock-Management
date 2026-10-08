@@ -169,6 +169,65 @@ test('employee deduction posts one Short/Excess CREDIT (negative signed amount)'
   assert.deepEqual(postingsOf({ ...ded.record }), [{ method: 'SHORT_EXCESS', amount: -500 }]);
 });
 
+test('live credit payment: date_time (UTC) is the date; method columns, not the label, split the amount', () => {
+  // Field names exactly as /api/credit-payments/collection returns them (values made up).
+  const live = (over) => ({
+    id: 501, reference_no: 'CP-501', date_time: '2026-10-07T20:15:10.000000Z',
+    customer: { id: 3, name: 'Test Customer', bucket: null }, branch: { id: null, name: null },
+    received_by: 'cashier1', payment_method: 'Cash', cash: 1000, card: 0, bank_transfer: 0, setoff: 0,
+    amount: 1000, collection: 1000, allocations: [{ type: 'sale', sale_id: 9, opening_balance_id: null, bill: 'B-9', amount: 1000 }],
+    allocated: 1000, unallocated: 0, notes: null, ...over
+  });
+
+  const cash = mapPosRecord(SOURCES.CREDIT_PAYMENT, live());
+  assert.equal(cash.ok, true, cash.reason);
+  assert.equal(cash.record.collection_date, '2026-10-08', '20:15 UTC is the next day in Sri Lanka');
+  assert.equal(cash.record.reference_no, 'CP-501');
+  assert.equal(cash.record.cashier_name, 'Test Customer');
+  assert.equal(cash.record.pos_branch_name, null);
+  assert.deepEqual(postingsOf(cash.record), [{ method: 'CASH', amount: 1000 }]);
+  assert.equal(cash.record.total_amount, cash.record.pos_total_amount);
+
+  // Labelled "Bank Transfer" but part paid in cash.
+  const split = mapPosRecord(SOURCES.CREDIT_PAYMENT, live({ payment_method: 'Bank Transfer', cash: 200, bank_transfer: 800 }));
+  assert.deepEqual(postingsOf(split.record), [{ method: 'CASH', amount: 200 }, { method: 'BANK', amount: 800 }]);
+  assert.equal(split.record.total_amount, 1000);
+
+  // Set-off part is not money received: only the cash is booked (= POS collection).
+  const mixed = mapPosRecord(SOURCES.CREDIT_PAYMENT, live({ payment_method: 'Cash + Overpayment Setoff', cash: 600, setoff: 400, amount: 1000, collection: 600 }));
+  assert.deepEqual(postingsOf(mixed.record), [{ method: 'CASH', amount: 600 }]);
+  assert.equal(mixed.record.total_amount, mixed.record.pos_total_amount);
+
+  const setoff = mapPosRecord(SOURCES.CREDIT_PAYMENT, live({ payment_method: 'Overpayment Setoff', cash: 0, setoff: 1000, collection: 0 }));
+  assert.equal(setoff.ok, false);
+  assert.equal(setoff.excluded, true, 'a set-off is excluded, not an unreadable record');
+  assert.match(setoff.reason, /Overpayment set-off - no new money received/);
+});
+
+test('live employee deduction: nested employee + source.shift_id (links the deduction to its shift)', () => {
+  // Field names exactly as /api/employee-deductions returns them (values made up).
+  const ded = mapPosRecord(SOURCES.EMPLOYEE_DEDUCTION, {
+    id: 31, deduction_date: '2026-09-25', employee: { id: 14, name: 'Test Employee' },
+    source_type: 'shift', source_label: 'Shift 0042', source: { shift_id: 211, shift_no: '0042', branch: 'Cafe - M' },
+    reason: 'Cash shortage', shortage: 750, offset: 0, amount: 750, offsets: [], status: 'active',
+    created_by: 'finance', created_at: '2026-09-25T10:05:05.000000Z', voided_by: null, voided_at: null
+  });
+  assert.equal(ded.ok, true, ded.reason);
+  assert.equal(ded.record.collection_date, '2026-09-25');
+  assert.equal(ded.record.employee_id, '14');
+  assert.equal(ded.record.employee_name, 'Test Employee');
+  assert.equal(ded.record.shift_id, '211');
+  assert.equal(ded.record.deduction_amount, 750);
+  // The branch is not used for deductions (department matching unchanged).
+  assert.equal(ded.record.pos_branch_name, null);
+
+  const voided = mapPosRecord(SOURCES.EMPLOYEE_DEDUCTION, {
+    id: 32, deduction_date: '2026-09-25', employee: { id: 14, name: 'Test Employee' }, amount: 100, status: 'voided'
+  });
+  assert.equal(voided.ok, false);
+  assert.equal(voided.excluded, true);
+});
+
 test('records that cannot be understood are reported with their real field names, never guessed', () => {
   const noId = mapPosRecord(SOURCES.SHIFT, { foo: 1, date: '2026-10-06', cash: 5 });
   assert.equal(noId.ok, false);

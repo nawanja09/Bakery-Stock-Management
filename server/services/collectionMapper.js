@@ -38,7 +38,10 @@ const PAYMENT_METHODS = Object.freeze({
   CARD: 'CARD',
   BANK: 'BANK',
   AR: 'AR',
-  SHORT_EXCESS: 'SHORT_EXCESS'
+  SHORT_EXCESS: 'SHORT_EXCESS',
+  // Not a received amount: the AR Account CREDIT of a Credit Payment (the
+  // customer's outstanding balance settled). See collectionService.settlementsOf.
+  AR_SETTLEMENT: 'AR_SETTLEMENT'
 });
 
 // ---- alias tables (first match wins) -----------------------------------------
@@ -70,17 +73,23 @@ const SHIFT = {
 
 const CREDIT_PAYMENT = {
   id: ['id', 'payment_id', 'credit_payment_id', 'transaction_id'],
+  // Verified: the POS sends the payment time as date_time ("2026-10-08T04:25:10.000000Z",
+  // UTC) and no other date field. Converted to the business (Sri Lanka) date.
+  date: ['date_time', 'datetime', 'payment_date_time', ...COMMON.date],
   reference: ['reference_no', 'reference', 'receipt_no', 'transaction_no', 'invoice_no', 'payment_no'],
   shift: ['shift_no', 'shift_number', 'shift_id'],
   method: ['payment_type', 'payment_method', 'payment_mode', 'method', 'type', 'pay_type'],
   amount: ['amount', 'paid_amount', 'payment_amount', 'total_amount', 'total'],
-  customer: ['customer_name', 'customer.name', 'customer', 'party_name']
+  customer: ['customer_name', 'customer.name', 'customer', 'party_name'],
+  // Verified per-method columns of /api/credit-payments/collection -> BSMS columns.
+  receivedColumns: [['cash', 'cash_amount'], ['card', 'card_amount'], ['bank_transfer', 'bank_amount']]
 };
 
 const DEDUCTION = {
   id: ['id', 'deduction_id', 'employee_deduction_id'],
   reference: ['reference_no', 'reference', 'deduction_no'],
-  shift: ['shift_id', 'shift_no', 'shift_number', 'shift.id'],
+  // Verified: { source: { shift_id, shift_no, branch } } - links the deduction to its shift.
+  shift: ['shift_id', 'shift_no', 'shift_number', 'shift.id', 'source.shift_id'],
   employeeId: ['employee_id', 'employee.id', 'staff_id', 'emp_id', 'cashier_id', 'user_id'],
   employeeName: ['employee_name', 'employee.name', 'staff_name', 'cashier_name', 'name'],
   amount: ['deduction_amount', 'deducted_amount', 'amount', 'total_amount', 'total']
@@ -191,6 +200,11 @@ const fail = (reason, raw) => ({
   fields: isPlainObject(raw) ? Object.keys(raw).slice(0, 40) : []
 });
 
+// A valid POS record that is deliberately not a collection (an overpayment
+// set-off, a voided deduction). A per-source mapper returns this instead of an
+// error text; it is reported as "excluded", not as a record that could not be read.
+const excluded = (reason) => ({ excluded: reason });
+
 const base = (source, raw, sourceId, date) => ({
   source_type: source,
   source_id: sourceId,
@@ -284,6 +298,28 @@ const mapCreditPayment = (raw, record) => {
   });
   if (!record.cashier_name) record.cashier_name = str(pick(raw, CREDIT_PAYMENT.customer), 255);
 
+  // Verified POS shape: one column per method. amount = cash + card +
+  // bank_transfer + setoff, and the POS `collection` = cash + card +
+  // bank_transfer (money actually received). An overpayment set-off only reuses
+  // money received earlier, so it is never booked as cash / bank. The columns -
+  // not the payment_method text - decide the split ("Bank Transfer" may also
+  // carry cash; "Cash + Overpayment Setoff" carries a set-off).
+  const columns = CREDIT_PAYMENT.receivedColumns.map(([key]) => getPath(raw, key));
+  if (columns.every((v) => typeof v === 'number' || (typeof v === 'string' && v.trim() !== ''))) {
+    const received = {};
+    for (const [key, column] of CREDIT_PAYMENT.receivedColumns) received[column] = toMoney(getPath(raw, key));
+    const values = Object.values(received);
+    if (values.some((n) => Number.isNaN(n))) return 'An amount field is not a valid number';
+    if (values.some((n) => n < 0)) return 'Negative payment amounts are not supported';
+    if (values.every((n) => n === 0)) {
+      return toMoney(getPath(raw, 'setoff')) > 0
+        ? excluded('Overpayment set-off - no new money received (POS collection is 0)')
+        : 'No cash / card / bank transfer amount found';
+    }
+    Object.assign(record, received, { total_amount: round2(values.reduce((a, b) => a + b, 0)) });
+    return null;
+  }
+
   if (methodRaw !== undefined) {
     // One payment = one method + one amount (the documented shape).
     const method = toPaymentMethod(methodRaw);
@@ -314,7 +350,7 @@ const mapCreditPayment = (raw, record) => {
 const mapDeduction = (raw, record) => {
   // Deductions are read with status=all: a cancelled / reversed one is not a recovery.
   const status = str(pick(raw, ['status', 'deduction_status']), 50);
-  if (status && /cancel|void|revers|delet/i.test(status)) return `Deduction is ${status} - not imported`;
+  if (status && /cancel|void|revers|delet/i.test(status)) return excluded(`Deduction is ${status}`);
   const amount = toMoney(pickAmountRaw(raw, DEDUCTION.amount));
   if (!Number.isFinite(amount) || amount <= 0) return 'Deduction amount missing or not greater than 0';
   const employeeId = str(pick(raw, DEDUCTION.employeeId), 100);
@@ -336,6 +372,10 @@ const ID_ALIASES = {
   [SOURCES.CREDIT_PAYMENT]: CREDIT_PAYMENT.id,
   [SOURCES.EMPLOYEE_DEDUCTION]: DEDUCTION.id
 };
+// Date fields per source (sources not listed use COMMON.date).
+const DATE_ALIASES = {
+  [SOURCES.CREDIT_PAYMENT]: CREDIT_PAYMENT.date
+};
 const MAPPERS = {
   [SOURCES.SHIFT]: mapShift,
   [SOURCES.CREDIT_PAYMENT]: mapCreditPayment,
@@ -352,11 +392,13 @@ const mapPosRecord = (source, raw) => {
   const sourceId = str(pick(raw, ID_ALIASES[source]), 100);
   if (!sourceId) return fail(`No unique id found (tried: ${ID_ALIASES[source].join(', ')})`, raw);
 
-  const date = toDateOnly(pick(raw, COMMON.date));
-  if (!date) return fail('No usable date found (expected an ISO date such as 2026-10-06)', raw);
+  const dateAliases = DATE_ALIASES[source] || COMMON.date;
+  const date = toDateOnly(pick(raw, dateAliases));
+  if (!date) return fail(`No usable date found (tried: ${dateAliases.slice(0, 8).join(', ')}...)`, raw);
 
   const record = base(source, raw, sourceId, date);
   const error = MAPPERS[source](raw, record);
+  if (error && error.excluded) return { ok: false, excluded: true, reason: error.excluded };
   if (error) return fail(error, raw);
 
   if (source !== SOURCES.EMPLOYEE_DEDUCTION) {

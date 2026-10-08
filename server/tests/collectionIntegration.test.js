@@ -198,8 +198,22 @@ test('MASActive is normalized to MAS Intimo (display + mapping), other names unt
   assert.equal(normalizePosBranchName('MAS Active'), 'MAS Intimo');
   assert.equal(normalizePosBranchName('MASAyathi'), 'MASAyathi');
   assert.equal(normalizePosBranchName('Cafe - M'), 'Cafe - M');
+  assert.equal(normalizePosBranchName('MASBrew'), 'MAS Ayathi Brew Bar');
+  assert.equal(normalizePosBranchName('MASBrew - M'), 'MAS Ayathi Brew Bar - M');
+  assert.equal(normalizePosBranchName('MAS Brew'), 'MAS Ayathi Brew Bar');
+  assert.equal(normalizePosBranchName('MAS Ayathi Brew Bar'), 'MAS Ayathi Brew Bar', 'the Stock Management name is left as is');
+  assert.equal(normalizePosBranchName('MASKreeda'), 'MASKreeda');
   const match = createDepartmentMatcher(DEPARTMENTS, new Map());
   assert.equal(match('MASActive').department.id, 14);
+  const brew = createDepartmentMatcher([...DEPARTMENTS, { id: 21, name: 'MAS Ayathi Brew Bar' }], new Map());
+  assert.equal(brew('MASBrew').department.id, 21, 'MASBrew -> MAS Ayathi Brew Bar');
+  assert.equal(brew('MASBrew - M').department.id, 21);
+  assert.equal(brew('MASActive').department.id, 14, 'MASActive still -> MAS Intimo');
+  assert.equal(brew('MASKreeda').department.id, 12, 'MASKreeda unchanged');
+  assert.equal(brew('Cafe - M').department.id, 7, 'Cafe unchanged');
+  // No "MAS Ayathi Brew Bar" department: reported, never guessed / created.
+  assert.equal(match('MASBrew').ok, false);
+  assert.equal(brew('MASAyathi').department.id, 10, 'MASAyathi keeps its own department');
   assert.equal(match('MASKreeda').department.id, 12);
 });
 
@@ -214,7 +228,10 @@ test('Credit Payment and Employee Deduction records are retrieved (deductions of
   const sources = Object.fromEntries(res.body.sync.sources.map((s) => [s.source, s]));
   assert.equal(sources.CREDIT_PAYMENT.fetched, 2);
   assert.equal(sources.EMPLOYEE_DEDUCTION.fetched, 2);
-  assert.equal(sources.EMPLOYEE_DEDUCTION.invalid, 1); // the cancelled one
+  // The cancelled one is excluded (not a collection), not reported as unreadable.
+  assert.equal(sources.EMPLOYEE_DEDUCTION.invalid, 0);
+  assert.equal(sources.EMPLOYEE_DEDUCTION.excluded, 1);
+  assert.match(sources.EMPLOYEE_DEDUCTION.excludedReasons[0].reason, /Deduction is cancel/i);
   // MASActive credit payment -> MAS Intimo department
   assert.equal(col(bySource('CREDIT_PAYMENT')[0], 'department_id'), 14);
 });

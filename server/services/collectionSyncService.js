@@ -28,7 +28,8 @@
 //
 // Department mapping
 //   The POS branch (branch.name, e.g. "Cafe - M") is first normalized
-//   (departmentMapper.normalizePosBranchName: POS "MASActive" -> "MAS Intimo") -
+//   (departmentMapper.normalizePosBranchName: POS "MASActive" -> "MAS Intimo",
+//   "MASBrew" -> "MAS Ayathi Brew Bar") -
 //   that is the name stored in pos_branch_name and shown; the original stays in
 //   raw_payload - then mapped to an EXISTING department (e.g. "Cafe"). A record
 //   whose branch maps to no department is still imported, with department_id
@@ -238,7 +239,7 @@ const loggedErrors = new Set();
 const syncSource = async (source, endpoint, { companyByName, matchDepartment, window }) => {
   const result = {
     source, fetched: 0, inserted: 0, updated: 0, unchanged: 0, duplicate: 0,
-    invalid: 0, invalidSamples: [], unmapped: 0, unmappedBranches: []
+    invalid: 0, invalidSamples: [], excluded: 0, excludedReasons: [], unmapped: 0, unmappedBranches: []
   };
   try {
     if (!endpoint) throw new Error('RAVON_POS_API_URL is not configured');
@@ -246,6 +247,14 @@ const syncSource = async (source, endpoint, { companyByName, matchDepartment, wi
     result.fetched = records.length;
     for (let index = 0; index < records.length; index += 1) {
       const mapped = mapPosRecord(source, records[index]);
+      if (mapped.excluded) {
+        // Deliberately not a collection (e.g. overpayment set-off): counted, not an error.
+        result.excluded += 1;
+        const known = result.excludedReasons.find((e) => e.reason === mapped.reason);
+        if (known) known.records += 1;
+        else result.excludedReasons.push({ reason: mapped.reason, records: 1 });
+        continue;
+      }
       if (!mapped.ok) {
         result.invalid += 1;
         if (result.invalidSamples.length < MAX_REPORTED_INVALID) {
@@ -255,7 +264,8 @@ const syncSource = async (source, endpoint, { companyByName, matchDepartment, wi
       }
       const record = mapped.record;
       record.company_id = companyByName.get(normName(record.pos_company)) ?? null;
-      // Stock Management name of the POS branch (POS "MASActive" -> "MAS Intimo").
+      // Stock Management name of the POS branch (POS "MASActive" -> "MAS Intimo",
+      // "MASBrew" -> "MAS Ayathi Brew Bar").
       record.pos_branch_name = normalizePosBranchName(record.pos_branch_name);
 
       // POS branch -> existing department. Records from EVERY branch are imported;
