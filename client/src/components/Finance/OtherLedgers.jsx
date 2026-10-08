@@ -26,7 +26,8 @@ const SOURCE_LABELS = {
   CASH_RECEIVE: 'Cash Received',
   CASH_ISSUED: 'Cash Issued',
   COLLECTION_AR: 'AR Collection',
-  COLLECTION_SHORT_EXCESS: 'Short / Excess'
+  COLLECTION_SHORT_EXCESS: 'Short / Excess',
+  COLLECTION_AR_SETTLEMENT: 'AR Settled (Credit Payment)'
 };
 
 const OtherLedgers = () => {

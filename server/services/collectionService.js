@@ -25,6 +25,11 @@
 //                    refused - amounts are never split or balanced artificially.
 //                    Credit payment by card: the payment itself is one row.
 //   AR            -> "AR Account" Other Ledger DEBIT
+//   AR_SETTLEMENT -> Credit Payment only: "AR Account" Other Ledger CREDIT of the
+//                    money received (Cash + Card + Bank / Online) - the customer's
+//                    outstanding AR is reduced by what they paid. Posted in the same
+//                    transaction and under the same company as the Cash / Bank /
+//                    Card debit, once per Credit Payment (UNIQUE lines below).
 //   SHORT_EXCESS  -> "Short/Excess Account" Other Ledger: short DEBIT, excess CREDIT
 //   Employee deduction -> "Short/Excess Account" CREDIT (shortage recovered),
 //                    linked to the shift collection it settles.
@@ -253,6 +258,26 @@ const postAr = (connection, ctx) => postOther(connection, ctx, {
   debit: ctx.amount, credit: 0, remark: `AR Collection (${ctx.ref})`
 });
 
+const postArSettlement = (connection, ctx) => postOther(connection, ctx, {
+  accountName: ol.AR_ACCOUNT_NAME, sourceType: ol.SOURCE_COLLECTION_AR_SETTLEMENT,
+  debit: 0, credit: ctx.amount,
+  remark: `AR settled - Credit Payment${ctx.row.cashier_name ? ` - ${ctx.row.cashier_name}` : ''} (${ctx.ref})`.slice(0, 255)
+});
+
+const RECEIVED_METHODS = [PAYMENT_METHODS.CASH, PAYMENT_METHODS.CARD, PAYMENT_METHODS.BANK];
+
+/**
+ * Ledger effects that are not received money: a Credit Payment settles the
+ * customer's AR by the amount received (Cash + Card + Bank / Online). Every
+ * other source has none, so Shift Collection / Employee Deduction are unchanged.
+ */
+const settlementsOf = (row, postings) => {
+  if (row.source_type !== SOURCES.CREDIT_PAYMENT) return [];
+  const received = postings.filter((p) => RECEIVED_METHODS.includes(p.method)).reduce((sum, p) => sum + p.amount, 0);
+  const amount = Number(received.toFixed(2));
+  return amount > 0 ? [{ method: PAYMENT_METHODS.AR_SETTLEMENT, amount }] : [];
+};
+
 const postShortExcess = (connection, ctx) => {
   const isDeduction = ctx.row.source_type === SOURCES.EMPLOYEE_DEDUCTION;
   const isShort = ctx.amount > 0;
@@ -275,7 +300,8 @@ const POSTERS = {
   [PAYMENT_METHODS.BANK]: postBank,
   [PAYMENT_METHODS.CARD]: postCard,
   [PAYMENT_METHODS.AR]: postAr,
-  [PAYMENT_METHODS.SHORT_EXCESS]: postShortExcess
+  [PAYMENT_METHODS.SHORT_EXCESS]: postShortExcess,
+  [PAYMENT_METHODS.AR_SETTLEMENT]: postArSettlement
 };
 
 /**
@@ -388,7 +414,7 @@ const approveCollections = async (connection, { items, userId }) => {
     // --- postings ---------------------------------------------------------------
     const ref = ledgerReference(row);
     const posted = [];
-    for (const { method, amount } of postings) {
+    for (const { method, amount } of [...postings, ...settlementsOf(row, postings)]) {
       const lineBank = method === PAYMENT_METHODS.BANK ? bankId : method === PAYMENT_METHODS.CARD ? cardBankId : null;
       const lineId = await insertLine(connection, row, { method, amount, companyId, bankId: lineBank, userId });
       await POSTERS[method](connection, {

@@ -17,7 +17,8 @@
 // never created here.
 //
 // Renamed POS departments: some POS branches carry a different name than the
-// Stock Management department (POS "MASActive" is "MAS Intimo"). The branch name
+// Stock Management department (POS "MASActive" is "MAS Intimo", POS "MASBrew" is
+// "MAS Ayathi Brew Bar" - existing departments, never created here). The branch name
 // is normalized with normalizePosBranchName() BEFORE storing / displaying /
 // matching, so the POS name never reaches the UI; the original stays in the
 // record's raw_payload for traceability.
@@ -26,7 +27,10 @@ const norm = (s) => String(s ?? '').toLowerCase().replace(/&/g, 'and').replace(/
 
 // [POS name pattern, Stock Management name]
 const POS_DEPARTMENT_RENAMES = [
-  [/\bMAS\s*[-_]?\s*Active\b/i, 'MAS Intimo']
+  [/\bMAS\s*[-_]?\s*Active\b/i, 'MAS Intimo'],
+  // "MASBrew", "MAS Brew", "MAS-Brew" (and "... Bar"); "MASAyathi" is NOT matched
+  // and keeps its own "MAS Ayathi" department.
+  [/\bMAS\s*[-_]?\s*Brew(?:\s*Bar)?\b/i, 'MAS Ayathi Brew Bar']
 ];
 
 /** POS branch name with renamed departments replaced ("MASActive - M" -> "MAS Intimo - M"). */
