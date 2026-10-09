@@ -9,6 +9,7 @@ const assert = require('node:assert/strict');
 
 let ledgerStatus = 1;
 let existingImpact = null;
+let mappedCompanies = [1, 2]; // other_ledger_company_map rows for ledger 3
 const writes = [];
 const state = { commits: 0, rollbacks: 0 };
 
@@ -27,6 +28,13 @@ const connection = {
     if (/FROM finance_transactions WHERE account_type = 'CASH' AND company_id = \? AND status = 1 ORDER BY/.test(s)) return [[]];
     if (/FROM finance_transactions WHERE id = \? AND account_type = 'CASH' AND reference_type = 'CASH_ISSUED'/.test(s)) return [[{ id: 55 }]];
     if (/FROM finance_transactions WHERE id = \? AND account_type = 'CASH' AND reference_type = \? AND status = 1/.test(s)) return [[{ id: 55, company_id: 1, status: 1 }]];
+    if (/FROM other_ledger_company_map WHERE other_ledger_id = \? AND company_id = \?/.test(s)) return [mappedCompanies.includes(Number(params[1])) ? [{ 1: 1 }] : []];
+    if (/^INSERT IGNORE INTO other_ledger_company_map/.test(s)) { writes.push({ table: 'map', params }); return [{}]; }
+    if (/FROM other_ledgers WHERE is_system = 1/.test(s)) return [[{ id: 20, name: 'AR Account', status: 1, is_system: 1 }]];
+    if (/FROM bank_details bd INNER JOIN company c/.test(s)) return [[1, 2, 3].includes(Number(params[1])) ? [{ id: params[0] }] : []];
+    if (/SELECT company FROM bank_details WHERE id = \?/.test(s)) return [[{ company: 'Company A' }]];
+    if (/FROM finance_transactions WHERE account_type = 'BANK' AND bank_id = \? AND status = 1 FOR UPDATE/.test(s)) return [[{ current_balance: 50000 }]];
+    if (/^UPDATE bank_details/.test(s)) { writes.push({ table: 'bank-balance', params }); return [{}]; }
     if (/SELECT id FROM company/.test(s)) return [[{ id: 1 }]];
     if (/FROM other_ledgers WHERE id = \?/.test(s)) return [[{ id: 3, name: 'Director', status: ledgerStatus }]];
     if (/FROM other_ledger_transactions WHERE source_type = \? AND source_id = \?/.test(s)) return [existingImpact ? [existingImpact] : []];
@@ -51,7 +59,7 @@ const run = async (handler, body = {}, params = {}) => {
   await handler({ body, params, query: {}, user: { userId: 7 } }, res);
   return out;
 };
-const reset = () => { writes.length = 0; state.commits = 0; state.rollbacks = 0; ledgerStatus = 1; existingImpact = null; };
+const reset = () => { writes.length = 0; state.commits = 0; state.rollbacks = 0; ledgerStatus = 1; existingImpact = null; mappedCompanies = [1, 2]; };
 
 // finance_transactions INSERT params: [company, date, type, ref, invoice, party, direction, remark, debit, credit, balance_after, refType, refId, createdBy]
 const financeRow = () => writes.find((w) => w.table === 'finance').params;
@@ -163,12 +171,109 @@ test('a plain Receive-Type receipt (no linked entry) cannot be edited/voided thr
   assert.equal(writes.length, 0);
 });
 
-test('balance convention: Credit 10,000 - Debit 4,000 = 6,000, running oldest-first', () => {
+test('direction: Issued TO the ledger (Debit) is IN, Received FROM it (Credit) is OUT; balance = Debit - Credit', () => {
   const rows = svc.withRunningBalance([
-    { date: '2026-10-01', debit: 0, credit: 10000 },
-    { date: '2026-10-05', debit: 4000, credit: 0 }
+    { date: '2026-10-01', debit: 10000, credit: 0 }, // Cash/Bank Issued to the ledger
+    { date: '2026-10-05', debit: 0, credit: 4000 } // Cash/Bank Received from the ledger
   ]);
   assert.deepEqual(rows.map((r) => r.balance), [10000, 6000]);
+  assert.deepEqual(rows.map((r) => r.direction), ['IN', 'OUT']);
+  // Same rows, read the other way round only if a ledger were still credit-normal.
+  assert.deepEqual(svc.withRunningBalance([{ debit: 0, credit: 10 }], 'CREDIT').map((r) => r.direction), ['IN']);
   assert.deepEqual(svc.impactForSource('CASH_RECEIVE', 10), { debit: 0, credit: 10 });
   assert.deepEqual(svc.impactForSource('CASH_ISSUED', 10), { debit: 10, credit: 0 });
+});
+
+// ---- Bank Received / Bank Issued + Other Ledger -------------------------------
+// bank finance_transactions INSERT params: [company, bank, date, type, ref, invoice, party, direction, remark, debit, credit, balance_after, refType, refId, createdBy]
+const bankRow = () => writes.find((w) => w.table === 'finance').params;
+
+test('Bank Received + Other Ledger: Bank DEBIT 2,500 and Director CREDIT 2,500, linked to the source row', async () => {
+  reset();
+  const r = await run(finance.receiveBank, { company_id: 1, bank_id: 4, date: '2026-10-09', amount: 2500, classification: 'other_ledger', other_ledger_id: 3 });
+  assert.equal(r.status, 201);
+  const b = bankRow();
+  assert.equal(b[9], 2500); assert.equal(b[10], 0); assert.equal(b[11], 52500);
+  assert.equal(b[12], 'BANK_RECEIVE'); assert.equal(b[6], 'Director');
+  const o = oltRow();
+  assert.equal(o[2], 0); assert.equal(o[3], 2500);
+  assert.equal(o[4], 'BANK_RECEIVE'); assert.equal(o[5], 55); assert.equal(o[6], 1);
+});
+
+test('Bank Issued: Bank CREDIT 2,500 from the source account and Director DEBIT 2,500', async () => {
+  reset();
+  const r = await run(finance.issueBank, { company_id: 1, bank_id: 4, date: '2026-10-09', amount: 2500, other_ledger_id: 3 });
+  assert.equal(r.status, 201);
+  const b = bankRow();
+  assert.equal(b[1], 4); assert.equal(b[9], 0); assert.equal(b[10], 2500); assert.equal(b[11], 47500);
+  assert.equal(b[7], 'OUT'); assert.equal(b[12], 'BANK_ISSUED');
+  const o = oltRow();
+  assert.equal(o[2], 2500); assert.equal(o[3], 0); assert.equal(o[4], 'BANK_ISSUED'); assert.equal(o[6], 1);
+});
+
+test('Bank Received: Receive Type and Other Ledger are mutually exclusive; Bank Issued needs a ledger and a source bank', async () => {
+  reset();
+  const base = { company_id: 1, bank_id: 4, date: '2026-10-09', amount: 100 };
+  for (const [handler, body, msg] of [
+    [finance.receiveBank, { ...base, receive_type: 'Customer Payment', other_ledger_id: 3 }, /not both/],
+    [finance.receiveBank, { ...base }, /Receive type is required/],
+    [finance.receiveBank, { ...base, classification: 'other_ledger' }, /Other Ledger is required/],
+    [finance.issueBank, { ...base }, /Other Ledger is required/],
+    [finance.issueBank, { ...base, bank_id: '', other_ledger_id: 3 }, /Source bank account is required/]
+  ]) {
+    const r = await run(handler, body);
+    assert.equal(r.status, 400); assert.match(r.body.error, msg);
+  }
+  assert.equal(writes.length, 0);
+});
+
+test('a second Other Ledger entry for the same bank row is refused and rolled back', async () => {
+  reset(); existingImpact = { id: 9, other_ledger_id: 3, status: 1 };
+  const r = await run(finance.issueBank, { company_id: 1, bank_id: 4, date: '2026-10-09', amount: 100, other_ledger_id: 3 });
+  assert.equal(r.status, 409);
+  assert.equal(state.commits, 0); assert.equal(state.rollbacks, 1);
+});
+
+// ---- Company-wise Other Ledgers -------------------------------------------------
+
+test('every Other Ledger integration rejects a ledger not linked to the transaction company; nothing is committed', async () => {
+  reset(); mappedCompanies = [1]; // Director is linked to company 1 only
+  const results = [
+    await run(finance.receiveCash, { company_id: 3, date: '2026-10-01', amount: 100, classification: 'other_ledger', other_ledger_id: 3, created_by: 7 }),
+    await run(issued.createCashIssued, { company_id: 3, date: '2026-10-05', amount: 100, other_ledger_id: 3 }),
+    await run(finance.receiveBank, { company_id: 3, bank_id: 4, date: '2026-10-09', amount: 100, classification: 'other_ledger', other_ledger_id: 3 }),
+    await run(finance.issueBank, { company_id: 3, bank_id: 4, date: '2026-10-09', amount: 100, other_ledger_id: 3 })
+  ];
+  for (const r of results) { assert.equal(r.status, 400); assert.match(r.body.error, /not linked to the selected company/); }
+  assert.equal(writes.some((w) => w.table === 'olt'), false);
+  assert.equal(state.commits, 0);
+});
+
+test('moving a Cash Issued to a ledger of another company is rejected', async () => {
+  reset(); mappedCompanies = [2]; existingImpact = { id: 9, other_ledger_id: 8, status: 1 };
+  const r = await run(issued.updateCashIssued, { date: '2026-10-05', amount: 100, other_ledger_id: 3 }, { id: 55 });
+  assert.equal(r.status, 400); assert.match(r.body.error, /not linked/);
+  assert.equal(state.commits, 0);
+});
+
+test('the Other Ledger entry always carries the transaction company', async () => {
+  reset();
+  await run(finance.receiveCash, { company_id: 2, date: '2026-10-01', amount: 10, classification: 'other_ledger', other_ledger_id: 3, created_by: 7 });
+  assert.equal(oltRow()[6], 2);
+});
+
+test('system accounts (Collection) are linked to the posting company on use', async () => {
+  reset();
+  const ledger = await svc.requireSystemLedger(connection, 'AR Account', { companyId: 2 });
+  assert.equal(ledger.id, 20);
+  assert.deepEqual(writes.find((w) => w.table === 'map').params, [20, 2]);
+});
+
+test('company balance only counts that company', async () => {
+  const seen = [];
+  const q = { query: async (sql, params) => { seen.push({ sql: String(sql), params }); return [[{ balance: 75 }]]; } };
+  assert.equal(await svc.getLedgerBalance(q, 3, 2), 75);
+  assert.match(seen[0].sql, /olt\.company_id = \?/); assert.deepEqual(seen[0].params, [3, 2]);
+  await svc.getLedgerBalance(q, 3);
+  assert.doesNotMatch(seen[1].sql, /company_id/); assert.deepEqual(seen[1].params, [3]);
 });

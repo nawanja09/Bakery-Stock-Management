@@ -1,2 +1,10 @@
 @import './Finance.css';
 @import '../common/FormStyles.css';
+
+/* Inline guidance under a field, e.g. "No Other Ledger is linked to this company". */
+.fl-field-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: var(--font-size-xs, 0.75rem);
+  color: var(--color-warning, #b45309);
+}

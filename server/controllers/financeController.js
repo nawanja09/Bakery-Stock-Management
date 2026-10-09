@@ -187,7 +187,7 @@ const receiveCash = async (req, res) => {
     if (classification === 'other_ledger') {
       // Cash Receive + Other Ledger: Cash Ledger DEBIT (the one primary
       // transaction) + a linked Other Ledger CREDIT for the same source row.
-      const ledger = await otherLedger.requireActiveLedger(connection, otherLedgerId);
+      const ledger = await otherLedger.requireActiveLedger(connection, otherLedgerId, { companyId: company_id });
       const balance = await recordCashTransaction(connection, {
         companyId: company_id,
         date,
@@ -377,33 +377,92 @@ const getAllBankAccounts = async (req, res) => {
   }
 };
 
+// The bank account must be active and belong to the selected company.
+const isCompanyBankAccount = async (connection, bankId, companyId) => {
+  const [accountRows] = await connection.query(
+    `SELECT bd.id
+     FROM bank_details bd
+     INNER JOIN company c ON LOWER(TRIM(c.name)) = LOWER(TRIM(bd.company))
+     WHERE bd.id = ? AND c.id = ? AND bd.status = 'Active' AND COALESCE(bd.record_status, 1) = 1`,
+    [bankId, companyId]
+  );
+  return accountRows.length > 0;
+};
+
+const bankErrorStatus = (error) => {
+  if (error.name === 'OtherLedgerError') return error.statusCode;
+  return error.name === 'InsufficientBalanceError' || error.name === 'DuplicateReferenceError' || error.name === 'HttpError' ? 400 : 500;
+};
+
 // POST /api/finance/bank/receive - Bank Receive (Bank In)
+// The selected bank account always receives the money (Bank DEBIT). The receipt
+// is classified EITHER by a Receive Type (original behaviour) OR by an Other
+// Ledger (Bank DEBIT + linked Other Ledger CREDIT) - never both, like Cash Receive.
 const receiveBank = async (req, res) => {
   const { company_id, bank_id, date, amount, receive_type, reference_number, remark } = req.body;
   const created_by = req.user.userId;
+  // classification defaults to 'receive_type' so existing callers keep working.
+  const classification = req.body.classification || 'receive_type';
+  const otherLedgerId = req.body.other_ledger_id;
+  const hasOtherLedger = otherLedgerId !== undefined && otherLedgerId !== null && otherLedgerId !== '';
+  const hasReceiveType = receive_type !== undefined && receive_type !== null && String(receive_type).trim() !== '';
 
   if (!company_id) return res.status(400).json({ error: 'Company is required' });
   if (!bank_id) return res.status(400).json({ error: 'Bank account is required' });
   if (!date) return res.status(400).json({ error: 'Date is required' });
   if (!amount || parseFloat(amount) <= 0) return res.status(400).json({ error: 'Amount must be greater than 0' });
-  if (!receive_type) return res.status(400).json({ error: 'Receive type is required' });
+  if (!['receive_type', 'other_ledger'].includes(classification)) {
+    return res.status(400).json({ error: 'Classification must be receive_type or other_ledger' });
+  }
+  if (hasReceiveType && hasOtherLedger) {
+    return res.status(400).json({ error: 'Select either a Receive Type or an Other Ledger, not both' });
+  }
+  if (classification === 'receive_type' && !hasReceiveType) {
+    return res.status(400).json({ error: hasOtherLedger ? 'Classification does not match the selected Other Ledger' : 'Receive type is required' });
+  }
+  if (classification === 'other_ledger' && !hasOtherLedger) return res.status(400).json({ error: 'Other Ledger is required' });
   if (!created_by) return res.status(401).json({ error: 'Authenticated user is required' });
 
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
-    const [accountRows] = await connection.query(
-      `SELECT bd.id
-       FROM bank_details bd
-       INNER JOIN company c ON LOWER(TRIM(c.name)) = LOWER(TRIM(bd.company))
-       WHERE bd.id = ? AND c.id = ? AND bd.status = 'Active' AND COALESCE(bd.record_status, 1) = 1`,
-      [bank_id, company_id]
-    );
-    if (accountRows.length === 0) {
+    if (!(await isCompanyBankAccount(connection, bank_id, company_id))) {
       await connection.rollback();
       return res.status(400).json({ error: 'Selected bank account is not active for the selected company' });
     }
     await checkDuplicateReference(connection, reference_number, { includeLedger: true });
+
+    if (classification === 'other_ledger') {
+      // Bank Ledger DEBIT (the one primary transaction) + a linked Other Ledger
+      // CREDIT for the same source row.
+      const ledger = await otherLedger.requireActiveLedger(connection, otherLedgerId, { companyId: company_id });
+      const balance = await recordBankTransaction(connection, {
+        bankId: bank_id,
+        date,
+        remark: remark || null,
+        debit: parseFloat(amount),
+        transactionType: otherLedger.OTHER_LEDGER_RECEIVE_TYPE,
+        referenceNumber: reference_number || null,
+        partyName: ledger.name,
+        referenceType: 'BANK_RECEIVE',
+        createdBy: created_by
+      });
+      const sourceId = await otherLedger.lastInsertId(connection);
+      if (!sourceId) throw new Error('Bank Ledger entry was not created for the Other Ledger receipt');
+      await otherLedger.createImpact(connection, {
+        otherLedgerId: ledger.id,
+        sourceType: otherLedger.SOURCE_BANK_RECEIVE,
+        sourceId,
+        date,
+        amount: parseFloat(amount),
+        companyId: company_id,
+        referenceNo: reference_number || null,
+        remark: remark || null,
+        createdBy: created_by
+      });
+      await connection.commit();
+      return res.status(201).json({ message: 'Bank receipt recorded successfully!', balance, id: sourceId });
+    }
 
     // Card payments are not in the bank until the card settlement is realised.
     // File them as a PENDING card transaction (Finance -> Card Ledger) instead of
@@ -441,7 +500,70 @@ const receiveBank = async (req, res) => {
   } catch (error) {
     await connection.rollback();
     console.error('Error recording bank receipt:', error);
-    res.status(error.name === 'InsufficientBalanceError' || error.name === 'DuplicateReferenceError' || error.name === 'HttpError' ? 400 : 500).json({ error: error.message });
+    res.status(bankErrorStatus(error)).json({ error: error.message });
+  } finally {
+    connection.release();
+  }
+};
+
+// POST /api/finance/bank/issued - Bank Issued (Bank Out to an Other Ledger)
+// Bank Ledger CREDIT on the source bank account (the primary transaction) +
+// a linked Other Ledger DEBIT, in one DB transaction - the bank mirror of Cash Issued.
+const issueBank = async (req, res) => {
+  const { company_id, bank_id, date, amount, reference_number, remark } = req.body;
+  const otherLedgerId = req.body.other_ledger_id;
+  const created_by = req.user.userId;
+
+  if (!company_id) return res.status(400).json({ error: 'Company is required' });
+  if (!bank_id) return res.status(400).json({ error: 'Source bank account is required' });
+  if (otherLedgerId === undefined || otherLedgerId === null || otherLedgerId === '') {
+    return res.status(400).json({ error: 'Other Ledger is required' });
+  }
+  if (!date) return res.status(400).json({ error: 'Date is required' });
+  if (!amount || parseFloat(amount) <= 0) return res.status(400).json({ error: 'Amount must be greater than 0' });
+  if (!created_by) return res.status(401).json({ error: 'Authenticated user is required' });
+
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    if (!(await isCompanyBankAccount(connection, bank_id, company_id))) {
+      await connection.rollback();
+      return res.status(400).json({ error: 'Selected bank account is not active for the selected company' });
+    }
+    await checkDuplicateReference(connection, reference_number, { includeLedger: true });
+    const ledger = await otherLedger.requireActiveLedger(connection, otherLedgerId, { companyId: company_id });
+
+    const balance = await recordBankTransaction(connection, {
+      bankId: bank_id,
+      date,
+      remark: remark || null,
+      credit: parseFloat(amount),
+      transactionType: otherLedger.BANK_ISSUED_TYPE,
+      referenceNumber: reference_number || null,
+      partyName: ledger.name,
+      referenceType: 'BANK_ISSUED',
+      createdBy: created_by
+    });
+    const sourceId = await otherLedger.lastInsertId(connection);
+    if (!sourceId) throw new Error('Bank Ledger entry was not created for the Bank Issued transaction');
+    // createImpact refuses a second entry for the same source row.
+    await otherLedger.createImpact(connection, {
+      otherLedgerId: ledger.id,
+      sourceType: otherLedger.SOURCE_BANK_ISSUED,
+      sourceId,
+      date,
+      amount: parseFloat(amount),
+      companyId: company_id,
+      referenceNo: reference_number || null,
+      remark: remark || null,
+      createdBy: created_by
+    });
+    await connection.commit();
+    res.status(201).json({ message: 'Bank issued recorded successfully!', balance, id: sourceId });
+  } catch (error) {
+    await connection.rollback();
+    console.error('Error recording bank issued:', error);
+    res.status(bankErrorStatus(error)).json({ error: error.message });
   } finally {
     connection.release();
   }
@@ -684,6 +806,7 @@ module.exports = {
   getBankAccounts,
   getAllBankAccounts,
   receiveBank,
+  issueBank,
   transferFunds,
   bankToBankTransfer
 };

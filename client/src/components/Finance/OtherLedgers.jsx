@@ -1,11 +1,13 @@
 // src/components/Finance/OtherLedgers.jsx
 //
-// Finance -> Other Ledgers: the statement for one Other Ledger.
-// Transactions are the linked impact of Cash Receive (Credit) and Cash Issued
-// (Debit), plus approved Collections for the two system accounts (AR Account,
-// Short/Excess Account). They are listed oldest first; Balance = previous +
-// Credit - Debit, or previous + Debit - Credit for those debit-normal accounts
-// (the API computes it).
+// Finance -> Other Ledgers: the statement for one Other Ledger of one company.
+// Company-wise: only ledgers linked to the selected company are listed, and the
+// entries, opening balance and balance are that company's alone.
+// Transactions are the linked impact of Cash/Bank Issued TO the ledger (IN,
+// Debit) and Cash/Bank Received FROM it (OUT, Credit), plus approved Collections
+// for the two system accounts (AR Account, Short/Excess Account). They are
+// listed oldest first; Balance = previous + Debit - Credit and the IN/OUT
+// direction both come from the API.
 // Everything shown here is read back from the API - nothing is computed as the
 // source of truth in the browser.
 import React, { useState, useEffect, useCallback } from 'react';
@@ -25,12 +27,16 @@ const fmtDate = (iso) => {
 const SOURCE_LABELS = {
   CASH_RECEIVE: 'Cash Received',
   CASH_ISSUED: 'Cash Issued',
+  BANK_RECEIVE: 'Bank Received',
+  BANK_ISSUED: 'Bank Issued',
   COLLECTION_AR: 'AR Collection',
   COLLECTION_SHORT_EXCESS: 'Short / Excess',
   COLLECTION_AR_SETTLEMENT: 'AR Settled (Credit Payment)'
 };
 
 const OtherLedgers = () => {
+  const [companies, setCompanies] = useState([]);
+  const [companyId, setCompanyId] = useState('');
   const [ledgers, setLedgers] = useState([]);
   const [showInactive, setShowInactive] = useState(false);
   const [ledgerId, setLedgerId] = useState('');
@@ -39,10 +45,21 @@ const OtherLedgers = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Dropdown shows ACTIVE ledgers; "Show inactive" adds the rest so old history stays reachable.
   useEffect(() => {
+    api.get('/purchases/companies')
+      .then((res) => {
+        const list = res.data || [];
+        setCompanies(list);
+        if (list.length > 0) setCompanyId(String(list[0].id));
+      })
+      .catch(() => setCompanies([]));
+  }, []);
+
+  // Dropdown shows the company's ACTIVE ledgers; "Show inactive" adds the rest so old history stays reachable.
+  useEffect(() => {
+    if (!companyId) { setLedgers([]); setLedgerId(''); return undefined; }
     let cancelled = false;
-    api.get(showInactive ? '/other-ledgers' : '/other-ledgers/active')
+    api.get(showInactive ? '/other-ledgers' : '/other-ledgers/active', { params: { companyId } })
       .then((res) => {
         if (cancelled) return;
         const list = Array.isArray(res.data) ? res.data : [];
@@ -51,20 +68,20 @@ const OtherLedgers = () => {
       })
       .catch(() => { if (!cancelled) { setLedgers([]); setError('Failed to load Other Ledgers'); } });
     return () => { cancelled = true; };
-  }, [showInactive]);
+  }, [showInactive, companyId]);
 
   const fetchTransactions = useCallback(() => {
-    if (!ledgerId) { setData(null); return; }
+    if (!ledgerId || !companyId) { setData(null); return; }
     setLoading(true);
     setError('');
-    const params = {};
+    const params = { companyId };
     if (filters.dateFrom) params.dateFrom = filters.dateFrom;
     if (filters.dateTo) params.dateTo = filters.dateTo;
     api.get(`/other-ledgers/${ledgerId}/transactions`, { params })
       .then((res) => setData(res.data))
       .catch((err) => { setData(null); setError(err.response?.data?.error || 'Failed to load ledger'); })
       .finally(() => setLoading(false));
-  }, [ledgerId, filters]);
+  }, [ledgerId, companyId, filters]);
 
   useEffect(() => { fetchTransactions(); }, [fetchTransactions]);
 
@@ -83,9 +100,13 @@ const OtherLedgers = () => {
           <FontAwesomeIcon icon={faBookOpen} style={{ marginRight: '8px' }} /> Other Ledgers
         </h2>
         <div className="cash-ledger-header-actions">
+          <label htmlFor="other-ledger-company" style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)', whiteSpace: 'nowrap' }}>Company:</label>
+          <select id="other-ledger-company" value={companyId} onChange={(e) => setCompanyId(e.target.value)} className="report-filter-select">
+            {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
           <label htmlFor="other-ledger-select" style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)', whiteSpace: 'nowrap' }}>Other Ledger:</label>
           <select id="other-ledger-select" value={ledgerId} onChange={(e) => setLedgerId(e.target.value)} className="report-filter-select">
-            {ledgers.length === 0 && <option value="">No Other Ledgers</option>}
+            {ledgers.length === 0 && <option value="">No Other Ledgers for this company</option>}
             {ledgers.map((l) => (
               <option key={l.id} value={l.id}>{l.name}{Number(l.status) === 0 ? ' (Inactive)' : ''}</option>
             ))}
@@ -103,7 +124,7 @@ const OtherLedgers = () => {
             <div className="cash-ledger-balance-icon"><FontAwesomeIcon icon={faBookOpen} /></div>
             <div style={{ flex: 1 }}>
               <div className="cash-ledger-balance-label">
-                {data.ledger.name} Balance
+                {data.ledger.name} Balance{companies.find((c) => String(c.id) === String(companyId)) ? ` — ${companies.find((c) => String(c.id) === String(companyId)).name}` : ''}
               </div>
               <div className="cash-ledger-balance-value" style={{ margin: 'var(--spacing-xs) 0' }}>
                 Rs. {fmt(data.balance)}
@@ -142,6 +163,7 @@ const OtherLedgers = () => {
                 <th>Date</th>
                 <th>Company</th>
                 <th>Type</th>
+                <th>Direction</th>
                 <th>Reference</th>
                 <th>Remark</th>
                 <th className="fl-num">Debit</th>
@@ -152,12 +174,12 @@ const OtherLedgers = () => {
             <tbody>
               {data && Number(data.opening_balance) !== 0 && (
                 <tr>
-                  <td colSpan={7} style={{ fontStyle: 'italic' }}>Balance brought forward</td>
+                  <td colSpan={8} style={{ fontStyle: 'italic' }}>Balance brought forward</td>
                   <td className="fl-num fl-balance-cell">{fmt(data.opening_balance)}</td>
                 </tr>
               )}
               {transactions.length === 0 ? (
-                <tr><td colSpan={8} style={{ textAlign: 'center', padding: 'var(--spacing-2xl)', color: 'var(--color-text-secondary)' }}>
+                <tr><td colSpan={9} style={{ textAlign: 'center', padding: 'var(--spacing-2xl)', color: 'var(--color-text-secondary)' }}>
                   {ledgerId ? 'No transactions yet' : 'Select an Other Ledger'}
                 </td></tr>
               ) : transactions.map((t) => (
@@ -165,6 +187,13 @@ const OtherLedgers = () => {
                   <td>{fmtDate(t.date)}</td>
                   <td>{t.company_name || '-'}</td>
                   <td><span className="fl-type-chip">{SOURCE_LABELS[t.source_type] || t.source_type}</span></td>
+                  <td>
+                    {t.direction ? (
+                      <span className={`fl-direction fl-direction-${t.direction.toLowerCase()}`}>
+                        {t.direction === 'IN' ? '▲' : '▼'} {t.direction}
+                      </span>
+                    ) : <span className="fl-empty-val">—</span>}
+                  </td>
                   <td>{t.reference_no || '—'}</td>
                   <td><span className="fl-remark-text">{t.remark || '—'}</span></td>
                   <td className="fl-num">{money(t.debit, 'fl-debit-amount')}</td>

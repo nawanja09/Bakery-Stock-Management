@@ -50,12 +50,21 @@ const CashReceive = ({ modal = false, defaultCompanyId = '', onClose, onSaved })
       .catch(() => setReceiveTypes([]));
   }, []);
 
-  // Only ACTIVE Other Ledgers can be chosen for a new transaction.
+  // Only ACTIVE Other Ledgers linked to the selected company can be chosen; a
+  // ledger picked for another company is cleared when the company changes.
   useEffect(() => {
-    api.get('/other-ledgers/active')
-      .then(res => setOtherLedgers(Array.isArray(res.data) ? res.data : []))
-      .catch(() => setOtherLedgers([]));
-  }, []);
+    if (!formData.company_id) { setOtherLedgers([]); setFormData(prev => ({ ...prev, other_ledger_id: '' })); return; }
+    let cancelled = false;
+    api.get('/other-ledgers/active', { params: { companyId: formData.company_id } })
+      .then(res => {
+        if (cancelled) return;
+        const list = Array.isArray(res.data) ? res.data : [];
+        setOtherLedgers(list);
+        setFormData(prev => (list.some(l => String(l.id) === String(prev.other_ledger_id)) ? prev : { ...prev, other_ledger_id: '' }));
+      })
+      .catch(() => { if (!cancelled) { setOtherLedgers([]); setFormData(prev => ({ ...prev, other_ledger_id: '' })); } });
+    return () => { cancelled = true; };
+  }, [formData.company_id]);
 
   useEffect(() => {
     if (!formData.company_id) { setBalance(null); return; }
@@ -156,6 +165,9 @@ const CashReceive = ({ modal = false, defaultCompanyId = '', onClose, onSaved })
             <option value="">Select Other Ledger</option>
             {otherLedgers.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
           </select>
+          {formData.company_id && otherLedgers.length === 0 && (
+            <span className="fl-field-hint">No Other Ledger is linked to this company</span>
+          )}
         </div>
       </div>
       <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', margin: '-4px 0 var(--spacing-sm)' }}>

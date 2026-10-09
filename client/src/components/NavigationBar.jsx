@@ -44,7 +44,6 @@ import {
   faWallet,
   faHandHoldingDollar,
   faBookOpen,
-  faLandmark,
   faRightLeft,
   faFileInvoiceDollar,
   faIdCard,
@@ -367,7 +366,6 @@ const NavigationBar = () => {
       {can('/finance/cash') && <li><NavLink to="/finance/cash" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faCashRegister} /></span><span>Cash Ledger</span></NavLink></li>}
       {can('/finance/other-ledgers') && <li><NavLink to="/finance/other-ledgers" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faBookOpen} /></span><span>Other Ledgers</span></NavLink></li>}
       {can('/finance/bank') && <li><NavLink to="/finance/bank" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faUniversity} /></span><span>Bank Ledger</span></NavLink></li>}
-      {can('/finance/bank-receive') && <li><NavLink to="/finance/bank-receive" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faLandmark} /></span><span>Bank Receive</span></NavLink></li>}
       {can('/finance/card-ledger') && <li><NavLink to="/finance/card-ledger" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faCreditCard} /></span><span>Card Ledger</span></NavLink></li>}
       {can('/finance/transfer') && <li><NavLink to="/finance/transfer" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faRightLeft} /></span><span>Cash / Bank Transfer</span></NavLink></li>}
       {can('/finance/bank-transfer') && <li><NavLink to="/finance/bank-transfer" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faRightLeft} /></span><span>Bank to Bank Transfer</span></NavLink></li>}
