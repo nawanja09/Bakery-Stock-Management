@@ -21,7 +21,8 @@ process.env.JWT_SECRET = process.env.JWT_SECRET || 'pos-finance-test-secret';
 const bcrypt = require('bcrypt');
 const USERS = [
   { id: 11, username: 'finance', name: 'Finance', role: 'Finance', status: 1, password: bcrypt.hashSync('finance-bsms', 4) },
-  { id: 8, username: 'accountant', name: 'Accountant', role: 'Accountant', status: 1, password: bcrypt.hashSync('bsms-pass', 4) },
+  { id: 8, username: 'accountant2', name: 'Accountant 2', role: 'Accountant', status: 1, password: bcrypt.hashSync('bsms-pass', 4) },
+  { id: 12, username: 'accountant1', name: 'Accountant 1', role: 'Accountant', status: 1, password: bcrypt.hashSync('acc1-pass', 4) },
   { id: 7, username: 'stores', name: 'Stores', role: 'Store Keeper', status: 1, password: bcrypt.hashSync('stores-bsms', 4) },
   { id: 2, username: 'admin', name: 'Admin', role: 'Admin', status: 1, password: bcrypt.hashSync('admin-bsms', 4) }
 ];
@@ -105,7 +106,8 @@ const settle = () => auth.getToken().catch(() => null);
 test('BSMS login is unchanged and only triggers the automatic POS Finance login', async () => {
   await withPos(FINANCE_ENV, async (pos) => {
     for (const [username, password, role] of [
-      ['finance', 'finance-bsms', 'Finance'], ['accountant', 'bsms-pass', 'Accountant'],
+      ['finance', 'finance-bsms', 'Finance'], ['accountant1', 'acc1-pass', 'Accountant'],
+      ['accountant2', 'bsms-pass', 'Accountant'],
       ['stores', 'stores-bsms', 'Store Keeper'], ['admin', 'admin-bsms', 'Admin']
     ]) {
       const { status, body } = await callLogin({ username, password });
