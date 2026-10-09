@@ -152,3 +152,282 @@
   margin-left: 4px;
   white-space: nowrap;
 }
+
+/* Expense Type -> Sub Expenses Type tree (summary table) */
+.esr-summary-table.esr-tree-table {
+  min-width: 900px;
+}
+
+.esr-tree-table .esr-parent-row td {
+  background: var(--color-surface-muted, rgba(0, 0, 0, 0.03));
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+.esr-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-heading);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.esr-toggle:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.esr-toggle-icon {
+  display: inline-block;
+  width: 14px;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+}
+
+.esr-group-count {
+  margin-top: 0;
+  font-weight: 400;
+}
+
+.esr-tree-table .esr-child-row td {
+  vertical-align: middle;
+}
+
+.esr-tree-table .esr-child-name {
+  position: relative;
+  padding-left: 32px;
+}
+
+.esr-tree-table .esr-child-name::before {
+  content: '\2514';
+  position: absolute;
+  left: 14px;
+  color: var(--color-text-secondary);
+}
+
+/* Expense summary report: compact, page-scoped financial report styling */
+.esr-page {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  gap: 12px;
+  padding: 12px 14px 16px;
+  border: 1px solid #e8dfbd;
+  border-radius: 8px;
+  background: #fffdf3;
+  color: #302e22;
+}
+
+.esr-page-header {
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0 0 8px;
+  border-bottom: 1px solid #e8dfbd;
+}
+
+.esr-page-header h2 {
+  color: #302e22;
+  font-size: 18px;
+  line-height: 1.25;
+  font-weight: 700;
+}
+
+.esr-page-header .btn {
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.esr-page .esr-filter-panel {
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid #e8dfbd;
+  border-radius: 6px;
+  background: #fffef8;
+  box-shadow: none;
+  overflow: visible;
+}
+
+.esr-filter-row {
+  gap: 8px 10px;
+}
+
+.esr-page .esr-report-card {
+  min-width: 0;
+  overflow: hidden;
+  gap: 0;
+  border: 1px solid #e8dfbd;
+  border-radius: 7px;
+  background: #fffef8;
+  box-shadow: none;
+}
+
+.esr-page .esr-filter-label {
+  padding: 6px 9px;
+  border-bottom: 1px solid #eee7ce;
+  color: #6d674f;
+  font-size: 11px;
+}
+
+.esr-table-scroll {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+.esr-page .esr-summary-table.esr-tree-table {
+  width: 100%;
+  min-width: 980px;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.esr-page .esr-summary-table th {
+  padding: 7px 8px;
+  border-bottom: 1px solid #e6dcba;
+  background: #f7f1d8;
+  color: #4e4938;
+  font-size: 10.5px;
+  line-height: 1.25;
+  font-weight: 700;
+  letter-spacing: 0.025em;
+  text-transform: none;
+  white-space: normal;
+}
+
+.esr-page .esr-summary-table th:nth-child(1) { width: 17%; }
+.esr-page .esr-summary-table th:nth-child(2) { width: 19%; }
+.esr-page .esr-summary-table th:nth-child(3) { width: 12%; }
+.esr-page .esr-summary-table th:nth-child(4) { width: 17%; }
+.esr-page .esr-summary-table th:nth-child(5) { width: 14%; }
+.esr-page .esr-summary-table th:nth-child(6) { width: 17%; }
+.esr-page .esr-summary-table th:nth-child(7) { width: 90px; }
+
+.esr-page .esr-summary-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #eee9d8;
+  background: #fffef8;
+  color: #343126;
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.esr-page .esr-summary-table .esr-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.esr-page .esr-summary-table .esr-action {
+  width: 90px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.esr-page .esr-summary-table tbody tr:hover td {
+  background: #faf6e9;
+}
+
+.esr-page .esr-summary-table .esr-parent-row td {
+  padding-top: 7px;
+  padding-bottom: 7px;
+  border-top: 1px solid #e5dbb9;
+  background: #fbf5df;
+  color: #302e22;
+  font-weight: 700;
+}
+
+.esr-toggle {
+  gap: 6px;
+  color: #302e22;
+  font-size: 12px;
+}
+
+.esr-toggle::before {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  border-radius: 50%;
+  background: #b49a45;
+  content: '';
+}
+
+.esr-toggle-icon {
+  width: 10px;
+  font-size: 9px;
+}
+
+.esr-page .esr-summary-table .esr-group-count {
+  color: #79735e;
+  font-size: 10px;
+}
+
+.esr-page .esr-summary-table .esr-child-row td {
+  background: #fffef8;
+  font-weight: 400;
+}
+
+.esr-page .esr-summary-table .esr-child-name {
+  padding-left: 27px;
+}
+
+.esr-page .esr-summary-table .esr-child-name::before {
+  left: 11px;
+}
+
+.esr-page .esr-summary-table .esr-view-button {
+  min-height: 24px;
+  padding: 3px 8px;
+  border: 1px solid #c9bd94;
+  border-radius: 4px;
+  background: #f7f1df;
+  color: #51482c;
+  font-size: 11px;
+  line-height: 1.2;
+  box-shadow: none;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.esr-page .esr-summary-table .esr-view-button:hover {
+  border-color: #a89459;
+  background: #eee4c4;
+  color: #302e22;
+}
+
+.esr-page .esr-summary-table tfoot td {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  border-top: 1px solid #d9cda7;
+  border-bottom: 0;
+  background: #f7f1d8;
+  color: #302e22;
+  font-weight: 700;
+}
+
+.esr-page .esr-footnote {
+  padding: 6px 9px;
+  border-top: 1px solid #eee7ce;
+  color: #716b56;
+  font-size: 10px;
+}
+
+@media (max-width: 640px) {
+  .esr-page {
+    padding: 9px;
+  }
+
+  .esr-page-header {
+    align-items: flex-start;
+  }
+}
