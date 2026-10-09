@@ -36,7 +36,7 @@ const getPurchasingPosition = async (pool, { asOfDate } = {}) => {
         GROUP BY payment_history_id
       ) alloc ON alloc.payment_history_id = ph.id
       WHERE COALESCE(p.deleted, 0) = 0
-        AND (ph.amount - alloc.total_allocated) > 0.001
+        AND (ph.amount - alloc.total_allocated) >= 0.01
     `),
     pool.query(`
       SELECT COALESCE(SUM(remaining_credit), 0) AS return_credit
