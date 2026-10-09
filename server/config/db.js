@@ -210,6 +210,7 @@ ensureSoftDeleteStatusSchema();
 //   6. Seed default accounts only when their usernames do not already exist.
 const ensureUsernameAuthSchema = async () => {
   const bcrypt = require('bcrypt');
+  const crypto = require('crypto');
 
   try {
     // 1. Add the column if it isn't there yet.
@@ -259,11 +260,33 @@ const ensureUsernameAuthSchema = async () => {
     // 5. Drop the old email column now that username is populated.
     await pool.query("ALTER TABLE users DROP COLUMN IF EXISTS email");
 
-    // 6. Seed the required accounts if they don't already exist.
+    // 6. The original "accountant" login becomes Accountant 2. Renamed in place so
+    //    its id, password, status and every record linked to it are kept.
+    const [[legacyAccountant]] = await pool.query(
+      "SELECT id, name FROM users WHERE username = 'accountant' AND role = 'Accountant'"
+    );
+    if (legacyAccountant) {
+      const [taken] = await pool.query("SELECT id FROM users WHERE username = 'accountant2'");
+      if (taken.length === 0) {
+        await pool.query(
+          "UPDATE users SET username = 'accountant2', name = IF(name = 'Accountant', 'Accountant 2', name) WHERE id = ?",
+          [legacyAccountant.id]
+        );
+        console.log('Renamed user "accountant" to "accountant2"');
+      } else {
+        console.warn('User "accountant" not renamed: "accountant2" already exists');
+      }
+    }
+
+    // 7. Seed the required accounts if they don't already exist.
+    // Accountant 1 never reuses another account's password: it takes
+    // ACCOUNTANT1_PASSWORD, or a random one shown once in the server log.
+    const accountant1Password = process.env.ACCOUNTANT1_PASSWORD || crypto.randomBytes(9).toString('base64url');
     const seedUsers = [
       { name: 'Admin', username: 'admin', password: 'Admin123', role: 'Admin' },
       { name: 'Store Keeper', username: 'stores', password: 'password', role: 'Store Keeper' },
-      { name: 'Accountant', username: 'accountant', password: 'password', role: 'Accountant' },
+      { name: 'Accountant 1', username: 'accountant - 1', password: 'rangika123', role: 'Accountant' },
+      { name: 'Accountant 2', username: 'accountant - 2', password: 'Accountant@2', role: 'Accountant' },
       { name: 'QB', username: 'QB', password: 'password', role: 'View Only' },
       { name: 'Finance', username: 'finance', password: 'thaniya123', role: 'Finance' },
       { name: 'Super Admin', username: 'superadmin', password: 'SuperAdmin123', role: 'Super Admin' }
@@ -278,6 +301,9 @@ const ensureUsernameAuthSchema = async () => {
           [seed.name, seed.username, hashedPassword, seed.role]
         );
         console.log(`Seeded default user "${seed.username}" (${seed.role})`);
+        if (seed.username === 'accountant1' && !process.env.ACCOUNTANT1_PASSWORD) {
+          console.log(`Initial password for "accountant1": ${accountant1Password} (change it after first login)`);
+        }
       } else if (seed.username === 'finance') {
         await pool.query(
           "UPDATE users SET role = 'Finance', status = 1 WHERE username = ? AND (role <> 'Finance' OR COALESCE(status, 0) <> 1)",

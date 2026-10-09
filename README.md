@@ -123,6 +123,8 @@ Access is enforced in **three places**: the navigation, the React routes, and th
 | **Admin** | Everything except Analyst |
 | **Super Admin** | Everything, including Analyst |
 
+Two logins hold the Accountant role: `accountant1` (Accountant 1) and `accountant2` (Accountant 2 - the former `accountant` login, renamed in place at server start-up so its id, password and history are kept). Both get exactly the Accountant grants above.
+
 All roles can also reach the Dashboard and Change Password. Roles that exist in the `users` table but have no privilege definition (for example `Staff`, `Manager`, `User`) get no module access.
 
 **How it works**
@@ -270,6 +272,7 @@ The client runs at `http://localhost:3000`. Log in with an account that exists i
 | `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` | Database connection |
 | `PORT` | API port (default `5000`) |
 | `JWT_SECRET` | Secret used to sign and verify JWTs (required) |
+| `ACCOUNTANT1_PASSWORD` | Optional initial password for the `accountant1` login, used only when that user is first created. If unset, a random password is generated and printed once in the server log |
 | `RAVON_POS_API_URL` | Base URL of the Ravon Bakers POS (example value in `.env.example`: `https://pos.ravonbakers.lk`) |
 | `RAVON_POS_ITEMS_ENDPOINT` | POS items endpoint (example: `/api/items-list`) |
 | `RAVON_POS_USERNAME`, `RAVON_POS_PASSWORD` | The POS's own service account (separate from every Stock Management login) used by the server for `POST /api/login`; the token is cached server-side, refreshed automatically and never sent to the browser. Required for Collection and FG items. `POS_USERNAME` / `POS_PASSWORD` / `POS_BASE_URL` are accepted as alternative names |
