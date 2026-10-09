@@ -4,6 +4,8 @@
 // Follows the Receive Types management pattern. The balance is derived on the
 // server from the ledger transactions and is read-only here. Ledgers are never
 // deleted - "Inactive" hides one from new transactions but keeps its history.
+// Company-wise: each ledger is linked to the companies that may post to it, and
+// its balance is shown per company (companies are never added together).
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { FiSearch, FiPlus, FiEdit, FiToggleLeft, FiToggleRight } from 'react-icons/fi';
 import api from '../../api';
@@ -19,8 +21,11 @@ const OtherLedgerManagement = () => {
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingRecord, setEditingRecord] = useState(null);
+  const [companies, setCompanies] = useState([]);
   const [newName, setNewName] = useState('');
+  const [newCompanyIds, setNewCompanyIds] = useState([]);
   const [editName, setEditName] = useState('');
+  const [editCompanyIds, setEditCompanyIds] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -38,14 +43,36 @@ const OtherLedgerManagement = () => {
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
+  useEffect(() => {
+    api.get('/purchases/companies')
+      .then((res) => setCompanies(Array.isArray(res.data) ? res.data : []))
+      .catch(() => setCompanies([]));
+  }, []);
+
+  const toggleId = (list, id) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
+
+  const companyPicker = (selected, setSelected) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', width: '100%' }}>
+      <span style={{ fontWeight: 600, fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>Companies:</span>
+      {companies.map((c) => (
+        <label key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--font-size-sm)', whiteSpace: 'nowrap' }}>
+          <input type="checkbox" checked={selected.includes(c.id)} onChange={() => setSelected((prev) => toggleId(prev, c.id))} />
+          {c.name}
+        </label>
+      ))}
+    </div>
+  );
+
   const handleAdd = async (e) => {
     e.preventDefault();
     if (!newName.trim()) return showPopup('error', 'Name is required');
+    if (newCompanyIds.length === 0) return showPopup('error', 'Select at least one company');
     setSubmitting(true);
     try {
-      await api.post('/other-ledgers', { name: newName.trim() });
+      await api.post('/other-ledgers', { name: newName.trim(), company_ids: newCompanyIds });
       showPopup('success', 'Other Ledger added');
       setNewName('');
+      setNewCompanyIds([]);
       setShowAddForm(false);
       await fetchAll();
     } catch (err) {
@@ -59,9 +86,10 @@ const OtherLedgerManagement = () => {
     e.preventDefault();
     if (!editingRecord) return;
     if (!editName.trim()) return showPopup('error', 'Name is required');
+    if (editCompanyIds.length === 0) return showPopup('error', 'Select at least one company');
     setSubmitting(true);
     try {
-      await api.put(`/other-ledgers/${editingRecord.id}`, { name: editName.trim() });
+      await api.put(`/other-ledgers/${editingRecord.id}`, { name: editName.trim(), company_ids: editCompanyIds });
       showPopup('success', 'Other Ledger updated');
       setEditingRecord(null);
       setEditName('');
@@ -91,6 +119,7 @@ const OtherLedgerManagement = () => {
   const openEdit = (record) => {
     setEditingRecord(record);
     setEditName(record.name);
+    setEditCompanyIds((record.companies || []).map((c) => c.id));
     setShowAddForm(false);
   };
 
@@ -130,6 +159,7 @@ const OtherLedgerManagement = () => {
             />
             <button type="submit" className="btn btn-primary" disabled={submitting}>{submitting ? 'Saving…' : 'Save'}</button>
             <button type="button" className="btn btn-secondary" onClick={() => setShowAddForm(false)}>Cancel</button>
+            {companyPicker(newCompanyIds, setNewCompanyIds)}
           </form>
         </div>
       )}
@@ -147,6 +177,7 @@ const OtherLedgerManagement = () => {
             />
             <button type="submit" className="btn btn-primary" disabled={submitting}>{submitting ? 'Saving…' : 'Save Changes'}</button>
             <button type="button" className="btn btn-secondary" onClick={() => setEditingRecord(null)}>Cancel</button>
+            {companyPicker(editCompanyIds, setEditCompanyIds)}
           </form>
         </div>
       )}
@@ -164,7 +195,8 @@ const OtherLedgerManagement = () => {
               <thead>
                 <tr>
                   <th>NAME</th>
-                  <th style={{ textAlign: 'right' }}>BALANCE</th>
+                  <th>COMPANIES</th>
+                  <th style={{ textAlign: 'right' }}>BALANCE (PER COMPANY)</th>
                   <th style={{ textAlign: 'center' }}>EDIT</th>
                   <th>STATUS</th>
                 </tr>
@@ -176,7 +208,18 @@ const OtherLedgerManagement = () => {
                       <strong>{rec.name}</strong>
                       {rec.is_system && <span className="badge badge-neutral" style={{ marginLeft: '8px' }} title="Used by Collection - cannot be renamed or made inactive">System</span>}
                     </td>
-                    <td style={{ textAlign: 'right' }}>{fmt(rec.balance)}</td>
+                    <td>
+                      {(rec.companies || []).length === 0
+                        ? <span className="badge badge-warning" title="Edit this ledger and link its companies before it can be used">Not linked</span>
+                        : rec.companies.map((c) => c.name).join(', ')}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      {(rec.company_balances || []).length === 0 ? fmt(0) : rec.company_balances.map((b) => (
+                        <div key={b.company_id} style={{ whiteSpace: 'nowrap' }}>
+                          <span className="text-muted font-sm">{b.company_name}:</span> {fmt(b.balance)}
+                        </div>
+                      ))}
+                    </td>
                     <td style={{ textAlign: 'center' }}>
                       {canWrite && !rec.is_system ? (
                         <button type="button" className="btn-icon edit" onClick={() => openEdit(rec)} title="Edit"><FiEdit size={14} /></button>

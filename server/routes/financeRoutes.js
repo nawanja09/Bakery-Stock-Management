@@ -44,6 +44,7 @@ router.post('/cash/opening-balance', ...financeOnly, financeController.setCashOp
 router.get('/bank/ledger/:bankId', ...financeReadOnly, financeController.getBankLedger); // ?dateFrom=&dateTo=&referenceNumber=&transactionType=
 router.get('/bank/accounts/all', ...financeReadOnly, financeController.getAllBankAccounts); // Bank ledger page's account picker
 router.post('/bank/receive', ...financeOnly, financeController.receiveBank);
+router.post('/bank/issued', ...financeOnly, financeController.issueBank);
 
 // Cash <-> Bank transfer - Finance module page
 router.post('/transfer', ...financeOnly, financeController.transferFunds);

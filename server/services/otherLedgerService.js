@@ -8,22 +8,30 @@
 // (source_type, source_id) which is UNIQUE - so a source can never have two
 // impacts, edits update in place, and voids switch the same row off.
 //
-// Accounting convention (Other Ledger = amount owed to / settled with the party):
-//   Cash Receive + Other Ledger : Cash DEBIT,  Other Ledger CREDIT
-//   Cash Issued  + Other Ledger : Cash CREDIT, Other Ledger DEBIT
-//   Balance = SUM(credit) - SUM(debit)   (never stored)
+// Accounting convention - the same transaction, same amount, on both sides:
+//                                 Cash/Bank           Other Ledger
+//   Cash/Bank Issued  -> Ledger : CREDIT (OUT)        DEBIT  (IN)
+//   Cash/Bank Receive <- Ledger : DEBIT  (IN)         CREDIT (OUT)
+//   Other Ledger balance = SUM(debit) - SUM(credit)   (never stored)
+// Every Other Ledger is debit-normal (other_ledgers.normal_balance = 'DEBIT'),
+// so money issued TO a ledger raises its balance (IN) and money received FROM
+// it lowers it (OUT). The 'CREDIT' branch is kept only for safety.
 //
 // Collection (see collectionService.js) adds two SYSTEM accounts, "AR Account"
-// and "Short/Excess Account" (other_ledgers.is_system = 1). They are
-// debit-normal (other_ledgers.normal_balance = 'DEBIT'): their balance is
-// SUM(debit) - SUM(credit). Every other ledger keeps normal_balance 'CREDIT', so
-// the convention above - and every existing balance - is unchanged.
+// and "Short/Excess Account" (other_ledgers.is_system = 1), also debit-normal.
+//
+// Company-wise: other_ledger_company_map lists the companies each ledger is
+// linked to. A transaction may only post to a ledger linked to ITS company
+// (requireActiveLedger / requireSystemLedger), and every entry stores that
+// company_id, so balances and statements are always read per company.
 //
 // Every function that writes takes an open transaction `connection`; none of
 // them commit, so they join the caller's DB transaction.
 
 const SOURCE_CASH_RECEIVE = 'CASH_RECEIVE';
 const SOURCE_CASH_ISSUED = 'CASH_ISSUED';
+const SOURCE_BANK_RECEIVE = 'BANK_RECEIVE';
+const SOURCE_BANK_ISSUED = 'BANK_ISSUED';
 const SOURCE_COLLECTION_AR = 'COLLECTION_AR';
 const SOURCE_COLLECTION_SHORT_EXCESS = 'COLLECTION_SHORT_EXCESS';
 const SOURCE_COLLECTION_AR_SETTLEMENT = 'COLLECTION_AR_SETTLEMENT'; // Credit Payment: AR Account CREDIT
@@ -31,6 +39,7 @@ const AR_ACCOUNT_NAME = 'AR Account';
 const SHORT_EXCESS_ACCOUNT_NAME = 'Short/Excess Account';
 const OTHER_LEDGER_RECEIVE_TYPE = 'Other Ledger'; // finance_transactions.transaction_type for receipts
 const CASH_ISSUED_TYPE = 'Cash Issued'; // finance_transactions.transaction_type for payments out
+const BANK_ISSUED_TYPE = 'Bank Issued'; // finance_transactions.transaction_type for bank payments out
 
 class OtherLedgerError extends Error {
   constructor(message, statusCode = 400) {
@@ -47,8 +56,8 @@ const normalizeName = (name) => String(name ?? '').trim().replace(/\s+/g, ' ');
 /** Debit/credit of the Other Ledger side for a given source type. */
 const impactForSource = (sourceType, amount) => {
   const value = round2(amount);
-  if (sourceType === SOURCE_CASH_RECEIVE) return { debit: 0, credit: value };
-  if (sourceType === SOURCE_CASH_ISSUED) return { debit: value, credit: 0 };
+  if (sourceType === SOURCE_CASH_RECEIVE || sourceType === SOURCE_BANK_RECEIVE) return { debit: 0, credit: value };
+  if (sourceType === SOURCE_CASH_ISSUED || sourceType === SOURCE_BANK_ISSUED) return { debit: value, credit: 0 };
   throw new OtherLedgerError('Unknown Other Ledger source type');
 };
 
@@ -60,15 +69,34 @@ const getLedgerById = async (connection, id, { forUpdate = false } = {}) => {
   return rows[0] || null;
 };
 
-/** Loads an Other Ledger that may be used for a NEW transaction (must be Active). */
-const requireActiveLedger = async (connection, id) => {
+/** True when the ledger is linked to the company (other_ledger_company_map). */
+const isLedgerLinkedToCompany = async (queryable, otherLedgerId, companyId) => {
+  const [rows] = await queryable.query(
+    'SELECT 1 FROM other_ledger_company_map WHERE other_ledger_id = ? AND company_id = ? LIMIT 1',
+    [otherLedgerId, companyId]
+  );
+  return rows.length > 0;
+};
+
+/**
+ * Loads an Other Ledger that may be used for a NEW transaction of `companyId`:
+ * it must be Active and linked to that company. Never falls back to another
+ * company's ledger - an unlinked ledger is rejected and nothing is posted.
+ */
+const requireActiveLedger = async (connection, id, { companyId } = {}) => {
   if (id === undefined || id === null || id === '') {
     throw new OtherLedgerError('Other Ledger is required');
+  }
+  if (companyId === undefined || companyId === null || companyId === '') {
+    throw new OtherLedgerError('Company is required for an Other Ledger transaction');
   }
   const ledger = await getLedgerById(connection, id, { forUpdate: true });
   if (!ledger) throw new OtherLedgerError('Other Ledger not found', 404);
   if (Number(ledger.status) !== 1) {
     throw new OtherLedgerError('This Other Ledger is inactive and cannot be used for new transactions');
+  }
+  if (!(await isLedgerLinkedToCompany(connection, ledger.id, companyId))) {
+    throw new OtherLedgerError(`"${ledger.name}" is not linked to the selected company. Link it under Other Ledgers management first.`);
   }
   return ledger;
 };
@@ -142,8 +170,12 @@ const insertImpactRow = async (connection, {
   return result?.insertId ?? null;
 };
 
-/** The active system account with this name (AR Account / Short/Excess Account), locked. */
-const requireSystemLedger = async (connection, name) => {
+/**
+ * The active system account with this name (AR Account / Short/Excess Account),
+ * locked. System accounts serve every company, so the posting company is linked
+ * on first use (the entry itself carries company_id, keeping companies apart).
+ */
+const requireSystemLedger = async (connection, name, { companyId } = {}) => {
   const [rows] = await connection.query(
     `SELECT id, name, status, is_system, normal_balance FROM other_ledgers
       WHERE is_system = 1 AND LOWER(TRIM(name)) = LOWER(?) ORDER BY id ASC LIMIT 1 FOR UPDATE`,
@@ -151,6 +183,12 @@ const requireSystemLedger = async (connection, name) => {
   );
   if (!rows.length) throw new OtherLedgerError(`The "${name}" Other Ledger account is missing`, 500);
   if (Number(rows[0].status) !== 1) throw new OtherLedgerError(`The "${name}" Other Ledger account is inactive`, 500);
+  if (companyId) {
+    await connection.query(
+      'INSERT IGNORE INTO other_ledger_company_map (other_ledger_id, company_id) VALUES (?, ?)',
+      [rows[0].id, companyId]
+    );
+  }
   return rows[0];
 };
 
@@ -215,39 +253,45 @@ const BALANCE_EFFECT_SQL = `CASE WHEN ol.normal_balance = 'DEBIT'
        ELSE CAST(olt.credit AS DECIMAL(14,2)) - CAST(olt.debit AS DECIMAL(14,2)) END`;
 
 /**
- * Balance over active rows. normal_balance 'CREDIT' (default, every ledger that
- * existed before Collection) = credits - debits; 'DEBIT' = debits - credits.
+ * Balance over active rows: 'DEBIT' (every ledger) = debits - credits;
+ * 'CREDIT' = credits - debits. With companyId, only that company's entries count.
  */
-const getLedgerBalance = async (queryable, otherLedgerId) => {
+const getLedgerBalance = async (queryable, otherLedgerId, companyId = null) => {
   const [rows] = await queryable.query(
     `SELECT COALESCE(SUM(${BALANCE_EFFECT_SQL}), 0) AS balance
        FROM other_ledger_transactions olt
        JOIN other_ledgers ol ON ol.id = olt.other_ledger_id
-      WHERE olt.other_ledger_id = ? AND olt.status = 1`,
-    [otherLedgerId]
+      WHERE olt.other_ledger_id = ? AND olt.status = 1${companyId ? ' AND olt.company_id = ?' : ''}`,
+    companyId ? [otherLedgerId, companyId] : [otherLedgerId]
   );
   return round2(rows[0]?.balance);
 };
 
 /** Signed effect of one row on a ledger with this normal balance. */
-const balanceEffect = (row, normalBalance = 'CREDIT') => {
+const balanceEffect = (row, normalBalance = 'DEBIT') => {
   const debit = Number(row.debit) || 0;
   const credit = Number(row.credit) || 0;
   return normalBalance === 'DEBIT' ? debit - credit : credit - debit;
 };
 
-/** Running balance, oldest first; same-date rows ordered by created_at then id. */
-const withRunningBalance = (rows, normalBalance = 'CREDIT', opening = 0) => {
+/**
+ * Running balance, oldest first; same-date rows ordered by created_at then id.
+ * direction: IN when the row raises the ledger's balance, OUT when it lowers it.
+ */
+const withRunningBalance = (rows, normalBalance = 'DEBIT', opening = 0) => {
   let running = round2(opening);
   return rows.map((row) => {
-    running = Number((running + balanceEffect(row, normalBalance)).toFixed(2));
-    return { ...row, balance: running };
+    const effect = balanceEffect(row, normalBalance);
+    running = Number((running + effect).toFixed(2));
+    return { ...row, direction: effect >= 0 ? 'IN' : 'OUT', balance: running };
   });
 };
 
 module.exports = {
   SOURCE_CASH_RECEIVE,
   SOURCE_CASH_ISSUED,
+  SOURCE_BANK_RECEIVE,
+  SOURCE_BANK_ISSUED,
   SOURCE_COLLECTION_AR,
   SOURCE_COLLECTION_SHORT_EXCESS,
   SOURCE_COLLECTION_AR_SETTLEMENT,
@@ -255,11 +299,13 @@ module.exports = {
   SHORT_EXCESS_ACCOUNT_NAME,
   OTHER_LEDGER_RECEIVE_TYPE,
   CASH_ISSUED_TYPE,
+  BANK_ISSUED_TYPE,
   OtherLedgerError,
   round2,
   normalizeName,
   impactForSource,
   getLedgerById,
+  isLedgerLinkedToCompany,
   requireActiveLedger,
   getImpactBySource,
   lastInsertId,

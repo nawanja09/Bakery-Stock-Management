@@ -115,7 +115,6 @@ import LastIssueDateReport from './components/Analysis/LastIssueDateReport';
 
 import CashLedger from './components/Finance/CashLedger';
 import BankLedger from './components/Finance/BankLedger';
-import BankReceive from './components/Finance/BankReceive';
 import FundTransfer from './components/Finance/FundTransfer';
 
 import BankTransfer from './components/Finance/BankTransfer';
@@ -327,7 +326,7 @@ function App() {
             <Route path="finance/cash" element={<FinanceRoute><CashLedger /></FinanceRoute>} />
             <Route path="finance/cash-receive" element={<Navigate to="/finance/cash" replace />} />
             <Route path="finance/bank" element={<FinanceRoute><BankLedger /></FinanceRoute>} />
-            <Route path="finance/bank-receive" element={<FinanceRoute><BankReceive /></FinanceRoute>} />
+            <Route path="finance/bank-receive" element={<Navigate to="/finance/bank" replace />} />
             <Route path="finance/transfer" element={<FinanceRoute><FundTransfer /></FinanceRoute>} />
             <Route path="finance/income" element={<FinanceRoute><IncomePage /></FinanceRoute>} />
             <Route path="wastage/edit/:id" element={<ModalRoute title="Edit Wastage"><EditWastage /></ModalRoute>} />

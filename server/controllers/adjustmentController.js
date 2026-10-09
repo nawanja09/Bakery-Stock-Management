@@ -189,13 +189,15 @@ const updateFinancialAdjustmentRecord = async (req, res) => {
       amount: normalizedAmount,
       remark: normalizedRemark
     };
-    // Cash Receives classified as an Other Ledger keep that classification: the
-    // Other Ledger entry is linked to this row, so the type cannot be swapped to
-    // a Receive Type here (and no plain receipt may take the reserved type).
+    // Cash / Bank Receives classified as an Other Ledger keep that classification:
+    // the Other Ledger entry is linked to this row, so the type cannot be swapped
+    // to a Receive Type here (and no plain receipt may take the reserved type).
     let linkedOtherLedgerImpact = null;
-    if (source === 'finance' && category === 'Cash Receive') {
+    const otherLedgerSourceType = category === 'Cash Receive'
+      ? otherLedgerService.SOURCE_CASH_RECEIVE : otherLedgerService.SOURCE_BANK_RECEIVE;
+    if (source === 'finance') {
       linkedOtherLedgerImpact = await otherLedgerService.getImpactBySource(
-        connection, otherLedgerService.SOURCE_CASH_RECEIVE, id, { forUpdate: true }
+        connection, otherLedgerSourceType, id, { forUpdate: true }
       );
       const reserved = otherLedgerService.OTHER_LEDGER_RECEIVE_TYPE;
       const typeChanged = String(updatedValues.receive_type) !== String(originalValues.receive_type);
@@ -224,7 +226,7 @@ const updateFinancialAdjustmentRecord = async (req, res) => {
       // Keep the linked Other Ledger entry (if any) in step with its source row:
       // updated in place, never duplicated. No-op for every other receipt.
       if (linkedOtherLedgerImpact) {
-        await otherLedgerService.syncImpactFromSource(connection, otherLedgerService.SOURCE_CASH_RECEIVE, id, {
+        await otherLedgerService.syncImpactFromSource(connection, otherLedgerSourceType, id, {
           date: updatedValues.date, amount: updatedValues.amount,
           referenceNo: updatedValues.reference_number, remark: updatedValues.remark
         });

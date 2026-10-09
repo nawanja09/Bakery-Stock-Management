@@ -245,7 +245,7 @@ const postCard = async (connection, ctx) => {
 };
 
 const postOther = async (connection, ctx, { accountName, sourceType, debit, credit, remark }) => {
-  const ledger = await ol.requireSystemLedger(connection, accountName);
+  const ledger = await ol.requireSystemLedger(connection, accountName, { companyId: ctx.companyId });
   const entryId = await ol.createImpactEntry(connection, {
     otherLedgerId: ledger.id, sourceType, sourceId: ctx.lineId, date: ctx.date, debit, credit,
     companyId: ctx.companyId, referenceNo: ctx.ref, remark, createdBy: ctx.userId

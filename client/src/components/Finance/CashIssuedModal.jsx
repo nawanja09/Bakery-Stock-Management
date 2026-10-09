@@ -38,19 +38,26 @@ const CashIssuedModal = ({ defaultCompanyId = '', record = null, onClose, onSave
       .catch(() => setCompanies([]));
   }, []);
 
-  // Only ACTIVE Other Ledgers are offered. When editing, the transaction's own
-  // ledger stays selectable even if it has since been made inactive.
+  // Only ACTIVE Other Ledgers linked to the selected company are offered; a
+  // ledger picked for another company is cleared when the company changes.
+  // When editing, the transaction's own ledger stays selectable even if it has
+  // since been made inactive.
   useEffect(() => {
-    api.get('/other-ledgers/active')
+    if (!formData.company_id) { setOtherLedgers([]); return; }
+    let cancelled = false;
+    api.get('/other-ledgers/active', { params: { companyId: formData.company_id } })
       .then(res => {
+        if (cancelled) return;
         const list = Array.isArray(res.data) ? res.data : [];
         if (record && !list.some(l => Number(l.id) === Number(record.other_ledger_id))) {
           list.push({ id: record.other_ledger_id, name: `${record.other_ledger_name} (Inactive)` });
         }
         setOtherLedgers(list);
+        setFormData(prev => (list.some(l => String(l.id) === String(prev.other_ledger_id)) ? prev : { ...prev, other_ledger_id: '' }));
       })
-      .catch(() => setOtherLedgers([]));
-  }, [record]);
+      .catch(() => { if (!cancelled) setOtherLedgers([]); });
+    return () => { cancelled = true; };
+  }, [record, formData.company_id]);
 
   useEffect(() => {
     if (!formData.company_id) { setBalance(null); return; }
@@ -135,6 +142,9 @@ const CashIssuedModal = ({ defaultCompanyId = '', record = null, onClose, onSave
                 <option value="">Select Other Ledger</option>
                 {otherLedgers.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
               </select>
+              {formData.company_id && otherLedgers.length === 0 && (
+                <span className="fl-field-hint">No Other Ledger is linked to this company</span>
+              )}
             </div>
             <div className="form-group">
               <label>Amount (Rs.) <span className="required">*</span></label>

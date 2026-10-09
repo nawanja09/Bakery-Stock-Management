@@ -78,7 +78,7 @@ const createCashIssued = async (req, res) => {
     const [companies] = await connection.query('SELECT id FROM company WHERE id = ?', [companyId]);
     if (!companies.length) throw new ol.OtherLedgerError('Company not found', 404);
     await checkDuplicateReference(connection, reference, { includeLedger: true });
-    const ledger = await ol.requireActiveLedger(connection, otherLedgerId);
+    const ledger = await ol.requireActiveLedger(connection, otherLedgerId, { companyId });
 
     // Cash Ledger CREDIT - money leaves the company (the primary transaction).
     const balance = await recordCashTransaction(connection, {
@@ -178,7 +178,7 @@ const updateCashIssued = async (req, res) => {
     const requested = req.body.other_ledger_id;
     if (requested !== undefined && requested !== null && requested !== '' &&
         Number(requested) !== Number(linked.impact.other_ledger_id)) {
-      ledger = await ol.requireActiveLedger(connection, requested);
+      ledger = await ol.requireActiveLedger(connection, requested, { companyId: linked.source.company_id });
       await connection.query('UPDATE other_ledger_transactions SET other_ledger_id = ? WHERE id = ?', [ledger.id, linked.impact.id]);
     }
 

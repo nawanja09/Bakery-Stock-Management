@@ -1149,6 +1149,32 @@ const ensureOtherLedgersSchema = async () => {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
 
+    // Company-wise Other Ledgers: which companies may post to which ledger.
+    // A transaction can only use a ledger linked to its own company, and every
+    // balance / statement is read per company (other_ledger_transactions.company_id).
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS other_ledger_company_map (
+        other_ledger_id INT NOT NULL,
+        company_id      INT NOT NULL,
+        created_at      TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (other_ledger_id, company_id),
+        KEY idx_olcm_company (company_id),
+        CONSTRAINT fk_olcm_other_ledger FOREIGN KEY (other_ledger_id) REFERENCES other_ledgers(id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    // Keep existing history valid: every ledger stays linked to each company it
+    // already has transactions for. Idempotent (a company with transactions on a
+    // ledger cannot be unlinked, so this never re-adds a removed link).
+    // Ledgers with no transactions yet get no link: they are linked to their
+    // companies under Other Ledgers management before they can be used.
+    await pool.query(`
+      INSERT IGNORE INTO other_ledger_company_map (other_ledger_id, company_id)
+      SELECT DISTINCT olt.other_ledger_id, olt.company_id
+        FROM other_ledger_transactions olt
+        JOIN company c ON c.id = olt.company_id
+       WHERE olt.status = 1
+    `);
+
     console.log('Other Ledgers schema ready');
   } catch (error) {
     console.warn('Other Ledgers schema check skipped:', error.message);
@@ -1327,7 +1353,15 @@ const ensureCollectionsSchema = async () => {
     for (const stmt of [
       'ALTER TABLE other_ledgers ADD COLUMN IF NOT EXISTS is_system TINYINT(1) NOT NULL DEFAULT 0',
       "ALTER TABLE other_ledgers ADD COLUMN IF NOT EXISTS normal_balance ENUM('CREDIT','DEBIT') NOT NULL DEFAULT 'CREDIT'",
-      "ALTER TABLE other_ledger_transactions MODIFY COLUMN source_type ENUM('CASH_RECEIVE','CASH_ISSUED','COLLECTION_AR','COLLECTION_SHORT_EXCESS','COLLECTION_AR_SETTLEMENT') NOT NULL",
+      // Transaction direction: money issued from Cash/Bank TO an Other Ledger is
+      // IN for that ledger, money received FROM it is OUT. Stored debit/credit
+      // rows are unchanged (Issued = Other Ledger DEBIT, Received = CREDIT); every
+      // Other Ledger is debit-normal, so balance = SUM(debit) - SUM(credit).
+      "ALTER TABLE other_ledgers MODIFY COLUMN normal_balance ENUM('CREDIT','DEBIT') NOT NULL DEFAULT 'DEBIT'",
+      "UPDATE other_ledgers SET normal_balance = 'DEBIT' WHERE normal_balance <> 'DEBIT'",
+      // BANK_RECEIVE / BANK_ISSUED: Bank Ledger rows linked to an Other Ledger
+      // (Finance -> Bank Ledger -> Bank Received / Bank Issued).
+      "ALTER TABLE other_ledger_transactions MODIFY COLUMN source_type ENUM('CASH_RECEIVE','CASH_ISSUED','COLLECTION_AR','COLLECTION_SHORT_EXCESS','COLLECTION_AR_SETTLEMENT','BANK_RECEIVE','BANK_ISSUED') NOT NULL",
       // Credit Payment approval also credits the AR Account (collectionService
       // AR_SETTLEMENT line). Adding an ENUM value keeps every existing row.
       "ALTER TABLE collection_transactions MODIFY COLUMN payment_method ENUM('CASH','CARD','BANK','AR','SHORT_EXCESS','AR_SETTLEMENT') NOT NULL"
@@ -1350,6 +1384,12 @@ const ensureCollectionsSchema = async () => {
         if (used.length === 0) await pool.query("UPDATE other_ledgers SET normal_balance = 'DEBIT' WHERE id = ?", [rows[0].id]);
       }
     }
+    // The system accounts serve every company (each company's entries and
+    // balance are kept apart by company_id), so they are linked to all of them.
+    await pool.query(`
+      INSERT IGNORE INTO other_ledger_company_map (other_ledger_id, company_id)
+      SELECT ol.id, c.id FROM other_ledgers ol CROSS JOIN company c WHERE ol.is_system = 1
+    `);
 
     // POS "MASActive" is the "MAS Intimo" department (departmentMapper
     // normalizePosBranchName). Rows staged before that rule get the Stock

@@ -1,8 +1,11 @@
 // src/components/finance/BankLedger.jsx
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faUniversity, faSpinner, faFilter } from '@fortawesome/free-solid-svg-icons';
+import { faUniversity, faSpinner, faFilter, faHandHoldingDollar, faMoneyBillTransfer } from '@fortawesome/free-solid-svg-icons';
 import api from '../../api';
+import usePermissions from '../../hooks/usePermissions';
+import { usePopup } from '../context/PopupContext';
+import BankTransactionModal from './BankTransactionModal';
 import './FinanceLedger.css';
 
 const TRANSACTION_TYPES = [
@@ -15,10 +18,15 @@ const TRANSACTION_TYPES = [
   { value: 'Other Income', label: 'Other Income' },
   { value: 'Adjustment', label: 'Adjustment' },
   { value: 'Bank Deposit', label: 'Bank Deposit' },
-  { value: 'Bank Withdrawal', label: 'Bank Withdrawal' }
+  { value: 'Bank Withdrawal', label: 'Bank Withdrawal' },
+  { value: 'Other Ledger', label: 'Other Ledger (Bank Received)' },
+  { value: 'Bank Issued', label: 'Bank Issued' }
 ];
 
 const BankLedger = () => {
+  const { canWrite } = usePermissions();
+  const { showPopup } = usePopup();
+  const [entryMode, setEntryMode] = useState(null); // 'receive' | 'issued' | null
   const [accounts, setAccounts] = useState([]);
   const [bankId, setBankId] = useState('');
   const [bank, setBank] = useState(null);
@@ -66,6 +74,15 @@ const BankLedger = () => {
 
   useEffect(() => { fetchLedger(); }, [fetchLedger]);
 
+  // After a Bank Received / Bank Issued save, show the ledger of the account it
+  // was posted to (refetching when that is already the selected account).
+  const handleSaved = (text, savedBankId) => {
+    setEntryMode(null);
+    if (text) showPopup('success', text);
+    if (savedBankId && String(savedBankId) !== String(bankId)) setBankId(String(savedBankId));
+    else fetchLedger();
+  };
+
   const handleFilterChange = e => {
     const { name, value } = e.target;
     setFilters(prev => ({ ...prev, [name]: value }));
@@ -101,9 +118,19 @@ const BankLedger = () => {
             <FontAwesomeIcon icon={faUniversity} style={{ marginRight: '8px' }} /> Bank Ledger
           </h2>
         </div>
-        <div className="report-filter-group" style={{ alignItems: 'center' }}>
-          <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)' }}>Bank Account:</label>
-          <select value={bankId} onChange={e => setBankId(e.target.value)} className="report-filter-select" disabled={loadingAccounts || accountLoadError}>
+        <div className="bank-ledger-header-actions">
+          {canWrite && (
+            <>
+              <button type="button" className="btn btn-primary" onClick={() => setEntryMode('receive')}>
+                <FontAwesomeIcon icon={faHandHoldingDollar} /> Bank Received
+              </button>
+              <button type="button" className="btn btn-secondary" onClick={() => setEntryMode('issued')}>
+                <FontAwesomeIcon icon={faMoneyBillTransfer} /> Bank Issued
+              </button>
+            </>
+          )}
+          <label htmlFor="bank-ledger-account" style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)', whiteSpace: 'nowrap' }}>Bank Account:</label>
+          <select id="bank-ledger-account" value={bankId} onChange={e => setBankId(e.target.value)} className="report-filter-select" disabled={loadingAccounts || accountLoadError}>
             <option value="">{loadingAccounts ? 'Loading…' : accountLoadError ? 'Unable to load bank accounts' : accounts.length === 0 ? 'No active bank accounts available' : 'Select bank account'}</option>
             {accounts.map(b => (
               <option key={b.id} value={b.id}>
@@ -208,6 +235,15 @@ const BankLedger = () => {
           </table>
         )}
       </div>
+
+      {entryMode && (
+        <BankTransactionModal
+          mode={entryMode}
+          defaultBank={accounts.find(b => String(b.id) === String(bankId)) || null}
+          onClose={() => setEntryMode(null)}
+          onSaved={handleSaved}
+        />
+      )}
     </div>
   );
 };
