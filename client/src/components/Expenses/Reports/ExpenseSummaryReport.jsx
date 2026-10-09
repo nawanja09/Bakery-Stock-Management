@@ -506,10 +506,6 @@ const ExpenseSummaryReport = () => {
               )}
             </table>
           </div>
-          <div className="esr-footnote">
-            Same transactions as Analyst → Expenses (Petty Cash, Cash Expenses, Bank Charges, Hidden Expenses, Other Expenses); Purchasing is not included.
-            VAT is recorded on Other Expenses bills only.
-          </div>
         </div>
       ) : (
         <div className="card" style={{ textAlign: 'center', padding: 'var(--spacing-3xl)', color: 'var(--color-text-secondary)' }}>
@@ -613,12 +609,6 @@ const ExpenseSummaryReport = () => {
                         </tr>
                       </tfoot>
                     </table>
-                  </div>
-                  <div className="esr-summary-grid esr-summary-grid--compact">
-                    <div className="card esr-summary-card"><span>Transaction Count</span><strong>{details.totals.transaction_count}</strong></div>
-                    <div className="card esr-summary-card"><span>Total Amount Without VAT</span><strong>{formatCurrency(details.totals.without_vat_amount)}</strong></div>
-                    <div className="card esr-summary-card"><span>Total VAT</span><strong>{formatCurrency(details.totals.vat_amount)}</strong></div>
-                    <div className="card esr-summary-card esr-summary-card--primary"><span>Total Amount With VAT</span><strong>{formatCurrency(details.totals.total_amount)}</strong></div>
                   </div>
                 </>
               ) : (
