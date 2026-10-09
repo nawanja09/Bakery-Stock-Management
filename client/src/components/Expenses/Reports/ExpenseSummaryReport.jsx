@@ -558,8 +558,6 @@ const ExpenseSummaryReport = () => {
                       <thead>
                         <tr>
                           <th>Date</th>
-                          <th>Expense Type</th>
-                          <th>Sub-Expense Type</th>
                           <th>Description</th>
                           <th>Company</th>
                           <th>Reference Number</th>
@@ -577,8 +575,6 @@ const ExpenseSummaryReport = () => {
                               {formatDate(tx.date)}
                               <div className="esr-muted">{tx.group_label}</div>
                             </td>
-                            <td>{tx.expense_type || <span className="esr-muted">{EMPTY_LABEL}</span>}</td>
-                            <td>{tx.sub_expense_type || <span className="esr-muted">{EMPTY_LABEL}</span>}</td>
                             <td>{tx.description || '-'}</td>
                             <td>{tx.company_name || '-'}</td>
                             <td className="esr-nowrap">{tx.reference || '-'}</td>
@@ -601,7 +597,7 @@ const ExpenseSummaryReport = () => {
                       </tbody>
                       <tfoot>
                         <tr>
-                          <td colSpan="7"><strong>TOTAL — {details.totals.transaction_count} transaction{details.totals.transaction_count !== 1 ? 's' : ''}</strong></td>
+                          <td colSpan="5"><strong>TOTAL — {details.totals.transaction_count} transaction{details.totals.transaction_count !== 1 ? 's' : ''}</strong></td>
                           <td className="esr-num"><strong>{formatCurrency(details.totals.without_vat_amount)}</strong></td>
                           <td className="esr-num"><strong>{formatCurrency(details.totals.vat_amount)}</strong></td>
                           <td className="esr-num"><strong>{formatCurrency(details.totals.total_amount)}</strong></td>
