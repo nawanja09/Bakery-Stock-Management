@@ -88,7 +88,7 @@ const makeConnection = ({ payload, cardAmount = CARD_TOTAL, postedKeys = [], use
       if (/FROM collections WHERE id = \? FOR UPDATE/.test(s)) {
         return [[{
           id: 7, source_type: 'SHIFT', source_id: '211', reference_no: '211-0104', collection_date: '2026-10-06',
-          shift_id: '211', cashier_name: 'Imasha', employee_name: null, company_id: 1, pos_bank_account: null,
+          shift_id: '211', shift_no: '0104', cashier_name: 'Imasha', employee_name: null, company_id: 1, pos_bank_account: null,
           pos_branch_name: 'Cafe - M', department_id: 7, cash_amount: 0, card_amount: cardAmount, bank_amount: 0,
           ar_amount: 0, short_excess_amount: 0, deduction_amount: 0, total_amount: cardAmount, pos_total_amount: null,
           linked_collection_id: null, status: 'pending', raw_payload: JSON.stringify(payload)
@@ -139,6 +139,8 @@ test('approve: every POS card payment becomes its own Card Ledger entry; the tot
   assert.match(cardRows[0].remark, /Sale #21127, receipt RCP2610060142 14:07 - SHIFT-211-0104 - Cafe - M/);
   assert.match(cardRows[2].remark, /Order advance #614/);
   assert.match(cardRows[3].remark, /\(card_and_cash\)/);
+  // Branch / Department (Credit Card Rate) and Shift No (Card Ledger filters) travel with every row.
+  assert.ok(writes.card.every(({ params }) => params[7] === 7 && params[8] === '0104'));
 
   // Each linked by its unique POS key (source + shift + POS payment id).
   assert.deepEqual(writes.ccp.map((p) => p[2]), ['SHIFT:211:sale-21127', 'SHIFT:211:sale-21138', 'SHIFT:211:order_advance-614', 'SHIFT:211:sale-21142']);

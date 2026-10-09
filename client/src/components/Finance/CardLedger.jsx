@@ -2,20 +2,25 @@
 //
 // Finance -> Card Ledger.
 //   Pending   - card transactions not yet realised. They have NO effect on any
-//               Bank Balance. Tick one or more rows (all from the same Company
-//               and Bank Account) and press Realise (below the table).
+//               Bank Balance. Tick one or more rows (or Select All - all from the
+//               same Company and Bank Account) and press Realise (below the table).
 //   Completed - realised card transactions for the chosen Company + Bank
-//               Account: Transaction Date, Realise Date, Reference No, Total
-//               Transaction Amount, Realise Amount, Remaining Balance - all read
-//               from the saved realisation records.
-// Realising lists the selected transactions, shows their read-only Total
-// Transaction Amount, and takes ONE Realise Amount for the whole selection
-// (> 0 and < the total). The read-only Remaining Balance (total - realise)
-// goes to Expenses -> Hidden Expenses as "Visa Card Payment". The totals on
-// screen are only a display aid: the server re-sums the selected rows from the
-// database, validates the amount and does all the writes in ONE database
-// transaction. After every change this page re-reads the API.
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+//               Account: Transaction Date, Realise Date, Reference No, Branch /
+//               Department, Total Transaction Amount, Expected Commission,
+//               Realise Amount, Remaining Balance / Bank Charge - all read from
+//               the saved realisation records.
+// Both tabs filter by Company, Bank Account, Branch / Department, Shift No and date.
+// Realising lists the selected transactions and shows, read-only, the Total
+// Transaction Amount, their Branch / Department, its Credit Card Rate
+// (Management -> Credit Card Rate) and the Expected Commission
+// (amount x rate / 100 per department). The user enters ONE Realise Amount; the
+// read-only Remaining Balance (total - realise - commission) is the Bank Charge.
+// The server records the commission ("Visa Card Payment commission") and the
+// bank charge ("Credit Card Bank Charge", only when > 0) as two Hidden Expenses.
+// The figures on screen are a display aid: the server re-reads the rows and
+// rates, validates and does all the writes in ONE database transaction. After
+// every change this page re-reads the API.
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCreditCard, faSpinner, faCheck, faTimes } from '@fortawesome/free-solid-svg-icons';
 import api from '../../api';
@@ -24,6 +29,7 @@ import './FinanceForm.css';
 import './CardLedger.css';
 
 const WRITE_ROLES = ['Admin', 'Super Admin', 'Accountant'];
+const NO_DEPARTMENT = 'none';
 
 const getStoredUserRole = () => {
   try {
@@ -46,6 +52,8 @@ const fmtMoney = (value) =>
   (Number.parseFloat(value) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const fmtCents = (cents) => fmtMoney(cents / 100);
+
+const fmtRate = (rate) => `${(Number.parseFloat(rate) || 0).toFixed(2)}%`;
 
 // 'YYYY-MM-DD' -> 'DD/MM/YYYY' without going through Date (no timezone shifts).
 const fmtDate = (value) => {
@@ -80,25 +88,60 @@ const parseMoney = (raw) => {
 };
 
 const bankLabel = (row) => `${row.bank_name || ''}${row.account_number ? `  ${row.account_number}` : ''}`.trim();
+const sameGroup = (a, b) => Number(a.company_id) === Number(b.company_id) && Number(a.bank_id) === Number(b.bank_id);
+const sameName = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+
+// Shift No is typed: wait until the user pauses before re-reading the API.
+const useDebounced = (value, delay = 400) => {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+  return debounced;
+};
+
+// Branch / Department + Shift No filters (same on both tabs).
+const DimensionFilters = ({ idPrefix, departments, departmentId, onDepartment, shiftNo, onShiftNo }) => (
+  <>
+    <div className="form-group">
+      <label htmlFor={`${idPrefix}-department`}>Branch / Department</label>
+      <select id={`${idPrefix}-department`} value={departmentId} onChange={onDepartment} className="form-select">
+        <option value="">All branches / departments</option>
+        {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+        <option value={NO_DEPARTMENT}>Not assigned</option>
+      </select>
+    </div>
+    <div className="form-group">
+      <label htmlFor={`${idPrefix}-shift`}>Shift No</label>
+      <input id={`${idPrefix}-shift`} type="search" value={shiftNo} onChange={onShiftNo} placeholder="Any shift" className="form-input" />
+    </div>
+  </>
+);
 
 const CardLedger = () => {
   const { showPopup } = usePopup();
   const canWrite = WRITE_ROLES.includes(getStoredUserRole());
 
   const [tab, setTab] = useState('Pending');
+  const [companies, setCompanies] = useState([]);
+  const [departments, setDepartments] = useState([]);
 
   // ---- Pending ----
   const [allBanks, setAllBanks] = useState([]);
-  const [pendingFilters, setPendingFilters] = useState({ bankId: '', dateFrom: '', dateTo: '' });
+  const [pendingFilters, setPendingFilters] = useState({ companyId: '', bankId: '', departmentId: '', dateFrom: '', dateTo: '' });
+  const [pendingShift, setPendingShift] = useState('');
+  const pendingShiftNo = useDebounced(pendingShift.trim());
   const [pending, setPending] = useState({ transactions: [], total: 0 });
   const [loadingPending, setLoadingPending] = useState(true);
   const [selectedIds, setSelectedIds] = useState([]);
 
   // ---- Completed ----
-  const [companies, setCompanies] = useState([]);
   const [companyBanks, setCompanyBanks] = useState([]);
   const [loadingBanks, setLoadingBanks] = useState(false);
-  const [completedFilters, setCompletedFilters] = useState({ companyId: '', bankId: '', dateFrom: '', dateTo: '' });
+  const [completedFilters, setCompletedFilters] = useState({ companyId: '', bankId: '', departmentId: '', dateFrom: '', dateTo: '' });
+  const [completedShift, setCompletedShift] = useState('');
+  const completedShiftNo = useDebounced(completedShift.trim());
   const [completed, setCompleted] = useState({ transactions: [], totals: null });
   const [loadingCompleted, setLoadingCompleted] = useState(false);
 
@@ -106,15 +149,17 @@ const CardLedger = () => {
   const [realiseOpen, setRealiseOpen] = useState(false);
   const [realiseDate, setRealiseDate] = useState('');
   const [realiseAmountText, setRealiseAmountText] = useState(''); // exactly what the user typed
+  const [assignDepartmentId, setAssignDepartmentId] = useState(''); // for rows without a department
+  const [preview, setPreview] = useState({ loading: false, data: null, error: '' });
   const [realiseError, setRealiseError] = useState('');
   const [realising, setRealising] = useState(false);
+  const submittingRef = useRef(false); // blocks a double click before React re-renders
 
   // ------------------------------------------------------------------ data
   const fetchPending = useCallback(async () => {
     const params = { status: 'Pending' };
-    if (pendingFilters.bankId) params.bankId = pendingFilters.bankId;
-    if (pendingFilters.dateFrom) params.dateFrom = pendingFilters.dateFrom;
-    if (pendingFilters.dateTo) params.dateTo = pendingFilters.dateTo;
+    Object.entries(pendingFilters).forEach(([key, value]) => { if (value) params[key] = value; });
+    if (pendingShiftNo) params.shiftNo = pendingShiftNo;
     try {
       const res = await api.get('/finance/card-ledger', { params });
       const transactions = res.data?.transactions || [];
@@ -127,17 +172,17 @@ const CardLedger = () => {
     } finally {
       setLoadingPending(false);
     }
-  }, [pendingFilters, showPopup]);
+  }, [pendingFilters, pendingShiftNo, showPopup]);
 
   const fetchCompleted = useCallback(async () => {
-    const { companyId, bankId, dateFrom, dateTo } = completedFilters;
+    const { companyId, bankId } = completedFilters;
     if (!companyId || !bankId) {
       setCompleted({ transactions: [], totals: null });
       return;
     }
-    const params = { status: 'Completed', companyId, bankId };
-    if (dateFrom) params.dateFrom = dateFrom;
-    if (dateTo) params.dateTo = dateTo;
+    const params = { status: 'Completed' };
+    Object.entries(completedFilters).forEach(([key, value]) => { if (value) params[key] = value; });
+    if (completedShiftNo) params.shiftNo = completedShiftNo;
     setLoadingCompleted(true);
     try {
       const res = await api.get('/finance/card-ledger', { params });
@@ -147,7 +192,7 @@ const CardLedger = () => {
     } finally {
       setLoadingCompleted(false);
     }
-  }, [completedFilters, showPopup]);
+  }, [completedFilters, completedShiftNo, showPopup]);
 
   useEffect(() => { setLoadingPending(true); fetchPending(); }, [fetchPending]);
   useEffect(() => { fetchCompleted(); }, [fetchCompleted]);
@@ -156,6 +201,9 @@ const CardLedger = () => {
     api.get('/finance/bank/accounts/all')
       .then((res) => setAllBanks(Array.isArray(res.data) ? res.data : []))
       .catch(() => setAllBanks([]));
+    api.get('/departments')
+      .then((res) => setDepartments(Array.isArray(res.data) ? res.data : []))
+      .catch(() => setDepartments([]));
     api.get('/purchases/companies')
       .then((res) => {
         const list = Array.isArray(res.data) ? res.data : [];
@@ -164,6 +212,13 @@ const CardLedger = () => {
       })
       .catch(() => setCompanies([]));
   }, []);
+
+  // Pending: the Bank Account list follows the Company filter.
+  const pendingCompany = companies.find((c) => String(c.id) === String(pendingFilters.companyId));
+  const pendingBanks = useMemo(
+    () => (pendingCompany ? allBanks.filter((b) => sameName(b.company, pendingCompany.name)) : allBanks),
+    [allBanks, pendingCompany]
+  );
 
   // Bank Account dropdown (Completed) only offers the selected Company's accounts.
   useEffect(() => {
@@ -193,6 +248,34 @@ const CardLedger = () => {
   );
   const group = selectedRows[0] || null; // Company + Bank Account of the current selection
 
+  // Select All: every row currently displayed (after the filters) that can be
+  // realised together with the current selection - or, with nothing selected,
+  // with the first displayed row (one Company + Bank Account per realisation).
+  const eligibleRows = useMemo(() => {
+    const anchor = group || pending.transactions[0];
+    return anchor ? pending.transactions.filter((r) => sameGroup(r, anchor)) : [];
+  }, [group, pending.transactions]);
+  const allEligibleSelected = eligibleRows.length > 0 && eligibleRows.every((r) => selectedIds.includes(r.id));
+  const someSelected = selectedIds.length > 0;
+  const selectAllRef = useRef(null);
+  useEffect(() => {
+    if (selectAllRef.current) selectAllRef.current.indeterminate = someSelected && !allEligibleSelected;
+  }, [someSelected, allEligibleSelected]);
+
+  const toggleAll = () => {
+    if (!canWrite) return;
+    if (allEligibleSelected) { setSelectedIds([]); return; }
+    setSelectedIds(eligibleRows.map((r) => r.id));
+    if (eligibleRows.length < pending.transactions.length) {
+      const anchor = eligibleRows[0];
+      showPopup(
+        'warning',
+        `Selected the ${eligibleRows.length} transactions of ${anchor.company_name} / ${bankLabel(anchor)}. `
+        + 'Transactions of another Company or Bank Account cannot be realised together - filter by Company and Bank Account to select them.'
+      );
+    }
+  };
+
   const toggleRow = (row) => {
     if (!canWrite) return;
     if (selectedIds.includes(row.id)) {
@@ -211,6 +294,8 @@ const CardLedger = () => {
   };
 
   // ----------------------------------------------------------- realise modal
+  const unassignedCount = selectedRows.filter((r) => !r.department_id).length;
+
   const openRealise = () => {
     if (selectedRows.length === 0) {
       return showPopup('error', 'Please select at least one card transaction to realise');
@@ -224,11 +309,31 @@ const CardLedger = () => {
     const today = todayLocal();
     setRealiseDate(today < latest ? latest : today);
     setRealiseAmountText('');
+    setAssignDepartmentId('');
     setRealiseError('');
+    setPreview({ loading: true, data: null, error: '' });
     setRealiseOpen(true);
   };
 
   const closeRealise = () => { if (!realising) setRealiseOpen(false); };
+
+  // Branch / Department, Credit Card Rate and Expected Commission come from the
+  // server (Management -> Credit Card Rate). Re-read whenever the selection or
+  // the department chosen for unassigned rows changes.
+  const selectionKey = selectedRows.map((r) => r.id).join(',');
+  useEffect(() => {
+    if (!realiseOpen || !selectionKey) return undefined;
+    let cancelled = false;
+    const params = { ids: selectionKey };
+    if (assignDepartmentId) params.departmentId = assignDepartmentId;
+    setPreview((prev) => ({ ...prev, loading: true, error: '' }));
+    api.get('/finance/card-ledger/commission', { params })
+      .then((res) => { if (!cancelled) setPreview({ loading: false, data: res.data, error: '' }); })
+      .catch((error) => {
+        if (!cancelled) setPreview({ loading: false, data: null, error: error.response?.data?.error || 'Failed to load the Credit Card Rate' });
+      });
+    return () => { cancelled = true; };
+  }, [realiseOpen, selectionKey, assignDepartmentId]);
 
   const minRealiseDate = useMemo(
     () => selectedRows.reduce((max, r) => (r.transaction_date > max ? r.transaction_date : max), ''),
@@ -241,48 +346,78 @@ const CardLedger = () => {
     [selectedRows]
   );
 
-  // Realise Amount validation + the auto-calculated Remaining Balance (read-only).
+  const groups = preview.data?.groups || [];
+  const problems = preview.data?.problems || [];
+  const commissionCents = preview.data && preview.data.expected_commission !== null && preview.data.expected_commission !== undefined
+    ? toCents(preview.data.expected_commission) : null;
+  const commissionReady = !preview.loading && !preview.error && commissionCents !== null;
+  const maxRealiseCents = commissionReady ? totalCents - commissionCents : null;
+
+  // Realise Amount validation + the auto-calculated Remaining Balance / Bank Charge.
   const amountCheck = useMemo(() => {
     if (String(realiseAmountText).trim() === '') return { error: '', cents: null };
     const parsed = parseMoney(realiseAmountText);
     if (parsed.error) return { error: parsed.error, cents: null };
-    if (parsed.cents >= totalCents) {
-      return { error: `Realise Amount must be less than the Total Transaction Amount (Rs. ${fmtCents(totalCents)})`, cents: null };
+    if (maxRealiseCents !== null && parsed.cents > maxRealiseCents) {
+      return {
+        error: `Realise Amount cannot be more than Rs. ${fmtCents(maxRealiseCents)} (Total Transaction Amount - Expected Commission)`,
+        cents: null
+      };
     }
     return { error: '', cents: parsed.cents };
-  }, [realiseAmountText, totalCents]);
-  const remainingCents = amountCheck.cents === null ? null : totalCents - amountCheck.cents;
+  }, [realiseAmountText, maxRealiseCents]);
+  const remainingCents = amountCheck.cents === null || maxRealiseCents === null ? null : maxRealiseCents - amountCheck.cents;
+
+  const departmentText = groups.length > 0
+    ? groups.map((g) => g.department_name).join(', ')
+    : (unassignedCount > 0 ? 'Not assigned' : '');
+  const rateText = groups.length === 0 ? ''
+    : groups.length === 1
+      ? (groups[0].rate === null ? 'No active rate' : fmtRate(groups[0].rate))
+      : groups.map((g) => `${g.department_name} ${g.rate === null ? 'no active rate' : fmtRate(g.rate)}`).join(' · ');
 
   const handleRealise = async (event) => {
     event.preventDefault();
-    if (realising || !group) return; // one submit at a time
+    if (realising || submittingRef.current || !group) return; // one submit at a time
 
     if (!group.company_id) return setRealiseError('Company is required');
     if (!group.bank_id) return setRealiseError('Bank Account is required');
     if (selectedRows.length === 0) return setRealiseError('Please select at least one card transaction');
-    if (String(realiseAmountText).trim() === '') return setRealiseError('Realise Amount is required');
-    if (amountCheck.error) return setRealiseError(amountCheck.error);
+    if (unassignedCount > 0 && !assignDepartmentId) {
+      return setRealiseError('Select the Branch / Department of the transactions that have none');
+    }
+    if (preview.loading) return setRealiseError('Please wait - the Credit Card Rate is still loading');
+    if (preview.error) return setRealiseError(preview.error);
+    if (problems.length > 0) return setRealiseError(problems.join(' '));
     if (!realiseDate) return setRealiseError('Realise Date is required');
     if (!isRealDate(realiseDate)) return setRealiseError('Please enter a valid Realise Date');
     if (realiseDate < minRealiseDate) {
       return setRealiseError('Realise Date cannot be earlier than the transaction date');
     }
+    if (String(realiseAmountText).trim() === '') return setRealiseError('Realise Amount is required');
+    if (amountCheck.error) return setRealiseError(amountCheck.error);
 
+    submittingRef.current = true;
     setRealising(true);
     setRealiseError('');
     try {
-      // Only the ids, the typed Realise Amount and the date are sent: the server
-      // works out the total and the remaining balance itself.
-      const response = await api.post('/finance/card-ledger/realise', {
+      // Only the ids, the typed Realise Amount, the date (and the department for
+      // unassigned rows) are sent: the server works out every figure itself.
+      const body = {
         transaction_ids: selectedRows.map((r) => r.id),
         realise_amount: (amountCheck.cents / 100).toFixed(2),
         realise_date: realiseDate
-      });
+      };
+      if (unassignedCount > 0) body.department_id = Number(assignDepartmentId);
+      const response = await api.post('/finance/card-ledger/realise', body);
       const t = response.data?.totals;
+      const parts = [];
+      if (toCents(t?.expectedCommission) > 0) parts.push(`Visa Card Payment commission Rs. ${fmtMoney(t.expectedCommission)}`);
+      if (toCents(t?.bankCharge) > 0) parts.push(`Credit Card Bank Charge Rs. ${fmtMoney(t.bankCharge)}`);
       showPopup(
         'success',
-        `Realised Rs. ${fmtMoney(t?.realiseAmount)} on ${fmtDate(realiseDate)} into ${bankLabel(group)}. `
-        + `Rs. ${fmtMoney(t?.remainingBalance)} moved to Hidden Expenses (Visa Card Payment).`
+        `Realised Rs. ${fmtMoney(t?.realiseAmount)} on ${fmtDate(realiseDate)} into ${bankLabel(group)}.`
+        + (parts.length ? ` Recorded in Hidden Expenses: ${parts.join('; ')}.` : '')
       );
       setRealiseOpen(false);
       setSelectedIds([]);
@@ -292,15 +427,28 @@ const CardLedger = () => {
       // A row may have been realised by someone else meanwhile - refresh the lists.
       fetchPending();
     } finally {
+      submittingRef.current = false;
       setRealising(false);
     }
   };
 
   // ---------------------------------------------------------------- render
   const isPending = tab === 'Pending';
-  const setPendingFilter = (name) => (e) => { setPendingFilters((p) => ({ ...p, [name]: e.target.value })); };
+  const setPendingFilter = (name) => (e) => {
+    const { value } = e.target;
+    setPendingFilters((p) => {
+      const next = { ...p, [name]: value };
+      if (name === 'companyId' && p.bankId) {
+        // Keep the Bank Account only if it belongs to the newly chosen Company.
+        const company = companies.find((c) => String(c.id) === String(value));
+        const bank = allBanks.find((b) => String(b.id) === String(p.bankId));
+        if (company && bank && !sameName(bank.company, company.name)) next.bankId = '';
+      }
+      return next;
+    });
+  };
   const setCompletedFilter = (name) => (e) => { setCompletedFilters((p) => ({ ...p, [name]: e.target.value })); };
-  const pendingCols = canWrite ? 7 : 6;
+  const pendingCols = canWrite ? 9 : 8;
 
   return (
     <div className="page-container cl-page">
@@ -325,16 +473,31 @@ const CardLedger = () => {
         {/* ------------------------------ PENDING ------------------------------ */}
         {isPending && (
           <>
-            <div className="cl-filters">
+            <div className="cl-filters cl-filters-row">
+              <div className="form-group">
+                <label htmlFor="cl-company">Company</label>
+                <select id="cl-company" value={pendingFilters.companyId} onChange={setPendingFilter('companyId')} className="form-select">
+                  <option value="">All companies</option>
+                  {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
               <div className="form-group">
                 <label htmlFor="cl-bank">Bank Account</label>
                 <select id="cl-bank" value={pendingFilters.bankId} onChange={setPendingFilter('bankId')} className="form-select">
                   <option value="">All bank accounts</option>
-                  {allBanks.map((b) => (
-                    <option key={b.id} value={b.id}>{b.company} - {b.bank_name}{b.account_number ? `  ${b.account_number}` : ''}</option>
+                  {pendingBanks.map((b) => (
+                    <option key={b.id} value={b.id}>{pendingCompany ? '' : `${b.company} - `}{b.bank_name}{b.account_number ? `  ${b.account_number}` : ''}</option>
                   ))}
                 </select>
               </div>
+              <DimensionFilters
+                idPrefix="cl"
+                departments={departments}
+                departmentId={pendingFilters.departmentId}
+                onDepartment={setPendingFilter('departmentId')}
+                shiftNo={pendingShift}
+                onShiftNo={(e) => setPendingShift(e.target.value)}
+              />
               <div className="form-group">
                 <label htmlFor="cl-from">Transaction Date From</label>
                 <input id="cl-from" type="date" value={pendingFilters.dateFrom} onChange={setPendingFilter('dateFrom')} className="form-input" />
@@ -357,10 +520,24 @@ const CardLedger = () => {
                 <table className="report-table cl-table">
                   <thead>
                     <tr>
-                      {canWrite && <th className="cl-check-col" aria-label="Select" />}
+                      {canWrite && (
+                        <th className="cl-check-col">
+                          <input
+                            ref={selectAllRef}
+                            type="checkbox"
+                            checked={allEligibleSelected}
+                            onChange={toggleAll}
+                            disabled={pending.transactions.length === 0}
+                            aria-label="Select all card transactions"
+                            title="Select all transactions shown that can be realised together"
+                          />
+                        </th>
+                      )}
                       <th>Transaction Date</th>
                       <th>Company</th>
                       <th>Bank Account</th>
+                      <th>Branch / Department</th>
+                      <th>Shift No</th>
                       <th>Reference No</th>
                       <th>Remark</th>
                       <th className="cl-num">Amount (Rs.)</th>
@@ -371,8 +548,7 @@ const CardLedger = () => {
                       <tr><td colSpan={pendingCols} className="cl-empty">No pending card transactions.</td></tr>
                     ) : pending.transactions.map((row) => {
                       const checked = selectedIds.includes(row.id);
-                      const otherGroup = !!group && !checked
-                        && (Number(row.company_id) !== Number(group.company_id) || Number(row.bank_id) !== Number(group.bank_id));
+                      const otherGroup = !!group && !checked && !sameGroup(row, group);
                       return (
                         <tr
                           key={row.id}
@@ -392,6 +568,8 @@ const CardLedger = () => {
                           <td>{fmtDate(row.transaction_date)}</td>
                           <td>{row.company_name}</td>
                           <td>{bankLabel(row)}</td>
+                          <td>{row.department_name || <span className="cl-muted">Not assigned</span>}</td>
+                          <td>{row.shift_no || ''}</td>
                           <td>{row.reference_number || ''}</td>
                           <td>{row.remark || ''}</td>
                           <td className="cl-num">{fmtMoney(row.amount)}</td>
@@ -417,6 +595,7 @@ const CardLedger = () => {
                   {group ? (
                     <>
                       <strong>{selectedRows.length}</strong> selected &middot; Company: <strong>{group.company_name}</strong> &middot; Bank Account: <strong>{bankLabel(group)}</strong>
+                      &middot; Rs. <strong>{fmtCents(totalCents)}</strong>
                       <button type="button" className="cl-link-btn" onClick={() => setSelectedIds([])}>Clear</button>
                     </>
                   ) : 'No transactions selected'}
@@ -432,7 +611,7 @@ const CardLedger = () => {
         {/* ----------------------------- COMPLETED ----------------------------- */}
         {!isPending && (
           <>
-            <div className="cl-filters cl-filters-4">
+            <div className="cl-filters cl-filters-row">
               <div className="form-group">
                 <label htmlFor="cl-c-company">Company</label>
                 <select id="cl-c-company" value={completedFilters.companyId} onChange={setCompletedFilter('companyId')} className="form-select">
@@ -451,6 +630,14 @@ const CardLedger = () => {
                   ))}
                 </select>
               </div>
+              <DimensionFilters
+                idPrefix="cl-c"
+                departments={departments}
+                departmentId={completedFilters.departmentId}
+                onDepartment={setCompletedFilter('departmentId')}
+                shiftNo={completedShift}
+                onShiftNo={(e) => setCompletedShift(e.target.value)}
+              />
               <div className="form-group">
                 <label htmlFor="cl-c-from">Realise Date From</label>
                 <input id="cl-c-from" type="date" value={completedFilters.dateFrom} onChange={setCompletedFilter('dateFrom')} className="form-input" />
@@ -473,14 +660,16 @@ const CardLedger = () => {
                       <th>Transaction Date</th>
                       <th>Realise Date</th>
                       <th>Reference No</th>
+                      <th>Branch / Department</th>
                       <th className="cl-num">Total Transaction Amount</th>
+                      <th className="cl-num">Expected Commission</th>
                       <th className="cl-num">Realise Amount</th>
-                      <th className="cl-num">Remaining Balance</th>
+                      <th className="cl-num">Remaining Balance / Bank Charge</th>
                     </tr>
                   </thead>
                   <tbody>
                     {completed.transactions.length === 0 ? (
-                      <tr><td colSpan={7} className="cl-empty">No completed card transactions.</td></tr>
+                      <tr><td colSpan={8} className="cl-empty">No completed card transactions.</td></tr>
                     ) : completed.transactions.map((row) => (
                       <tr key={row.id}>
                         <td className="cl-stack">
@@ -489,10 +678,13 @@ const CardLedger = () => {
                         <td className="cl-realise-date">{fmtDate(row.realise_date)}</td>
                         <td className="cl-stack">
                           {(row.cards || []).length > 0
-                            ? row.cards.map((card) => <div key={card.id}>{card.reference_number || '\u2014'}</div>)
+                            ? row.cards.map((card) => <div key={card.id}>{card.reference_number || '—'}</div>)
                             : (row.reference_number || '')}
                         </td>
+                        <td>{(row.departments || []).join(', ') || '—'}</td>
                         <td className="cl-num">{fmtMoney(row.total_amount)}</td>
+                        {/* Realisations saved before the commission split have no commission figure. */}
+                        <td className="cl-num">{row.commission_amount === null || row.commission_amount === undefined ? '—' : fmtMoney(row.commission_amount)}</td>
                         <td className="cl-num">{fmtMoney(row.realise_amount)}</td>
                         <td className="cl-num">{fmtMoney(row.remaining_balance)}</td>
                       </tr>
@@ -501,8 +693,9 @@ const CardLedger = () => {
                   {completed.transactions.length > 0 && completed.totals && (
                     <tfoot>
                       <tr>
-                        <td colSpan={3} className="cl-total-label">Total</td>
+                        <td colSpan={4} className="cl-total-label">Total</td>
                         <td className="cl-num cl-total">{fmtMoney(completed.totals.total_amount)}</td>
+                        <td className="cl-num cl-total">{fmtMoney(completed.totals.commission_amount)}</td>
                         <td className="cl-num cl-total">{fmtMoney(completed.totals.realise_amount)}</td>
                         <td className="cl-num cl-total">{fmtMoney(completed.totals.remaining_balance)}</td>
                       </tr>
@@ -532,12 +725,13 @@ const CardLedger = () => {
               <div className="cl-modal-body">
                 <section aria-labelledby="cl-selected-title">
                   <h4 id="cl-selected-title" className="cl-section-label">Selected Transactions</h4>
-                  <div className="cl-table-wrap">
+                  <div className="cl-table-wrap cl-selected-wrap">
                     <table className="report-table cl-table cl-realise-table">
                       <thead>
                         <tr>
                           <th>Transaction Date</th>
                           <th>Reference No</th>
+                          <th>Branch / Department</th>
                           <th className="cl-num">Amount</th>
                         </tr>
                       </thead>
@@ -546,6 +740,7 @@ const CardLedger = () => {
                           <tr key={row.id}>
                             <td>{fmtDate(row.transaction_date)}</td>
                             <td>{row.reference_number || ''}</td>
+                            <td>{row.department_name || <span className="cl-muted">Not assigned</span>}</td>
                             <td className="cl-num">{fmtMoney(row.amount)}</td>
                           </tr>
                         ))}
@@ -554,63 +749,119 @@ const CardLedger = () => {
                   </div>
                 </section>
 
-                <div className="form-group">
-                  <label htmlFor="cl-total">Total Transaction Amount</label>
-                  <input
-                    id="cl-total"
-                    type="text"
-                    readOnly
-                    tabIndex={-1}
-                    value={fmtCents(totalCents)}
-                    className="form-input cl-amount-input cl-readonly"
-                  />
+                <div className="cl-form-grid">
+                  <div className="form-group">
+                    <label htmlFor="cl-total">Total Transaction Amount</label>
+                    <input id="cl-total" type="text" readOnly tabIndex={-1} value={fmtCents(totalCents)} className="form-input cl-amount-input cl-readonly" />
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="cl-realise-department">Branch / Department</label>
+                    <input id="cl-realise-department" type="text" readOnly tabIndex={-1} value={departmentText} className="form-input cl-readonly" />
+                  </div>
+
+                  {unassignedCount > 0 && (
+                    <div className="form-group cl-span-2">
+                      <label htmlFor="cl-assign-department">
+                        Branch / Department for {unassignedCount === 1 ? 'the transaction' : `the ${unassignedCount} transactions`} without one <span className="required">*</span>
+                      </label>
+                      <select
+                        id="cl-assign-department"
+                        value={assignDepartmentId}
+                        onChange={(e) => { setAssignDepartmentId(e.target.value); setRealiseError(''); }}
+                        className="form-input"
+                      >
+                        <option value="">Select Branch / Department</option>
+                        {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                      </select>
+                      <span className="form-helper">Saved on those transactions when they are realised; its Credit Card Rate is applied.</span>
+                    </div>
+                  )}
+
+                  <div className="form-group">
+                    <label htmlFor="cl-rate">Credit Card Rate (%)</label>
+                    <input id="cl-rate" type="text" readOnly tabIndex={-1} value={preview.loading ? 'Loading...' : rateText} className="form-input cl-readonly" />
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="cl-commission">Expected Commission</label>
+                    <input
+                      id="cl-commission"
+                      type="text"
+                      readOnly
+                      tabIndex={-1}
+                      value={commissionReady ? fmtCents(commissionCents) : ''}
+                      placeholder={preview.loading ? 'Loading...' : '0.00'}
+                      className="form-input cl-amount-input cl-readonly"
+                    />
+                  </div>
                 </div>
 
-                <div className="form-group">
-                  <label htmlFor="cl-realise-amount">Realise Amount <span className="required">*</span></label>
-                  <input
-                    id="cl-realise-amount"
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    inputMode="decimal"
-                    value={realiseAmountText}
-                    onChange={(e) => { setRealiseAmountText(e.target.value); setRealiseError(''); }}
-                    placeholder="0.00"
-                    className={`form-input cl-amount-input ${amountCheck.error ? 'cl-input-invalid' : ''}`}
-                    aria-invalid={!!amountCheck.error}
-                    autoFocus
-                  />
-                  {amountCheck.error && <span className="form-error">{amountCheck.error}</span>}
-                </div>
+                {groups.length > 1 && commissionReady && (
+                  <ul className="cl-breakdown" aria-label="Commission by Branch / Department">
+                    {groups.map((g) => (
+                      <li key={g.department_id}>
+                        <span>{g.department_name}: Rs. {fmtMoney(g.amount)} &times; {fmtRate(g.rate)}</span>
+                        <strong>Rs. {fmtMoney(g.expected_commission)}</strong>
+                      </li>
+                    ))}
+                  </ul>
+                )}
 
-                <div className="form-group">
-                  <label htmlFor="cl-remaining">Remaining Balance</label>
-                  <input
-                    id="cl-remaining"
-                    type="text"
-                    readOnly
-                    tabIndex={-1}
-                    value={remainingCents === null ? '' : fmtCents(remainingCents)}
-                    placeholder="0.00"
-                    className="form-input cl-amount-input cl-readonly"
-                  />
-                  <span className="form-helper">
-                    Total Transaction Amount &minus; Realise Amount. Recorded under Expenses &rarr; Hidden Expenses as &ldquo;Visa Card Payment&rdquo;.
-                  </span>
-                </div>
+                {(preview.error || problems.length > 0) && (
+                  <div className="cl-modal-error" role="alert">
+                    {preview.error || problems.map((p) => <div key={p}>{p}</div>)}
+                  </div>
+                )}
 
-                <div className="form-group">
-                  <label htmlFor="cl-realise-date">Realise Date <span className="required">*</span></label>
-                  <input
-                    id="cl-realise-date"
-                    type="date"
-                    min={minRealiseDate}
-                    value={realiseDate}
-                    onChange={(e) => { setRealiseDate(e.target.value); setRealiseError(''); }}
-                    className="form-input"
-                  />
-                  <span className="form-helper">The Realise Amount is added to the Bank Ledger on this date. This cannot be repeated.</span>
+                <div className="cl-form-grid">
+                  <div className="form-group">
+                    <label htmlFor="cl-realise-date">Realise Date <span className="required">*</span></label>
+                    <input
+                      id="cl-realise-date"
+                      type="date"
+                      min={minRealiseDate}
+                      value={realiseDate}
+                      onChange={(e) => { setRealiseDate(e.target.value); setRealiseError(''); }}
+                      className="form-input"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="cl-realise-amount">Realise Amount <span className="required">*</span></label>
+                    <input
+                      id="cl-realise-amount"
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      inputMode="decimal"
+                      value={realiseAmountText}
+                      onChange={(e) => { setRealiseAmountText(e.target.value); setRealiseError(''); }}
+                      placeholder={maxRealiseCents !== null ? `max ${fmtCents(maxRealiseCents)}` : '0.00'}
+                      className={`form-input cl-amount-input ${amountCheck.error ? 'cl-input-invalid' : ''}`}
+                      aria-invalid={!!amountCheck.error}
+                      autoFocus
+                    />
+                  </div>
+                  {amountCheck.error && <span className="form-error cl-span-2">{amountCheck.error}</span>}
+
+                  <div className="form-group cl-span-2">
+                    <label htmlFor="cl-remaining">Remaining Balance / Bank Charge</label>
+                    <input
+                      id="cl-remaining"
+                      type="text"
+                      readOnly
+                      tabIndex={-1}
+                      value={remainingCents === null ? '' : fmtCents(remainingCents)}
+                      placeholder="0.00"
+                      className="form-input cl-amount-input cl-readonly"
+                    />
+                    <span className="form-helper">
+                      Total Transaction Amount &minus; Realise Amount &minus; Expected Commission. The Realise Amount is added to the
+                      Bank Ledger on the Realise Date; the Expected Commission is recorded under Expenses &rarr; Hidden Expenses as
+                      &ldquo;Visa Card Payment commission&rdquo; and the Bank Charge (when greater than zero) as &ldquo;Credit Card Bank Charge&rdquo;.
+                    </span>
+                  </div>
                 </div>
 
                 {realiseError && <div className="cl-modal-error" role="alert">{realiseError}</div>}
@@ -618,7 +869,7 @@ const CardLedger = () => {
 
               <div className="cl-modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={closeRealise} disabled={realising}>Cancel</button>
-                <button type="submit" className="btn btn-primary" disabled={realising}>
+                <button type="submit" className="btn btn-primary" disabled={realising || preview.loading}>
                   {realising ? <><FontAwesomeIcon icon={faSpinner} spin /> Realising...</> : <><FontAwesomeIcon icon={faCheck} /> Confirm Realise</>}
                 </button>
               </div>

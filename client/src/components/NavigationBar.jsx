@@ -82,6 +82,7 @@ const NavigationBar = () => {
         path.startsWith('/bank-charges-type-management') ||
         path.startsWith('/finance/receive-types') ||
         path.startsWith('/other-ledgers-management') ||
+        path.startsWith('/credit-card-rate-management') ||
         path.startsWith('/admin/employees')) {
       setActiveModule('management');
     } else if (path.startsWith('/admin/password')) {
@@ -177,6 +178,7 @@ const NavigationBar = () => {
       {can('/bank-charges-type-management') && <li><NavLink to="/bank-charges-type-management" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faUniversity} /></span><span>Bank Charges Type Management</span></NavLink></li>}
       {can('/finance/receive-types') && <li><NavLink to="/finance/receive-types" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faCashRegister} /></span><span>Receive Types</span></NavLink></li>}
       {can('/other-ledgers-management') && <li><NavLink to="/other-ledgers-management" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faBookOpen} /></span><span>Other Ledgers</span></NavLink></li>}
+      {can('/credit-card-rate-management') && <li><NavLink to="/credit-card-rate-management" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faCreditCard} /></span><span>Credit Card Rate</span></NavLink></li>}
       {can('/admin/employees') && <li><NavLink to="/admin/employees" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faIdCard} /></span><span>Employee Management</span></NavLink></li>}
     </>
   );

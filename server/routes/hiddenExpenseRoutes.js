@@ -15,7 +15,8 @@ const pool = require('../config/db');
 const authenticate = require('../middleware/authenticate');
 const restrictRoles = require('../middleware/restrictRoles');
 
-const ALLOWED_TYPES = ['PickMe', 'Credit Card Charge', 'Visa Card Payment'];
+// The last two are written by the Card Ledger realisation (services/cardLedgerService.js).
+const ALLOWED_TYPES = ['PickMe', 'Credit Card Charge', 'Visa Card Payment', 'Visa Card Payment commission', 'Credit Card Bank Charge'];
 
 router.use(authenticate, restrictRoles('Store Keeper', 'Stores'));
 

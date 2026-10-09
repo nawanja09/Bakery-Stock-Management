@@ -120,6 +120,7 @@ import FundTransfer from './components/Finance/FundTransfer';
 import BankTransfer from './components/Finance/BankTransfer';
 import ReceiveTypeManagement from './components/Finance/ReceiveTypeManagement';
 import OtherLedgerManagement from './components/Finance/OtherLedgerManagement';
+import CreditCardRateManagement from './components/Finance/CreditCardRateManagement';
 import OtherLedgers from './components/Finance/OtherLedgers';
 import ExpensesChequeRegistry from './components/Finance/ExpensesChequeRegistry';
 import StaffLoans from './components/Finance/StaffLoans';
@@ -341,6 +342,7 @@ function App() {
             <Route path="/finance/bank-transfer" element={<FinanceRoute><BankTransfer /></FinanceRoute>} />
             <Route path="/finance/receive-types" element={<FinanceRoute><ReceiveTypeManagement /></FinanceRoute>} />
             <Route path="/other-ledgers-management" element={<FinanceRoute><OtherLedgerManagement /></FinanceRoute>} />
+            <Route path="/credit-card-rate-management" element={<FinanceRoute><CreditCardRateManagement /></FinanceRoute>} />
             <Route path="/finance/other-ledgers" element={<FinanceRoute><OtherLedgers /></FinanceRoute>} />
             <Route path="/finance/cheque-registry" element={<FinanceRoute><ExpensesChequeRegistry /></FinanceRoute>} />
             <Route path="/finance/staff-loans" element={<FinanceRoute><StaffLoans /></FinanceRoute>} />

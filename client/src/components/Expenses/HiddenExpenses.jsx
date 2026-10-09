@@ -27,7 +27,7 @@ import api from '../../api';
 
 const today = () => new Date().toISOString().split('T')[0];
 
-const TYPE_OPTIONS = ['PickMe', 'Credit Card Charge', 'Visa Card Payment'];
+const TYPE_OPTIONS = ['PickMe', 'Credit Card Charge', 'Visa Card Payment', 'Visa Card Payment commission', 'Credit Card Bank Charge'];
 
 const emptyForm = {
   expense_date: today(),

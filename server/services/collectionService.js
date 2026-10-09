@@ -16,7 +16,9 @@
 //   CARD          -> Card Ledger: Pending card transactions (cardLedgerService.
 //                    createPendingCardTransaction) - the unchanged Card Ledger
 //                    process then realises them into the bank. The Card Ledger needs
-//                    the settlement bank account, which the user picks.
+//                    the settlement bank account, which the user picks. Each row keeps
+//                    the collection's Branch / Department (its Credit Card Rate is
+//                    applied on realise) and Shift No (Card Ledger filters).
 //                    SHIFT: one Card Ledger row PER INDIVIDUAL POS CARD PAYMENT
 //                    (card.transactions[]), never the shift's card total. Each keeps
 //                    its own date, POS reference (receipt / order) and details, and
@@ -85,7 +87,7 @@ const optionalId = (value) => {
 const lockCollection = async (connection, id) => {
   const [rows] = await connection.query(
     `SELECT id, source_type, source_id, reference_no, DATE_FORMAT(collection_date, '%Y-%m-%d') AS collection_date,
-            shift_id, cashier_name, employee_name, company_id, pos_bank_account, pos_branch_name, department_id,
+            shift_id, shift_no, cashier_name, employee_name, company_id, pos_bank_account, pos_branch_name, department_id,
             cash_amount, card_amount, bank_amount, ar_amount, short_excess_amount, deduction_amount,
             total_amount, pos_total_amount, linked_collection_id, status, raw_payload
        FROM collections WHERE id = ? FOR UPDATE`,
@@ -215,6 +217,7 @@ const postShiftCardPayments = async (connection, ctx) => {
     const cardId = await createPendingCardTransaction(connection, {
       companyId: ctx.companyId, bankId: ctx.bankId, date: p.date || ctx.date, amount: p.amount,
       referenceNumber: cardPaymentReference(ctx.ref, p), remark: cardPaymentRemark(ctx, p).slice(0, 255),
+      departmentId: ctx.row.department_id, shiftNo: ctx.row.shift_no,
       createdBy: ctx.userId
     });
     try {
@@ -239,7 +242,8 @@ const postCard = async (connection, ctx) => {
   if (ctx.cardPayments) return postShiftCardPayments(connection, ctx);
   const cardId = await createPendingCardTransaction(connection, {
     companyId: ctx.companyId, bankId: ctx.bankId, date: ctx.date, amount: ctx.amount,
-    referenceNumber: ctx.ref, remark: `Collection - Card (${ctx.ref})`, createdBy: ctx.userId
+    referenceNumber: ctx.ref, remark: `Collection - Card (${ctx.ref})`, createdBy: ctx.userId,
+    departmentId: ctx.row.department_id, shiftNo: ctx.row.shift_no
   });
   await setLineLedger(connection, ctx.lineId, { card_transaction_id: cardId });
 };
