@@ -170,6 +170,8 @@ const API_RULES = [
   { prefix: '/staff-loans', modules: [M.FINANCE] },
   { prefix: '/receive-types', modules: [M.FINANCE] },
   { prefix: '/other-ledgers', modules: [M.FINANCE] },
+  // Management -> Credit Card Rate (card commission per Branch / Department).
+  { prefix: '/credit-card-rates', modules: [M.FINANCE] },
   // Collection: Accountant / Admin / Super Admin full, QB read-only (view-only rule
   // refuses every POST), every other role 403.
   { prefix: '/collections', modules: [M.COLLECTION] },

@@ -11,6 +11,8 @@ const cardLedgerController = require('../controllers/cardLedgerController');
 const { financeReadAccess, financeWriteAccess } = require('../middleware/moduleAccess');
 
 router.get('/', ...financeReadAccess, cardLedgerController.getCardTransactions);
+// Realise dialog preview (Branch / Department, Credit Card Rate, Expected Commission).
+router.get('/commission', ...financeWriteAccess, cardLedgerController.getCommissionPreview);
 // Batch realise: one request realises every selected card transaction in ONE DB transaction.
 router.post('/realise', ...financeWriteAccess, cardLedgerController.realiseTransactions);
 

@@ -164,6 +164,7 @@ export const ROUTE_RULES = [
   rule('/bank-charges-type-management', { all: [M.MANAGEMENT], any: FIN_MASTER }),
   rule('/finance/receive-types', { all: [M.MANAGEMENT], any: [M.FINANCE] }),
   rule('/other-ledgers-management', { all: [M.MANAGEMENT], any: [M.FINANCE] }),
+  rule('/credit-card-rate-management', { all: [M.MANAGEMENT], any: [M.FINANCE] }),
   rule('/items/add', { all: [M.MANAGEMENT], any: RM, write: true }),
   rule('/items/edit', { all: [M.MANAGEMENT], any: RM, write: true }),
 
@@ -266,7 +267,8 @@ export const NAV_MODULES = Object.freeze({
       '/items', '/item-types', '/suppliers', '/departments', '/companies',
       '/adjustments/payment-methods', '/expenses/bank-details', '/expense-types-management',
       '/sub-expense-types-management', '/expense-payees-management',
-      '/bank-charges-type-management', '/finance/receive-types', '/other-ledgers-management', '/admin/employees'
+      '/bank-charges-type-management', '/finance/receive-types', '/other-ledgers-management', '/credit-card-rate-management',
+      '/admin/employees'
     ]
   },
   raw: {

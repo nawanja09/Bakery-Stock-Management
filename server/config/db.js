@@ -1088,9 +1088,11 @@ const ensureCardLedgerSchema = async () => {
     `);
 
     // Hidden Expenses gain the "Visa Card Payment" type (existing values are kept).
+    // The list must include every later type too (ensureCardCommissionSchema),
+    // otherwise this startup step would shrink the ENUM again.
     try {
       await pool.query(
-        "ALTER TABLE hidden_expenses MODIFY COLUMN `type` ENUM('PickMe','Credit Card Charge','Visa Card Payment') NOT NULL"
+        "ALTER TABLE hidden_expenses MODIFY COLUMN `type` ENUM('PickMe','Credit Card Charge','Visa Card Payment','Visa Card Payment commission','Credit Card Bank Charge') NOT NULL"
       );
     } catch (enumErr) {
       console.warn('Hidden Expenses type update skipped:', enumErr.message);
@@ -1102,7 +1104,7 @@ const ensureCardLedgerSchema = async () => {
   }
 };
 
-ensureCardLedgerSchema();
+const cardLedgerReady = ensureCardLedgerSchema();
 
 // Management / Finance -> Other Ledgers (Director, AR, Short, Excess, ...).
 // Additive only. The source transaction (a finance_transactions row with
@@ -1460,5 +1462,83 @@ const ensureCollectionsSchema = async () => {
 };
 
 pool.collectionsSchemaReady = ensureCollectionsSchema();
+
+// Management -> Credit Card Rate, and the Card Ledger commission / bank charge
+// split (see migrations/030_credit_card_rates_card_commission.sql). Runs after
+// the Card Ledger and Collections schemas because it extends / reads both.
+// Additive only; every step is safe to re-run.
+const ensureCardCommissionSchema = async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS credit_card_rates (
+        id                   INT NOT NULL AUTO_INCREMENT,
+        department_id        INT NOT NULL,
+        rate                 DECIMAL(7,4) NOT NULL,
+        status               TINYINT(1) NOT NULL DEFAULT 1,
+        created_by           INT NULL,
+        updated_by           INT NULL,
+        created_at           TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at           TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        KEY idx_ccr_department_status (department_id, status),
+        CONSTRAINT fk_ccr_department FOREIGN KEY (department_id) REFERENCES departments(id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    for (const ddl of [
+      // One ACTIVE rate per department at database level (NULL for inactive rows).
+      // The API checks this too, so a server without generated columns still works.
+      "ALTER TABLE credit_card_rates ADD COLUMN IF NOT EXISTS active_department_id INT AS (IF(status = 1, department_id, NULL)) STORED AFTER status",
+      "ALTER TABLE credit_card_rates ADD UNIQUE KEY uq_ccr_active_department (active_department_id)",
+      "ALTER TABLE card_transactions ADD COLUMN IF NOT EXISTS department_id INT NULL AFTER bank_id",
+      "ALTER TABLE card_transactions ADD COLUMN IF NOT EXISTS shift_no VARCHAR(50) NULL AFTER department_id",
+      "ALTER TABLE card_transactions ADD COLUMN IF NOT EXISTS commission_rate DECIMAL(5,2) NULL AFTER realisation_id",
+      "ALTER TABLE card_transactions ADD KEY idx_card_tx_department (department_id)",
+      "ALTER TABLE card_realisations ADD COLUMN IF NOT EXISTS commission_amount DECIMAL(14,2) NULL AFTER realise_amount",
+      "ALTER TABLE card_realisations ADD COLUMN IF NOT EXISTS commission_expense_id INT NULL AFTER hidden_expense_id",
+      "ALTER TABLE card_realisations ADD COLUMN IF NOT EXISTS bank_charge_expense_id INT NULL AFTER commission_expense_id",
+      "ALTER TABLE card_realisations ADD UNIQUE KEY uq_card_real_commission_exp (commission_expense_id)",
+      "ALTER TABLE card_realisations ADD UNIQUE KEY uq_card_real_bank_charge_exp (bank_charge_expense_id)"
+    ]) {
+      try { await pool.query(ddl); } catch (ddlErr) { /* already applied */ }
+    }
+
+    // Hidden Expenses gain the two Card Ledger types (existing values are kept).
+    try {
+      await pool.query(
+        "ALTER TABLE hidden_expenses MODIFY COLUMN `type` ENUM('PickMe','Credit Card Charge','Visa Card Payment','Visa Card Payment commission','Credit Card Bank Charge') NOT NULL"
+      );
+    } catch (enumErr) {
+      console.warn('Hidden Expenses card commission types skipped:', enumErr.message);
+    }
+
+    // Branch / Department + Shift No of card rows created by Collections before
+    // these columns existed. Only empty values are filled. Idempotent.
+    try {
+      for (const link of [
+        'JOIN collection_card_payments l ON l.card_transaction_id = ct.id',
+        'JOIN collection_transactions l ON l.card_transaction_id = ct.id'
+      ]) {
+        await pool.query(`
+          UPDATE card_transactions ct
+            ${link}
+            JOIN collections c ON c.id = l.collection_id
+             SET ct.department_id = COALESCE(ct.department_id, c.department_id),
+                 ct.shift_no      = COALESCE(ct.shift_no, c.shift_no)
+           WHERE ct.department_id IS NULL OR ct.shift_no IS NULL
+        `);
+      }
+    } catch (backfillErr) {
+      console.warn('Card Ledger department / shift backfill skipped:', backfillErr.message);
+    }
+
+    console.log('Credit Card Rate schema ready');
+  } catch (error) {
+    console.warn('Credit Card Rate schema check skipped:', error.message);
+  }
+};
+
+pool.cardCommissionSchemaReady = Promise.all([cardLedgerReady, pool.collectionsSchemaReady])
+  .then(ensureCardCommissionSchema);
 
 module.exports = pool;
