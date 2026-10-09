@@ -2,7 +2,9 @@
 //
 // Expense Report Summary: an analytical summary of Analyst -> Expenses, grouped
 // by Expense Type -> Sub-Expense Type, with a View drill-down for each
-// combination. Read-only; /reports/expense-summary reads the same records as
+// combination. The table shows each Expense Type as an expandable parent row
+// (totals of its Sub-Expense Types, grouped here from the same API rows) with
+// its Sub-Expense Types indented underneath. Read-only; /reports/expense-summary reads the same records as
 // Analyst -> Expenses (Expenses-module methods only, never Purchasing).
 import React, { useState, useEffect, useCallback } from 'react';
 import { format, parseISO, startOfMonth, endOfMonth } from 'date-fns';
@@ -12,7 +14,7 @@ import { faEye } from '@fortawesome/free-solid-svg-icons';
 import './ExpensesReport.css';
 import './ExpenseSummaryReport.css';
 import api from '../../../api';
-import { formatCurrency } from '../../../utils/formatters';
+import { formatCurrency, formatNumber } from '../../../utils/formatters';
 import useExpenseTypes from '../useExpenseTypes';
 
 const today = new Date();
@@ -79,16 +81,29 @@ const formatDateSpan = (row) => {
 // Distinct values of a summary row, as plain text (exports / tooltips)
 const joinValues = (values) => (values || []).join(', ');
 
-// Distinct values of a summary row: the first value, "+N more" for the rest
-// (full list on hover / in View)
-const ValueList = ({ values }) => {
-  if (!values?.length) return <span className="esr-muted">{EMPTY_LABEL}</span>;
-  if (values.length === 1) return values[0];
-  return (
-    <span title={joinValues(values)}>
-      {values[0]} <span className="esr-muted esr-more">+{values.length - 1} more</span>
-    </span>
-  );
+const roundMoney = (n) => Math.round((Number(n) || 0) * 100) / 100;
+
+// Summary rows (one per Expense Type + Sub-Expense Type, already sorted by the
+// API) -> one group per Expense Type with its rows and summed totals. Names are
+// matched like the server's normalizeName (trimmed, case-insensitive).
+const groupByExpenseType = (rows) => {
+  const groups = [];
+  const byKey = new Map();
+  rows.forEach((row) => {
+    const key = String(row.expense_type || '').trim().toLowerCase();
+    let group = byKey.get(key);
+    if (!group) {
+      group = { key, expense_type: row.expense_type, rows: [], transaction_count: 0, without_vat_amount: 0, vat_amount: 0, total_amount: 0 };
+      byKey.set(key, group);
+      groups.push(group);
+    }
+    group.rows.push(row);
+    group.transaction_count += Number(row.transaction_count) || 0;
+    group.without_vat_amount = roundMoney(group.without_vat_amount + Number(row.without_vat_amount || 0));
+    group.vat_amount = roundMoney(group.vat_amount + Number(row.vat_amount || 0));
+    group.total_amount = roundMoney(group.total_amount + Number(row.total_amount || 0));
+  });
+  return groups;
 };
 
 const describePayment = (p) => [
@@ -110,6 +125,8 @@ const ExpenseSummaryReport = () => {
 
   const [summary, setSummary] = useState([]);
   const [totals, setTotals] = useState(null);
+  // Expense Types (group keys) whose Sub-Expense Types are hidden; all open by default
+  const [collapsed, setCollapsed] = useState(() => new Set());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [hasSearched, setHasSearched] = useState(false);
@@ -147,6 +164,7 @@ const ExpenseSummaryReport = () => {
       const res = await api.get('/reports/expense-summary', { params: toParams(nextFilters) });
       setSummary(res.data?.summary || []);
       setTotals(res.data?.totals || null);
+      setCollapsed(new Set());
       setAppliedFilters(nextFilters);
     } catch (err) {
       console.error('Error fetching expense summary:', err);
@@ -199,6 +217,12 @@ const ExpenseSummaryReport = () => {
       setDetailsLoading(false);
     }
   };
+
+  const toggleGroup = (key) => setCollapsed(prev => {
+    const next = new Set(prev);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    return next;
+  });
 
   const closeDetails = () => {
     setSelectedRow(null);
@@ -278,8 +302,8 @@ const ExpenseSummaryReport = () => {
   };
 
   return (
-    <div className="page-container">
-      <header className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+    <div className="page-container esr-page">
+      <header className="page-header esr-page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           <h2 style={{ textAlign: 'left', margin: 0 }}>Expense Report Summary</h2>
         </div>
@@ -296,7 +320,7 @@ const ExpenseSummaryReport = () => {
       </header>
 
       {/* Filters */}
-      <div className="card filters-section report-filter-bar" style={{ padding: 'var(--spacing-lg)', marginBottom: 'var(--spacing-lg)' }}>
+      <div className="card filters-section report-filter-bar esr-filter-panel">
         <div className="ledger-filter-row esr-filter-row">
           <div style={fieldStyle}>
             <label style={labelStyle}>Period</label>
@@ -400,73 +424,79 @@ const ExpenseSummaryReport = () => {
 
       {error && <div className="er-error">{error}</div>}
 
-      {/* Headline totals for the applied filters */}
-      {totals && !loading && (
-        <div className="esr-summary-grid">
-          <div className="card esr-summary-card"><span>Transactions</span><strong>{totals.transaction_count}</strong></div>
-          <div className="card esr-summary-card"><span>Amount Without VAT</span><strong>{formatCurrency(totals.without_vat_amount)}</strong></div>
-          <div className="card esr-summary-card"><span>VAT</span><strong>{formatCurrency(totals.vat_amount)}</strong></div>
-          <div className="card esr-summary-card esr-summary-card--primary"><span>Total Amount With VAT</span><strong>{formatCurrency(totals.total_amount)}</strong></div>
-        </div>
-      )}
-
       {/* Summary */}
       {loading ? (
         <div style={{ textAlign: 'center', padding: 'var(--spacing-2xl)', color: 'var(--color-text-secondary)' }}>Loading expense summary...</div>
       ) : summary.length > 0 ? (
-        <div className="card" style={{ display: 'flex', flexDirection: 'column' }}>
+        <div className="card esr-report-card" style={{ display: 'flex', flexDirection: 'column' }}>
           <div className="esr-filter-label">{appliedFilterLabel()}</div>
-          <div style={{ overflowX: 'auto' }}>
-            <table className="report-table esr-table esr-summary-table">
+          <div className="esr-table-scroll">
+            <table className="report-table esr-table esr-summary-table esr-tree-table">
               <thead>
                 <tr>
-                  <th>Date</th>
-                  <th>Reference No</th>
-                  <th>Expenses Method</th>
                   <th>Expenses Type</th>
                   <th>Sub Expenses Type</th>
-                  <th>Company</th>
-                  <th>Payment Type</th>
-                  <th>Description</th>
                   <th className="esr-num">Transaction Count</th>
                   <th className="esr-num">Amount Without VAT</th>
                   <th className="esr-num">VAT Amount</th>
-                  <th className="esr-num">Total Amount With VAT</th>
+                  <th className="esr-num">Total Amount</th>
                   <th className="esr-action">Action</th>
                 </tr>
               </thead>
-              <tbody>
-                {summary.map((row) => (
-                  <tr key={`${row.expense_type}\u0000${row.sub_expense_type || ''}`}>
-                    <td className="esr-nowrap">{formatDateSpan(row)}</td>
-                    <td className="esr-nowrap"><ValueList values={row.references} /></td>
-                    <td className="esr-nowrap"><ValueList values={row.expense_methods} /></td>
-                    <td>{row.expense_type || <span className="esr-muted">{EMPTY_LABEL}</span>}</td>
-                    <td>{row.sub_expense_type || <span className="esr-muted">{EMPTY_LABEL}</span>}</td>
-                    <td><ValueList values={row.companies} /></td>
-                    <td><ValueList values={row.payment_types} /></td>
-                    <td className="esr-desc"><ValueList values={row.descriptions} /></td>
-                    <td className="esr-num">{row.transaction_count}</td>
-                    <td className="esr-num">{formatCurrency(row.without_vat_amount)}</td>
-                    <td className="esr-num">{formatCurrency(row.vat_amount)}</td>
-                    <td className="esr-num"><strong>{formatCurrency(row.total_amount)}</strong></td>
-                    <td className="esr-action">
-                      <button
-                        className="btn btn-primary btn-sm"
-                        onClick={() => handleView(row)}
-                        title={`View ${comboLabel(row)} transactions`}
-                      >
-                        <FontAwesomeIcon icon={faEye} /> View
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
+              {groupByExpenseType(summary).map((group) => {
+                const isOpen = !collapsed.has(group.key);
+                const typeName = group.expense_type || EMPTY_LABEL;
+                return (
+                  <tbody key={group.key} className="esr-group">
+                    <tr className="esr-parent-row">
+                      <td colSpan="2">
+                        <button
+                          type="button"
+                          className="esr-toggle"
+                          onClick={() => toggleGroup(group.key)}
+                          aria-expanded={isOpen}
+                          title={`${isOpen ? 'Hide' : 'Show'} the Sub Expenses Types of ${typeName}`}
+                        >
+                          <span className="esr-toggle-icon" aria-hidden="true">{isOpen ? '▼' : '▶'}</span>
+                          {group.expense_type || <span className="esr-muted">{EMPTY_LABEL}</span>}
+                          <span className="esr-muted esr-group-count">
+                            ({group.rows.length} sub type{group.rows.length !== 1 ? 's' : ''})
+                          </span>
+                        </button>
+                      </td>
+                      <td className="esr-num">{formatNumber(group.transaction_count)}</td>
+                      <td className="esr-num">{formatCurrency(group.without_vat_amount)}</td>
+                      <td className="esr-num">{formatCurrency(group.vat_amount)}</td>
+                      <td className="esr-num"><strong>{formatCurrency(group.total_amount)}</strong></td>
+                      <td className="esr-action"></td>
+                    </tr>
+                    {isOpen && group.rows.map((row) => (
+                      <tr key={`${row.expense_type}\u0000${row.sub_expense_type || ''}`} className="esr-child-row">
+                        <td></td>
+                        <td className="esr-child-name">{row.sub_expense_type || <span className="esr-muted">{EMPTY_LABEL}</span>}</td>
+                        <td className="esr-num">{formatNumber(row.transaction_count)}</td>
+                        <td className="esr-num">{formatCurrency(row.without_vat_amount)}</td>
+                        <td className="esr-num">{formatCurrency(row.vat_amount)}</td>
+                        <td className="esr-num">{formatCurrency(row.total_amount)}</td>
+                        <td className="esr-action">
+                          <button
+                            className="btn btn-primary btn-sm esr-view-button"
+                            onClick={() => handleView(row)}
+                            title={`View ${comboLabel(row)} transactions`}
+                          >
+                            <FontAwesomeIcon icon={faEye} /> View
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                );
+              })}
               {totals && (
                 <tfoot>
                   <tr>
-                    <td colSpan="8"><strong>TOTAL</strong></td>
-                    <td className="esr-num"><strong>{totals.transaction_count}</strong></td>
+                    <td colSpan="2"><strong>TOTAL</strong></td>
+                    <td className="esr-num"><strong>{formatNumber(totals.transaction_count)}</strong></td>
                     <td className="esr-num"><strong>{formatCurrency(totals.without_vat_amount)}</strong></td>
                     <td className="esr-num"><strong>{formatCurrency(totals.vat_amount)}</strong></td>
                     <td className="esr-num"><strong>{formatCurrency(totals.total_amount)}</strong></td>
