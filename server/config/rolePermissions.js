@@ -175,6 +175,10 @@ const API_RULES = [
   // Collection: Accountant / Admin / Super Admin full, QB read-only (view-only rule
   // refuses every POST), every other role 403.
   { prefix: '/collections', modules: [M.COLLECTION] },
+  // POS / Restaurant connection status + one-time Connect: also the Finance role
+  // (its own RAVON accounts), which has no Collection module. The controller
+  // narrows it to Finance / Accountant / Admin / Super Admin (+ QB read).
+  { prefix: '/collections/integrations', modules: [ANY], denyRoles: [ROLES.STORES] },
   { prefix: '/incomes', modules: [M.FINANCE, M.ANALYST] },
 
   // ---- Finished Goods -------------------------------------------------------

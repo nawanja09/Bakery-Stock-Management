@@ -45,10 +45,20 @@
 //     posting impossible even under concurrency.
 //   * A record whose POS reference was already completed under another POS id
 //     is refused.
+//
+// POS and Restaurant (collections.source_system)
+//   Both systems go through exactly the same approval and ledger posting. Their
+//   ids and references are only unique within one system, so every generated
+//   key / reference carries the system: a Restaurant record can never collide
+//   with, overwrite or be reconciled against a POS record. POS references are
+//   byte-for-byte unchanged ("SHIFT-211-0104", card key "SHIFT:211:sale-1");
+//   Restaurant ones get the RST- / RESTAURANT: prefix ("RST-SHIFT-211-0104",
+//   card key "RESTAURANT:SHIFT:211:sale-1"), which also keeps them apart in the
+//   Card Ledger (its reference numbers are unique).
 const { recordCashTransaction, recordBankTransaction } = require('../utils/financeLedger');
 const { createPendingCardTransaction } = require('./cardLedgerService');
 const ol = require('./otherLedgerService');
-const { SOURCES, PAYMENT_METHODS, postingsOf, cardPaymentsOf, reconcileCard } = require('./collectionMapper');
+const { SYSTEMS, SOURCES, PAYMENT_METHODS, postingsOf, cardPaymentsOf, reconcileCard } = require('./collectionMapper');
 const { HttpError } = require('../utils/staffLoanUtils');
 
 const MAX_BATCH = 100;
@@ -57,9 +67,17 @@ const REFERENCE_MAX = 100;
 const REF_PREFIX = { [SOURCES.SHIFT]: 'SHIFT', [SOURCES.CREDIT_PAYMENT]: 'CP', [SOURCES.EMPLOYEE_DEDUCTION]: 'DED' };
 const FINANCE_REFERENCE_TYPE = 'COLLECTION';
 
-/** Reference stored on every ledger row: the original POS reference, e.g. "SHIFT-1042". */
+// Reference / key prefix per system. POS has none, so POS references are unchanged.
+const SYSTEM_REF_PREFIX = { [SYSTEMS.POS]: '', [SYSTEMS.RESTAURANT]: 'RST-' };
+const SYSTEM_KEY_PREFIX = { [SYSTEMS.POS]: '', [SYSTEMS.RESTAURANT]: 'RESTAURANT:' };
+const systemOf = (row) => (row && row.source_system) || SYSTEMS.POS;
+
+/**
+ * Reference stored on every ledger row: the original reference, e.g.
+ * "SHIFT-1042" (POS) or "RST-SHIFT-1042" (Restaurant).
+ */
 const ledgerReference = (row) =>
-  `${REF_PREFIX[row.source_type] || 'POS'}-${row.reference_no || row.source_id}`.slice(0, REFERENCE_MAX);
+  `${SYSTEM_REF_PREFIX[systemOf(row)] ?? ''}${REF_PREFIX[row.source_type] || 'POS'}-${row.reference_no || row.source_id}`.slice(0, REFERENCE_MAX);
 
 const label = (row) => ledgerReference(row);
 
@@ -86,7 +104,7 @@ const optionalId = (value) => {
 
 const lockCollection = async (connection, id) => {
   const [rows] = await connection.query(
-    `SELECT id, source_type, source_id, reference_no, DATE_FORMAT(collection_date, '%Y-%m-%d') AS collection_date,
+    `SELECT id, source_system, source_type, source_id, reference_no, DATE_FORMAT(collection_date, '%Y-%m-%d') AS collection_date,
             shift_id, shift_no, cashier_name, employee_name, company_id, pos_bank_account, pos_branch_name, department_id,
             cash_amount, card_amount, bank_amount, ar_amount, short_excess_amount, deduction_amount,
             total_amount, pos_total_amount, linked_collection_id, status, raw_payload
@@ -179,8 +197,9 @@ const postBank = async (connection, ctx) => {
   await setLineLedger(connection, ctx.lineId, { finance_transaction_id: await ol.lastInsertId(connection) });
 };
 
-// Unique key of one POS card payment across all collections.
-const posCardKey = (row, payment) => `${row.source_type}:${row.source_id}:${payment.key}`.slice(0, 191);
+// Unique key of one card payment across all collections (and both systems).
+const posCardKey = (row, payment) =>
+  `${SYSTEM_KEY_PREFIX[systemOf(row)] ?? ''}${row.source_type}:${row.source_id}:${payment.key}`.slice(0, 191);
 
 // Card Ledger reference of one card payment, from its POS transaction id:
 // "SHIFT-211-0104/SALE-20834", "SHIFT-211-0104/ORDER-614". The receipt number is
@@ -334,8 +353,8 @@ const approveCollections = async (connection, { items, userId }) => {
 
     // --- validation: everything is checked BEFORE the first write -------------
     if (!row.department_id && row.pos_branch_name) {
-      throw new HttpError(400, `Collection ${label(row)}: POS branch "${row.pos_branch_name}" is not mapped to a department. `
-        + 'Add or rename the department (or set RAVON_POS_BRANCH_DEPARTMENT_MAP), refresh from the POS, then approve.');
+      throw new HttpError(400, `Collection ${label(row)}: branch "${row.pos_branch_name}" is not mapped to a department. `
+        + 'Add or rename the department (or set RAVON_POS_BRANCH_DEPARTMENT_MAP), refresh, then approve.');
     }
     const [lines] = await connection.query('SELECT id FROM collection_transactions WHERE collection_id = ? LIMIT 1', [id]);
     if (lines.length > 0) throw new HttpError(409, `Collection ${label(row)} already has ledger postings`);
@@ -343,8 +362,8 @@ const approveCollections = async (connection, { items, userId }) => {
     if (row.reference_no) {
       const [sameRef] = await connection.query(
         `SELECT id FROM collections
-          WHERE source_type = ? AND reference_no = ? AND id <> ? AND status = 'completed' LIMIT 1`,
-        [row.source_type, row.reference_no, id]
+          WHERE source_type = ? AND reference_no = ? AND source_system = ? AND id <> ? AND status = 'completed' LIMIT 1`,
+        [row.source_type, row.reference_no, systemOf(row), id]
       );
       if (sameRef.length > 0) {
         throw new HttpError(409, `POS reference ${label(row)} was already approved as collection #${sameRef[0].id}`);
@@ -410,7 +429,7 @@ const approveCollections = async (connection, { items, userId }) => {
     let linkedRef = null;
     if (row.source_type === SOURCES.EMPLOYEE_DEDUCTION && row.linked_collection_id) {
       const [linked] = await connection.query(
-        'SELECT id, source_type, source_id, reference_no FROM collections WHERE id = ?', [row.linked_collection_id]
+        'SELECT id, source_system, source_type, source_id, reference_no FROM collections WHERE id = ?', [row.linked_collection_id]
       );
       if (linked.length) linkedRef = ledgerReference(linked[0]);
     }

@@ -2,15 +2,22 @@
 //
 // Collection module API (mounted at /api/collections; `collection` module access).
 //
-// POS authentication is handled by the backend (posAuthService): every POS call
-// uses the shared RAVON POS Finance session the backend logs in to (and renews)
-// automatically with RAVON_POS_USERNAME / RAVON_POS_PASSWORD. Users only log in
-// to Stock Management, never to the POS. Their role decides
-// what they may do here (rolePermissions.js: Accountant / Admin / Super Admin
-// full, QB view only). Neither the user's department nor any POS branch is used
-// as a filter - every POS department is imported.
+// Two source systems, one flow: RAVON POS and RAVON Restaurant records are
+// staged into the same `collections` table (source_system 'POS' | 'RESTAURANT')
+// and go through the identical approve / reject / restore and ledger posting.
 //
-//   GET  /pending?refresh=1   pulls the 3 POS endpoints (ALL departments) into
+// Authentication (integrationAuthService): there are no POS / Restaurant
+// credentials on the server. Every call uses the token of the latest Finance
+// session of that system (obtained when the Finance account logged in to BSMS,
+// or through "Connect" below), else the requesting user's own session. With
+// no valid session nothing new can be read - there is no background sync - and
+// the page says "Log in with the Finance account to sync". The user's role
+// decides what they may do here (rolePermissions.js: Accountant / Admin / Super
+// Admin full, QB view only). Neither the user's department nor any branch is
+// used as a filter - every department is imported.
+//
+//   GET  /pending?refresh=1   pulls the 3 endpoints of BOTH systems (ALL
+//                             departments, each system independently) into
 //                             Pending for the requested from_date..to_date (or
 //                             the default recent window) - never posts to a
 //                             ledger - then lists Pending with all filters
@@ -18,20 +25,28 @@
 //   GET  /rejected            rejected collections, from the BSMS database only
 //   GET  /?status=...         same lists, one endpoint (status=pending&refresh=1 pulls too)
 //   GET  /departments         Department filter options (from the Collection data)
-//   All lists take search, source, department_id, from_date, to_date, page, limit
-//   (combined with AND, filtered in SQL; the date range is inclusive).
+//   All lists take search, source, source_system (POS | RESTAURANT), department_id,
+//   from_date, to_date, page, limit (combined with AND, filtered in SQL; the
+//   date range is inclusive).
+//   GET  /integrations/status per system { configured, connected, state, username,
+//                             expiresAt, scope { branchIds, allBranches, warning } }
+//   POST /integrations/:provider/connect { username, password } - one-time
+//                             "Connect <POS | Restaurant> Finance account" (Finance /
+//                             Accountant / Admin / Super Admin, rate limited): logs in,
+//                             keeps ONLY the encrypted token, returns
+//                             { connected: true, username } - never the token or password
 //   GET  /:id                 one collection with its posted lines + ledger ids
 //   POST /approve             approve selected (ONE DB transaction, idempotent)
 //   POST /reject              reject selected (reason required)
 //   POST /restore             rejected -> pending
-// The POS token / credentials never appear in any response.
+// No token, password or Authorization header ever appears in a response.
 const pool = require('../config/db');
 const { HttpError } = require('../utils/staffLoanUtils');
 const { OtherLedgerError } = require('../services/otherLedgerService');
-const { getAuthStatus, getIntegrationScope } = require('../services/posAuthService');
-const { canWrite } = require('../config/rolePermissions');
+const integrationAuth = require('../services/integrationAuthService');
+const { canWrite, hasModule, MODULES } = require('../config/rolePermissions');
 const { syncCollections, MAX_RANGE_DAYS } = require('../services/collectionSyncService');
-const { SOURCES, cardPaymentsOf, reconcileCard } = require('../services/collectionMapper');
+const { SYSTEMS, SOURCES, cardPaymentsOf, reconcileCard } = require('../services/collectionMapper');
 const { posCardKey, cardPaymentReference, ledgerReference } = require('../services/collectionService');
 const { approveCollections, rejectCollections, restoreCollections } = require('../services/collectionService');
 
@@ -45,7 +60,7 @@ const sendError = (res, error, fallback) => {
 };
 
 const HEADER_SELECT = `
-  SELECT c.id, c.source_type, c.source_id, c.reference_no,
+  SELECT c.id, c.source_system, c.source_type, c.source_id, c.reference_no,
          DATE_FORMAT(c.collection_date, '%Y-%m-%d') AS collection_date,
          c.shift_id, c.shift_no, c.shift_reference, c.cashier_name, c.employee_id, c.employee_name,
          c.pos_company, c.company_id, co.name AS company_name,
@@ -56,7 +71,8 @@ const HEADER_SELECT = `
          c.pos_payment_method, c.pos_bank_account,
          c.cash_amount, c.card_amount, c.card_txn_count, c.card_txn_total, c.bank_amount, c.ar_amount, c.short_excess_amount,
          c.deduction_amount, c.total_amount, c.pos_total_amount,
-         c.linked_collection_id, lc.source_type AS linked_source_type, lc.source_id AS linked_source_id,
+         c.linked_collection_id, lc.source_system AS linked_source_system,
+         lc.source_type AS linked_source_type, lc.source_id AS linked_source_id,
          lc.reference_no AS linked_reference_no,
          c.status,
          DATE_FORMAT(c.approved_at, '%Y-%m-%d %H:%i') AS approved_at, au.name AS approved_by_name,
@@ -99,6 +115,7 @@ const POSTED_SELECT = `
 //                 method word (cash, card, bank/online, ar, short, excess)
 //   source        SHIFT | CREDIT_PAYMENT | EMPLOYEE_DEDUCTION
 //                 (also shift_collection / credit_payment / employee_deduction)
+//   source_system POS | RESTAURANT (also pos / restaurant; "" / all = both)
 //   department_id a department id, or "unmapped" (POS branch with no department)
 //   branch        POS branch name (narrows "unmapped" to one branch)
 //   from_date / to_date (YYYY-MM-DD) on the collection date (shift closing date /
@@ -133,8 +150,18 @@ const SEARCH_WORDS = [
   [/^(short\s*\/?\s*excess|short-excess)$/i, 'c.short_excess_amount <> 0'],
   [/^(shift|shift collection)$/i, "c.source_type = 'SHIFT'"],
   [/^credit payments?$/i, "c.source_type = 'CREDIT_PAYMENT'"],
-  [/^(deduction|employee deductions?)$/i, "c.source_type = 'EMPLOYEE_DEDUCTION'"]
+  [/^(deduction|employee deductions?)$/i, "c.source_type = 'EMPLOYEE_DEDUCTION'"],
+  [/^restaurant$/i, "c.source_system = 'RESTAURANT'"]
 ];
+const SYSTEM_ALIASES = {
+  pos: SYSTEMS.POS, ravon_pos: SYSTEMS.POS,
+  restaurant: SYSTEMS.RESTAURANT, rst: SYSTEMS.RESTAURANT, ravon_restaurant: SYSTEMS.RESTAURANT
+};
+const normalizeSystem = (value) => {
+  const key = String(value ?? '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+  if (!key || key === 'all') return null;
+  return SYSTEM_ALIASES[key] || undefined;
+};
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const DEFAULT_LIMIT = 100;
 const MAX_LIMIT = 500;
@@ -145,6 +172,7 @@ const parseFilters = (query) => {
   const f = {
     search: first(query.search) ? String(query.search).trim().slice(0, 100) : null,
     source: null,
+    system: null,
     departmentId: null,
     unmapped: false,
     branch: first(query.branch) ? String(query.branch).trim().slice(0, 255) : null,
@@ -157,6 +185,11 @@ const parseFilters = (query) => {
   if (source) {
     f.source = normalizeSource(source);
     if (!f.source) throw new HttpError(400, `Unknown source "${String(source).trim().slice(0, 50)}"`);
+  }
+  const system = first(query.source_system, query.system, query.sourceSystem);
+  if (system) {
+    f.system = normalizeSystem(system);
+    if (f.system === undefined) throw new HttpError(400, 'source_system must be POS or RESTAURANT');
   }
   const dept = first(query.department_id, query.departmentId);
   if (dept) {
@@ -180,6 +213,7 @@ const buildWhere = (status, f) => {
   if (f.branch) { clauses.push('c.pos_branch_name = ?'); params.push(f.branch); }
   if (f.fromDate) { clauses.push('c.collection_date >= ?'); params.push(f.fromDate); }
   if (f.toDate) { clauses.push('c.collection_date <= ?'); params.push(f.toDate); }
+  if (f.system) { clauses.push('c.source_system = ?'); params.push(f.system); }
   if (f.search) {
     const like = `%${f.search.replace(/[\\%_]/g, (m) => `\\${m}`)}%`;
     // The columns come from tables with different collations: convert the
@@ -279,38 +313,159 @@ const listByStatus = async (status, query) => {
   };
 };
 
-// GET /api/collections/pending?refresh=1&search=&source=&department_id=&from_date=&to_date=&page=&limit=
-// refresh=1 (opening the tab / Search) first pulls ALL POS departments into
-// Pending for the requested date range (from_date..to_date, inclusive), or the
-// recent default window when no range is given - so a range is never answered
-// from whatever happened to be loaded before. Then the list is filtered in SQL.
-// Staging only mirrors the POS (nothing is posted), so view-only roles may pull
-// too. Paging (page > 1) never pulls again.
+// Per-system sync result for the page: only safe fields (no tokens can reach here;
+// messages are scrubbed by the sync service).
+const systemResult = (s) => ({
+  system: s.system, label: s.label, configured: s.configured !== false, skipped: Boolean(s.skipped),
+  fetched: s.fetched, created: s.created, updated: s.updated, duplicates: s.duplicates,
+  unmapped: s.unmapped, invalid: s.invalid, excluded: s.excluded,
+  ...(s.message ? { message: s.message } : {}),
+  ...(s.error ? { error: s.error, code: s.code || null, partial: Boolean(s.partial) } : {}),
+  sources: s.sources
+});
+
+// GET /api/collections/pending?refresh=1&search=&source=&source_system=&department_id=&from_date=&to_date=&page=&limit=
+// refresh=1 (opening the tab / Search) first pulls ALL departments of BOTH
+// systems into Pending for the requested date range (from_date..to_date,
+// inclusive), or the recent default window when no range is given - so a range
+// is never answered from whatever happened to be loaded before. Then the list is
+// filtered in SQL. Staging only mirrors the source systems (nothing is posted),
+// so view-only roles may pull too. Paging (page > 1) never pulls again.
+// Response (unchanged fields + additions):
+//   sync.sources   POS sources, as before
+//   sync.systems   [{ system, fetched, created, updated, duplicates, unmapped, invalid, error?, code? }]
+//   pos            POS status, as before (+ connected / state / username / scope)
+//   integrations   { pos, restaurant } status of each system
 const getPending = async (req, res) => {
   try {
     await pool.collectionsSchemaReady;
-    const filters = parseFilters(req.query); // validates the dates before any POS call
+    const filters = parseFilters(req.query); // validates the dates before any external call
     if (filters.fromDate && filters.toDate
       && (Date.parse(filters.toDate) - Date.parse(filters.fromDate)) / 86400000 > MAX_RANGE_DAYS) {
       throw new HttpError(400, `The date range cannot be longer than ${MAX_RANGE_DAYS} days`);
     }
+    const userId = req.user?.userId || null;
     let sync = null;
     if (String(req.query.refresh ?? '0') === '1') {
       const startedAt = new Date().toISOString();
-      const { window, sources } = await syncCollections({ fromDate: filters.fromDate, toDate: filters.toDate });
-      sync = { startedAt, window, sources, ok: sources.every((s) => !s.error) };
+      const { window, sources, systems } = await syncCollections({ fromDate: filters.fromDate, toDate: filters.toDate, userId });
+      sync = {
+        startedAt,
+        window,
+        sources,
+        systems: systems.map(systemResult),
+        ok: systems.every((s) => s.skipped || !s.error)
+      };
     }
     const list = await listByStatus('pending', req.query);
-    const pos = getAuthStatus();
-    // The automatic POS Finance login failed (invalid credentials / POS login
-    // unavailable / not configured): say so on the page - the records already
-    // staged are still listed.
-    const authFailure = (sync?.sources || []).find((s) => s.errorCode);
-    if (authFailure) Object.assign(pos, { authError: true, code: authFailure.errorCode, message: authFailure.error });
-    if (sync && !authFailure) pos.scope = await getIntegrationScope(); // which POS branches the Finance account sees
-    res.json({ ...list, sync, viewOnly: !canWrite(req.user?.role), pos });
+    const integrations = await integrationAuth.getIntegrationStatus({ userId, withScope: Boolean(sync) });
+    // Backward compatible `pos` (configured / authenticated / code / message) plus
+    // authError when the POS part of this sync failed to authenticate - the
+    // records already staged are still listed.
+    const pos = { ...integrations.pos };
+    const posSystem = (sync?.systems || []).find((s) => s.system === SYSTEMS.POS);
+    if (posSystem?.code) Object.assign(pos, { authError: true, code: posSystem.code, message: posSystem.error });
+    for (const s of sync?.systems || []) {
+      const status = integrations[s.system.toLowerCase()];
+      if (status && s.code) Object.assign(status, { authError: true, syncCode: s.code, syncError: s.error });
+    }
+    res.json({ ...list, sync, viewOnly: !canWrite(req.user?.role), pos, integrations, backgroundSync: false });
   } catch (error) {
     sendError(res, error, 'Failed to load pending collections');
+  }
+};
+
+// ---------------------------------------------------------------------------
+// POS / Restaurant integration status and the one-time "Connect" action.
+// ---------------------------------------------------------------------------
+const BACKGROUND_SYNC_NOTE = 'No POS / Restaurant password is stored, so collections are only read while a valid '
+  + 'Finance session exists. Log in with the Finance account to sync.';
+
+// Who may see the status (Collection users + integration roles) / connect (integration roles).
+const canSeeIntegrations = (role) => integrationAuth.isIntegrationRole(role) || hasModule(role, MODULES.COLLECTION);
+
+// GET /api/collections/integrations/status
+const getIntegrationsStatus = async (req, res) => {
+  try {
+    if (!canSeeIntegrations(req.user?.role)) throw new HttpError(403, 'You do not have permission to access this module');
+    const integrations = await integrationAuth.getIntegrationStatus({ userId: req.user?.userId || null, withScope: true });
+    res.json({ integrations, backgroundSync: false, message: BACKGROUND_SYNC_NOTE });
+  } catch (error) {
+    sendError(res, error, 'Failed to load the POS / Restaurant connection status');
+  }
+};
+
+// Connect attempts per BSMS user (in memory). The external login endpoints also
+// allow only 5 logins per minute; integrationAuthService enforces that per system.
+const CONNECT_MAX_ATTEMPTS = 5;
+const CONNECT_WINDOW_MS = 10 * 60 * 1000;
+const connectAttempts = new Map(); // userId -> [ms]
+const connectRateLimited = (userId) => {
+  const now = Date.now();
+  const recent = (connectAttempts.get(userId) || []).filter((t) => now - t < CONNECT_WINDOW_MS);
+  connectAttempts.set(userId, recent);
+  if (recent.length >= CONNECT_MAX_ATTEMPTS) return true;
+  recent.push(now);
+  return false;
+};
+
+const CREDENTIAL_MAX = 150;
+// eslint-disable-next-line no-control-regex
+const CONTROL_CHARS = /[\u0000-\u001f\u007f]/;
+const credential = (value, name) => {
+  if (typeof value !== 'string' || value.trim() === '') throw new HttpError(400, `${name} is required`);
+  if (value.length > CREDENTIAL_MAX) throw new HttpError(400, `${name} is too long`);
+  if (CONTROL_CHARS.test(value)) throw new HttpError(400, `${name} contains invalid characters`);
+  return value;
+};
+
+// POST /api/collections/integrations/:provider/connect { username, password }
+// The password is sent once to that system's /api/login and then dropped; it is
+// never stored, logged or returned. Refused credentials answer 400 (not 401:
+// a 401 would sign the user out of BSMS).
+const connectIntegration = async (req, res) => {
+  const role = req.user?.role;
+  if (!integrationAuth.isIntegrationRole(role) || !canWrite(role)) {
+    return res.status(403).json({ error: 'Only Finance, Accountant, Admin or Super Admin users can connect POS / Restaurant' });
+  }
+  let provider;
+  try {
+    provider = integrationAuth.providerOf(req.params.provider);
+  } catch (error) {
+    return res.status(404).json({ error: 'Unknown system - use pos or restaurant' });
+  }
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const extra = Object.keys(body).filter((k) => !['username', 'password'].includes(k));
+  if (extra.length) return res.status(400).json({ error: 'Only username and password may be sent' });
+  let username;
+  let password;
+  try {
+    username = credential(body.username, 'Username').trim();
+    password = credential(body.password, 'Password');
+  } catch (error) {
+    return res.status(error.status || 400).json({ error: error.message });
+  }
+  const userId = req.user?.userId || null;
+  if (connectRateLimited(userId)) {
+    return res.status(429).json({ error: 'Too many connection attempts. Try again in a few minutes.', code: integrationAuth.codeOf(provider.id, 'RATE_LIMITED') });
+  }
+  try {
+    const result = await integrationAuth.connect(provider.id, { userId, username, password });
+    return res.json({ connected: true, username: result.username, provider: result.provider, system: result.system, expiresAt: result.expiresAt });
+  } catch (error) {
+    const message = integrationAuth.scrub(error.message, [password]);
+    if (error instanceof integrationAuth.PosConfigError) return res.status(503).json({ error: message, code: error.code });
+    if (error instanceof integrationAuth.PosAuthError) {
+      return res.status(400).json({ error: `${message}. Check the ${provider.account} username and password.`, code: error.code });
+    }
+    if (error instanceof integrationAuth.PosUnavailableError) {
+      return res.status(/RATE_LIMITED$/.test(error.code || '') ? 429 : 503).json({ error: message, code: error.code || null });
+    }
+    console.error(`Connect ${provider.label} failed:`, integrationAuth.scrub(error.message, [password]));
+    return res.status(500).json({ error: `Could not connect to ${provider.label}` });
+  } finally {
+    password = null;
+    if (req.body && typeof req.body === 'object') delete req.body.password;
   }
 };
 
@@ -473,6 +628,8 @@ const restore = (req, res) => inTransaction(
 
 module.exports = {
   getPending,
+  getIntegrationsStatus,
+  connectIntegration,
   listCollections,
   getDepartmentOptions,
   getCompleted: listHandler('completed'),

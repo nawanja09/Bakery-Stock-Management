@@ -165,3 +165,35 @@
   cursor: pointer;
   font: inherit;
 }
+
+/* Source system badge (POS / Restaurant) and per-system connection status */
+.col-system {
+  display: inline-block;
+  margin-right: 4px;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  vertical-align: 1px;
+}
+.col-system-pos { background: #e0f2fe; color: #075985; }
+.col-system-restaurant { background: #fce7f3; color: #9d174d; }
+
+.col-integrations { margin: 0 0 var(--spacing-md, 12px); }
+.col-integration-badges { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.col-integration {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  border: 1px solid transparent;
+}
+.col-integration-ok { background: #ecfdf5; color: #065f46; border-color: #a7f3d0; }
+.col-integration-warn { background: #fffbeb; color: #92400e; border-color: #fde68a; }
+.col-integration-off { background: #f1f5f9; color: #475569; border-color: #e2e8f0; }
+.col-connect-btn { font-weight: 600; }
+.col-sync-alert.col-sync-warn { background: #fffbeb; border-color: #fde68a; color: #92400e; }
+.col-connect-modal { max-width: 440px; width: 95vw; }

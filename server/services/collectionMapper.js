@@ -27,6 +27,14 @@
 //   sign does. Short = Short/Excess Account DEBIT, excess = CREDIT. It is NOT part
 //   of the POS `collection` figure, so it is not part of total_amount either.
 
+// The system a record comes from (collections.source_system). Ids are only
+// unique within one system: POS shift 211 and Restaurant shift 211 are
+// different records.
+const SYSTEMS = Object.freeze({
+  POS: 'POS',
+  RESTAURANT: 'RESTAURANT'
+});
+
 const SOURCES = Object.freeze({
   SHIFT: 'SHIFT',
   CREDIT_PAYMENT: 'CREDIT_PAYMENT',
@@ -412,6 +420,35 @@ const mapPosRecord = (source, raw) => {
   return { ok: true, record };
 };
 
+// ---- per-system record adapters ---------------------------------------------------
+// RAVON Restaurant runs the same Laravel API as RAVON POS: verified without
+// credentials that it exposes the same routes, the same /api/login validation
+// (username / password), the same 401 envelope and the same rate limits. Its
+// record JSON could NOT be verified (that needs a real login), so no field
+// names are invented for it: the adapter is the identity and the POS mapper
+// above reads the record exactly as it reads a POS one. A Restaurant record the
+// mapper cannot understand is NOT guessed at - it is skipped and reported with
+// its real field names (sync result `invalid` / `invalidSamples`), and
+// `node scripts/posCollectionProbe.js --login restaurant` prints the live shape.
+// If the shape turns out to differ, translate it HERE (and add a fixture to
+// tests/collectionIntegration.test.js) - nothing else needs to change.
+const RECORD_ADAPTERS = {
+  [SYSTEMS.POS]: (source, raw) => raw,
+  [SYSTEMS.RESTAURANT]: (source, raw) => raw
+};
+
+/**
+ * mapPosRecord for a record of `system` ('POS' | 'RESTAURANT'); the result
+ * carries source_system. Unknown systems are refused.
+ */
+const mapSystemRecord = (system, source, raw) => {
+  const adapt = RECORD_ADAPTERS[system];
+  if (!adapt) return fail(`Unknown source system "${String(system).slice(0, 30)}"`, raw);
+  const result = mapPosRecord(source, adapt(source, raw));
+  if (result.ok) result.record.source_system = system;
+  return result;
+};
+
 // Pulls the record array out of the usual envelopes (bare array, {data: []},
 // Laravel paginator {data: {data: []}}, {items|results|records: []}, ...).
 const EXTRACT_KEYS = ['data', 'items', 'results', 'records', 'collections', 'shifts', 'payments', 'deductions'];
@@ -554,9 +591,11 @@ const postingsOf = (row) => {
 };
 
 module.exports = {
+  SYSTEMS,
   SOURCES,
   PAYMENT_METHODS,
   mapPosRecord,
+  mapSystemRecord,
   extractRecords,
   postingsOf,
   cardPaymentsOf,
