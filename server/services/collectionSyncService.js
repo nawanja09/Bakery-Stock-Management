@@ -1,34 +1,49 @@
 // server/services/collectionSyncService.js
 //
-// POS -> BSMS staging for the Collection module. It ONLY ever writes
-// `collections` rows with status 'pending' and NEVER touches a ledger: posting
-// happens when a user approves a record (collectionService.js).
+// RAVON POS + RAVON Restaurant -> BSMS staging for the Collection module. It
+// ONLY ever writes `collections` rows with status 'pending' and NEVER touches a
+// ledger: posting happens when a user approves a record (collectionService.js).
+// Both systems run the same API and are synced the same way; every staged row
+// carries its source_system ('POS' | 'RESTAURANT').
 //
-// Endpoints (RAVON_POS_API_URL + path; each can be overridden with a full URL):
-//   SHIFT               /api/completed-shifts/collection   RAVON_POS_SHIFT_COLLECTION_URL
-//   CREDIT_PAYMENT      /api/credit-payments/collection    RAVON_POS_CREDIT_PAYMENTS_URL
-//   EMPLOYEE_DEDUCTION  /api/employee-deductions           RAVON_POS_EMPLOYEE_DEDUCTIONS_URL
-// Every call goes through posAuthService.posGet: the shared RAVON POS Finance
-// session the backend obtains (and renews) automatically with
-// RAVON_POS_USERNAME / RAVON_POS_PASSWORD - the same for every Stock
-// Management user; nobody signs in to the POS. The POS only returns the branches of that account
-// (/api/me branch_ids), so it must be an all-branch account. The browser never
-// talks to the POS.
+// Endpoints (base URL + path; each can be overridden with a full URL):
+//   POS         base RAVON_POS_API_URL          overrides RAVON_POS_SHIFT_COLLECTION_URL,
+//                                                RAVON_POS_CREDIT_PAYMENTS_URL, RAVON_POS_EMPLOYEE_DEDUCTIONS_URL
+//   RESTAURANT  base RAVON_RESTAURANT_API_URL   overrides RAVON_RESTAURANT_SHIFT_COLLECTION_URL,
+//                                                RAVON_RESTAURANT_CREDIT_PAYMENTS_URL, RAVON_RESTAURANT_EMPLOYEE_DEDUCTIONS_URL
+//   SHIFT               /api/completed-shifts/collection
+//   CREDIT_PAYMENT      /api/credit-payments/collection
+//   EMPLOYEE_DEDUCTION  /api/employee-deductions
+// A system whose base URL is not set is skipped and reported "not configured"
+// (not an error, and never an error for the other system).
+//
+// Authentication: every call goes through integrationAuthService.posGet with
+// the token of the latest Finance session of that system (else the requesting
+// user's own). No credentials are stored anywhere, so there is NO background /
+// unattended sync: a sync runs only when a user opens / refreshes Pending, and
+// only while a valid Finance session exists ("Log in with the Finance account
+// to sync"). The browser never talks to POS / Restaurant.
+//
+// Independence: the two systems run in parallel (Promise.allSettled). An
+// authentication / network / 5xx failure of one never stops the other from
+// importing; each reports its own result. Within a system a failing source
+// never blocks the other sources.
 //
 // Duplicate prevention
-//   * UNIQUE (source_type, source_id): a POS record is staged once; re-syncing
-//     updates a still-pending row in place and never touches completed/rejected.
-//   * A record whose (source_type, reference_no) already belongs to a COMPLETED
-//     collection under a different POS id is not staged (reported as duplicate).
+//   * UNIQUE (source_system, source_type, source_id): a record is staged once;
+//     re-syncing updates a still-pending row in place and never touches
+//     completed/rejected. The same id in POS and Restaurant never collides.
+//   * A record whose (source_system, source_type, reference_no) already belongs
+//     to a COMPLETED collection under a different id is not staged (duplicate).
 //
 // All branches / departments
 //   No branch or department filter is ever sent, and the BSMS user's own
-//   department is never used: the POS returns every branch the integration
-//   account may see. Retrieval and department mapping are separate steps.
+//   department is never used: each system returns every branch its account may
+//   see. Retrieval and department mapping are separate steps.
 //
-// Department mapping
-//   The POS branch (branch.name, e.g. "Cafe - M") is first normalized
-//   (departmentMapper.normalizePosBranchName: POS "MASActive" -> "MAS Intimo",
+// Department mapping (same for both systems)
+//   The branch (branch.name, e.g. "Cafe - M") is first normalized
+//   (departmentMapper.normalizePosBranchName: "MASActive" -> "MAS Intimo",
 //   "MASBrew" -> "MAS Ayathi Brew Bar") -
 //   that is the name stored in pos_branch_name and shown; the original stays in
 //   raw_payload - then mapped to an EXISTING department (e.g. "Cafe"). A record
@@ -36,7 +51,8 @@
 //   NULL, reported as unmapped, and refused at approval until it maps (never
 //   assigned to a wrong department, never creates one).
 //
-// Date window (POS start_date / end_date, both inclusive)
+// Date window (start_date / end_date, both inclusive; the same window and the
+// same RAVON_POS_* timing settings are used for both systems)
 //   * No range given: today - RAVON_POS_COLLECTION_LOOKBACK_DAYS (default 7) .. today.
 //   * A range From..To (the collection date the user sees = shift CLOSING date in
 //     the business time zone): the POS filters shifts by their COMPLETED date,
@@ -49,8 +65,8 @@
 // Pages are followed through meta.current_page / meta.last_page (the POS sends
 // no next-page URL); per_page is raised to cut the number of calls.
 const pool = require('../config/db');
-const { posGet } = require('./posAuthService');
-const { SOURCES, mapPosRecord, extractRecords } = require('./collectionMapper');
+const integrationAuth = require('./integrationAuthService');
+const { SYSTEMS, SOURCES, mapSystemRecord, extractRecords } = require('./collectionMapper');
 const { createDepartmentMatcher, normalizePosBranchName } = require('./departmentMapper');
 
 const MAX_PAGES = 200;
@@ -103,29 +119,55 @@ const SOURCE_PARAMS = {
   [SOURCES.EMPLOYEE_DEDUCTION]: { status: 'all' }
 };
 
-const ENDPOINTS = () => {
-  const baseUrl = (process.env.RAVON_POS_API_URL || '').replace(/\/+$/, '');
-  const url = (override, path) => override || (baseUrl ? `${baseUrl}${path}` : '');
-  return {
-    [SOURCES.SHIFT]: url(process.env.RAVON_POS_SHIFT_COLLECTION_URL, '/api/completed-shifts/collection'),
-    [SOURCES.CREDIT_PAYMENT]: url(process.env.RAVON_POS_CREDIT_PAYMENTS_URL, '/api/credit-payments/collection'),
-    [SOURCES.EMPLOYEE_DEDUCTION]: url(process.env.RAVON_POS_EMPLOYEE_DEDUCTIONS_URL, '/api/employee-deductions')
-  };
+// Per system: integration provider, base URL variable and endpoint overrides.
+const SYSTEM_CONFIG = {
+  [SYSTEMS.POS]: {
+    provider: 'pos', baseEnv: 'RAVON_POS_API_URL',
+    overrides: {
+      [SOURCES.SHIFT]: 'RAVON_POS_SHIFT_COLLECTION_URL',
+      [SOURCES.CREDIT_PAYMENT]: 'RAVON_POS_CREDIT_PAYMENTS_URL',
+      [SOURCES.EMPLOYEE_DEDUCTION]: 'RAVON_POS_EMPLOYEE_DEDUCTIONS_URL'
+    }
+  },
+  [SYSTEMS.RESTAURANT]: {
+    provider: 'restaurant', baseEnv: 'RAVON_RESTAURANT_API_URL',
+    overrides: {
+      [SOURCES.SHIFT]: 'RAVON_RESTAURANT_SHIFT_COLLECTION_URL',
+      [SOURCES.CREDIT_PAYMENT]: 'RAVON_RESTAURANT_CREDIT_PAYMENTS_URL',
+      [SOURCES.EMPLOYEE_DEDUCTION]: 'RAVON_RESTAURANT_EMPLOYEE_DEDUCTIONS_URL'
+    }
+  }
 };
+const SOURCE_PATHS = {
+  [SOURCES.SHIFT]: '/api/completed-shifts/collection',
+  [SOURCES.CREDIT_PAYMENT]: '/api/credit-payments/collection',
+  [SOURCES.EMPLOYEE_DEDUCTION]: '/api/employee-deductions'
+};
+
+/** Endpoint URL per source for a system ('' = not configured). Defaults to POS. */
+const ENDPOINTS = (system = SYSTEMS.POS) => {
+  const cfg = SYSTEM_CONFIG[system];
+  const baseUrl = (process.env[cfg.baseEnv] || '').trim().replace(/\/+$/, '');
+  return Object.fromEntries(Object.values(SOURCES).map((source) => [
+    source, process.env[cfg.overrides[source]] || (baseUrl ? `${baseUrl}${SOURCE_PATHS[source]}` : '')
+  ]));
+};
+
+const systemLabel = (system) => integrationAuth.providerOf(SYSTEM_CONFIG[system].provider).label;
 
 // Follows next_page_url / links.next on the same host, or meta.current_page /
 // meta.last_page by requesting ?page=N.
-const fetchAllRecords = async (url) => {
+const fetchAllRecords = async (url, { provider = 'pos', userId = null } = {}) => {
   const origin = new URL(url).origin;
   const records = [];
   let next = url;
   for (let page = 0; next && page < MAX_PAGES; page += 1) {
     const current = next;
-    const payload = await posGet(next);
+    const payload = await integrationAuth.posGet(provider, next, null, { userId });
     const batch = extractRecords(payload);
     if (batch === null) {
       const keys = payload && typeof payload === 'object' ? Object.keys(payload).slice(0, 20).join(', ') : typeof payload;
-      throw new Error(`POS response did not contain a list of records (fields: ${keys})`);
+      throw new Error(`${integrationAuth.providerOf(provider).label} response did not contain a list of records (fields: ${keys})`);
     }
     records.push(...batch);
     const candidate = payload && typeof payload === 'object' && !Array.isArray(payload)
@@ -156,29 +198,34 @@ const COLUMNS = [
  *   new                     -> inserted as pending
  *   pending                 -> updated in place when the POS payload changed
  *   completed / rejected    -> untouched
- *   same reference already completed under another POS id -> 'duplicate'
+ *   same reference already completed under another id of the SAME system -> 'duplicate'
+ * Records are identified by (source_system, source_type, source_id): a POS and a
+ * Restaurant record with the same id never touch each other. A record without
+ * source_system is a POS one (unchanged POS behaviour).
  * @returns {Promise<'inserted'|'updated'|'unchanged'|'duplicate'>}
  */
 const stagePending = async (queryable, record) => {
+  const system = record.source_system || SYSTEMS.POS;
   const [existing] = await queryable.query(
-    'SELECT id, status, raw_payload, department_id, pos_branch_name, card_txn_count, card_txn_total FROM collections WHERE source_type = ? AND source_id = ?',
-    [record.source_type, record.source_id]
+    `SELECT id, status, raw_payload, department_id, pos_branch_name, card_txn_count, card_txn_total FROM collections
+      WHERE source_type = ? AND source_id = ? AND source_system = ?`,
+    [record.source_type, record.source_id, system]
   );
 
   if (existing.length === 0) {
     if (record.reference_no) {
       const [sameRef] = await queryable.query(
         `SELECT id FROM collections
-          WHERE source_type = ? AND reference_no = ? AND source_id <> ? AND status = 'completed' LIMIT 1`,
-        [record.source_type, record.reference_no, record.source_id]
+          WHERE source_type = ? AND reference_no = ? AND source_system = ? AND source_id <> ? AND status = 'completed' LIMIT 1`,
+        [record.source_type, record.reference_no, system, record.source_id]
       );
       if (sameRef.length > 0) return 'duplicate';
     }
     try {
       await queryable.query(
-        `INSERT INTO collections (source_type, source_id, ${COLUMNS.join(', ')}, status, last_synced_at)
-         VALUES (?, ?, ${COLUMNS.map(() => '?').join(', ')}, 'pending', NOW())`,
-        [record.source_type, record.source_id, ...COLUMNS.map((c) => record[c] ?? null)]
+        `INSERT INTO collections (source_type, source_id, ${COLUMNS.join(', ')}, source_system, status, last_synced_at)
+         VALUES (?, ?, ${COLUMNS.map(() => '?').join(', ')}, ?, 'pending', NOW())`,
+        [record.source_type, record.source_id, ...COLUMNS.map((c) => record[c] ?? null), system]
       );
       return 'inserted';
     } catch (error) {
@@ -216,15 +263,17 @@ const stagePending = async (queryable, record) => {
 
 /**
  * Links pending employee deductions to the shift collection they belong to
- * (same POS shift id / shift reference), so the Short/Excess posting of the
- * deduction can be traced back to the shift's shortage. A deduction the POS
- * sent without a company takes the shift's company.
+ * (same shift id / shift reference IN THE SAME SYSTEM - a Restaurant deduction
+ * is never linked to a POS shift), so the Short/Excess posting of the
+ * deduction can be traced back to the shift's shortage. A deduction sent
+ * without a company takes the shift's company.
  */
 const linkDeductionsToShifts = async (queryable) => {
   await queryable.query(
     `UPDATE collections d
        JOIN collections s
          ON s.source_type = 'SHIFT'
+        AND s.source_system = d.source_system
         AND (s.source_id = d.shift_id OR s.shift_reference = d.shift_id)
         SET d.linked_collection_id = s.id,
             d.company_id = COALESCE(d.company_id, s.company_id)
@@ -234,19 +283,28 @@ const linkDeductionsToShifts = async (queryable) => {
   );
 };
 
+// Server log only, once per message (scrubbed: never a token).
 const loggedErrors = new Set();
+const logOnce = (key, message) => {
+  const text = integrationAuth.scrub(message);
+  if (loggedErrors.has(`${key}:${text}`)) return;
+  loggedErrors.add(`${key}:${text}`);
+  console.warn(`Collection sync - ${text}`);
+};
 
-const syncSource = async (source, endpoint, { companyByName, matchDepartment, window }) => {
+const syncSource = async (system, source, endpoint, { companyByName, matchDepartment, window, userId }) => {
+  const { provider } = SYSTEM_CONFIG[system];
   const result = {
-    source, fetched: 0, inserted: 0, updated: 0, unchanged: 0, duplicate: 0,
+    system, source, fetched: 0, inserted: 0, updated: 0, unchanged: 0, duplicate: 0,
     invalid: 0, invalidSamples: [], excluded: 0, excludedReasons: [], unmapped: 0, unmappedBranches: []
   };
   try {
-    if (!endpoint) throw new Error('RAVON_POS_API_URL is not configured');
-    const records = await fetchAllRecords(withParams(endpoint, { ...window, per_page: PER_PAGE, ...(SOURCE_PARAMS[source] || {}) }));
+    if (!endpoint) throw new Error(`${SYSTEM_CONFIG[system].baseEnv} is not configured`);
+    const url = withParams(endpoint, { ...window, per_page: PER_PAGE, ...(SOURCE_PARAMS[source] || {}) });
+    const records = await fetchAllRecords(url, { provider, userId });
     result.fetched = records.length;
     for (let index = 0; index < records.length; index += 1) {
-      const mapped = mapPosRecord(source, records[index]);
+      const mapped = mapSystemRecord(system, source, records[index]);
       if (mapped.excluded) {
         // Deliberately not a collection (e.g. overpayment set-off): counted, not an error.
         result.excluded += 1;
@@ -264,11 +322,11 @@ const syncSource = async (source, endpoint, { companyByName, matchDepartment, wi
       }
       const record = mapped.record;
       record.company_id = companyByName.get(normName(record.pos_company)) ?? null;
-      // Stock Management name of the POS branch (POS "MASActive" -> "MAS Intimo",
-      // "MASBrew" -> "MAS Ayathi Brew Bar").
+      // Stock Management name of the branch ("MASActive" -> "MAS Intimo",
+      // "MASBrew" -> "MAS Ayathi Brew Bar"); same rule for both systems.
       record.pos_branch_name = normalizePosBranchName(record.pos_branch_name);
 
-      // POS branch -> existing department. Records from EVERY branch are imported;
+      // Branch -> existing department. Records from EVERY branch are imported;
       // one whose branch matches no department is kept with department_id NULL
       // (shown as "Unmapped", never given a guessed department) and cannot be
       // approved until a department matches. Mapping is re-checked on every sync.
@@ -290,49 +348,134 @@ const syncSource = async (source, endpoint, { companyByName, matchDepartment, wi
       result[outcome] += 1;
     }
   } catch (error) {
-    // Not shown on the Collection page; kept in the server log (once per message).
-    if (!loggedErrors.has(`${source}:${error.message}`)) {
-      loggedErrors.add(`${source}:${error.message}`);
-      console.warn(`Collection sync - ${source} could not be loaded from the POS: ${error.message}`);
-    }
-    result.error = error.message;
+    const message = integrationAuth.scrub(error.message);
+    logOnce(`${system}:${source}`, `${source} could not be loaded from ${systemLabel(system)}: ${message}`);
+    result.error = message;
     result.errorType = error.name;
-    result.errorCode = error.code || null; // POS_CREDENTIALS_INVALID / POS_AUTH_UNAVAILABLE / POS_NOT_CONFIGURED: automatic POS login failed
+    // e.g. POS_NOT_CONNECTED / RESTAURANT_NOT_CONNECTED (no valid Finance session),
+    // *_CREDENTIALS_INVALID, *_AUTH_UNAVAILABLE, *_NOT_CONFIGURED
+    result.errorCode = error.code || null;
   }
   return result;
 };
 
-// One run per date window at a time.
+const AUTH_ERROR_NAMES = ['PosAuthError', 'PosConfigError'];
+
+/** Totals of one system's sync (what the Collection page reports per system). */
+const summarize = (system, sources, extra = {}) => {
+  const sum = (field) => sources.reduce((n, s) => n + (Number(s[field]) || 0), 0);
+  const failed = sources.filter((s) => s.error);
+  const first = failed.find((s) => s.errorCode && AUTH_ERROR_NAMES.includes(s.errorType)) || failed[0];
+  const out = {
+    system,
+    label: systemLabel(system),
+    configured: true,
+    fetched: sum('fetched'),
+    created: sum('inserted'),
+    updated: sum('updated'),
+    duplicates: sum('duplicate'),
+    unmapped: sum('unmapped'),
+    invalid: sum('invalid'),
+    excluded: sum('excluded'),
+    sources,
+    ...extra
+  };
+  if (first) {
+    out.error = first.error;
+    out.code = first.errorCode || null;
+    out.partial = failed.length < sources.length;
+  }
+  return out;
+};
+
+/**
+ * One system: its three sources, one after another. Before reading anything a
+ * session is resolved once - when there is none (or the system is not
+ * configured) the system is reported without calling its data endpoints.
+ */
+const syncSystem = async (system, context) => {
+  const { provider, baseEnv } = SYSTEM_CONFIG[system];
+  const endpoints = ENDPOINTS(system);
+  if (!Object.values(endpoints).some(Boolean) || !integrationAuth.isConfigured(provider)) {
+    return {
+      system, label: systemLabel(system), configured: false, skipped: true, status: 'not configured',
+      message: `${systemLabel(system)} is not configured (${baseEnv} is not set) - skipped`,
+      fetched: 0, created: 0, updated: 0, duplicates: 0, unmapped: 0, invalid: 0, excluded: 0, sources: []
+    };
+  }
+  if (system !== SYSTEMS.POS && typeof pool.collectionsSourceSystemOk === 'function' && !pool.collectionsSourceSystemOk()) {
+    // Without collections.source_system its ids could collide with POS ones.
+    return summarize(system, [], {
+      error: 'The collections.source_system migration has not run (see the server log) - Restaurant records are not imported',
+      code: 'SCHEMA_NOT_READY'
+    });
+  }
+  try {
+    await integrationAuth.getToken(provider, { userId: context.userId });
+  } catch (error) {
+    const message = integrationAuth.scrub(error.message);
+    logOnce(system, `${systemLabel(system)} skipped: ${message}`);
+    return summarize(system, [], { error: message, code: error.code || null, errorType: error.name });
+  }
+  const sources = [];
+  for (const source of Object.values(SOURCES)) {
+    sources.push(await syncSource(system, source, endpoints[source], context));
+  }
+  return summarize(system, sources);
+};
+
+// One run per date window (and requesting user) at a time.
 const inFlight = new Map();
 
 /**
- * Pulls all three POS sources into Pending, from ALL POS departments, for the
- * window of { fromDate, toDate } ('YYYY-MM-DD', inclusive; both optional - see
- * dateWindow). A failing source never blocks the others. Concurrent callers for
- * the same window share one run (opening the Pending tab twice does not hit the
- * POS twice). Returns { window, sources }.
+ * Pulls the three sources of BOTH systems into Pending, from ALL departments,
+ * for the window of { fromDate, toDate } ('YYYY-MM-DD', inclusive; both
+ * optional - see dateWindow). userId = the requesting BSMS user (its own
+ * session is the fallback token source). The systems run in parallel and
+ * independently (Promise.allSettled): one failing never stops the other.
+ * Concurrent callers for the same window share one run.
+ * Returns { window, sources, systems }:
+ *   sources - the POS sources, as before (backward compatible)
+ *   systems - one entry per system: { system, configured, fetched, created,
+ *             updated, duplicates, unmapped, invalid, excluded, sources[], error?, code? }
  */
-const syncCollections = async ({ fromDate, toDate } = {}) => {
+const syncCollections = async ({ fromDate, toDate, userId = null } = {}) => {
   const window = dateWindow(new Date(), { fromDate, toDate });
-  const key = `${window.start_date}..${window.end_date}`;
+  const key = `${window.start_date}..${window.end_date}:${userId ?? ''}`;
   if (inFlight.has(key)) return inFlight.get(key);
   const run = (async () => {
     await pool.collectionsSchemaReady;
-    const endpoints = ENDPOINTS();
     const [companies] = await pool.query('SELECT id, name FROM company');
     const companyByName = new Map(companies.map((c) => [normName(c.name), c.id]));
     const [departments] = await pool.query('SELECT id, name FROM departments');
-    const context = { companyByName, matchDepartment: createDepartmentMatcher(departments), window };
+    const context = { companyByName, matchDepartment: createDepartmentMatcher(departments), window, userId };
 
-    const sources = [];
-    for (const source of Object.values(SOURCES)) {
-      sources.push(await syncSource(source, endpoints[source], context));
+    const order = [SYSTEMS.POS, SYSTEMS.RESTAURANT];
+    const settled = await Promise.allSettled(order.map((system) => syncSystem(system, context)));
+    const systems = settled.map((outcome, i) => (outcome.status === 'fulfilled'
+      ? outcome.value
+      : summarize(order[i], [], {
+        error: integrationAuth.scrub(outcome.reason?.message || 'sync failed'), code: outcome.reason?.code || null
+      })));
+    try {
+      await linkDeductionsToShifts(pool);
+    } catch (error) {
+      logOnce('link', `linking deductions to shifts failed: ${error.message}`);
     }
-    await linkDeductionsToShifts(pool);
-    return { window, sources };
+    // Backward compatible `sources`: the POS sources (or the POS-level failure on each).
+    const pos = systems.find((s) => s.system === SYSTEMS.POS);
+    const sources = pos.sources.length || (!pos.error && !pos.skipped) ? pos.sources
+      : Object.values(SOURCES).map((source) => ({
+        system: SYSTEMS.POS, source, fetched: 0, inserted: 0, updated: 0, unchanged: 0, duplicate: 0, invalid: 0,
+        invalidSamples: [], excluded: 0, excludedReasons: [], unmapped: 0, unmappedBranches: [],
+        error: pos.error || pos.message, errorType: pos.errorType || 'PosConfigError', errorCode: pos.code || 'POS_NOT_CONFIGURED'
+      }));
+    return { window, sources, systems };
   })().finally(() => { inFlight.delete(key); });
   inFlight.set(key, run);
   return run;
 };
 
-module.exports = { syncCollections, stagePending, linkDeductionsToShifts, ENDPOINTS, dateWindow, MAX_RANGE_DAYS };
+module.exports = {
+  syncCollections, stagePending, linkDeductionsToShifts, ENDPOINTS, SYSTEM_CONFIG, dateWindow, MAX_RANGE_DAYS
+};

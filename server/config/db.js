@@ -1251,12 +1251,57 @@ const retireDraftCollectionsTable = async () => {
   console.warn(`Collections: old draft table renamed to ${target}; pending records will be re-read from the POS`);
 };
 
+// --- information_schema helpers (work on MySQL and MariaDB, so every step can
+// be checked first and safely re-run) ------------------------------------------
+const columnExists = async (table, column) => {
+  const [rows] = await pool.query(
+    `SELECT 1 FROM information_schema.columns
+      WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ? LIMIT 1`,
+    [table, column]
+  );
+  return rows.length > 0;
+};
+// Column list of an index, in order ('' when the index does not exist).
+const indexColumns = async (table, index) => {
+  const [rows] = await pool.query(
+    `SELECT column_name AS col FROM information_schema.statistics
+      WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ?
+      ORDER BY seq_in_index`,
+    [table, index]
+  );
+  return rows.map((r) => String(r.col).toLowerCase()).join(',');
+};
+
+// collections.source_system ('POS' | 'RESTAURANT'). Existing rows are POS (the
+// column default backfills them). The unique key becomes (source_system,
+// source_type, source_id) - added BEFORE the old (source_type, source_id) one is
+// dropped, so uniqueness is never lost. Idempotent; see
+// migrations/031_restaurant_collections_integration_sessions.sql.
+let collectionsSourceSystemOk = false;
+const ensureCollectionsSourceSystem = async () => {
+  if (!(await columnExists('collections', 'source_system'))) {
+    await pool.query("ALTER TABLE collections ADD COLUMN source_system ENUM('POS','RESTAURANT') NOT NULL DEFAULT 'POS' AFTER id");
+  }
+  await pool.query("UPDATE collections SET source_system = 'POS' WHERE source_system IS NULL OR source_system = ''");
+  if (!(await indexColumns('collections', 'uq_collections_system_source'))) {
+    await pool.query('ALTER TABLE collections ADD UNIQUE KEY uq_collections_system_source (source_system, source_type, source_id)');
+  }
+  if (await indexColumns('collections', 'uq_collections_source')) {
+    await pool.query('ALTER TABLE collections DROP INDEX uq_collections_source');
+  }
+  if (!(await indexColumns('collections', 'idx_collections_system_reference'))) {
+    await pool.query('ALTER TABLE collections ADD KEY idx_collections_system_reference (source_system, source_type, reference_no)');
+  }
+  collectionsSourceSystemOk = true;
+};
+
 const ensureCollectionsSchema = async () => {
   try {
     await retireDraftCollectionsTable();
     await pool.query(`
       CREATE TABLE IF NOT EXISTS collections (
         id                   INT NOT NULL AUTO_INCREMENT,
+        source_system        ENUM('POS','RESTAURANT') NOT NULL DEFAULT 'POS',
         source_type          ENUM('SHIFT','CREDIT_PAYMENT','EMPLOYEE_DEDUCTION') NOT NULL,
         source_id            VARCHAR(100) NOT NULL,
         reference_no         VARCHAR(100) NULL,
@@ -1294,8 +1339,9 @@ const ensureCollectionsSchema = async () => {
         created_at           TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at           TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         PRIMARY KEY (id),
-        UNIQUE KEY uq_collections_source (source_type, source_id),
+        UNIQUE KEY uq_collections_system_source (source_system, source_type, source_id),
         KEY idx_collections_reference (source_type, reference_no),
+        KEY idx_collections_system_reference (source_system, source_type, reference_no),
         KEY idx_collections_status_date (status, collection_date),
         KEY idx_collections_company (company_id),
         KEY idx_collections_shift (shift_id),
@@ -1316,6 +1362,15 @@ const ensureCollectionsSchema = async () => {
       'ALTER TABLE collections ADD COLUMN IF NOT EXISTS card_txn_total DECIMAL(14,2) NULL AFTER card_txn_count'
     ]) {
       try { await pool.query(stmt); } catch (alterErr) { console.warn('Collections schema alter skipped:', alterErr.message); }
+    }
+
+    // RAVON Restaurant records next to POS ones (migrations/031_...sql). Without
+    // it a Restaurant record could collide with a POS one, so the Restaurant sync
+    // is refused (pool.collectionsSourceSystemOk) until this succeeded.
+    try {
+      await ensureCollectionsSourceSystem();
+    } catch (systemErr) {
+      console.error('Collections source_system migration FAILED - Restaurant sync disabled:', systemErr.message);
     }
 
     await pool.query(`
@@ -1488,6 +1543,51 @@ const ensureCollectionsSchema = async () => {
 };
 
 pool.collectionsSchemaReady = ensureCollectionsSchema();
+pool.collectionsSourceSystemOk = () => collectionsSourceSystemOk;
+
+// POS / Restaurant sessions of Stock Management users (services/posSessionStore.js):
+// only the encrypted Bearer token, never a password. One row per (user, provider).
+// Upgrades the earlier POS-only table (PRIMARY KEY user_id, no provider column):
+// its rows become provider 'pos' and keep working. Idempotent; see
+// migrations/031_restaurant_collections_integration_sessions.sql.
+const ensureIntegrationSessionsSchema = async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS pos_sessions (
+        user_id        INT NOT NULL,
+        provider       VARCHAR(20) NOT NULL DEFAULT 'pos',
+        pos_username   VARCHAR(150) NOT NULL,
+        token_enc      TEXT NOT NULL,
+        expires_at     DATETIME NULL,
+        created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        invalidated_at DATETIME NULL,
+        finance        TINYINT(1) NOT NULL DEFAULT 0,
+        all_branches   TINYINT(1) NULL,
+        PRIMARY KEY (user_id, provider),
+        KEY idx_pos_sessions_provider (provider, finance, invalidated_at)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    if (!(await columnExists('pos_sessions', 'provider'))) {
+      await pool.query("ALTER TABLE pos_sessions ADD COLUMN provider VARCHAR(20) NOT NULL DEFAULT 'pos' AFTER user_id");
+    }
+    if (!(await columnExists('pos_sessions', 'finance'))) {
+      await pool.query('ALTER TABLE pos_sessions ADD COLUMN finance TINYINT(1) NOT NULL DEFAULT 0');
+    }
+    if (!(await columnExists('pos_sessions', 'all_branches'))) {
+      await pool.query('ALTER TABLE pos_sessions ADD COLUMN all_branches TINYINT(1) NULL');
+    }
+    const primary = await indexColumns('pos_sessions', 'PRIMARY');
+    if (primary !== 'user_id,provider') {
+      await pool.query(`ALTER TABLE pos_sessions ${primary ? 'DROP PRIMARY KEY, ' : ''}ADD PRIMARY KEY (user_id, provider)`);
+    }
+    if (!(await indexColumns('pos_sessions', 'idx_pos_sessions_provider'))) {
+      await pool.query('ALTER TABLE pos_sessions ADD KEY idx_pos_sessions_provider (provider, finance, invalidated_at)');
+    }
+  } catch (error) {
+    console.warn('POS / Restaurant session table check skipped:', error.message);
+  }
+};
+pool.integrationSessionsSchemaReady = ensureIntegrationSessionsSchema();
 
 // Management -> Credit Card Rate, and the Card Ledger commission / bank charge
 // split (see migrations/030_credit_card_rates_card_commission.sql). Runs after

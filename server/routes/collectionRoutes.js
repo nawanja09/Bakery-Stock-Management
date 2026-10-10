@@ -11,6 +11,15 @@ const router = express.Router();
 const controller = require('../controllers/collectionController');
 const { collectionReadAccess, collectionWriteAccess } = require('../middleware/moduleAccess');
 
+// POS / Restaurant connection (rule /collections/integrations in rolePermissions.js:
+// any signed-in role reaches the controller, which allows status to Collection
+// users + Finance / Accountant / Admin / Super Admin and Connect to the latter
+// only; QB is refused on POST by the view-only rule). Authenticated by the BSMS
+// JWT in the Authorization header - no cookie, so a cross-site form cannot
+// trigger it (no CSRF exposure). Connect is rate limited in the controller.
+router.get('/integrations/status', ...collectionReadAccess, controller.getIntegrationsStatus);
+router.post('/integrations/:provider/connect', ...collectionWriteAccess, controller.connectIntegration);
+
 // Fixed paths BEFORE the parameterised '/:id'.
 router.get('/', ...collectionReadAccess, controller.listCollections);
 router.get('/departments', ...collectionReadAccess, controller.getDepartmentOptions);

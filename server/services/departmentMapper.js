@@ -1,7 +1,8 @@
 // server/services/departmentMapper.js
 //
-// Maps a POS branch name (e.g. "Cafe - M") to an EXISTING Stock Management
-// department (e.g. "Cafe"). Pure: the caller passes the department list.
+// Maps a POS / Restaurant branch name (e.g. "Cafe - M") to an EXISTING Stock
+// Management department (e.g. "Cafe"); the same rule is used for both systems.
+// Pure: the caller passes the department list.
 //
 // Rule (no per-branch hard-coding):
 //   1. An explicit alias, if configured (RAVON_POS_BRANCH_DEPARTMENT_MAP, JSON:
@@ -85,7 +86,7 @@ const createDepartmentMatcher = (departments, aliases = parseAliases()) => {
 
   return (branchName) => {
     const candidates = branchCandidates(branchName);
-    if (candidates.length === 0) return { ok: false, reason: 'The POS record has no branch' };
+    if (candidates.length === 0) return { ok: false, reason: 'The record has no branch' };
 
     for (const candidate of candidates) {
       const alias = aliases.get(norm(candidate));
@@ -104,7 +105,7 @@ const createDepartmentMatcher = (departments, aliases = parseAliases()) => {
     }
     return {
       ok: false,
-      reason: `No department matches POS branch "${branchName}" (tried: ${candidates.join(', ')})`
+      reason: `No department matches branch "${branchName}" (tried: ${candidates.join(', ')})`
     };
   };
 };

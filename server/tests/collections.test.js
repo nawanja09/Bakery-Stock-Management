@@ -1,8 +1,8 @@
 // Collection module tests that need no MySQL:
 //   * collectionMapper: POS record -> collections row, postings per payment method
-//   * posAuthService:   background POS login against a local mock POS server -
-//                       token reuse, single-flight login, expired / invalid token
-//                       (401 -> one re-login + retry), rejected credentials.
+//   * integrationAuthService: POS sessions from typed logins against a local mock
+//                       POS - token reuse, single-flight login, expired / invalid
+//                       token (401 -> one retry), refused credentials, no env credentials.
 // The approve / reject / ledger flow is exercised against a real database by
 // the end-to-end script described in the project notes.
 const test = require('node:test');
@@ -120,7 +120,7 @@ test('no matching department -> clear error, never a guess', () => {
   const match = createDepartmentMatcher(DEPARTMENTS, new Map());
   const result = match('Savoury - M'); // DB spells it "Savory"
   assert.equal(result.ok, false);
-  assert.match(result.reason, /No department matches POS branch "Savoury - M"/);
+  assert.match(result.reason, /No department matches branch "Savoury - M"/);
   assert.equal(match('').ok, false);
   assert.equal(match(null).ok, false);
 });
@@ -270,118 +270,140 @@ const json = (res, status, payload) => {
 
 const UNAUTH = { error: true, message: 'Unauthenticated.', status: 401 };
 
+// No credentials in the environment, ever. A token only comes from a typed login
+// (loginAll at the BSMS login, or connect()); nothing is persisted in these tests.
+process.env.POS_SESSION_PERSIST = '0';
+for (const name of ['RAVON_POS_USERNAME', 'RAVON_POS_PASSWORD', 'RAVON_POS_API_KEY', 'POS_USERNAME', 'POS_PASSWORD']) delete process.env[name];
+delete process.env.RAVON_RESTAURANT_API_URL; // POS-only here
+
+const auth = require('../services/integrationAuthService');
+const pos = require('../services/posAuthService');
+
 const setupPos = async (options = {}) => {
   const stats = { logins: 0, dataCalls: 0, tokensSeen: [] };
-  let validToken = null;
+  const valid = new Set();
   const server = await startMockPos((req, res, body) => {
     if (req.method === 'POST' && req.url === '/api/login') {
       stats.logins += 1;
       const { username, password } = JSON.parse(body || '{}');
-      if (username !== 'svc-user' || password !== 'svc-pass') return json(res, 401, { message: 'Invalid credentials' });
-      validToken = `tok-${stats.logins}`;
-      return json(res, 200, { status: true, data: { token: validToken, expires_in: options.expiresIn } });
+      if (username !== 'finance' || password !== 'fin-pass') return json(res, 401, { message: 'Invalid credentials' });
+      const token = `tok-${stats.logins}`;
+      valid.add(token);
+      return json(res, 200, { status: true, data: { token, expires_in: options.expiresIn } });
     }
+    if (req.url === '/api/me') return json(res, 200, { user: { id: 1, name: 'finance', branch_ids: [] } });
     stats.dataCalls += 1;
-    const auth = req.headers.authorization || '';
-    stats.tokensSeen.push(auth);
-    if (auth !== `Bearer ${validToken}`) return json(res, 401, UNAUTH);
+    const header = req.headers.authorization || '';
+    stats.tokensSeen.push(header);
+    if (!valid.has(header.replace(/^Bearer /, ''))) return json(res, 401, UNAUTH);
     return json(res, 200, { data: [{ id: 1 }] });
   });
-  const { port } = server.address();
-  process.env.RAVON_POS_API_URL = `http://127.0.0.1:${port}`;
-  process.env.RAVON_POS_USERNAME = 'svc-user';
-  process.env.RAVON_POS_PASSWORD = 'svc-pass';
-  delete process.env.RAVON_POS_API_KEY;
-  const auth = require('../services/posAuthService');
+  process.env.RAVON_POS_API_URL = `http://127.0.0.1:${server.address().port}`;
   auth.resetAuthState();
   return {
-    auth, stats, server,
-    expireServerToken: () => { validToken = 'rotated-on-server'; },
+    stats, server,
+    financeLogin: () => auth.loginAll({ userId: 11, role: 'Finance', username: 'finance', password: 'fin-pass' }),
+    expireServerTokens: () => valid.clear(),
     close: () => new Promise((r) => server.close(r))
   };
 };
 
-test('logs in once in the background and reuses the token', async () => {
-  const pos = await setupPos();
+test('a Finance login gives the token; every later call reuses it (no background login)', async () => {
+  const mock = await setupPos();
   try {
-    await pos.auth.posGet('/api/completed-shifts/collection');
-    await pos.auth.posGet('/api/credit-payments/collection');
-    await pos.auth.posGet('/api/employee-deductions');
-    assert.equal(pos.stats.logins, 1);
-    assert.deepEqual(pos.stats.tokensSeen, ['Bearer tok-1', 'Bearer tok-1', 'Bearer tok-1']);
-  } finally { await pos.close(); }
+    await assert.rejects(pos.posGet('/api/employee-deductions'), { code: 'POS_NOT_CONNECTED' });
+    assert.equal(mock.stats.logins, 0, 'nothing logs in by itself');
+    const result = await mock.financeLogin();
+    assert.equal(result.pos.ok, true);
+    await pos.posGet('/api/completed-shifts/collection');
+    await pos.posGet('/api/credit-payments/collection');
+    await pos.posGet('/api/employee-deductions');
+    assert.equal(mock.stats.logins, 1);
+    assert.deepEqual(mock.stats.tokensSeen, ['Bearer tok-1', 'Bearer tok-1', 'Bearer tok-1']);
+  } finally { await mock.close(); }
 });
 
-test('concurrent requests share ONE login (POS allows only 5 logins per minute)', async () => {
-  const pos = await setupPos();
+test('concurrent logins with the same typed credentials share ONE request (5 logins/minute limit)', async () => {
+  const mock = await setupPos();
   try {
-    await Promise.all(Array.from({ length: 8 }, () => pos.auth.posGet('/api/employee-deductions')));
-    assert.equal(pos.stats.logins, 1);
-  } finally { await pos.close(); }
+    await Promise.all(Array.from({ length: 6 }, () => mock.financeLogin()));
+    assert.equal(mock.stats.logins, 1);
+    await Promise.all(Array.from({ length: 8 }, () => pos.posGet('/api/employee-deductions')));
+    assert.equal(mock.stats.logins, 1);
+  } finally { await mock.close(); }
 });
 
-test('expired / invalid token: 401 Unauthenticated -> logs in again once and retries', async () => {
-  const pos = await setupPos();
+test('401 Unauthenticated -> token invalidated, ONE retry with the next session, then a clear "log in" error', async () => {
+  const mock = await setupPos();
   try {
-    await pos.auth.posGet('/api/employee-deductions');
-    pos.expireServerToken(); // the POS no longer accepts tok-1
-    const payload = await pos.auth.posGet('/api/employee-deductions');
-    assert.deepEqual(payload, { data: [{ id: 1 }] });
-    assert.equal(pos.stats.logins, 2);
-    assert.deepEqual(pos.stats.tokensSeen.slice(-2), ['Bearer tok-1', 'Bearer tok-2']);
-  } finally { await pos.close(); }
+    await mock.financeLogin();
+    // The accountant's own POS session is the second token source.
+    await auth.loginAll({ userId: 8, role: 'Accountant', username: 'finance', password: 'fin-pass' });
+    assert.equal(mock.stats.logins, 2);
+    mock.expireServerTokens();
+    await assert.rejects(pos.posGet('/api/employee-deductions', null, { userId: 8 }),
+      (e) => e.code === 'POS_NOT_CONNECTED' && /Log in with the RAVON POS Finance account/.test(e.message));
+    assert.equal(mock.stats.dataCalls, 2, 'exactly one retry');
+    assert.equal(mock.stats.logins, 2, 'no password is stored, so there is no automatic re-login');
+    assert.equal(auth.getAuthStatus('pos').state, 'expired');
+  } finally { await mock.close(); }
 });
 
-test('token that the POS says has expired is refreshed before use', async () => {
-  const pos = await setupPos({ expiresIn: 30 }); // expires inside the safety margin
+test('401 on the shared session falls back to the requesting user\'s own valid session', async () => {
+  const mock = await setupPos();
   try {
-    await pos.auth.posGet('/api/employee-deductions');
-    await pos.auth.posGet('/api/employee-deductions');
-    assert.equal(pos.stats.logins, 2);
-    assert.equal(pos.stats.dataCalls, 2);
-  } finally { await pos.close(); }
+    await mock.financeLogin();
+    const shared = auth.getAuthStatus('pos');
+    assert.equal(shared.source, 'finance');
+    mock.expireServerTokens();
+    await auth.loginAll({ userId: 8, role: 'Accountant', username: 'finance', password: 'fin-pass' }); // tok-2 valid
+    assert.deepEqual(await pos.posGet('/api/employee-deductions', null, { userId: 8 }), { data: [{ id: 1 }] });
+    assert.deepEqual(mock.stats.tokensSeen, ['Bearer tok-1', 'Bearer tok-2']);
+  } finally { await mock.close(); }
 });
 
-test('rejected credentials -> clear error, and no login retry storm', async () => {
-  const pos = await setupPos();
-  process.env.RAVON_POS_PASSWORD = 'wrong';
+test('a token the login says expires (inside the safety margin) is not used', async () => {
+  const mock = await setupPos({ expiresIn: 30 });
   try {
-    await assert.rejects(pos.auth.posGet('/api/employee-deductions'), (e) => e.name === 'PosAuthError' && /RAVON_POS_USERNAME/.test(e.message));
-    await assert.rejects(pos.auth.posGet('/api/employee-deductions'), { name: 'PosAuthError' });
-    assert.equal(pos.stats.logins, 1); // second call answered from the cool-down, POS not hit again
-    assert.equal(pos.stats.dataCalls, 0);
-  } finally { await pos.close(); }
+    await mock.financeLogin();
+    await assert.rejects(pos.posGet('/api/employee-deductions'), { code: 'POS_NOT_CONNECTED' });
+    assert.equal(mock.stats.dataCalls, 0);
+  } finally { await mock.close(); }
 });
 
-test('POS keeps answering Unauthenticated -> PosAuthError after exactly one retry', async () => {
-  const stats = { logins: 0, dataCalls: 0 };
-  const server = await startMockPos((req, res) => {
-    if (req.url === '/api/login') { stats.logins += 1; return json(res, 200, { token: `t${stats.logins}` }); }
-    stats.dataCalls += 1;
-    return json(res, 401, UNAUTH);
-  });
-  process.env.RAVON_POS_API_URL = `http://127.0.0.1:${server.address().port}`;
-  process.env.RAVON_POS_USERNAME = 'svc-user';
-  process.env.RAVON_POS_PASSWORD = 'svc-pass';
-  const auth = require('../services/posAuthService');
-  auth.resetAuthState();
+test('refused credentials -> clear error, cool-down, no login storm', async () => {
+  const mock = await setupPos();
   try {
-    await assert.rejects(auth.posGet('/api/completed-shifts/collection'), { name: 'PosAuthError' });
-    assert.equal(stats.logins, 2);
-    assert.equal(stats.dataCalls, 2);
-  } finally { await new Promise((r) => server.close(r)); }
+    const first = await auth.loginAll({ userId: 11, role: 'Finance', username: 'finance', password: 'wrong' });
+    assert.equal(first.pos.ok, false);
+    assert.equal(first.pos.code, 'POS_CREDENTIALS_INVALID');
+    assert.doesNotMatch(JSON.stringify(first), /wrong/);
+    await auth.loginAll({ userId: 11, role: 'Finance', username: 'finance', password: 'wrong' });
+    assert.equal(mock.stats.logins, 1, 'second attempt answered from the cool-down');
+  } finally { await mock.close(); }
 });
 
-test('missing configuration is reported without calling the POS; status never exposes the token', async () => {
-  const auth = require('../services/posAuthService');
-  auth.resetAuthState();
-  delete process.env.RAVON_POS_USERNAME;
-  delete process.env.RAVON_POS_PASSWORD;
-  delete process.env.RAVON_POS_API_KEY;
-  await assert.rejects(auth.posGet('/api/employee-deductions'), { name: 'PosConfigError', code: 'POS_NOT_CONFIGURED' });
-  const status = auth.getAuthStatus();
-  assert.deepEqual(Object.keys(status).sort(), ['authenticated', 'code', 'configured', 'message']);
-  assert.equal(status.configured, false);
+test('login rate limit: at most 4 login requests per minute per system', async () => {
+  const mock = await setupPos();
+  try {
+    for (let i = 0; i < 7; i += 1) {
+      await auth.loginAll({ userId: 100 + i, role: 'Admin', username: `user${i}`, password: 'x' });
+    }
+    assert.equal(mock.stats.logins, 4);
+  } finally { await mock.close(); }
+});
+
+test('not configured is reported without any network call; status never exposes the token', async () => {
+  const mock = await setupPos();
+  await mock.financeLogin();
+  const status = auth.getAuthStatus('pos');
+  assert.equal(status.connected, true);
+  assert.equal(status.username, 'finance');
+  assert.doesNotMatch(JSON.stringify(status), /tok-1|fin-pass/);
+  await mock.close();
+  delete process.env.RAVON_POS_API_URL;
+  await assert.rejects(pos.posGet('/api/employee-deductions'), { name: 'PosConfigError', code: 'POS_NOT_CONFIGURED' });
+  assert.equal(auth.getAuthStatus('pos').configured, false);
 });
 
 test('login token is found in the common response shapes', () => {
@@ -390,7 +412,50 @@ test('login token is found in the common response shapes', () => {
   assert.equal(extractToken({ access_token: 'b', token_type: 'Bearer' }), 'b');
   assert.equal(extractToken({ data: { token: 'c' } }), 'c');
   assert.equal(extractToken({ authorisation: { token: 'd' } }), 'd');
+  assert.equal(extractToken({ token: { plainTextToken: 'e' } }), 'e');
+  assert.equal(extractToken({ data: { access_token: 'f', expires_in: 3600 } }), 'f');
   assert.equal(extractToken({ message: 'ok' }), null);
+  const { extractExpiry } = require('../services/posAuthService');
+  assert.equal(extractExpiry({ expires_in: 60 }, 1000), 61000);
+  assert.equal(extractExpiry({ data: { expires_at: '2026-10-10T00:00:00Z' } }), Date.parse('2026-10-10T00:00:00Z'));
+  assert.equal(extractExpiry({ token: 'x' }), null);
+});
+
+test('scrub() removes Bearer values, live tokens and given secrets', async () => {
+  const mock = await setupPos();
+  try {
+    await mock.financeLogin();
+    const text = auth.scrub('failed with Authorization: Bearer abc.def and tok-1 and pw fin-pass', ['fin-pass']);
+    assert.doesNotMatch(text, /abc\.def|tok-1|fin-pass/);
+  } finally { await mock.close(); }
+});
+
+test('credential variables in the environment are ignored (no service login, no static key)', async () => {
+  const mock = await setupPos();
+  Object.assign(process.env, { RAVON_POS_USERNAME: 'finance', RAVON_POS_PASSWORD: 'fin-pass', RAVON_POS_API_KEY: 'tok-1', POS_USERNAME: 'finance', POS_PASSWORD: 'fin-pass' });
+  try {
+    await assert.rejects(pos.posGet('/api/employee-deductions'), { code: 'POS_NOT_CONNECTED' });
+    assert.equal(mock.stats.logins, 0);
+    assert.equal(mock.stats.dataCalls, 0);
+  } finally {
+    for (const name of ['RAVON_POS_USERNAME', 'RAVON_POS_PASSWORD', 'RAVON_POS_API_KEY', 'POS_USERNAME', 'POS_PASSWORD']) delete process.env[name];
+    await mock.close();
+  }
+});
+
+test('no source code file contains a POS / Restaurant credential variable or fallback', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const root = path.join(__dirname, '..');
+  const files = ['services', 'controllers', 'routes', 'config', 'scripts', 'middleware']
+    .flatMap((dir) => fs.readdirSync(path.join(root, dir)).filter((f) => f.endsWith('.js')).map((f) => path.join(root, dir, f)));
+  for (const file of [...files, path.join(root, 'server.js'), path.join(root, '.env.example'), path.join(root, '.env')]) {
+    if (!fs.existsSync(file)) continue;
+    const src = fs.readFileSync(file, 'utf8');
+    const assigned = src.match(/^\s*(RAVON_POS_USERNAME|RAVON_POS_PASSWORD|RAVON_POS_API_KEY|POS_USERNAME|POS_PASSWORD)\s*=/m);
+    assert.equal(assigned, null, `${path.basename(file)} sets ${assigned && assigned[1]}`);
+    assert.doesNotMatch(src, /process\.env\.(RAVON_POS_USERNAME|RAVON_POS_PASSWORD|RAVON_POS_API_KEY|POS_USERNAME|POS_PASSWORD)\b/, path.basename(file));
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -432,24 +497,38 @@ test('client and server role tables agree on Collection', async () => {
   assert.match(src, /rule\('\/collection', \{ all: \[M\.COLLECTION\] \}\)/);
 });
 
+test('POS / Restaurant integration endpoints: status + connect reach the controller for Finance too, never Stores; QB cannot POST', () => {
+  const { evaluateApiAccess } = require('../config/rolePermissions');
+  const can = (role, method, url) => evaluateApiAccess(role, method, url).allowed;
+  for (const role of ['Finance', 'Accountant', 'Admin', 'Super Admin']) {
+    assert.equal(can(role, 'GET', '/api/collections/integrations/status'), true, role);
+    assert.equal(can(role, 'POST', '/api/collections/integrations/restaurant/connect'), true, role);
+  }
+  assert.equal(can('QB', 'GET', '/api/collections/integrations/status'), true);
+  assert.equal(evaluateApiAccess('QB', 'POST', '/api/collections/integrations/pos/connect').reason, 'view-only');
+  assert.equal(can('Store Keeper', 'GET', '/api/collections/integrations/status'), false);
+  assert.equal(can('Store Keeper', 'POST', '/api/collections/integrations/pos/connect'), false);
+  // The rest of /collections is unchanged for Finance.
+  assert.equal(can('Finance', 'GET', '/api/collections/pending'), false);
+});
+
 // ---------------------------------------------------------------------------
-// POS error handling: meaningful messages, bounded retries
+// Data call error handling: meaningful messages, bounded retries
 // ---------------------------------------------------------------------------
 const posWithStatus = async (sequence) => {
   const stats = { logins: 0, dataCalls: 0 };
   const server = await startMockPos((req, res) => {
     if (req.url === '/api/login') { stats.logins += 1; return json(res, 200, { token: 'tok' }); }
+    if (req.url === '/api/me') return json(res, 200, { user: { branch_ids: [] } });
     const step = sequence[Math.min(stats.dataCalls, sequence.length - 1)];
     stats.dataCalls += 1;
     if (step.headers) Object.entries(step.headers).forEach(([k, v]) => res.setHeader(k, v));
     return json(res, step.status, step.body ?? {});
   });
   process.env.RAVON_POS_API_URL = `http://127.0.0.1:${server.address().port}`;
-  process.env.RAVON_POS_USERNAME = 'svc-user';
-  process.env.RAVON_POS_PASSWORD = 'svc-pass';
-  const auth = require('../services/posAuthService');
   auth.resetAuthState();
-  return { auth, stats, close: () => new Promise((r) => server.close(r)) };
+  await auth.loginAll({ userId: 11, role: 'Finance', username: 'finance', password: 'fin-pass' });
+  return { auth: pos, stats, close: () => new Promise((r) => server.close(r)) };
 };
 
 test('POS 403 / 422 / 429 / 500 -> meaningful errors, no endless retries', async () => {
@@ -457,14 +536,14 @@ test('POS 403 / 422 / 429 / 500 -> meaningful errors, no endless retries', async
     [{ status: 403, body: { message: 'Forbidden' } }, /not allowed to read/, 1],
     [{ status: 422, body: { message: 'The start date is invalid.' } }, /request parameters \(422: The start date is invalid\.\)/, 1],
     [{ status: 429, headers: { 'Retry-After': '30' } }, /rate limit .* in 30 seconds/, 1],
-    [{ status: 500, body: { message: 'Server Error' } }, /POS server had an error \(500\)/, 1]
+    [{ status: 500, body: { message: 'Server Error' } }, /RAVON POS server had an error \(500\)/, 1]
   ];
   for (const [step, pattern, calls] of cases) {
-    const pos = await posWithStatus([step]);
+    const mock = await posWithStatus([step]);
     try {
-      await assert.rejects(pos.auth.posGet('/api/completed-shifts/collection'), (e) => e.name === 'PosResponseError' && pattern.test(e.message));
-      assert.equal(pos.stats.dataCalls, calls, `status ${step.status}`);
-    } finally { await pos.close(); }
+      await assert.rejects(mock.auth.posGet('/api/completed-shifts/collection'), (e) => e.name === 'PosResponseError' && pattern.test(e.message));
+      assert.equal(mock.stats.dataCalls, calls, `status ${step.status}`);
+    } finally { await mock.close(); }
   }
 });
 
@@ -476,31 +555,16 @@ test('POS 503 is retried once, then succeeds; a second 503 is reported', async (
   } finally { await ok.close(); }
   const bad = await posWithStatus([{ status: 503 }]);
   try {
-    await assert.rejects(bad.auth.posGet('/api/employee-deductions'), /POS server had an error \(503\)/);
+    await assert.rejects(bad.auth.posGet('/api/employee-deductions'), /server had an error \(503\)/);
     assert.equal(bad.stats.dataCalls, 2);
   } finally { await bad.close(); }
 });
 
-test('POS network failure -> PosUnavailableError after one retry', async () => {
-  const auth = require('../services/posAuthService');
+test('POS network failure -> PosUnavailableError after one retry; login unreachable -> POS_AUTH_UNAVAILABLE', async () => {
+  const mock = await posWithStatus([{ status: 200, body: { data: [] } }]);
+  await mock.close();
+  await assert.rejects(pos.posGet('/api/employee-deductions'), { name: 'PosUnavailableError' });
   auth.resetAuthState();
-  process.env.RAVON_POS_API_URL = 'http://127.0.0.1:1'; // nothing listens here
-  process.env.RAVON_POS_USERNAME = 'svc-user';
-  process.env.RAVON_POS_PASSWORD = 'svc-pass';
-  await assert.rejects(auth.posGet('/api/employee-deductions'), { name: 'PosUnavailableError' });
-});
-
-test('POS_USERNAME / POS_PASSWORD / POS_BASE_URL are accepted as alternative names', async () => {
-  const pos = await posWithStatus([{ status: 200, body: { data: [] } }]);
-  const base = process.env.RAVON_POS_API_URL;
-  delete process.env.RAVON_POS_API_URL; delete process.env.RAVON_POS_USERNAME; delete process.env.RAVON_POS_PASSWORD;
-  process.env.POS_BASE_URL = base; process.env.POS_USERNAME = 'svc-user'; process.env.POS_PASSWORD = 'svc-pass';
-  try {
-    pos.auth.resetAuthState();
-    assert.deepEqual(await pos.auth.posGet('/api/employee-deductions'), { data: [] });
-    assert.equal(pos.stats.logins, 1);
-  } finally {
-    delete process.env.POS_BASE_URL; delete process.env.POS_USERNAME; delete process.env.POS_PASSWORD;
-    await pos.close();
-  }
+  const result = await auth.loginAll({ userId: 11, role: 'Finance', username: 'finance', password: 'fin-pass' });
+  assert.equal(result.pos.code, 'POS_AUTH_UNAVAILABLE');
 });

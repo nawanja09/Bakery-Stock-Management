@@ -1,15 +1,21 @@
 // src/components/Collection/Collection.jsx
 //
-// Collection module: POS collections -> Pending -> Completed / Rejected.
-//   Pending   - opening the tab asks the BSMS backend to pull the three POS
+// Collection module: RAVON POS + RAVON Restaurant collections -> Pending ->
+// Completed / Rejected. Both systems go through the same flow; every row shows
+// its System (POS / Restaurant).
+//   Pending   - opening the tab asks the BSMS backend to pull the three
 //               endpoints (completed shift collections, credit payments, employee
-//               deductions) for the searched date range (or the recent default
-//               window). The backend uses its own POS finance integration login;
-//               users never sign in to the POS here. Collections from ALL POS
-//               departments are loaded, never just the user's own department.
+//               deductions) of BOTH systems for the searched date range (or the
+//               recent default window). The backend uses the Finance account's
+//               session of each system - the browser never calls POS / Restaurant
+//               and never sees a token. No password is stored, so there is no
+//               background sync: when a system is "not connected / expired" the
+//               page says so and offers "Connect" (the password is sent once and
+//               not stored). Collections from ALL departments are loaded, never
+//               just the user's own department.
 //               Pending records are NOT in any ledger. Tick one, several or all
 //               and Approve or Reject.
-//   Filters   - Search text, Source, Department and From / To date are applied
+//   Filters   - Search text, System, Source, Department and From / To date are applied
 //               together by the backend when Search is pressed (or Enter).
 //   Completed - approved collections, read from the BSMS database (not the POS),
 //               with what was posted to which ledger.
@@ -42,6 +48,11 @@ const SOURCE_LABELS = {
   EMPLOYEE_DEDUCTION: 'Employee Deduction'
 };
 const REF_PREFIX = { SHIFT: 'SHIFT', CREDIT_PAYMENT: 'CP', EMPLOYEE_DEDUCTION: 'DED' };
+// Source system of a record (collections.source_system). Restaurant references
+// carry "RST-" (mirrors collectionService.ledgerReference); POS ones are unchanged.
+const SYSTEM_LABELS = { POS: 'POS', RESTAURANT: 'Restaurant' };
+const SYSTEM_REF_PREFIX = { POS: '', RESTAURANT: 'RST-' };
+const PROVIDER_ORDER = ['pos', 'restaurant'];
 const METHOD_LABELS = { CASH: 'Cash', CARD: 'Card', BANK: 'Bank / Online', AR: 'AR', SHORT_EXCESS: 'Short / Excess', AR_SETTLEMENT: 'AR settled' };
 const REASON_MAX = 255;
 
@@ -66,23 +77,31 @@ const fmtDateTime = (value) => {
 };
 const CARD_TYPE_LABELS = { sale: 'Sale', order_advance: 'Order advance' };
 
-// Ledger reference (e.g. "SHIFT-211-0104") and the reference shown in the tables
-// (a shift shows its Shift Reference "211-0104").
-const refOf = (row) => `${REF_PREFIX[row.source_type] || 'POS'}-${row.reference_no || row.source_id}`;
+// Ledger reference (e.g. "SHIFT-211-0104", Restaurant "RST-SHIFT-211-0104") and
+// the reference shown in the tables (a shift shows its Shift Reference "211-0104").
+const systemOf = (system) => (system === 'RESTAURANT' ? 'RESTAURANT' : 'POS');
+const refOf = (row) => `${SYSTEM_REF_PREFIX[systemOf(row.source_system)]}${REF_PREFIX[row.source_type] || 'POS'}-${row.reference_no || row.source_id}`;
 const displayRef = (row) => row.shift_reference || row.reference_no || row.source_id;
+
+const systemBadge = (system) => {
+  const s = systemOf(system);
+  return <span className={`col-system col-system-${s.toLowerCase()}`} title={`Source system: ${SYSTEM_LABELS[s]}`}>{SYSTEM_LABELS[s]}</span>;
+};
+// Reference cell: system badge + reference.
+const refCell = (r) => <>{systemBadge(r.source_system)} {displayRef(r)}</>;
 
 const isUnmapped = (r) => !r.department_id && !!r.pos_branch_name;
 
 const departmentCell = (r) => (
   <>
     {r.department_name
-      || (isUnmapped(r) ? <span className="col-warn" title="No Stock Management department matches this POS branch">Unmapped</span>
+      || (isUnmapped(r) ? <span className="col-warn" title="No Stock Management department matches this branch">Unmapped</span>
         : <span className="col-zero">—</span>)}
-    {r.pos_branch_name && <div className="col-sub">POS: {r.pos_branch_name}</div>}
+    {r.pos_branch_name && <div className="col-sub">Branch: {r.pos_branch_name}</div>}
   </>
 );
 const linkedRefOf = (row) => (row.linked_collection_id
-  ? `${REF_PREFIX[row.linked_source_type] || 'POS'}-${row.linked_reference_no || row.linked_source_id}` : null);
+  ? `${SYSTEM_REF_PREFIX[systemOf(row.linked_source_system)]}${REF_PREFIX[row.linked_source_type] || 'POS'}-${row.linked_reference_no || row.linked_source_id}` : null);
 
 // Short/Excess: + short, - excess.
 const shortExcessText = (v) => {
@@ -107,7 +126,7 @@ const arSettlementOf = (row) => (row.source_type === 'CREDIT_PAYMENT'
 // Why a shift's card cannot be posted as individual payments, or null.
 const cardIssue = (row) => {
   if (row.source_type !== 'SHIFT' || num(row.card_amount) === 0) return null;
-  if (row.card_txn_count === null || row.card_txn_count === undefined) return 'the POS sent no individual card payments';
+  if (row.card_txn_count === null || row.card_txn_count === undefined) return `${SYSTEM_LABELS[systemOf(row.source_system)]} sent no individual card payments`;
   const diff = num(row.card_amount) - num(row.card_txn_total);
   if (Math.abs(diff) > 0.009) {
     return `the ${row.card_txn_count} card payments add up to ${fmtMoney(row.card_txn_total)}, not ${fmtMoney(row.card_amount)} (difference ${fmtMoney(diff)})`;
@@ -118,17 +137,18 @@ const cardIssue = (row) => {
 const totalMismatch = (row) => row.pos_total_amount !== null && row.pos_total_amount !== undefined
   && Math.abs(num(row.pos_total_amount) - num(row.total_amount)) > 0.009;
 
-const EMPTY_FILTERS = { search: '', source: '', department: '', fromDate: '', toDate: '' };
+const EMPTY_FILTERS = { search: '', system: '', source: '', department: '', fromDate: '', toDate: '' };
 const EMPTY_DATA = {
   records: [], total: 0, page: 1, pages: 1, limit: 100,
   summary: { count: 0, cash: 0, card: 0, bank: 0, ar: 0, short_excess: 0, deduction: 0, total: 0, unmapped: 0 }
 };
 const PAGE_SIZE = 100;
 
-// Department filter value: "d:<department id>" or "u:<POS branch>" (unmapped branch).
+// Department filter value: "d:<department id>" or "u:<branch>" (unmapped branch).
 const toParams = (f, page) => {
   const p = { page, limit: PAGE_SIZE };
   if (f.search) p.search = f.search;
+  if (f.system) p.source_system = f.system;
   if (f.source) p.source = f.source;
   if (f.department.startsWith('d:')) p.department_id = f.department.slice(2);
   if (f.department.startsWith('u:')) { p.department_id = 'unmapped'; p.branch = f.department.slice(2); }
@@ -162,7 +182,8 @@ const Collection = () => {
   const [data, setData] = useState(EMPTY_DATA);
   const [loading, setLoading] = useState(false);
   const [sync, setSync] = useState(null);
-  const [posStatus, setPosStatus] = useState(null);
+  // { pos: {...}, restaurant: {...} } - connection state of each system (never a token)
+  const [integrations, setIntegrations] = useState(null);
   const [selectedIds, setSelectedIds] = useState([]);
   const [rejectedSelected, setRejectedSelected] = useState([]);
   const refreshOnNextLoad = useRef(true); // pull from the POS when Pending is opened / searched
@@ -175,6 +196,8 @@ const Collection = () => {
   const [dialogError, setDialogError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [cardView, setCardView] = useState(null); // { row, loading, data, error } - individual card payments
+  // "Connect <system> Finance account": { provider, label, account, username, password, error, submitting }
+  const [connect, setConnect] = useState(null);
 
   // ------------------------------------------------------------------ data
   useEffect(() => {
@@ -197,11 +220,17 @@ const Collection = () => {
 
   const params = useMemo(() => toParams(filters, page), [filters, page]);
 
+  const loadIntegrations = useCallback(() => {
+    api.get('/collections/integrations/status')
+      .then((res) => setIntegrations(res.data?.integrations || null))
+      .catch(() => {});
+  }, []);
+
   // One loader for the current tab. On Pending, opening the tab, Search and
-  // "Refresh from POS" first make the backend pull the POS (all departments) for
-  // the searched date range - the range is never answered from rows loaded
-  // earlier. Paging only reads the database. The backend's POS integration
-  // account is used; the user never signs in to the POS.
+  // "Refresh" first make the backend pull POS and Restaurant (all departments)
+  // for the searched date range - the range is never answered from rows loaded
+  // earlier. Paging only reads the database. The backend uses the Finance
+  // sessions; the browser never talks to POS / Restaurant.
   const load = useCallback(async ({ refresh = false } = {}) => {
     const status = tab.toLowerCase();
     const pull = status === 'pending' && refresh;
@@ -212,7 +241,7 @@ const Collection = () => {
       setData({ ...EMPTY_DATA, ...body, records: body.records || [] });
       if (status === 'pending') {
         if (body.sync) setSync(body.sync);
-        if (body.pos) setPosStatus(body.pos);
+        if (body.integrations) setIntegrations(body.integrations);
         const visible = new Set((body.records || []).map((r) => r.id));
         setSelectedIds((prev) => prev.filter((id) => visible.has(id)));
         if (pull) loadDepartmentOptions();
@@ -233,6 +262,33 @@ const Collection = () => {
   }, [load, tab, searchSeq]);
 
   useEffect(() => { loadDepartmentOptions(); }, [loadDepartmentOptions]);
+  useEffect(() => { loadIntegrations(); }, [loadIntegrations]);
+
+  // ------------------------------------------------------------- connect
+  const openConnect = (status) => setConnect({
+    provider: status.provider, label: status.label, account: status.account,
+    username: '', password: '', error: '', submitting: false
+  });
+  const closeConnect = () => setConnect((c) => (c && c.submitting ? c : null));
+  const submitConnect = async (e) => {
+    if (e) e.preventDefault();
+    if (!connect || connect.submitting) return;
+    const username = connect.username.trim();
+    if (!username || !connect.password) { setConnect((c) => ({ ...c, error: 'Enter the username and password' })); return; }
+    const { provider, password } = connect;
+    // The password leaves this component only in this one request; it is
+    // cleared from state right away and is never stored by the server.
+    setConnect((c) => ({ ...c, password: '', submitting: true, error: '' }));
+    try {
+      const res = await api.post(`/collections/integrations/${provider}/connect`, { username, password });
+      showPopup('success', `${connect.label} connected as ${res.data?.username || username}`);
+      setConnect(null);
+      loadIntegrations();
+      if (tab === 'Pending') load({ refresh: true });
+    } catch (error) {
+      setConnect((c) => (c ? { ...c, submitting: false, error: error.response?.data?.error || `Could not connect to ${c.label}` } : c));
+    }
+  };
 
   const openTab = (t) => {
     if (t === tab) return;
@@ -287,22 +343,23 @@ const Collection = () => {
     if (selectedRows.length === 0) { showPopup('error', 'Select at least one pending record to approve'); return; }
     const unmapped = selectedRows.filter(isUnmapped);
     if (unmapped.length > 0) {
-      showPopup('error', `${refOf(unmapped[0])}: POS branch "${unmapped[0].pos_branch_name}" is not mapped to a department, so it cannot be approved yet.`);
+      showPopup('error', `${refOf(unmapped[0])}: branch "${unmapped[0].pos_branch_name}" is not mapped to a department, so it cannot be approved yet.`);
       return;
     }
     const mismatched = selectedRows.filter(totalMismatch);
     if (mismatched.length > 0) {
-      showPopup('error', `${refOf(mismatched[0])}: the POS collection total does not match Cash + Card + Bank / Online + AR. Reject it or fix it in the POS.`);
+      const system = SYSTEM_LABELS[systemOf(mismatched[0].source_system)];
+      showPopup('error', `${refOf(mismatched[0])}: the ${system} collection total does not match Cash + Card + Bank / Online + AR. Reject it or fix it in ${system}.`);
       return;
     }
     const cardProblem = selectedRows.find(cardIssue);
     if (cardProblem) {
-      showPopup('error', `${refOf(cardProblem)}: card cannot be posted - ${cardIssue(cardProblem)}. Check the shift's card payments in the POS.`);
+      showPopup('error', `${refOf(cardProblem)}: card cannot be posted - ${cardIssue(cardProblem)}. Check the shift's card payments in ${SYSTEM_LABELS[systemOf(cardProblem.source_system)]}.`);
       return;
     }
     const inputs = {};
     selectedRows.forEach((r) => {
-      // No company from the POS: suggest the one last used for this department.
+      // No company from POS / Restaurant: suggest the one last used for this department.
       const companyId = r.company_id ? String(r.company_id) : (r.suggested_company_id ? String(r.suggested_company_id) : '');
       const options = banksForCompany(companyId);
       const posMatch = r.pos_bank_account
@@ -439,35 +496,83 @@ const Collection = () => {
   };
 
   // ------------------------------------------------------------- render helpers
-  // A source the POS could not be reached for is not reported on this page
-  // (the server logs it); the records already in Pending are simply shown.
-  const loadedSources = (sync?.sources || []).filter((s) => !s.error);
+  // Results of the last sync, per system ({ system, fetched, created, ... sources[] }).
+  // Older responses without `systems` are POS-only.
+  const syncSystems = sync?.systems || (sync?.sources ? [{ system: 'POS', sources: sync.sources }] : []);
+  const sourceLabel = (s) => `${SYSTEM_LABELS[systemOf(s.system)]} ${SOURCE_LABELS[s.source]}`;
+  // A source that could not be read is reported by the per-system status below;
+  // the records already in Pending are simply shown.
+  const loadedSources = syncSystems.flatMap((sys) => (sys.sources || []).map((s) => ({ ...s, system: sys.system })))
+    .filter((s) => !s.error);
   const syncProblems = loadedSources.filter((s) => s.invalid > 0 || s.duplicate > 0 || s.unmapped > 0);
 
-  // The POS only returns the branches its integration account may see
-  // (/api/me branch_ids); Stock Management itself applies no department filter.
-  const renderScopeWarning = () => {
-    const ids = posStatus?.scope?.branchIds;
-    if (!ids || ids.length === 0) return null;
+  // POS / Restaurant connection badges. The browser never sees a token: only
+  // connected / not connected / expired, the account name and branch scope.
+  const statusText = (st) => {
+    if (!st) return 'Checking...';
+    if (st.state === 'not_configured') return 'Not configured';
+    if (st.connected) return `Connected${st.username ? ` as ${st.username}` : ''}`;
+    if (st.state === 'expired') return 'Session expired';
+    return 'Not connected';
   };
-
-  // The backend logs in to RAVON POS automatically with its configured Finance
-  // account; this only shows when that automatic login failed.
-  const renderPosSessionWarning = () => {
-    if (!posStatus?.authError) return null;
+  const renderIntegrationStatus = () => {
+    const list = PROVIDER_ORDER.map((id) => integrations?.[id]).filter(Boolean);
+    if (list.length === 0) return null;
+    const needsLogin = list.filter((st) => st.configured && !st.connected);
+    const syncFailures = syncSystems.filter((s) => s.error);
+    const scopeWarnings = list.filter((st) => st.connected && st.scope?.warning);
     return (
-      <div className="col-sync-alert" role="alert">
-        <FontAwesomeIcon icon={faTriangleExclamation} />
-        <div>
-          <strong>Could not sign in to RAVON POS.</strong>{' '}
-          {posStatus.message}
-          {' '}The records below are the ones already loaded; new POS collections cannot be read until this is resolved.
+      <div className="col-integrations">
+        <div className="col-integration-badges" aria-label="POS / Restaurant connection">
+          {list.map((st) => {
+            const stateClass = st.connected ? 'ok' : (st.state === 'not_configured' ? 'off' : 'warn');
+            return (
+              <span key={st.provider} className={`col-integration col-integration-${stateClass}`}
+                title={st.connected && st.expiresAt ? `Session valid until ${fmtDateTime(st.expiresAt)}` : (st.message || '')}>
+                <strong>{SYSTEM_LABELS[st.system] || st.label}</strong> {statusText(st)}
+                {canWrite && st.configured && !st.connected && (
+                  <button type="button" className="col-link-btn col-connect-btn" onClick={() => openConnect(st)}>
+                    {st.state === 'expired' ? 'Reconnect' : 'Connect'}
+                  </button>
+                )}
+              </span>
+            );
+          })}
         </div>
+        {needsLogin.length > 0 && (
+          <div className="col-sync-alert col-sync-warn" role="alert">
+            <FontAwesomeIcon icon={faTriangleExclamation} />
+            <div>
+              <strong>{needsLogin.map((st) => SYSTEM_LABELS[st.system]).join(' and ')} not connected.</strong>{' '}
+              Log in with the Finance account to sync
+              {canWrite ? ', or use Connect with the Finance account of that system' : ''}.
+              {' '}Passwords are never stored, so collections are only read while a Finance session is valid
+              (there is no background sync). The records below are the ones already loaded.
+            </div>
+          </div>
+        )}
+        {syncFailures.filter((s) => !needsLogin.some((st) => st.system === s.system)).map((s) => (
+          <div key={`err-${s.system}`} className="col-sync-alert" role="alert">
+            <FontAwesomeIcon icon={faTriangleExclamation} />
+            <div>
+              <strong>{SYSTEM_LABELS[systemOf(s.system)]}{s.partial ? ' (partly)' : ''} could not be read:</strong> {s.error}
+              {' '}The other system is not affected; the records below are the ones already loaded.
+            </div>
+          </div>
+        ))}
+        {scopeWarnings.map((st) => (
+          // The system only returns the branches of the account (/api/me branch_ids);
+          // Stock Management itself applies no department filter.
+          <div key={`scope-${st.provider}`} className="col-sync-alert col-sync-warn" role="alert">
+            <FontAwesomeIcon icon={faTriangleExclamation} />
+            <div>{st.scope.warning}</div>
+          </div>
+        ))}
       </div>
     );
   };
 
-  // Valid POS records that are deliberately not collections (overpayment
+  // Valid records that are deliberately not collections (overpayment
   // set-offs, voided deductions): an information line, not a warning.
   const renderExcludedNote = () => {
     const withExcluded = loadedSources.filter((s) => s.excluded > 0);
@@ -476,7 +581,7 @@ const Collection = () => {
       <p className="cl-note">
         Not imported (not collections):{' '}
         {withExcluded.map((s) => (
-          `${SOURCE_LABELS[s.source]} - ${(s.excludedReasons || []).map((e) => `${e.records} ${e.reason}`).join('; ')}`
+          `${sourceLabel(s)} - ${(s.excludedReasons || []).map((e) => `${e.records} ${e.reason}`).join('; ')}`
         )).join(' | ')}.
       </p>
     );
@@ -485,12 +590,16 @@ const Collection = () => {
   const renderSyncBanner = () => {
     if (!sync || loadedSources.length === 0) return null;
     if (syncProblems.length === 0) {
-      const fetched = loadedSources.reduce((n, s) => n + s.fetched, 0);
-      const added = loadedSources.reduce((n, s) => n + s.inserted + s.updated, 0);
+      const read = syncSystems.filter((sys) => (sys.sources || []).some((s) => !s.error));
       return (
         <p className="cl-note">
-          POS checked: {fetched} record{fetched === 1 ? '' : 's'} read from all branches
-          {' '}({loadedSources.map((s) => `${SOURCE_LABELS[s.source]} ${s.fetched}`).join(', ')}), {added} new or updated.
+          {read.map((sys) => {
+            const ok = (sys.sources || []).filter((s) => !s.error);
+            const fetched = ok.reduce((n, s) => n + s.fetched, 0);
+            const added = ok.reduce((n, s) => n + s.inserted + s.updated, 0);
+            return `${SYSTEM_LABELS[systemOf(sys.system)]} checked: ${fetched} record${fetched === 1 ? '' : 's'} read from all branches `
+              + `(${ok.map((s) => `${SOURCE_LABELS[s.source]} ${s.fetched}`).join(', ')}), ${added} new or updated.`;
+          }).join(' ')}
         </p>
       );
     }
@@ -499,8 +608,8 @@ const Collection = () => {
         <FontAwesomeIcon icon={faTriangleExclamation} />
         <div>
           {syncProblems.map((s) => (
-            <div key={s.source}>
-              <strong>{SOURCE_LABELS[s.source]}:</strong>{' '}
+            <div key={`${s.system}-${s.source}`}>
+              <strong>{sourceLabel(s)}:</strong>{' '}
               {s.invalid > 0 && (
                 <>
                   {s.invalid} record{s.invalid === 1 ? '' : 's'} could not be read and {s.invalid === 1 ? 'was' : 'were'} skipped
@@ -510,7 +619,7 @@ const Collection = () => {
               {s.duplicate > 0 && <> {s.duplicate} already-approved reference{s.duplicate === 1 ? '' : 's'} ignored.</>}
               {s.unmapped > 0 && (
                 <>
-                  {' '}{s.unmapped} record{s.unmapped === 1 ? '' : 's'} from POS branches without a matching department
+                  {' '}{s.unmapped} record{s.unmapped === 1 ? '' : 's'} from branches without a matching department
                   {' '}(shown as <em>Unmapped</em>; they cannot be approved until the branch maps):
                   <ul className="col-map-errors">
                     {(s.unmappedBranches || []).map((u) => (
@@ -538,6 +647,13 @@ const Collection = () => {
             value={draft.search} onChange={setDraftField('search')} />
         </div>
         <div className="form-group">
+          <label htmlFor="col-system">System</label>
+          <select id="col-system" value={draft.system} onChange={setDraftField('system')} className="form-select">
+            <option value="">All</option>
+            {Object.entries(SYSTEM_LABELS).map(([value, text]) => <option key={value} value={value}>{text}</option>)}
+          </select>
+        </div>
+        <div className="form-group">
           <label htmlFor="col-type">Collection Type</label>
           <select id="col-type" value={draft.source} onChange={setDraftField('source')} className="form-select">
             <option value="">All</option>
@@ -552,7 +668,7 @@ const Collection = () => {
               <option key={`d${d.id}`} value={`d:${d.id}`}>{d.name}</option>
             ))}
             {departmentOptions.unmapped.length > 0 && (
-              <optgroup label="Unmapped POS branches">
+              <optgroup label="Unmapped branches">
                 <option value="unmapped">All unmapped</option>
                 {departmentOptions.unmapped.map((u) => (
                   <option key={`u${u.branch}`} value={`u:${u.branch}`}>{u.branch}</option>
@@ -576,7 +692,7 @@ const Collection = () => {
         </button>
         {tab === 'Pending' && canWrite && (
           <button type="button" className="btn btn-secondary" onClick={() => load({ refresh: true })} disabled={loading}>
-            <FontAwesomeIcon icon={faRotateRight} spin={loading} /> Refresh from POS
+            <FontAwesomeIcon icon={faRotateRight} spin={loading} /> Refresh from POS / Restaurant
           </button>
         )}
       </div>
@@ -617,16 +733,15 @@ const Collection = () => {
         {tab === 'Pending' && (
           <>
             {!canWrite && (
-              <p className="cl-note">View only: these are the collections already loaded from the POS. Approving and rejecting are not available for your role.</p>
+              <p className="cl-note">View only: these are the collections already loaded from POS / Restaurant. Approving and rejecting are not available for your role.</p>
             )}
-            {renderPosSessionWarning()}
-            {renderScopeWarning()}
+            {renderIntegrationStatus()}
             {renderSyncBanner()}
             {renderExcludedNote()}
             <p className="cl-note">Pending collections are <strong>not</strong> posted to any ledger. Only approved records update the ledgers.</p>
 
             {loading && records.length === 0 ? (
-              <div className="cl-empty"><FontAwesomeIcon icon={faSpinner} spin /> Loading collections from the POS...</div>
+              <div className="cl-empty"><FontAwesomeIcon icon={faSpinner} spin /> Loading collections from POS / Restaurant...</div>
             ) : (
               <div className="cl-table-wrap">
                 <table className="report-table cl-table col-table">
@@ -669,14 +784,14 @@ const Collection = () => {
                           )}
                           <td>{fmtDate(r.collection_date)}</td>
                           <td>
-                            {displayRef(r)}
+                            {refCell(r)}
                             {isDeduction && linkedRefOf(r) && <div className="col-sub">for {linkedRefOf(r)}</div>}
                           </td>
                           <td>{SOURCE_LABELS[r.source_type]}</td>
                           <td>{departmentCell(r)}</td>
                           <td>
                             {methodsOf(r).map((m) => <span key={m} className="col-chip">{METHOD_LABELS[m]}</span>)}
-                            {r.pos_payment_method && <div className="col-sub">POS: {r.pos_payment_method}</div>}
+                            {r.pos_payment_method && <div className="col-sub">{SYSTEM_LABELS[systemOf(r.source_system)]}: {r.pos_payment_method}</div>}
                           </td>
                           <td className="cl-num">{moneyCell(r.cash_amount)}</td>
                           <td className="cl-num">{cardCell(r, r.card_amount)}</td>
@@ -689,7 +804,7 @@ const Collection = () => {
                           </td>
                           <td className="cl-num">
                             <strong>{fmtMoney(r.total_amount)}</strong>
-                            {mismatch && <div className="col-warn">POS total {fmtMoney(r.pos_total_amount)}</div>}
+                            {mismatch && <div className="col-warn">{SYSTEM_LABELS[systemOf(r.source_system)]} total {fmtMoney(r.pos_total_amount)}</div>}
                           </td>
                           <td>{r.company_name || <span className="col-warn">{r.pos_company ? `Unmatched: ${r.pos_company}` : 'Not set'}</span>}</td>
                           <td>{r.cashier_name || r.employee_name || '—'}</td>
@@ -776,7 +891,7 @@ const Collection = () => {
                   <tr key={r.id}>
                     <td>{fmtDate(r.collection_date)}</td>
                     <td>
-                      {displayRef(r)}
+                      {refCell(r)}
                       {linkedRefOf(r) && <div className="col-sub">for {linkedRefOf(r)}</div>}
                     </td>
                     <td>{SOURCE_LABELS[r.source_type]}</td>
@@ -847,7 +962,7 @@ const Collection = () => {
                         </td>
                       )}
                       <td>{fmtDate(r.collection_date)}</td>
-                      <td>{displayRef(r)}</td>
+                      <td>{refCell(r)}</td>
                       <td>{SOURCE_LABELS[r.source_type]}</td>
                       <td>{departmentCell(r)}</td>
                       <td className="cl-num">{fmtMoney(r.total_amount)}</td>
@@ -918,7 +1033,7 @@ const Collection = () => {
                       return (
                         <tr key={r.id}>
                           <td>
-                            {displayRef(r)}
+                            {refCell(r)}
                             <div className="col-sub">{fmtDate(r.collection_date)}{r.department_name ? ` · ${r.department_name}` : ''}</div>
                           </td>
                           <td className="col-posts">
@@ -973,7 +1088,7 @@ const Collection = () => {
           <div className="cl-modal cl-modal-wide col-modal" role="dialog" aria-modal="true" aria-labelledby="col-card-title" onClick={(e) => e.stopPropagation()}>
             <div className="cl-modal-header">
               <div>
-                <h3 id="col-card-title">Card Payments - Shift {displayRef(cardView.row)}</h3>
+                <h3 id="col-card-title">Card Payments - {SYSTEM_LABELS[systemOf(cardView.row.source_system)]} Shift {displayRef(cardView.row)}</h3>
                 <div className="cl-modal-sub">
                   {fmtDate(cardView.row.collection_date)}
                   {cardView.row.department_name ? ` · ${cardView.row.department_name}` : ''}
@@ -991,7 +1106,7 @@ const Collection = () => {
               {!cardView.loading && !cardView.error && !cardView.data?.available && (
                 <div className="col-sync-alert" role="alert">
                   <FontAwesomeIcon icon={faTriangleExclamation} />
-                  <div>The POS sent no individual card payments for this shift, so its card amount cannot be posted to the Card Ledger.</div>
+                  <div>{SYSTEM_LABELS[systemOf(cardView.row.source_system)]} sent no individual card payments for this shift, so its card amount cannot be posted to the Card Ledger.</div>
                 </div>
               )}
               {cardView.data?.legacy_single_entry && (
@@ -1008,7 +1123,7 @@ const Collection = () => {
                       <FontAwesomeIcon icon={faTriangleExclamation} />
                       <div>
                         Card cannot be posted: {cardView.data.problem}. Nothing is changed or balanced automatically -
-                        check this shift's card payments in the POS.
+                        check this shift's card payments in {SYSTEM_LABELS[systemOf(cardView.row.source_system)]}.
                       </div>
                     </div>
                   )}
@@ -1019,7 +1134,7 @@ const Collection = () => {
                           <th>#</th>
                           <th>Date / Time</th>
                           <th>Type</th>
-                          <th>POS Reference</th>
+                          <th>Receipt / Reference</th>
                           <th>Payment</th>
                           <th>Card Ledger Reference</th>
                           <th className="cl-num">Amount (Rs.)</th>
@@ -1055,7 +1170,7 @@ const Collection = () => {
                           <td className="cl-num cl-total">{fmtMoney(cardView.data.total)}</td>
                         </tr>
                         <tr>
-                          <td colSpan={6} className="cl-total-label">Shift card total (POS)</td>
+                          <td colSpan={6} className="cl-total-label">Shift card total ({SYSTEM_LABELS[systemOf(cardView.row.source_system)]})</td>
                           <td className="cl-num">{fmtMoney(cardView.data.card_total)}</td>
                         </tr>
                         <tr>
@@ -1105,6 +1220,49 @@ const Collection = () => {
               </button>
             </div>
           </div>
+        </div>
+      )}
+      {/* --------------------- CONNECT POS / RESTAURANT FINANCE ACCOUNT --------------------- */}
+      {connect && (
+        <div className="cl-modal-overlay" onClick={closeConnect}>
+          <form className="cl-modal col-connect-modal" role="dialog" aria-modal="true" aria-labelledby="col-connect-title"
+            onClick={(e) => e.stopPropagation()} onSubmit={submitConnect} autoComplete="off">
+            <div className="cl-modal-header">
+              <div>
+                <h3 id="col-connect-title">Connect {connect.account} account</h3>
+                <div className="cl-modal-sub">Sign in once so Stock Management can read {connect.label} collections.</div>
+              </div>
+              <button type="button" className="cl-modal-close" onClick={closeConnect} aria-label="Close" disabled={connect.submitting}>
+                <FontAwesomeIcon icon={faTimes} />
+              </button>
+            </div>
+            <div className="cl-modal-body">
+              <p className="cl-note">
+                Your password is sent once to {connect.label} to sign in and is <strong>not stored</strong> anywhere -
+                Stock Management keeps only the session (encrypted, on the server). When it expires you will be asked
+                to connect again; nothing is synced in the background.
+              </p>
+              <div className="form-group">
+                <label htmlFor="col-connect-user">{connect.label} username</label>
+                <input id="col-connect-user" className="form-input" autoComplete="off" autoFocus maxLength={150}
+                  value={connect.username} disabled={connect.submitting}
+                  onChange={(e) => { const { value } = e.target; setConnect((c) => ({ ...c, username: value, error: '' })); }} />
+              </div>
+              <div className="form-group">
+                <label htmlFor="col-connect-pass">{connect.label} password</label>
+                <input id="col-connect-pass" type="password" className="form-input" autoComplete="new-password" maxLength={150}
+                  value={connect.password} disabled={connect.submitting}
+                  onChange={(e) => { const { value } = e.target; setConnect((c) => ({ ...c, password: value, error: '' })); }} />
+              </div>
+              {connect.error && <div className="cl-modal-error" role="alert">{connect.error}</div>}
+            </div>
+            <div className="cl-modal-footer">
+              <button type="button" className="btn btn-secondary" onClick={closeConnect} disabled={connect.submitting}>Cancel</button>
+              <button type="submit" className="btn btn-primary" disabled={connect.submitting}>
+                {connect.submitting ? <><FontAwesomeIcon icon={faSpinner} spin /> Connecting...</> : 'Connect'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>

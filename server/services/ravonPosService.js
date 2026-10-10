@@ -7,9 +7,11 @@
 // or manages an FG Item master of its own - it reads the live item list
 // from the POS `/api/items-list` endpoint through this service.
 //
-// Only the POS services (this file, posAuthService.js for the login/token and
-// collectionSyncService.js for the Collection endpoints) know about the POS
-// API URL/credentials.
+// Only the POS services (this file, posAuthService.js / integrationAuthService.js
+// for the token and collectionSyncService.js for the Collection endpoints) know
+// about the POS API URL. No POS credentials exist on the server: the items are
+// read with the token of the latest Finance login accepted by the POS, so they
+// are only available while such a session is valid (code POS_NOT_CONNECTED).
 // Controllers must always go through the functions exported here -
 // the BSMS frontend must never call the POS API directly.
 //
@@ -25,7 +27,7 @@
 // names differ, only `mapPosItem()` needs to change.
 // ----------------------------------------------------------------------
 
-// Authentication (background /api/login + Bearer token) lives in posAuthService.
+// Authentication (Finance session token, never a stored password) lives in posAuthService.
 const { posGet, PosConfigError, PosAuthError, PosUnavailableError, PosResponseError } = require('./posAuthService');
 
 const RAVON_POS_API_URL = process.env.RAVON_POS_API_URL || '';
@@ -54,8 +56,9 @@ class RavonPosResponseError extends Error {
   }
 }
 
-// The automatic RAVON POS Finance login failed: code POS_CREDENTIALS_INVALID
-// (credentials rejected) or POS_AUTH_UNAVAILABLE (POS login service unreachable).
+// No usable RAVON POS Finance session: code POS_NOT_CONNECTED (nobody with a POS
+// account has logged in, or the session expired), POS_CREDENTIALS_INVALID or
+// POS_AUTH_UNAVAILABLE (POS login service unreachable).
 class RavonPosAuthError extends Error {
   constructor(message, code) {
     super(message);
@@ -141,7 +144,7 @@ const mapPosItem = (raw) => {
 const fetchRavonPosItems = async ({ includeInactive = false } = {}) => {
   const url = buildItemsUrl();
 
-  // Authenticated through the shared background POS login (posAuthService);
+  // Authenticated with the Finance session token (posAuthService);
   // its errors are mapped onto this module's existing error classes.
   let payload;
   try {

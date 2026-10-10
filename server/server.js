@@ -210,9 +210,10 @@ const startServer = async () => {
     await ensureChequeReleaseSchema();
     app.listen(PORT, () => {
       startChequeReleaseProcessor();
-      // Log in to RAVON POS with the configured Finance account right away, so
-      // POS data is ready before the first user request (never blocks startup).
-      require('./services/posAuthService').warmUp();
+      // Load the stored POS / Restaurant sessions (encrypted tokens of earlier
+      // Finance logins). No credentials exist on the server, so nothing logs in
+      // here: POS / Restaurant data is read only while a Finance session is valid.
+      require('./services/integrationAuthService').warmUp();
       console.log(`Server running on port ${PORT}`);
       console.log(`Uploads directory: ${path.join(__dirname, 'uploads')}`);
     });
