@@ -23,7 +23,7 @@ describe('Finance role permissions', () => {
     expect(canSeeNavModule(ROLES.FINANCE_USER, 'management')).toBe(true);
     expect(canSeeNavModule(ROLES.FINANCE_USER, 'expenses')).toBe(true);
     [
-      'raw', 'finished', 'finance', 'cutlery', 'fg-production',
+      'raw', 'finance', 'cutlery', 'fg-production',
       'adjustments', 'vat', 'analyst', 'admin'
     ].forEach((moduleName) => {
       expect(canSeeNavModule(ROLES.FINANCE_USER, moduleName)).toBe(false);

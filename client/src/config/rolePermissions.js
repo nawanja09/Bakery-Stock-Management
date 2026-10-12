@@ -20,7 +20,6 @@ export const ROLES = Object.freeze({
 export const MODULES = Object.freeze({
   MANAGEMENT: 'management',
   RAW_MATERIAL: 'rawMaterial',
-  FINISHED_GOODS: 'finishedGoods',
   EXPENSES: 'expenses',
   FINANCE: 'finance',
   CUTLERY: 'cutlery',
@@ -38,7 +37,7 @@ export const MODULES = Object.freeze({
 const M = MODULES;
 
 const ADMIN_MODULES = [
-  M.MANAGEMENT, M.RAW_MATERIAL, M.FINISHED_GOODS, M.EXPENSES, M.FINANCE,
+  M.MANAGEMENT, M.RAW_MATERIAL, M.EXPENSES, M.FINANCE,
   M.CUTLERY, M.FG_PRODUCTION, M.ADJUSTMENTS, M.VAT, M.SETTINGS, M.EMPLOYEES, M.COLLECTION
 ];
 
@@ -195,10 +194,6 @@ export const ROUTE_RULES = [
   rule('/reports/wastage', { all: RM }),
   rule('/analysis', { all: RM }),
 
-  // ---- Finished Goods ----
-  rule('/finished-goods', { all: [M.FINISHED_GOODS] }),
-  rule('/cost-calculator', { all: [M.FINISHED_GOODS] }),
-
   // ---- Expenses ----
   rule('/expenses', { all: [M.EXPENSES] }),
 
@@ -275,7 +270,6 @@ export const NAV_MODULES = Object.freeze({
     module: M.RAW_MATERIAL,
     landing: ['/purchase/new', '/purchase/orders', '/purchase/history', '/reports/stock']
   },
-  finished: { module: M.FINISHED_GOODS, landing: ['/finished-goods/items'] },
   expenses: { module: M.EXPENSES, landing: ['/expenses/petty-cash'] },
   finance: { module: M.FINANCE, landing: ['/finance/cash'] },
   cutlery: { module: M.CUTLERY, landing: ['/cutlery/locations'] },

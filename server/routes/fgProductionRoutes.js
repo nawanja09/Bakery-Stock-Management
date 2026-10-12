@@ -1,8 +1,7 @@
 // server/routes/fgProductionRoutes.js
 //
-// FG - Finished Goods Production (NEW, INDEPENDENT MODULE)
+// FG - Finished Goods Production (independent module)
 // Mounted at /api/fg-production in server.js
-// This does NOT reuse or touch the existing /api/finished-goods-* routes.
 
 const express = require('express');
 const router = express.Router();

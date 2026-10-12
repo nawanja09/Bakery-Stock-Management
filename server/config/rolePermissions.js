@@ -35,7 +35,6 @@ const ROLES = Object.freeze({
 const MODULES = Object.freeze({
   MANAGEMENT: 'management',
   RAW_MATERIAL: 'rawMaterial',
-  FINISHED_GOODS: 'finishedGoods',
   EXPENSES: 'expenses',
   FINANCE: 'finance',
   CUTLERY: 'cutlery',
@@ -56,7 +55,7 @@ const M = MODULES;
 
 // Everything except Analyst.
 const ADMIN_MODULES = [
-  M.MANAGEMENT, M.RAW_MATERIAL, M.FINISHED_GOODS, M.EXPENSES, M.FINANCE,
+  M.MANAGEMENT, M.RAW_MATERIAL, M.EXPENSES, M.FINANCE,
   M.CUTLERY, M.FG_PRODUCTION, M.ADJUSTMENTS, M.VAT, M.SETTINGS, M.EMPLOYEES, M.COLLECTION
 ];
 
@@ -125,13 +124,13 @@ const API_RULES = [
   { prefix: '/purchases', modules: [M.RAW_MATERIAL] },
   { prefix: '/purchases/companies', modules: [M.RAW_MATERIAL], read: [ANY] },
   { prefix: '/purchases/suppliers', modules: [M.RAW_MATERIAL], read: [M.VAT] },
-  { prefix: '/purchases/previous-prices', modules: [M.RAW_MATERIAL], read: [M.FG_PRODUCTION, M.FINISHED_GOODS] },
+  { prefix: '/purchases/previous-prices', modules: [M.RAW_MATERIAL], read: [M.FG_PRODUCTION] },
   // Purchasing payment adjustments belong to the Adjustments module
   { prefix: '/purchases/payments', modules: [M.ADJUSTMENTS] },
   { prefix: '/purchases/payment-adjustments', modules: [M.ADJUSTMENTS] },
   { prefix: '/suppliers', modules: [M.RAW_MATERIAL], read: [M.ADJUSTMENTS, M.VAT] },
-  { prefix: '/items', modules: [M.RAW_MATERIAL], read: [M.FINISHED_GOODS, M.FG_PRODUCTION, M.ADJUSTMENTS, M.VAT] },
-  { prefix: '/item-types', modules: [M.RAW_MATERIAL], read: [M.VAT, M.FINISHED_GOODS] },
+  { prefix: '/items', modules: [M.RAW_MATERIAL], read: [M.FG_PRODUCTION, M.ADJUSTMENTS, M.VAT] },
+  { prefix: '/item-types', modules: [M.RAW_MATERIAL], read: [M.VAT] },
   { prefix: '/departments', modules: [M.RAW_MATERIAL], read: [ANY] },
   { prefix: '/opening-balance', modules: [M.RAW_MATERIAL] },
   { prefix: '/issuances', modules: [M.RAW_MATERIAL] },
@@ -144,7 +143,6 @@ const API_RULES = [
   { prefix: '/reports', modules: [M.RAW_MATERIAL], read: [M.VAT] },
   { prefix: '/reports/expenses-report', modules: [M.EXPENSES] },
   { prefix: '/reports/expense-summary', modules: [M.EXPENSES] },
-  { prefix: '/reports/bakery-stock', modules: [M.FINISHED_GOODS] },
 
   // ---- Shared master data ---------------------------------------------------
   { prefix: '/companies', modules: [M.RAW_MATERIAL, M.EXPENSES, M.FINANCE], read: [ANY] },
@@ -180,18 +178,6 @@ const API_RULES = [
   // narrows it to Finance / Accountant / Admin / Super Admin (+ QB read).
   { prefix: '/collections/integrations', modules: [ANY], denyRoles: [ROLES.STORES] },
   { prefix: '/incomes', modules: [M.FINANCE, M.ANALYST] },
-
-  // ---- Finished Goods -------------------------------------------------------
-  { prefix: '/finished-goods-items', modules: [M.FINISHED_GOODS] },
-  { prefix: '/finished-goods-opening-balance', modules: [M.FINISHED_GOODS] },
-  { prefix: '/finished-goods-transfers', modules: [M.FINISHED_GOODS] },
-  { prefix: '/finished-goods-wastages', modules: [M.FINISHED_GOODS] },
-  { prefix: '/finished-goods-reports', modules: [M.FINISHED_GOODS] },
-  { prefix: '/finished-goods-ingredients', modules: [M.FINISHED_GOODS] },
-  { prefix: '/finished-goods-sales', modules: [M.FINISHED_GOODS] },
-  { prefix: '/productions', modules: [M.FINISHED_GOODS] },
-  { prefix: '/transfer-destinations', modules: [M.FINISHED_GOODS] },
-  { prefix: '/cost-calculations', modules: [M.FINISHED_GOODS] },
 
   // ---- Cutlery --------------------------------------------------------------
   { prefix: '/cutlery-locations', modules: [M.CUTLERY] },

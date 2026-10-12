@@ -107,23 +107,12 @@ exports.getGeneralStats = async (req, res) => {
       users = rows[0].count;
     } catch (e) { console.warn('Users query failed'); }
 
-    let orders = 0;
-    try {
-      const [rows] = await pool.query('SELECT COUNT(*) AS count FROM finished_goods_sales');
-      orders = rows[0].count;
-    } catch (e) { console.warn('Sales query failed'); }
-
-    let revenue = 0;
-    try {
-      const [rows] = await pool.query('SELECT SUM(total_value) AS total FROM finished_goods_sale_items');
-      revenue = rows[0].total || 0;
-    } catch (e) { console.warn('Revenue query failed'); }
-
-    let products = 0;
-    try {
-      const [rows] = await pool.query('SELECT COUNT(*) AS count FROM finished_goods_items');
-      products = rows[0].count;
-    } catch (e) { console.warn('Products query failed'); }
+    // orders / revenue / products came from the removed Finished Goods module
+    // (finished_goods_sales / _sale_items / _items). Kept as 0 so the response
+    // shape stays the same for any existing consumer.
+    const orders = 0;
+    const revenue = 0;
+    const products = 0;
 
     res.json({
       users,
@@ -208,8 +197,8 @@ exports.getDashboardOverview = async (req, res) => {
       console.warn('issues7d query failed', e.message);
     }
 
-    // ---- Wastage (last 7 days) — raw material + finished goods ----
-    let wastage7d = { rawCount: 0, fgCount: 0 };
+    // ---- Wastage (last 7 days) — raw material ----
+    let wastage7d = { rawCount: 0 };
     try {
       const [[row]] = await pool.query(`
         SELECT COUNT(*) AS count FROM wastages
@@ -218,29 +207,6 @@ exports.getDashboardOverview = async (req, res) => {
       wastage7d.rawCount = row.count;
     } catch (e) {
       console.warn('raw wastage7d query failed', e.message);
-    }
-    try {
-      const [[row]] = await pool.query(`
-        SELECT COUNT(*) AS count FROM finished_goods_wastages
-        WHERE date BETWEEN CURDATE() - INTERVAL 6 DAY AND CURDATE()
-      `);
-      wastage7d.fgCount = row.count;
-    } catch (e) {
-      console.warn('fg wastage7d query failed', e.message);
-    }
-
-    // ---- Finished goods production (last 7 days) ----
-    let production7d = { count: 0, totalUnits: 0 };
-    try {
-      const [[row]] = await pool.query(`
-        SELECT COUNT(DISTINCT p.id) AS count, COALESCE(SUM(pi.quantity), 0) AS totalUnits
-        FROM finished_goods_productions p
-        JOIN finished_goods_production_items pi ON pi.production_id = p.id
-        WHERE p.production_date BETWEEN CURDATE() - INTERVAL 6 DAY AND CURDATE()
-      `);
-      production7d = { count: row.count, totalUnits: Number(row.totalUnits) || 0 };
-    } catch (e) {
-      console.warn('production7d query failed', e.message);
     }
 
     res.json({
@@ -251,8 +217,7 @@ exports.getDashboardOverview = async (req, res) => {
       purchases7d,
       pendingPayments,
       issues7d,
-      wastage7d,
-      production7d
+      wastage7d
     });
   } catch (error) {
     console.error('Error in getDashboardOverview:', error);
