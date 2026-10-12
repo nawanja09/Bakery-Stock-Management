@@ -1,35 +1,34 @@
 const pool = require('../config/db');
+const withTransaction = require('../utils/withTransaction');
+const { HttpError } = require('../utils/staffLoanUtils');
 
 const createProduction = async (req, res) => {
   const { production_date, prepared_by, remarks, items, department_id } = req.body;
+  if (!Array.isArray(items)) return res.status(400).json({ error: 'items must be an array' });
 
   try {
-    await pool.query('START TRANSACTION');
-
-    // Insert production record with department_id
-    const [productionResult] = await pool.query(
-      'INSERT INTO finished_goods_productions (production_date, prepared_by, remarks, department_id) VALUES (?, ?, ?, ?)',
-      [production_date, prepared_by, remarks, department_id]
-    );
-
-    const productionId = productionResult.insertId;
-
-    // Insert production items
-    for (const item of items) {
-      await pool.query(
-        'INSERT INTO finished_goods_production_items (production_id, item_id, quantity) VALUES (?, ?, ?)',
-        [productionId, item.item_id, item.quantity]
+    const productionId = await withTransaction(async (connection) => {
+      // Insert production record with department_id
+      const [productionResult] = await connection.query(
+        'INSERT INTO finished_goods_productions (production_date, prepared_by, remarks, department_id) VALUES (?, ?, ?, ?)',
+        [production_date, prepared_by, remarks, department_id]
       );
-    }
 
-    await pool.query('COMMIT');
+      // Insert production items
+      for (const item of items) {
+        await connection.query(
+          'INSERT INTO finished_goods_production_items (production_id, item_id, quantity) VALUES (?, ?, ?)',
+          [productionResult.insertId, item.item_id, item.quantity]
+        );
+      }
+      return productionResult.insertId;
+    });
 
     res.status(201).json({
       id: productionId,
       message: 'Production created successfully'
     });
   } catch (error) {
-    await pool.query('ROLLBACK');
     console.error('Error creating production:', error);
     res.status(500).json({ error: 'Server error' });
   }
@@ -38,35 +37,29 @@ const createProduction = async (req, res) => {
 const updateProduction = async (req, res) => {
   const { id } = req.params;
   const { production_date, prepared_by, remarks, items, department_id } = req.body;
+  if (!Array.isArray(items)) return res.status(400).json({ error: 'items must be an array' });
 
   try {
-    await pool.query('START TRANSACTION');
-
-    // Update production record with department_id
-    const [productionResult] = await pool.query(
-      'UPDATE finished_goods_productions SET production_date = ?, prepared_by = ?, remarks = ?, department_id = ? WHERE id = ?',
-      [production_date, prepared_by, remarks, department_id, id]
-    );
-
-    if (productionResult.affectedRows === 0) {
-      await pool.query('ROLLBACK');
-      return res.status(404).json({ error: 'Production not found' });
-    }
-
-    // Delete existing items and insert new items (same as before)
-    await pool.query('DELETE FROM finished_goods_production_items WHERE production_id = ?', [id]);
-    
-    for (const item of items) {
-      await pool.query(
-        'INSERT INTO finished_goods_production_items (production_id, item_id, quantity) VALUES (?, ?, ?)',
-        [id, item.item_id, item.quantity]
+    await withTransaction(async (connection) => {
+      // Update production record with department_id
+      const [productionResult] = await connection.query(
+        'UPDATE finished_goods_productions SET production_date = ?, prepared_by = ?, remarks = ?, department_id = ? WHERE id = ?',
+        [production_date, prepared_by, remarks, department_id, id]
       );
-    }
+      if (productionResult.affectedRows === 0) throw new HttpError(404, 'Production not found');
 
-    await pool.query('COMMIT');
+      // Delete existing items and insert new items (same as before)
+      await connection.query('DELETE FROM finished_goods_production_items WHERE production_id = ?', [id]);
+      for (const item of items) {
+        await connection.query(
+          'INSERT INTO finished_goods_production_items (production_id, item_id, quantity) VALUES (?, ?, ?)',
+          [id, item.item_id, item.quantity]
+        );
+      }
+    });
     res.json({ message: 'Production updated successfully' });
   } catch (error) {
-    await pool.query('ROLLBACK');
+    if (error instanceof HttpError) return res.status(error.status).json({ error: error.message });
     console.error('Error updating production:', error);
     res.status(500).json({ error: 'Server error' });
   }

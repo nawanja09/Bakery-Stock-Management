@@ -10,10 +10,10 @@
 // * Only the Bearer token is kept - NEVER a password. No username / password of
 //   either system exists in .env, in the code or in the database.
 // * The token is encrypted with AES-256-GCM. The key is derived from
-//   POS_SESSION_SECRET, or JWT_SECRET when that is not set (same derivation as
-//   the earlier POS-only store, so sessions saved before the `provider` column
-//   existed still decrypt). Changing the secret simply invalidates every
-//   stored session (they no longer decrypt) - users log in again.
+//   POS_SESSION_SECRET only - never from JWT_SECRET, so a leaked login secret
+//   cannot decrypt the RAVON tokens (config/secrets.js). Without it, sessions
+//   stay in memory only. Changing the secret simply invalidates every stored
+//   session (they no longer decrypt) - users log in again.
 // * `finance` = 1 marks the shared session: a Finance user's login, or an
 //   explicit "Connect ... Finance account". It is used for every Collection
 //   sync; a user's own non-finance session only for that user's requests.
@@ -23,6 +23,7 @@
 //   migrations/031_restaurant_collections_integration_sessions.sql.
 // ----------------------------------------------------------------------
 const crypto = require('crypto');
+const { getPosSessionSecret } = require('../config/secrets');
 
 let pool = null;
 const db = () => {
@@ -31,7 +32,7 @@ const db = () => {
 };
 
 const keyOf = () => {
-  const secret = process.env.POS_SESSION_SECRET || process.env.JWT_SECRET || '';
+  const secret = getPosSessionSecret();
   if (!secret) return null;
   return crypto.createHash('sha256').update(`bsms-pos-session:${secret}`).digest();
 };
@@ -73,7 +74,7 @@ const save = async ({ userId, provider = 'pos', username, token, expiresAt = nul
   if (!persistenceEnabled() || !userId) return;
   const tokenEnc = encrypt(token);
   if (!tokenEnc) {
-    console.warn('Integration session not persisted: JWT_SECRET / POS_SESSION_SECRET is not set');
+    console.warn('Integration session not persisted: POS_SESSION_SECRET is not set');
     return;
   }
   try {

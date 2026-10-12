@@ -1,5 +1,7 @@
 // server/controllers/finishedGoodsWastageController.js
 const pool = require('../config/db');
+const withTransaction = require('../utils/withTransaction');
+const { HttpError } = require('../utils/staffLoanUtils');
 
 const generateWastageNumber = () => {
   return `FG-WN-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
@@ -50,30 +52,28 @@ const getAllFinishedGoodsWastages = async (req, res) => {
 // Update create function to include department_id
 const createFinishedGoodsWastage = async (req, res) => {
   const { date, approved_by, reason, remarks, items, wastage_type, production_id, department_id, destination_id } = req.body;
-  const created_by = req.user?.id || 5;
+  if (!Array.isArray(items)) return res.status(400).json({ error: 'items must be an array' });
+  // The authenticated user (the JWT carries userId; req.user.id never existed, so this was always 5).
+  const created_by = req.user.userId;
 
   try {
-    await pool.query('START TRANSACTION');
-
     const wastage_number = generateWastageNumber();
-    
-    // Insert wastage record - include both department_id and destination_id for general wastage
-    const [wastageResult] = await pool.query(
-      'INSERT INTO finished_goods_wastages (wastage_number, date, approved_by, reason, remarks, wastage_type, created_by, department_id, destination_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [wastage_number, date, approved_by, reason, remarks, wastage_type || 'General', created_by, department_id || null, destination_id || null]
-    );
-
-    const wastageId = wastageResult.insertId;
-
-    // Insert wastage items
-    for (const item of items) {
-      await pool.query(
-        'INSERT INTO finished_goods_wastage_items (wastage_id, item_id, quantity, estimated_loss, production_id) VALUES (?, ?, ?, ?, ?)',
-        [wastageId, item.item_id, item.quantity, item.estimated_loss || 0, production_id || null]
+    const wastageId = await withTransaction(async (connection) => {
+      // Insert wastage record - include both department_id and destination_id for general wastage
+      const [wastageResult] = await connection.query(
+        'INSERT INTO finished_goods_wastages (wastage_number, date, approved_by, reason, remarks, wastage_type, created_by, department_id, destination_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [wastage_number, date, approved_by, reason, remarks, wastage_type || 'General', created_by, department_id || null, destination_id || null]
       );
-    }
 
-    await pool.query('COMMIT');
+      // Insert wastage items
+      for (const item of items) {
+        await connection.query(
+          'INSERT INTO finished_goods_wastage_items (wastage_id, item_id, quantity, estimated_loss, production_id) VALUES (?, ?, ?, ?, ?)',
+          [wastageResult.insertId, item.item_id, item.quantity, item.estimated_loss || 0, production_id || null]
+        );
+      }
+      return wastageResult.insertId;
+    });
 
     res.status(201).json({
       id: wastageId,
@@ -81,7 +81,6 @@ const createFinishedGoodsWastage = async (req, res) => {
       message: 'Finished Goods Wastage recorded successfully'
     });
   } catch (error) {
-    await pool.query('ROLLBACK');
     console.error('Error creating finished goods wastage:', error);
     res.status(500).json({ error: 'Server error' });
   }
@@ -152,36 +151,30 @@ const updateFinishedGoodsWastage = async (req, res) => {
   const { id } = req.params;
   const { date, approved_by, reason, remarks, items } = req.body;
 
+  if (!Array.isArray(items)) return res.status(400).json({ error: 'items must be an array' });
+
   try {
-    await pool.query('START TRANSACTION');
-
-    // Update wastage record
-    const [wastageResult] = await pool.query(
-      'UPDATE finished_goods_wastages SET date = ?, approved_by = ?, reason = ?, remarks = ? WHERE id = ?',
-      [date, approved_by, reason, remarks, id]
-    );
-
-    if (wastageResult.affectedRows === 0) {
-      await pool.query('ROLLBACK');
-      return res.status(404).json({ error: 'Finished Goods Wastage not found' });
-    }
-
-    // Delete existing items
-    await pool.query('DELETE FROM finished_goods_wastage_items WHERE wastage_id = ?', [id]);
-
-    // Insert new items
-    for (const item of items) {
-      await pool.query(
-        'INSERT INTO finished_goods_wastage_items (wastage_id, item_id, quantity, estimated_loss) VALUES (?, ?, ?, ?)',
-        [id, item.item_id, item.quantity, item.estimated_loss || 0]
+    await withTransaction(async (connection) => {
+      // Update wastage record
+      const [wastageResult] = await connection.query(
+        'UPDATE finished_goods_wastages SET date = ?, approved_by = ?, reason = ?, remarks = ? WHERE id = ?',
+        [date, approved_by, reason, remarks, id]
       );
-    }
+      if (wastageResult.affectedRows === 0) throw new HttpError(404, 'Finished Goods Wastage not found');
 
-    await pool.query('COMMIT');
+      // Delete existing items, then insert the new ones
+      await connection.query('DELETE FROM finished_goods_wastage_items WHERE wastage_id = ?', [id]);
+      for (const item of items) {
+        await connection.query(
+          'INSERT INTO finished_goods_wastage_items (wastage_id, item_id, quantity, estimated_loss) VALUES (?, ?, ?, ?)',
+          [id, item.item_id, item.quantity, item.estimated_loss || 0]
+        );
+      }
+    });
 
     res.json({ message: 'Finished Goods Wastage updated successfully' });
   } catch (error) {
-    await pool.query('ROLLBACK');
+    if (error instanceof HttpError) return res.status(error.status).json({ error: error.message });
     console.error('Error updating finished goods wastage:', error);
     res.status(500).json({ error: 'Server error' });
   }

@@ -1,0 +1,7 @@
+# Secrets - never commit real environment files (copy server/.env.example instead)
+.env
+.env.*
+!.env.example
+
+# Archives can contain .env files and other secrets
+*.zip

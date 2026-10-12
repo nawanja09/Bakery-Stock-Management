@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const { getJwtSecret, JWT_VERIFY_OPTIONS } = require('../config/secrets');
 
 // View Only users may read data but cannot mutate API resources.
 const readOnly = (req, res, next) => {
@@ -8,7 +9,7 @@ const readOnly = (req, res, next) => {
   if (!authHeader || !authHeader.startsWith('Bearer ')) return next();
 
   try {
-    const user = jwt.verify(authHeader.slice(7), process.env.JWT_SECRET);
+    const user = jwt.verify(authHeader.slice(7), getJwtSecret(), JWT_VERIFY_OPTIONS);
     if (user.role === 'View Only') {
       return res.status(403).json({ error: 'You have view-only access. You do not have permission to edit or delete this information.' });
     }
