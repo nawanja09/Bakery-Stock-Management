@@ -15,8 +15,6 @@ import {
   faMoneyCheckDollar,
   faArrowRightArrowLeft,
   faTrash,
-  faIndustry,
-  faBoxesPacking,
   faArrowRight
 } from '@fortawesome/free-solid-svg-icons';
 
@@ -25,8 +23,7 @@ const emptyOverview = {
   purchases7d: { count: 0, totalAmount: 0 },
   pendingPayments: { count: 0, totalAmount: 0 },
   issues7d: 0,
-  wastage7d: { rawCount: 0, fgCount: 0 },
-  production7d: { count: 0, totalUnits: 0 }
+  wastage7d: { rawCount: 0 }
 };
 
 const emptyChartData = {
@@ -177,7 +174,7 @@ const Dashboard = () => {
     return () => { active = false; };
   }, [topItemsType, topItemsPeriod, customDates, isFinanceUser]);
 
-  const wastageTotal7d = (overview.wastage7d?.rawCount || 0) + (overview.wastage7d?.fgCount || 0);
+  const wastageTotal7d = overview.wastage7d?.rawCount || 0;
   const financeMetrics = financeOverview.expenses;
 
   if (isFinanceUser) {
@@ -359,25 +356,13 @@ const Dashboard = () => {
       tone: wastageTotal7d > 0 ? 'warning' : 'success',
       path: '/wastage/history',
       onClick: () => navigate('/wastage/history')
-    },
-    {
-      key: 'production',
-      label: 'Production runs — 7 days',
-      value: overview.production7d.count,
-      sub: `${formatNumber(overview.production7d.totalUnits)} units`,
-      icon: faIndustry,
-      tone: 'primary',
-      path: '/finished-goods/production',
-      onClick: () => navigate('/finished-goods/production')
     }
   ].filter((card) => card && canAccessPath(card.path));
 
   const quickActions = [
     { label: 'New Purchase', icon: faTruckLoading, path: '/purchase/new' },
     { label: 'Issue to Department', icon: faArrowRightArrowLeft, path: '/issuance/issue' },
-    { label: 'Record Wastage', icon: faTrash, path: '/wastage/add' },
-    { label: 'New Production', icon: faIndustry, path: '/finished-goods/production' },
-    { label: 'New Transfer', icon: faBoxesPacking, path: '/finished-goods/transfer/add' }
+    { label: 'Record Wastage', icon: faTrash, path: '/wastage/add' }
   ];
 
   return (

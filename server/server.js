@@ -20,22 +20,9 @@ const dashboardController = require('./controllers/dashboardController');
 const employeeRoutes = require('./routes/employeeRoutes');
 const adjustmentRoutes = require('./routes/adjustmentRoutes');
 
-const finishedGoodsItemsRouter = require('./routes/finishedGoodsItems');
-const finishedGoodsOpeningBalanceRouter = require('./routes/finishedGoodsOpeningBalance');
-const productionsRouter = require('./routes/productions');
-const finishedGoodsTransfersRouter = require('./routes/finishedGoodsTransfers');
-const finishedGoodsWastageRouter = require('./routes/finishedGoodsWastage');
-//const finishedGoodsStockReportRouter = require('./routes/finishedGoodsStockReport');
-const finishedGoodsReportRoutes = require('./routes/finishedGoodsReports');
-const finishedGoodsStockReportRouter = require('./routes/finishedGoodsStockReport');
-
-const costCalculatorRoutes = require('./routes/costCalculator');
-const finishedGoodsIngredientsRouter = require('./routes/finishedGoodsIngredients');
 const departmentUsageReportRoutes = require('./routes/departmentUsageReport');
-const finishedGoodsSalesRouter = require('./routes/finishedGoodsSalesRoutes');
 
 const returnRoutes = require('./routes/returnRoutes');
-const bakeryStockReportRoutes = require('./routes/bakeryStockReportRoutes');
 
 const cutleryLocationsRoutes = require('./routes/cutleryLocations');
 const cutleryAssetsRoutes = require('./routes/cutleryAssets');
@@ -75,8 +62,7 @@ const hiddenExpenseRoutes = require('./routes/hiddenExpenseRoutes');
 const { ensureChequeReleaseSchema, startChequeReleaseProcessor } = require('./services/chequeReleaseService');
 
 
-// NEW, independent module - FG (Finished Goods) Production.
-// Kept completely separate from the existing finished-goods-* routes above.
+// FG (Finished Goods) Production - recipes / costing module.
 const fgProductionRoutes = require('./routes/fgProductionRoutes');
 
 
@@ -136,22 +122,9 @@ app.use('/api/employees', employeeRoutes);
 app.use('/api/adjustments', adjustmentRoutes);
 app.use('/api/orders', orderRoutes);
 
-app.use('/api/finished-goods-items', finishedGoodsItemsRouter);
-app.use('/api/finished-goods-opening-balance', finishedGoodsOpeningBalanceRouter);
-app.use('/api/productions', productionsRouter);
-app.use('/api/finished-goods-transfers', finishedGoodsTransfersRouter);
-app.use('/api/finished-goods-wastages', finishedGoodsWastageRouter);
-//app.use('/api/finished-goods-reports', finishedGoodsStockReportRouter);
-app.use('/api/finished-goods-reports', finishedGoodsReportRoutes);
-app.use('/api/finished-goods-reports', finishedGoodsStockReportRouter);
-
-app.use('/api/cost-calculations', costCalculatorRoutes);
-app.use('/api/finished-goods-ingredients', finishedGoodsIngredientsRouter);
 app.use('/api/department-usage-report', departmentUsageReportRoutes);
-app.use('/api/finished-goods-sales', finishedGoodsSalesRouter);
 
 app.use('/api/returns', returnRoutes);
-app.use('/api/reports', bakeryStockReportRoutes);
 
 app.use('/api/cutlery-locations', cutleryLocationsRoutes);
 app.use('/api/cutlery-assets', cutleryAssetsRoutes);
@@ -172,8 +145,7 @@ app.use('/api/suppliers', supplierCreditRoutes);
 app.use('/api/item-types', itemTypeRoutes);
 app.use('/api/companies', companyRoutes);
 
-// NEW, independent module - FG (Finished Goods) Production.
-// Does not reuse or alter any existing Finished Goods routes/tables.
+// FG (Finished Goods) Production - recipes / costing module.
 app.use('/api/fg-production', fgProductionRoutes);
 app.use('/api/payment-methods', PaymentMethodManagement);
 // Card Ledger must be mounted before the generic /api/finance router.

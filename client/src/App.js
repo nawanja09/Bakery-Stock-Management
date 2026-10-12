@@ -36,37 +36,10 @@ import SubExpenseTypeManagement from './components/RawMaterial/ExpenseTypes/SubE
 import ExpensePayeeManagement from './components/RawMaterial/ExpensePayees/ExpensePayeeManagement';
 import BankChargesTypeManagement from './components/RawMaterial/BankChargesType/BankChargesTypeManagement';
 
-import AddFinishedGoodsItem from './components/FinishedGoods/Item Management - FS/AddFinishedGoodsItem';
-import EditFinishedGoodsItem from './components/FinishedGoods/Item Management - FS/EditFinishedGoodsItem';
-import ViewFinishedGoodsItems from './components/FinishedGoods/Item Management - FS/ViewFinishedGoodsItems';
-import ViewFinishedGoodsItem from './components/FinishedGoods/Item Management - FS/ViewFinishedGoodsItem';
-import AddFinishedGoodsOpeningBalance from './components/FinishedGoods/Opening Management - FS/AddFinishedGoodsOpeningBalance';
-import FinishedGoodsOpeningBalanceHistory from './components/FinishedGoods/Opening Management - FS/FinishedGoodsOpeningBalanceHistory';
-import ProductionManagement from './components/FinishedGoods/Production Management/ProductionManagement';
-import ViewProduction from './components/FinishedGoods/Production Management/ViewProduction';
-import EditProduction from './components/FinishedGoods/Production Management/EditProduction';
-import TransfersManagement from './components/FinishedGoods/Transfers/TransfersManagement';
-import ViewTransfer from './components/FinishedGoods/Transfers/ViewTransferPopup';
-import EditTransfer from './components/FinishedGoods/Transfers/EditTransferPopup';
-import AddTransferPopup from './components/FinishedGoods/Transfers/AddTransferPopup';
-import AddFinishedGoodsWastage from './components/FinishedGoods/Wastage/AddFinishedGoodsWastage'
-import FinishedGoodsWastageHistory from './components/FinishedGoods/Wastage/FinishedGoodsWastageHistory';
-import AddProductionWastage from './components/FinishedGoods/Production Wastage/AddProductionWastage';
-import ProductionReport from './components/FinishedGoods/Reports/ProductionReport';
-import KitchenWastageReport from './components/FinishedGoods/Reports/WastageReport';
-import TransferReport from './components/FinishedGoods/Reports/TransferReport';
-import FinishedGoodsStockReport from './components/FinishedGoods/Reports/StockReport';
-
-import CalculateCost from './components/CostCalculator/CalculateCost';
-import SavedCosting from './components/CostCalculator/SavedCosting';
 import DepartmentUsageReport from './components/report/DepartmentUsageReport';
-import AddFinishedGoodsSale from './components/FinishedGoods/Sales/AddFinishedGoodsSale';
-import FinishedGoodsSalesHistory from './components/FinishedGoods/Sales/FinishedGoodsSalesHistory';
 
-import StockSummary from './components/FinishedGoods/Reports/StockSummary';
 import AddReturn from './components/returns/AddReturn';
 import ReturnsHistory from './components/returns/ReturnsHistory';
-import BakeryStockReport from './components/FinishedGoods/Reports/BakeryStockReport';
 
 import Locations from './components/Cutlery/Locations/Locations';
 import Assets from './components/Cutlery/Assets/Assets';
@@ -262,38 +235,10 @@ function App() {
             <Route path="admin/employees" element={<PermittedRoute><EmployeeManagement /></PermittedRoute>} />
             <Route path="reports/stock/items" element={<ItemWiseStockReport/>} />
 
-            <Route path="finished-goods/items/add" element={<ModalRoute title="Add New Finished Goods Item"><AddFinishedGoodsItem /></ModalRoute>} />
-            <Route path="finished-goods/items" element={<ViewFinishedGoodsItems />} />
-            <Route path="finished-goods/items/edit/:id" element={<ModalRoute title="Edit Finished Goods Item"><EditFinishedGoodsItem /></ModalRoute>} />
-            <Route path="finished-goods/items/view/:id" element={<ModalRoute title="Finished Goods Details" size="medium"><ViewFinishedGoodsItem /></ModalRoute>} />
-            <Route path="finished-goods/opening/add" element={<ModalRoute title="Add Finished Goods Opening Balance" size="medium"><AddFinishedGoodsOpeningBalance /></ModalRoute>} />
-            <Route path="finished-goods/opening/history" element={<FinishedGoodsOpeningBalanceHistory />} />
-            <Route path="finished-goods/production" element={<FgProductionRoute><ProductionManagement /></FgProductionRoute>} />
-            <Route path="finished-goods/production/view/:id" element={<ModalRoute title="Production Details" size="medium"><ViewProduction /></ModalRoute>} />
-            <Route path="finished-goods/production/edit/:id" element={<ModalRoute title="Edit Production"><EditProduction /></ModalRoute>} />
-            <Route path="finished-goods/transfer" element={<TransfersManagement />} />
-            <Route path="finished-goods/transfer/view/:id" element={<ModalRoute title="Transfer Details" size="medium"><ViewTransfer /></ModalRoute>} />
-            <Route path="finished-goods/transfer/edit/:id" element={<ModalRoute title="Edit Transfer"><EditTransfer /></ModalRoute>} />
-            <Route path="finished-goods/transfer/add" element={<ModalRoute title="Add New Transfer"><AddTransferPopup /></ModalRoute>} />
-            <Route path="finished-goods/wastage/kitchen" element={<ModalRoute title="Add Finished Goods Wastage"><AddFinishedGoodsWastage /></ModalRoute>} />
-            <Route path="finished-goods/wastage/production/add" element={<ModalRoute title="Add Production Wastage"><AddProductionWastage /></ModalRoute>} />
-            <Route path="finished-goods/wastage/history" element={<FinishedGoodsWastageHistory />} />
-
-            <Route path="finished-goods/reports/stock" element={<FinishedGoodsStockReport />} />
-            <Route path="finished-goods/reports/production" element={<ProductionReport />} />
-            <Route path="finished-goods/reports/wastage" element={<KitchenWastageReport />} />
-            <Route path="finished-goods/reports/transfer" element={<TransferReport />} />
-
-            <Route path="cost-calculator/calculate" element={<CalculateCost />} />
-            <Route path="cost-calculator/saved" element={<SavedCosting />} />
             <Route path="/reports/department-usage" element={<DepartmentUsageReport />} />
-            <Route path="finished-goods/sales/new" element={<ModalRoute title="Add Finished Goods Sale"><AddFinishedGoodsSale /></ModalRoute>} />
-            <Route path="finished-goods/sales/history" element={<FinishedGoodsSalesHistory />} />
 
-            <Route path="finished-goods/reports/stock/summary" element={<StockSummary />} />
             <Route path="returns/add" element={<RawMaterialRoute><ModalRoute title="Add New Return"><AddReturn /></ModalRoute></RawMaterialRoute>} />
             <Route path="returns/history" element={<RawMaterialRoute><ReturnsHistory /></RawMaterialRoute>} />
-            <Route path="finished-goods/reports/bakery-stock" element={<BakeryStockReport />} />
 
             <Route path="cutlery/locations" element={<Locations />} />
             <Route path="cutlery/assets" element={<Assets />} />

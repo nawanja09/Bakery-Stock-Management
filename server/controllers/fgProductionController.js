@@ -1,10 +1,9 @@
 // server/controllers/fgProductionController.js
 //
-// FG - Finished Goods Production (NEW, INDEPENDENT MODULE)
+// FG - Finished Goods Production (independent module)
 // ----------------------------------------------------------------------
-// This controller belongs to a brand new module that is intentionally
-// isolated from the existing Finished Goods functionality
-// (finished_goods_items, finished_goods_ingredients, finished_goods_*).
+// The old standalone Finished Goods module (finished_goods_* tables) has
+// been removed; this module never depended on it.
 // It only reads existing master data (departments, items) as reference
 // data - it never modifies those tables.
 //

@@ -7,7 +7,7 @@
 
 # Bakery Stock Management System (BSMS)
 
-A full-stack web application for running a bakery business's **stock, production, expenses and finance** in one place. It covers raw-material purchasing and stock, finished-goods production and sales, cutlery assets, an expenses module, cash and bank ledgers, VAT and analyst reports, and stock adjustments. Access to every page and API call is controlled by **role-based permissions**, so each user only sees the modules they are allowed to use.
+A full-stack web application for running a bakery business's **stock, production, expenses and finance** in one place. It covers raw-material purchasing and stock, finished-goods (FG) production recipes and costing, cutlery assets, an expenses module, cash and bank ledgers, VAT and analyst reports, and stock adjustments. Access to every page and API call is controlled by **role-based permissions**, so each user only sees the modules they are allowed to use.
 
 ---
 
@@ -19,7 +19,6 @@ A full-stack web application for running a bakery business's **stock, production
   - [Modules and features](#modules-and-features)
     - [Management (master data)](#management-master-data)
     - [Raw Materials](#raw-materials)
-    - [Finished Goods](#finished-goods)
     - [Expenses](#expenses)
     - [Finance](#finance)
     - [Cutlery](#cutlery)
@@ -77,9 +76,6 @@ RM Items, RM Item Types, Suppliers, Departments, Companies, Payment Methods, Ban
 - **Reports**: Stock Reports, Item Wise Stock Report, Purchasing Summary / Item Detail, Purchase Report, RM Issue / Wastage / Department Return summaries and item details.
 - **Analysis**: Last Issued Date.
 - **Supplier payments** are made against pending invoices (including multi-invoice payments), with payment history, credit settlement and outstanding-balance tracking.
-
-### Finished Goods
-Item management, opening balances, production, transfers, wastage (add and history), sales (add and history), and reports (item-wise stock, stock, production, wastage, transfer, bakery stock).
 
 ### Expenses
 Petty Cash (vouchers and reimbursements), Bank Charges, **New Expenses** (bill entry, payment with partial-payment and overpayment handling, credit notes), Cash Expenses, **Hidden Expenses** (report-only records that do not post to the cash or bank books), and Expenses Reports.
@@ -143,7 +139,7 @@ The dashboard is built from the signed-in user's modules rather than being the s
 
 - **Header**: "Welcome, *username*" (taken from the login response), the user's role, a *View only* badge when applicable, and the modules they hold.
 - **Expenses section**, shown to users with the Expenses module: cards for total, paid, pending and outstanding expenses, petty cash, cash expenses and open credit notes / overpayments (current month unless stated), a 6-month trend, top expense types for the month, and the latest 8 entries. The data comes from one read-only endpoint, `GET /api/expenses/dashboard-summary`.
-- **Operations section**, shown to users with Raw Materials, Finished Goods or FG Production: key 7-day numbers (low stock, purchases, pending payments for users with Finance, issues, wastage, production), quick actions, an activity trend chart, low-stock list, top issued / wasted items, and (with FG Production) a recipe cost versus selling price chart.
+- **Operations section**, shown to users with Raw Materials or FG Production: key 7-day numbers (low stock, purchases, pending payments for users with Finance, issues, wastage), quick actions, an activity trend chart, low-stock list, top issued / wasted items, and (with FG Production) a recipe cost versus selling price chart.
 
 A user with none of these modules sees a short message instead.
 
@@ -166,7 +162,7 @@ Bakery-Stock-Management/
 │       │   ├── common/             # route guard, Access Denied, view-only guard, popups
 │       │   ├── RawMaterial/, purchase/, issuance/, wastage/, returns/, purchasereturn/,
 │       │   │   supplierPayments/, Items/, Suppliers/, OpeningBalance/, Analysis/
-│       │   ├── FinishedGoods/, FGProduction/, CostCalculator/, Cutlery/
+│       │   ├── FGProduction/, Cutlery/
 │       │   ├── Expenses/, Finance/, adjustments/, Income/, Analyst/
 │       │   ├── report/             # stock, purchasing, VAT and other reports
 │       │   └── Employees/, admin/, ChangePassword.jsx
@@ -324,7 +320,7 @@ Practical guidance: import the dump, start the server once so the self-migrating
 2. **Check the Dashboard.** It shows the sections your role is allowed to see.
 3. **Set up master data** under Management: items, item types, suppliers, departments, companies, payment methods, bank details, expense types and payees, employees.
 4. **Raw materials.** Record purchases (or create an Order from the low-stock list and invoice it), then pay supplier invoices from the pending-invoices view. Issue materials to departments, record wastage and department returns, and review the stock and purchasing reports.
-5. **Finished goods and production.** Enter opening balances, record production, transfers, wastage and sales, and use the FG Production module for recipes and recipe cost reports.
+5. **FG Production.** Maintain finished-goods recipes in the FG Production module and review recipe cost reports.
 6. **Expenses.** Enter bills in New Expenses and pay them (cash, cheque or bank, with partial payments, overpayments and credit notes), record petty cash vouchers and reimbursements, cash expenses and bank charges, and review Expenses Reports.
 7. **Finance.** Use the cash and bank ledgers for receipts and transfers, track cheques in the Cheque Registry, manage staff loans and intercompany transactions.
 8. **Adjustments.** Adjust stores balances and process Inhand adjustments (approve or cancel).

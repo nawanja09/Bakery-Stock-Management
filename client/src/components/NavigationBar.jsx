@@ -9,7 +9,6 @@ import {
   faCutlery,
   faSignOutAlt,
   faChevronDown,
-  faList,
   faHistory,
   faPlusCircle,
   faFileInvoice,
@@ -99,8 +98,6 @@ const NavigationBar = () => {
                path.startsWith('/reports/wastage') ||
                path.startsWith('/purchase-returns') || path.startsWith('/opening')) {
       setActiveModule('raw');
-    } else if (path.startsWith('/finished-goods') || path.startsWith('/cost-calculator')) {
-      setActiveModule('finished');
     } else if (path.startsWith('/expenses')) {
       setActiveModule('expenses');
     } else if (path.startsWith('/finance')) {
@@ -254,90 +251,6 @@ const NavigationBar = () => {
           {activeDropdown === 'analysis' && (
             <ul className="dropdown-menu">
               {can('/analysis/last-issued-date') && <li><NavLink to="/analysis/last-issued-date" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faClock} /></span><span>Last Issued Date</span></NavLink></li>}
-            </ul>
-          )}
-        </li>
-      )}
-    </>
-  );
-
-  // ============================================================
-  // FINISHED GOODS MODULE — headings only, sub-items on click
-  // ============================================================
-  const renderFinishedGoodsContent = () => (
-    <>
-      {can('/finished-goods/items') && <li><NavLink to="/finished-goods/items" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faList} /></span><span>Item Management - FS</span></NavLink></li>}
-
-      {/* Opening Balances (heading) */}
-      {canAny(['/finished-goods/opening/add', '/finished-goods/opening/history']) && (
-        <li className={`dropdown ${activeDropdown === 'finished-opening' ? 'active' : ''}`}>
-          <div className="dropdown-header" onClick={() => toggleDropdown('finished-opening')}>
-            <span className="icon-container"><FontAwesomeIcon icon={faBalanceScale} /></span>
-            <span>Opening Balances - FS</span>
-            <FontAwesomeIcon icon={faChevronDown} className={`chevron ${activeDropdown === 'finished-opening' ? 'rotated' : ''}`} />
-          </div>
-          {activeDropdown === 'finished-opening' && (
-            <ul className="dropdown-menu">
-              {can('/finished-goods/opening/add') && <li><NavLink to="/finished-goods/opening/add" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faPlusCircle} /></span><span>Add Opening Balance</span></NavLink></li>}
-              {can('/finished-goods/opening/history') && <li><NavLink to="/finished-goods/opening/history" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faHistory} /></span><span>View History</span></NavLink></li>}
-            </ul>
-          )}
-        </li>
-      )}
-
-      {can('/finished-goods/production') && <li><NavLink to="/finished-goods/production" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faCog} /></span><span>Production Management</span></NavLink></li>}
-      {can('/finished-goods/transfer') && <li><NavLink to="/finished-goods/transfer" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faTruck} /></span><span>Transfers</span></NavLink></li>}
-
-      {/* Wastage (heading) */}
-      {canAny(['/finished-goods/wastage/kitchen', '/finished-goods/wastage/history']) && (
-        <li className={`dropdown ${activeDropdown === 'finished-wastage' ? 'active' : ''}`}>
-          <div className="dropdown-header" onClick={() => toggleDropdown('finished-wastage')}>
-            <span className="icon-container"><FontAwesomeIcon icon={faTrash} /></span>
-            <span>Wastage</span>
-            <FontAwesomeIcon icon={faChevronDown} className={`chevron ${activeDropdown === 'finished-wastage' ? 'rotated' : ''}`} />
-          </div>
-          {activeDropdown === 'finished-wastage' && (
-            <ul className="dropdown-menu">
-              {can('/finished-goods/wastage/kitchen') && <li><NavLink to="/finished-goods/wastage/kitchen" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faPlusCircle} /></span><span>Add New Wastage</span></NavLink></li>}
-              {can('/finished-goods/wastage/history') && <li><NavLink to="/finished-goods/wastage/history" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faList} /></span><span>Wastage History</span></NavLink></li>}
-            </ul>
-          )}
-        </li>
-      )}
-
-      {/* Reports (heading) */}
-      {canAny(['/finished-goods/reports/stock', '/finished-goods/reports/stock/summary', '/finished-goods/reports/production', '/finished-goods/reports/wastage', '/finished-goods/reports/transfer', '/finished-goods/reports/bakery-stock']) && (
-        <li className={`dropdown ${activeDropdown === 'finished-reports' ? 'active' : ''}`}>
-          <div className="dropdown-header" onClick={() => toggleDropdown('finished-reports')}>
-            <span className="icon-container"><FontAwesomeIcon icon={faChartBar} /></span>
-            <span>Reports</span>
-            <FontAwesomeIcon icon={faChevronDown} className={`chevron ${activeDropdown === 'finished-reports' ? 'rotated' : ''}`} />
-          </div>
-          {activeDropdown === 'finished-reports' && (
-            <ul className="dropdown-menu">
-              {can('/finished-goods/reports/stock') && <li><NavLink to="/finished-goods/reports/stock" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faBox} /></span><span>Item Wise Stock Report</span></NavLink></li>}
-              {can('/finished-goods/reports/stock/summary') && <li><NavLink to="/finished-goods/reports/stock/summary" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faBox} /></span><span>Stock Report</span></NavLink></li>}
-              {can('/finished-goods/reports/production') && <li><NavLink to="/finished-goods/reports/production" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faCog} /></span><span>Production Report</span></NavLink></li>}
-              {can('/finished-goods/reports/wastage') && <li><NavLink to="/finished-goods/reports/wastage" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faTrash} /></span><span>Wastage Report</span></NavLink></li>}
-              {can('/finished-goods/reports/transfer') && <li><NavLink to="/finished-goods/reports/transfer" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faTruck} /></span><span>Transfer Report</span></NavLink></li>}
-              {can('/finished-goods/reports/bakery-stock') && <li><NavLink to="/finished-goods/reports/bakery-stock" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faCalculator} /></span><span>Bakery Stock Report</span></NavLink></li>}
-            </ul>
-          )}
-        </li>
-      )}
-
-      {/* Sales (heading) */}
-      {canAny(['/finished-goods/sales/new', '/finished-goods/sales/history']) && (
-        <li className={`dropdown ${activeDropdown === 'sales' ? 'active' : ''}`}>
-          <div className="dropdown-header" onClick={() => toggleDropdown('sales')}>
-            <span className="icon-container"><FontAwesomeIcon icon={faShoppingCart} /></span>
-            <span>Sales</span>
-            <FontAwesomeIcon icon={faChevronDown} className={`chevron ${activeDropdown === 'sales' ? 'rotated' : ''}`} />
-          </div>
-          {activeDropdown === 'sales' && (
-            <ul className="dropdown-menu">
-              {can('/finished-goods/sales/new') && <li><NavLink to="/finished-goods/sales/new" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faPlusCircle} /></span><span>Add New Sale</span></NavLink></li>}
-              {can('/finished-goods/sales/history') && <li><NavLink to="/finished-goods/sales/history" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faHistory} /></span><span>Sales History</span></NavLink></li>}
             </ul>
           )}
         </li>
@@ -513,20 +426,6 @@ const NavigationBar = () => {
                 </div>
               </li>
               {!isCollapsed && activeModule === 'raw' && <div className="module-content">{renderRawMaterialContent()}</div>}
-            </>
-          )}
-
-          {/* Finished Goods */}
-          {canSeeNavModule('finished') && (
-            <>
-            <li>
-              <div className={`nav-link module-item ${activeModule === 'finished' ? 'active-module' : ''}`} onClick={() => handleModuleClick('finished')}>
-                <span className="icon-container"><FontAwesomeIcon icon={faBox} /></span>
-                <span>Finished Goods</span>
-                {!isCollapsed && <FontAwesomeIcon icon={faChevronDown} className={`chevron ${activeModule === 'finished' ? 'rotated' : ''}`} />}
-              </div>
-            </li>
-            {!isCollapsed && activeModule === 'finished' && <div className="module-content">{renderFinishedGoodsContent()}</div>}
             </>
           )}
 
