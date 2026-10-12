@@ -1,8 +1,10 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const path = require('path'); 
-const fs = require('fs'); 
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
+const { assertProductionSecrets } = require('./config/secrets');
 
 const authRoutes = require('./routes/authRoutes');
 const purchaseRoutes = require('./routes/purchaseRoutes');
@@ -206,6 +208,16 @@ app.use((err, req, res, next) => {
 });
 
 const startServer = async () => {
+  try {
+    // Refuse to boot with missing / short / shared JWT and POS session secrets.
+    // Exit immediately: the DB pool would otherwise keep a process alive that
+    // never listens (clients only see "connection refused").
+    assertProductionSecrets();
+  } catch (error) {
+    console.error(`FATAL: ${error.message}`);
+    process.exit(1);
+  }
+
   try {
     await ensureChequeReleaseSchema();
     app.listen(PORT, () => {

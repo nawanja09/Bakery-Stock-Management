@@ -5,10 +5,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { getRoleModules } = require('../config/rolePermissions');
 const integrationAuth = require('../services/integrationAuthService');
-
-if (!process.env.JWT_SECRET) {
-  console.error('FATAL: JWT_SECRET is not defined. Authentication will fail.');
-}
+const { getJwtSecret, JWT_SIGN_OPTIONS } = require('../config/secrets');
 
 const loginUser = async (req, res) => {
   const { username, password } = req.body;
@@ -38,8 +35,8 @@ const loginUser = async (req, res) => {
       const permissions = ['dashboard', ...getRoleModules(user.role)];
       const token = jwt.sign(
         { userId: user.id, username: user.username, role: user.role, permissions },
-        process.env.JWT_SECRET,
-        { expiresIn: '24h' }
+        getJwtSecret(),
+        JWT_SIGN_OPTIONS
       );
 
       // RAVON POS + RAVON Restaurant: the SAME typed username / password are

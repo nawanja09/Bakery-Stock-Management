@@ -5,6 +5,7 @@ const router = express.Router();
 const jwt = require('jsonwebtoken')
 const { loginUser,changePassword } = require('../controllers/authController');
 const authenticate = require('../middleware/authenticate');
+const { getJwtSecret, JWT_SIGN_OPTIONS, JWT_VERIFY_OPTIONS } = require('../config/secrets');
 
 router.post('/login', loginUser);
 router.post('/change-password', authenticate,changePassword);
@@ -14,11 +15,11 @@ router.post('/refresh-token', (req, res) => {
   if (!token) return res.status(401).json({ error: 'Token required' });
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, getJwtSecret(), JWT_VERIFY_OPTIONS);
     const newToken = jwt.sign(
       { userId: decoded.userId, username: decoded.username, role: decoded.role },
-      process.env.JWT_SECRET,
-      { expiresIn: '24h' }
+      getJwtSecret(),
+      JWT_SIGN_OPTIONS
     );
     res.json({ token: newToken });
   } catch (error) {

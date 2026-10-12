@@ -214,9 +214,18 @@ const API_RULES = [
 
 const READ_METHODS = ['GET', 'HEAD', 'OPTIONS'];
 
+// Matches no rule, so the request is denied by default.
+const REJECTED_PATH = '/__rejected__';
+
 // '/api/purchases/12?x=1' or '/purchases/12/' -> '/purchases/12'
+// Lower-cased because Express routers match paths case-insensitively: without
+// it '/purchases/PAYMENTS/...' skipped the narrow '/purchases/payments' rule and
+// fell through to the broader '/purchases' one. Encoded separators (%2F, %5C)
+// are refused outright so a path can never be read two different ways.
 const toApiPath = (url = '') => {
   let path = String(url).split('?')[0].split('#')[0];
+  if (/%2f|%5c/i.test(path)) return REJECTED_PATH;
+  path = path.toLowerCase();
   if (path === '/api' || path.startsWith('/api/')) path = path.slice(4);
   path = path.replace(/\/{2,}/g, '/').replace(/\/+$/, '');
   return path.startsWith('/') ? path : `/${path}`;

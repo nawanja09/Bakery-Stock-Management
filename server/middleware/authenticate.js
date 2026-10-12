@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const { getJwtSecret, JWT_VERIFY_OPTIONS } = require('../config/secrets');
 
 const authenticate = (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -10,7 +11,7 @@ const authenticate = (req, res, next) => {
   const token = authHeader.split(' ')[1];
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET); // Make sure you have JWT_SECRET in your .env
+    const decoded = jwt.verify(token, getJwtSecret(), JWT_VERIFY_OPTIONS);
     req.user = decoded;
     next();
   } catch (err) {

@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const withTransaction = require('../utils/withTransaction');
 
 const generateSaleNumber = () => {
   return `SALE-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
@@ -6,30 +7,28 @@ const generateSaleNumber = () => {
 
 const createFinishedGoodsSale = async (req, res) => {
   const { sale_date, designation, cashier_name, remarks, items } = req.body;
-  const created_by = req.user?.id || 5;
+  if (!Array.isArray(items)) return res.status(400).json({ error: 'items must be an array' });
+  // The authenticated user (the JWT carries userId; req.user.id never existed, so this was always 5).
+  const created_by = req.user.userId;
 
   try {
-    await pool.query('START TRANSACTION');
-
     const sale_number = generateSaleNumber();
-    
-    // Insert sale record
-    const [saleResult] = await pool.query(
-      'INSERT INTO finished_goods_sales (sale_number, sale_date, designation, cashier_name, remarks, created_by) VALUES (?, ?, ?, ?, ?, ?)',
-      [sale_number, sale_date, designation, cashier_name, remarks, created_by]
-    );
-
-    const saleId = saleResult.insertId;
-
-    // Insert sale items
-    for (const item of items) {
-      await pool.query(
-        'INSERT INTO finished_goods_sale_items (sale_id, item_id, quantity, unit_price, total_value) VALUES (?, ?, ?, ?, ?)',
-        [saleId, item.item_id, item.quantity, item.unit_price, item.total_value]
+    const saleId = await withTransaction(async (connection) => {
+      // Insert sale record
+      const [saleResult] = await connection.query(
+        'INSERT INTO finished_goods_sales (sale_number, sale_date, designation, cashier_name, remarks, created_by) VALUES (?, ?, ?, ?, ?, ?)',
+        [sale_number, sale_date, designation, cashier_name, remarks, created_by]
       );
-    }
 
-    await pool.query('COMMIT');
+      // Insert sale items
+      for (const item of items) {
+        await connection.query(
+          'INSERT INTO finished_goods_sale_items (sale_id, item_id, quantity, unit_price, total_value) VALUES (?, ?, ?, ?, ?)',
+          [saleResult.insertId, item.item_id, item.quantity, item.unit_price, item.total_value]
+        );
+      }
+      return saleResult.insertId;
+    });
 
     res.status(201).json({
       id: saleId,
@@ -37,14 +36,13 @@ const createFinishedGoodsSale = async (req, res) => {
       message: 'Sale recorded successfully'
     });
   } catch (error) {
-    await pool.query('ROLLBACK');
     console.error('Error creating sale:', error);
-    
+
     if (error.code === 'ER_DUP_ENTRY') {
       return res.status(400).json({ error: 'Sale number already exists' });
     }
-    
-    res.status(500).json({ error: 'Server error: ' + error.message });
+
+    res.status(500).json({ error: 'Server error' });
   }
 };
 
