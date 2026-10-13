@@ -51,6 +51,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import bakeryLogo from '../images/icon.jpeg';
 import usePermissions from '../hooks/usePermissions';
+import useIntegrationAccess from '../hooks/useIntegrationAccess';
 import './NavigationBar.css';
 
 const NavigationBar = () => {
@@ -67,6 +68,14 @@ const NavigationBar = () => {
   const { canAccessPath, canAccessAnyPath, canSeeNavModule, getModuleLanding } = usePermissions();
   const can = (path) => canAccessPath(path);
   const canAny = (paths) => canAccessAnyPath(paths);
+  // Collection also needs the user's OWN POS / Restaurant privileges (server
+  // validated). Hidden when every configured system is connected and none of
+  // them grants collections; while a system is not connected yet the page stays
+  // reachable so the user can Connect there. Unknown yet -> the role decides.
+  const { access: integrationAccess } = useIntegrationAccess({ enabled: can('/collection') });
+  const collectionAllowed = !integrationAccess
+    || integrationAccess.collection?.allowed === true
+    || Object.values(integrationAccess.systems || {}).some((s) => s.configured && !s.connected);
 
   // Sync activeModule with current route
   useEffect(() => {
@@ -457,8 +466,9 @@ const NavigationBar = () => {
             </>
           )}
 
-          {/* Collection - directly below Finance (Accountant, Admin, Super Admin; QB view only) */}
-          {can('/collection') && (
+          {/* Collection - directly below Finance (Accountant, Finance, Admin, Super Admin; QB view only),
+              only when the user's own POS / Restaurant accounts may see collections */}
+          {can('/collection') && collectionAllowed && (
             <li>
               <NavLink
                 to="/collection"

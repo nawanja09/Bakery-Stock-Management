@@ -194,6 +194,4 @@
 .col-integration-ok { background: #ecfdf5; color: #065f46; border-color: #a7f3d0; }
 .col-integration-warn { background: #fffbeb; color: #92400e; border-color: #fde68a; }
 .col-integration-off { background: #f1f5f9; color: #475569; border-color: #e2e8f0; }
-.col-connect-btn { font-weight: 600; }
 .col-sync-alert.col-sync-warn { background: #fffbeb; border-color: #fde68a; color: #92400e; }
-.col-connect-modal { max-width: 440px; width: 95vw; }

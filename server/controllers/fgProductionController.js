@@ -22,6 +22,10 @@
 //   API through ravonPosService) and BSMS stores the POS item's ID as
 //   `external_item_id`, with `fg_item_name` kept only as a display/cache
 //   value. See server/services/ravonPosService.js for the integration.
+//   The list is read with the REQUESTING user's own POS session and only when
+//   their POS account has the items.view privilege (checked here through
+//   integrationAuthService.getUserAccess, and again by the POS itself) - the
+//   BSMS role alone is not enough to see it or to pick an FG item.
 //
 // Soft delete convention: status = 1 (Active) / status = 0 (Deleted)
 // ----------------------------------------------------------------------
@@ -37,6 +41,7 @@ const {
   RavonPosAuthError
 } = require('../services/ravonPosService');
 const { isValidUnit, areCompatibleUnits, convertQuantity } = require('../utils/unitConversion');
+const integrationAuth = require('../services/integrationAuthService');
 
 // =============================================
 // Helpers
@@ -68,13 +73,40 @@ const validateFgProductionInput = ({ external_item_id, fg_item_name, department_
   return null;
 };
 
+// Error for a user whose own POS account may not view the item list.
+class PosItemsAccessError extends Error {
+  constructor(message, code) {
+    super(message);
+    this.name = 'PosItemsAccessError';
+    this.code = code;
+  }
+}
+
+/**
+ * Throws PosItemsAccessError unless THIS user's own POS account currently has
+ * the items.view privilege (validated against the POS, fails closed).
+ */
+const assertPosItemsAccess = async (req) => {
+  const access = await integrationAuth.getUserAccess('pos', { userId: req.user?.userId || null });
+  if (access.abilities.includes(integrationAuth.ABILITIES.ITEMS)) return;
+  if (access.state === 'connected') {
+    throw new PosItemsAccessError('Your RAVON POS account does not have permission to view the item list', 'POS_FORBIDDEN');
+  }
+  throw new PosItemsAccessError(access.message || 'Not connected to RAVON POS', access.code || 'POS_NOT_CONNECTED');
+};
+
 // Maps a Ravon POS integration error to an { status, error } pair that is
 // safe to send to the frontend (no stack traces / internal config).
 const posErrorResponse = (error) => {
+  if (error instanceof PosItemsAccessError || (error instanceof RavonPosAuthError && error.code === 'POS_FORBIDDEN')) {
+    // Not allowed for this user (403), or not connected / session expired (409):
+    // never 401, which would log the Stock Management user out.
+    return { status: error.code === 'POS_FORBIDDEN' ? 403 : 409, error: error.message, code: error.code };
+  }
   if (error instanceof RavonPosAuthError) {
-    // The automatic RAVON POS Finance login failed. The message says whether the
-    // configured credentials are invalid or the POS login service is unavailable
-    // (never 401, which would log the Stock Management user out).
+    // The user's own RAVON POS session is missing / was refused, or the POS
+    // login service is unavailable (never 401, which would log the Stock
+    // Management user out).
     console.warn('[FG Production] Ravon POS authentication failed:', error.message);
     return { status: error.code === 'POS_CREDENTIALS_INVALID' ? 502 : 503, error: error.message, code: error.code };
   }
@@ -122,7 +154,8 @@ const validateRecipeInput = ({ rm_item_id, quantity, recipe_unit, last_price }) 
 // are returned - no POS credentials/internal config are exposed.
 const getPosItems = async (req, res) => {
   try {
-    const items = await fetchRavonPosItems();
+    await assertPosItemsAccess(req);
+    const items = await fetchRavonPosItems({ userId: req.user?.userId || null });
     res.json(items);
   } catch (error) {
     const { status, error: message, code } = posErrorResponse(error);
@@ -203,7 +236,9 @@ const createFgProduction = async (req, res) => {
   // exists in the POS.
   let posItem;
   try {
-    posItem = await findRavonPosItem(external_item_id);
+    // Choosing an FG item needs the user's own POS item-list privilege.
+    await assertPosItemsAccess(req);
+    posItem = await findRavonPosItem(external_item_id, { userId: req.user?.userId || null });
   } catch (error) {
     const { status, error: message, code } = posErrorResponse(error);
     return res.status(status).json({ error: message, ...(code ? { code } : {}) });
@@ -260,7 +295,8 @@ const updateFgProduction = async (req, res) => {
     if (itemIsChanging) {
       let posItem;
       try {
-        posItem = await findRavonPosItem(external_item_id);
+        await assertPosItemsAccess(req);
+        posItem = await findRavonPosItem(external_item_id, { userId: req.user?.userId || null });
       } catch (error) {
         const { status, error: message, code } = posErrorResponse(error);
         return res.status(status).json({ error: message, ...(code ? { code } : {}) });
@@ -587,7 +623,7 @@ const getRecipesReport = async (req, res) => {
     // Selling Price = null (formatted as "N/A" below) rather than failing.
     let posItemsByExternalId = new Map();
     try {
-      const posItems = await fetchRavonPosItems({ includeInactive: true });
+      const posItems = await fetchRavonPosItems({ includeInactive: true, userId: req.user?.userId || null });
       posItemsByExternalId = new Map(posItems.map(item => [String(item.external_item_id), item]));
     } catch (error) {
       console.warn('[FG Production] Could not load Ravon POS items for Selling Price:', error.message);

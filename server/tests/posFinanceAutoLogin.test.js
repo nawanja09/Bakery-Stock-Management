@@ -4,10 +4,12 @@
 //   * BSMS login is decided by the BSMS password only; POS / Restaurant outcomes
 //     never block it or change each other
 //   * the typed username / password are tried on both systems in parallel, once,
-//     only for Finance / Accountant / Admin / Super Admin, only after the BSMS
+//     only for roles with a page that reads them (Collection / FG Production:
+//     Store Keeper, Accountant, QB, Admin, Super Admin), only after the BSMS
 //     password matched; nothing is configured in the environment
-//   * a Finance session serves every POS call (FG items too); without one the
-//     error is POS_NOT_CONNECTED (no background login)
+//   * each session serves ONLY that user's calls (FG items too) - there is no
+//     shared Finance session; without their own session the error is
+//     POS_NOT_CONNECTED (no background login)
 //   * no token / password reaches the response or the log
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -96,10 +98,12 @@ const captureLogs = async (fn) => {
   return lines.join('\n');
 };
 
+const ACCOUNTS = { finance: 'finance-bsms', accountant2: 'bsms-pass', stores: 'stores-bsms', admin: 'admin-bsms' };
+
 const withSystems = async (options, fn) => {
   auth.resetAuthState();
-  const posMock = await startMock({ prefix: 'pos', accounts: { finance: 'finance-bsms' }, ...(options.pos || {}) });
-  const restMock = await startMock({ prefix: 'rst', accounts: { finance: 'finance-bsms' }, ...(options.restaurant || {}) });
+  const posMock = await startMock({ prefix: 'pos', accounts: ACCOUNTS, ...(options.pos || {}) });
+  const restMock = await startMock({ prefix: 'rst', accounts: ACCOUNTS, ...(options.restaurant || {}) });
   process.env.RAVON_POS_API_URL = posMock.url;
   process.env.RAVON_RESTAURANT_API_URL = restMock.url;
   try {
@@ -111,7 +115,12 @@ const withSystems = async (options, fn) => {
   }
 };
 
-test('BSMS login: the typed Finance credentials are tried on POS and Restaurant (once each); nothing else changes', async () => {
+const ADMIN = 2;
+const ACCOUNTANT = 8;
+const STORES = 7;
+const FINANCE = 11;
+
+test('BSMS login: the typed credentials are tried on POS and Restaurant (once each) as that user\'s own session', async () => {
   await withSystems({}, async (posMock, restMock) => {
     const logs = await captureLogs(async () => {
       for (const [username, password, role] of [
@@ -126,84 +135,92 @@ test('BSMS login: the typed Finance credentials are tried on POS and Restaurant 
       }
       assert.equal((await callLogin({ username: 'finance', password: 'wrong' })).status, 401);
     });
-    // Store Keeper is never forwarded; a wrong BSMS password is never forwarded.
-    assert.deepEqual(posMock.stats.logins, ['finance', 'accountant2', 'admin']);
-    assert.deepEqual(restMock.stats.logins, ['finance', 'accountant2', 'admin']);
-    assert.equal(auth.getAuthStatus('pos').connected, true);
-    assert.equal(auth.getAuthStatus('restaurant').connected, true);
-    assert.equal(auth.getAuthStatus('restaurant').source, 'finance');
-    assert.doesNotMatch(logs, /finance-bsms|bsms-pass|admin-bsms|pos-tok|rst-tok/, 'no password / token in the log');
+    // Finance has no page reading POS / Restaurant -> never forwarded; a wrong BSMS password is never forwarded.
+    assert.deepEqual(posMock.stats.logins, ['accountant2', 'stores', 'admin']);
+    assert.deepEqual(restMock.stats.logins, ['accountant2', 'stores', 'admin']);
+    for (const userId of [ACCOUNTANT, STORES, ADMIN]) {
+      assert.equal(auth.getAuthStatus('pos', { userId }).connected, true, String(userId));
+      assert.equal(auth.getAuthStatus('restaurant', { userId }).source, 'own');
+    }
+    assert.equal(auth.getAuthStatus('pos', { userId: FINANCE }).connected, false);
+    assert.equal(auth.getAuthStatus('pos').connected, false, 'no user -> no session');
+    assert.doesNotMatch(logs, /finance-bsms|bsms-pass|admin-bsms|stores-bsms|pos-tok|rst-tok/, 'no password / token in the log');
   });
 });
 
 test('Restaurant refuses the login -> BSMS login and the POS session are unaffected', async () => {
-  await withSystems({ restaurant: { accounts: { finance: 'other-restaurant-pass' } } }, async (posMock, restMock) => {
-    const { status } = await callLogin({ username: 'finance', password: 'finance-bsms' });
+  await withSystems({ restaurant: { accounts: { admin: 'other-restaurant-pass' } } }, async (posMock, restMock) => {
+    const { status } = await callLogin({ username: 'admin', password: 'admin-bsms' });
     assert.equal(status, 200);
     await auth.whenIdle();
-    assert.equal(auth.getAuthStatus('pos').connected, true);
-    const rest = auth.getAuthStatus('restaurant');
+    assert.equal(auth.getAuthStatus('pos', { userId: ADMIN }).connected, true);
+    const rest = auth.getAuthStatus('restaurant', { userId: ADMIN });
     assert.equal(rest.connected, false);
     assert.equal(rest.code, 'RESTAURANT_CREDENTIALS_INVALID');
-    assert.doesNotMatch(JSON.stringify(rest), /finance-bsms/);
-    assert.deepEqual(await pos.posGet('/api/completed-shifts/collection'), { data: [] });
+    assert.doesNotMatch(JSON.stringify(rest), /admin-bsms/);
+    assert.deepEqual(await pos.posGet('/api/completed-shifts/collection', null, { userId: ADMIN }), { data: [] });
     assert.equal(restMock.stats.logins.length, 1);
   });
 });
 
 test('Restaurant unreachable / 503 -> BSMS login still succeeds at once, POS still connected', async () => {
   await withSystems({ restaurant: { loginStatus: 503 } }, async () => {
-    const { status } = await callLogin({ username: 'finance', password: 'finance-bsms' });
+    const { status } = await callLogin({ username: 'admin', password: 'admin-bsms' });
     assert.equal(status, 200);
     await auth.whenIdle();
-    assert.equal(auth.getAuthStatus('pos').connected, true);
-    assert.equal(auth.getAuthStatus('restaurant').code, 'RESTAURANT_AUTH_UNAVAILABLE');
+    assert.equal(auth.getAuthStatus('pos', { userId: ADMIN }).connected, true);
+    assert.equal(auth.getAuthStatus('restaurant', { userId: ADMIN }).code, 'RESTAURANT_AUTH_UNAVAILABLE');
   });
   await withSystems({}, async (posMock, restMock) => {
     await restMock.close(); // nothing listening
-    const { status } = await callLogin({ username: 'finance', password: 'finance-bsms' });
+    const { status } = await callLogin({ username: 'admin', password: 'admin-bsms' });
     assert.equal(status, 200);
     await auth.whenIdle();
-    assert.equal(auth.getAuthStatus('pos').connected, true);
-    assert.equal(auth.getAuthStatus('restaurant').connected, false);
+    assert.equal(auth.getAuthStatus('pos', { userId: ADMIN }).connected, true);
+    assert.equal(auth.getAuthStatus('restaurant', { userId: ADMIN }).connected, false);
   });
 });
 
 test('POS refuses but Restaurant accepts -> the Restaurant session is kept, the POS result is independent', async () => {
-  await withSystems({ pos: { accounts: { finance: 'other-pos-pass' } } }, async () => {
-    await callLogin({ username: 'finance', password: 'finance-bsms' });
+  await withSystems({ pos: { accounts: { admin: 'other-pos-pass' } } }, async () => {
+    await callLogin({ username: 'admin', password: 'admin-bsms' });
     await auth.whenIdle();
-    assert.equal(auth.getAuthStatus('pos').code, 'POS_CREDENTIALS_INVALID');
-    assert.equal(auth.getAuthStatus('restaurant').connected, true);
+    assert.equal(auth.getAuthStatus('pos', { userId: ADMIN }).code, 'POS_CREDENTIALS_INVALID');
+    assert.equal(auth.getAuthStatus('restaurant', { userId: ADMIN }).connected, true);
   });
 });
 
-test('FG items and every POS API use the Finance session; without one -> POS_NOT_CONNECTED, nothing logs in', async () => {
+test('FG items and every POS API use the user\'s OWN session; another user\'s login never helps', async () => {
   await withSystems({}, async (posMock) => {
     const { RavonPosAuthError, fetchRavonPosItems } = require('../services/ravonPosService');
-    await assert.rejects(fetchRavonPosItems(), (e) => e instanceof RavonPosAuthError && e.code === 'POS_NOT_CONNECTED');
+    await assert.rejects(fetchRavonPosItems({ userId: ADMIN }), (e) => e instanceof RavonPosAuthError && e.code === 'POS_NOT_CONNECTED');
     assert.deepEqual(posMock.stats.logins, []);
 
-    await callLogin({ username: 'finance', password: 'finance-bsms' });
+    await callLogin({ username: 'admin', password: 'admin-bsms' });
     await auth.whenIdle();
     for (const endpoint of ['/api/items-list', '/api/completed-shifts/collection', '/api/credit-payments/collection', '/api/employee-deductions']) {
-      await pos.posGet(endpoint);
+      await pos.posGet(endpoint, null, { userId: ADMIN });
     }
-    assert.deepEqual(posMock.stats.logins, ['finance']);
+    assert.deepEqual(posMock.stats.logins, ['admin']);
     assert.ok(posMock.stats.tokensSeen.filter((t) => !t.startsWith('/api/me')).every((t) => t.endsWith(' pos-tok-1')));
+
+    // The Admin's session is NOT used for anyone else (or for a call without a user).
+    const seen = posMock.stats.tokensSeen.length;
+    await assert.rejects(fetchRavonPosItems({ userId: ACCOUNTANT }), (e) => e instanceof RavonPosAuthError && e.code === 'POS_NOT_CONNECTED');
+    await assert.rejects(pos.posGet('/api/items-list'), (e) => e.code === 'POS_NOT_CONNECTED');
+    assert.equal(posMock.stats.tokensSeen.length, seen, 'nothing was sent');
   });
 });
 
 test('Restaurant not configured -> skipped without any request; POS unaffected', async () => {
   await withSystems({}, async (posMock, restMock) => {
     delete process.env.RAVON_RESTAURANT_API_URL;
-    await callLogin({ username: 'finance', password: 'finance-bsms' });
-    const results = await auth.loginAll({ userId: 2, role: 'Admin', username: 'admin', password: 'admin-bsms' });
+    const results = await auth.loginAll({ userId: ADMIN, role: 'Admin', username: 'admin', password: 'admin-bsms' });
     assert.equal(results.restaurant.skipped, true);
     assert.equal(results.restaurant.code, 'RESTAURANT_NOT_CONFIGURED');
     await auth.whenIdle();
     assert.deepEqual(restMock.stats.logins, []);
-    assert.equal(auth.getAuthStatus('restaurant').state, 'not_configured');
-    assert.equal(auth.getAuthStatus('pos').connected, true);
+    assert.equal(auth.getAuthStatus('restaurant', { userId: ADMIN }).state, 'not_configured');
+    assert.equal(auth.getAuthStatus('pos', { userId: ADMIN }).connected, true);
   });
 });

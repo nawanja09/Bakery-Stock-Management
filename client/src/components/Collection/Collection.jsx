@@ -6,13 +6,14 @@
 //   Pending   - opening the tab asks the BSMS backend to pull the three
 //               endpoints (completed shift collections, credit payments, employee
 //               deductions) of BOTH systems for the searched date range (or the
-//               recent default window). The backend uses the Finance account's
-//               session of each system - the browser never calls POS / Restaurant
-//               and never sees a token. No password is stored, so there is no
-//               background sync: when a system is "not connected / expired" the
-//               page says so and offers "Connect" (the password is sent once and
-//               not stored). Collections from ALL departments are loaded, never
-//               just the user's own department.
+//               recent default window). The backend uses the signed-in user's
+//               OWN session of each system and shows only what that account may
+//               see there (collection types, POS branches) - the browser never
+//               calls POS / Restaurant and never sees a token. No password is
+//               stored, so there is no background sync: when a system is "not
+//               connected / expired" the page says so (log in again with the same
+//               username / password as that system). When the user's accounts
+//               may see no collections at all, the page says so (server 403).
 //               Pending records are NOT in any ledger. Tick one, several or all
 //               and Approve or Reject.
 //   Filters   - Search text, System, Source, Department and From / To date are applied
@@ -184,6 +185,10 @@ const Collection = () => {
   const [sync, setSync] = useState(null);
   // { pos: {...}, restaurant: {...} } - connection state of each system (never a token)
   const [integrations, setIntegrations] = useState(null);
+  // What THIS user's own POS / Restaurant accounts may see (server-validated):
+  // { collection: { allowed, sources: { POS: [...], RESTAURANT: [...] } }, systems }
+  const [access, setAccess] = useState(null);
+  const [accessDenied, setAccessDenied] = useState(null); // message when the server refused (403)
   const [selectedIds, setSelectedIds] = useState([]);
   const [rejectedSelected, setRejectedSelected] = useState([]);
   const refreshOnNextLoad = useRef(true); // pull from the POS when Pending is opened / searched
@@ -196,8 +201,6 @@ const Collection = () => {
   const [dialogError, setDialogError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [cardView, setCardView] = useState(null); // { row, loading, data, error } - individual card payments
-  // "Connect <system> Finance account": { provider, label, account, username, password, error, submitting }
-  const [connect, setConnect] = useState(null);
 
   // ------------------------------------------------------------------ data
   useEffect(() => {
@@ -222,15 +225,19 @@ const Collection = () => {
 
   const loadIntegrations = useCallback(() => {
     api.get('/collections/integrations/status')
-      .then((res) => setIntegrations(res.data?.integrations || null))
+      .then((res) => {
+        setIntegrations(res.data?.integrations || null);
+        if (res.data?.access) setAccess(res.data.access);
+      })
       .catch(() => {});
   }, []);
 
   // One loader for the current tab. On Pending, opening the tab, Search and
   // "Refresh" first make the backend pull POS and Restaurant (all departments)
   // for the searched date range - the range is never answered from rows loaded
-  // earlier. Paging only reads the database. The backend uses the Finance
-  // sessions; the browser never talks to POS / Restaurant.
+  // earlier. Paging only reads the database. The backend uses THIS user's own
+  // POS / Restaurant sessions and returns only what those accounts may see;
+  // the browser never talks to POS / Restaurant.
   const load = useCallback(async ({ refresh = false } = {}) => {
     const status = tab.toLowerCase();
     const pull = status === 'pending' && refresh;
@@ -238,10 +245,12 @@ const Collection = () => {
     try {
       const res = await api.get(`/collections/${status}`, { params: { ...params, ...(pull ? { refresh: 1 } : {}) } });
       const body = res.data || {};
+      setAccessDenied(null);
       setData({ ...EMPTY_DATA, ...body, records: body.records || [] });
       if (status === 'pending') {
         if (body.sync) setSync(body.sync);
         if (body.integrations) setIntegrations(body.integrations);
+        if (body.access) setAccess(body.access);
         const visible = new Set((body.records || []).map((r) => r.id));
         setSelectedIds((prev) => prev.filter((id) => visible.has(id)));
         if (pull) loadDepartmentOptions();
@@ -249,7 +258,15 @@ const Collection = () => {
         setRejectedSelected([]);
       }
     } catch (error) {
-      showPopup('error', error.response?.data?.error || `Failed to load ${tab.toLowerCase()} collections`);
+      const body = error.response?.data || {};
+      if (error.response?.status === 403 && body.code === 'INTEGRATION_ACCESS_DENIED') {
+        // The user's own POS / Restaurant accounts may not see any collections.
+        setData(EMPTY_DATA);
+        setAccessDenied(body.error || 'You do not have permission to access Collections.');
+        if (body.access) setAccess(body.access);
+      } else {
+        showPopup('error', body.error || `Failed to load ${tab.toLowerCase()} collections`);
+      }
     } finally {
       setLoading(false);
     }
@@ -263,32 +280,6 @@ const Collection = () => {
 
   useEffect(() => { loadDepartmentOptions(); }, [loadDepartmentOptions]);
   useEffect(() => { loadIntegrations(); }, [loadIntegrations]);
-
-  // ------------------------------------------------------------- connect
-  const openConnect = (status) => setConnect({
-    provider: status.provider, label: status.label, account: status.account,
-    username: '', password: '', error: '', submitting: false
-  });
-  const closeConnect = () => setConnect((c) => (c && c.submitting ? c : null));
-  const submitConnect = async (e) => {
-    if (e) e.preventDefault();
-    if (!connect || connect.submitting) return;
-    const username = connect.username.trim();
-    if (!username || !connect.password) { setConnect((c) => ({ ...c, error: 'Enter the username and password' })); return; }
-    const { provider, password } = connect;
-    // The password leaves this component only in this one request; it is
-    // cleared from state right away and is never stored by the server.
-    setConnect((c) => ({ ...c, password: '', submitting: true, error: '' }));
-    try {
-      const res = await api.post(`/collections/integrations/${provider}/connect`, { username, password });
-      showPopup('success', `${connect.label} connected as ${res.data?.username || username}`);
-      setConnect(null);
-      loadIntegrations();
-      if (tab === 'Pending') load({ refresh: true });
-    } catch (error) {
-      setConnect((c) => (c ? { ...c, submitting: false, error: error.response?.data?.error || `Could not connect to ${c.label}` } : c));
-    }
-  };
 
   const openTab = (t) => {
     if (t === tab) return;
@@ -508,6 +499,30 @@ const Collection = () => {
 
   // POS / Restaurant connection badges. The browser never sees a token: only
   // connected / not connected / expired, the account name and branch scope.
+  // Collection types this user's own account may see in a system (server-validated).
+  const allowedSourcesOf = (system) => access?.collection?.sources?.[system] || [];
+  // Filter options: only systems / types the user may see (all until known).
+  const visibleSystems = access
+    ? Object.keys(SYSTEM_LABELS).filter((system) => allowedSourcesOf(system).length > 0)
+    : Object.keys(SYSTEM_LABELS);
+  const visibleSourceTypes = access
+    ? Object.keys(SOURCE_LABELS).filter((source) => visibleSystems.some((system) => allowedSourcesOf(system).includes(source)))
+    : Object.keys(SOURCE_LABELS);
+
+  const renderAccessDenied = () => (
+    <>
+      <div className="col-sync-alert" role="alert">
+        <FontAwesomeIcon icon={faTriangleExclamation} />
+        <div>
+          <strong>No access to Collections.</strong> {accessDenied}
+          {' '}Access follows the permissions of your own POS / Restaurant account
+          (shift review, credit payments, salary deductions). Ask the administrator of that system if you need more.
+        </div>
+      </div>
+      {renderIntegrationStatus()}
+    </>
+  );
+
   const statusText = (st) => {
     if (!st) return 'Checking...';
     if (st.state === 'not_configured') return 'Not configured';
@@ -530,10 +545,12 @@ const Collection = () => {
               <span key={st.provider} className={`col-integration col-integration-${stateClass}`}
                 title={st.connected && st.expiresAt ? `Session valid until ${fmtDateTime(st.expiresAt)}` : (st.message || '')}>
                 <strong>{SYSTEM_LABELS[st.system] || st.label}</strong> {statusText(st)}
-                {canWrite && st.configured && !st.connected && (
-                  <button type="button" className="col-link-btn col-connect-btn" onClick={() => openConnect(st)}>
-                    {st.state === 'expired' ? 'Reconnect' : 'Connect'}
-                  </button>
+                {st.connected && access && (
+                  <span className="col-access-sources">
+                    {' '}&middot; {allowedSourcesOf(st.system).length
+                      ? allowedSourcesOf(st.system).map((s) => SOURCE_LABELS[s]).join(', ')
+                      : 'no collection access'}
+                  </span>
                 )}
               </span>
             );
@@ -544,10 +561,9 @@ const Collection = () => {
             <FontAwesomeIcon icon={faTriangleExclamation} />
             <div>
               <strong>{needsLogin.map((st) => SYSTEM_LABELS[st.system]).join(' and ')} not connected.</strong>{' '}
-              Log in with the Finance account to sync
-              {canWrite ? ', or use Connect with the Finance account of that system' : ''}.
-              {' '}Passwords are never stored, so collections are only read while a Finance session is valid
-              (there is no background sync). The records below are the ones already loaded.
+              Log in to Stock Management with the same username and password as your own account there.
+              {' '}Collections are read with your own account and show only what it may see there;
+              passwords are never stored (there is no background sync).
             </div>
           </div>
         )}
@@ -650,14 +666,14 @@ const Collection = () => {
           <label htmlFor="col-system">System</label>
           <select id="col-system" value={draft.system} onChange={setDraftField('system')} className="form-select">
             <option value="">All</option>
-            {Object.entries(SYSTEM_LABELS).map(([value, text]) => <option key={value} value={value}>{text}</option>)}
+            {visibleSystems.map((value) => <option key={value} value={value}>{SYSTEM_LABELS[value]}</option>)}
           </select>
         </div>
         <div className="form-group">
           <label htmlFor="col-type">Collection Type</label>
           <select id="col-type" value={draft.source} onChange={setDraftField('source')} className="form-select">
             <option value="">All</option>
-            {Object.entries(SOURCE_LABELS).map(([value, text]) => <option key={value} value={value}>{text}</option>)}
+            {visibleSourceTypes.map((value) => <option key={value} value={value}>{SOURCE_LABELS[value]}</option>)}
           </select>
         </div>
         <div className="form-group">
@@ -729,8 +745,11 @@ const Collection = () => {
 
         {renderFilters()}
 
+        {/* No access: the user's own POS / Restaurant accounts may see no collections. */}
+        {accessDenied && renderAccessDenied()}
+
         {/* ------------------------------ PENDING ------------------------------ */}
-        {tab === 'Pending' && (
+        {!accessDenied && tab === 'Pending' && (
           <>
             {!canWrite && (
               <p className="cl-note">View only: these are the collections already loaded from POS / Restaurant. Approving and rejecting are not available for your role.</p>
@@ -859,7 +878,7 @@ const Collection = () => {
         )}
 
         {/* ------------------------------ COMPLETED ------------------------------ */}
-        {tab === 'Completed' && (loading ? (
+        {!accessDenied && tab === 'Completed' && (loading ? (
           <div className="cl-empty"><FontAwesomeIcon icon={faSpinner} spin /> Loading...</div>
         ) : (
           <div className="cl-table-wrap">
@@ -928,7 +947,7 @@ const Collection = () => {
         ))}
 
         {/* ------------------------------ REJECTED ------------------------------ */}
-        {tab === 'Rejected' && (loading ? (
+        {!accessDenied && tab === 'Rejected' && (loading ? (
           <div className="cl-empty"><FontAwesomeIcon icon={faSpinner} spin /> Loading...</div>
         ) : (
           <>
@@ -1222,49 +1241,7 @@ const Collection = () => {
           </div>
         </div>
       )}
-      {/* --------------------- CONNECT POS / RESTAURANT FINANCE ACCOUNT --------------------- */}
-      {connect && (
-        <div className="cl-modal-overlay" onClick={closeConnect}>
-          <form className="cl-modal col-connect-modal" role="dialog" aria-modal="true" aria-labelledby="col-connect-title"
-            onClick={(e) => e.stopPropagation()} onSubmit={submitConnect} autoComplete="off">
-            <div className="cl-modal-header">
-              <div>
-                <h3 id="col-connect-title">Connect {connect.account} account</h3>
-                <div className="cl-modal-sub">Sign in once so Stock Management can read {connect.label} collections.</div>
-              </div>
-              <button type="button" className="cl-modal-close" onClick={closeConnect} aria-label="Close" disabled={connect.submitting}>
-                <FontAwesomeIcon icon={faTimes} />
-              </button>
-            </div>
-            <div className="cl-modal-body">
-              <p className="cl-note">
-                Your password is sent once to {connect.label} to sign in and is <strong>not stored</strong> anywhere -
-                Stock Management keeps only the session (encrypted, on the server). When it expires you will be asked
-                to connect again; nothing is synced in the background.
-              </p>
-              <div className="form-group">
-                <label htmlFor="col-connect-user">{connect.label} username</label>
-                <input id="col-connect-user" className="form-input" autoComplete="off" autoFocus maxLength={150}
-                  value={connect.username} disabled={connect.submitting}
-                  onChange={(e) => { const { value } = e.target; setConnect((c) => ({ ...c, username: value, error: '' })); }} />
-              </div>
-              <div className="form-group">
-                <label htmlFor="col-connect-pass">{connect.label} password</label>
-                <input id="col-connect-pass" type="password" className="form-input" autoComplete="new-password" maxLength={150}
-                  value={connect.password} disabled={connect.submitting}
-                  onChange={(e) => { const { value } = e.target; setConnect((c) => ({ ...c, password: value, error: '' })); }} />
-              </div>
-              {connect.error && <div className="cl-modal-error" role="alert">{connect.error}</div>}
-            </div>
-            <div className="cl-modal-footer">
-              <button type="button" className="btn btn-secondary" onClick={closeConnect} disabled={connect.submitting}>Cancel</button>
-              <button type="submit" className="btn btn-primary" disabled={connect.submitting}>
-                {connect.submitting ? <><FontAwesomeIcon icon={faSpinner} spin /> Connecting...</> : 'Connect'}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+
     </div>
   );
 };

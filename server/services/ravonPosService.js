@@ -10,8 +10,9 @@
 // Only the POS services (this file, posAuthService.js / integrationAuthService.js
 // for the token and collectionSyncService.js for the Collection endpoints) know
 // about the POS API URL. No POS credentials exist on the server: the items are
-// read with the token of the latest Finance login accepted by the POS, so they
-// are only available while such a session is valid (code POS_NOT_CONNECTED).
+// read with the REQUESTING user's own POS session (pass { userId }), so a user
+// only gets them while their own session is valid (code POS_NOT_CONNECTED) and
+// their POS account has the items.view ability (the POS answers 403 otherwise).
 // Controllers must always go through the functions exported here -
 // the BSMS frontend must never call the POS API directly.
 //
@@ -27,13 +28,14 @@
 // names differ, only `mapPosItem()` needs to change.
 // ----------------------------------------------------------------------
 
-// Authentication (Finance session token, never a stored password) lives in posAuthService.
+// Authentication (the user's own session token, never a stored password) lives in posAuthService.
 const { posGet, PosConfigError, PosAuthError, PosUnavailableError, PosResponseError } = require('./posAuthService');
 
-const RAVON_POS_API_URL = process.env.RAVON_POS_API_URL || '';
+// Read at call time (like integrationAuthService), so a changed .env / tests apply.
+const posApiUrl = () => process.env.RAVON_POS_API_URL || '';
 // One endpoint. If several are listed ("a,b,c"), the first is the items list -
 // the Collection endpoints have their own settings (collectionSyncService.js).
-const RAVON_POS_ITEMS_ENDPOINT = (process.env.RAVON_POS_ITEMS_ENDPOINT || '').split(',')[0].trim() || '/api/items-list';
+const posItemsEndpoint = () => (process.env.RAVON_POS_ITEMS_ENDPOINT || '').split(',')[0].trim() || '/api/items-list';
 
 class RavonPosConfigError extends Error {
   constructor(message) {
@@ -56,9 +58,10 @@ class RavonPosResponseError extends Error {
   }
 }
 
-// No usable RAVON POS Finance session: code POS_NOT_CONNECTED (nobody with a POS
-// account has logged in, or the session expired), POS_CREDENTIALS_INVALID or
-// POS_AUTH_UNAVAILABLE (POS login service unreachable).
+// No usable POS session of the user: code POS_NOT_CONNECTED (they have not
+// logged in with their POS account, or the session expired),
+// POS_CREDENTIALS_INVALID, POS_AUTH_UNAVAILABLE (POS login service
+// unreachable) or POS_FORBIDDEN (their POS account may not view items).
 class RavonPosAuthError extends Error {
   constructor(message, code) {
     super(message);
@@ -68,13 +71,13 @@ class RavonPosAuthError extends Error {
 }
 
 const buildItemsUrl = () => {
-  if (!RAVON_POS_API_URL) {
+  const apiUrl = posApiUrl();
+  if (!apiUrl) {
     throw new RavonPosConfigError('RAVON_POS_API_URL is not configured');
   }
-  const base = RAVON_POS_API_URL.replace(/\/+$/, '');
-  const path = RAVON_POS_ITEMS_ENDPOINT.startsWith('/')
-    ? RAVON_POS_ITEMS_ENDPOINT
-    : `/${RAVON_POS_ITEMS_ENDPOINT}`;
+  const base = apiUrl.replace(/\/+$/, '');
+  const endpoint = posItemsEndpoint();
+  const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   return `${base}${path}`;
 };
 
@@ -139,20 +142,25 @@ const mapPosItem = (raw) => {
  *
  * @param {Object} options
  * @param {boolean} options.includeInactive - if true, inactive/deleted POS items are also returned
+ * @param {number} options.userId - the requesting BSMS user (their own POS session is used)
  * @returns {Promise<Array<{external_item_id: string, fg_item_name: string, selling_price: number|null, is_active: boolean}>>}
  */
-const fetchRavonPosItems = async ({ includeInactive = false } = {}) => {
+const fetchRavonPosItems = async ({ includeInactive = false, userId = null } = {}) => {
   const url = buildItemsUrl();
 
-  // Authenticated with the Finance session token (posAuthService);
+  // Authenticated with the user's own session token (posAuthService);
   // its errors are mapped onto this module's existing error classes.
   let payload;
   try {
-    payload = await posGet(url);
+    payload = await posGet(url, null, { userId });
   } catch (err) {
     if (err instanceof PosConfigError) throw new RavonPosConfigError(err.message);
     if (err instanceof PosAuthError || (err instanceof PosUnavailableError && err.code)) {
       throw new RavonPosAuthError(err.message, err.code);
+    }
+    if (err instanceof PosResponseError && err.status === 403) {
+      // The user's POS account may not view items (POS ApiAbilities items.view).
+      throw new RavonPosAuthError('Your RAVON POS account does not have permission to view the item list', 'POS_FORBIDDEN');
     }
     if (err instanceof PosResponseError && err.status) {
       throw new RavonPosUnavailableError(`Ravon POS API responded with status ${err.status}`);
@@ -177,11 +185,11 @@ const fetchRavonPosItems = async ({ includeInactive = false } = {}) => {
  * Convenience helper - fetches the current POS item list and checks
  * whether a given external_item_id is present and active.
  */
-const findRavonPosItem = async (externalItemId) => {
+const findRavonPosItem = async (externalItemId, { userId = null } = {}) => {
   if (externalItemId === undefined || externalItemId === null || String(externalItemId).trim() === '') {
     return null;
   }
-  const items = await fetchRavonPosItems({ includeInactive: true });
+  const items = await fetchRavonPosItems({ includeInactive: true, userId });
   return items.find(item => String(item.external_item_id) === String(externalItemId)) || null;
 };
 

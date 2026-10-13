@@ -206,9 +206,26 @@ test('atomic: a Card Ledger failure part-way through rolls the whole approval ba
   const db = require('../config/db');
   db.getConnection = async () => connection;
   db.collectionsSchemaReady = Promise.resolve();
+  // User 9's own POS account may see POS shifts (integrationAccess.test.js covers
+  // how that is validated); this test is about the transaction.
+  const integrationAccess = require('../services/integrationAccess');
+  const realGetAccess = integrationAccess.getAccess;
+  integrationAccess.getAccess = async () => ({
+    systems: {
+      pos: { system: 'POS', label: 'RAVON POS', configured: true, connected: true, state: 'connected', abilities: ['collection.shifts'], branchIds: null },
+      restaurant: { system: 'RESTAURANT', label: 'RAVON Restaurant', configured: false, connected: false, state: 'not_configured', abilities: [], branchIds: null }
+    },
+    collection: { POS: { sources: ['SHIFT'], branchIds: null }, RESTAURANT: { sources: [], branchIds: null } },
+    canCollection: true,
+    canFgItems: false
+  });
   const controller = require('../controllers/collectionController');
   const res = { statusCode: 200, body: null, status(c) { this.statusCode = c; return this; }, json(b) { this.body = b; return this; } };
-  await controller.approve({ user: { userId: 9, role: 'Accountant' }, body: { items: [{ id: 7, card_bank_account_id: 3 }] } }, res);
+  try {
+    await controller.approve({ user: { userId: 9, role: 'Accountant' }, body: { items: [{ id: 7, card_bank_account_id: 3 }] } }, res);
+  } finally {
+    integrationAccess.getAccess = realGetAccess;
+  }
 
   // Two card rows were written before the third failed - and the transaction was
   // rolled back, not committed: never Completed with a partial Card Ledger.

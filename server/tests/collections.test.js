@@ -302,22 +302,23 @@ const setupPos = async (options = {}) => {
   auth.resetAuthState();
   return {
     stats, server,
-    financeLogin: () => auth.loginAll({ userId: 11, role: 'Finance', username: 'finance', password: 'fin-pass' }),
+    // User 11's OWN login (an Accountant whose POS account is 'finance').
+    financeLogin: () => auth.loginAll({ userId: 11, role: 'Accountant', username: 'finance', password: 'fin-pass' }),
     expireServerTokens: () => valid.clear(),
     close: () => new Promise((r) => server.close(r))
   };
 };
 
-test('a Finance login gives the token; every later call reuses it (no background login)', async () => {
+test('a user\'s own login gives the token; their later calls reuse it (no background login)', async () => {
   const mock = await setupPos();
   try {
-    await assert.rejects(pos.posGet('/api/employee-deductions'), { code: 'POS_NOT_CONNECTED' });
+    await assert.rejects(pos.posGet('/api/employee-deductions', null, { userId: 11 }), { code: 'POS_NOT_CONNECTED' });
     assert.equal(mock.stats.logins, 0, 'nothing logs in by itself');
     const result = await mock.financeLogin();
     assert.equal(result.pos.ok, true);
-    await pos.posGet('/api/completed-shifts/collection');
-    await pos.posGet('/api/credit-payments/collection');
-    await pos.posGet('/api/employee-deductions');
+    await pos.posGet('/api/completed-shifts/collection', null, { userId: 11 });
+    await pos.posGet('/api/credit-payments/collection', null, { userId: 11 });
+    await pos.posGet('/api/employee-deductions', null, { userId: 11 });
     assert.equal(mock.stats.logins, 1);
     assert.deepEqual(mock.stats.tokensSeen, ['Bearer tok-1', 'Bearer tok-1', 'Bearer tok-1']);
   } finally { await mock.close(); }
@@ -328,37 +329,35 @@ test('concurrent logins with the same typed credentials share ONE request (5 log
   try {
     await Promise.all(Array.from({ length: 6 }, () => mock.financeLogin()));
     assert.equal(mock.stats.logins, 1);
-    await Promise.all(Array.from({ length: 8 }, () => pos.posGet('/api/employee-deductions')));
+    await Promise.all(Array.from({ length: 8 }, () => pos.posGet('/api/employee-deductions', null, { userId: 11 })));
     assert.equal(mock.stats.logins, 1);
   } finally { await mock.close(); }
 });
 
-test('401 Unauthenticated -> token invalidated, ONE retry with the next session, then a clear "log in" error', async () => {
+test('401 Unauthenticated -> the user\'s token is invalidated, a clear "log in" error, no other session used', async () => {
   const mock = await setupPos();
   try {
     await mock.financeLogin();
-    // The accountant's own POS session is the second token source.
     await auth.loginAll({ userId: 8, role: 'Accountant', username: 'finance', password: 'fin-pass' });
     assert.equal(mock.stats.logins, 2);
     mock.expireServerTokens();
     await assert.rejects(pos.posGet('/api/employee-deductions', null, { userId: 8 }),
-      (e) => e.code === 'POS_NOT_CONNECTED' && /Log in with the RAVON POS Finance account/.test(e.message));
-    assert.equal(mock.stats.dataCalls, 2, 'exactly one retry');
+      (e) => e.code === 'POS_NOT_CONNECTED' && /Log in again with your own RAVON POS account/.test(e.message));
+    assert.equal(mock.stats.dataCalls, 1, 'only the user\'s own token is tried');
+    assert.deepEqual(mock.stats.tokensSeen, ['Bearer tok-2']);
     assert.equal(mock.stats.logins, 2, 'no password is stored, so there is no automatic re-login');
-    assert.equal(auth.getAuthStatus('pos').state, 'expired');
+    assert.equal(auth.getAuthStatus('pos', { userId: 8 }).state, 'expired');
   } finally { await mock.close(); }
 });
 
-test('401 on the shared session falls back to the requesting user\'s own valid session', async () => {
+test('another user\'s session is never used (no shared Finance session)', async () => {
   const mock = await setupPos();
   try {
-    await mock.financeLogin();
-    const shared = auth.getAuthStatus('pos');
-    assert.equal(shared.source, 'finance');
-    mock.expireServerTokens();
-    await auth.loginAll({ userId: 8, role: 'Accountant', username: 'finance', password: 'fin-pass' }); // tok-2 valid
-    assert.deepEqual(await pos.posGet('/api/employee-deductions', null, { userId: 8 }), { data: [{ id: 1 }] });
-    assert.deepEqual(mock.stats.tokensSeen, ['Bearer tok-1', 'Bearer tok-2']);
+    await auth.loginAll({ userId: 8, role: 'Accountant', username: 'finance', password: 'fin-pass' });
+    assert.equal(auth.getAuthStatus('pos', { userId: 8 }).source, 'own');
+    await assert.rejects(pos.posGet('/api/employee-deductions', null, { userId: 11 }), { code: 'POS_NOT_CONNECTED' });
+    await assert.rejects(pos.posGet('/api/employee-deductions'), { code: 'POS_NOT_CONNECTED' });
+    assert.deepEqual(mock.stats.tokensSeen, []);
   } finally { await mock.close(); }
 });
 
@@ -366,7 +365,7 @@ test('a token the login says expires (inside the safety margin) is not used', as
   const mock = await setupPos({ expiresIn: 30 });
   try {
     await mock.financeLogin();
-    await assert.rejects(pos.posGet('/api/employee-deductions'), { code: 'POS_NOT_CONNECTED' });
+    await assert.rejects(pos.posGet('/api/employee-deductions', null, { userId: 11 }), { code: 'POS_NOT_CONNECTED' });
     assert.equal(mock.stats.dataCalls, 0);
   } finally { await mock.close(); }
 });
@@ -383,26 +382,38 @@ test('refused credentials -> clear error, cool-down, no login storm', async () =
   } finally { await mock.close(); }
 });
 
-test('login rate limit: at most 4 login requests per minute per system', async () => {
-  const mock = await setupPos();
+test('login rate limit: at most RAVON_LOGIN_MAX_PER_MINUTE login requests per minute per system (default 30)', async () => {
+  let mock = await setupPos();
   try {
+    // Every BSMS user logs in from this server: 7 different users all go through.
     for (let i = 0; i < 7; i += 1) {
       await auth.loginAll({ userId: 100 + i, role: 'Admin', username: `user${i}`, password: 'x' });
     }
-    assert.equal(mock.stats.logins, 4);
+    assert.equal(mock.stats.logins, 7);
   } finally { await mock.close(); }
+  process.env.RAVON_LOGIN_MAX_PER_MINUTE = '4';
+  mock = await setupPos();
+  try {
+    for (let i = 0; i < 7; i += 1) {
+      await auth.loginAll({ userId: 200 + i, role: 'Admin', username: `other${i}`, password: 'x' });
+    }
+    assert.equal(mock.stats.logins, 4);
+  } finally {
+    delete process.env.RAVON_LOGIN_MAX_PER_MINUTE;
+    await mock.close();
+  }
 });
 
 test('not configured is reported without any network call; status never exposes the token', async () => {
   const mock = await setupPos();
   await mock.financeLogin();
-  const status = auth.getAuthStatus('pos');
+  const status = auth.getAuthStatus('pos', { userId: 11 });
   assert.equal(status.connected, true);
   assert.equal(status.username, 'finance');
   assert.doesNotMatch(JSON.stringify(status), /tok-1|fin-pass/);
   await mock.close();
   delete process.env.RAVON_POS_API_URL;
-  await assert.rejects(pos.posGet('/api/employee-deductions'), { name: 'PosConfigError', code: 'POS_NOT_CONFIGURED' });
+  await assert.rejects(pos.posGet('/api/employee-deductions', null, { userId: 11 }), { name: 'PosConfigError', code: 'POS_NOT_CONFIGURED' });
   assert.equal(auth.getAuthStatus('pos').configured, false);
 });
 
@@ -527,13 +538,13 @@ const posWithStatus = async (sequence) => {
   });
   process.env.RAVON_POS_API_URL = `http://127.0.0.1:${server.address().port}`;
   auth.resetAuthState();
-  await auth.loginAll({ userId: 11, role: 'Finance', username: 'finance', password: 'fin-pass' });
-  return { auth: pos, stats, close: () => new Promise((r) => server.close(r)) };
+  await auth.loginAll({ userId: 11, role: 'Accountant', username: 'finance', password: 'fin-pass' });
+  return { auth: { posGet: (path, params = null) => pos.posGet(path, params, { userId: 11 }) }, stats, close: () => new Promise((r) => server.close(r)) };
 };
 
 test('POS 403 / 422 / 429 / 500 -> meaningful errors, no endless retries', async () => {
   const cases = [
-    [{ status: 403, body: { message: 'Forbidden' } }, /not allowed to read/, 1],
+    [{ status: 403, body: { message: 'Forbidden' } }, /Your RAVON POS account is not allowed to read/, 1],
     [{ status: 422, body: { message: 'The start date is invalid.' } }, /request parameters \(422: The start date is invalid\.\)/, 1],
     [{ status: 429, headers: { 'Retry-After': '30' } }, /rate limit .* in 30 seconds/, 1],
     [{ status: 500, body: { message: 'Server Error' } }, /RAVON POS server had an error \(500\)/, 1]
@@ -563,7 +574,7 @@ test('POS 503 is retried once, then succeeds; a second 503 is reported', async (
 test('POS network failure -> PosUnavailableError after one retry; login unreachable -> POS_AUTH_UNAVAILABLE', async () => {
   const mock = await posWithStatus([{ status: 200, body: { data: [] } }]);
   await mock.close();
-  await assert.rejects(pos.posGet('/api/employee-deductions'), { name: 'PosUnavailableError' });
+  await assert.rejects(mock.auth.posGet('/api/employee-deductions'), { name: 'PosUnavailableError' });
   auth.resetAuthState();
   const result = await auth.loginAll({ userId: 11, role: 'Finance', username: 'finance', password: 'fin-pass' });
   assert.equal(result.pos.code, 'POS_AUTH_UNAVAILABLE');

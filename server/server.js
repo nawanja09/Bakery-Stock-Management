@@ -49,6 +49,7 @@ const staffLoanRoutes = require('./routes/staffLoanRoutes');
 const otherLedgerRoutes = require('./routes/otherLedgerRoutes');
 const creditCardRateRoutes = require('./routes/creditCardRateRoutes');
 const collectionRoutes = require('./routes/collectionRoutes');
+const integrationRoutes = require('./routes/integrationRoutes');
 const inhandRoutes  = require('./routes/inhandRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const receiveTypeRoutes = require('./routes/receiveTypeRoutes');
@@ -155,6 +156,8 @@ app.use('/api/staff-loans', staffLoanRoutes);
 app.use('/api/other-ledgers', otherLedgerRoutes);
 app.use('/api/credit-card-rates', creditCardRateRoutes);
 app.use('/api/collections', collectionRoutes);
+// The user's own POS / Restaurant access (Collection + FG Production pages)
+app.use('/api/integrations', integrationRoutes);
 app.use('/api/inhand', inhandRoutes);
 app.use('/api/receive-types', receiveTypeRoutes);
 app.use('/api/analyst', analystRoutes);
@@ -194,9 +197,8 @@ const startServer = async () => {
     await ensureChequeReleaseSchema();
     app.listen(PORT, () => {
       startChequeReleaseProcessor();
-      // Load the stored POS / Restaurant sessions (encrypted tokens of earlier
-      // Finance logins). No credentials exist on the server, so nothing logs in
-      // here: POS / Restaurant data is read only while a Finance session is valid.
+      // POS / Restaurant sessions are per user (their own logins) and are loaded
+      // on that user's first request; no credentials exist on the server.
       require('./services/integrationAuthService').warmUp();
       console.log(`Server running on port ${PORT}`);
       console.log(`Uploads directory: ${path.join(__dirname, 'uploads')}`);

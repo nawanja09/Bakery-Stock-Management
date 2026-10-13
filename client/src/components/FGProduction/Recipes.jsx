@@ -13,6 +13,9 @@
 // backend proxies from the Ravon POS `/api/items-list` API). Selecting
 // an item stores its POS `external_item_id`; `fg_item_name` is kept only
 // as a display/cache value. See server/services/ravonPosService.js.
+// The list is read with the signed-in user's OWN POS account: it (and adding
+// an FG item) is available only when that account may view items in the POS
+// (server-checked; useIntegrationAccess only hides the button).
 // -----------------------------------------------------------------------
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -23,6 +26,7 @@ import {
 import Select from 'react-select';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
+import useIntegrationAccess from '../../hooks/useIntegrationAccess';
 import './FGProduction.css';
 import { UTILITY_COST_RATE } from './fgProductionConstants';
 import { getCompatibleUnits, convertQuantity, areCompatibleUnits } from './unitConversion';
@@ -34,6 +38,14 @@ const formatCurrency = (value) =>
 
 const Recipes = () => {
   const { showPopup } = usePopup();
+  // The user's own POS privileges (null = not known yet).
+  const { access: integrationAccess, refresh: refreshIntegrationAccess } = useIntegrationAccess();
+  const fgItemsAllowed = integrationAccess ? integrationAccess.fgItems?.allowed === true : null;
+  const posAccessStatus = integrationAccess?.systems?.pos || null;
+  const fgItemsDeniedText = posAccessStatus && posAccessStatus.connected
+    ? 'Your RAVON POS account does not have permission to view the FG item list, so you cannot add FG Production items. Existing items and recipes are still shown.'
+    : (posAccessStatus?.message || 'Not connected to RAVON POS.')
+      + ' Log in to Stock Management with the same username and password as your RAVON POS account to load the FG item list.';
 
   // Master / reference data
   const [departments, setDepartments] = useState([]);
@@ -481,10 +493,21 @@ const Recipes = () => {
           <h1><FontAwesomeIcon icon={faFlask} /> Finished Goods Production</h1>
           <p className="fg-production-subtitle">Manage production items, raw material recipes, and recipe costing.</p>
         </div>
-        <button className="fgprod-btn-primary" onClick={openCreateFgForm}>
+        <button
+          className="fgprod-btn-primary"
+          onClick={openCreateFgForm}
+          disabled={fgItemsAllowed === false}
+          title={fgItemsAllowed === false ? fgItemsDeniedText : undefined}
+        >
           <FontAwesomeIcon icon={faPlus} /> New FG Production Item
         </button>
       </header>
+
+      {fgItemsAllowed === false && (
+        <div className="fgprod-pos-warning-text" role="alert" style={{ margin: '0 0 16px' }}>
+          {fgItemsDeniedText}
+        </div>
+      )}
 
       {/* FG Details / picker */}
       <div className="fg-production-card fg-production-card-body">
@@ -669,7 +692,7 @@ const Recipes = () => {
                     <button
                       type="button"
                       className="fgprod-btn-secondary fgprod-btn-small"
-                      onClick={fetchPosItems}
+                      onClick={() => { refreshIntegrationAccess(); fetchPosItems(); }}
                     >
                       Retry
                     </button>

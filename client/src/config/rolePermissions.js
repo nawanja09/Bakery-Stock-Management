@@ -30,7 +30,7 @@ export const MODULES = Object.freeze({
   SETTINGS: 'settings',
   // Inside Management, but HR data - Admin / Super Admin only.
   EMPLOYEES: 'employees',
-  // Collection: Accountant, Admin, Super Admin (full) and QB (view only).
+  // Collection: Accountant, Finance, Admin, Super Admin (full) and QB (view only).
   COLLECTION: 'collection'
 });
 
@@ -47,7 +47,7 @@ export const ROLE_MODULES = Object.freeze({
   [ROLES.STORES]: [M.MANAGEMENT, M.RAW_MATERIAL, M.FG_PRODUCTION, M.SETTINGS],
   [ROLES.ACCOUNTANT]: [M.MANAGEMENT, M.RAW_MATERIAL, M.FINANCE, M.EXPENSES, M.FG_PRODUCTION, M.VAT, M.SETTINGS, M.COLLECTION],
   [ROLES.QB]: [M.MANAGEMENT, M.RAW_MATERIAL, M.FG_PRODUCTION, M.FINANCE, M.EXPENSES, M.VAT, M.SETTINGS, M.COLLECTION],
-  [ROLES.FINANCE_USER]: [M.MANAGEMENT, M.EXPENSES],
+  [ROLES.FINANCE_USER]: [M.MANAGEMENT, M.EXPENSES, M.COLLECTION],
   [ROLES.ADMIN]: ADMIN_MODULES,
   [ROLES.SUPER_ADMIN]: [...ADMIN_MODULES, M.ANALYST]
 });

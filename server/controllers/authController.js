@@ -42,10 +42,11 @@ const loginUser = async (req, res) => {
       // RAVON POS + RAVON Restaurant: the SAME typed username / password are
       // also tried on both systems' /api/login - in parallel, once each, with
       // the timeout / rate-limit / cool-down protection of
-      // integrationAuthService - for the roles that use the Collection
-      // integration (Finance, Accountant, Admin, Super Admin). When a system
-      // accepts them, only its token is kept (encrypted, server side); the
-      // password is used for these calls only and then discarded. The outcomes
+      // integrationAuthService - for the roles with a page that reads them
+      // (Collection / FG Production). When a system accepts them, only its
+      // token and the user's privileges there are kept (encrypted, server
+      // side), for THIS user's own requests only; the password is used for
+      // these calls only and then discarded. The outcomes
       // are independent of each other and never affect this BSMS login: it is
       // already decided above and the response is not delayed (a Collection
       // sync waits for these logins to finish). A refused system can be

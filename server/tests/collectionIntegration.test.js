@@ -84,6 +84,9 @@ const shift = (i, branch, closedAt) => ({
   short_excess: { by_method: {}, total: 0, status: 'balanced' }, collection: 100
 });
 
+const ALL_ABILITIES = ['items.view', 'collection.shifts', 'collection.credit_payments', 'collection.employee_deductions'];
+const abilitiesOf = (sys, username) => (sys.abilities[username] || ALL_ABILITIES);
+
 const json = (res, status, payload) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(payload)); };
 
 // One RAVON system. Both use the same API; the Restaurant's records reuse the
@@ -91,6 +94,8 @@ const json = (res, status, payload) => { res.writeHead(status, { 'Content-Type':
 const startSystem = ({ prefix, accounts, branches }) => new Promise((resolve) => {
   const sys = {
     prefix, accounts, logins: [], dataCalls: [], unauthorized: 0, valid: new Set(), seq: 0,
+    tokenUser: new Map(), // token -> username
+    abilities: {}, // username -> abilities (default: all)
     failData: null, // e.g. 500 -> every data call answers that status
     close: null, url: null
   };
@@ -106,11 +111,18 @@ const startSystem = ({ prefix, accounts, branches }) => new Promise((resolve) =>
         sys.seq += 1;
         const token = `${prefix}-token-${sys.seq}`;
         sys.valid.add(token);
-        return json(res, 200, { token, user: { username } });
+        sys.tokenUser.set(token, username);
+        return json(res, 200, { token, user: { username, abilities: abilitiesOf(sys, username) } });
       }
       const auth = (req.headers.authorization || '').replace(/^Bearer /, '');
       if (!sys.valid.has(auth)) { sys.unauthorized += 1; return json(res, 401, { error: true, message: 'Unauthenticated.', status: 401 }); }
-      if (url.pathname === '/api/me') return json(res, 200, { user: { id: 3, name: 'finance', branch_ids: [] } });
+      const who = sys.tokenUser.get(auth);
+      if (url.pathname === '/api/me') return json(res, 200, { user: { id: 3, name: who, branch_ids: [], abilities: abilitiesOf(sys, who) } });
+      // Like the real APIs: each data route needs its ability.
+      const needed = url.pathname.includes('completed-shifts') ? 'collection.shifts'
+        : url.pathname.includes('credit-payments') ? 'collection.credit_payments'
+          : url.pathname.includes('employee-deductions') ? 'collection.employee_deductions' : null;
+      if (needed && !abilitiesOf(sys, who).includes(needed)) return json(res, 403, { error: true, message: 'You do not have permission to access this resource.', status: 403 });
       sys.dataCalls.push({ path: url.pathname, query: Object.fromEntries(url.searchParams), token: auth });
       if (sys.failData) return json(res, sys.failData, { message: 'Server Error' });
       if (url.pathname.includes('completed-shifts')) {
@@ -170,15 +182,17 @@ const reset = async ({ restaurant = true, financeLogin = true, connectRestaurant
   sqlLog.length = 0;
   for (const sys of [posSys, rstSys]) {
     sys.logins.length = 0; sys.dataCalls.length = 0; sys.unauthorized = 0; sys.valid.clear(); sys.failData = null; sys.seq = 0;
+    sys.tokenUser.clear(); sys.abilities = {};
   }
   auth.resetAuthState();
   process.env.RAVON_POS_API_URL = posSys.url;
   if (restaurant) process.env.RAVON_RESTAURANT_API_URL = rstSys.url;
   else delete process.env.RAVON_RESTAURANT_API_URL;
-  // The Finance user's BSMS login: the typed credentials go to both systems.
-  if (financeLogin) await auth.loginAll({ userId: 11, role: 'Finance', username: 'finance', password: 'fin-pass' });
+  // The requesting user's OWN BSMS login (user 1): the typed credentials go to
+  // both systems; the Restaurant account has another password -> Connect.
+  if (financeLogin) await auth.loginAll({ userId: 1, role: 'Accountant', username: 'finance', password: 'fin-pass' });
   if (restaurant && connectRestaurant) {
-    await auth.connect('restaurant', { userId: 11, username: 'rst-finance', password: 'rst-pass' });
+    await auth.connect('restaurant', { userId: 1, username: 'rst-finance', password: 'rst-pass' });
   }
 };
 
@@ -325,7 +339,7 @@ test('POS failure (auth) does not break the Restaurant import', async () => {
   await reset({ financeLogin: false }); // nobody logged in to the POS
   const res = await pull();
   assert.equal(bySystem(res.body, 'POS').code, 'POS_NOT_CONNECTED');
-  assert.match(bySystem(res.body, 'POS').error, /Log in with the RAVON POS Finance account/);
+  assert.match(bySystem(res.body, 'POS').error, /Log in to Stock Management with your own RAVON POS username and password/);
   assert.equal(bySystem(res.body, 'RESTAURANT').created, 6);
   assert.equal(res.body.pos.authError, true);
   assert.equal(posSys.dataCalls.length, 0);
@@ -333,30 +347,30 @@ test('POS failure (auth) does not break the Restaurant import', async () => {
   assert.ok(res.body.sync.sources.every((s) => s.errorCode === 'POS_NOT_CONNECTED'));
 });
 
-test('token expiry: 401 -> the token is dropped and the call retried ONCE with the next session', async () => {
+test('token expiry: 401 -> the user\'s own token is dropped, a clear error, no re-login, the other system unaffected', async () => {
   await reset();
-  // The accountant's own Restaurant login is the second token source.
-  await auth.loginAll({ userId: 1, role: 'Accountant', username: 'accountant', password: 'acc-pass' });
   const before = rstSys.logins.length;
-  // rst-token-1 = the connected Finance account (shared), rst-token-2 = the accountant's own.
-  rstSys.valid.delete('rst-token-1'); // the Restaurant revokes the shared Finance token
+  // The Restaurant revokes this user's own (connected) token.
+  rstSys.valid.clear();
   const res = await pull();
   const rst = bySystem(res.body, 'RESTAURANT');
-  assert.equal(rst.error, undefined, rst.error);
-  assert.equal(rst.created, 6);
-  assert.equal(rstSys.unauthorized, 1, 'exactly one rejected call');
-  assert.equal(rstSys.logins.length, before, 'no password is stored: no re-login, the next session is used');
-  assert.ok(rstSys.dataCalls.every((c) => c.token === 'rst-token-2'));
+  assert.equal(rst.code, 'RESTAURANT_NOT_CONNECTED');
+  assert.ok(rstSys.unauthorized <= 1, 'never more than one rejected call');
+  assert.equal(rstSys.logins.length, before, 'no password is stored: no re-login');
+  assert.equal(bySystem(res.body, 'POS').error, undefined);
+  assert.equal(bySystem(res.body, 'POS').created, 8);
+  assert.equal(res.body.integrations.restaurant.state, 'expired');
+});
 
-  // Every session revoked -> one retry, then a clear error; the POS is unaffected.
-  rstSys.valid.clear();
-  inserted.length = 0;
-  rstSys.unauthorized = 0;
-  const again = await pull();
-  assert.equal(bySystem(again.body, 'RESTAURANT').code, 'RESTAURANT_NOT_CONNECTED');
-  assert.ok(rstSys.unauthorized <= 1, 'never more than one retry');
-  assert.equal(bySystem(again.body, 'POS').error, undefined);
-  assert.equal(again.body.integrations.restaurant.state, 'expired');
+test('a user never reads with another user\'s session (no shared Finance session)', async () => {
+  await reset(); // user 1 is connected to both
+  posSys.dataCalls.length = 0;
+  const res = fakeRes();
+  await controller.getPending({ user: { userId: 99, role: 'Accountant' }, query: { refresh: '1' }, body: {}, params: {} }, res);
+  assert.equal(res.statusCode, 403, JSON.stringify(res.body));
+  assert.equal(res.body.code, 'INTEGRATION_ACCESS_DENIED');
+  assert.equal(posSys.dataCalls.length, 0);
+  assert.equal(rstSys.dataCalls.length, 0);
 });
 
 test('Connect endpoint: roles, validation, success without secrets, rate limit', async () => {
@@ -367,7 +381,7 @@ test('Connect endpoint: roles, validation, success without secrets, rate limit',
     return res;
   };
   const good = { username: 'rst-finance', password: 'rst-pass' };
-  for (const role of ['Store Keeper', 'QB', 'View Only', 'Staff', null]) {
+  for (const role of ['Finance', 'QB', 'View Only', 'Staff', null]) {
     assert.equal((await connect(role, good)).statusCode, 403, String(role));
   }
   assert.equal((await connect('Accountant', good, 'erp')).statusCode, 404);
@@ -381,12 +395,14 @@ test('Connect endpoint: roles, validation, success without secrets, rate limit',
   assert.equal(refused.body.code, 'RESTAURANT_CREDENTIALS_INVALID');
   assert.doesNotMatch(JSON.stringify(refused.body), /wrong-pass/);
 
-  const ok = await connect('Finance', good, 'restaurant', 11);
+  const ok = await connect('Accountant', good, 'restaurant', 11);
   assert.equal(ok.statusCode, 200, JSON.stringify(ok.body));
   assert.equal(ok.body.connected, true);
   assert.equal(ok.body.username, 'rst-finance');
   assert.doesNotMatch(JSON.stringify(ok.body), /rst-pass|rst-token/);
-  assert.equal(auth.getAuthStatus('restaurant').connected, true);
+  assert.equal(auth.getAuthStatus('restaurant', { userId: 11 }).connected, true);
+  assert.equal(auth.getAuthStatus('restaurant', { userId: 12 }).connected, false, 'only for that user');
+  assert.deepEqual(ok.body.abilities, ['items.view', 'collection.shifts', 'collection.credit_payments', 'collection.employee_deductions']);
 
   // POS reconnect works the same way.
   assert.equal((await connect('Admin', { username: 'finance', password: 'fin-pass' }, 'pos', 2)).body.connected, true);
@@ -397,18 +413,20 @@ test('Connect endpoint: roles, validation, success without secrets, rate limit',
   assert.equal(codes[5], 429);
 });
 
-test('integration status endpoint: per system, Collection users + Finance only, no secrets', async () => {
+test('integration status endpoint: the user\'s own connection + privileges, no secrets', async () => {
   await reset();
   const res = fakeRes();
-  await controller.getIntegrationsStatus(fakeReq('Finance'), res);
+  await controller.getIntegrationsStatus(fakeReq('Accountant'), res);
   assert.equal(res.statusCode, 200);
   assert.deepEqual(Object.keys(res.body.integrations).sort(), ['pos', 'restaurant']);
   assert.equal(res.body.integrations.pos.connected, true);
   assert.equal(res.body.backgroundSync, false);
-  assert.match(res.body.message, /Log in with the Finance account to sync/);
+  assert.match(res.body.message, /your own POS \/ Restaurant account/);
+  assert.equal(res.body.access.collection.allowed, true);
+  assert.equal(res.body.access.fgItems.allowed, true);
   assert.doesNotMatch(JSON.stringify(res.body), /fin-pass|rst-pass|pos-token|rst-token/);
   const stores = fakeRes();
-  await controller.getIntegrationsStatus(fakeReq('Store Keeper'), stores);
+  await controller.getIntegrationsStatus(fakeReq('Staff'), stores);
   assert.equal(stores.statusCode, 403);
 });
 
@@ -651,6 +669,7 @@ test('Restaurant record adapter: same shape as POS maps identically; an unknown 
 });
 
 test('Filters: source and source_system resolve to the stored values and combine with the others', async () => {
+  await reset();
   const cases = [
     ['SHIFT', 'SHIFT'], ['Shift Collection', 'SHIFT'], ['shift_collection', 'SHIFT'],
     ['CREDIT_PAYMENT', 'CREDIT_PAYMENT'], ['Credit Payment', 'CREDIT_PAYMENT'], ['credit-payment', 'CREDIT_PAYMENT'],
@@ -666,22 +685,23 @@ test('Filters: source and source_system resolve to the stored values and combine
     assert.equal(res.statusCode, 200, `${input}: ${JSON.stringify(res.body)}`);
     const { sql, params } = listQueries[0];
     assert.match(sql, /c.source_type = ?/);
-    assert.equal(params[1], stored, input);
+    assert.ok(params.includes(stored), input);
+    assert.match(sql, /c\.source_type IN \(\?\)/, 'the user\'s access is always applied');
     assert.ok(params.includes(14) && params.includes('2026-10-01') && params.includes('2026-10-30') && params.includes('%CP-41%'));
-    assert.doesNotMatch(sql, /source_system = \?/, 'no system filter unless asked for');
+    assert.doesNotMatch(sql, /AND c\.source_system = \?/, 'no system filter unless asked for');
   }
   for (const [input, stored] of [['POS', 'POS'], ['pos', 'POS'], ['Restaurant', 'RESTAURANT'], ['RESTAURANT', 'RESTAURANT']]) {
     listQueries.length = 0;
     const res = fakeRes();
     await controller.listCollections(fakeReq('Accountant', { status: 'rejected', source_system: input, source: 'SHIFT' }), res);
     assert.equal(res.statusCode, 200);
-    assert.match(listQueries[0].sql, /c\.source_system = \?/);
+    assert.match(listQueries[0].sql, /AND c\.source_system = \?/);
     assert.ok(listQueries[0].params.includes(stored), input);
   }
   for (const all of ['', 'all']) {
     listQueries.length = 0;
     await controller.listCollections(fakeReq('Accountant', { status: 'completed', source_system: all }), fakeRes());
-    assert.doesNotMatch(listQueries[0].sql, /source_system = \?/);
+    assert.doesNotMatch(listQueries[0].sql, /AND c\.source_system = \?/);
   }
   const bad = fakeRes();
   await controller.listCollections(fakeReq('Accountant', { status: 'pending', source: 'gift voucher' }), bad);

@@ -18,11 +18,11 @@
 // (not an error, and never an error for the other system).
 //
 // Authentication: every call goes through integrationAuthService.posGet with
-// the token of the latest Finance session of that system (else the requesting
-// user's own). No credentials are stored anywhere, so there is NO background /
-// unattended sync: a sync runs only when a user opens / refreshes Pending, and
-// only while a valid Finance session exists ("Log in with the Finance account
-// to sync"). The browser never talks to POS / Restaurant.
+// the REQUESTING user's own session of that system, and only for the sources
+// that user may read there (`allowed`, from integrationAccess.js). No
+// credentials are stored anywhere, so there is NO background / unattended
+// sync: a sync runs only when a user opens / refreshes Pending. The browser
+// never talks to POS / Restaurant.
 //
 // Independence: the two systems run in parallel (Promise.allSettled). An
 // authentication / network / 5xx failure of one never stops the other from
@@ -131,6 +131,9 @@ const SYSTEM_CONFIG = {
   },
   [SYSTEMS.RESTAURANT]: {
     provider: 'restaurant', baseEnv: 'RAVON_RESTAURANT_API_URL',
+    // The Restaurant is ONE location: a shift / credit payment it sends without
+    // a branch belongs to this branch (-> the "Restaurant" department).
+    defaultBranch: () => (process.env.RAVON_RESTAURANT_BRANCH_NAME || 'Restaurant').trim(),
     overrides: {
       [SOURCES.SHIFT]: 'RAVON_RESTAURANT_SHIFT_COLLECTION_URL',
       [SOURCES.CREDIT_PAYMENT]: 'RAVON_RESTAURANT_CREDIT_PAYMENTS_URL',
@@ -321,6 +324,10 @@ const syncSource = async (system, source, endpoint, { companyByName, matchDepart
         continue;
       }
       const record = mapped.record;
+      const { defaultBranch } = SYSTEM_CONFIG[system];
+      if (!record.pos_branch_name && defaultBranch && source !== SOURCES.EMPLOYEE_DEDUCTION) {
+        record.pos_branch_name = defaultBranch() || null;
+      }
       record.company_id = companyByName.get(normName(record.pos_company)) ?? null;
       // Stock Management name of the branch ("MASActive" -> "MAS Intimo",
       // "MASBrew" -> "MAS Ayathi Brew Bar"); same rule for both systems.
@@ -410,6 +417,17 @@ const syncSystem = async (system, context) => {
       code: 'SCHEMA_NOT_READY'
     });
   }
+  // Only the sources this user may read in that system (integrationAccess.js).
+  // A system missing from `allowed` (user not connected there) is still tried:
+  // getToken below then reports why, without reading anything.
+  const allowedSources = context.allowed && context.allowed[system] ? context.allowed[system] : Object.values(SOURCES);
+  if (allowedSources.length === 0) {
+    return {
+      system, label: systemLabel(system), configured: true, skipped: true, status: 'no access',
+      message: `Your ${systemLabel(system)} account has no access to collections - skipped`,
+      fetched: 0, created: 0, updated: 0, duplicates: 0, unmapped: 0, invalid: 0, excluded: 0, sources: []
+    };
+  }
   try {
     await integrationAuth.getToken(provider, { userId: context.userId });
   } catch (error) {
@@ -418,7 +436,7 @@ const syncSystem = async (system, context) => {
     return summarize(system, [], { error: message, code: error.code || null, errorType: error.name });
   }
   const sources = [];
-  for (const source of Object.values(SOURCES)) {
+  for (const source of allowedSources) {
     sources.push(await syncSource(system, source, endpoints[source], context));
   }
   return summarize(system, sources);
@@ -430,8 +448,10 @@ const inFlight = new Map();
 /**
  * Pulls the three sources of BOTH systems into Pending, from ALL departments,
  * for the window of { fromDate, toDate } ('YYYY-MM-DD', inclusive; both
- * optional - see dateWindow). userId = the requesting BSMS user (its own
- * session is the fallback token source). The systems run in parallel and
+ * optional - see dateWindow). userId = the requesting BSMS user: every call
+ * uses THAT user's own session. allowed = { POS: [sources], RESTAURANT: [sources] }
+ * limits the run to what the user may read (integrationAccess.js); a system
+ * with none is skipped without any call. The systems run in parallel and
  * independently (Promise.allSettled): one failing never stops the other.
  * Concurrent callers for the same window share one run.
  * Returns { window, sources, systems }:
@@ -439,16 +459,16 @@ const inFlight = new Map();
  *   systems - one entry per system: { system, configured, fetched, created,
  *             updated, duplicates, unmapped, invalid, excluded, sources[], error?, code? }
  */
-const syncCollections = async ({ fromDate, toDate, userId = null } = {}) => {
+const syncCollections = async ({ fromDate, toDate, userId = null, allowed = null } = {}) => {
   const window = dateWindow(new Date(), { fromDate, toDate });
-  const key = `${window.start_date}..${window.end_date}:${userId ?? ''}`;
+  const key = `${window.start_date}..${window.end_date}:${userId ?? ''}:${allowed ? JSON.stringify(allowed) : '*'}`;
   if (inFlight.has(key)) return inFlight.get(key);
   const run = (async () => {
     await pool.collectionsSchemaReady;
     const [companies] = await pool.query('SELECT id, name FROM company');
     const companyByName = new Map(companies.map((c) => [normName(c.name), c.id]));
     const [departments] = await pool.query('SELECT id, name FROM departments');
-    const context = { companyByName, matchDepartment: createDepartmentMatcher(departments), window, userId };
+    const context = { companyByName, matchDepartment: createDepartmentMatcher(departments), window, userId, allowed };
 
     const order = [SYSTEMS.POS, SYSTEMS.RESTAURANT];
     const settled = await Promise.allSettled(order.map((system) => syncSystem(system, context)));

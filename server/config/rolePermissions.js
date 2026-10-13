@@ -65,7 +65,7 @@ const ROLE_MODULES = Object.freeze({
   [ROLES.STORES]: [M.MANAGEMENT, M.RAW_MATERIAL, M.FG_PRODUCTION, M.SETTINGS],
   [ROLES.ACCOUNTANT]: [M.MANAGEMENT, M.RAW_MATERIAL, M.FINANCE, M.EXPENSES, M.FG_PRODUCTION, M.VAT, M.SETTINGS, M.COLLECTION],
   [ROLES.QB]: [M.MANAGEMENT, M.RAW_MATERIAL, M.FG_PRODUCTION, M.FINANCE, M.EXPENSES, M.VAT, M.SETTINGS, M.COLLECTION],
-  [ROLES.FINANCE_USER]: [M.MANAGEMENT, M.EXPENSES],
+  [ROLES.FINANCE_USER]: [M.MANAGEMENT, M.EXPENSES, M.COLLECTION],
   [ROLES.ADMIN]: ADMIN_MODULES,
   [ROLES.SUPER_ADMIN]: [...ADMIN_MODULES, M.ANALYST]
 });
@@ -170,13 +170,16 @@ const API_RULES = [
   { prefix: '/other-ledgers', modules: [M.FINANCE] },
   // Management -> Credit Card Rate (card commission per Branch / Department).
   { prefix: '/credit-card-rates', modules: [M.FINANCE] },
-  // Collection: Accountant / Admin / Super Admin full, QB read-only (view-only rule
+  // Collection: Accountant / Finance / Admin / Super Admin full, QB read-only (view-only rule
   // refuses every POST), every other role 403.
   { prefix: '/collections', modules: [M.COLLECTION] },
   // POS / Restaurant connection status + one-time Connect: also the Finance role
   // (its own RAVON accounts), which has no Collection module. The controller
   // narrows it to Finance / Accountant / Admin / Super Admin (+ QB read).
   { prefix: '/collections/integrations', modules: [ANY], denyRoles: [ROLES.STORES] },
+  // The user's own POS / Restaurant privileges (which Collection / FG Production
+  // features to show): every role with a page that reads them.
+  { prefix: '/integrations', modules: [M.COLLECTION, M.FG_PRODUCTION] },
   { prefix: '/incomes', modules: [M.FINANCE, M.ANALYST] },
 
   // ---- Cutlery --------------------------------------------------------------

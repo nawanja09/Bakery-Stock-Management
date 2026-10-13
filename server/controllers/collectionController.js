@@ -7,14 +7,19 @@
 // and go through the identical approve / reject / restore and ledger posting.
 //
 // Authentication (integrationAuthService): there are no POS / Restaurant
-// credentials on the server. Every call uses the token of the latest Finance
-// session of that system (obtained when the Finance account logged in to BSMS,
-// or through "Connect" below), else the requesting user's own session. With
-// no valid session nothing new can be read - there is no background sync - and
-// the page says "Log in with the Finance account to sync". The user's role
-// decides what they may do here (rolePermissions.js: Accountant / Admin / Super
-// Admin full, QB view only). Neither the user's department nor any branch is
-// used as a filter - every department is imported.
+// credentials on the server. Every call uses the REQUESTING user's own session
+// of that system (obtained when they logged in to BSMS, or through "Connect"
+// below). With no valid session nothing new can be read - there is no
+// background sync.
+// Authorization - BOTH must allow it:
+//   * the user's BSMS role (rolePermissions.js: Accountant / Admin / Super
+//     Admin full, QB view only), and
+//   * the user's OWN privileges in POS / Restaurant (integrationAccess.js):
+//     every list, filter option, record, sync and approve / reject / restore is
+//     limited to the systems and sources (shifts, credit payments, employee
+//     deductions) - and POS branches - that account may see there. No access
+//     at all -> 403 INTEGRATION_ACCESS_DENIED.
+// The BSMS user's own department is not used as a filter.
 //
 //   GET  /pending?refresh=1   pulls the 3 endpoints of BOTH systems (ALL
 //                             departments, each system independently) into
@@ -49,12 +54,20 @@ const { syncCollections, MAX_RANGE_DAYS } = require('../services/collectionSyncS
 const { SYSTEMS, SOURCES, cardPaymentsOf, reconcileCard } = require('../services/collectionMapper');
 const { posCardKey, cardPaymentReference, ledgerReference } = require('../services/collectionService');
 const { approveCollections, rejectCollections, restoreCollections } = require('../services/collectionService');
+const integrationAccess = require('../services/integrationAccess');
 
 const SOURCE_VALUES = Object.values(SOURCES);
 
 const sendError = (res, error, fallback) => {
   if (error instanceof HttpError) return res.status(error.status).json({ error: error.message });
   if (error instanceof OtherLedgerError) return res.status(error.statusCode).json({ error: error.message });
+  if (error instanceof integrationAccess.IntegrationAccessError) {
+    return res.status(403).json({
+      error: error.message,
+      code: error.code,
+      ...(error.access ? { access: integrationAccess.getAccessSummary(error.access) } : {})
+    });
+  }
   console.error(fallback, error);
   return res.status(500).json({ error: fallback });
 };
@@ -204,9 +217,19 @@ const parseFilters = (query) => {
   return f;
 };
 
-const buildWhere = (status, f) => {
-  const clauses = ['c.status = ?'];
-  const params = [status];
+// The requesting user's POS / Restaurant privileges (integrationAccess.js);
+// throws 403 when they may see no collections at all.
+const collectionAccessOf = async (req) => {
+  const access = await integrationAccess.getAccess(req.user?.userId || null);
+  integrationAccess.assertCollectionAccess(access);
+  return access;
+};
+
+const buildWhere = (status, f, access) => {
+  // Only the systems / sources (and POS branches) this user may see.
+  const allowed = integrationAccess.collectionWhere(access, 'c');
+  const clauses = ['c.status = ?', allowed.sql];
+  const params = [status, ...allowed.params];
   if (f.source) { clauses.push('c.source_type = ?'); params.push(f.source); }
   if (f.departmentId) { clauses.push('c.department_id = ?'); params.push(f.departmentId); }
   if (f.unmapped) clauses.push('c.department_id IS NULL');
@@ -264,9 +287,9 @@ const cardPostingSummary = async (ids) => {
   }));
 };
 
-const listByStatus = async (status, query) => {
+const listByStatus = async (status, query, access) => {
   const f = parseFilters(query);
-  const { where, params } = buildWhere(status, f);
+  const { where, params } = buildWhere(status, f, access);
   const order = status === 'pending'
     ? 'c.collection_date ASC, c.id ASC'
     : `${status === 'completed' ? 'c.approved_at' : 'c.rejected_at'} DESC, c.id DESC`;
@@ -345,10 +368,13 @@ const getPending = async (req, res) => {
       throw new HttpError(400, `The date range cannot be longer than ${MAX_RANGE_DAYS} days`);
     }
     const userId = req.user?.userId || null;
+    const access = await collectionAccessOf(req);
     let sync = null;
     if (String(req.query.refresh ?? '0') === '1') {
       const startedAt = new Date().toISOString();
-      const { window, sources, systems } = await syncCollections({ fromDate: filters.fromDate, toDate: filters.toDate, userId });
+      const { window, sources, systems } = await syncCollections({
+        fromDate: filters.fromDate, toDate: filters.toDate, userId, allowed: integrationAccess.allowedSources(access)
+      });
       sync = {
         startedAt,
         window,
@@ -357,7 +383,7 @@ const getPending = async (req, res) => {
         ok: systems.every((s) => s.skipped || !s.error)
       };
     }
-    const list = await listByStatus('pending', req.query);
+    const list = await listByStatus('pending', req.query, access);
     const integrations = await integrationAuth.getIntegrationStatus({ userId, withScope: Boolean(sync) });
     // Backward compatible `pos` (configured / authenticated / code / message) plus
     // authError when the POS part of this sync failed to authenticate - the
@@ -369,7 +395,10 @@ const getPending = async (req, res) => {
       const status = integrations[s.system.toLowerCase()];
       if (status && s.code) Object.assign(status, { authError: true, syncCode: s.code, syncError: s.error });
     }
-    res.json({ ...list, sync, viewOnly: !canWrite(req.user?.role), pos, integrations, backgroundSync: false });
+    res.json({
+      ...list, sync, viewOnly: !canWrite(req.user?.role), pos, integrations, backgroundSync: false,
+      access: integrationAccess.getAccessSummary(access)
+    });
   } catch (error) {
     sendError(res, error, 'Failed to load pending collections');
   }
@@ -378,18 +407,24 @@ const getPending = async (req, res) => {
 // ---------------------------------------------------------------------------
 // POS / Restaurant integration status and the one-time "Connect" action.
 // ---------------------------------------------------------------------------
-const BACKGROUND_SYNC_NOTE = 'No POS / Restaurant password is stored, so collections are only read while a valid '
-  + 'Finance session exists. Log in with the Finance account to sync.';
+const BACKGROUND_SYNC_NOTE = 'Collections are read with your own POS / Restaurant account and show only what '
+  + 'that account may see there. No password is stored: log in again when the session expires.';
+const SERVICE_KEY_NOTE = 'Collections are read by the Stock Management server with its integration key - '
+  + 'no POS / Restaurant login is needed.';
+const integrationNote = () => (integrationAuth.PROVIDER_IDS.every((id) => !integrationAuth.isConfigured(id) || integrationAuth.usesServiceKey(id))
+  ? SERVICE_KEY_NOTE : BACKGROUND_SYNC_NOTE);
 
-// Who may see the status (Collection users + integration roles) / connect (integration roles).
+// Who may see the status / connect: roles with a page that reads POS / Restaurant.
 const canSeeIntegrations = (role) => integrationAuth.isIntegrationRole(role) || hasModule(role, MODULES.COLLECTION);
 
-// GET /api/collections/integrations/status
+// GET /api/collections/integrations/status - this user's own connections and privileges
 const getIntegrationsStatus = async (req, res) => {
   try {
     if (!canSeeIntegrations(req.user?.role)) throw new HttpError(403, 'You do not have permission to access this module');
-    const integrations = await integrationAuth.getIntegrationStatus({ userId: req.user?.userId || null, withScope: true });
-    res.json({ integrations, backgroundSync: false, message: BACKGROUND_SYNC_NOTE });
+    const userId = req.user?.userId || null;
+    const integrations = await integrationAuth.getIntegrationStatus({ userId, withScope: true });
+    const access = await integrationAccess.getAccess(userId);
+    res.json({ integrations, access: integrationAccess.getAccessSummary(access), backgroundSync: false, message: integrationNote() });
   } catch (error) {
     sendError(res, error, 'Failed to load the POS / Restaurant connection status');
   }
@@ -426,7 +461,7 @@ const credential = (value, name) => {
 const connectIntegration = async (req, res) => {
   const role = req.user?.role;
   if (!integrationAuth.isIntegrationRole(role) || !canWrite(role)) {
-    return res.status(403).json({ error: 'Only Finance, Accountant, Admin or Super Admin users can connect POS / Restaurant' });
+    return res.status(403).json({ error: 'Your role cannot connect POS / Restaurant' });
   }
   let provider;
   try {
@@ -450,13 +485,16 @@ const connectIntegration = async (req, res) => {
     return res.status(429).json({ error: 'Too many connection attempts. Try again in a few minutes.', code: integrationAuth.codeOf(provider.id, 'RATE_LIMITED') });
   }
   try {
-    const result = await integrationAuth.connect(provider.id, { userId, username, password });
-    return res.json({ connected: true, username: result.username, provider: result.provider, system: result.system, expiresAt: result.expiresAt });
+    const result = await integrationAuth.connect(provider.id, { userId, username, password, role });
+    return res.json({
+      connected: true, username: result.username, provider: result.provider, system: result.system,
+      expiresAt: result.expiresAt, abilities: result.abilities
+    });
   } catch (error) {
     const message = integrationAuth.scrub(error.message, [password]);
     if (error instanceof integrationAuth.PosConfigError) return res.status(503).json({ error: message, code: error.code });
     if (error instanceof integrationAuth.PosAuthError) {
-      return res.status(400).json({ error: `${message}. Check the ${provider.account} username and password.`, code: error.code });
+      return res.status(400).json({ error: `${message}. Check your ${provider.label} username and password.`, code: error.code });
     }
     if (error instanceof integrationAuth.PosUnavailableError) {
       return res.status(/RATE_LIMITED$/.test(error.code || '') ? 429 : 503).json({ error: message, code: error.code || null });
@@ -472,7 +510,8 @@ const connectIntegration = async (req, res) => {
 const listHandler = (status) => async (req, res) => {
   try {
     await pool.collectionsSchemaReady;
-    res.json(await listByStatus(status, req.query));
+    const access = await collectionAccessOf(req);
+    res.json(await listByStatus(status, req.query, access));
   } catch (error) {
     sendError(res, error, `Failed to load ${status} collections`);
   }
@@ -488,21 +527,25 @@ const listCollections = async (req, res) => {
 };
 
 // GET /api/collections/departments - Department filter options, built from the
-// Collection data itself (every department / POS branch that has records).
+// Collection data the user may see (every department / POS branch that has such records).
 const getDepartmentOptions = async (req, res) => {
   try {
     await pool.collectionsSchemaReady;
+    const allowed = integrationAccess.collectionWhere(await collectionAccessOf(req), 'c');
     const [mapped] = await pool.query(
       `SELECT c.department_id AS id, dep.name, COUNT(*) AS records,
               GROUP_CONCAT(DISTINCT c.pos_branch_name ORDER BY c.pos_branch_name SEPARATOR ', ') AS pos_branches
          FROM collections c JOIN departments dep ON dep.id = c.department_id
-        GROUP BY c.department_id, dep.name ORDER BY dep.name`
+        WHERE ${allowed.sql}
+        GROUP BY c.department_id, dep.name ORDER BY dep.name`,
+      allowed.params
     );
     const [unmapped] = await pool.query(
       `SELECT c.pos_branch_name AS branch, COUNT(*) AS records
          FROM collections c
-        WHERE c.department_id IS NULL AND c.pos_branch_name IS NOT NULL
-        GROUP BY c.pos_branch_name ORDER BY c.pos_branch_name`
+        WHERE c.department_id IS NULL AND c.pos_branch_name IS NOT NULL AND ${allowed.sql}
+        GROUP BY c.pos_branch_name ORDER BY c.pos_branch_name`,
+      allowed.params
     );
     res.json({ departments: mapped, unmapped });
   } catch (error) {
@@ -513,7 +556,9 @@ const getDepartmentOptions = async (req, res) => {
 // GET /api/collections/:id
 const getCollectionById = async (req, res) => {
   try {
-    const [rows] = await pool.query(`${HEADER_SELECT} WHERE c.id = ?`, [req.params.id]);
+    // A record the user may not see is reported as not found (no existence leak).
+    const allowed = integrationAccess.collectionWhere(await collectionAccessOf(req), 'c');
+    const [rows] = await pool.query(`${HEADER_SELECT} WHERE c.id = ? AND ${allowed.sql}`, [req.params.id, ...allowed.params]);
     if (!rows.length) throw new HttpError(404, 'Collection not found');
     const [lines] = await pool.query(
       `SELECT ct.id, ct.payment_method, ct.amount, DATE_FORMAT(ct.transaction_date, '%Y-%m-%d') AS transaction_date,
@@ -598,33 +643,70 @@ const inTransaction = async (res, fallback, work, toBody) => {
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
-const approve = (req, res) => inTransaction(
+// Refuses (403) when any selected record is one the user may not see - checked
+// inside the transaction, before anything is posted. Unknown ids are left to
+// the service (it reports them).
+const assertRecordsAllowed = async (connection, access, rawIds) => {
+  const ids = (Array.isArray(rawIds) ? rawIds : []).map(Number).filter((id) => Number.isInteger(id) && id > 0);
+  if (!ids.length) return;
+  const allowed = integrationAccess.collectionWhere(access, 'c');
+  const [hidden] = await connection.query(
+    // COALESCE: a NULL (e.g. a row without branch) counts as not allowed.
+    `SELECT c.id FROM collections c WHERE c.id IN (?) AND NOT COALESCE(${allowed.sql}, FALSE)`, [ids, ...allowed.params]
+  );
+  if (hidden.length) {
+    throw new HttpError(403, `You do not have permission for ${plural(hidden.length, 'selected record')} `
+      + '(your POS / Restaurant account cannot see them)');
+  }
+};
+
+// Resolves the user's access (network) BEFORE the transaction opens, then runs it.
+const withAccess = (fallback, run) => async (req, res) => {
+  let access;
+  try {
+    access = await collectionAccessOf(req);
+  } catch (error) {
+    return sendError(res, error, fallback);
+  }
+  return run(req, res, access);
+};
+
+const approve = withAccess('Failed to approve collections', (req, res, access) => inTransaction(
   res, 'Failed to approve collections',
-  (connection) => approveCollections(connection, { items: req.body?.items, userId: req.user?.userId || null }),
+  async (connection) => {
+    await assertRecordsAllowed(connection, access, (Array.isArray(req.body?.items) ? req.body.items : []).map((item) => item?.id));
+    return approveCollections(connection, { items: req.body?.items, userId: req.user?.userId || null });
+  },
   ({ approved, skipped }) => ({
     message: `${plural(approved.length, 'collection')} approved`
       + (skipped.length ? ` (${plural(skipped.length, 'record')} already completed - nothing posted again)` : ''),
     approved,
     skipped
   })
-);
+));
 
-const reject = (req, res) => inTransaction(
+const reject = withAccess('Failed to reject collections', (req, res, access) => inTransaction(
   res, 'Failed to reject collections',
-  (connection) => rejectCollections(connection, { ids: req.body?.ids, reason: req.body?.reason, userId: req.user?.userId || null }),
+  async (connection) => {
+    await assertRecordsAllowed(connection, access, req.body?.ids);
+    return rejectCollections(connection, { ids: req.body?.ids, reason: req.body?.reason, userId: req.user?.userId || null });
+  },
   ({ rejected, skipped }) => ({
     message: `${plural(rejected.length, 'collection')} rejected`
       + (skipped.length ? ` (${plural(skipped.length, 'record')} already rejected)` : ''),
     rejected,
     skipped
   })
-);
+));
 
-const restore = (req, res) => inTransaction(
+const restore = withAccess('Failed to move collections back to Pending', (req, res, access) => inTransaction(
   res, 'Failed to move collections back to Pending',
-  (connection) => restoreCollections(connection, { ids: req.body?.ids }),
+  async (connection) => {
+    await assertRecordsAllowed(connection, access, req.body?.ids);
+    return restoreCollections(connection, { ids: req.body?.ids });
+  },
   (ids) => ({ message: `${plural(ids.length, 'collection')} moved back to Pending`, ids })
-);
+));
 
 module.exports = {
   getPending,
