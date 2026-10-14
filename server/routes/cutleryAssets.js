@@ -3,6 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { ALLOWED_EXTENSIONS } = require('../utils/signedUploads');
 const {
   getAssets,
   createAsset,
@@ -26,8 +27,11 @@ const storage = multer.diskStorage({
   }
 });
 
+// The browser-sent MIME type alone is not trusted: the extension must be an
+// image one too, or e.g. 'x.html' labelled image/png would be stored and served.
 const fileFilter = (req, file, cb) => {
-  if (file.mimetype.startsWith('image/')) {
+  const ext = path.extname(file.originalname || '').toLowerCase();
+  if (file.mimetype.startsWith('image/') && ALLOWED_EXTENSIONS.includes(ext)) {
     cb(null, true);
   } else {
     cb(new Error('Only image files are allowed!'), false);

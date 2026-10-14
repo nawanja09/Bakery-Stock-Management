@@ -1,6 +1,7 @@
 const pool = require('../config/db');
 const path = require('path');
 const fs = require('fs');
+const { signedUploadUrl } = require('../utils/signedUploads');
 
 const getAssets = async (req, res) => {
   try {
@@ -13,7 +14,7 @@ const getAssets = async (req, res) => {
     // Convert image paths to full URLs
     const assetsWithImageUrls = rows.map(asset => ({
       ...asset,
-      image_url: asset.image_path ? `${req.protocol}://${req.get('host')}/uploads/cutlery-assets/${path.basename(asset.image_path)}` : null
+      image_url: signedUploadUrl(req, 'cutlery-assets', asset.image_path)
     }));
     
     res.json(assetsWithImageUrls);
@@ -64,7 +65,7 @@ const createAsset = async (req, res) => {
 
     const assetWithUrl = {
       ...newAsset[0],
-      image_url: newAsset[0].image_path ? `${req.protocol}://${req.get('host')}/uploads/cutlery-assets/${newAsset[0].image_path}` : null
+      image_url: signedUploadUrl(req, 'cutlery-assets', newAsset[0].image_path)
     };
 
     res.status(201).json({ 
@@ -132,7 +133,7 @@ const getAssetById = async (req, res) => {
     const asset = rows[0];
     const assetWithUrl = {
       ...asset,
-      image_url: asset.image_path ? `${req.protocol}://${req.get('host')}/uploads/cutlery-assets/${asset.image_path}` : null
+      image_url: signedUploadUrl(req, 'cutlery-assets', asset.image_path)
     };
 
     res.json(assetWithUrl);
@@ -189,7 +190,7 @@ const updateAsset = async (req, res) => {
 
     const assetWithUrl = {
       ...updatedAsset[0],
-      image_url: updatedAsset[0].image_path ? `${req.protocol}://${req.get('host')}/uploads/cutlery-assets/${updatedAsset[0].image_path}` : null
+      image_url: signedUploadUrl(req, 'cutlery-assets', updatedAsset[0].image_path)
     };
 
     res.json({ 

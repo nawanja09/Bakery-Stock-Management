@@ -109,3 +109,50 @@ test('M6: guessing the current password through a session is throttled too', asy
   for (let i = 0; i < 5; i += 1) await change({ currentPassword: 'wrong', newPassword: 'another-good-pass' }, 1);
   assert.equal((await change({ currentPassword: 'right-pass-1', newPassword: 'another-good-pass' }, 1)).status, 429);
 });
+
+// ---------------------------------------------------------------- #3 /uploads
+test('#3: /uploads serves only signed, unexpired links to image files', async () => {
+  const fs = require('fs');
+  const os = require('os');
+  const path = require('path');
+  const express = require('express');
+  const { serveSignedUploads, signUploadPath } = require('../utils/signedUploads');
+
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'bsms-uploads-'));
+  fs.mkdirSync(path.join(root, 'cutlery-assets'));
+  fs.writeFileSync(path.join(root, 'cutlery-assets', 'asset-1.png'), 'PNGDATA');
+  fs.writeFileSync(path.join(root, 'cutlery-assets', 'evil.html'), '<script>alert(1)</script>');
+
+  const app = express();
+  app.use('/uploads', serveSignedUploads(root));
+  const server = await new Promise((resolve) => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const get = (p) => fetch(base + p);
+  try {
+    const signed = signUploadPath('/uploads/cutlery-assets/asset-1.png');
+    const ok = await get(signed);
+    assert.equal(ok.status, 200);
+    assert.equal(await ok.text(), 'PNGDATA');
+    assert.equal(ok.headers.get('x-content-type-options'), 'nosniff');
+
+    assert.equal((await get('/uploads/cutlery-assets/asset-1.png')).status, 403, 'no signature');
+    assert.equal((await get(signed.replace(/sig=./, 'sig=X'))).status, 403, 'tampered signature');
+    const { searchParams } = new URL(base + signed);
+    assert.equal((await get(`/uploads/cutlery-assets/asset-2.png?${searchParams}`)).status, 403, 'signature of another file');
+    const expired = signUploadPath('/uploads/cutlery-assets/asset-1.png', Date.now() - 10 * 3600 * 1000);
+    assert.equal((await get(expired)).status, 403, 'expired link');
+    assert.equal((await get(signUploadPath('/uploads/cutlery-assets/evil.html'))).status, 404, 'non-image never served');
+  } finally {
+    server.closeAllConnections();
+    await new Promise((resolve) => server.close(resolve));
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('#3: the upload filter refuses a non-image extension even with an image MIME type', () => {
+  const routerPath = require.resolve('../routes/cutleryAssets');
+  const src = require('fs').readFileSync(routerPath, 'utf8');
+  assert.match(src, /ALLOWED_EXTENSIONS\.includes\(ext\)/);
+  const { ALLOWED_EXTENSIONS } = require('../utils/signedUploads');
+  assert.ok(!ALLOWED_EXTENSIONS.includes('.html') && !ALLOWED_EXTENSIONS.includes('.svg'));
+});
