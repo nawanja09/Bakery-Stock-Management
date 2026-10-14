@@ -1,5 +1,5 @@
 // Regression tests for Priority-1 security fixes (docs/security-financial-reaudit-2026-10-14.md):
-//   M6 - login brute-force protection (per account + per IP), password policy
+//   M6 - password policy (min 8 characters, ...); no account / IP lockout
 //   #6 - a wrong CURRENT password on change-password is a 400, not a 401
 //        (a 401 makes the client sign the user out)
 // No MySQL: config/db is a fake answering the two users queries.
@@ -23,7 +23,6 @@ const fakePool = {
 const dbPath = require.resolve('../config/db');
 require.cache[dbPath] = { id: dbPath, filename: dbPath, loaded: true, exports: fakePool };
 
-const throttle = require('../services/loginThrottle');
 const { loginUser, changePassword } = require('../controllers/authController');
 
 const addUser = (id, username, password, status = 1) =>
@@ -44,31 +43,11 @@ const call = async (handler, { body, ip = '10.0.0.1', user } = {}) => {
 };
 const login = (username, password, ip) => call(loginUser, { body: { username, password }, ip });
 
-test.beforeEach(() => { throttle.reset(); delete process.env.LOGIN_MAX_FAILURES_PER_IP; });
-
-test('M6: 5 wrong passwords lock that account (429 + Retry-After), even for the right password', async () => {
-  for (let i = 0; i < 5; i += 1) assert.equal((await login('accountant1', 'wrong')).status, 401);
-  const locked = await login('accountant1', 'right-pass-1');
-  assert.equal(locked.status, 429);
-  assert.match(locked.body.error, /Too many failed attempts/);
-  assert.ok(Number(locked.headers['Retry-After']) > 0);
-  // Other accounts are unaffected; the lock is case-insensitive.
-  assert.equal((await login('accountant2', 'right-pass-2')).status, 200);
-  assert.equal((await login('ACCOUNTANT1', 'right-pass-1')).status, 429);
-});
-
-test('M6: a successful login clears the account\'s failures', async () => {
-  for (let i = 0; i < 4; i += 1) await login('accountant1', 'wrong');
+// Account / IP lockout was removed at the owner's request (2026-10-14):
+// wrong passwords never block a later correct login.
+test('M6: repeated wrong passwords do not lock the account', async () => {
+  for (let i = 0; i < 10; i += 1) assert.equal((await login('accountant1', 'wrong')).status, 401);
   assert.equal((await login('accountant1', 'right-pass-1')).status, 200);
-  for (let i = 0; i < 4; i += 1) await login('accountant1', 'wrong');
-  assert.equal((await login('accountant1', 'right-pass-1')).status, 200, 'still under the limit');
-});
-
-test('M6: one IP guessing many usernames is blocked by the per-IP limit', async () => {
-  process.env.LOGIN_MAX_FAILURES_PER_IP = '3';
-  await login('a', 'x', '10.9.9.9'); await login('b', 'x', '10.9.9.9'); await login('c', 'x', '10.9.9.9');
-  assert.equal((await login('accountant2', 'right-pass-2', '10.9.9.9')).status, 429);
-  assert.equal((await login('accountant2', 'right-pass-2', '10.1.1.1')).status, 200, 'another IP is fine');
 });
 
 test('M6: unknown usernames and inactive accounts do not leak before the password is right', async () => {
@@ -103,11 +82,6 @@ test('M6: a valid change stores a cost-12 bcrypt hash and returns a fresh token'
   assert.equal(r.status, 200);
   assert.ok(r.body.token);
   assert.match(updates[0][0], /^\$2[aby]\$12\$/);
-});
-
-test('M6: guessing the current password through a session is throttled too', async () => {
-  for (let i = 0; i < 5; i += 1) await change({ currentPassword: 'wrong', newPassword: 'another-good-pass' }, 1);
-  assert.equal((await change({ currentPassword: 'right-pass-1', newPassword: 'another-good-pass' }, 1)).status, 429);
 });
 
 // ---------------------------------------------------------------- #3 /uploads

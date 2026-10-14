@@ -21,7 +21,7 @@
 | # | Item | Status | Change |
 |---|---|---|---|
 | 1 | N6 secrets in git | **Fixed locally - push pending (owner)** | DB dump, client/build.zip and node_modules untracked; .gitignore extended. History rewritten (filter-branch) on all local branches + tag: server/.env, server.zip, bakery system db.sql, client/build.zip are in 0 commits; main content byte-identical. Backup: BSMS-backups/repo-pre-history-purge-20261014.bundle. **Production DB password must still be rotated** (unchanged since the leak). |
-| 2 | M6 login brute force | **Fixed** | services/loginThrottle.js: 5 failures lock an account 15 min, 50 per IP (env-tunable); unknown users cost a dummy bcrypt; inactive revealed only with the right password. Password policy: 8+ chars, not current/username, <= 72 bytes, bcrypt cost 12. |
+| 2 | M6 login brute force | **Partly fixed - lockout removed by owner decision (2026-10-14)** | No account / IP lockout (accepted risk: online password guessing is not rate limited). Kept: unknown users cost a dummy bcrypt; inactive revealed only with the right password. Password policy: 8+ chars, not current/username, <= 72 bytes, bcrypt cost 12. |
 | 3 | L2 /uploads public | **Fixed** | utils/signedUploads.js: 2h HMAC-signed image links, 403 otherwise; image extensions only, nosniff + sandbox CSP; upload filter checks the extension (stored-XSS via .html closed). |
 | 4 | L3 CORS / headers | **Fixed** | middleware/httpSecurity.js: CORS_ORIGINS allow-list (**required in production .env**), security headers, explicit 100kb JSON limit (was already Express's default). |
 | 5 | L4 JWT | **Fixed** | 12h lifetime, iss=bsms / aud=bsms-web verified. |

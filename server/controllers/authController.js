@@ -7,7 +7,6 @@ const { getRoleModules } = require('../config/rolePermissions');
 const integrationAuth = require('../services/integrationAuthService');
 const { getJwtSecret, JWT_SIGN_OPTIONS } = require('../config/secrets');
 const { forget: forgetSessionUser } = require('../services/sessionUser');
-const loginThrottle = require('../services/loginThrottle');
 
 const BCRYPT_COST = 12;
 const PASSWORD_MIN = 8;
@@ -21,21 +20,12 @@ const getDummyHash = async () => {
   return dummyHash;
 };
 
-const tooMany = (res, retryAfterSeconds) => {
-  res.set('Retry-After', String(retryAfterSeconds));
-  return res.status(429).json({ error: loginThrottle.blockedMessage(retryAfterSeconds) });
-};
-
 const loginUser = async (req, res) => {
   const { username, password } = req.body;
 
   if (typeof username !== 'string' || typeof password !== 'string' || !username.trim() || !password) {
     return res.status(400).json({ error: 'Username and password are required' });
   }
-
-  const attempt = { username, ip: req.ip };
-  const limit = loginThrottle.check(attempt);
-  if (limit.blocked) return tooMany(res, limit.retryAfterSeconds);
 
   try {
     const [rows] = await pool.query(
@@ -46,10 +36,8 @@ const loginUser = async (req, res) => {
     const match = await bcrypt.compare(password, user ? user.password : await getDummyHash());
 
     if (!user || !match) {
-      loginThrottle.recordFailure(attempt);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
-    loginThrottle.recordSuccess(attempt);
 
     // Checked only after the password, so the response never reveals whether
     // an account exists or is inactive to someone who does not know its password.
@@ -113,11 +101,6 @@ const changePassword = async (req, res) => {
     return res.status(400).json({ error: 'The new password must be different from the current password' });
   }
 
-  // Guessing the current password through a stolen session is throttled too.
-  const attempt = { username: `change-password:${userId}`, ip: req.ip };
-  const limit = loginThrottle.check(attempt);
-  if (limit.blocked) return tooMany(res, limit.retryAfterSeconds);
-
   try {
     const [rows] = await pool.query(
       'SELECT * FROM users WHERE id = ?',
@@ -129,11 +112,9 @@ const changePassword = async (req, res) => {
     const user = rows[0];
     const match = await bcrypt.compare(currentPassword, user.password);
     if (!match) {
-      loginThrottle.recordFailure(attempt);
       // 400, not 401: a 401 makes the client sign the user out (client/src/api.js).
       return res.status(400).json({ error: 'Current password is incorrect' });
     }
-    loginThrottle.recordSuccess(attempt);
     if (newPassword.trim().toLowerCase() === String(user.username || '').trim().toLowerCase()) {
       return res.status(400).json({ error: 'The new password must not be your username' });
     }
