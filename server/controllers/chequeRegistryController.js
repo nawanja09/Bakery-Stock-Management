@@ -9,6 +9,7 @@
 // When released, ledger entries are posted using the release_date and account balances updated.
 
 const pool = require('../config/db');
+const { toYmd, todayYmd } = require('../utils/dateOnly');
 const {
   postChequeRelease,
   unreleaseCheque,
@@ -89,6 +90,12 @@ const updateChequeRegistryRecord = async (req, res) => {
   const { deposit_date, release_date, returned, slip_number, cheque_date, status } = req.body;
   let connection;
 
+  // An unreadable date would otherwise be stored / posted as 0000-00-00.
+  if (release_date !== undefined && release_date !== null && release_date !== '' && !toYmd(release_date)) {
+    return res.status(400).json({ error: 'Release date must be a valid date (YYYY-MM-DD)' });
+  }
+  const releaseYmd = release_date ? toYmd(release_date) : null;
+
   try {
     connection = await pool.getConnection();
     await connection.beginTransaction();
@@ -106,7 +113,8 @@ const updateChequeRegistryRecord = async (req, res) => {
     const current = existing[0];
     const isNowReturned = returned !== undefined ? !!returned : !!current.returned;
     const requestedStatus = status !== undefined ? status : current.status;
-    const requestedReleaseDate = release_date !== undefined ? release_date : current.release_date;
+    // Always 'YYYY-MM-DD' (current.release_date is a Date object from the DB).
+    const requestedReleaseDate = release_date !== undefined ? releaseYmd : toYmd(current.release_date);
 
     // Handle transition to Returned
     if (isNowReturned && (!current.returned || current.status !== 'Returned')) {
@@ -114,7 +122,7 @@ const updateChequeRegistryRecord = async (req, res) => {
     }
     // Handle transition to Released (either explicit status = 'Released' or setting release_date with status = 'Released')
     else if (requestedStatus === 'Released' && !isNowReturned) {
-      const effectiveDate = requestedReleaseDate || current.release_date || new Date().toISOString().slice(0, 10);
+      const effectiveDate = requestedReleaseDate || toYmd(current.release_date) || todayYmd();
       await postChequeRelease(connection, current, effectiveDate);
     }
     // Handle transition back to Pending/Unreleased
@@ -122,7 +130,7 @@ const updateChequeRegistryRecord = async (req, res) => {
       await unreleaseCheque(connection, current, 'Pending');
     }
     // If already released, but release date changed
-    else if (current.status === 'Released' && requestedReleaseDate && String(requestedReleaseDate).slice(0, 10) !== String(current.release_date || '').slice(0, 10)) {
+    else if (current.status === 'Released' && requestedReleaseDate && requestedReleaseDate !== toYmd(current.release_date)) {
       await postChequeRelease(connection, current, requestedReleaseDate);
     }
 
@@ -142,7 +150,7 @@ const updateChequeRegistryRecord = async (req, res) => {
     }
     if (release_date !== undefined && requestedStatus !== 'Released') {
       updates.push('release_date = ?');
-      vals.push(release_date || null);
+      vals.push(releaseYmd);
     }
 
     if (updates.length > 0) {

@@ -1,5 +1,6 @@
 const pool = require('../config/db');
 const { recordCashTransaction, recordBankTransaction } = require('../utils/financeLedger');
+const { toYmd, todayYmd } = require('../utils/dateOnly');
 
 const ensureChequeReleaseSchema = async () => {
   await pool.query(`
@@ -288,9 +289,11 @@ const postChequeRelease = async (connection, chequeOrId, releaseDate) => {
   const amount = Number.parseFloat(source.amount ?? cheque.amount) || 0;
   if (amount <= 0) throw new Error(`Cheque ${cheque.id} has an invalid amount`);
 
-  const effectiveReleaseDate = releaseDate
-    ? String(releaseDate).slice(0, 10)
-    : (cheque.release_date ? String(cheque.release_date).slice(0, 10) : new Date().toISOString().slice(0, 10));
+  // Dates may arrive as 'YYYY-MM-DD' strings or as Date objects read from the
+  // DB (utils/dateOnly.js) - String(date).slice() turned the latter into
+  // "Wed Sep 16", which the ledger stored as 0000-00-00.
+  if (releaseDate && !toYmd(releaseDate)) throw new Error(`Invalid release date for cheque ${cheque.cheque_number || cheque.id}`);
+  const effectiveReleaseDate = toYmd(releaseDate) || toYmd(cheque.release_date) || todayYmd();
 
   const canonicalRef = getCanonicalReferenceType(cheque.source_type);
   const refTypes = getLedgerReferenceTypes(cheque.source_type);
@@ -334,7 +337,7 @@ const postChequeRelease = async (connection, chequeOrId, releaseDate) => {
       // historical Bank Ledger timing is still correct.
       await recordBankTransaction(connection, {
         bankId: source.bank_id,
-        date: source.transfer_date ? String(source.transfer_date).slice(0, 10) : effectiveReleaseDate,
+        date: toYmd(source.transfer_date) || effectiveReleaseDate,
         remark: source.remark || `Transfer to Cash (Cheque ${referenceNumber})`,
         credit: amount,
         transactionType: 'Bank Withdrawal',
@@ -492,15 +495,17 @@ const unreleaseCheque = async (connection, chequeOrId, newStatus = 'Pending') =>
 };
 
 const postChequeIfDue = async (connection, cheque, today) => {
-  if (!cheque.release_date || String(cheque.release_date).slice(0, 10) > today) return false;
-  return postChequeRelease(connection, cheque, cheque.release_date);
+  const releaseDate = toYmd(cheque.release_date);
+  if (!releaseDate || releaseDate > today) return false;
+  return postChequeRelease(connection, cheque, releaseDate);
 };
 
 const processDueCheques = async () => {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
-    const today = new Date().toISOString().slice(0, 10);
+    // Local calendar date (toISOString() is still yesterday before 05:30 in Colombo).
+    const today = todayYmd();
     const [cheques] = await connection.query(
       `SELECT * FROM expenses_cheque_registry
        WHERE status NOT IN ('Deleted', 'Released', 'Returned')

@@ -8,7 +8,10 @@ const {
 } = require('../services/chequeReleaseService');
 const { getBankBalance, getCashBalance } = require('../utils/financeLedger');
 
-async function runTests() {
+// NOTE: runs against the REAL database configured in server/.env. Every row it
+// creates is recorded in `created` and removed again in cleanup() - also when
+// a check fails - so a failing run never leaves test data behind.
+async function testBody(created) {
   console.log('🚀 Starting Cheque Release Consistency Tests...');
   await ensureChequeReleaseSchema();
 
@@ -16,14 +19,22 @@ async function runTests() {
   const testChequeNum1 = `CHQ-B2C-${testSuffix}`;
   const testChequeNum2 = `CHQ-PUR-${testSuffix}`;
   const testChequeNum3 = `CHQ-EXP-${testSuffix}`;
+  Object.assign(created, { testChequeNum1, testChequeNum2, testChequeNum3 });
 
   // Get test bank and company
   const [banks] = await pool.query("SELECT id FROM bank_details WHERE status = 'Active' ORDER BY id LIMIT 1");
   const testBankId = banks[0]?.id;
+  created.testBankId = testBankId;
   assert.ok(testBankId, 'Active bank details required for test');
 
   const [companies] = await pool.query('SELECT id FROM company ORDER BY id LIMIT 1');
   const testCompanyId = companies[0]?.id;
+  created.testCompanyId = testCompanyId;
+
+  // An existing user (created_by has a foreign key to users; id 1 may not exist).
+  const [users] = await pool.query('SELECT id FROM users ORDER BY id LIMIT 1');
+  const testUserId = users[0]?.id;
+  assert.ok(testUserId, 'A user is required for test');
   assert.ok(testCompanyId, 'Company required for test');
 
   const initialBankBalance = await getBankBalance(testBankId);
@@ -35,10 +46,11 @@ async function runTests() {
   console.log('\n--- Test 1: Finance Bank-to-Cash Cheque Transfer ---');
   const [b2cTransfer] = await pool.query(
     `INSERT INTO finance_cheque_transfers (company_id, bank_id, amount, transfer_date, cheque_number, remark, created_by)
-     VALUES (?, ?, ?, '2026-09-10', ?, 'Test B2C Cheque', 1)`,
-    [testCompanyId, testBankId, 500, testChequeNum1]
+     VALUES (?, ?, ?, '2026-09-10', ?, 'Test B2C Cheque', ?)`,
+    [testCompanyId, testBankId, 500, testChequeNum1, testUserId]
   );
   const b2cTransferId = b2cTransfer.insertId;
+  created.b2cTransferId = b2cTransferId;
 
   const [b2cReg] = await pool.query(
     `INSERT INTO expenses_cheque_registry
@@ -47,6 +59,7 @@ async function runTests() {
     [b2cTransferId, testChequeNum1]
   );
   const b2cChequeId = b2cReg.insertId;
+  created.b2cChequeId = b2cChequeId;
 
   // Verify on creation date (2026-09-10): status is Pending, NO ledger transactions exist
   const [b2cTxBefore] = await pool.query(
@@ -71,7 +84,8 @@ async function runTests() {
   assert.equal(b2cCheckRow[0].status, 'Released');
   assert.equal(b2cCheckRow[0].release_date, '2026-09-16');
 
-  // Verify ledger transactions created with transaction_date = 2026-09-16
+  // Bank leg dated the Transfer Date (2026-09-10), Cash leg the Released Date
+  // (2026-09-16) - see chequeReleaseService.postChequeRelease. Never 0000-00-00.
   const [b2cTxAfter] = await pool.query(
     `SELECT *, DATE_FORMAT(transaction_date, '%Y-%m-%d') AS formatted_date
      FROM finance_transactions
@@ -80,7 +94,9 @@ async function runTests() {
   );
   assert.equal(b2cTxAfter.length, 2, 'Released B2C cheque must create 2 ledger legs (Bank & Cash)');
   for (const tx of b2cTxAfter) {
-    assert.equal(tx.formatted_date, '2026-09-16', 'Ledger transaction date must be the Released Date');
+    assert.notEqual(tx.formatted_date, '0000-00-00', `${tx.account_type} leg must have a real date`);
+    const expected = tx.account_type === 'BANK' ? '2026-09-10' : '2026-09-16';
+    assert.equal(tx.formatted_date, expected, `${tx.account_type} leg must be dated ${tx.account_type === 'BANK' ? 'the Transfer Date' : 'the Released Date'}`);
   }
 
   const bankBalAfterB2CRelease = await getBankBalance(testBankId);
@@ -105,14 +121,16 @@ async function runTests() {
     [`INV-TEST-${testSuffix}`, testSupplierId, testCompanyId]
   );
   const testPurchaseId = purchResult.insertId;
+  created.testPurchaseId = testPurchaseId;
 
   // Record payment in payment_history
   const [phResult] = await pool.query(
     `INSERT INTO payment_history (purchase_id, payment_date, amount, payment_method, check_number, bank_id, created_by)
-     VALUES (?, '2026-09-10', 1200, 'CHEQUE', ?, ?, 1)`,
-    [testPurchaseId, testChequeNum2, testBankId]
+     VALUES (?, '2026-09-10', 1200, 'CHEQUE', ?, ?, ?)`,
+    [testPurchaseId, testChequeNum2, testBankId, testUserId]
   );
   const paymentHistoryId = phResult.insertId;
+  created.paymentHistoryId = paymentHistoryId;
 
   // Insert in expenses_cheque_registry with status Pending
   const [purReg] = await pool.query(
@@ -122,6 +140,7 @@ async function runTests() {
     [paymentHistoryId, testChequeNum2]
   );
   const purChequeId = purReg.insertId;
+  created.purChequeId = purChequeId;
 
   // Verify on creation: NO ledger transaction exists
   const [purTxBefore] = await pool.query(
@@ -165,10 +184,11 @@ async function runTests() {
   console.log('\n--- Test 3: New Expenses Cheque Payment ---');
   const [expPayResult] = await pool.query(
     `INSERT INTO expense_payments (payment_date, payee_name, payment_type, bank_id, cheque_number, total_bill_amount, transfer_amount, created_by)
-     VALUES ('2026-09-10', 'Test Payee', 'Cheque', ?, ?, 800, 800, 1)`,
-    [testBankId, testChequeNum3]
+     VALUES ('2026-09-10', 'Test Payee', 'Cheque', ?, ?, 800, 800, ?)`,
+    [testBankId, testChequeNum3, testUserId]
   );
   const expensePaymentId = expPayResult.insertId;
+  created.expensePaymentId = expensePaymentId;
 
   const [expReg] = await pool.query(
     `INSERT INTO expenses_cheque_registry
@@ -177,6 +197,7 @@ async function runTests() {
     [expensePaymentId, testChequeNum3]
   );
   const expChequeId = expReg.insertId;
+  created.expChequeId = expChequeId;
 
   // Verify on creation: NO ledger transaction exists
   const [expTxBefore] = await pool.query(
@@ -239,28 +260,62 @@ async function runTests() {
   );
   console.log('✅ Test 4 Passed: Unreleasing a cheque voids ledger deduction and restores balance!');
 
-  // Clean up test rows
-  console.log('\n--- Cleaning up test records ---');
-  await pool.query('DELETE FROM finance_transactions WHERE reference_type IN (?, ?, ?) AND reference_id IN (?, ?, ?)', [
-    'CASH_BANK_TRANSFER', 'PURCHASE_PAYMENT', 'EXPENSE_PAYMENT',
-    b2cTransferId, paymentHistoryId, expensePaymentId
-  ]);
-  await pool.query('DELETE FROM expenses_cheque_registry WHERE id IN (?, ?, ?)', [b2cChequeId, purChequeId, expChequeId]);
-  await pool.query('DELETE FROM expense_payments WHERE id = ?', [expensePaymentId]);
-  await pool.query('DELETE FROM payment_history WHERE id = ?', [paymentHistoryId]);
-  await pool.query('DELETE FROM purchases WHERE id = ?', [testPurchaseId]);
-  await pool.query('DELETE FROM finance_cheque_transfers WHERE id = ?', [b2cTransferId]);
-
-  const finalBankBal = await getBankBalance(testBankId);
-  const conn = await pool.getConnection();
-  await rebuildAccountBalance(conn, 'BANK', testBankId);
-  conn.release();
-
   console.log('\n🎉 ALL TESTS PASSED SUCCESSFULLY! The cheque release logic is 100% consistent across all 3 pages.');
+}
+
+// Removes exactly what this run created. Each ledger row is matched by its OWN
+// reference type + id + this run's cheque number (never a type x id cross
+// product, which could hit a real payment with the same id), then the stored
+// Bank AND Cash balances are rebuilt.
+async function cleanup(c) {
+  console.log('\n--- Cleaning up test records ---');
+  const legs = [
+    ['CASH_BANK_TRANSFER', c.b2cTransferId, c.testChequeNum1],
+    ['PURCHASE_PAYMENT', c.paymentHistoryId, c.testChequeNum2],
+    ['EXPENSE_PAYMENT', c.expensePaymentId, c.testChequeNum3]
+  ];
+  for (const [type, id, chequeNumber] of legs) {
+    if (!id) continue;
+    await pool.query(
+      'DELETE FROM finance_transactions WHERE reference_type = ? AND reference_id = ? AND reference_number = ?',
+      [type, id, chequeNumber]
+    );
+  }
+  const chequeIds = [c.b2cChequeId, c.purChequeId, c.expChequeId].filter(Boolean);
+  if (chequeIds.length) await pool.query('DELETE FROM expenses_cheque_registry WHERE id IN (?)', [chequeIds]);
+  if (c.expensePaymentId) await pool.query('DELETE FROM expense_payments WHERE id = ?', [c.expensePaymentId]);
+  if (c.paymentHistoryId) await pool.query('DELETE FROM payment_history WHERE id = ?', [c.paymentHistoryId]);
+  if (c.testPurchaseId) await pool.query('DELETE FROM purchases WHERE id = ?', [c.testPurchaseId]);
+  if (c.b2cTransferId) await pool.query('DELETE FROM finance_cheque_transfers WHERE id = ?', [c.b2cTransferId]);
+
+  const conn = await pool.getConnection();
+  try {
+    if (c.testBankId) await rebuildAccountBalance(conn, 'BANK', c.testBankId);
+    if (c.testCompanyId) await rebuildAccountBalance(conn, 'CASH', c.testCompanyId);
+  } finally {
+    conn.release();
+  }
+}
+
+async function runTests() {
+  const created = {};
+  let failed = null;
+  try {
+    await testBody(created);
+  } catch (err) {
+    failed = err;
+  }
+  try {
+    await cleanup(created);
+  } catch (cleanupErr) {
+    console.error('\n⚠️ CLEANUP FAILED - remove these test rows by hand:', created, cleanupErr);
+    failed = failed || cleanupErr;
+  }
+  if (failed) {
+    console.error('\n❌ TEST FAILED:', failed);
+    process.exit(1);
+  }
   process.exit(0);
 }
 
-runTests().catch((err) => {
-  console.error('\n❌ TEST FAILED:', err);
-  process.exit(1);
-});
+runTests();
