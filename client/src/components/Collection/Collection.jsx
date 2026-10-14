@@ -164,7 +164,7 @@ const digits = (v) => String(v || '').replace(/\D/g, '');
 
 const Collection = () => {
   const { showPopup } = usePopup();
-  const { canWrite } = usePermissions();
+  const { canWrite, canApproveCollections } = usePermissions();
 
   const [tab, setTab] = useState('Pending');
   const [companies, setCompanies] = useState([]);
@@ -400,7 +400,11 @@ const Collection = () => {
         return item;
       });
       const res = await api.post('/collections/approve', { items });
-      showPopup('success', res.data?.message || 'Collections approved');
+      // Records the server skipped (already approved, or a duplicate POS reference
+      // approved by another user) are listed in the message: show it as a warning.
+      const skipped = Array.isArray(res.data?.skipped) ? res.data.skipped : [];
+      showPopup(skipped.length ? 'warning' : 'success', res.data?.message || 'Collections approved',
+        skipped.length ? { duration: 12000 } : {});
       setApproveOpen(false);
       setSelectedIds([]);
       await load();
@@ -868,9 +872,12 @@ const Collection = () => {
                   <button type="button" className="btn btn-secondary col-reject-btn" onClick={openReject} disabled={loading || selectedRows.length === 0}>
                     <FontAwesomeIcon icon={faBan} /> Reject
                   </button>
-                  <button type="button" className="btn btn-primary" onClick={openApprove} disabled={loading || selectedRows.length === 0}>
-                    <FontAwesomeIcon icon={faCheck} /> Approve
-                  </button>
+                  {/* Approve posts to the ledgers - Accountant only (the API enforces it too). */}
+                  {canApproveCollections && (
+                    <button type="button" className="btn btn-primary" onClick={openApprove} disabled={loading || selectedRows.length === 0}>
+                      <FontAwesomeIcon icon={faCheck} /> Approve
+                    </button>
+                  )}
                 </div>
               </div>
             )}

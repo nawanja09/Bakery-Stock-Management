@@ -9,12 +9,24 @@ const {
   normalizeRole
 } = require('../config/rolePermissions');
 
-test('Finance role has only Management, Expenses and Collection privileges', () => {
+test('Finance role has only Management and Expenses privileges (no Collection: segregation of duties)', () => {
   assert.equal(normalizeRole('Finance'), ROLES.FINANCE_USER);
   assert.equal(normalizeRole(ROLES.FINANCE_USER), ROLES.FINANCE_USER);
-  assert.deepEqual(getRoleModules('Finance'), [MODULES.MANAGEMENT, MODULES.EXPENSES, MODULES.COLLECTION]);
-  assert.deepEqual(getRoleModules(ROLES.FINANCE_USER), [MODULES.MANAGEMENT, MODULES.EXPENSES, MODULES.COLLECTION]);
+  assert.deepEqual(getRoleModules('Finance'), [MODULES.MANAGEMENT, MODULES.EXPENSES]);
+  assert.deepEqual(getRoleModules(ROLES.FINANCE_USER), [MODULES.MANAGEMENT, MODULES.EXPENSES]);
   assert.equal(canWrite('Finance'), true);
+});
+
+test('Finance cannot reach any Collection or POS / Restaurant endpoint', () => {
+  const canAccess = (method, url) => evaluateApiAccess('Finance', method, url).allowed;
+  for (const url of ['/api/collections/pending', '/api/collections/completed', '/api/collections/12',
+    '/api/collections/departments', '/api/collections/integrations/status', '/api/integrations/access']) {
+    assert.equal(canAccess('GET', url), false, url);
+  }
+  for (const url of ['/api/collections/approve', '/api/collections/reject', '/api/collections/restore',
+    '/api/collections/integrations/pos/connect', '/api/Collections/APPROVE']) {
+    assert.equal(canAccess('POST', url), false, url);
+  }
 });
 
 test('Finance dashboard APIs only expose the scoped dashboard overview', () => {

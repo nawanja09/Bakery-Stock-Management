@@ -208,6 +208,10 @@ const ensureUsernameAuthSchema = async () => {
     // 1. Add the column if it isn't there yet.
     await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS username VARCHAR(100) NULL AFTER name");
     await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS status TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=Active, 0=Deleted (soft delete)'");
+    // Login tokens carry this as `tv`; middleware/authenticate.js refuses a token
+    // whose tv differs. Bump it (password change, forced sign-out) to revoke
+    // every token issued before.
+    await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version INT NOT NULL DEFAULT 0 COMMENT 'bump to revoke all issued login tokens'");
 
     // 2. Backfill from email where possible (no-op once email is dropped).
     try {
@@ -1287,6 +1291,32 @@ const ensureCollectionsSourceSystem = async () => {
   collectionsSourceSystemOk = true;
 };
 
+// One COMPLETED collection per (source_system, source_type, reference_no):
+// completed_ref_key is NULL for every other row, so only approved rows compete
+// for the UNIQUE key. Two users approving two pending copies of the same POS
+// reference at the same moment can then never both post to the ledgers - the
+// second status flip fails with ER_DUP_ENTRY and its transaction rolls back.
+// See migrations/033_collections_completed_reference_unique.sql.
+const ensureCollectionsCompletedReferenceUnique = async () => {
+  if (await indexColumns('collections', 'uq_collections_completed_ref')) return;
+  const [dupes] = await pool.query(
+    `SELECT source_system, source_type, reference_no, COUNT(*) AS n FROM collections
+      WHERE status = 'completed' AND reference_no IS NOT NULL
+      GROUP BY source_system, source_type, reference_no HAVING n > 1 LIMIT 5`
+  );
+  if (dupes.length) {
+    throw new Error(`completed collections already share a reference (${dupes.map((d) => `${d.source_system}:${d.source_type}:${d.reference_no}`).join(', ')}) - resolve them by hand`);
+  }
+  if (!(await columnExists('collections', 'completed_ref_key'))) {
+    await pool.query(
+      `ALTER TABLE collections ADD COLUMN completed_ref_key VARCHAR(220)
+         AS (IF(status = 'completed' AND reference_no IS NOT NULL,
+                CONCAT(source_system, ':', source_type, ':', reference_no), NULL)) PERSISTENT`
+    );
+  }
+  await pool.query('ALTER TABLE collections ADD UNIQUE KEY uq_collections_completed_ref (completed_ref_key)');
+};
+
 const ensureCollectionsSchema = async () => {
   try {
     await retireDraftCollectionsTable();
@@ -1363,6 +1393,11 @@ const ensureCollectionsSchema = async () => {
       await ensureCollectionsSourceSystem();
     } catch (systemErr) {
       console.error('Collections source_system migration FAILED - Restaurant sync disabled:', systemErr.message);
+    }
+    try {
+      await ensureCollectionsCompletedReferenceUnique();
+    } catch (refErr) {
+      console.error('Collections completed-reference UNIQUE key FAILED - duplicate approvals are only checked in code:', refErr.message);
     }
 
     await pool.query(`

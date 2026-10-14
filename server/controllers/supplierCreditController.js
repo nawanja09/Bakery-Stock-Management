@@ -1,5 +1,6 @@
 // controllers/supplierCreditController.js
 const pool = require('../config/db');
+const { actorId } = require('../utils/actor');
 const { normalizePaymentMethodValue } = require('../utils/paymentMethodUtils');
 const { recordCashTransaction, recordBankTransaction } = require('../utils/financeLedger');
 const { checkDuplicateReference, DuplicateReferenceError } = require('../services/referenceValidationService');
@@ -171,10 +172,10 @@ const createOverpayment = async (req, res) => {
     reference_number,
     amount,
     notes,
-    created_by,
     purchase_id,
     bank_id
   } = req.body;
+  const created_by = actorId(req); // never the client's created_by
 
   const normalizedPaymentMethod = normalizePaymentMethodValue(payment_method);
 

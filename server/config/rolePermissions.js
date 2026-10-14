@@ -22,6 +22,9 @@
 //              may only GET it (shared look-ups such as /companies).
 //              The longest matching prefix wins, so a narrow rule can override a
 //              broad one (e.g. /purchases/payments -> Adjustments only).
+//              `writeRoles` (optional) = only these roles may POST/PUT/PATCH/DELETE
+//              that prefix, even if other roles hold the module (maker-checker
+//              steps such as approving collections into the ledgers).
 
 const ROLES = Object.freeze({
   STORES: 'STORES',
@@ -47,7 +50,8 @@ const MODULES = Object.freeze({
   // Management but holds HR data, so it is limited to Admin / Super Admin.
   EMPLOYEES: 'employees',
   // Collection (POS collections -> ledgers). Its own module so access is
-  // exactly: Accountant, Admin, Super Admin (full) and QB (view only).
+  // exactly: Accountant, Admin, Super Admin and QB (view only). Approving
+  // (posting to the ledgers) is Accountant only - see API_RULES.
   COLLECTION: 'collection'
 });
 
@@ -65,7 +69,9 @@ const ROLE_MODULES = Object.freeze({
   [ROLES.STORES]: [M.MANAGEMENT, M.RAW_MATERIAL, M.FG_PRODUCTION, M.SETTINGS],
   [ROLES.ACCOUNTANT]: [M.MANAGEMENT, M.RAW_MATERIAL, M.FINANCE, M.EXPENSES, M.FG_PRODUCTION, M.VAT, M.SETTINGS, M.COLLECTION],
   [ROLES.QB]: [M.MANAGEMENT, M.RAW_MATERIAL, M.FG_PRODUCTION, M.FINANCE, M.EXPENSES, M.VAT, M.SETTINGS, M.COLLECTION],
-  [ROLES.FINANCE_USER]: [M.MANAGEMENT, M.EXPENSES, M.COLLECTION],
+  // Finance pays expenses, so it must NOT also record cash coming in
+  // (Collection approvals): segregation of duties.
+  [ROLES.FINANCE_USER]: [M.MANAGEMENT, M.EXPENSES],
   [ROLES.ADMIN]: ADMIN_MODULES,
   [ROLES.SUPER_ADMIN]: [...ADMIN_MODULES, M.ANALYST]
 });
@@ -170,13 +176,15 @@ const API_RULES = [
   { prefix: '/other-ledgers', modules: [M.FINANCE] },
   // Management -> Credit Card Rate (card commission per Branch / Department).
   { prefix: '/credit-card-rates', modules: [M.FINANCE] },
-  // Collection: Accountant / Finance / Admin / Super Admin full, QB read-only (view-only rule
-  // refuses every POST), every other role 403.
+  // Collection: Accountant / Admin / Super Admin, QB read-only (view-only rule
+  // refuses every POST), every other role (incl. Finance) 403.
   { prefix: '/collections', modules: [M.COLLECTION] },
-  // POS / Restaurant connection status + one-time Connect: also the Finance role
-  // (its own RAVON accounts), which has no Collection module. The controller
-  // narrows it to Finance / Accountant / Admin / Super Admin (+ QB read).
-  { prefix: '/collections/integrations', modules: [ANY], denyRoles: [ROLES.STORES] },
+  // Approve posts Cash / Bank / Card / AR to the ledgers: Accountant only.
+  // Reject / Restore (no ledger effect) stay with every Collection writer.
+  { prefix: '/collections/approve', modules: [M.COLLECTION], writeRoles: [ROLES.ACCOUNTANT] },
+  // POS / Restaurant connection status + one-time Connect. The controller
+  // narrows it to roles with a page that reads POS / Restaurant (+ QB read).
+  { prefix: '/collections/integrations', modules: [ANY], denyRoles: [ROLES.STORES, ROLES.FINANCE_USER] },
   // The user's own POS / Restaurant privileges (which Collection / FG Production
   // features to show): every role with a page that reads them.
   { prefix: '/integrations', modules: [M.COLLECTION, M.FG_PRODUCTION] },
@@ -255,8 +263,15 @@ const evaluateApiAccess = (role, method, url) => {
   if (!isRead && VIEW_ONLY_ROLES.includes(canonical)) {
     return { allowed: false, reason: 'view-only' };
   }
+  if (!isRead && rule.writeRoles && !rule.writeRoles.includes(canonical)) {
+    return { allowed: false, reason: 'module' };
+  }
   return { allowed: true };
 };
+
+// Only the Accountant approves collections (posts them to the ledgers).
+const canApproveCollections = (role) =>
+  evaluateApiAccess(role, 'POST', '/api/collections/approve').allowed;
 
 module.exports = {
   ROLES,
@@ -273,6 +288,7 @@ module.exports = {
   hasModule,
   isViewOnlyRole,
   canWrite,
+  canApproveCollections,
   toApiPath,
   resolveApiRule,
   evaluateApiAccess

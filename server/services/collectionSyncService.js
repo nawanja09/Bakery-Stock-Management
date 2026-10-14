@@ -159,9 +159,9 @@ const ENDPOINTS = (system = SYSTEMS.POS) => {
 const systemLabel = (system) => integrationAuth.providerOf(SYSTEM_CONFIG[system].provider).label;
 
 // Follows next_page_url / links.next on the same host, or meta.current_page /
-// meta.last_page by requesting ?page=N.
+// meta.last_page by requesting ?page=N. A next link on any other origin is
+// ignored (it would receive the user's token / a valid signature).
 const fetchAllRecords = async (url, { provider = 'pos', userId = null } = {}) => {
-  const origin = new URL(url).origin;
   const records = [];
   let next = url;
   for (let page = 0; next && page < MAX_PAGES; page += 1) {
@@ -176,7 +176,7 @@ const fetchAllRecords = async (url, { provider = 'pos', userId = null } = {}) =>
     const candidate = payload && typeof payload === 'object' && !Array.isArray(payload)
       ? (payload.next_page_url || payload.links?.next || payload.data?.next_page_url || payload.meta?.next_page_url || null)
       : null;
-    next = typeof candidate === 'string' && candidate.startsWith(origin) ? candidate : null;
+    next = typeof candidate === 'string' && integrationAuth.isSameOrigin(provider, candidate) ? candidate : null;
     const meta = payload && typeof payload === 'object' && !Array.isArray(payload) ? payload.meta : null;
     if (!next && meta && Number(meta.last_page) > Number(meta.current_page) && batch.length > 0) {
       const u = new URL(current);
@@ -497,5 +497,5 @@ const syncCollections = async ({ fromDate, toDate, userId = null, allowed = null
 };
 
 module.exports = {
-  syncCollections, stagePending, linkDeductionsToShifts, ENDPOINTS, SYSTEM_CONFIG, dateWindow, MAX_RANGE_DAYS
+  syncCollections, stagePending, linkDeductionsToShifts, fetchAllRecords, ENDPOINTS, SYSTEM_CONFIG, dateWindow, MAX_RANGE_DAYS
 };

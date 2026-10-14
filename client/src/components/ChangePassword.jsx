@@ -38,6 +38,9 @@ const ChangePassword = () => {
                 throw new Error('Failed to change password');
             }
             const data = await response.data;
+            // Changing the password signs out every other session; this one
+            // continues with the new token the server returned.
+            if (data.token) localStorage.setItem('token', data.token);
             showPopup('success', data.message || 'Password changed successfully');
             setCurrentPassword('');
             setNewPassword('');

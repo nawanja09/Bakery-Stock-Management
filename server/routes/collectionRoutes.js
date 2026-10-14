@@ -2,7 +2,8 @@
 //
 // Collection module. Mounted at /api/collections (see server.js).
 // Access (config/rolePermissions.js, `collection` module):
-//   Accountant, Admin, Super Admin -> view + approve / reject / restore
+//   Accountant                  -> view + approve / reject / restore
+//   Admin, Super Admin          -> view + reject / restore (approve is Accountant only)
 //   QB                          -> view only (every POST refused with 403)
 //   any other role              -> 403 on every endpoint
 // Enforced here on every route, independently of what the UI shows.
@@ -13,7 +14,7 @@ const { collectionReadAccess, collectionWriteAccess } = require('../middleware/m
 
 // POS / Restaurant connection (rule /collections/integrations in rolePermissions.js:
 // any signed-in role reaches the controller, which allows status to Collection
-// users + Finance / Accountant / Admin / Super Admin and Connect to the latter
+// users + Accountant / Admin / Super Admin and Connect to the latter
 // only; QB is refused on POST by the view-only rule). Authenticated by the BSMS
 // JWT in the Authorization header - no cookie, so a cross-site form cannot
 // trigger it (no CSRF exposure). Connect is rate limited in the controller.

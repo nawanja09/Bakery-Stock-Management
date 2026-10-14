@@ -135,11 +135,13 @@ test('BSMS login: the typed credentials are tried on POS and Restaurant (once ea
       }
       assert.equal((await callLogin({ username: 'finance', password: 'wrong' })).status, 401);
     });
-    // Every role with a page reading POS / Restaurant (Finance has Collection) is forwarded once;
-    // a wrong BSMS password is never forwarded.
-    assert.deepEqual(posMock.stats.logins, ['finance', 'accountant2', 'stores', 'admin']);
-    assert.deepEqual(restMock.stats.logins, ['finance', 'accountant2', 'stores', 'admin']);
-    for (const userId of [FINANCE, ACCOUNTANT, STORES, ADMIN]) {
+    // Every role with a page reading POS / Restaurant is forwarded once. Finance has no
+    // such page any more, so its password is never sent; a wrong BSMS password is never
+    // forwarded either.
+    assert.deepEqual(posMock.stats.logins, ['accountant2', 'stores', 'admin']);
+    assert.deepEqual(restMock.stats.logins, ['accountant2', 'stores', 'admin']);
+    assert.equal(auth.getAuthStatus('pos', { userId: FINANCE }).connected, false, 'Finance is not connected');
+    for (const userId of [ACCOUNTANT, STORES, ADMIN]) {
       assert.equal(auth.getAuthStatus('pos', { userId }).connected, true, String(userId));
       assert.equal(auth.getAuthStatus('restaurant', { userId }).source, 'own');
     }

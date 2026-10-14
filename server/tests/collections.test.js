@@ -472,15 +472,26 @@ test('no source code file contains a POS / Restaurant credential variable or fal
 // ---------------------------------------------------------------------------
 // Collection role access (backend rule, independent of the UI)
 // ---------------------------------------------------------------------------
-test('Collection API: Accountant / Finance / Admin / Super Admin full, QB view only, everyone else 403', () => {
-  const { evaluateApiAccess } = require('../config/rolePermissions');
+test('Collection API: Accountant full; Admin / Super Admin all but approve; QB view only; Finance and everyone else 403', () => {
+  const { evaluateApiAccess, canApproveCollections } = require('../config/rolePermissions');
   const reads = ['/api/collections/pending', '/api/collections/completed', '/api/collections/rejected', '/api/collections/12'];
   const writes = ['/api/collections/approve', '/api/collections/reject', '/api/collections/restore'];
   const can = (role, method, url) => evaluateApiAccess(role, method, url).allowed;
 
-  for (const role of ['Accountant', 'Finance', 'Admin', 'Super Admin', 'SuperAdmin']) {
+  for (const url of reads) assert.equal(can('Accountant', 'GET', url), true, `Accountant GET ${url}`);
+  for (const url of writes) assert.equal(can('Accountant', 'POST', url), true, `Accountant POST ${url}`);
+  // Approving posts to the ledgers: Accountant only, whatever the URL case.
+  for (const role of ['Admin', 'Super Admin', 'SuperAdmin']) {
     for (const url of reads) assert.equal(can(role, 'GET', url), true, `${role} GET ${url}`);
-    for (const url of writes) assert.equal(can(role, 'POST', url), true, `${role} POST ${url}`);
+    assert.equal(can(role, 'POST', '/api/collections/reject'), true, `${role} reject`);
+    assert.equal(can(role, 'POST', '/api/collections/restore'), true, `${role} restore`);
+    for (const url of ['/api/collections/approve', '/api/Collections/APPROVE', '/api/collections/approve/']) {
+      assert.equal(can(role, 'POST', url), false, `${role} POST ${url}`);
+    }
+  }
+  assert.equal(canApproveCollections('Accountant'), true);
+  for (const role of ['Admin', 'Super Admin', 'Finance', 'QB', 'Store Keeper', null]) {
+    assert.equal(canApproveCollections(role), false, String(role));
   }
   for (const role of ['View Only', 'QB']) {
     for (const url of reads) assert.equal(can(role, 'GET', url), true, `${role} GET ${url}`);
@@ -490,7 +501,7 @@ test('Collection API: Accountant / Finance / Admin / Super Admin full, QB view o
       assert.equal(result.reason, 'view-only');
     }
   }
-  for (const role of ['Store Keeper', 'Staff', 'Manager', 'User', null]) {
+  for (const role of ['Finance', 'Store Keeper', 'Staff', 'Manager', 'User', null]) {
     for (const url of reads) assert.equal(can(role, 'GET', url), false, `${role} GET ${url}`);
     for (const url of writes) assert.equal(can(role, 'POST', url), false, `${role} POST ${url}`);
   }
@@ -503,15 +514,16 @@ test('client and server role tables agree on Collection', async () => {
   assert.match(src, /COLLECTION: 'collection'/);
   assert.match(src, /\[ROLES\.ACCOUNTANT\]: \[[^\]]*M\.COLLECTION\]/);
   assert.match(src, /\[ROLES\.QB\]: \[[^\]]*M\.COLLECTION\]/);
-  assert.match(src, /\[ROLES\.FINANCE_USER\]: \[[^\]]*M\.COLLECTION\]/);
+  assert.doesNotMatch(src.match(/\[ROLES\.FINANCE_USER\]: \[[^\]]*\]/)[0], /COLLECTION/);
+  assert.match(src, /COLLECTION_APPROVER_ROLES = Object\.freeze\(\[ROLES\.ACCOUNTANT\]\)/);
   assert.doesNotMatch(src.match(/\[ROLES\.STORES\]: \[[^\]]*\]/)[0], /COLLECTION/);
   assert.match(src, /rule\('\/collection', \{ all: \[M\.COLLECTION\] \}\)/);
 });
 
-test('POS / Restaurant integration endpoints: status + connect for Finance / Accountant / Admin, never Stores; QB cannot POST', () => {
+test('POS / Restaurant integration endpoints: status + connect for Accountant / Admin, never Stores or Finance; QB cannot POST', () => {
   const { evaluateApiAccess } = require('../config/rolePermissions');
   const can = (role, method, url) => evaluateApiAccess(role, method, url).allowed;
-  for (const role of ['Finance', 'Accountant', 'Admin', 'Super Admin']) {
+  for (const role of ['Accountant', 'Admin', 'Super Admin']) {
     assert.equal(can(role, 'GET', '/api/collections/integrations/status'), true, role);
     assert.equal(can(role, 'POST', '/api/collections/integrations/restaurant/connect'), true, role);
   }
@@ -519,8 +531,10 @@ test('POS / Restaurant integration endpoints: status + connect for Finance / Acc
   assert.equal(evaluateApiAccess('QB', 'POST', '/api/collections/integrations/pos/connect').reason, 'view-only');
   assert.equal(can('Store Keeper', 'GET', '/api/collections/integrations/status'), false);
   assert.equal(can('Store Keeper', 'POST', '/api/collections/integrations/pos/connect'), false);
-  // Finance has the Collection page itself too.
-  assert.equal(can('Finance', 'GET', '/api/collections/pending'), true);
+  // Finance has no Collection access at all.
+  assert.equal(can('Finance', 'GET', '/api/collections/integrations/status'), false);
+  assert.equal(can('Finance', 'POST', '/api/collections/integrations/pos/connect'), false);
+  assert.equal(can('Finance', 'GET', '/api/collections/pending'), false);
 });
 
 // ---------------------------------------------------------------------------

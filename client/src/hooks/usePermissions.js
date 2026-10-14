@@ -13,6 +13,7 @@ import {
   getRoleModules,
   hasModule,
   canWrite,
+  canApproveCollections,
   isViewOnlyRole,
   canAccessPath,
   canAccessAnyPath,
@@ -40,6 +41,7 @@ export const usePermissions = () => {
     modules: getRoleModules(role),
     isViewOnly: isViewOnlyRole(role),
     canWrite: canWrite(role),               // false for QB
+    canApproveCollections: canApproveCollections(role), // Accountant only
     hasModule: (moduleName) => hasModule(role, moduleName),
     canAccessPath: (path) => canAccessPath(role, path),
     canAccessAnyPath: (paths) => canAccessAnyPath(role, paths),

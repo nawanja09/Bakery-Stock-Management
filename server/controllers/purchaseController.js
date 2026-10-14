@@ -1,24 +1,10 @@
 // controllers/purchaseController.js
 const pool = require('../config/db');
+const { actorId } = require('../utils/actor');
 const { normalizePaymentMethodValue } = require('../utils/paymentMethodUtils');
 const { recordCashTransaction, recordBankTransaction } = require('../utils/financeLedger');
 const { checkDuplicateReference, DuplicateReferenceError } = require('../services/referenceValidationService');
 const { isRmAdjustmentRequest, recordRmAdjustment, sameItems, sameValue } = require('../utils/rmAdjustmentAudit');
-
-const resolveUserId = async (connection, ...candidateIds) => {
-  for (const candidateId of candidateIds) {
-    const numericId = Number(candidateId);
-    if (Number.isInteger(numericId) && numericId > 0) {
-      const [rows] = await connection.query('SELECT id FROM users WHERE id = ? LIMIT 1', [numericId]);
-      if (rows.length > 0) {
-        return numericId;
-      }
-    }
-  }
-
-  const [rows] = await connection.query('SELECT id FROM users ORDER BY id LIMIT 1');
-  return rows[0]?.id || null;
-};
 
 const calculatePaymentState = (paidAmount, totalAmount) => {
   const parsedPaidAmount = parseFloat(paidAmount) || 0;
@@ -144,7 +130,6 @@ const createPurchase = async (req, res) => {
     payment_method, 
     check_number,
     remarks, 
-    prepared_by,
     company_id,
     order_id
   } = req.body;
@@ -194,7 +179,7 @@ const createPurchase = async (req, res) => {
     const normalizedBalanceAmount = paymentState.balance_amount;
     const normalizedBalanceStatus = paymentState.balance_status;
     const normalizedPaymentStatus = paymentState.payment_status;
-    const resolvedPreparedBy = await resolveUserId(connection, prepared_by, req.user?.id);
+    const resolvedPreparedBy = actorId(req); // the signed-in user, never the client's prepared_by
 
     if (!resolvedPreparedBy) {
       await connection.rollback();
@@ -539,7 +524,6 @@ const updatePurchase = async (req, res) => {
     payment_method, 
     check_number,
     remarks, 
-    prepared_by,
     company_id
   } = req.body;
 
@@ -562,7 +546,7 @@ const updatePurchase = async (req, res) => {
 
     await checkDuplicateReference(connection, invoice_no, { table: 'purchases', id });
 
-    const resolvedPreparedBy = await resolveUserId(connection, prepared_by, req.user?.id);
+    const resolvedPreparedBy = actorId(req); // the signed-in user, never the client's prepared_by
 
     if (!resolvedPreparedBy) {
       await connection.rollback();
@@ -807,7 +791,6 @@ const makePayment = async (req, res) => {
     check_number,
     voucher_number,
     notes,
-    created_by,
     invoice_allocations,
     supplier_id,
     bank_id
@@ -913,7 +896,7 @@ const makePayment = async (req, res) => {
     }
 
     const paymentHistoryPurchaseId = normalizedAllocations[0]?.purchase_id || null;
-    const resolvedCreatedBy = await resolveUserId(connection, created_by, req.user?.id);
+    const resolvedCreatedBy = actorId(req); // the signed-in user, never the client's created_by
     const normalizedPaymentMethodForHistory = normalizePaymentMethodForHistory(normalizedPaymentMethod);
 
     if (!resolvedCreatedBy) {
@@ -1851,7 +1834,7 @@ const adjustPurchasePayment = async (req, res) => {
           overpaymentNumber, purchase.supplier_id, purchase.company_id || null, payment_date, overpaymentMethod,
           voucher_number || null, excessAmount, excessAmount,
           `Supplier credit from Purchasing Payment Adjustment on invoice ${purchase.invoice_no} (Payment #${paymentId})`,
-          await resolveUserId(connection, req.user?.id)
+          actorId(req)
         ]
       );
       overpaymentRecord = { id: overpayResult.insertId, overpayment_number: overpaymentNumber, amount: excessAmount };
@@ -1870,7 +1853,7 @@ const adjustPurchasePayment = async (req, res) => {
         payment.payment_date, payment_date, oldAllocatedAmount, newAmount,
         Number((newAmount - oldAllocatedAmount).toFixed(2)),
         excessAmount > 0 ? `Rs. ${excessAmount.toFixed(2)} recorded as supplier credit${overpaymentRecord ? ` (${overpaymentRecord.overpayment_number})` : ''}` : null,
-        await resolveUserId(connection, req.user?.id)
+        actorId(req)
       ]
     );
 

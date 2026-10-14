@@ -13,7 +13,7 @@
 // background sync.
 // Authorization - BOTH must allow it:
 //   * the user's BSMS role (rolePermissions.js: Accountant / Admin / Super
-//     Admin full, QB view only), and
+//     Admin, QB view only; APPROVE is Accountant only, Finance has no access), and
 //   * the user's OWN privileges in POS / Restaurant (integrationAccess.js):
 //     every list, filter option, record, sync and approve / reject / restore is
 //     limited to the systems and sources (shifts, credit payments, employee
@@ -36,8 +36,8 @@
 //   GET  /integrations/status per system { configured, connected, state, username,
 //                             expiresAt, scope { branchIds, allBranches, warning } }
 //   POST /integrations/:provider/connect { username, password } - one-time
-//                             "Connect <POS | Restaurant> Finance account" (Finance /
-//                             Accountant / Admin / Super Admin, rate limited): logs in,
+//                             "Connect <POS | Restaurant>" (Accountant /
+//                             Admin / Super Admin, rate limited): logs in,
 //                             keeps ONLY the encrypted token, returns
 //                             { connected: true, username } - never the token or password
 //   GET  /:id                 one collection with its posted lines + ledger ids
@@ -49,7 +49,7 @@ const pool = require('../config/db');
 const { HttpError } = require('../utils/staffLoanUtils');
 const { OtherLedgerError } = require('../services/otherLedgerService');
 const integrationAuth = require('../services/integrationAuthService');
-const { canWrite, hasModule, MODULES } = require('../config/rolePermissions');
+const { canWrite, canApproveCollections, hasModule, MODULES } = require('../config/rolePermissions');
 const { syncCollections, MAX_RANGE_DAYS } = require('../services/collectionSyncService');
 const { SYSTEMS, SOURCES, cardPaymentsOf, reconcileCard } = require('../services/collectionMapper');
 const { posCardKey, cardPaymentReference, ledgerReference } = require('../services/collectionService');
@@ -396,7 +396,8 @@ const getPending = async (req, res) => {
       if (status && s.code) Object.assign(status, { authError: true, syncCode: s.code, syncError: s.error });
     }
     res.json({
-      ...list, sync, viewOnly: !canWrite(req.user?.role), pos, integrations, backgroundSync: false,
+      ...list, sync, viewOnly: !canWrite(req.user?.role), canApprove: canApproveCollections(req.user?.role),
+      pos, integrations, backgroundSync: false,
       access: integrationAccess.getAccessSummary(access)
     });
   } catch (error) {
@@ -671,19 +672,28 @@ const withAccess = (fallback, run) => async (req, res) => {
   return run(req, res, access);
 };
 
-const approve = withAccess('Failed to approve collections', (req, res, access) => inTransaction(
+// Approving posts to the ledgers: Accountant only (also enforced by the
+// /collections/approve rule in config/rolePermissions.js - checked here again
+// so this handler can never be mounted without it).
+const requireApprover = (handler) => (req, res) => (canApproveCollections(req.user?.role)
+  ? handler(req, res)
+  : res.status(403).json({ error: 'Only an Accountant can approve collections' }));
+
+const approve = requireApprover(withAccess('Failed to approve collections', (req, res, access) => inTransaction(
   res, 'Failed to approve collections',
   async (connection) => {
     await assertRecordsAllowed(connection, access, (Array.isArray(req.body?.items) ? req.body.items : []).map((item) => item?.id));
     return approveCollections(connection, { items: req.body?.items, userId: req.user?.userId || null });
   },
   ({ approved, skipped }) => ({
-    message: `${plural(approved.length, 'collection')} approved`
-      + (skipped.length ? ` (${plural(skipped.length, 'record')} already completed - nothing posted again)` : ''),
+    // Each skipped record says why (already approved, or a duplicate POS reference
+    // approved by someone else) - nothing was posted for it.
+    message: `${plural(approved.length, 'collection')} approved.`
+      + (skipped.length ? ` Not approved: ${skipped.map((s) => `${s.reference} - ${s.reason}`).join('; ')}.` : ''),
     approved,
     skipped
   })
-));
+)));
 
 const reject = withAccess('Failed to reject collections', (req, res, access) => inTransaction(
   res, 'Failed to reject collections',

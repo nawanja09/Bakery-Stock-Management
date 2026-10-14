@@ -144,29 +144,37 @@ test('C1: start-up refuses missing, short or shared secrets', () => {
   assert.doesNotThrow(() => boot({ JWT_SECRET: STRONG_A, POS_SESSION_SECRET: STRONG_B }));
 });
 
-test('C1: authenticate only accepts HS256 tokens signed with JWT_SECRET', () => {
-  const authenticate = require('../middleware/authenticate');
-  const run = (token) => {
+test('C1: authenticate only accepts HS256 tokens signed with JWT_SECRET', async () => {
+  // The user lookup is injected (no database); see securityHigh.test.js for the N3 checks.
+  const { createAuthenticate } = require('../middleware/authenticate');
+  const authenticate = createAuthenticate({
+    loadUser: async (id) => (Number(id) === 1 ? { id: 1, username: 'admin', role: 'Admin', token_version: 0 } : null)
+  });
+  const run = async (token) => {
     let status = null; let user = null;
     const req = { headers: { authorization: `Bearer ${token}` } };
     const res = { status(code) { status = code; return { json() {} }; } };
-    authenticate(req, res, () => { user = req.user; });
+    await authenticate(req, res, () => { user = req.user; });
     return { status, user };
   };
-  withEnv({ JWT_SECRET: STRONG_A }, () => {
-    const good = jwt.sign({ userId: 1, role: 'Admin' }, STRONG_A, secrets.JWT_SIGN_OPTIONS);
-    assert.equal(run(good).user.role, 'Admin');
+  const previous = process.env.JWT_SECRET;
+  process.env.JWT_SECRET = STRONG_A;
+  try {
+    const good = jwt.sign({ userId: 1, role: 'Admin', tv: 0 }, STRONG_A, secrets.JWT_SIGN_OPTIONS);
+    assert.equal((await run(good)).user.role, 'Admin');
 
-    const otherSecret = jwt.sign({ userId: 1, role: 'Super Admin' }, 'fifteen-chars!!');
-    assert.equal(run(otherSecret).status, 401);
+    const otherSecret = jwt.sign({ userId: 1, role: 'Super Admin', tv: 0 }, 'fifteen-chars!!');
+    assert.equal((await run(otherSecret)).status, 401);
 
-    const hs512 = jwt.sign({ userId: 1, role: 'Super Admin' }, STRONG_A, { algorithm: 'HS512' });
-    assert.equal(run(hs512).status, 401, 'non-HS256 algorithms are refused');
+    const hs512 = jwt.sign({ userId: 1, role: 'Super Admin', tv: 0 }, STRONG_A, { algorithm: 'HS512' });
+    assert.equal((await run(hs512)).status, 401, 'non-HS256 algorithms are refused');
 
     const unsigned = `${Buffer.from('{"alg":"none","typ":"JWT"}').toString('base64url')}.`
-      + `${Buffer.from('{"userId":1,"role":"Super Admin"}').toString('base64url')}.`;
-    assert.equal(run(unsigned).status, 401, 'alg=none is refused');
-  });
+      + `${Buffer.from('{"userId":1,"role":"Super Admin","tv":0}').toString('base64url')}.`;
+    assert.equal((await run(unsigned)).status, 401, 'alg=none is refused');
+  } finally {
+    if (previous === undefined) delete process.env.JWT_SECRET; else process.env.JWT_SECRET = previous;
+  }
 });
 
 test('C1: POS session key never falls back to JWT_SECRET', () => {

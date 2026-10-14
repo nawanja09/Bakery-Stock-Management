@@ -273,6 +273,27 @@ const scrub = (text, extraSecrets = []) => {
 };
 
 // ---------------------------------------------------------------- http
+// Every request (token or signature) may only go to the configured origin of
+// that system. A string-prefix check is NOT enough: "https://pos.x.lk.evil.tld"
+// and "https://pos.x.lk@evil.tld" both start with "https://pos.x.lk". A URL taken
+// from a response (next_page_url) is therefore compared by parsed origin, and
+// userinfo is refused outright.
+const expectedOrigin = (P) => {
+  const { baseUrl } = config(P);
+  if (!baseUrl) throw new PosConfigError(notConfiguredMessage(P), codeOf(P, 'NOT_CONFIGURED'), P.id);
+  return new URL(baseUrl).origin;
+};
+
+/** True only for a URL on the configured origin of P, without user:password@. */
+const sameOrigin = (P, candidate) => {
+  try {
+    const u = new URL(candidate);
+    return u.origin === expectedOrigin(P) && u.username === '' && u.password === '';
+  } catch (error) {
+    return false;
+  }
+};
+
 const buildUrl = (P, pathOrUrl, params) => {
   let url;
   if (/^https?:\/\//i.test(pathOrUrl)) {
@@ -281,6 +302,13 @@ const buildUrl = (P, pathOrUrl, params) => {
     const { baseUrl } = config(P);
     if (!baseUrl) throw new PosConfigError(notConfiguredMessage(P), codeOf(P, 'NOT_CONFIGURED'), P.id);
     url = `${baseUrl}${String(pathOrUrl).startsWith('/') ? '' : '/'}${pathOrUrl}`;
+  }
+  if (!sameOrigin(P, url)) {
+    throw new PosConfigError(`Refused a ${P.label} request to a host other than ${P.urlEnv[0]}`, codeOf(P, 'NOT_CONFIGURED'), P.id);
+  }
+  // Tokens and signatures must never travel in clear text in production.
+  if (process.env.NODE_ENV === 'production' && new URL(url).protocol !== 'https:') {
+    throw new PosConfigError(`${P.label} must be reached over https (${P.urlEnv[0]})`, codeOf(P, 'NOT_CONFIGURED'), P.id);
   }
   if (params && typeof params === 'object') {
     const u = new URL(url);
@@ -942,6 +970,7 @@ module.exports = {
   KINDS,
   providerOf,
   codeOf: (provider, kind) => codeOf(providerOf(provider), kind),
+  isSameOrigin: (provider, url) => sameOrigin(providerOf(provider), url),
   isConfigured,
   usesServiceKey,
   isIntegrationRole,

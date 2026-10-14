@@ -25,6 +25,7 @@
 // feature (financeController.transferFunds), not this one.
 
 const pool = require('../config/db');
+const { actorId } = require('../utils/actor');
 const { recordCashTransaction, recordBankTransaction } = require('../utils/financeLedger');
 
 const ACCOUNT_TYPES = ['CASH', 'BANK'];
@@ -99,8 +100,9 @@ const createIntercompanyTransaction = async (req, res) => {
   const {
     from_company_id, from_account_type, from_bank_id,
     to_company_id, to_account_type, to_bank_id,
-    amount, date, description, created_by
+    amount, date, description
   } = req.body;
+  const created_by = actorId(req); // never the client's created_by
 
   if (!from_company_id) return res.status(400).json({ error: 'From Company is required' });
   if (!to_company_id) return res.status(400).json({ error: 'To Company is required' });

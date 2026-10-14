@@ -1,5 +1,6 @@
 // server/controllers/financeController.js
 const pool = require('../config/db');
+const { actorId } = require('../utils/actor');
 const {
   recordCashTransaction,
   recordBankTransaction,
@@ -150,7 +151,8 @@ const getCashLedger = async (req, res) => {
 
 // POST /api/finance/cash/receive - Cash Receive (Cash In)
 const receiveCash = async (req, res) => {
-  const { company_id, date, amount, receive_type, reference_number, remark, created_by } = req.body;
+  const { company_id, date, amount, receive_type, reference_number, remark } = req.body;
+  const created_by = actorId(req); // never the client's created_by
   // classification: 'receive_type' (default - the original behaviour, so existing
   // API callers that never send it keep working) or 'other_ledger'.
   const classification = req.body.classification || 'receive_type';
@@ -240,7 +242,8 @@ const receiveCash = async (req, res) => {
 
 // POST /api/finance/cash/opening-balance - one-time (or edit-while-still-only-entry) setup
 const setCashOpeningBalance = async (req, res) => {
-  const { company_id, date, amount, created_by } = req.body;
+  const { company_id, date, amount } = req.body;
+  const created_by = actorId(req); // never the client's created_by
 
   if (!company_id) return res.status(400).json({ error: 'Company is required' });
   if (!date) return res.status(400).json({ error: 'Date is required' });
@@ -573,7 +576,8 @@ const issueBank = async (req, res) => {
 
 // POST /api/finance/transfer - Cash <-> Bank transfer
 const transferFunds = async (req, res) => {
-  const { company_id, from_account, to_account, bank_id, amount, date, remark, created_by, cheque_number } = req.body;
+  const { company_id, from_account, to_account, bank_id, amount, date, remark, cheque_number } = req.body;
+  const created_by = actorId(req); // never the client's created_by
 
   if (!company_id) return res.status(400).json({ error: 'Company is required' });
   if (!from_account || !to_account) return res.status(400).json({ error: 'From and To accounts are required' });
@@ -716,7 +720,8 @@ const transferFunds = async (req, res) => {
 // POST /api/finance/bank/transfer - Bank-to-Bank Transfer
 // Moves money between two company bank accounts without affecting income/expense.
 const bankToBankTransfer = async (req, res) => {
-  const { from_bank_id, to_bank_id, amount, date, reference_number, remark, created_by } = req.body;
+  const { from_bank_id, to_bank_id, amount, date, reference_number, remark } = req.body;
+  const created_by = actorId(req); // never the client's created_by
 
   if (!from_bank_id) return res.status(400).json({ error: 'From bank account is required' });
   if (!to_bank_id) return res.status(400).json({ error: 'To bank account is required' });

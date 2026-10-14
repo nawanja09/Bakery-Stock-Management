@@ -6,6 +6,7 @@ const jwt = require('jsonwebtoken');
 const { getRoleModules } = require('../config/rolePermissions');
 const integrationAuth = require('../services/integrationAuthService');
 const { getJwtSecret, JWT_SIGN_OPTIONS } = require('../config/secrets');
+const { forget: forgetSessionUser } = require('../services/sessionUser');
 
 const loginUser = async (req, res) => {
   const { username, password } = req.body;
@@ -33,8 +34,10 @@ const loginUser = async (req, res) => {
 
     if (match) {
       const permissions = ['dashboard', ...getRoleModules(user.role)];
+      // tv = users.token_version: middleware/authenticate.js refuses the token
+      // once it changes (password change / forced sign-out).
       const token = jwt.sign(
-        { userId: user.id, username: user.username, role: user.role, permissions },
+        { userId: user.id, username: user.username, role: user.role, permissions, tv: Number(user.token_version) || 0 },
         getJwtSecret(),
         JWT_SIGN_OPTIONS
       );
@@ -74,6 +77,10 @@ const changePassword = async (req, res) => {
   const { currentPassword, newPassword } = req.body;
   const userId = req.user.userId;
 
+  if (typeof currentPassword !== 'string' || typeof newPassword !== 'string' || newPassword === '') {
+    return res.status(400).json({ error: 'Current password and new password are required' });
+  }
+
   try {
     const [rows] = await pool.query(
       'SELECT * FROM users WHERE id = ?',
@@ -88,12 +95,22 @@ const changePassword = async (req, res) => {
       return res.status(401).json({ error: 'Current password is incorrect' });
     }
     const hashedPassword = await bcrypt.hash(newPassword, 10);
+    // Bumping token_version signs out every other session of this user (e.g. a
+    // stolen token). This session continues with the new token returned below.
     await pool.query(
-      'UPDATE users SET password = ? WHERE id = ?',
+      'UPDATE users SET password = ?, token_version = token_version + 1 WHERE id = ?',
       [hashedPassword, userId]
     );
+    forgetSessionUser(userId);
+    const [[fresh]] = await pool.query('SELECT token_version FROM users WHERE id = ?', [userId]);
+    const permissions = ['dashboard', ...getRoleModules(user.role)];
+    const token = jwt.sign(
+      { userId: user.id, username: user.username, role: user.role, permissions, tv: Number(fresh?.token_version) || 0 },
+      getJwtSecret(),
+      JWT_SIGN_OPTIONS
+    );
 
-    res.json({ message: 'Password changed successfully' });
+    res.json({ message: 'Password changed successfully', token });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Server error' });

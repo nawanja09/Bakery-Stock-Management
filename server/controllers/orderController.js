@@ -9,13 +9,15 @@
 // (controllers/purchaseController.js:createPurchase), exactly as before.
 
 const pool = require('../config/db');
+const { actorId } = require('../utils/actor');
 const { getAllItemsWithStock, getItemStock } = require('../services/rmStockService');
 
 // ─────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────
 
-const resolveUserId = (req) => req.user?.userId || req.user?.id || req.body?.created_by || null;
+// The authenticated user only - a created_by in the body is ignored.
+const resolveUserId = (req) => actorId(req);
 
 // ORD-YYYY-XXXXX, unique. Retries on the rare collision (unique key on
 // order_no) instead of trusting the count alone.

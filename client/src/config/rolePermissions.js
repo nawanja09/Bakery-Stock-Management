@@ -30,7 +30,7 @@ export const MODULES = Object.freeze({
   SETTINGS: 'settings',
   // Inside Management, but HR data - Admin / Super Admin only.
   EMPLOYEES: 'employees',
-  // Collection: Accountant, Finance, Admin, Super Admin (full) and QB (view only).
+  // Collection: Accountant, Admin, Super Admin and QB (view only). Approve = Accountant only.
   COLLECTION: 'collection'
 });
 
@@ -47,7 +47,8 @@ export const ROLE_MODULES = Object.freeze({
   [ROLES.STORES]: [M.MANAGEMENT, M.RAW_MATERIAL, M.FG_PRODUCTION, M.SETTINGS],
   [ROLES.ACCOUNTANT]: [M.MANAGEMENT, M.RAW_MATERIAL, M.FINANCE, M.EXPENSES, M.FG_PRODUCTION, M.VAT, M.SETTINGS, M.COLLECTION],
   [ROLES.QB]: [M.MANAGEMENT, M.RAW_MATERIAL, M.FG_PRODUCTION, M.FINANCE, M.EXPENSES, M.VAT, M.SETTINGS, M.COLLECTION],
-  [ROLES.FINANCE_USER]: [M.MANAGEMENT, M.EXPENSES, M.COLLECTION],
+  // Finance pays expenses, so it must not also approve cash coming in (Collection).
+  [ROLES.FINANCE_USER]: [M.MANAGEMENT, M.EXPENSES],
   [ROLES.ADMIN]: ADMIN_MODULES,
   [ROLES.SUPER_ADMIN]: [...ADMIN_MODULES, M.ANALYST]
 });
@@ -86,6 +87,10 @@ export const getRoleModules = (role) => ROLE_MODULES[normalizeRole(role)] || [];
 export const hasModule = (role, moduleName) => getRoleModules(role).includes(moduleName);
 export const isViewOnlyRole = (role) => VIEW_ONLY_ROLES.includes(normalizeRole(role));
 export const canWrite = (role) => !!normalizeRole(role) && !isViewOnlyRole(role);
+// Approving collections posts them to the ledgers: Accountant only (mirrors the
+// /collections/approve writeRoles rule on the server). Reject / Restore = canWrite.
+export const COLLECTION_APPROVER_ROLES = Object.freeze([ROLES.ACCOUNTANT]);
+export const canApproveCollections = (role) => COLLECTION_APPROVER_ROLES.includes(normalizeRole(role));
 
 // ---------------------------------------------------------------------------
 // Reading the logged-in user's role from the existing auth data.

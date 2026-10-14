@@ -327,8 +327,36 @@ const POSTERS = {
   [PAYMENT_METHODS.AR_SETTLEMENT]: postArSettlement
 };
 
+// The other, already APPROVED copy of this record's POS reference (the POS can
+// send the same shift / payment again under a new id): { id, approved_by_name }
+// or null. `locking` reads the latest committed data (LOCK IN SHARE MODE) - used
+// after a concurrent approval, when that copy was committed by another user.
+const approvedCopyOf = async (connection, row, { locking = false } = {}) => {
+  const [copies] = await connection.query(
+    `SELECT id FROM collections
+      WHERE source_type = ? AND reference_no = ? AND source_system = ? AND id <> ? AND status = 'completed'
+      LIMIT 1${locking ? ' LOCK IN SHARE MODE' : ''}`,
+    [row.source_type, row.reference_no, systemOf(row), row.id]
+  );
+  if (!copies.length) return null;
+  const [who] = await connection.query(
+    'SELECT u.name FROM collections c LEFT JOIN users u ON u.id = c.approved_by WHERE c.id = ?', [copies[0].id]
+  );
+  return { id: copies[0].id, approved_by_name: who[0]?.name || null };
+};
+
+const duplicateReason = (copy, { now = false } = {}) => {
+  const who = copy?.approved_by_name ? ` by ${copy.approved_by_name}` : '';
+  const which = copy ? `collection #${copy.id}` : 'another collection';
+  return `same POS reference was ${now ? 'approved at the same moment' : 'already approved'} as ${which}${who}`
+    + ' - nothing was posted for this duplicate; reject it';
+};
+
 /**
  * Approves pending collections. Already-completed ones are skipped (idempotent).
+ * A duplicate of an already-approved POS reference is skipped too (with the
+ * reason) instead of failing the whole batch - also when another user approves
+ * the other copy at the same moment (UNIQUE uq_collections_completed_ref).
  * @param items [{ id, company_id?, bank_account_id?, card_bank_account_id? }]
  * @returns {{ approved: Array, skipped: Array }}
  */
@@ -360,13 +388,10 @@ const approveCollections = async (connection, { items, userId }) => {
     if (lines.length > 0) throw new HttpError(409, `Collection ${label(row)} already has ledger postings`);
 
     if (row.reference_no) {
-      const [sameRef] = await connection.query(
-        `SELECT id FROM collections
-          WHERE source_type = ? AND reference_no = ? AND source_system = ? AND id <> ? AND status = 'completed' LIMIT 1`,
-        [row.source_type, row.reference_no, systemOf(row), id]
-      );
-      if (sameRef.length > 0) {
-        throw new HttpError(409, `POS reference ${label(row)} was already approved as collection #${sameRef[0].id}`);
+      const copy = await approvedCopyOf(connection, row);
+      if (copy) {
+        skipped.push({ id, reference: label(row), reason: duplicateReason(copy), duplicate_of: copy.id });
+        continue;
       }
     }
 
@@ -435,6 +460,9 @@ const approveCollections = async (connection, { items, userId }) => {
     }
 
     // --- postings ---------------------------------------------------------------
+    // Everything posted for THIS record can be undone on its own (see below)
+    // without losing the records already approved in this batch.
+    await connection.query('SAVEPOINT collection_approval');
     const ref = ledgerReference(row);
     const posted = [];
     for (const { method, amount } of [...postings, ...settlementsOf(row, postings)]) {
@@ -450,11 +478,26 @@ const approveCollections = async (connection, { items, userId }) => {
       });
     }
 
-    const [update] = await connection.query(
-      `UPDATE collections SET status = 'completed', approved_by = ?, approved_at = NOW(), company_id = ?
-        WHERE id = ? AND status = 'pending'`,
-      [userId, companyId, id]
-    );
+    // UNIQUE uq_collections_completed_ref (config/db.js) refuses a second
+    // completed row with the same POS reference. The check above is a plain read
+    // (a locking one could deadlock two users approving the two copies), so
+    // when another user approves the other copy at the same moment it is
+    // stopped here: this record's postings are rolled back to the savepoint and
+    // it is reported as skipped - the rest of the batch is still approved.
+    let update;
+    try {
+      [update] = await connection.query(
+        `UPDATE collections SET status = 'completed', approved_by = ?, approved_at = NOW(), company_id = ?
+          WHERE id = ? AND status = 'pending'`,
+        [userId, companyId, id]
+      );
+    } catch (error) {
+      if (error.code !== 'ER_DUP_ENTRY') throw error;
+      await connection.query('ROLLBACK TO SAVEPOINT collection_approval');
+      const copy = await approvedCopyOf(connection, row, { locking: true });
+      skipped.push({ id, reference: ref, reason: duplicateReason(copy, { now: true }), duplicate_of: copy?.id ?? null });
+      continue;
+    }
     if (update.affectedRows !== 1) {
       throw new HttpError(409, `Collection ${label(row)} was changed by someone else; nothing was saved`);
     }

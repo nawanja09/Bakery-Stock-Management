@@ -11,6 +11,7 @@
 // Existing Cash Receives (Receive Type) have no linked impact and are NOT
 // handled here: they keep their existing edit path (Adjustments) untouched.
 const pool = require('../config/db');
+const { actorId } = require('../utils/actor');
 const { recordCashTransaction } = require('../utils/financeLedger');
 const { checkDuplicateReference } = require('../services/referenceValidationService');
 const ol = require('../services/otherLedgerService');
@@ -69,7 +70,7 @@ const createCashIssued = async (req, res) => {
   const connection = await pool.getConnection();
   try {
     const { company_id: companyId, other_ledger_id: otherLedgerId } = req.body;
-    const createdBy = req.body.created_by || req.user?.userId;
+    const createdBy = actorId(req); // never the client's created_by
     if (!companyId) throw new ol.OtherLedgerError('Company is required');
     if (!createdBy) throw new ol.OtherLedgerError('Created by is required');
     const { date, amount, reference, remark } = readCommonFields(req.body);

@@ -5,26 +5,25 @@ const router = express.Router();
 const jwt = require('jsonwebtoken')
 const { loginUser,changePassword } = require('../controllers/authController');
 const authenticate = require('../middleware/authenticate');
-const { getJwtSecret, JWT_SIGN_OPTIONS, JWT_VERIFY_OPTIONS } = require('../config/secrets');
+const { getRoleModules } = require('../config/rolePermissions');
+const { getJwtSecret, JWT_SIGN_OPTIONS } = require('../config/secrets');
 
 router.post('/login', loginUser);
 router.post('/change-password', authenticate,changePassword);
 
-router.post('/refresh-token', (req, res) => {
-  const token = req.body.token;
-  if (!token) return res.status(401).json({ error: 'Token required' });
-
-  try {
-    const decoded = jwt.verify(token, getJwtSecret(), JWT_VERIFY_OPTIONS);
-    const newToken = jwt.sign(
-      { userId: decoded.userId, username: decoded.username, role: decoded.role },
-      getJwtSecret(),
-      JWT_SIGN_OPTIONS
-    );
-    res.json({ token: newToken });
-  } catch (error) {
-    res.status(401).json({ error: 'Invalid token' });
-  }
+// A new token only for a user who is STILL active, with the role they have NOW
+// (authenticate re-reads both from the database and refuses revoked tokens).
+// The token must be sent in the Authorization header; a token in the body is
+// no longer accepted.
+router.post('/refresh-token', authenticate, (req, res) => {
+  const { userId, username, role } = req.user;
+  const permissions = ['dashboard', ...getRoleModules(role)];
+  const token = jwt.sign(
+    { userId, username, role, permissions, tv: Number(req.authenticatedUser.token_version) || 0 },
+    getJwtSecret(),
+    JWT_SIGN_OPTIONS
+  );
+  res.json({ token, permissions });
 });
 
 module.exports = router;
