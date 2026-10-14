@@ -16,6 +16,19 @@
 
 | N5 | **Fixed**; branch scope **not needed (business decision, 2026-10-14)** | Finance = Management + Expenses only (no Collection, no POS / Restaurant endpoints, and its BSMS password is no longer relayed to RAVON at login). **Approve** is Accountant only: new `writeRoles` on `/collections/approve` in `config/rolePermissions.js`, re-checked in `collectionController.approve`, Approve button hidden for others (`canApproveCollections`). Reject / Restore stay with Accountant, Admin, Super Admin. **Branch scope:** the Accountant role (users accountant1 and accountant2) must see and approve every branch, so `user_collection_scope` is deliberately not built. Revisit if a branch-specific accountant is ever added. |
 
+### Priority 1 (security) - 2026-10-14
+
+| # | Item | Status | Change |
+|---|---|---|---|
+| 1 | N6 secrets in git | **Fixed locally - push pending (owner)** | DB dump, client/build.zip and node_modules untracked; .gitignore extended. History rewritten (filter-branch) on all local branches + tag: server/.env, server.zip, bakery system db.sql, client/build.zip are in 0 commits; main content byte-identical. Backup: BSMS-backups/repo-pre-history-purge-20261014.bundle. **Production DB password must still be rotated** (unchanged since the leak). |
+| 2 | M6 login brute force | **Fixed** | services/loginThrottle.js: 5 failures lock an account 15 min, 50 per IP (env-tunable); unknown users cost a dummy bcrypt; inactive revealed only with the right password. Password policy: 8+ chars, not current/username, <= 72 bytes, bcrypt cost 12. |
+| 3 | L2 /uploads public | **Fixed** | utils/signedUploads.js: 2h HMAC-signed image links, 403 otherwise; image extensions only, nosniff + sandbox CSP; upload filter checks the extension (stored-XSS via .html closed). |
+| 4 | L3 CORS / headers | **Fixed** | middleware/httpSecurity.js: CORS_ORIGINS allow-list (**required in production .env**), security headers, explicit 100kb JSON limit (was already Express's default). |
+| 5 | L4 JWT | **Fixed** | 12h lifetime, iss=bsms / aud=bsms-web verified. |
+| 6 | Wrong current password logged users out | **Fixed** | 400 instead of 401; client shows the server message. |
+| 7 | M2 password relay | **Fixed** | Relay opt-in only (RAVON_LOGIN_RELAY=on); a broken server key no longer silently falls back to sending passwords. |
+| 8 | N1 host binding (BSMS-SIG-2) | **Not started** | Needs the Cafe and Restaurant repos and a joint deploy; Ravon-Restaurant-New currently has an unfinished merge (and tracks its .env). Strict-origin check from N1 already blocks the fake-host path. |
+
 Tests: `tests/securityHigh.test.js` (14 tests incl. N5, no DB needed) plus an updated C1 test in `securityCritical.test.js`. Full suite: 189/191 pass. The two file-level failures are `chequeReleaseConsistency` (fails identically on the unmodified code) and a Windows libuv crash under `--test-force-exit` (`securityHigh` passes 12/12 when run without that flag). `staffLoans.test.js` cannot run because `tests/helpers/sqliteMysqlAdapter.js` was never committed. When that file is restored, it also needs `tv: 0` in its tokens and matching `users` rows.
 
 ---
