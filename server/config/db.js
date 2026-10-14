@@ -427,7 +427,9 @@ const ensureFinanceSchema = async () => {
   }
 };
 
-ensureFinanceSchema();
+// Resolves once the Cash / Bank ledger schema (and a cash account for every
+// company) is in place - tests/db wait for it before creating fixtures.
+pool.financeSchemaReady = ensureFinanceSchema();
 
 const ensureAutoIncrementPrimaryKeys = async () => {
   const repairTables = [

@@ -3,7 +3,10 @@
   "version": "1.0.0",
   "main": "server.js",
   "scripts": {
-    "start": "nodemon server.js"
+    "start": "nodemon server.js",
+    "test": "node --test \"tests/*.test.js\"",
+    "test:db": "node --test --test-concurrency=1 \"tests/db/*.test.js\"",
+    "test:db:setup": "node scripts/createTestDatabase.js"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",
@@ -19,8 +22,15 @@
     "nodemon": "^3.1.0"
   },
   "nodemonConfig": {
-    "watch": [".", ".env"],
+    "watch": [
+      ".",
+      ".env"
+    ],
     "ext": "js,json",
-    "ignore": ["node_modules/", "uploads/", "tests/"]
+    "ignore": [
+      "node_modules/",
+      "uploads/",
+      "tests/"
+    ]
   }
 }
