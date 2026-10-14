@@ -156,3 +156,42 @@ test('#3: the upload filter refuses a non-image extension even with an image MIM
   const { ALLOWED_EXTENSIONS } = require('../utils/signedUploads');
   assert.ok(!ALLOWED_EXTENSIONS.includes('.html') && !ALLOWED_EXTENSIONS.includes('.svg'));
 });
+
+// ---------------------------------------------------------------- #4 CORS / headers / body limit
+test('#4: CORS only for CORS_ORIGINS; security headers; JSON body limit', async () => {
+  const express = require('express');
+  const { applyHttpSecurity, allowedOrigins } = require('../middleware/httpSecurity');
+
+  assert.deepEqual(allowedOrigins(undefined), ['http://localhost:3000'], 'default = local dev');
+  assert.deepEqual(allowedOrigins(' https://stock.ravonbakers.lk/ , https://cjtradingcompany.lk '),
+    ['https://stock.ravonbakers.lk', 'https://cjtradingcompany.lk']);
+
+  const app = express();
+  applyHttpSecurity(app, { origins: ['https://stock.ravonbakers.lk'] });
+  app.post('/api/echo', (req, res) => res.json({ size: JSON.stringify(req.body).length }));
+  const server = await new Promise((resolve) => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
+  const url = `http://127.0.0.1:${server.address().port}/api/echo`;
+  const post = (origin, body = {}) => fetch(url, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...(origin ? { Origin: origin } : {}) }, body: JSON.stringify(body)
+  });
+  try {
+    const good = await post('https://stock.ravonbakers.lk');
+    assert.equal(good.headers.get('access-control-allow-origin'), 'https://stock.ravonbakers.lk');
+    const evil = await post('https://evil.example');
+    assert.equal(evil.headers.get('access-control-allow-origin'), null, 'other origins get no CORS grant');
+    const preflight = await fetch(url, { method: 'OPTIONS', headers: { Origin: 'https://evil.example', 'Access-Control-Request-Method': 'POST' } });
+    assert.equal(preflight.headers.get('access-control-allow-origin'), null);
+
+    assert.equal(good.headers.get('x-content-type-options'), 'nosniff');
+    assert.equal(good.headers.get('x-frame-options'), 'DENY');
+    assert.equal(good.headers.get('cache-control'), 'no-store');
+    assert.match(good.headers.get('content-security-policy'), /default-src 'none'/);
+    assert.equal(good.headers.get('x-powered-by'), null);
+
+    assert.equal((await post(null, { blob: 'x'.repeat(200 * 1024) })).status, 413, 'bodies over 100kb are refused');
+    assert.equal((await post(null, { blob: 'x'.repeat(50 * 1024) })).status, 200);
+  } finally {
+    server.closeAllConnections();
+    await new Promise((resolve) => server.close(resolve));
+  }
+});

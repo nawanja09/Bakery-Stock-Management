@@ -1,11 +1,11 @@
 require('dotenv').config();
 const express = require('express');
-const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 const { assertProductionSecrets } = require('./config/secrets');
 const { serveSignedUploads } = require('./utils/signedUploads');
+const { applyHttpSecurity } = require('./middleware/httpSecurity');
 
 const authRoutes = require('./routes/authRoutes');
 const purchaseRoutes = require('./routes/purchaseRoutes');
@@ -85,16 +85,8 @@ uploadDirs.forEach(dir => {
   }
 });
 
-app.use(cors({
-  //origin: 'https://stock.ravonbakers.lk',
-  //origin: 'https://cjtradingcompany.lk',
-  origin: 'http://localhost:3000',
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-RM-Adjustment'],
-  credentials: true
-}));
-
-app.use(express.json());
+// CORS (CORS_ORIGINS in .env), security headers, JSON body limit.
+applyHttpSecurity(app);
 
 // Uploaded images: only through the short-lived signed links the API returns
 // to signed-in users (utils/signedUploads.js) - never public.
