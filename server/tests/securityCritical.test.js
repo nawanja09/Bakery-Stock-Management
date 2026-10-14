@@ -3,6 +3,7 @@
 //        key never falls back to JWT_SECRET
 //   C2 - RBAC cannot be bypassed by changing the case of (or encoding) the URL
 //   C3 - multi-statement writes run in a real transaction on one connection
+require('./helpers/noDatabase'); // unit test: never the real database
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const express = require('express');

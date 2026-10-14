@@ -1,3 +1,4 @@
+require('./helpers/noDatabase'); // unit test: never the real database
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { validateItemInput } = require('../controllers/itemController');
