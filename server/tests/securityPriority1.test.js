@@ -224,3 +224,23 @@ test('#5: tokens last 12h and must carry the BSMS issuer and audience', async ()
   assert.equal(await run(jwt.sign({ userId: 1, tv: 0 }, secret,
     { ...secrets.JWT_SIGN_OPTIONS, audience: 'something-else' })), 401, 'other audience');
 });
+
+// ---------------------------------------------------------------- #7 password relay
+test('#7: the BSMS password is never forwarded to POS / Restaurant unless RAVON_LOGIN_RELAY=on', async () => {
+  const integrationAuth = require('../services/integrationAuthService');
+  const original = integrationAuth.loginAll;
+  const forwarded = [];
+  integrationAuth.loginAll = (args) => { forwarded.push(args.username); return Promise.resolve({}); };
+  try {
+    delete process.env.RAVON_LOGIN_RELAY;
+    assert.equal((await login('accountant1', 'right-pass-1')).status, 200);
+    assert.deepEqual(forwarded, [], 'off by default (a broken server key must not fall back to sending passwords)');
+
+    process.env.RAVON_LOGIN_RELAY = 'on';
+    assert.equal((await login('accountant1', 'right-pass-1')).status, 200);
+    assert.deepEqual(forwarded, ['accountant1'], 'opt-in still works for per-user deployments');
+  } finally {
+    integrationAuth.loginAll = original;
+    delete process.env.RAVON_LOGIN_RELAY;
+  }
+});

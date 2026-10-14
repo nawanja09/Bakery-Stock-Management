@@ -18,6 +18,8 @@ const path = require('node:path');
 
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'pos-finance-test-secret';
 process.env.POS_SESSION_PERSIST = '0';
+// This file tests the per-user login relay, which is off unless opted in.
+process.env.RAVON_LOGIN_RELAY = 'on';
 for (const name of ['RAVON_POS_USERNAME', 'RAVON_POS_PASSWORD', 'RAVON_POS_API_KEY', 'POS_USERNAME', 'POS_PASSWORD']) delete process.env[name];
 
 // ---- fake MySQL pool (only the users lookup of loginUser) -------------------

@@ -221,6 +221,13 @@ const INTEGRATION_ROLES = Object.values(ROLES)
 const isIntegrationRole = (role) => INTEGRATION_ROLES.includes(normalizeRole(role));
 const isFinanceRole = (role) => normalizeRole(role) === ROLES.FINANCE_USER;
 
+// Forwarding the typed BSMS password to POS / Restaurant at the BSMS login is
+// OFF unless RAVON_LOGIN_RELAY=on. Production reads both systems with the
+// server key, which never needs it - and without this switch a missing or
+// mistyped private key silently fell back to per-user mode and started
+// sending every user's BSMS password to the other systems.
+const loginRelayEnabled = () => /^(1|on|true|yes)$/i.test(String(process.env.RAVON_LOGIN_RELAY || '').trim());
+
 const ABILITIES = Object.freeze({
   SHIFTS: 'collection.shifts',
   CREDIT_PAYMENTS: 'collection.credit_payments',
@@ -975,6 +982,7 @@ module.exports = {
   usesServiceKey,
   isIntegrationRole,
   isFinanceRole,
+  loginRelayEnabled,
   INTEGRATION_ROLES,
   posGet,
   login,

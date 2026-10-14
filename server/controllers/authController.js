@@ -66,6 +66,8 @@ const loginUser = async (req, res) => {
       JWT_SIGN_OPTIONS
     );
 
+    // ONLY when RAVON_LOGIN_RELAY=on (off by default - production uses the
+    // server key, see integrationAuthService.loginRelayEnabled):
     // RAVON POS + RAVON Restaurant: the SAME typed username / password are
     // also tried on both systems' /api/login - in parallel, once each, with
     // the timeout / rate-limit / cool-down protection of
@@ -78,7 +80,7 @@ const loginUser = async (req, res) => {
     // already decided above and the response is not delayed (a Collection
     // sync waits for these logins to finish). A refused system can be
     // connected later from the Collection page.
-    if (integrationAuth.isIntegrationRole(user.role)) {
+    if (integrationAuth.loginRelayEnabled() && integrationAuth.isIntegrationRole(user.role)) {
       integrationAuth.loginAll({ userId: user.id, role: user.role, username, password });
     }
 
