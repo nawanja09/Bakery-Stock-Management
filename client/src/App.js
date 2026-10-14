@@ -108,12 +108,18 @@ import AnalystIncomePage from './components/Analyst/AnalystIncomePage';
 import IncomePage from './components/Income/IncomePage';
 
 import './App.css';
-import './css/page-design-system.css';
-import './css/purchasing-page-ui.css';
-import './css/fg-finance-ui.css';
+import './styles/pages/purchasing-page-ui.css';
+import './styles/pages/fg-finance-ui.css';
+// Must stay the last stylesheet: gives every legacy popup the shared <Modal> look.
+import './styles/legacy-dialogs.css';
 import RouteModal from './components/common/RouteModal';
 import RouteAccessGuard from './components/common/RouteAccessGuard';
 import usePermissions from './hooks/usePermissions';
+
+// Living style guide for the shared UI components - development builds only.
+const UiPreview = process.env.NODE_ENV === 'development'
+  ? React.lazy(() => import('./components/common/ui/UiPreview'))
+  : null;
 
 const RootRedirect = () => {
   localStorage.removeItem('token');
@@ -188,6 +194,9 @@ function App() {
         <Routes>
           <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
           <Route path="/auth-check" element={<AuthCheck />} />
+          {UiPreview && (
+            <Route path="/ui-preview" element={<React.Suspense fallback={null}><UiPreview /></React.Suspense>} />
+          )}
 
           {/* Protected Routes */}  
           <Route

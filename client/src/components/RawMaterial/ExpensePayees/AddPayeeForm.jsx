@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useId } from 'react';
+import { Modal } from '../../common/ui';
 import '../common/ManagementForm.css';
 
 /**
@@ -24,6 +25,7 @@ const AddPayeeForm = ({
   const [vatRegNumber, setVatRegNumber] = useState(initialValue.vat_reg_number || '');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const formId = useId();
 
   useEffect(() => {
     setPayeeName(initialValue.payee_name || '');
@@ -60,65 +62,48 @@ const AddPayeeForm = ({
   };
 
   return (
-    <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel(); }}>
-      <div className="modal-content" style={{ width: '400px', maxWidth: '90%' }}>
-        <div className="modal-header">
-          <h2>{title}</h2>
-          <button type="button" className="modal-close" onClick={onCancel} aria-label="Close">
-            ×
+    <Modal
+      title={title}
+      size="sm"
+      onClose={submitting ? undefined : onCancel}
+      footer={(
+        <>
+          <button type="button" className="btn btn-secondary" onClick={onCancel} disabled={submitting}>
+            Cancel
           </button>
+          <button type="submit" form={formId} className="btn btn-primary" disabled={submitting || !payeeName.trim()}>
+            {submitting ? 'Saving...' : submitLabel}
+          </button>
+        </>
+      )}
+    >
+      <form id={formId} className="ui-form" onSubmit={handleSubmit} noValidate>
+        <div className={`ui-field ${error ? 'has-error' : ''}`.trim()}>
+          <label htmlFor="rm-payee-name">Payee Name *</label>
+          <input
+            type="text"
+            id="rm-payee-name"
+            name="rm-payee-name"
+            value={payeeName}
+            onChange={handleNameChange}
+            placeholder="e.g. Ceylon Electricity Board"
+            aria-invalid={Boolean(error)}
+          />
+          {error && <span className="ui-field-error">{error}</span>}
         </div>
-
-        <form onSubmit={handleSubmit} noValidate>
-          <div className="modal-body">
-            <label htmlFor="rm-payee-name">
-              Payee Name *
-            </label>
-            <input
-              type="text"
-              id="rm-payee-name"
-              name="rm-payee-name"
-              value={payeeName}
-              onChange={handleNameChange}
-              placeholder="e.g. Ceylon Electricity Board"
-              autoFocus
-              style={{ borderColor: error ? 'var(--color-danger)' : undefined }}
-            />
-            {error && <span className="text-danger" style={{ fontSize: 'var(--font-size-xs)', marginTop: '4px', display: 'block' }}>{error}</span>}
-
-            <label htmlFor="rm-payee-vat" style={{ marginTop: '14px' }}>
-              VAT Reg Number
-            </label>
-            <input
-              type="text"
-              id="rm-payee-vat"
-              name="rm-payee-vat"
-              value={vatRegNumber}
-              onChange={(e) => setVatRegNumber(e.target.value)}
-              placeholder="e.g. 123456789-1 (optional)"
-            />
-          </div>
-
-          <div className="modal-footer">
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={onCancel}
-              disabled={submitting}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={submitting || !payeeName.trim()}
-            >
-              {submitting ? 'Saving...' : submitLabel}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <div className="ui-field">
+          <label htmlFor="rm-payee-vat">VAT Reg Number</label>
+          <input
+            type="text"
+            id="rm-payee-vat"
+            name="rm-payee-vat"
+            value={vatRegNumber}
+            onChange={(e) => setVatRegNumber(e.target.value)}
+            placeholder="e.g. 123456789-1 (optional)"
+          />
+        </div>
+      </form>
+    </Modal>
   );
 };
 

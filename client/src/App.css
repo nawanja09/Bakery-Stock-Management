@@ -10,63 +10,23 @@
 }
 
 /* ============================================================================
-   LAYOUT STRUCTURE
+   SHARED PAGE SURFACES
    ============================================================================ */
 
-.layout {
-  display: flex;
-  flex: 1;
-}
-
-.layout-sidebar {
-  background-color: var(--color-surface);
-  border-right: 1px solid var(--color-border);
-  transition: all var(--transition-base);
-}
-
-.layout-main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.layout-navbar {
-  background-color: var(--color-surface);
-  border-bottom: 1px solid var(--color-border);
-  box-shadow: var(--shadow-sm);
-  z-index: var(--z-navbar);
-}
-
-.layout-content {
-  flex: 1;
-  overflow-y: auto;
-  padding: var(--spacing-2xl);
-}
-
-.page-content,
 .page-container,
 .dashboard-container,
-.content-panel,
-.table-card,
-.data-section,
 .report-container,
-.form-container,
-.card-panel {
+.form-container {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: 20px;
+  border-radius: var(--radius-xl);
   box-shadow: var(--shadow-card);
 }
 
 .page-container,
 .dashboard-container,
-.content-panel,
-.table-card,
-.data-section,
 .report-container,
-.form-container,
-.card-panel {
+.form-container {
   padding: 1.5rem;
 }
 
@@ -87,8 +47,8 @@
 .form-header h1,
 .form-header h2 {
   margin: 0;
-  color: var(--color-heading);
-  letter-spacing: -0.04em;
+  color: var(--color-primary-deep);
+  letter-spacing: -0.025em;
 }
 
 .page-header .page-actions,
@@ -100,10 +60,7 @@
   align-items: center;
 }
 
-.page-content table,
 .report-container table,
-.table-card table,
-.data-section table,
 .table-responsive table {
   width: 100%;
   border-collapse: collapse;
@@ -112,14 +69,8 @@
   overflow: hidden;
 }
 
-.page-content th,
-.page-content td,
 .report-container th,
 .report-container td,
-.table-card th,
-.table-card td,
-.data-section th,
-.data-section td,
 .table-responsive th,
 .table-responsive td {
   padding: 0.9rem 0.85rem;
@@ -129,52 +80,45 @@
   color: var(--color-text);
 }
 
-.page-content thead th,
 .report-container thead th,
-.table-card thead th,
-.data-section thead th,
 .table-responsive thead th {
-  background: var(--color-surface-strong);
-  color: var(--color-text-secondary);
+  background: var(--color-primary-50);
+  color: var(--color-primary);
+  border-bottom: 1px solid var(--color-primary-200);
   font-size: 0.72rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-weight: 700;
 }
 
-.page-content tbody tr:hover,
 .report-container tbody tr:hover,
-.table-card tbody tr:hover,
-.data-section tbody tr:hover,
 .table-responsive tbody tr:hover {
-  background: var(--color-primary-lighter);
+  background: var(--color-highlight-light);
 }
 
-.stat-grid,
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 1rem;
 }
 
-.stat-card,
 .summary-card {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   padding: 1rem 1.2rem;
   box-shadow: var(--shadow-card);
+  border-top: 3px solid var(--color-accent);
 }
 
-.stat-card strong,
 .summary-card strong {
   display: block;
+  font-family: var(--font-family-heading);
   font-size: 1.5rem;
-  color: var(--color-heading);
+  color: var(--color-primary-deep);
   margin-top: 0.2rem;
 }
 
-.stat-card span,
 .summary-card span {
   color: var(--color-text-secondary);
   font-size: 0.8rem;
@@ -204,7 +148,7 @@
   margin: 0;
   font-size: var(--font-size-3xl);
   font-weight: var(--font-weight-bold);
-  color: var(--color-text-primary);
+  color: var(--color-primary-deep);
 }
 
 .page-title p {
@@ -237,7 +181,7 @@
   font-weight: var(--font-weight-semibold);
   font-size: var(--font-size-sm);
   margin-bottom: var(--spacing-sm);
-  color: var(--color-text-primary);
+  color: var(--color-gray-700);
 }
 
 .form-group label .required {
@@ -285,7 +229,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: rgba(23, 42, 58, 0.48);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -295,7 +239,7 @@
 }
 
 .modal-content {
-  background-color: var(--color-bg);
+  background-color: var(--color-surface);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-2xl);
   max-height: 90vh;
@@ -397,35 +341,6 @@
    ANIMATIONS
    ============================================================================ */
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes slideUp {
-  from {
-    transform: translateY(20px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 @keyframes pulse {
   0%, 100% {
     opacity: 1;
@@ -436,92 +351,10 @@
 }
 
 /* ============================================================================
-   REACT SELECT CUSTOM STYLING
-   ============================================================================ */
-
-.react-select__control {
-  border: 1px solid var(--color-border) !important;
-  border-radius: var(--radius-md) !important;
-  background-color: var(--color-bg) !important;
-  box-shadow: none !important;
-  min-height: 44px;
-  transition: all var(--transition-fast) !important;
-}
-
-.react-select__control:hover {
-  border-color: var(--color-primary) !important;
-}
-
-.react-select__control--is-focused {
-  border-color: var(--color-primary) !important;
-  box-shadow: 0 0 0 3px var(--color-primary-light) !important;
-}
-
-.react-select__input {
-  color: var(--color-text-primary) !important;
-  font-size: var(--font-size-base) !important;
-}
-
-.react-select__placeholder {
-  color: var(--color-text-tertiary) !important;
-}
-
-.react-select__single-value {
-  color: var(--color-text-primary) !important;
-  font-size: var(--font-size-base) !important;
-}
-
-.react-select__menu {
-  background-color: var(--color-bg) !important;
-  border: 1px solid var(--color-border) !important;
-  border-radius: var(--radius-md) !important;
-  box-shadow: var(--shadow-lg) !important;
-  z-index: 100;
-}
-
-.react-select__menu-list {
-  padding: 0 !important;
-}
-
-.react-select__option {
-  padding: var(--spacing-md) var(--spacing-lg) !important;
-  color: var(--color-text-primary) !important;
-  background-color: var(--color-bg) !important;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.react-select__option:hover {
-  background-color: var(--color-bg-tertiary) !important;
-  color: var(--color-text-primary) !important;
-}
-
-.react-select__option--is-selected {
-  background-color: var(--color-primary-light) !important;
-  color: var(--color-primary-dark) !important;
-}
-
-.react-select__option--is-focused {
-  background-color: var(--color-bg-secondary) !important;
-}
-
-.react-select__indicator-separator {
-  background-color: var(--color-border) !important;
-}
-
-.react-select__indicator {
-  color: var(--color-text-secondary) !important;
-}
-
-/* ============================================================================
    RESPONSIVE LAYOUT
    ============================================================================ */
 
 @media (max-width: 1024px) {
-  .layout-content {
-    padding: var(--spacing-xl);
-  }
-
   .form-row {
     grid-template-columns: 1fr;
   }
@@ -537,19 +370,6 @@
 }
 
 @media (max-width: 768px) {
-  .layout {
-    flex-direction: column;
-  }
-
-  .layout-sidebar {
-    border-right: none;
-    border-bottom: 1px solid var(--color-border);
-  }
-
-  .layout-content {
-    padding: var(--spacing-lg);
-  }
-
   .page-header {
     margin-bottom: var(--spacing-lg);
   }
@@ -564,10 +384,6 @@
 }
 
 @media (max-width: 480px) {
-  .layout-content {
-    padding: var(--spacing-md);
-  }
-
   .card,
   .panel,
   .box {

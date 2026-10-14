@@ -1,0 +1,43 @@
+/* ============================================================================
+   MODAL
+   Overlay, dialog, header / body / footer.
+   ============================================================================ */
+
+/* MODAL & POPUP */
+.modal-overlay, .popup-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(23, 42, 58, 0.48);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  z-index: var(--z-modal); padding: var(--spacing-lg);
+  animation: fadeIn var(--transition-base);
+}
+.modal-content, .popup-content {
+  background: var(--color-surface); border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl); box-shadow: var(--shadow-2xl);
+  max-height: 90vh; overflow-y: auto; animation: slideUp var(--transition-base);
+}
+.modal-header, .popup-header {
+  padding: 18px var(--spacing-xl); border-bottom: 1px solid var(--color-border);
+  background: linear-gradient(180deg, var(--color-primary-50), var(--color-surface));
+  display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-md);
+}
+.modal-header h2, .popup-title {
+  margin: 0; font-size: var(--font-size-xl); font-weight: var(--font-weight-bold); color: var(--color-heading);
+}
+.modal-close, .popup-close-btn {
+  width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+  border-radius: var(--radius-md); border: 1px solid var(--color-border);
+  background: var(--color-surface-strong); color: var(--color-text-secondary);
+  cursor: pointer; transition: all var(--transition-fast); font-size: 14px;
+}
+.modal-close:hover, .popup-close-btn:hover {
+  background: var(--color-danger-light); border-color: rgba(194, 65, 59,0.25); color: var(--color-danger);
+}
+.modal-body, .popup-body { padding: var(--spacing-xl); }
+.modal-footer, .popup-footer {
+  padding: 16px var(--spacing-xl); border-top: 1px solid var(--color-border);
+  background: var(--color-surface-hover);
+  display: flex; justify-content: flex-end; gap: var(--spacing-md);
+}

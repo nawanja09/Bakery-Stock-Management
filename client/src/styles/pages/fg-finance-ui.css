@@ -1,16 +1,16 @@
 :root {
-  --fg-erp-blue: #2D6CDF;
-  --fg-erp-blue-dark: #1A4FA3;
+  --fg-erp-blue: var(--color-primary);
+  --fg-erp-blue-dark: var(--color-primary-dark);
   --fg-erp-surface: #FFFFFF;
-  --fg-erp-heading: #0F172A;
-  --fg-erp-text: #334155;
-  --fg-erp-muted: #64748B;
-  --fg-erp-border: #E2E8F0;
-  --fg-erp-success: #059669;
-  --fg-erp-warning: #D97706;
-  --fg-erp-danger: #DC2626;
+  --fg-erp-heading: var(--color-heading);
+  --fg-erp-text: var(--color-gray-700);
+  --fg-erp-muted: var(--color-text-secondary);
+  --fg-erp-border: var(--color-border);
+  --fg-erp-success: var(--color-success);
+  --fg-erp-warning: var(--color-warning);
+  --fg-erp-danger: var(--color-danger);
   --fg-erp-radius: 10px;
-  --fg-erp-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+  --fg-erp-shadow: 0 2px 8px rgba(23, 42, 58, 0.06);
 }
 
 .erp-cutlery-assets-page {
@@ -57,7 +57,7 @@
 
 .erp-cutlery-assets-page .asset-image {
   height: 190px;
-  background: #F8FAFC;
+  background: var(--color-surface-hover);
 }
 
 .erp-cutlery-assets-page .asset-body {
@@ -101,7 +101,7 @@
   max-width: 560px;
   border: 1px solid var(--fg-erp-border);
   border-radius: 12px;
-  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.2);
+  box-shadow: 0 20px 50px rgba(23, 42, 58, 0.2);
 }
 
 .erp-asset-form .add-asset-form {

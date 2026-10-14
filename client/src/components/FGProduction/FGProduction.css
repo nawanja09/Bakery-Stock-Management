@@ -69,7 +69,7 @@
 .fgprod-loading, .fgprod-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; min-height: 180px; padding: 28px; color: var(--fgprod-muted); text-align: center; }
 .fgprod-empty svg { color: var(--color-text-tertiary); }
 .fgprod-count { padding: 14px 24px; border-top: 1px solid var(--fgprod-border); color: var(--fgprod-muted); font-size: var(--font-size-xs); }
-.fgprod-modal-overlay { position: fixed; inset: 0; z-index: calc(var(--z-modal) + 20); display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(15, 23, 42, .58); backdrop-filter: blur(3px); animation: fadeIn var(--transition-base); }
+.fgprod-modal-overlay { position: fixed; inset: 0; z-index: calc(var(--z-modal) + 20); display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(23, 42, 58, .58); backdrop-filter: blur(3px); animation: fadeIn var(--transition-base); }
 .fgprod-modal-content { display: flex; flex-direction: column; width: min(100%, 680px); max-height: min(90vh, 760px); overflow: hidden; border: 1px solid var(--fgprod-border); border-radius: 12px; background: var(--fgprod-surface); box-shadow: var(--shadow-2xl); animation: slideUp var(--transition-base); }
 .fgprod-modal-header, .fgprod-modal-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 22px; }
 .fgprod-modal-header { flex: 0 0 auto; border-bottom: 1px solid var(--fgprod-border); }
@@ -121,7 +121,7 @@
 	align-items: center;
 	justify-content: center;
 	padding: 24px;
-	background: rgba(15, 23, 42, 0.58);
+	background: rgba(23, 42, 58, 0.58);
 	backdrop-filter: blur(2px);
 	animation: fadeIn var(--transition-base);
 }
@@ -175,7 +175,7 @@
 }
 
 .fgprod-modal-close:hover {
-	border-color: rgba(220, 38, 38, 0.25);
+	border-color: rgba(194, 65, 59, 0.25);
 	background: var(--color-danger-light);
 	color: var(--color-danger);
 }

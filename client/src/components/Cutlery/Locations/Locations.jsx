@@ -5,7 +5,9 @@ import AddLocationForm from './AddLocationForm';
 import { FiTrash2 } from 'react-icons/fi';
 import './Locations.css';
 
+import { useConfirm } from '../../common/ui';
 const Locations = () => {
+  const confirm = useConfirm();
   const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -40,7 +42,7 @@ const Locations = () => {
   };
 
   const handleDeleteLocation = async (id, locationName) => {
-    if (window.confirm(`Are you sure you want to delete "${locationName}"?`)) {
+    if (await confirm(`Are you sure you want to delete "${locationName}"?`)) {
       try {
         await api.delete(`/cutlery-locations/${id}`);
         showPopup('success', 'Location deleted successfully');

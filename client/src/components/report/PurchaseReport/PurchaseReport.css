@@ -266,7 +266,7 @@
 }
 
 .pm-badge--cash     { background: #dcfce7; color: #15803d; }
-.pm-badge--bank     { background: #dbeafe; color: #1d4ed8; }
+.pm-badge--bank     { background: var(--color-primary-100); color: var(--color-primary-dark); }
 .pm-badge--cheque   { background: #fef9c3; color: #92400e; }
 .pm-badge--credit   { background: #ede9fe; color: #6d28d9; }
 .pm-badge--default  { background: var(--color-surface-strong); color: var(--color-text-secondary); }

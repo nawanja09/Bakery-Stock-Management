@@ -9,6 +9,7 @@ import CashReceive from './CashReceive';
 import CashIssuedModal from './CashIssuedModal';
 import './FinanceLedger.css';
 
+import { useConfirm } from '../common/ui';
 const TRANSACTION_TYPES = [
   { value: '', label: 'All Types' },
   { value: 'Opening Balance', label: 'Opening Balance' },
@@ -26,6 +27,7 @@ const TRANSACTION_TYPES = [
 ];
 
 const CashLedger = () => {
+  const confirm = useConfirm();
   const currentUser = JSON.parse(localStorage.getItem('user') || 'null');
   const { canWrite } = usePermissions();
   const { showPopup } = usePopup();
@@ -110,7 +112,7 @@ const CashLedger = () => {
 
   const handleVoid = async (t) => {
     const issued = isIssuedRow(t);
-    if (!window.confirm(`Void this ${issued ? 'Cash Issued' : 'Cash Received'} transaction? Its Other Ledger entry will be reversed as well.`)) return;
+    if (!await confirm(`Void this ${issued ? 'Cash Issued' : 'Cash Received'} transaction? Its Other Ledger entry will be reversed as well.`)) return;
     try {
       await api.delete(issued ? `/finance/cash/issued/${t.id}` : `/finance/cash/receive/${t.id}`);
       showPopup('success', 'Transaction voided');

@@ -4,9 +4,11 @@ import api from '../../../api';
 import { usePopup } from '../../context/PopupContext';
 import '../common/ManagementList.css';
 
+import { useConfirm } from '../../common/ui';
 const emptyForm = { expense_type_id: '', name: '', status: '1' };
 
 const SubExpenseTypeManagement = () => {
+  const confirm = useConfirm();
   const { showPopup } = usePopup();
   const [records, setRecords] = useState([]);
   const [expenseTypes, setExpenseTypes] = useState([]);
@@ -100,7 +102,7 @@ const SubExpenseTypeManagement = () => {
   const toggleStatus = async (record) => {
     const nextStatus = record.status ? 0 : 1;
     const action = nextStatus ? 'activate' : 'deactivate';
-    if (!window.confirm(`Are you sure you want to ${action} "${record.name}"?`)) return;
+    if (!await confirm(`Are you sure you want to ${action} "${record.name}"?`)) return;
     try {
       const response = await api.patch(`/sub-expense-types/${record.id}/status`, { status: nextStatus });
       showPopup('success', response.data?.message || 'Status updated successfully');

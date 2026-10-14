@@ -1,0 +1,102 @@
+/* ============================================================================
+   PAGE HEADER
+   One look for the title row at the top of every page, matching the shared
+   <PageHeader> component: navy title with a sky-blue accent bar, actions on
+   the right, a divider underneath.
+
+   Most pages render the same markup:
+     <header className="page-header"> <div><h2>Title</h2></div> actions… </header>
+   `header.page-header` (element + class) outranks the older `.page-header`
+   rules in App.css / page files, so this applies everywhere without
+   touching the JSX. The same look is given to the other title-row class
+   names a few pages use (div.page-header, .fg-production-header,
+   .header-section, .header-with-actions,
+   .orders-page-header, .payment-page-header, .report-header,
+   .employee-management-header).
+   ============================================================================ */
+
+:is(header.page-header, div.page-header, header.fg-production-header, div.header-section, div.header-with-actions, div.orders-page-header, div.payment-page-header, div.report-header, div.employee-management-header) {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  margin-bottom: 20px;
+  padding: 2px 0 16px 16px;
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+:is(header.page-header, div.page-header, header.fg-production-header, div.header-section, div.header-with-actions, div.orders-page-header, div.payment-page-header, div.report-header, div.employee-management-header)::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 2px;
+  bottom: 18px;
+  width: 4px;
+  border-radius: 4px;
+  background: linear-gradient(180deg, var(--brand-navy), var(--brand-sky));
+}
+
+:is(header.page-header, div.page-header, header.fg-production-header, div.header-section, div.header-with-actions, div.orders-page-header, div.payment-page-header, div.report-header, div.employee-management-header) h1,
+:is(header.page-header, div.page-header, header.fg-production-header, div.header-section, div.header-with-actions, div.orders-page-header, div.payment-page-header, div.report-header, div.employee-management-header) h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: clamp(1.25rem, 1.6vw, 1.5rem);
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  color: var(--color-primary-deep);
+}
+
+:is(header.page-header, div.page-header, header.fg-production-header, div.header-section, div.header-with-actions, div.orders-page-header, div.payment-page-header, div.report-header, div.employee-management-header) h1 > svg,
+:is(header.page-header, div.page-header, header.fg-production-header, div.header-section, div.header-with-actions, div.orders-page-header, div.payment-page-header, div.report-header, div.employee-management-header) h2 > svg {
+  width: 0.85em;
+  height: 0.85em;
+  margin-right: 0 !important;
+  color: var(--color-accent-dark);
+}
+
+:is(header.page-header, div.page-header, header.fg-production-header, div.header-section, div.header-with-actions, div.orders-page-header, div.payment-page-header, div.report-header, div.employee-management-header) p {
+  margin-top: 2px;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+/* Action group (any direct child after the title block) */
+:is(header.page-header, div.page-header, header.fg-production-header, div.header-section, div.header-with-actions, div.orders-page-header, div.payment-page-header, div.report-header, div.employee-management-header) > div:not(:first-child),
+:is(header.page-header, div.page-header, header.fg-production-header, div.header-section, div.header-with-actions, div.orders-page-header, div.payment-page-header, div.report-header, div.employee-management-header) > .page-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (max-width: 767px) {
+  :is(header.page-header, div.page-header, header.fg-production-header, div.header-section, div.header-with-actions, div.orders-page-header, div.payment-page-header, div.report-header, div.employee-management-header) {
+    align-items: flex-start !important;
+    margin-bottom: 16px;
+  }
+
+  :is(header.page-header, div.page-header, header.fg-production-header, div.header-section, div.header-with-actions, div.orders-page-header, div.payment-page-header, div.report-header, div.employee-management-header) > div:not(:first-child),
+  :is(header.page-header, div.page-header, header.fg-production-header, div.header-section, div.header-with-actions, div.orders-page-header, div.payment-page-header, div.report-header, div.employee-management-header) > .page-actions,
+  :is(header.page-header, div.page-header, header.fg-production-header, div.header-section, div.header-with-actions, div.orders-page-header, div.payment-page-header, div.report-header, div.employee-management-header) > button:not(.btn-close) {
+    width: 100%;
+  }
+
+  :is(header.page-header, div.page-header, header.fg-production-header, div.header-section, div.header-with-actions, div.orders-page-header, div.payment-page-header, div.report-header, div.employee-management-header) > button:not(.btn-close),
+  :is(header.page-header, div.page-header, header.fg-production-header, div.header-section, div.header-with-actions, div.orders-page-header, div.payment-page-header, div.report-header, div.employee-management-header) > div:not(:first-child) > .btn {
+    flex: 1 1 auto;
+  }
+}
+
+/* The page card that wraps most pages. Its flex gap already spaces the
+   header from the content, so the header needs no bottom margin there.
+   (div.page-container outranks the plain .page-container rules.) */
+div.page-container { gap: 20px; }
+div.page-container > :is(header.page-header, div.page-header, header.fg-production-header, div.header-section, div.header-with-actions, div.orders-page-header, div.payment-page-header, div.report-header, div.employee-management-header) { margin-bottom: 0; }
+
+@media (max-width: 640px) {
+  div.page-container { padding: 16px; border-radius: var(--radius-lg); gap: 16px; }
+}

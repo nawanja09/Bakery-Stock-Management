@@ -22,7 +22,9 @@ import './Payees.css';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
 
+import { useConfirm } from '../common/ui';
 const Payees = () => {
+  const confirm = useConfirm();
   const [payees, setPayees] = useState([]);
   const [isFetching, setIsFetching] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -107,7 +109,7 @@ const Payees = () => {
   };
 
   const handleDelete = async (id, name) => {
-    if (!window.confirm(`Are you sure you want to delete "${name}"?`)) return;
+    if (!await confirm(`Are you sure you want to delete "${name}"?`)) return;
     
     try {
       await api.delete(`/payees/${id}`);

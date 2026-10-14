@@ -1,0 +1,48 @@
+/* ============================================================================
+   TABLES
+   Data tables: tinted header, zebra rows, hover highlight.
+   ============================================================================ */
+
+/* TABLES */
+table, .data-table, .report-table, .minimal-table table, .mu-data-table, .vat-data-table, .erp-data-table {
+  width: 100%; border-collapse: collapse; background: transparent;
+}
+thead, .report-table thead, .minimal-table thead, .mu-data-table thead {
+  background: var(--color-primary-50); border-bottom: 1px solid var(--color-primary-200);
+}
+th, .data-table th, .report-table th, .minimal-table th, .mu-data-table th, .vat-data-table th, .erp-data-table th {
+  padding: 12px 14px; text-align: left; font-size: var(--font-size-xs);
+  letter-spacing: 0.07em; text-transform: uppercase; color: var(--color-primary);
+  font-weight: 700; white-space: nowrap; background: var(--color-primary-50);
+  border-bottom: 1px solid var(--color-primary-200);
+}
+td, .data-table td, .report-table td, .minimal-table td, .mu-data-table td, .vat-data-table td, .erp-data-table td {
+  padding: 11px 14px; border-bottom: 1px solid var(--color-border-light);
+  color: var(--color-text-primary); vertical-align: middle;
+  font-size: var(--font-size-base); background: var(--color-surface);
+}
+tbody tr, .data-table tbody tr, .report-table tbody tr, .minimal-table tbody tr { transition: background var(--transition-fast); }
+tbody tr:last-child td { border-bottom: none; }
+:where(tbody tr:nth-child(even)) > td { background: #fafcfd; }
+tbody tr:hover td, .data-table tbody tr:hover td, .report-table tbody tr:hover td, .minimal-table tbody tr:hover td {
+  background: var(--color-highlight-light);
+}
+
+/* Money / quantity columns line up digit-for-digit */
+.num, td.num, th.num { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+
+/* Totals row */
+tfoot td, tr.total-row td, tr.totals-row td, tr.grand-total-row td {
+  background: var(--color-primary-50);
+  border-top: 2px solid var(--color-primary-200);
+  border-bottom: none;
+  color: var(--color-primary-deep);
+  font-weight: 700;
+}
+
+/* Phones / small tablets: keep each cell on one line and let the table
+   scroll sideways inside its card instead of breaking words apart. */
+@media (max-width: 767px) {
+  th, td { white-space: nowrap; padding: 10px 12px; }
+  td .table-actions { flex-wrap: nowrap; width: auto; }
+}

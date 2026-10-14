@@ -8,7 +8,9 @@ import './Transfers.css';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faEye, faPen, faTrash, faPlus, faSync } from '@fortawesome/free-solid-svg-icons';
 
+import { useConfirm } from '../../common/ui';
 const Transfers = () => {
+  const confirm = useConfirm();
   const [transfers, setTransfers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -117,7 +119,7 @@ const Transfers = () => {
   };
 
   const handleDeleteTransfer = async (id, transferId) => {
-    if (!window.confirm(`Delete transfer ${transferId}?`)) return;
+    if (!await confirm(`Delete transfer ${transferId}?`)) return;
     
     try {
       const res = await api.delete(`/cutlery-transfers/${id}`);

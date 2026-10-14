@@ -9,7 +9,9 @@ import EditPurchase from './EditPurchase';
 
 import './Purchases.css';
 
+import { useConfirm } from '../../common/ui';
 const Purchases = () => {
+  const confirm = useConfirm();
   const [purchases, setPurchases] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -85,7 +87,7 @@ const Purchases = () => {
   };
 
   const handleDeletePurchase = async (id, purchaseId) => {
-    if (!window.confirm(`Delete purchase ${purchaseId}?`)) return;
+    if (!await confirm(`Delete purchase ${purchaseId}?`)) return;
 
     try {
       await api.delete(`/cutlery-purchases/${id}`);

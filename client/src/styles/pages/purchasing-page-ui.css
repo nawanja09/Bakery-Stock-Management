@@ -1,14 +1,14 @@
 :root {
-  --erp-blue: #2D6CDF;
-  --erp-blue-dark: #1A4FA3;
-  --erp-page: #F0F4F8;
+  --erp-blue: var(--color-primary);
+  --erp-blue-dark: var(--color-primary-dark);
+  --erp-page: var(--color-background);
   --erp-surface: #FFFFFF;
-  --erp-text: #0F172A;
-  --erp-muted: #64748B;
-  --erp-border: #E2E8F0;
-  --erp-soft-blue: #EEF4FF;
+  --erp-text: var(--color-heading);
+  --erp-muted: var(--color-text-secondary);
+  --erp-border: var(--color-border);
+  --erp-soft-blue: var(--color-primary-50);
   --erp-radius: 10px;
-  --erp-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+  --erp-shadow: 0 2px 8px rgba(23, 42, 58, 0.06);
 }
 
 .erp-purchase-page,
@@ -223,7 +223,7 @@
   padding: 16px;
   border: 1px solid var(--erp-border);
   border-radius: 8px;
-  background: #FAFCFF;
+  background: var(--color-surface-hover);
 }
 
 .item-management-page .toggle-row {

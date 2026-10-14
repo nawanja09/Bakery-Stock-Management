@@ -10,6 +10,7 @@ import {
 import './EmployeeManagement.css';
 import api from '../../api';
 
+import { useConfirm } from '../common/ui';
 const EMPTY_FORM = {
   employee_name: '',
   employee_code: '',
@@ -27,6 +28,7 @@ const EMPTY_FORM = {
 const NIC_REGEX = /^([0-9]{9}[vVxX]|[0-9]{12})$/;
 
 const EmployeeManagement = () => {
+  const confirm = useConfirm();
   const [employees, setEmployees] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [companies, setCompanies] = useState([]);
@@ -251,7 +253,7 @@ const EmployeeManagement = () => {
       ? `Deactivate "${employee.employee_name}"? Their record is kept, only the status changes.`
       : `Reactivate "${employee.employee_name}"?`;
 
-    if (!window.confirm(confirmMessage)) return;
+    if (!await confirm(confirmMessage)) return;
 
     try {
       await api.patch(`/employees/${employee.id}/status`, { status: newStatus });

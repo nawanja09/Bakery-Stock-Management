@@ -7,6 +7,7 @@ import './Assets.css';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faEye, faPen, faTrash } from '@fortawesome/free-solid-svg-icons';
 
+import { useConfirm } from '../../common/ui';
 const FallbackImage = ({ src, alt }) => {
   const [error, setError] = useState(false);
   
@@ -18,6 +19,7 @@ const FallbackImage = ({ src, alt }) => {
 };
 
 const Assets = () => {
+  const confirm = useConfirm();
   const [assets, setAssets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -61,7 +63,7 @@ const Assets = () => {
   };
 
   const handleDelete = async (id, name) => {
-    if (!window.confirm(`Delete "${name}"?`)) return;
+    if (!await confirm(`Delete "${name}"?`)) return;
     try {
       await api.delete(`/cutlery-assets/${id}`);
       showPopup('success', 'Asset deleted');

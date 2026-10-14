@@ -6,5 +6,5 @@
   display: block;
   margin-top: 4px;
   font-size: var(--font-size-xs, 0.75rem);
-  color: var(--color-warning, #b45309);
+  color: var(--color-warning, var(--color-warning-dark));
 }

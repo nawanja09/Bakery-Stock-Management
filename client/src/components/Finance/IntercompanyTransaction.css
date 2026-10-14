@@ -7,7 +7,7 @@
   margin: 0 0 var(--spacing-lg, 16px);
   font-size: var(--font-size-lg, 1.125rem);
   font-weight: var(--font-weight-semibold, 600);
-  color: var(--color-text-primary, #0f172a);
+  color: var(--color-text-primary, var(--color-heading));
   display: flex;
   align-items: center;
 }
@@ -24,8 +24,8 @@
 }
 
 .ict-side-card {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: var(--color-surface-hover);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   padding: 14px 16px;
 }
@@ -35,7 +35,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #64748b;
+  color: var(--color-text-secondary);
   margin-bottom: 10px;
 }
 
@@ -45,7 +45,7 @@
   justify-content: center;
   height: 100%;
   padding-top: 40px;
-  color: var(--color-primary, #2563eb);
+  color: var(--color-primary);
   font-size: 1.25rem;
 }
 
@@ -54,9 +54,9 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
-  color: #1e3a8a;
+  background: var(--color-primary-50);
+  border: 1px solid var(--color-primary-200);
+  color: var(--color-primary-deep);
   border-radius: 8px;
   padding: 10px 14px;
   font-size: 0.9rem;
@@ -85,8 +85,8 @@
   display: inline-block;
   padding: 2px 8px;
   border-radius: 999px;
-  background: #e2e8f0;
-  color: #0f172a;
+  background: var(--color-border);
+  color: var(--color-heading);
   font-size: 0.75rem;
   font-weight: 700;
   margin-right: 6px;
@@ -95,7 +95,7 @@
 .ict-empty {
   text-align: center;
   padding: var(--spacing-2xl, 32px);
-  color: var(--color-text-secondary, #64748b);
+  color: var(--color-text-secondary);
 }
 
 @media (max-width: 640px) {

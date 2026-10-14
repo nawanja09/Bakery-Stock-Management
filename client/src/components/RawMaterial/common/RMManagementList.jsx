@@ -3,6 +3,7 @@ import { FiSearch, FiPlus, FiEdit, FiTrash2 } from 'react-icons/fi';
 import api from '../../../api';
 import { usePopup } from '../../context/PopupContext';
 import AddSimpleNameForm from './AddSimpleNameForm';
+import { PageHeader, EmptyState, StatusBadge, ConfirmDialog } from '../../common/ui';
 import './ManagementList.css';
 
 const RMManagementList = ({
@@ -26,6 +27,8 @@ const RMManagementList = ({
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingRecord, setEditingRecord] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [pendingDelete, setPendingDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   const { showPopup } = usePopup();
 
   useEffect(() => {
@@ -73,15 +76,17 @@ const RMManagementList = ({
   };
 
   const handleDelete = async (record) => {
-    const confirmed = window.confirm(`Are you sure you want to delete this ${pageTitle.toLowerCase()}?`);
-    if (!confirmed) return;
-
+    setDeleting(true);
     try {
       const response = await api.delete(`${apiPath}/${record.id}`);
       showPopup('success', response.data?.message || `${pageTitle} deleted successfully`);
+      setPendingDelete(null);
       await fetchRecords();
     } catch (err) {
+      setPendingDelete(null);
       showPopup('error', err.response?.data?.error || `Failed to delete ${pageTitle}`);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -96,17 +101,20 @@ const RMManagementList = ({
   const closeEditor = () => setEditingRecord(null);
 
   return (
-    <div className="erp-page">
-      <div className="filters-section" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <h2 style={{ margin: 0, color: 'var(--color-heading)' }}>{pageTitle}</h2>
-        </div>
-        <button className="btn btn-primary" onClick={() => setShowAddForm(true)}>
-          <FiPlus size={16} /> {addButtonLabel}
-        </button>
-      </div>
+    <div className="ui-page">
+      <PageHeader
+        eyebrow="Master data"
+        title={pageTitle}
+        subtitle={subtitle}
+        badge={!loading && <span className="ui-count-badge">{records.length}</span>}
+        actions={(
+          <button type="button" className="btn btn-primary" onClick={() => setShowAddForm(true)}>
+            <FiPlus size={16} /> {addButtonLabel}
+          </button>
+        )}
+      />
 
-      <div className="filters-section">
+      <div className="ui-toolbar">
         <div className="items-search">
           <FiSearch className="text-muted" />
           <input
@@ -143,22 +151,24 @@ const RMManagementList = ({
         />
       )}
 
-      <div className="card">
+      <div className="ui-table-card">
         {loading ? (
           <div className="loading-state">
             <div className="loading-spinner"></div>
             Loading {pageTitle}...
           </div>
         ) : filteredRecords.length === 0 ? (
-          <div className="empty-state">
-            <p>
-              {records.length === 0
-                ? emptyMessage
-                : `No results found for "${searchTerm}".`}
-            </p>
-          </div>
+          <EmptyState
+            title={records.length === 0 ? `No ${pageTitle.toLowerCase()} records yet` : 'No matches'}
+            description={records.length === 0 ? emptyMessage : `No results found for "${searchTerm}".`}
+            action={records.length === 0 && (
+              <button type="button" className="btn btn-primary" onClick={() => setShowAddForm(true)}>
+                <FiPlus size={16} /> {addButtonLabel}
+              </button>
+            )}
+          />
         ) : (
-          <div className="overflow-x-auto">
+          <div className="ui-table-scroll">
             <table className="erp-data-table">
               <thead>
                 <tr>
@@ -172,9 +182,7 @@ const RMManagementList = ({
                   <tr key={rec.id}>
                     <td><strong>{rec[nameField]}</strong></td>
                     <td>
-                      <span className={`badge ${rec.status === 'Inactive' ? 'badge-neutral' : 'badge-success'}`}>
-                        {rec.status || 'Active'}
-                      </span>
+                      <StatusBadge status={rec.status || 'Active'} tone={rec.status === 'Inactive' ? 'neutral' : 'success'} />
                     </td>
                     <td>
                       <div className="table-actions" style={{ justifyContent: 'flex-end' }}>
@@ -183,14 +191,16 @@ const RMManagementList = ({
                           className="btn-icon edit"
                           onClick={() => setEditingRecord(rec)}
                           title="Edit"
+                          aria-label={`Edit ${rec[nameField]}`}
                         >
                           <FiEdit size={14} />
                         </button>
                         <button
                           type="button"
                           className="btn-icon delete"
-                          onClick={() => handleDelete(rec)}
+                          onClick={() => setPendingDelete(rec)}
                           title="Delete"
+                          aria-label={`Delete ${rec[nameField]}`}
                         >
                           <FiTrash2 size={14} />
                         </button>
@@ -202,12 +212,22 @@ const RMManagementList = ({
             </table>
           </div>
         )}
+        {!loading && records.length > 0 && (
+          <div className="ui-table-footer">
+            <span>Showing {filteredRecords.length} of {records.length} record{records.length !== 1 ? 's' : ''}</span>
+          </div>
+        )}
       </div>
 
-      {!loading && records.length > 0 && (
-        <p className="text-muted text-right font-sm" style={{ paddingRight: '8px' }}>
-          Showing {filteredRecords.length} of {records.length} record{records.length !== 1 ? 's' : ''}
-        </p>
+      {pendingDelete && (
+        <ConfirmDialog
+          title={`Delete ${pageTitle.toLowerCase()}?`}
+          message={<>"<strong>{pendingDelete[nameField]}</strong>" will be removed. This cannot be undone.</>}
+          confirmText="Delete"
+          busy={deleting}
+          onConfirm={() => handleDelete(pendingDelete)}
+          onCancel={() => setPendingDelete(null)}
+        />
       )}
     </div>
   );

@@ -5,7 +5,7 @@
 /* UI Redesign Updates - ERP Design System */
 .page-header h1, .header-with-actions h2 {
   text-align: left;
-  color: #2D6CDF;
+  color: var(--color-primary);
   font-weight: 600;
   margin-bottom: 24px;
 }
@@ -14,7 +14,7 @@
   background-color: #ffffff;
   border-radius: 12px;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border);
   padding: 24px;
   margin-bottom: 24px;
 }
@@ -30,22 +30,22 @@
 }
 
 .styled-table th, .items-table th {
-  background-color: #f3f4f6;
-  color: #374151;
+  background-color: var(--color-surface-strong);
+  color: var(--color-gray-700);
   font-weight: 600;
   padding: 12px 16px;
   text-align: left;
-  border-bottom: 2px solid #e5e7eb;
+  border-bottom: 2px solid var(--color-border);
 }
 
 .styled-table td, .items-table td {
   padding: 12px 16px;
-  border-bottom: 1px solid #e5e7eb;
-  color: #4b5563;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-gray-600);
 }
 
 .styled-table tbody tr:hover, .items-table tbody tr:hover {
-  background-color: #f9fafb;
+  background-color: var(--color-surface-hover);
 }
 
 .filters-bar {
@@ -53,7 +53,7 @@
   border-radius: 12px;
   padding: 16px 24px;
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border);
   display: flex;
   align-items: center;
   gap: 16px;
@@ -66,11 +66,11 @@
   align-items: center;
   gap: 8px;
   font-weight: 500;
-  color: #374151;
+  color: var(--color-gray-700);
 }
 
 .filter-input, .form-control {
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--color-border-strong);
   border-radius: 6px;
   padding: 8px 12px;
   outline: none;
@@ -78,12 +78,12 @@
 }
 
 .filter-input:focus, .form-control:focus {
-  border-color: #2D6CDF;
-  box-shadow: 0 0 0 3px rgba(45, 108, 223, 0.2);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(53, 88, 114, 0.2);
 }
 
 .btn-primary, .btn-save {
-  background-color: #2D6CDF;
+  background-color: var(--color-primary);
   color: white;
   border: none;
   border-radius: 6px;
@@ -94,7 +94,7 @@
 }
 
 .btn-primary:hover, .btn-save:hover {
-  background-color: #1e40af;
+  background-color: var(--color-primary-deep);
 }
 
 /* Fix table text alignment */
@@ -105,32 +105,32 @@
 
 /* Common Summary Section Styles */
 .summary-section, .totals-content {
-  background-color: #f9fafb;
+  background-color: var(--color-surface-hover);
   border-radius: 8px;
   padding: 16px;
   margin-top: 16px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border);
 }
 
 .summary-row {
   display: flex;
   justify-content: space-between;
   padding: 8px 0;
-  color: #4b5563;
+  color: var(--color-gray-600);
   font-size: 16px;
 }
 
 .summary-row.grand-total, .summary-row.total {
   font-size: 18px;
   font-weight: bold;
-  color: #111827;
-  border-top: 1px solid #d1d5db;
+  color: var(--color-heading);
+  border-top: 1px solid var(--color-border-strong);
   margin-top: 8px;
   padding-top: 12px;
 }
 
 .summary-row.grand-total span:last-child {
-  color: #2D6CDF;
+  color: var(--color-primary);
 }
 
 /* Action Buttons */
@@ -143,8 +143,8 @@
 
 .btn-secondary {
   background-color: #ffffff;
-  color: #374151;
-  border: 1px solid #d1d5db;
+  color: var(--color-gray-700);
+  border: 1px solid var(--color-border-strong);
   border-radius: 6px;
   padding: 8px 16px;
   font-weight: 500;
@@ -153,6 +153,6 @@
 }
 
 .btn-secondary:hover {
-  background-color: #f3f4f6;
-  border-color: #9ca3af;
+  background-color: var(--color-surface-strong);
+  border-color: var(--color-text-tertiary);
 }

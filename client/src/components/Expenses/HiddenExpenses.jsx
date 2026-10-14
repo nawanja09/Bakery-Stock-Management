@@ -23,6 +23,7 @@ import './Expenses.css';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
 
+import { useConfirm } from '../common/ui';
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 const today = () => new Date().toISOString().split('T')[0];
@@ -41,6 +42,7 @@ const emptyForm = {
 // ── component ─────────────────────────────────────────────────────────────────
 
 const HiddenExpenses = () => {
+  const confirm = useConfirm();
   const { showPopup } = usePopup();
 
   // UI state
@@ -161,7 +163,7 @@ const HiddenExpenses = () => {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this hidden expense?')) return;
+    if (!await confirm('Are you sure you want to delete this hidden expense?')) return;
 
     try {
       await api.delete(`/hidden-expenses/${id}`);

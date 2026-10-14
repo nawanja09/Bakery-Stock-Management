@@ -12,9 +12,11 @@ import api from '../../api';
 import { usePopup } from '../context/PopupContext';
 import usePermissions from '../../hooks/usePermissions';
 
+import { useConfirm } from '../common/ui';
 const fmt = (v) => Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const OtherLedgerManagement = () => {
+  const confirm = useConfirm();
   const { canWrite } = usePermissions();
   const { showPopup } = usePopup();
   const [records, setRecords] = useState([]);
@@ -106,7 +108,7 @@ const OtherLedgerManagement = () => {
     const message = makeActive
       ? `Activate "${record.name}"?`
       : `Make "${record.name}" inactive? It will no longer appear in new transactions, but its history is kept.`;
-    if (!window.confirm(message)) return;
+    if (!await confirm(message)) return;
     try {
       await api.patch(`/other-ledgers/${record.id}/status`, { status: makeActive ? 1 : 0 });
       showPopup('success', makeActive ? `"${record.name}" activated` : `"${record.name}" made inactive`);

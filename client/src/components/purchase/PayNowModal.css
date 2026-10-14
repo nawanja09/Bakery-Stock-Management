@@ -7,7 +7,7 @@
 	align-items: center;
 	justify-content: center;
 	padding: 24px;
-	background: rgba(15, 23, 42, 0.58);
+	background: rgba(23, 42, 58, 0.58);
 	backdrop-filter: blur(3px);
 }
 
@@ -69,7 +69,7 @@
 .pnm-form-group { min-width: 0; }
 .pnm-form-group label { margin-bottom: 6px; }
 .pnm-amount-input { font-weight: 700; font-variant-numeric: tabular-nums; }
-.pnm-footer { justify-content: flex-end; border-top: 1px solid var(--color-border); background: #f8fafc; }
+.pnm-footer { justify-content: flex-end; border-top: 1px solid var(--color-border); background: var(--color-surface-hover); }
 .pnm-btn-cancel,
 .pnm-btn-submit { height: var(--btn-height); padding: 0 16px; border-radius: 6px; font-weight: 700; }
 .pnm-btn-cancel { border: 1px solid var(--color-border-strong); color: var(--color-text-primary); }

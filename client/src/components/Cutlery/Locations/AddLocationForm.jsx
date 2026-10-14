@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
+import { Modal } from '../../common/ui';
 import './AddLocationForm.css';
 
 const AddLocationForm = ({ onSubmit, onCancel }) => {
   const [formData, setFormData] = useState({ location_name: '' });
   const [submitting, setSubmitting] = useState(false);
+  const formId = useId();
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -26,19 +28,29 @@ const AddLocationForm = ({ onSubmit, onCancel }) => {
   };
 
   return (
-    <div className="overlay">
-      <div className="form-container">
-        <div className="form-header">
-          <h3>Add New Location</h3>
-          <button type="button" className="close-btn" onClick={onCancel}>
-            ×
+    <Modal
+      title="Add New Location"
+      size="sm"
+      onClose={submitting ? undefined : onCancel}
+      footer={(
+        <>
+          <button type="button" className="btn btn-secondary" onClick={onCancel} disabled={submitting}>
+            Cancel
           </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="form-body">
-          <label htmlFor="location_name" className="input-label">
-            Location Name *
-          </label>
+          <button
+            type="submit"
+            form={formId}
+            className="btn btn-primary"
+            disabled={submitting || !formData.location_name.trim()}
+          >
+            {submitting ? 'Adding...' : 'Add Location'}
+          </button>
+        </>
+      )}
+    >
+      <form id={formId} onSubmit={handleSubmit} className="ui-form">
+        <div className="ui-field">
+          <label htmlFor="location_name">Location Name *</label>
           <input
             type="text"
             id="location_name"
@@ -47,25 +59,13 @@ const AddLocationForm = ({ onSubmit, onCancel }) => {
             onChange={handleChange}
             placeholder="Enter location name"
             required
-            autoFocus
-            className="input-field"
           />
-          <small className="input-note">
+          <small className="ui-field-hint">
             Location ID will be automatically generated (L001, L002, etc.)
           </small>
-
-          <div className="form-actions">
-            <button
-              type="submit"
-              className="btn submit"
-              disabled={submitting || !formData.location_name.trim()}
-            >
-              {submitting ? 'Adding...' : 'Add Location'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        </div>
+      </form>
+    </Modal>
   );
 };
 

@@ -8,7 +8,9 @@ import {
 import api from '../../api';
 import './Adjustments.css';
 
+import { useConfirm } from '../common/ui';
 const PaymentMethodManagement = () => {
+  const confirm = useConfirm();
   const [methods, setMethods] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState({ type: '', text: '' });
@@ -95,7 +97,7 @@ const PaymentMethodManagement = () => {
   };
 
   const handleDelete = async (method) => {
-    if (!window.confirm(`Delete "${method.name}"? This can't be undone.`)) return;
+    if (!await confirm(`Delete "${method.name}"? This can't be undone.`)) return;
 
     try {
       await api.delete(`/payment-methods/${method.id}`);

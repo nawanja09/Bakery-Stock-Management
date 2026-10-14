@@ -3,7 +3,6 @@
    Covers: Purchase, Items, Suppliers, Reports, Issuance, Wastage, etc.
    ============================================================================ */
 
-@import '../../css/page-design-system.css';
 
 /* ============================================================================
    PAGE CONTAINER
@@ -239,7 +238,7 @@
 }
 
 .btn-danger:hover {
-  background-color: #dc2626;
+  background-color: var(--color-danger);
   box-shadow: var(--shadow-md);
 }
 
@@ -249,7 +248,7 @@
 }
 
 .btn-success:hover {
-  background-color: #059669;
+  background-color: var(--color-success);
   box-shadow: var(--shadow-md);
 }
 

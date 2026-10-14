@@ -6,7 +6,9 @@ import ViewDamage from './ViewDamage';
 import EditDamage from './EditDamage';
 import './Damages.css';
 
+import { useConfirm } from '../../common/ui';
 const Damages = () => {
+  const confirm = useConfirm();
   const [damages, setDamages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -73,7 +75,7 @@ const Damages = () => {
   };
 
   const handleDeleteDamage = async (id, damageId) => {
-    if (window.confirm(`Are you sure you want to delete damage record ${damageId}?`)) {
+    if (await confirm(`Are you sure you want to delete damage record ${damageId}?`)) {
       try {
         await api.delete(`/cutlery-damages/${id}`);
         showPopup('success', 'Damage record deleted successfully');

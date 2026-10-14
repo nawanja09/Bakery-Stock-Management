@@ -45,6 +45,7 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import isToday from 'dayjs/plugin/isToday';
 import isYesterday from 'dayjs/plugin/isYesterday';
 
+import { useConfirm } from '../common/ui';
 dayjs.extend(relativeTime);
 dayjs.extend(isToday);
 dayjs.extend(isYesterday);
@@ -195,7 +196,7 @@ const PurchaseTableRow = React.memo(({ purchase, backgroundLocation }) => {
           to={`/purchase/${purchase.id}`}
           state={{ backgroundLocation }}
           style={{
-            textDecoration: 'none', background: '#3b82f6', color: 'white',
+            textDecoration: 'none', background: 'var(--color-primary)', color: 'white',
             padding: '6px 12px', borderRadius: '4px', fontSize: '13px',
             display: 'inline-flex', alignItems: 'center', gap: '5px',
           }}
@@ -393,6 +394,7 @@ Pagination.displayName = 'Pagination';
 
 // ─── Main component ───────────────────────────────────────────────────────────
 const PurchaseHistory = () => {
+  const confirm = useConfirm();
   const responsive = useResponsive();
   const backgroundLocation = useLocation();
 
@@ -635,12 +637,12 @@ const PurchaseHistory = () => {
   }, []);
 
   const handleBatchDelete = useCallback(async () => {
-    if (window.confirm(`Delete ${selectedPurchases.size} purchase(s)?`)) {
+    if (await confirm(`Delete ${selectedPurchases.size} purchase(s)?`)) {
       setPurchases(prev => prev.filter(p => !selectedPurchases.has(p.id)));
       setSelectedPurchases(new Set());
       setShowBatchActions(false);
     }
-  }, [selectedPurchases]);
+  }, [selectedPurchases, confirm]);
 
   // ── Loading state
   if (loading) {

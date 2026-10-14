@@ -207,7 +207,7 @@
 }
 
 .purchase-item-remove:hover {
-  background-color: #dc2626;
+  background-color: var(--color-danger);
 }
 
 .purchase-summary {
@@ -383,7 +383,7 @@
 /* UI Redesign Updates - ERP Design System */
 .page-header h1, .header-with-actions h2 {
   text-align: left;
-  color: #2D6CDF;
+  color: var(--color-primary);
   font-weight: 600;
   margin-bottom: 24px;
 }
@@ -392,7 +392,7 @@
   background-color: #ffffff;
   border-radius: 12px;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border);
   padding: 24px;
   margin-bottom: 24px;
 }
@@ -408,22 +408,22 @@
 }
 
 .styled-table th, .items-table th {
-  background-color: #f3f4f6;
-  color: #374151;
+  background-color: var(--color-surface-strong);
+  color: var(--color-gray-700);
   font-weight: 600;
   padding: 12px 16px;
   text-align: left;
-  border-bottom: 2px solid #e5e7eb;
+  border-bottom: 2px solid var(--color-border);
 }
 
 .styled-table td, .items-table td {
   padding: 12px 16px;
-  border-bottom: 1px solid #e5e7eb;
-  color: #4b5563;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-gray-600);
 }
 
 .styled-table tbody tr:hover, .items-table tbody tr:hover {
-  background-color: #f9fafb;
+  background-color: var(--color-surface-hover);
 }
 
 /* Keep the item selector compact and aligned with the table inputs. */
@@ -482,13 +482,13 @@
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 3px;
-  color: #64748b;
+  color: var(--color-text-secondary);
   font-size: 11px;
 }
 
 .purchase-item-option mark {
   padding: 0;
-  background: #dbeafe;
+  background: var(--color-primary-100);
   color: inherit;
 }
 
@@ -500,7 +500,7 @@
   background: #fff;
   border: 1px solid #dbe3ec;
   border-radius: 8px;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14);
+  box-shadow: 0 10px 24px rgba(23, 42, 58, 0.14);
 }
 
 .purchase-item-select .react-select__menu-list {
@@ -523,7 +523,7 @@
   border-radius: 12px;
   padding: 16px 24px;
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border);
   display: flex;
   align-items: center;
   gap: 16px;
@@ -536,11 +536,11 @@
   align-items: center;
   gap: 8px;
   font-weight: 500;
-  color: #374151;
+  color: var(--color-gray-700);
 }
 
 .filter-input, .form-control {
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--color-border-strong);
   border-radius: 6px;
   padding: 8px 12px;
   outline: none;
@@ -548,12 +548,12 @@
 }
 
 .filter-input:focus, .form-control:focus {
-  border-color: #2D6CDF;
-  box-shadow: 0 0 0 3px rgba(45, 108, 223, 0.2);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(53, 88, 114, 0.2);
 }
 
 .btn-primary, .btn-save {
-  background-color: #2D6CDF;
+  background-color: var(--color-primary);
   color: white;
   border: none;
   border-radius: 6px;
@@ -564,7 +564,7 @@
 }
 
 .btn-primary:hover, .btn-save:hover {
-  background-color: #1e40af;
+  background-color: var(--color-primary-deep);
 }
 
 /* Fix table text alignment */
@@ -575,32 +575,32 @@
 
 /* Common Summary Section Styles */
 .summary-section, .totals-content {
-  background-color: #f9fafb;
+  background-color: var(--color-surface-hover);
   border-radius: 8px;
   padding: 16px;
   margin-top: 16px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border);
 }
 
 .summary-row {
   display: flex;
   justify-content: space-between;
   padding: 8px 0;
-  color: #4b5563;
+  color: var(--color-gray-600);
   font-size: 16px;
 }
 
 .summary-row.grand-total, .summary-row.total {
   font-size: 18px;
   font-weight: bold;
-  color: #111827;
-  border-top: 1px solid #d1d5db;
+  color: var(--color-heading);
+  border-top: 1px solid var(--color-border-strong);
   margin-top: 8px;
   padding-top: 12px;
 }
 
 .summary-row.grand-total span:last-child {
-  color: #2D6CDF;
+  color: var(--color-primary);
 }
 
 /* Action Buttons */
@@ -613,8 +613,8 @@
 
 .btn-secondary {
   background-color: #ffffff;
-  color: #374151;
-  border: 1px solid #d1d5db;
+  color: var(--color-gray-700);
+  border: 1px solid var(--color-border-strong);
   border-radius: 6px;
   padding: 8px 16px;
   font-weight: 500;
@@ -623,8 +623,8 @@
 }
 
 .btn-secondary:hover {
-  background-color: #f3f4f6;
-  border-color: #9ca3af;
+  background-color: var(--color-surface-strong);
+  border-color: var(--color-text-tertiary);
 }
 
 /* ============================================================================
@@ -657,10 +657,10 @@
 
 .erp-purchase-details .back-button {
   align-items: center;
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
+  background: var(--color-surface-strong);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
-  color: #475569;
+  color: var(--color-gray-600);
   cursor: pointer;
   display: flex;
   font-size: 16px;
@@ -672,12 +672,12 @@
 }
 
 .erp-purchase-details .back-button:hover {
-  background: #e2e8f0;
-  color: #1e293b;
+  background: var(--color-border);
+  color: var(--color-text);
 }
 
 .erp-purchase-details .page-header h1 {
-  color: #16263A;
+  color: var(--color-primary-deep);
   font-size: clamp(20px, 2.5vw, 26px);
   font-weight: 700;
   margin: 0;
@@ -716,7 +716,7 @@
 .erp-purchase-details .payment-status-banner.non-paid {
   background: linear-gradient(135deg, #fef2f2, #fee2e2);
   border: 1px solid #fca5a5;
-  color: #b91c1c;
+  color: var(--color-danger-dark);
 }
 
 .erp-purchase-details .status-text {
@@ -746,16 +746,16 @@
 /* ---------- Detail cards ---------- */
 .erp-purchase-details .detail-card {
   background: #ffffff;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border);
   border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 2px 8px rgba(23, 42, 58, 0.06);
   overflow: hidden;
 }
 
 .erp-purchase-details .detail-card .card-header {
   align-items: center;
-  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
-  border-bottom: 1px solid #e5e7eb;
+  background: linear-gradient(135deg, var(--color-surface-hover), var(--color-surface-strong));
+  border-bottom: 1px solid var(--color-border);
   display: flex;
   font-size: 14px;
   font-weight: 700;
@@ -763,11 +763,11 @@
   padding: 14px 20px;
   text-transform: uppercase;
   letter-spacing: 0.4px;
-  color: #374151;
+  color: var(--color-gray-700);
 }
 
 .erp-purchase-details .detail-card .card-header svg {
-  color: #D97706;
+  color: var(--color-warning);
   font-size: 13px;
 }
 
@@ -775,7 +775,7 @@
   font-size: 14px;
   font-weight: 700;
   margin: 0;
-  color: #374151;
+  color: var(--color-gray-700);
   text-transform: uppercase;
   letter-spacing: 0.4px;
 }
@@ -790,7 +790,7 @@
 /* ---------- Info rows ---------- */
 .erp-purchase-details .info-row {
   align-items: baseline;
-  border-bottom: 1px solid #f8fafc;
+  border-bottom: 1px solid var(--color-surface-hover);
   display: flex;
   gap: 12px;
   padding: 10px 0;
@@ -801,7 +801,7 @@
 }
 
 .erp-purchase-details .info-row .label {
-  color: #6B7280;
+  color: var(--color-text-secondary);
   flex-shrink: 0;
   font-size: 13px;
   font-weight: 600;
@@ -809,16 +809,16 @@
 }
 
 .erp-purchase-details .info-row .value {
-  color: #111827;
+  color: var(--color-heading);
   font-size: 14px;
   font-weight: 500;
   word-break: break-word;
 }
 
 .erp-purchase-details .info-row .value.vat-number {
-  background: #eff6ff;
+  background: var(--color-primary-50);
   border-radius: 5px;
-  color: #1d4ed8;
+  color: var(--color-primary-dark);
   font-family: monospace;
   font-size: 13px;
   font-weight: 700;
@@ -826,13 +826,13 @@
 }
 
 .erp-purchase-details .info-row .value.invoice-number {
-  color: #16263A;
+  color: var(--color-primary-deep);
   font-weight: 700;
 }
 
 /* "Not Set" placeholder */
 .erp-purchase-details .value-placeholder {
-  color: #9CA3AF;
+  color: var(--color-text-tertiary);
   font-size: 13px;
   font-style: italic;
 }
@@ -844,7 +844,7 @@
 
 .erp-purchase-details .detail-card.financial .summary-row {
   align-items: center;
-  border-bottom: 1px solid #f8fafc;
+  border-bottom: 1px solid var(--color-surface-hover);
   display: flex;
   font-size: 14px;
   justify-content: space-between;
@@ -858,29 +858,29 @@
 .erp-purchase-details .detail-card.financial .summary-row.total {
   font-size: 16px;
   font-weight: 700;
-  border-top: 2px solid #e5e7eb;
+  border-top: 2px solid var(--color-border);
   margin-top: 6px;
   padding-top: 14px;
-  color: #111827;
+  color: var(--color-heading);
 }
 
 .erp-purchase-details .detail-card.financial .summary-row.vat {
   color: #7c3aed;
 }
 
-.erp-purchase-details .detail-card.financial .summary-row.returns span { color: #dc2626; }
-.erp-purchase-details .detail-card.financial .returns-amount { color: #dc2626; font-weight: 700; }
+.erp-purchase-details .detail-card.financial .summary-row.returns span { color: var(--color-danger); }
+.erp-purchase-details .detail-card.financial .returns-amount { color: var(--color-danger); font-weight: 700; }
 
 .erp-purchase-details .detail-card.financial .summary-divider {
   border: none;
-  border-top: 1px dashed #e5e7eb;
+  border-top: 1px dashed var(--color-border);
   margin: 8px 0;
 }
 
 .erp-purchase-details .detail-card.financial .summary-row span.paid { color: #16a34a; font-weight: 700; }
-.erp-purchase-details .detail-card.financial .summary-row.due.negative span:last-child { color: #dc2626; font-weight: 700; }
+.erp-purchase-details .detail-card.financial .summary-row.due.negative span:last-child { color: var(--color-danger); font-weight: 700; }
 .erp-purchase-details .detail-card.financial .summary-row.due.positive span:last-child { color: #16a34a; font-weight: 700; }
-.erp-purchase-details .detail-card.financial .due-amount { color: #dc2626; font-weight: 800; }
+.erp-purchase-details .detail-card.financial .due-amount { color: var(--color-danger); font-weight: 800; }
 .erp-purchase-details .detail-card.financial .summary-row .bold { font-weight: 800; }
 
 .erp-purchase-details .payment-status {
@@ -907,7 +907,7 @@
 /* ---------- Tab navigation ---------- */
 .erp-purchase-details .tabs-container {
   background: #ffffff;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border);
   border-radius: 10px;
   display: flex;
   gap: 4px;
@@ -920,7 +920,7 @@
   background: transparent;
   border: none;
   border-radius: 7px;
-  color: #6B7280;
+  color: var(--color-text-secondary);
   cursor: pointer;
   display: flex;
   font-size: 13px;
@@ -932,28 +932,28 @@
 }
 
 .erp-purchase-details .tab-button:hover {
-  background: #f1f5f9;
-  color: #374151;
+  background: var(--color-surface-strong);
+  color: var(--color-gray-700);
 }
 
 .erp-purchase-details .tab-button.active {
-  background: #16263A;
+  background: var(--color-primary-deep);
   color: #ffffff;
 }
 
 /* ---------- Items / Payments / Returns card ---------- */
 .erp-purchase-details .items-card {
   background: #ffffff;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border);
   border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 2px 8px rgba(23, 42, 58, 0.06);
   overflow: hidden;
 }
 
 .erp-purchase-details .items-card .card-header {
   align-items: center;
-  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
-  border-bottom: 1px solid #e5e7eb;
+  background: linear-gradient(135deg, var(--color-surface-hover), var(--color-surface-strong));
+  border-bottom: 1px solid var(--color-border);
   display: flex;
   gap: 10px;
   justify-content: space-between;
@@ -962,7 +962,7 @@
 
 .erp-purchase-details .items-card .card-header h3 {
   align-items: center;
-  color: #16263A;
+  color: var(--color-primary-deep);
   display: flex;
   font-size: 15px;
   font-weight: 700;
@@ -971,7 +971,7 @@
 }
 
 .erp-purchase-details .items-card .card-header h3 svg {
-  color: #D97706;
+  color: var(--color-warning);
 }
 
 .erp-purchase-details .vat-note {
@@ -980,9 +980,9 @@
 }
 
 .erp-purchase-details .badge {
-  background: #eff6ff;
+  background: var(--color-primary-50);
   border-radius: 999px;
-  color: #1d4ed8;
+  color: var(--color-primary-dark);
   font-size: 11px;
   font-weight: 750;
   padding: 4px 10px;
@@ -991,11 +991,11 @@
 .erp-purchase-details .total-payments,
 .erp-purchase-details .total-returns {
   font-size: 13px;
-  color: #6B7280;
+  color: var(--color-text-secondary);
 }
 
 .erp-purchase-details .total-payments strong { color: #16a34a; }
-.erp-purchase-details .total-returns strong { color: #dc2626; }
+.erp-purchase-details .total-returns strong { color: var(--color-danger); }
 
 /* ---------- Tables (items, payments, returns) ---------- */
 .erp-purchase-details .table-responsive {
@@ -1015,9 +1015,9 @@
 .erp-purchase-details .items-details-table th,
 .erp-purchase-details .payment-history-table th,
 .erp-purchase-details .returns-history-table th {
-  background: #f8fafc;
-  border-bottom: 2px solid #e5e7eb;
-  color: #6B7280;
+  background: var(--color-surface-hover);
+  border-bottom: 2px solid var(--color-border);
+  color: var(--color-text-secondary);
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.4px;
@@ -1029,8 +1029,8 @@
 .erp-purchase-details .items-details-table td,
 .erp-purchase-details .payment-history-table td,
 .erp-purchase-details .returns-history-table td {
-  border-bottom: 1px solid #f1f5f9;
-  color: #374151;
+  border-bottom: 1px solid var(--color-surface-strong);
+  color: var(--color-gray-700);
   padding: 12px 14px;
   vertical-align: middle;
 }
@@ -1038,7 +1038,7 @@
 .erp-purchase-details .items-details-table tbody tr:hover,
 .erp-purchase-details .payment-history-table tbody tr:hover,
 .erp-purchase-details .returns-history-table tbody tr:hover {
-  background: #f9fafb;
+  background: var(--color-surface-hover);
 }
 
 .erp-purchase-details .items-details-table tbody tr:last-child td,
@@ -1050,20 +1050,20 @@
 .erp-purchase-details .items-details-table tfoot td,
 .erp-purchase-details .payment-history-table tfoot td,
 .erp-purchase-details .returns-history-table tfoot td {
-  background: #f8fafc;
-  border-top: 2px solid #e5e7eb;
+  background: var(--color-surface-hover);
+  border-top: 2px solid var(--color-border);
   font-weight: 700;
   padding: 12px 14px;
 }
 
 /* Column-specific colours */
 .erp-purchase-details .vat-column { color: #7c3aed; }
-.erp-purchase-details .total-column { color: #16263A; font-weight: 700; }
+.erp-purchase-details .total-column { color: var(--color-primary-deep); font-weight: 700; }
 .erp-purchase-details .paid-amount { color: #16a34a; font-weight: 700; }
 .erp-purchase-details .return-badge {
   background: #fef2f2;
   border-radius: 5px;
-  color: #b91c1c;
+  color: var(--color-danger-dark);
   font-size: 12px;
   font-weight: 700;
   padding: 3px 8px;
@@ -1087,25 +1087,25 @@
 
 .erp-purchase-details .item-name {
   font-weight: 600;
-  color: #111827;
+  color: var(--color-heading);
 }
 
 .erp-purchase-details .price-different {
-  color: #ef4444;
+  color: var(--color-danger);
   font-weight: 700;
 }
 
 .erp-purchase-details .price-history {
-  color: #9CA3AF;
+  color: var(--color-text-tertiary);
   font-size: 11px;
   display: block;
 }
 
 /* Payment method badge */
 .erp-purchase-details .payment-method-badge {
-  background: #f1f5f9;
+  background: var(--color-surface-strong);
   border-radius: 5px;
-  color: #475569;
+  color: var(--color-gray-600);
   font-size: 12px;
   font-weight: 700;
   padding: 3px 8px;
@@ -1113,14 +1113,14 @@
 }
 
 .erp-purchase-details .payment-method-badge.cash { background: #dcfce7; color: #15803d; }
-.erp-purchase-details .payment-method-badge.bank_transfer { background: #dbeafe; color: #1d4ed8; }
+.erp-purchase-details .payment-method-badge.bank_transfer { background: var(--color-primary-100); color: var(--color-primary-dark); }
 .erp-purchase-details .payment-method-badge.cheque { background: #fef9c3; color: #854d0e; }
 .erp-purchase-details .payment-method-badge.credit_card { background: #ede9fe; color: #6d28d9; }
 
 /* ---------- Items summary stats ---------- */
 .erp-purchase-details .items-summary {
-  background: #f8fafc;
-  border-top: 1px solid #e5e7eb;
+  background: var(--color-surface-hover);
+  border-top: 1px solid var(--color-border);
   padding: 14px 20px;
 }
 
@@ -1136,7 +1136,7 @@
 }
 
 .erp-purchase-details .stat-label {
-  color: #9CA3AF;
+  color: var(--color-text-tertiary);
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
@@ -1144,14 +1144,14 @@
 }
 
 .erp-purchase-details .stat-value {
-  color: #16263A;
+  color: var(--color-primary-deep);
   font-size: 15px;
   font-weight: 700;
 }
 
 /* ---------- Empty states ---------- */
 .erp-purchase-details .empty-state-small {
-  color: #9CA3AF;
+  color: var(--color-text-tertiary);
   font-size: 14px;
   padding: 32px 20px;
   text-align: center;
@@ -1164,14 +1164,14 @@
 /* ---------- Remarks card ---------- */
 .erp-purchase-details .remarks-card {
   background: #ffffff;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border);
   border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 2px 8px rgba(23, 42, 58, 0.06);
   overflow: hidden;
 }
 
 .erp-purchase-details .remarks-content {
-  color: #374151;
+  color: var(--color-gray-700);
   font-size: 14px;
   line-height: 1.6;
   padding: 16px 20px;

@@ -20,6 +20,7 @@ import './BankDetails.css';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
 
+import { useConfirm } from '../common/ui';
 const emptyForm = {
   bank_name: '',
   account_number: '',
@@ -34,6 +35,7 @@ const emptyForm = {
 };
 
 const BankDetails = () => {
+  const confirm = useConfirm();
   const [banks, setBanks] = useState([]);
   const [isFetching, setIsFetching] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -162,7 +164,7 @@ const BankDetails = () => {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this bank?')) return;
+    if (!await confirm('Are you sure you want to delete this bank?')) return;
     try {
       await api.delete(`/expenses/banks/${id}`);
       showPopup('success', 'Bank removed successfully');

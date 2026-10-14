@@ -1,0 +1,88 @@
+/* ============================================================================
+   REACT-SELECT
+   Searchable dropdown skin. Single source of truth - do not restyle
+   .react-select__* globally anywhere else; scope page tweaks to a wrapper.
+   ============================================================================ */
+
+.react-select__control {
+  min-height: var(--input-height) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: var(--radius-md) !important;
+  background-color: var(--color-surface) !important;
+  box-shadow: var(--shadow-xs) !important;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast) !important;
+}
+
+.react-select__control:hover {
+  border-color: var(--color-border-strong) !important;
+}
+
+.react-select__control--is-focused {
+  border-color: var(--color-accent-dark) !important;
+  box-shadow: 0 0 0 4px var(--color-focus-ring) !important;
+}
+
+.react-select__input {
+  color: var(--color-text-primary) !important;
+  font-size: var(--font-size-base) !important;
+}
+
+.react-select__placeholder {
+  color: var(--color-text-placeholder) !important;
+}
+
+.react-select__single-value {
+  color: var(--color-text-primary) !important;
+  font-size: var(--font-size-base) !important;
+}
+
+.react-select__multi-value {
+  background-color: var(--color-primary-100) !important;
+  border-radius: var(--radius-sm) !important;
+}
+
+.react-select__multi-value__label {
+  color: var(--color-primary-dark) !important;
+}
+
+.react-select__menu {
+  background-color: var(--color-surface) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-lg) !important;
+  overflow: hidden;
+  z-index: 100;
+}
+
+.react-select__menu-list {
+  padding: 4px !important;
+}
+
+.react-select__option {
+  padding: 9px 12px !important;
+  border-radius: 8px;
+  color: var(--color-text-primary) !important;
+  background-color: transparent !important;
+  font-size: var(--font-size-base) !important;
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.react-select__option:hover,
+.react-select__option--is-focused {
+  background-color: var(--color-highlight-light) !important;
+  color: var(--color-primary-dark) !important;
+}
+
+.react-select__option--is-selected {
+  background-color: var(--color-primary) !important;
+  color: #fff !important;
+}
+
+.react-select__indicator-separator {
+  background-color: var(--color-border) !important;
+}
+
+.react-select__indicator {
+  color: var(--color-primary) !important;
+}

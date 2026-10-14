@@ -140,7 +140,7 @@
 .report-table-shell th {
   padding: 12px 14px;
   border-bottom: 1px solid var(--color-border);
-  background: #f8fafc;
+  background: var(--color-surface-hover);
   color: var(--color-text-secondary);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
@@ -174,7 +174,7 @@
 .report-table-shell tfoot td {
   border-top: 2px solid var(--color-border);
   border-bottom: 0;
-  background: #f8fafc;
+  background: var(--color-surface-hover);
   color: var(--color-heading);
   font-weight: var(--font-weight-bold);
 }

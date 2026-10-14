@@ -1,0 +1,12 @@
+/* ============================================================================
+   PRINT
+   Hide app chrome when printing.
+   ============================================================================ */
+
+@media print {
+  .sidebar, .app-header, .filters-section, .report-filters, .filter-bar,
+  .report-actions, .page-actions, .btn, .table-actions { display: none !important; }
+  body { background: white; color: black; font-size: 12px; }
+  table { font-size: 11px; }
+  th, td { padding: 6px 8px !important; }
+}

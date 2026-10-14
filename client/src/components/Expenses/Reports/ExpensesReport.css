@@ -167,8 +167,8 @@
 }
 
 .er-btn-secondary:hover:not(:disabled) {
-  background: #f3f4f6;
-  border-color: #d1d5db;
+  background: var(--color-surface-strong);
+  border-color: var(--color-border-strong);
 }
 
 .er-btn-excel {
@@ -248,7 +248,7 @@
 }
 
 .er-table tbody tr:hover {
-  background: #fafbff;
+  background: var(--color-surface-hover);
 }
 
 .er-table tbody tr:last-child td {
@@ -366,7 +366,7 @@
 
 .er-type-badge.er-type-bank {
   background: #ecfdf5;
-  color: #047857;
+  color: var(--color-success-dark);
 }
 
 .er-type-badge.er-type-rm {
@@ -376,7 +376,7 @@
 
 .er-type-badge.er-type-hidden {
   background: #fee2e2;
-  color: #b91c1c;
+  color: var(--color-danger-dark);
 }
 
 .er-summary-bar {

@@ -6,7 +6,9 @@ import { FiSearch, FiPlus, FiEdit, FiToggleLeft, FiToggleRight } from 'react-ico
 import api from '../../api';
 import { usePopup } from '../context/PopupContext';
 
+import { useConfirm } from '../common/ui';
 const ReceiveTypeManagement = () => {
+  const confirm = useConfirm();
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -68,7 +70,7 @@ const ReceiveTypeManagement = () => {
   const handleToggleStatus = async (record) => {
     const isActive = record.status === 1;
     const action = isActive ? 'deactivate' : 'activate';
-    if (!window.confirm(`Are you sure you want to ${action} "${record.type_name}"?`)) return;
+    if (!await confirm(`Are you sure you want to ${action} "${record.type_name}"?`)) return;
     try {
       if (isActive) {
         await api.delete(`/receive-types/${record.id}`);

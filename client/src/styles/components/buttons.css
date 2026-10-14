@@ -1,0 +1,87 @@
+/* ============================================================================
+   BUTTONS
+   Primary / secondary / danger / success / ghost / icon buttons.
+   ============================================================================ */
+
+/* BUTTONS - NO GLOBAL BACKGROUND OVERRIDE */
+button { font-family: inherit; cursor: pointer; border: none; background: none; padding: 0; font-size: inherit; line-height: 1; }
+
+.btn,
+.minimal-button,
+.report-filter-btn,
+.form-btn,
+.minimal-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: var(--btn-height);
+  padding: 0 var(--spacing-lg);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  white-space: nowrap;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-base), transform var(--transition-fast), color var(--transition-fast);
+  line-height: 1;
+  letter-spacing: 0.01em;
+}
+
+.btn:focus-visible, .minimal-button:focus-visible, .report-filter-btn:focus-visible, .form-btn:focus-visible, .minimal-btn:focus-visible {
+  outline: none; box-shadow: 0 0 0 4px var(--color-focus-ring);
+}
+
+.btn:hover, .minimal-button:hover, .report-filter-btn:hover, .form-btn:hover { transform: translateY(-1px); }
+.btn:active, .minimal-button:active { transform: translateY(0); }
+.btn:disabled, .minimal-button:disabled, .btn[disabled] { opacity: 0.55; cursor: not-allowed; transform: none !important; box-shadow: none !important; pointer-events: none; }
+
+.btn-primary, .minimal-button-primary, .report-filter-btn.apply,
+.btn-generate, .btn-save, .btn-add, .btn-create, .btn-submit, .primary-btn {
+  background: var(--color-primary); color: #fff; border-color: var(--color-primary-dark);
+  box-shadow: 0 1px 2px rgba(23, 42, 58, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.10);
+}
+.btn-primary:hover, .minimal-button-primary:hover, .report-filter-btn.apply:hover, .primary-btn:hover {
+  background: var(--color-primary-dark); border-color: var(--color-primary-deep); box-shadow: var(--shadow-primary); color: #fff;
+}
+
+.btn-secondary, .minimal-button-secondary, .report-filter-btn.reset,
+.btn-cancel, .btn-reset, .secondary-btn, .report-print-btn {
+  background: var(--color-surface); color: var(--color-primary); border-color: var(--color-border-strong);
+  box-shadow: var(--shadow-xs);
+}
+.btn-secondary:hover, .minimal-button-secondary:hover, .report-filter-btn.reset:hover,
+.secondary-btn:hover, .report-print-btn:hover {
+  background: var(--color-primary-50); border-color: var(--color-accent); color: var(--color-primary-dark);
+}
+
+.btn-danger, .danger-btn, .delete-btn { background: var(--color-danger); color: #fff; border-color: var(--color-danger); }
+.btn-danger:hover, .danger-btn:hover { background: var(--color-danger-dark); box-shadow: 0 4px 12px rgba(194, 65, 59,0.25); }
+
+.btn-success, .success-btn, .btn-export, .report-export-btn { background: var(--color-success); color: #fff; border-color: var(--color-success); }
+.btn-success:hover, .success-btn:hover, .report-export-btn:hover { background: var(--color-success-dark); box-shadow: 0 4px 12px rgba(35, 128, 93,0.25); }
+
+.btn-warning, .warning-btn { background: var(--color-warning); color: #fff; border-color: var(--color-warning-dark); }
+.btn-warning:hover, .warning-btn:hover { background: var(--color-warning-dark); }
+
+.btn-ghost { background: transparent; color: var(--color-primary); border-color: var(--color-primary-border); }
+.btn-ghost:hover { background: var(--color-primary-light); }
+
+.btn-sm { height: var(--btn-height-sm); padding: 0 var(--spacing-md); font-size: var(--font-size-xs); }
+.btn-lg { height: var(--btn-height-lg); padding: 0 var(--spacing-xl); font-size: var(--font-size-md); }
+
+.btn-icon {
+  width: 32px; height: 32px;
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0; border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface); color: var(--color-text-secondary);
+  cursor: pointer; transition: all var(--transition-fast); font-size: 12px; flex-shrink: 0;
+}
+.btn-icon:hover { background: var(--color-primary-light); border-color: var(--color-primary-border); color: var(--color-primary); transform: translateY(-1px); }
+.btn-icon.edit:hover { background: var(--color-primary-light); border-color: var(--color-primary-border); color: var(--color-primary); }
+.btn-icon.delete:hover { background: var(--color-danger-light); border-color: rgba(194, 65, 59,0.25); color: var(--color-danger); }
+.btn-icon.view:hover { background: var(--color-success-light); border-color: rgba(35, 128, 93,0.25); color: var(--color-success); }
+.table-actions { display: inline-flex; align-items: center; gap: 5px; }

@@ -38,6 +38,7 @@ import './OnlineExpenses.css';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
 
+import { useConfirm } from '../common/ui';
 const emptyBillForm = {
   bill_date: new Date().toISOString().split('T')[0],
   bill_number: '',
@@ -73,6 +74,7 @@ const emptyPaymentForm = {
 };
 
 const NewExpenses = () => {
+  const confirm = useConfirm();
   const { showPopup } = usePopup();
 
   const [isLoading, setIsLoading] = useState(false);
@@ -527,7 +529,7 @@ const NewExpenses = () => {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this expense bill?')) return;
+    if (!await confirm('Are you sure you want to delete this expense bill?')) return;
     setIsLoading(true);
     try {
       await api.delete(`/new-expenses/${id}`);

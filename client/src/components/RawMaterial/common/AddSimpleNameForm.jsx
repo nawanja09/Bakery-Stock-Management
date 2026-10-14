@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
+import { Modal } from '../../common/ui';
 import './ManagementForm.css';
 
 /**
@@ -27,6 +28,7 @@ const AddSimpleNameForm = ({
   const [value, setValue] = useState(initialValue);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const formId = useId();
 
   React.useEffect(() => {
     setValue(initialValue);
@@ -58,54 +60,38 @@ const AddSimpleNameForm = ({
   };
 
   return (
-    <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel(); }}>
-      <div className="modal-content" style={{ width: '400px', maxWidth: '90%' }}>
-        <div className="modal-header">
-          <h2>{title}</h2>
-          <button type="button" className="modal-close" onClick={onCancel} aria-label="Close">
-            ×
+    <Modal
+      title={title}
+      size="sm"
+      onClose={submitting ? undefined : onCancel}
+      footer={(
+        <>
+          <button type="button" className="btn btn-secondary" onClick={onCancel} disabled={submitting}>
+            Cancel
           </button>
+          <button type="submit" form={formId} className="btn btn-primary" disabled={submitting || !value.trim()}>
+            {submitting ? 'Saving...' : submitLabel}
+          </button>
+        </>
+      )}
+    >
+      <form id={formId} className="ui-form" onSubmit={handleSubmit} noValidate>
+        <div className={`ui-field ${error ? 'has-error' : ''}`.trim()}>
+          <label htmlFor="rm-simple-name">{fieldLabel}</label>
+          <input
+            type="text"
+            id="rm-simple-name"
+            name="rm-simple-name"
+            value={value}
+            onChange={handleChange}
+            placeholder={placeholder}
+            aria-invalid={Boolean(error)}
+          />
+          {error && <span className="ui-field-error">{error}</span>}
+          {note && <small className="ui-field-hint">{note}</small>}
         </div>
-
-        <form onSubmit={handleSubmit} noValidate>
-          <div className="modal-body">
-            <label htmlFor="rm-simple-name">
-              {fieldLabel}
-            </label>
-            <input
-              type="text"
-              id="rm-simple-name"
-              name="rm-simple-name"
-              value={value}
-              onChange={handleChange}
-              placeholder={placeholder}
-              autoFocus
-              style={{ borderColor: error ? 'var(--color-danger)' : undefined }}
-            />
-            {error && <span className="text-danger" style={{ fontSize: 'var(--font-size-xs)', marginTop: '4px', display: 'block' }}>{error}</span>}
-            {note && <small className="text-muted" style={{ display: 'block', marginTop: '4px' }}>{note}</small>}
-          </div>
-
-          <div className="modal-footer">
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={onCancel}
-              disabled={submitting}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={submitting || !value.trim()}
-            >
-              {submitting ? 'Saving...' : submitLabel}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+      </form>
+    </Modal>
   );
 };
 

@@ -100,7 +100,7 @@
 	align-items: center;
 	justify-content: center;
 	padding: 24px;
-	background: rgba(15, 23, 42, .62);
+	background: rgba(23, 42, 58, .62);
 	backdrop-filter: blur(3px);
 }
 
@@ -113,7 +113,7 @@
 	border: 1px solid var(--color-border);
 	border-radius: 14px;
 	background: var(--color-surface);
-	box-shadow: 0 24px 70px rgba(15, 23, 42, .28);
+	box-shadow: 0 24px 70px rgba(23, 42, 58, .28);
 }
 
 /* Payment History uses the available viewport width while keeping its table
@@ -505,7 +505,7 @@
 .new-expenses-page .btn-pay:hover:not(:disabled) {
 	background: var(--color-primary-dark);
 	border-color: var(--color-primary-dark);
-	box-shadow: 0 5px 14px rgba(45, 108, 223, .25);
+	box-shadow: 0 5px 14px rgba(53, 88, 114, .25);
 	transform: translateY(-1px);
 }
 

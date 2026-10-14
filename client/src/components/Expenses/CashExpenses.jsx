@@ -25,6 +25,7 @@ import { usePopup } from '../context/PopupContext';
 import api from '../../api';
 import useExpenseTypes, { withSavedOption, findExpenseTypeId } from './useExpenseTypes';
 
+import { useConfirm } from '../common/ui';
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 const today = () => new Date().toISOString().split('T')[0];
@@ -44,6 +45,7 @@ const emptyForm = {
 // ── component ─────────────────────────────────────────────────────────────────
 
 const CashExpenses = () => {
+  const confirm = useConfirm();
   const { showPopup } = usePopup();
 
   // UI state
@@ -233,7 +235,7 @@ const CashExpenses = () => {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this cash expense? This will reverse the ledger entry.')) return;
+    if (!await confirm('Are you sure you want to delete this cash expense? This will reverse the ledger entry.')) return;
 
     try {
       await api.delete(`/cash-expenses/${id}`);

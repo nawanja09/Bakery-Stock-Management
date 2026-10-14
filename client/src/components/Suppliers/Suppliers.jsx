@@ -5,7 +5,9 @@ import './Suppliers.css';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
 
+import { useConfirm } from '../common/ui';
 const Suppliers = () => {
+  const confirm = useConfirm();
   const [suppliers, setSuppliers] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState(null);
@@ -207,7 +209,7 @@ const Suppliers = () => {
   };
 
   const handleDelete = async (id, supplierName) => {
-    if (!window.confirm(`Are you sure you want to delete supplier "${supplierName}"?`)) {
+    if (!await confirm(`Are you sure you want to delete supplier "${supplierName}"?`)) {
       return;
     }
 

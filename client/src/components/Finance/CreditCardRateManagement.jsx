@@ -12,6 +12,7 @@ import api from '../../api';
 import { usePopup } from '../context/PopupContext';
 import { canWrite, getRawAuthRole } from '../../config/rolePermissions';
 
+import { useConfirm } from '../common/ui';
 const EMPTY_FORM = { department_id: '', rate: '' };
 
 // Mirrors the server rule (services/creditCardRateService.js parseRatePercent).
@@ -33,6 +34,7 @@ const inputStyle = {
 };
 
 const CreditCardRateManagement = () => {
+  const confirm = useConfirm();
   const { showPopup } = usePopup();
   const writable = canWrite(getRawAuthRole());
   const [records, setRecords] = useState([]);
@@ -110,7 +112,7 @@ const CreditCardRateManagement = () => {
     const isActive = Number(record.status) === 1;
     const action = isActive ? 'deactivate' : 'activate';
     const warning = isActive ? ' Card transactions of this Branch / Department cannot be realised without an active rate.' : '';
-    if (!window.confirm(`Are you sure you want to ${action} the Credit Card Rate of "${record.department_name}"?${warning}`)) return;
+    if (!await confirm(`Are you sure you want to ${action} the Credit Card Rate of "${record.department_name}"?${warning}`)) return;
     try {
       const res = await api.patch(`/credit-card-rates/${record.id}/${action}`);
       showPopup('success', res.data?.message || `Credit Card Rate ${action}d`);

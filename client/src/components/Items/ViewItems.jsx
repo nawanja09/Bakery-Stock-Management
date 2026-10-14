@@ -20,7 +20,9 @@ import { ITEM_TYPE_OPTIONS } from './itemTypeOptions';
 import { formatNumber } from '../../utils/formatters';
 import * as XLSX from 'xlsx';
 
+import { useConfirm } from '../common/ui';
 const ViewItems = () => {
+  const confirm = useConfirm();
   const [items, setItems] = useState([]);
   const [filteredItems, setFilteredItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -103,7 +105,7 @@ const ViewItems = () => {
     const newStatus = !item.is_active;
     const action = newStatus ? 'activate' : 'deactivate';
 
-    if (!window.confirm(
+    if (!await confirm(
       `Are you sure you want to ${action} "${item.name}"?\n\n` +
       (newStatus
         ? 'The item will reappear in all dropdowns and the Stock Report.'
@@ -122,7 +124,7 @@ const ViewItems = () => {
 
   // Soft-delete the item (sets deleted = TRUE in DB, removes from all views)
   const handleDelete = async (id, itemName) => {
-    if (!window.confirm(
+    if (!await confirm(
       `Are you sure you want to DELETE "${itemName}"?\n\n` +
       'This will permanently remove it from all views (dropdowns, reports, and this list).\n' +
       'The record will remain in the database as deleted.'

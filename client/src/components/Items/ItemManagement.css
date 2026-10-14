@@ -57,7 +57,7 @@
 }
 
 .item-code-badge {
-  background: #eef4ff;
+  background: var(--color-primary-50);
   color: #315fae;
   font-family: var(--font-family-mono);
 }
@@ -113,7 +113,7 @@
 }
 
 .btn-icon:hover {
-  background: #eef4ff;
+  background: var(--color-primary-50);
   color: var(--color-primary);
   transform: translateY(-1px);
 }

@@ -7,6 +7,7 @@ import { usePopup } from '../context/PopupContext';
 import NewIncomeModal from '../Income/NewIncomeModal';
 import '../Income/Income.css';
 
+import { useConfirm } from '../common/ui';
 const ALLOWED_COMPANY_NAMES = ['JH', 'RD'];
 const initialFilters = { fromDate: '', toDate: '', departmentId: 'all', companyId: 'all' };
 const formatDate = (value) => (value ? new Date(`${value}T00:00:00`).toLocaleDateString('en-GB') : '-');
@@ -15,6 +16,7 @@ const sortRecords = (records) => [...records].sort((a, b) => (
 ));
 
 const AnalystIncomePage = () => {
+  const confirm = useConfirm();
   const { showPopup } = usePopup();
   const [records, setRecords] = useState([]);
   const [totalIncome, setTotalIncome] = useState(0);
@@ -99,7 +101,7 @@ const AnalystIncomePage = () => {
   };
 
   const handleDelete = async (record) => {
-    if (!window.confirm('Delete this income record?')) return;
+    if (!await confirm('Delete this income record?')) return;
     try {
       await api.delete(`/incomes/${record.id}`);
       loadRecords(filters);

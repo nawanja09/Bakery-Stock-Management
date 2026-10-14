@@ -1,0 +1,156 @@
+/* ============================================================================
+   LEGACY DIALOG SKIN
+   Older popups were each built with their own class names (.sl-modal,
+   .cl-modal, .snm-modal, ...). Until each one is moved onto the shared
+   <Modal> component (components/common/ui), this file gives all of them
+   the same look as <Modal>: dimmed blurred backdrop, white card with the
+   app radius/shadow, tinted header, grey footer and the standard close
+   button.
+
+   SKIN ONLY: colours, borders, radius, shadow. No widths, heights,
+   padding or layout - those stay with each page so nothing reflows.
+   Loaded last (App.js) so it wins over the per-page files.
+   When a popup is migrated to <Modal>, delete its selectors here.
+   ============================================================================ */
+
+/* ---------- Backdrop ---------- */
+.modal-overlay,
+.payment-modal-overlay,
+.sl-modal-overlay,
+.cl-modal-overlay,
+.em-modal-overlay,
+.settlement-modal-overlay,
+.orders-modal-overlay,
+.fgprod-modal-overlay,
+.modern-modal-overlay,
+.issuance-modal-overlay,
+.ecr-release-modal-overlay,
+.ipm-overlay,
+.pnm-overlay,
+.snm-overlay,
+.inc-overlay,
+.ih-form-overlay,
+.ih-drawer-overlay,
+.ep-overlay,
+.edit-transfer-overlay,
+.edit-damage-overlay,
+.view-damage-overlay,
+.add-damage-form-overlay,
+.add-purchase-form-overlay,
+.add-asset-overlay,
+.form-overlay {
+  background: rgba(23, 42, 58, 0.48);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+/* ---------- Dialog card ---------- */
+.modal-content,
+.payment-modal-content,
+.sl-modal,
+.cl-modal,
+.em-modal-content,
+.settlement-modal,
+.orders-modal-content,
+.fgprod-modal-content,
+.modern-modal,
+.issuance-modal-content,
+.ecr-release-modal,
+.ipm-modal,
+.pnm-modal,
+.snm-modal,
+.inc-modal,
+.ih-form-modal,
+.ep-card,
+.edit-transfer-container,
+.edit-damage-container,
+.view-damage-container,
+.add-damage-form-container,
+.add-purchase-form-container,
+.add-asset-card,
+.form-overlay > .form-container {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-2xl);
+}
+
+.ih-drawer {
+  background-color: var(--color-surface);
+  border-left: 1px solid var(--color-border);
+  box-shadow: var(--shadow-2xl);
+}
+
+/* ---------- Header (light headers; navy .payment-modal-header / .snm-header keep their brand fill) ---------- */
+.modal-header,
+.sl-modal-header,
+.cl-modal-header,
+.em-modal-header,
+.settlement-modal-header,
+.orders-modal-header,
+.fgprod-modal-header,
+.modern-modal-header,
+.ecr-release-modal-header,
+.ih-drawer-header,
+.ipm-header,
+.pnm-header,
+.inc-header,
+.edit-transfer-header,
+.edit-damage-header,
+.view-damage-header,
+.add-damage-form-header,
+.add-asset-header {
+  background: linear-gradient(180deg, var(--color-primary-50), var(--color-surface));
+  border-bottom: 1px solid var(--color-border);
+}
+
+.modal-header h2, .modal-header h3,
+.sl-modal-header h2, .sl-modal-header h3,
+.cl-modal-header h2, .cl-modal-header h3,
+.em-modal-header h2, .em-modal-header h3,
+.settlement-modal-header h2, .settlement-modal-header h3,
+.orders-modal-header h2, .orders-modal-header h3,
+.fgprod-modal-header h2, .fgprod-modal-header h3,
+.modern-modal-header h2, .modern-modal-header h3,
+.ecr-release-modal-header h2, .ecr-release-modal-header h3,
+.ipm-header h3, .pnm-header h3, .inc-header h3 {
+  color: var(--color-primary-deep);
+  letter-spacing: -0.02em;
+}
+
+/* ---------- Footer ---------- */
+.modal-footer,
+.sl-modal-footer,
+.cl-modal-footer,
+.em-modal-footer,
+.settlement-modal-footer,
+.orders-modal-footer,
+.fgprod-modal-footer,
+.payment-modal-footer,
+.ih-drawer-actions {
+  background: var(--color-surface-hover);
+  border-top: 1px solid var(--color-border);
+}
+
+/* ---------- Close button ---------- */
+.modal-close,
+.sl-modal-close,
+.cl-modal-close,
+.orders-modal-close,
+.fgprod-modal-close {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  transition: color var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.modal-close:hover,
+.sl-modal-close:hover,
+.cl-modal-close:hover,
+.orders-modal-close:hover,
+.fgprod-modal-close:hover {
+  color: var(--color-danger);
+  border-color: rgba(194, 65, 59, 0.3);
+  background: var(--color-danger-light);
+}

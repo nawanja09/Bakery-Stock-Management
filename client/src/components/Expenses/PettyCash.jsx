@@ -10,9 +10,11 @@ import { usePopup } from '../context/PopupContext';
 import api from '../../api';
 import useExpenseTypes, { withSavedOption, findExpenseTypeId } from './useExpenseTypes';
 
+import { useConfirm } from '../common/ui';
 const RECENT_LIMIT = 10;
 
 const PettyCash = () => {
+  const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState('voucher');
   const [balance, setBalance] = useState(0);
   const [balanceData, setBalanceData] = useState({ totalReimbursements: 0, totalVouchers: 0 });
@@ -262,7 +264,7 @@ const PettyCash = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this voucher?')) {
+    if (await confirm('Are you sure you want to delete this voucher?')) {
       setIsLoading(true);
       try {
         const response = await api.delete(`/expenses/petty-cash/voucher/${id}`);

@@ -1,5 +1,25 @@
 import React from 'react';
+import { Modal, StatusBadge } from '../../common/ui';
 import './ViewPurchase.css';
+
+const PAYMENT_STATUS = {
+  PENDING: { label: 'Pending', tone: 'warning' },
+  PAID: { label: 'Paid', tone: 'success' },
+  PARTIAL: { label: 'Partial', tone: 'warning' },
+};
+
+const PAYMENT_METHOD = {
+  CASH: 'Cash',
+  BANK_TRANSFER: 'Bank Transfer',
+  CREDIT: 'Credit',
+};
+
+const Detail = ({ label, children, amount = false }) => (
+  <div className="ui-detail-item">
+    <span className="ui-detail-label">{label}</span>
+    <span className={`ui-detail-value ${amount ? 'is-amount' : ''}`.trim()}>{children}</span>
+  </div>
+);
 
 const ViewPurchase = ({ purchase, onClose, onEdit }) => {
   const formatCurrency = (amount) => {
@@ -10,109 +30,67 @@ const ViewPurchase = ({ purchase, onClose, onEdit }) => {
     }).format(amount || 0);
   };
 
-  const getStatusBadge = (status) => {
-    const statusConfig = {
-      'PENDING': { class: 'status-pending', label: 'Pending' },
-      'PAID': { class: 'status-paid', label: 'Paid' },
-      'PARTIAL': { class: 'status-partial', label: 'Partial' }
-    };
-    
-    const config = statusConfig[status] || { class: 'status-default', label: status };
-    return <span className={`status-badge ${config.class}`}>{config.label}</span>;
-  };
-
-  const getPaymentMethodBadge = (method) => {
-    const methodConfig = {
-      'CASH': { class: 'method-cash', label: 'Cash' },
-      'BANK_TRANSFER': { class: 'method-bank', label: 'Bank Transfer' },
-      'CREDIT': { class: 'method-credit', label: 'Credit' }
-    };
-    
-    const config = methodConfig[method] || { class: 'method-default', label: method };
-    return <span className={`method-badge ${config.class}`}>{config.label}</span>;
-  };
+  const status = PAYMENT_STATUS[purchase.payment_status] || { label: purchase.payment_status, tone: 'neutral' };
 
   return (
-    <div className="overlay">
-      <div className="container">
-        {/* Header */}
-        <div className="header">
-          <h3>Purchase Details</h3>
-          <button className="btn-close" onClick={onClose}>×</button>
-        </div>
+    <Modal
+      title="Purchase Details"
+      subtitle={purchase.purchase_id}
+      size="lg"
+      onClose={onClose}
+      closeOnOverlay
+      footer={(
+        <>
+          <button type="button" className="btn btn-secondary" onClick={onClose}>Close</button>
+          <button type="button" className="btn btn-primary" onClick={onEdit}>Edit Purchase</button>
+        </>
+      )}
+    >
+      <div className="ui-details">
+        <section className="ui-detail-section">
+          <h4>Purchase Information</h4>
+          <div className="ui-detail-grid">
+            <Detail label="Purchase ID">{purchase.purchase_id}</Detail>
+            <Detail label="Purchase Date">{new Date(purchase.purchase_date).toLocaleDateString()}</Detail>
+            <Detail label="Invoice Number">{purchase.invoice_number}</Detail>
+            <Detail label="Total Amount" amount>{formatCurrency(purchase.total_amount)}</Detail>
+          </div>
+        </section>
 
-        {/* Main Content */}
-        <div className="content">
-          {/* Purchase Info */}
-          <section className="section">
-            <h4>Purchase Information</h4>
-            <div className="grid">
-              <div>
-                <label>Purchase ID</label>
-                <span className="highlight">{purchase.purchase_id}</span>
-              </div>
-              <div>
-                <label>Purchase Date</label>
-                <span>{new Date(purchase.purchase_date).toLocaleDateString()}</span>
-              </div>
-              <div>
-                <label>Invoice Number</label>
-                <span>{purchase.invoice_number}</span>
-              </div>
-              <div>
-                <label>Total Amount</label>
-                <span className="amount">{formatCurrency(purchase.total_amount)}</span>
-              </div>
-            </div>
-          </section>
+        <section className="ui-detail-section">
+          <h4>Supplier Information</h4>
+          <div className="ui-detail-grid">
+            <Detail label="Supplier Name">{purchase.supplier_name}</Detail>
+            <Detail label="Contact Person">{purchase.contact_person || 'N/A'}</Detail>
+            <Detail label="Phone">{purchase.supplier_phone || 'N/A'}</Detail>
+          </div>
+        </section>
 
-          {/* Supplier Info */}
-          <section className="section">
-            <h4>Supplier Information</h4>
-            <div className="grid">
-              <div>
-                <label>Supplier Name</label>
-                <span>{purchase.supplier_name}</span>
-              </div>
-              <div>
-                <label>Contact Person</label>
-                <span>{purchase.contact_person || 'N/A'}</span>
-              </div>
-              <div>
-                <label>Phone</label>
-                <span>{purchase.supplier_phone || 'N/A'}</span>
-              </div>
-            </div>
-          </section>
+        <section className="ui-detail-section">
+          <h4>Payment Information</h4>
+          <div className="ui-detail-grid">
+            <Detail label="Payment Method">
+              <StatusBadge tone="primary">{PAYMENT_METHOD[purchase.payment_method] || purchase.payment_method}</StatusBadge>
+            </Detail>
+            <Detail label="Payment Status">
+              <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
+            </Detail>
+          </div>
+        </section>
 
-          {/* Payment Info */}
-          <section className="section">
-            <h4>Payment Information</h4>
-            <div className="grid">
-              <div>
-                <label>Payment Method</label>
-                {getPaymentMethodBadge(purchase.payment_method)}
-              </div>
-              <div>
-                <label>Payment Status</label>
-                {getStatusBadge(purchase.payment_status)}
-              </div>
-            </div>
-          </section>
-
-          {/* Purchase Items */}
-          <section className="section">
-            <h4>Purchase Items ({purchase.items?.length || 0})</h4>
-            {purchase.items && purchase.items.length > 0 ? (
-              <div className="table-wrapper">
-                <table>
+        <section className="ui-detail-section">
+          <h4>Purchase Items ({purchase.items?.length || 0})</h4>
+          {purchase.items && purchase.items.length > 0 ? (
+            <div className="ui-table-card">
+              <div className="ui-table-scroll">
+                <table className="erp-data-table">
                   <thead>
                     <tr>
                       <th>#</th>
                       <th>Asset</th>
-                      <th>Qty</th>
-                      <th>Unit Price</th>
-                      <th>Total</th>
+                      <th className="num">Qty</th>
+                      <th className="num">Unit Price</th>
+                      <th className="num">Total</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -120,64 +98,46 @@ const ViewPurchase = ({ purchase, onClose, onEdit }) => {
                       <tr key={item.id || index}>
                         <td>{index + 1}</td>
                         <td>
-                          <div className="asset">
-                            <div>{item.asset_name || 'Unknown Asset'}</div>
-                            <small>{item.asset_code || 'N/A'}</small>
-                          </div>
+                          <strong>{item.asset_name || 'Unknown Asset'}</strong>
+                          <small className="ui-muted-sub">{item.asset_code || 'N/A'}</small>
                         </td>
-                        <td>{item.quantity}</td>
-                        <td>{formatCurrency(item.unit_price)}</td>
-                        <td>{formatCurrency(item.total_price)}</td>
+                        <td className="num">{item.quantity}</td>
+                        <td className="num">{formatCurrency(item.unit_price)}</td>
+                        <td className="num">{formatCurrency(item.total_price)}</td>
                       </tr>
                     ))}
                   </tbody>
                   <tfoot>
                     <tr>
-                      <td colSpan="4" className="total-label">Grand Total</td>
-                      <td>{formatCurrency(purchase.total_amount)}</td>
+                      <td colSpan="4">Grand Total</td>
+                      <td className="num">{formatCurrency(purchase.total_amount)}</td>
                     </tr>
                   </tfoot>
                 </table>
               </div>
-            ) : (
-              <p className="no-items">No items found.</p>
-            )}
-          </section>
-
-          {/* Notes */}
-          {purchase.notes && (
-            <section className="section">
-              <h4>Notes</h4>
-              <p className="notes">{purchase.notes}</p>
-            </section>
-          )}
-
-          {/* System Info */}
-          <section className="section">
-            <h4>System Information</h4>
-            <div className="grid">
-              <div>
-                <label>Created By</label>
-                <span>{purchase.created_by_name || 'System'}</span>
-              </div>
-              <div>
-                <label>Created Date</label>
-                <span>{new Date(purchase.created_at).toLocaleString()}</span>
-              </div>
-              <div>
-                <label>Last Updated</label>
-                <span>{new Date(purchase.updated_at).toLocaleString()}</span>
-              </div>
             </div>
-          </section>
-        </div>
+          ) : (
+            <p>No items found.</p>
+          )}
+        </section>
 
-        {/* Actions */}
-        <div className="actions">
-          <button className="btn-edit" onClick={onEdit}>Edit Purchase</button>
-        </div>
+        {purchase.notes && (
+          <section className="ui-detail-section">
+            <h4>Notes</h4>
+            <p className="ui-detail-note">{purchase.notes}</p>
+          </section>
+        )}
+
+        <section className="ui-detail-section">
+          <h4>System Information</h4>
+          <div className="ui-detail-grid">
+            <Detail label="Created By">{purchase.created_by_name || 'System'}</Detail>
+            <Detail label="Created Date">{new Date(purchase.created_at).toLocaleString()}</Detail>
+            <Detail label="Last Updated">{new Date(purchase.updated_at).toLocaleString()}</Detail>
+          </div>
+        </section>
       </div>
-    </div>
+    </Modal>
   );
 };
 

@@ -1,6 +1,5 @@
 @import '../common/FormStyles.css';
 @import '../common/CommonComponents.css';
-@import '../../css/page-design-system.css';
 
 /* ============================================================================
    ISSUANCE DESIGN SYSTEM - ERP BLUE PALETTE
@@ -309,7 +308,7 @@
 .status-badge.approved {
   background: var(--color-success-light);
   color: var(--color-success-dark);
-  border: 1px solid rgba(5, 150, 105, 0.25);
+  border: 1px solid rgba(35, 128, 93, 0.25);
 }
 
 .status-badge.pending {
@@ -321,7 +320,7 @@
 .status-badge.cancelled {
   background: var(--color-danger-light);
   color: var(--color-danger-dark);
-  border: 1px solid rgba(220, 38, 38, 0.25);
+  border: 1px solid rgba(194, 65, 59, 0.25);
 }
 
 .status-badge.neutral,
@@ -499,7 +498,7 @@
   align-items: center;
   justify-content: center;
   padding: 20px;
-  background: rgba(15, 23, 42, 0.58);
+  background: rgba(23, 42, 58, 0.58);
   backdrop-filter: blur(2px);
   animation: fadeIn var(--transition-base);
 }
@@ -562,7 +561,7 @@
 .btn-close-modal:hover {
   background: var(--color-danger-light);
   color: var(--color-danger);
-  border-color: rgba(220, 38, 38, 0.25);
+  border-color: rgba(194, 65, 59, 0.25);
 }
 
 .detail-info-grid {

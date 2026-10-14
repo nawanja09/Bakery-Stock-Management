@@ -31,12 +31,14 @@ import './FGProduction.css';
 import { UTILITY_COST_RATE } from './fgProductionConstants';
 import { getCompatibleUnits, convertQuantity, areCompatibleUnits } from './unitConversion';
 
+import { useConfirm } from '../common/ui';
 const emptyRecipeForm = { rm_item_id: '', quantity: '', last_price: '', recipe_unit: '', base_unit: '' };
 
 const formatCurrency = (value) =>
   `Rs. ${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 const Recipes = () => {
+  const confirm = useConfirm();
   const { showPopup } = usePopup();
   // The user's own POS privileges (null = not known yet).
   const { access: integrationAccess, refresh: refreshIntegrationAccess } = useIntegrationAccess();
@@ -304,7 +306,7 @@ const Recipes = () => {
 
   const handleDeleteFg = async () => {
     if (!selectedFg) return;
-    if (!window.confirm(`Delete "${selectedFg.fg_item_name}" and all its recipe items?`)) return;
+    if (!await confirm(`Delete "${selectedFg.fg_item_name}" and all its recipe items?`)) return;
     try {
       await api.delete(`/fg-production/${selectedFg.id}`);
       showPopup('success', 'FG Production item deleted successfully');
@@ -450,7 +452,7 @@ const Recipes = () => {
   };
 
   const handleDeleteRecipe = async (recipe) => {
-    if (!window.confirm(`Remove "${recipe.rm_item_name}" from this recipe?`)) return;
+    if (!await confirm(`Remove "${recipe.rm_item_name}" from this recipe?`)) return;
     try {
       await api.delete(`/fg-production/recipes/${recipe.id}`);
       showPopup('success', 'Recipe item deleted successfully');

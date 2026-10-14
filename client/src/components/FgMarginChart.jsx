@@ -63,7 +63,7 @@ const FgMarginChart = ({ recipes = [], loading }) => {
     );
   }
 
-  const primary = getThemeColor('--color-primary', '#2D6CDF');
+  const primary = getThemeColor('--color-primary', '#355872');
   const success = getThemeColor('--color-success', '#059669');
 
   const data = {

@@ -59,7 +59,8 @@ const NavigationBar = () => {
   const location = useLocation();
   const [activeModule, setActiveModule] = useState(null);
   const [activeDropdown, setActiveDropdown] = useState(null);
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  // Tablets start with the icon-only sidebar so the page keeps enough width.
+  const [isCollapsed, setIsCollapsed] = useState(() => window.innerWidth >= 768 && window.innerWidth < 1024);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const sidebarRef = useRef(null);
 
@@ -147,14 +148,23 @@ const NavigationBar = () => {
     if (landing) navigate(landing);
   };
 
+  // Must match the phone breakpoint in NavigationBar.css / Layout.css, where
+  // the sidebar becomes an off-canvas drawer.
+  const isPhone = () => window.innerWidth <= 767;
+
   const toggleSidebar = () => {
-    if (window.innerWidth <= 640) {
+    if (isPhone()) {
       setIsMobileOpen((isOpen) => !isOpen);
       return;
     }
     setIsCollapsed(!isCollapsed);
     if (!isCollapsed) setActiveDropdown(null);
   };
+
+  // Close the phone drawer after moving to another page.
+  useEffect(() => {
+    setIsMobileOpen(false);
+  }, [location.pathname]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -387,6 +397,18 @@ const NavigationBar = () => {
   );
 
   return (
+    <>
+    {/* Phones: the sidebar is off-screen, so the menu button lives outside it */}
+    <button
+      type="button"
+      className="mobile-nav-toggle"
+      onClick={() => setIsMobileOpen(true)}
+      aria-label="Open navigation"
+      aria-expanded={isMobileOpen}
+    >
+      <FontAwesomeIcon icon={faBars} />
+    </button>
+    {isMobileOpen && <div className="sidebar-backdrop" onClick={() => setIsMobileOpen(false)} aria-hidden="true" />}
     <div className={`sidebar ${isCollapsed ? 'collapsed' : ''} ${isMobileOpen ? 'mobile-open' : ''}`} ref={sidebarRef}>
       <button className="toggle-button" onClick={toggleSidebar} aria-label="Toggle navigation">
         <FontAwesomeIcon icon={faBars} />
@@ -577,6 +599,7 @@ const NavigationBar = () => {
         </button>
       </div>
     </div>
+    </>
   );
 };
 

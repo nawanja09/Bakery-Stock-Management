@@ -128,14 +128,14 @@ export const reportItemSelectStyles = {
     fontSize: 'var(--font-size-sm, 14px)',
     padding: '8px 12px',
     backgroundColor: state.isSelected 
-      ? 'var(--color-primary, #2563eb)' 
+      ? 'var(--color-primary, #355872)' 
       : state.isFocused 
         ? 'var(--color-primary-light, #eff6ff)' 
         : 'transparent',
     color: state.isSelected 
       ? '#ffffff' 
       : state.isFocused 
-        ? 'var(--color-primary-dark, #1d4ed8)' 
+        ? 'var(--color-primary-dark, #27445a)' 
         : 'var(--color-text-primary, #1e293b)',
     cursor: 'pointer'
   })

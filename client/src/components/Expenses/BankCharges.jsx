@@ -19,7 +19,9 @@ import './BankCharges.css';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
 
+import { useConfirm } from '../common/ui';
 const BankCharges = () => {
+  const confirm = useConfirm();
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
   const [isFetchingBanks, setIsFetchingBanks] = useState(false);
@@ -252,7 +254,7 @@ const BankCharges = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this bank charge?')) {
+    if (await confirm('Are you sure you want to delete this bank charge?')) {
       setIsLoading(true);
       try {
         const response = await api.delete(`/expenses/bank-charges/${id}`);
