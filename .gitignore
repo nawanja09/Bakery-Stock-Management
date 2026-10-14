@@ -5,3 +5,11 @@
 
 # Archives can contain .env files and other secrets
 *.zip
+
+# Dependencies - installed with `npm ci`, never committed
+node_modules/
+
+# Database dumps can hold user password hashes and business data
+# (schema changes belong in server/migrations/*.sql)
+/*.sql
+*.sql.gz
