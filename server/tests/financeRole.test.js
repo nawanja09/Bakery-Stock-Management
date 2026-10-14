@@ -9,11 +9,11 @@ const {
   normalizeRole
 } = require('../config/rolePermissions');
 
-test('Finance role has only Management and Expenses privileges', () => {
+test('Finance role has only Management, Expenses and Collection privileges', () => {
   assert.equal(normalizeRole('Finance'), ROLES.FINANCE_USER);
   assert.equal(normalizeRole(ROLES.FINANCE_USER), ROLES.FINANCE_USER);
-  assert.deepEqual(getRoleModules('Finance'), [MODULES.MANAGEMENT, MODULES.EXPENSES]);
-  assert.deepEqual(getRoleModules(ROLES.FINANCE_USER), [MODULES.MANAGEMENT, MODULES.EXPENSES]);
+  assert.deepEqual(getRoleModules('Finance'), [MODULES.MANAGEMENT, MODULES.EXPENSES, MODULES.COLLECTION]);
+  assert.deepEqual(getRoleModules(ROLES.FINANCE_USER), [MODULES.MANAGEMENT, MODULES.EXPENSES, MODULES.COLLECTION]);
   assert.equal(canWrite('Finance'), true);
 });
 

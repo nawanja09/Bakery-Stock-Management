@@ -381,7 +381,7 @@ test('Connect endpoint: roles, validation, success without secrets, rate limit',
     return res;
   };
   const good = { username: 'rst-finance', password: 'rst-pass' };
-  for (const role of ['Finance', 'QB', 'View Only', 'Staff', null]) {
+  for (const role of ['QB', 'View Only', 'Staff', null]) {
     assert.equal((await connect(role, good)).statusCode, 403, String(role));
   }
   assert.equal((await connect('Accountant', good, 'erp')).statusCode, 404);
