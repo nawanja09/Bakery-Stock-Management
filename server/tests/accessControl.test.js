@@ -66,7 +66,8 @@ test('requireRoles only allows the listed roles', () => {
 test('readOnly blocks view-only mutations with the standard warning', () => {
   const token = require('jsonwebtoken').sign(
     { role: 'View Only' },
-    process.env.JWT_SECRET || 'test-secret'
+    process.env.JWT_SECRET || 'test-secret',
+    require('../config/secrets').JWT_SIGN_OPTIONS
   );
   const previousSecret = process.env.JWT_SECRET;
   process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret';

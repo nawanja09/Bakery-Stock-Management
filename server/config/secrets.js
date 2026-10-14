@@ -19,9 +19,14 @@ const MIN_SECRET_BYTES = 32;
 
 // Every jwt.sign / jwt.verify must use these, so a token signed with another
 // algorithm (e.g. "none" or RS256 confusion) is never accepted.
+// issuer / audience bind a token to THIS API: a token signed with the same
+// secret for another purpose (or another app sharing it) is refused.
+// 12h = one working day; the client does not refresh, so users log in daily.
 const JWT_ALGORITHM = 'HS256';
-const JWT_VERIFY_OPTIONS = Object.freeze({ algorithms: [JWT_ALGORITHM] });
-const JWT_SIGN_OPTIONS = Object.freeze({ algorithm: JWT_ALGORITHM, expiresIn: '24h' });
+const JWT_ISSUER = 'bsms';
+const JWT_AUDIENCE = 'bsms-web';
+const JWT_VERIFY_OPTIONS = Object.freeze({ algorithms: [JWT_ALGORITHM], issuer: JWT_ISSUER, audience: JWT_AUDIENCE });
+const JWT_SIGN_OPTIONS = Object.freeze({ algorithm: JWT_ALGORITHM, expiresIn: '12h', issuer: JWT_ISSUER, audience: JWT_AUDIENCE });
 
 const read = (name) => {
   const value = process.env[name];

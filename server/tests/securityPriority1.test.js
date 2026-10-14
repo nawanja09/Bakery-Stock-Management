@@ -195,3 +195,32 @@ test('#4: CORS only for CORS_ORIGINS; security headers; JSON body limit', async 
     await new Promise((resolve) => server.close(resolve));
   }
 });
+
+// ---------------------------------------------------------------- #5 JWT lifetime / issuer / audience
+test('#5: tokens last 12h and must carry the BSMS issuer and audience', async () => {
+  const jwt = require('jsonwebtoken');
+  const secrets = require('../config/secrets');
+  const { createAuthenticate } = require('../middleware/authenticate');
+  const secret = secrets.getJwtSecret();
+  const authenticate = createAuthenticate({
+    loadUser: async () => ({ id: 1, username: 'accountant1', role: 'Accountant', token_version: 0 })
+  });
+  const run = async (token) => {
+    let status = null;
+    const req = { headers: { authorization: `Bearer ${token}` } };
+    const res = { status(code) { status = code; return { json() {} }; } };
+    await authenticate(req, res, () => {});
+    return status;
+  };
+
+  const good = jwt.sign({ userId: 1, tv: 0 }, secret, secrets.JWT_SIGN_OPTIONS);
+  const { iat, exp, iss, aud } = jwt.decode(good);
+  assert.equal(exp - iat, 12 * 3600, '12 hours');
+  assert.equal(iss, 'bsms');
+  assert.equal(aud, 'bsms-web');
+  assert.equal(await run(good), null, 'accepted');
+
+  assert.equal(await run(jwt.sign({ userId: 1, tv: 0 }, secret, { algorithm: 'HS256' })), 401, 'no issuer / audience');
+  assert.equal(await run(jwt.sign({ userId: 1, tv: 0 }, secret,
+    { ...secrets.JWT_SIGN_OPTIONS, audience: 'something-else' })), 401, 'other audience');
+});
