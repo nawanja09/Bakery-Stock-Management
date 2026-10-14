@@ -1,14 +1,15 @@
+require('./useTestDatabase'); // the TEST database (scripts/createTestDatabase.js), never the real one
 const assert = require('node:assert/strict');
-const pool = require('../config/db');
+const pool = require('../../config/db');
 const {
   ensureChequeReleaseSchema,
   postChequeRelease,
   unreleaseCheque,
   rebuildAccountBalance
-} = require('../services/chequeReleaseService');
-const { getBankBalance, getCashBalance } = require('../utils/financeLedger');
+} = require('../../services/chequeReleaseService');
+const { getBankBalance, getCashBalance } = require('../../utils/financeLedger');
 
-// NOTE: runs against the REAL database configured in server/.env. Every row it
+// Runs against the TEST database (tests/db/useTestDatabase.js). Every row it
 // creates is recorded in `created` and removed again in cleanup() - also when
 // a check fails - so a failing run never leaves test data behind.
 async function testBody(created) {
