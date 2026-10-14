@@ -29,6 +29,14 @@
 | 7 | M2 password relay | **Fixed** | Relay opt-in only (RAVON_LOGIN_RELAY=on); a broken server key no longer silently falls back to sending passwords. |
 | 8 | N1 host binding (BSMS-SIG-2) | **Not started** | Needs the Cafe and Restaurant repos and a joint deploy; Ravon-Restaurant-New currently has an unfinished merge (and tracks its .env). Strict-origin check from N1 already blocks the fake-host path. |
 
+### Found later on 2026-10-14
+
+| ID | Sev | Item | Status |
+|---|---|---|---|
+| N8 | **CRITICAL** | config/db.js (re)created 7 logins (admin, superadmin, both accountants, finance, ...) with **passwords written in the source** on every start, and re-activated a disabled `finance`. In the local copy of production data, **accountant - 1, accountant - 2 and finance still used those passwords.** | **Fixed in code** - no accounts or passwords at start-up; `scripts/createUser.js` (hidden prompt, same password rules, reset signs out). **Owner action: change those 3 passwords in production** - the old ones remain in git history. |
+| N9 | HIGH | Cheque release posted ledger rows dated **0000-00-00** for DB date values (auto release, bank-leg safety net, registry re-release); they drop out of every date-range report. No real rows affected yet. | **Fixed** - utils/dateOnly.toYmd; registry PATCH rejects bad dates. |
+| N7 | LOW | Tests hung / touched the real DB / staffLoans never ran. | **Fixed** - `npm test` (unit, no DB), `npm run test:db` on a separate *_test database (`npm run test:db:setup`). CI workflow still to do. |
+
 Tests: `tests/securityHigh.test.js` (14 tests incl. N5, no DB needed) plus an updated C1 test in `securityCritical.test.js`. Full suite: 189/191 pass. The two file-level failures are `chequeReleaseConsistency` (fails identically on the unmodified code) and a Windows libuv crash under `--test-force-exit` (`securityHigh` passes 12/12 when run without that flag). `staffLoans.test.js` cannot run because `tests/helpers/sqliteMysqlAdapter.js` was never committed. When that file is restored, it also needs `tv: 0` in its tokens and matching `users` rows.
 
 ---

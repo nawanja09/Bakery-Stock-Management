@@ -201,8 +201,6 @@ ensureSoftDeleteStatusSchema();
 //   5. Drop the old `email` column (also removes its unique key).
 //   6. Seed default accounts only when their usernames do not already exist.
 const ensureUsernameAuthSchema = async () => {
-  const bcrypt = require('bcrypt');
-  const crypto = require('crypto');
 
   try {
     // 1. Add the column if it isn't there yet.
@@ -274,38 +272,16 @@ const ensureUsernameAuthSchema = async () => {
       }
     }
 
-    // 7. Seed the required accounts if they don't already exist.
-    // Accountant 1 never reuses another account's password: it takes
-    // ACCOUNTANT1_PASSWORD, or a random one shown once in the server log.
-    const accountant1Password = process.env.ACCOUNTANT1_PASSWORD || crypto.randomBytes(9).toString('base64url');
-    const seedUsers = [
-      { name: 'Admin', username: 'admin', password: 'Admin123', role: 'Admin' },
-      { name: 'Store Keeper', username: 'stores', password: 'password', role: 'Store Keeper' },
-      { name: 'Accountant 1', username: 'accountant - 1', password: 'rangika123', role: 'Accountant' },
-      { name: 'Accountant 2', username: 'accountant - 2', password: 'Accountant@2', role: 'Accountant' },
-      { name: 'QB', username: 'QB', password: 'password', role: 'View Only' },
-      { name: 'Finance', username: 'finance', password: 'thaniya123', role: 'Finance' },
-      { name: 'Super Admin', username: 'superadmin', password: 'SuperAdmin123', role: 'Super Admin' }
-    ];
-
-    for (const seed of seedUsers) {
-      const [existing] = await pool.query('SELECT id FROM users WHERE username = ?', [seed.username]);
-      if (existing.length === 0) {
-        const hashedPassword = await bcrypt.hash(seed.password, 10);
-        await pool.query(
-          'INSERT INTO users (name, username, password, role) VALUES (?, ?, ?, ?)',
-          [seed.name, seed.username, hashedPassword, seed.role]
-        );
-        console.log(`Seeded default user "${seed.username}" (${seed.role})`);
-        if (seed.username === 'accountant1' && !process.env.ACCOUNTANT1_PASSWORD) {
-          console.log(`Initial password for "accountant1": ${accountant1Password} (change it after first login)`);
-        }
-      } else if (seed.username === 'finance') {
-        await pool.query(
-          "UPDATE users SET role = 'Finance', status = 1 WHERE username = ? AND (role <> 'Finance' OR COALESCE(status, 0) <> 1)",
-          [seed.username]
-        );
-      }
+    // 7. No accounts are created here. This used to (re)create seven accounts
+    //    with passwords written in this file - known to anyone with the code -
+    //    on every start, and re-activated "finance" whenever it was disabled.
+    //    Accounts are created with scripts/createUser.js (password typed in,
+    //    never stored in code or logs).
+    const [[admins]] = await pool.query(
+      "SELECT COUNT(*) AS n FROM users WHERE role IN ('Admin', 'Super Admin') AND COALESCE(status, 1) = 1"
+    );
+    if (Number(admins.n) === 0) {
+      console.warn('No active Admin / Super Admin account exists. Create one with: node scripts/createUser.js');
     }
 
     console.log('Username auth schema ready');
