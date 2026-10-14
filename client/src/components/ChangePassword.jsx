@@ -28,6 +28,12 @@ const ChangePassword = () => {
             setLoading(false);
             return;
         }
+        // Same rule as the server (authController.changePassword).
+        if (newPassword.length < 8) {
+            setMessage('The new password must be at least 8 characters');
+            setLoading(false);
+            return;
+        }
 
         try {
             const response = await api.post('/change-password', { 
@@ -46,7 +52,9 @@ const ChangePassword = () => {
             setNewPassword('');
             setConfirmPassword('');
         } catch (error) {
-            showPopup('error', error.message || 'An error occurred while changing password');
+            // The server's own message (e.g. "Current password is incorrect"),
+            // not axios's generic "Request failed with status code 400".
+            showPopup('error', error.response?.data?.error || error.message || 'An error occurred while changing password');
         } finally {
             setLoading(false);
         }
