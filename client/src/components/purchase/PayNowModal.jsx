@@ -142,7 +142,6 @@ const PayNowModal = ({ isOpen, onClose, suppliers = [], companies = [], supplier
         reference_number: formData.reference_number || null,
         amount: amt,
         notes: formData.notes || null,
-        created_by: currentUser.id,
         bank_id: normalizedPaymentMethod === 'BANK_TRANSFER' ? formData.bank_id : null
       });
 

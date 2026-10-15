@@ -108,7 +108,7 @@ const getAllItems = async (req, res) => {
            WHERE ii.item_id = i.id) -
           (SELECT COALESCE(SUM(wi.quantity), 0) 
            FROM wastage_items wi 
-           JOIN wastages w ON wi.wastage_id = w.id 
+           JOIN wastages w ON wi.wastage_id = w.id AND COALESCE(w.status, 1) = 1 
            WHERE wi.item_id = i.id) +
           (SELECT COALESCE(SUM(ri.quantity), 0) 
            FROM return_items ri 
@@ -170,7 +170,7 @@ const getItemById = async (req, res) => {
            WHERE ii.item_id = i.id) -
           (SELECT COALESCE(SUM(wi.quantity), 0) 
            FROM wastage_items wi 
-           JOIN wastages w ON wi.wastage_id = w.id 
+           JOIN wastages w ON wi.wastage_id = w.id AND COALESCE(w.status, 1) = 1 
            WHERE wi.item_id = i.id) +
           (SELECT COALESCE(SUM(ri.quantity), 0) 
            FROM return_items ri 

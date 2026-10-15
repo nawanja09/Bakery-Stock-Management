@@ -2,7 +2,7 @@
 
 **Scope:** `server/` at `1b56c0c` (2026-10-15).
 **Earlier passes:** [2026-10-12](security-financial-audit-2026-10-12.md) (at `189c342`) and [2026-10-14](security-financial-reaudit-2026-10-14.md) (at `de0a965`). The earlier finding IDs (C, H, M, L and N) are kept. New findings in this pass are numbered **R1–R10**.
-**Method:** Manual code review of every module touched by the brief: purchasing, payments, stock movements, expenses, collections, ledgers, RBAC and audit. RBAC decisions were checked by running `config/rolePermissions.evaluateApiAccess` in `node`. The concurrency findings (R1) come from code reading against InnoDB REPEATABLE READ semantics. They were **not** reproduced against a live database.
+**Method:** Manual code review of every module touched by the brief: purchasing, payments, stock movements, expenses, collections, ledgers, RBAC and audit. RBAC decisions were checked by running `config/rolePermissions.evaluateApiAccess` in `node`. The concurrency findings (R1) come from code reading against InnoDB REPEATABLE READ semantics. They were later reproduced on the MySQL test database before being fixed (see R1).
 
 ---
 
@@ -25,14 +25,14 @@ So brief domains 2–4 (valuation, double entry, P&L) are mostly **design gaps**
 |---|---|---|---|
 | C4 | **CRITICAL (design)** | No double-entry ledger: Debits = Credits cannot be proven, so no P&L can be produced | carried |
 | C5 | **CRITICAL (design)** | No COGS: RAVON sends no sale lines, and stock is valued at last price | carried |
-| **R1** | **HIGH** | Supplier-invoice payment: a concurrent double payment pays twice, allocations are not capped at the outstanding amount, and the unallocated part of a payment leaves the cash book with no AP record | **new** |
-| **R2** | **HIGH** | Store Keeper can disburse supplier payments from Cash/Bank (no segregation of duties on AP) | **new** |
-| **R3** | **HIGH** | A "deleted" wastage note keeps reducing stock and inventory value; the loss disappears from every wastage list | **new** |
+| **R1** | **Fixed** 2026-10-15 (was HIGH) | Supplier-invoice payment: a concurrent double payment pays twice, allocations are not capped at the outstanding amount, and the unallocated part of a payment leaves the cash book with no AP record | **new** |
+| **R2** | ~~HIGH~~ **Accepted** | Store Keeper can disburse supplier payments from Cash/Bank (no segregation of duties on AP). Business decision 2026-10-15: keep as is | **new** |
+| **R3** | **Fixed** (route removed, 2026-10-15) - was MEDIUM | A "deleted" wastage note keeps reducing stock and inventory value; the loss disappears from every wastage list. **No page has a Delete button** - reachable only by a direct API call | **new** |
 | H4 | HIGH | No stock-availability check or item lock; adjustments trust client `system_qty`; no approval step | carried |
 | H5 | HIGH | No expense maker–checker; ledger rows hard-deleted (see R8) | carried |
 | H6 | HIGH | Audit trail opt-in (`X-RM-Adjustment` header) and mutable; sync rejects go only to `console.warn` | carried |
 | H7 | HIGH | No period close; back-dating allowed everywhere; `balance_after` wrong for back-dated rows | carried |
-| **R4** | MEDIUM | Actor spoofing survived the N4 sweep: `issued_by`, `approved_by`, `user_name`, `settled_by` (written into `payment_history.created_by`) | **new** |
+| **R4** | **Fixed** 2026-10-15 (was MEDIUM) | Actor spoofing survived the N4 sweep: `issued_by`, `approved_by`, `user_name`, `settled_by` (written into `payment_history.created_by`) | **new** |
 | **R5** | MEDIUM | `InsufficientBalanceError` is never thrown, so Cash in Hand can be driven negative; every "insufficient balance" handler is dead code | **new** |
 | **R6** | MEDIUM | `GET /api/cutlery-reports/stock-report/test` writes fake purchases, transfers and damages into production data | **new** |
 | **R7** | MEDIUM | GRN, issuance, wastage and return payloads are not validated: negative quantities, and client-supplied subtotal/VAT/total | **new** |
@@ -62,6 +62,16 @@ C4 and C5 are unchanged (see the 10-14 report). Two new facts strengthen C4:
 ## [HIGH]
 
 ### R1: Supplier-invoice payment can pay twice, overpay, or send cash out unrecorded
+> **Fixed (2026-10-15, uncommitted). Reproduced first on the MySQL test database.** Before the fix, two simultaneous Rs. 10,000 payments of one invoice both succeeded (Rs. 20,000 left cash, balance −10,000), and allocations above the balance were accepted.
+> - `makePayment` now locks every selected invoice **as the first statement** of its transaction (`SELECT … FOR UPDATE`, id order). A second payment waits, then sees the invoice paid and gets **409** ("someone may have just paid it, refresh").
+> - An allocation above what the invoice still owes gets **409**, and nothing is posted. The same invoice twice, or an amount below the allocations, gets **400**.
+> - An amount **above** the allocations (the "Any amount above the invoice balance will be stored as supplier credit" promise on the payment screen) now really creates a `supplier_overpayments` row (`ADV-<date>-P<payment id>`). It has its own `SUPPLIER_ADVANCE` cash/bank line, so it can be settled against later invoices. `payment_history.amount` holds only what reached the invoices, so the Supplier Ledger does not count it twice. This works for Cash and Bank only; Cheque and Card overpayments get **400** (use Advance Payment).
+> - `request_id` (body, sent by both payment screens, one per form opening) or `Idempotency-Key` (header): `payment_history.request_id` is UNIQUE (`config/db.js`, `migrations/034_…sql`), so the same request twice records one payment.
+> - Amounts compared in 1/10000 units (the columns are DECIMAL(…,4)).
+> - Tests: `tests/db/supplierPayments.test.js` (12 tests, including two real concurrent races). 7 of them failed on the old code; all pass on the new code, 5 runs in a row. `npm run test:db` 31/31, `npm test` 217/217.
+>
+> **Correction to point 3 below:** before the fix, the unallocated part was not completely invisible. `services/purchasingPositionService.js` showed it as "unallocated payment credit" in the Supplier Ledger totals. It could not be settled against invoices, and the Analyst balance sheet ignored it. Payments made before this fix are unchanged. Run the data-check SQL below to find them.
+
 **Where:** `controllers/purchaseController.js` `makePayment` (`:785-1163`). It is reached through `POST /purchases/:id/pay`, `POST /purchases/pay-multiple` and `POST /purchases/purchase/:id/pay`.
 
 Three independent defects:
@@ -149,6 +159,8 @@ SELECT id, invoice_no, total_with_vat, paid_amount, balance_amount FROM purchase
 ---
 
 ### R2: Store Keeper can pay suppliers (no segregation of duties on AP)
+> **Decision (2026-10-15): accepted, do not change.** The owner keeps Store Keeper's supplier-payment access exactly as it is. The fix below is kept for reference only and is **not** to be applied.
+
 **Where:** `config/rolePermissions.js:69` grants `STORES` the `rawMaterial` module. The rules `/purchases` (`:130`), `/suppliers` (`:137`) and `/purchase-returns` (`:146`) give that module **full write**, with no `writeRoles`.
 
 Verified with `evaluateApiAccess`:
@@ -184,6 +196,9 @@ Mirror the change in `client/src/config/rolePermissions.js` and hide the Pay / S
 ---
 
 ### R3: Deleting a wastage note hides the loss but keeps the stock reduction
+> **Correction (2026-10-15): severity lowered to MEDIUM.** No client page calls `DELETE /api/wastages/:id`. The Edit and Delete buttons were removed from Wastage History (`WastageHistory.jsx:199`), and the trash icon on Edit Wastage (`EditWastage.jsx:572-581`) only removes an item line from the form. The defect can only be triggered by a direct API call with a valid token from a Raw Material role (Store Keeper, Accountant, Admin, Super Admin), for example from browser dev tools or Postman. The normal way to correct a wrong note is **Edit Wastage**, which replaces the item lines, so the stock is correct. Fix the formulas anyway, or remove the unused `DELETE` route (`routes/wastageRoutes.js:12`).
+
+> **Fixed (2026-10-15, uncommitted):** `DELETE /api/wastages/:id` and `wastageController.deleteWastage` were removed. A note is corrected only through Edit (PUT), which replaces its item lines. Regression test: `tests/wastageRoutes.test.js`. **Still to check in production:** notes deleted before this fix (`SELECT id, wastage_note_number, date FROM wastages WHERE status = 0;`). Each one is still subtracted from stock while hidden from every list. Decide per note whether to restore it (`status = 1`) or reverse it by editing.
 **Where:** `controllers/wastageController.js:284` soft-deletes (`UPDATE wastages SET status = 0`). The wastage list (`:83`) and detail (`:150`) then hide it. **No stock formula filters on `w.status`:**
 `services/rmStockService.js:62,107` (Orders / low stock), `controllers/reportController.js:114,164,338,345,476,483` (Stock report, stock-by-range), `controllers/adjustmentController.js:638` (system qty used for adjustments), `controllers/analystController.js:254` (balance-sheet stores value), `controllers/dashboardController.js:147`, `controllers/itemController.js:111,173`, `controllers/issuanceController.js:304`.
 
@@ -242,6 +257,13 @@ Call it inside `recordCashTransaction` / `recordBankTransaction` (one place cove
 ## [MEDIUM]
 
 ### R4: Actor fields still taken from the request body
+> **Fixed (2026-10-15, uncommitted).**
+> - Issued By (issuances), Entered By (wastages), the new `stock_adjustments.created_by`, Settled By (Settle Now, both return-settle routes, and the `payment_history.created_by` they write) and Returned By now all come from `actorId(req)`. Body values are ignored.
+> - **Approved By** (Issue, Wastage, Stock Adjustment `user_name`) is the approver typed on the form when there is one (often someone without a login). Otherwise it is the signed-in user's name (`utils/actor.approverName`). The form field is now optional and labelled so.
+> - The pages no longer send `issued_by`, `settled_by`, `returned_by`, `created_by` or `prepared_by`. Issue, Wastage and Stock Adjustment details show Issued By / Entered By.
+> - Tests: `tests/db/actorFields.test.js` (5 tests, each sending another user's id). All 5 fail on the old code and pass on the new.
+> - Not changed: Cutlery `reported_by` / `transferred_by` are free-text staff names, and the logged-in user is already saved there as `created_by`.
+
 The N4/H2 sweep fixed 11 sites but missed these:
 
 | Where | Field | Effect |
@@ -337,16 +359,16 @@ After that, `REVOKE DELETE ON bsms.finance_transactions FROM 'bsms_app'@'%'` (ru
 | Domain | Verdict at `1b56c0c` |
 |---|---|
 | 1. Ingestion auth | **Good.** ECDSA P-256 signed pulls with nonce and 5-min window. Strict same-origin pagination and HTTPS in production (N1 fixed). Host not yet signed (low). |
-| 1. Idempotency | **Good for collections.** `UNIQUE(source_system, source_type, source_id)`, unique completed reference (N2), `FOR UPDATE` in id order with per-record savepoints. **Weak for supplier payments** (R1: no idempotency key, check-then-act race). |
+| 1. Idempotency | **Good for collections.** `UNIQUE(source_system, source_type, source_id)`, unique completed reference (N2), `FOR UPDATE` in id order with per-record savepoints. Supplier payments: fixed 2026-10-15 (R1: invoice lock first, `request_id` UNIQUE). |
 | 1. Payload validation | Collections: heuristic mapping (M4), POS total cross-check before approval (`collectionService.js:410-414`). GRNs and stock lines: **none** (R7). |
 | 2. Valuation / COGS | Not implemented (C5). Last-price valuation, and the balance-sheet stores value is skewed by deleted wastage (R3). |
 | 2. Atomic stock reductions | None: no item lock or availability check (H4). Negative quantities accepted (R7). |
 | 2. Adjustments / write-offs | No approval (H4). Client-supplied system qty and user name (H4, R4). Deleted wastage still reduces stock (R3). No loss-ledger posting (C4). |
 | 3. Double entry / CoA | Absent (C4). AP and cash book can diverge silently (R1, H3). |
-| 3. Approval workflows | Collections: Accountant-only approve (good). Expenses: none (H5). **Supplier payments: Store Keeper can pay** (R2). |
+| 3. Approval workflows | Collections: Accountant-only approve (good). Expenses: none (H5). Supplier payments: Store Keeper can pay (R2, accepted 2026-10-15). |
 | 4. P&L / precision | No P&L engine. Money handled as floats in JS (M5). Columns are `DECIMAL`. The expense-payment path already uses cents (`newExpenseRoutes.js:273`). |
 | 4. Period close | None (H7). Fix above. |
-| 5. RBAC | Central default-deny table. Role re-read from the DB on every request (N3 fixed). Gap: AP money-out (R2). |
+| 5. RBAC | Central default-deny table. Role re-read from the DB on every request (N3 fixed). Store Keeper pays suppliers by design (R2, accepted 2026-10-15). |
 | 5. IDOR / branches | Collections are row-filtered in per-user mode. All Accountants see all branches (accepted 2026-10-14). Everything else has no company scoping (M8). |
 | 6. Audit trail | Opt-in by header and mutable (H6). Ledger rows hard-deleted (R8). Sync rejects not persisted (H6). |
 
@@ -356,8 +378,8 @@ After that, `REVOKE DELETE ON bsms.finance_transactions FROM 'bsms_app'@'%'` (ru
 
 | When | Action |
 |---|---|
-| **Now** | R2 (`writeRoles` change, no data migration). R3 (`status` filter at 14 sites). R6 (delete the test route). Run the R1 data-check SQL on production. |
-| **This week** | R1 (lock first, cap, amount = Σ allocations, idempotency key). R4 (`actorId`). R5 (negative cash guard). R7 (line validation + server-side totals). R8 (void, not delete) + least-privilege DB user. |
+| **Now** | R3 done (route removed); check production for `wastages.status = 0`. R6 (delete the test route). Run the R1 data-check SQL on production. |
+| **This week** | R1 done (lock first, cap, excess → supplier credit, request_id). R4 (`actorId`). R5 (negative cash guard). R7 (line validation + server-side totals). R8 (void, not delete) + least-privilege DB user. |
 | **2–4 weeks** | H7 period lock. H5 expense approval + void-not-delete everywhere. H6 `audit_log` + `integration_sync_log`. M3 payload hash. R9 reference registry. M7 single stock definition (also removes R10). |
 | **Quarter** | C4 GL and posting map. C5 WAC + RAVON sale lines. M5 money migration. M8 company scoping. BSMS-SIG-2. |
 

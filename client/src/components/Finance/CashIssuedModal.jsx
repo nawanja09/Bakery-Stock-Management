@@ -96,8 +96,7 @@ const CashIssuedModal = ({ defaultCompanyId = '', record = null, onClose, onSave
         other_ledger_id: formData.other_ledger_id,
         amount: amt,
         reference_number: formData.reference_number || null,
-        remark: formData.remark || null,
-        created_by: currentUser.id
+        remark: formData.remark || null
       };
       if (isEdit) await api.put(`/finance/cash/issued/${record.id}`, payload);
       else await api.post('/finance/cash/issued', payload);

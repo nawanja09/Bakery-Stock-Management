@@ -28,7 +28,7 @@ import dayjs from 'dayjs';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
 import './Purchase.css';
-import { formatQuantity, PURCHASING_DECIMALS } from '../../utils/formatters';
+import { formatQuantity, formatPaymentMethodLabel, PURCHASING_DECIMALS } from '../../utils/formatters';
 
 const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
   const params = useParams();
@@ -515,8 +515,8 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
                         <td className="text-right">{formatCurrency(totalWithVat)}</td>
                         <td className="text-right paid-amount">{formatCurrency(allocatedPaidAmount)}</td>
                         <td className="text-left">
-                          <span className={`payment-method-badge ${payment.payment_method?.toLowerCase()}`}>
-                            {payment.payment_method?.replace('_', ' ')}
+                          <span className={`payment-method-badge ${String(payment.payment_method || '').toLowerCase()}`}>
+                            {formatPaymentMethodLabel(payment.payment_method)}
                           </span>
                         </td>
                         <td className="text-left">{payment.check_number || '-'}</td>

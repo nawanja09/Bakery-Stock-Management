@@ -16,6 +16,7 @@ import { usePopup } from '../context/PopupContext';
 import api from '../../api';
 import useDialog from '../common/ui/useDialog';
 import usePaymentMethods from '../../utils/usePaymentMethods';
+import { formatPaymentMethodLabel } from '../../utils/formatters';
 import './PaymentModal.css';
 
 const PaymentModal = ({ purchase, onClose, onPaymentComplete }) => {
@@ -30,6 +31,9 @@ const PaymentModal = ({ purchase, onClose, onPaymentComplete }) => {
   const [paymentHistory, setPaymentHistory] = useState([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  // One id per opening of this form: a double-click or a retried request is
+  // recorded by the server as ONE payment.
+  const [paymentRequestId] = useState(() => window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`);
   const dialogRef = useRef(null);
   // Escape closes (not while saving); focus moves in; Tab and page scroll stay put.
   useDialog(dialogRef, { open: true, onClose: submitting ? undefined : onClose });
@@ -106,7 +110,7 @@ const PaymentModal = ({ purchase, onClose, onPaymentComplete }) => {
     try {
       const response = await api.post(`/purchases/${purchase.id}/pay`, {
         ...formData,
-        created_by: currentUser.id
+        request_id: paymentRequestId
       });
 
       onPaymentComplete({
@@ -333,9 +337,9 @@ const PaymentModal = ({ purchase, onClose, onPaymentComplete }) => {
                         <tr key={payment.id}>
                           <td>{formatDate(payment.payment_date)}</td>
                           <td>
-                            <span className={`method-badge ${payment.payment_method.toLowerCase()}`}>
+                            <span className={`method-badge ${String(payment.payment_method || '').toLowerCase()}`}>
                               <FontAwesomeIcon icon={getPaymentMethodIcon(payment.payment_method)} />
-                              {payment.payment_method.replace('_', ' ')}
+                              {formatPaymentMethodLabel(payment.payment_method)}
                             </span>
                           </td>
                           <td className="amount">{formatCurrency(payment.amount)}</td>

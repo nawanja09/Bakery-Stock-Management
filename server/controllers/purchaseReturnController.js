@@ -1,5 +1,6 @@
 // controllers/purchaseReturnController.js
 const pool = require('../config/db');
+const { actorId } = require('../utils/actor');
 
 // Get all purchases for return selection
 const getPurchasesForReturn = async (req, res) => {
@@ -126,8 +127,6 @@ const createPurchaseReturn = async (req, res) => {
       return_date,
       items,
       remarks,
-      returned_by,
-      payment_method,
       company_id,
       check_number,
       settlements,
@@ -151,8 +150,10 @@ const createPurchaseReturn = async (req, res) => {
     if (!items || items.length === 0) {
       throw new Error('At least one item is required');
     }
+    // Returned By = the signed-in user, never a value from the form.
+    const returned_by = actorId(req);
     if (!returned_by) {
-      throw new Error('Returned by user ID is required');
+      throw new Error('Please log in again');
     }
 
     // ─── Re-verify supplier VAT registration directly from DB ──────────────
@@ -374,10 +375,12 @@ const createPurchaseReturn = async (req, res) => {
             [newBalance, newPaid, newBalanceStatus, paymentStatus, settlement.purchase_id]
           );
 
+          // PURCHASE_RETURN, never the form's payment method: a return moves no
+          // cash (services/settlementPaymentMethods.js).
           await connection.query(
-            `INSERT INTO payment_history (purchase_id, payment_date, amount, payment_method, notes, created_by)
-             VALUES (?, ?, ?, ?, ?, ?)`,
-            [settlement.purchase_id, return_date, settlementAmount, payment_method || 'CASH',
+            `INSERT INTO payment_history (purchase_id, payment_date, amount, payment_method, check_number, notes, created_by)
+             VALUES (?, ?, ?, 'PURCHASE_RETURN', ?, ?, ?)`,
+            [settlement.purchase_id, return_date, settlementAmount, return_number,
              `Return settlement from return #${return_number}`, returned_by]
           );
         }
@@ -875,6 +878,7 @@ const getCurrentStock = async (req, res) => {
         COALESCE((
           SELECT COALESCE(SUM(wi.quantity), 0)
           FROM wastage_items wi 
+          JOIN wastages w ON wi.wastage_id = w.id AND COALESCE(w.status, 1) = 1
           WHERE wi.item_id = i.id
         ), 0) AS quantity
       FROM items i
@@ -924,6 +928,7 @@ const getItemStock = async (req, res) => {
         COALESCE((
           SELECT COALESCE(SUM(wi.quantity), 0)
           FROM wastage_items wi 
+          JOIN wastages w ON wi.wastage_id = w.id AND COALESCE(w.status, 1) = 1
           WHERE wi.item_id = ?
         ), 0) AS quantity
       FROM items i
@@ -1133,7 +1138,13 @@ const addSettlementToPurchaseReturn = async (req, res) => {
   try {
     await connection.beginTransaction();
 
-    const { settlements, payment_method, settlement_date, notes, settled_by } = req.body;
+    const { settlements, settlement_date, notes } = req.body;
+    // Settled By = the signed-in user, never a value from the form.
+    const settled_by = actorId(req);
+    if (!settled_by) {
+      await connection.rollback();
+      return res.status(401).json({ error: 'Please log in again' });
+    }
 
     // Validate required fields
     if (!settlements || settlements.length === 0) {
@@ -1252,16 +1263,17 @@ const addSettlementToPurchaseReturn = async (req, res) => {
           [newBalance, newPaid, newBalanceStatus, paymentStatus, settlement.purchase_id]
         );
 
-        // Record payment history
+        // Record payment history - PURCHASE_RETURN, never the form's payment
+        // method: a return moves no cash (services/settlementPaymentMethods.js).
         await connection.query(
-          `INSERT INTO payment_history 
-           (purchase_id, payment_date, amount, payment_method, notes, created_by)
-           VALUES (?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO payment_history
+           (purchase_id, payment_date, amount, payment_method, check_number, notes, created_by)
+           VALUES (?, ?, ?, 'PURCHASE_RETURN', ?, ?, ?)`,
           [
             settlement.purchase_id,
             settlement_date || new Date().toISOString().split('T')[0],
             settlementAmount,
-            payment_method || 'CASH',
+            currentReturn.return_number,
             notes || `Settlement added to return #${currentReturn.return_number}`,
             settled_by
           ]

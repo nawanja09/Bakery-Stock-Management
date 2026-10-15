@@ -81,7 +81,8 @@ const StoresBalance = () => {
 
   const [generalInfo, setGeneralInfo] = useState({
     date: new Date().toISOString().slice(0, 16),
-    user_name: '',
+    // Only when someone else approved; empty = the signed-in user (saved by the server).
+    approved_by: '',
     reference_note: ''
   });
 
@@ -221,11 +222,6 @@ const StoresBalance = () => {
   };
 
   const validateForm = () => {
-    if (!generalInfo.user_name.trim()) {
-      showMessage('Please enter your name in the "Adjusted By" field.', 'error');
-      return false;
-    }
-
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       if (!row.item_id) {
@@ -383,16 +379,14 @@ const StoresBalance = () => {
             
             <div className="form-group">
               <label>
-                <FontAwesomeIcon icon={faUser} /> Adjusted By
-                <span className="required">*</span>
+                <FontAwesomeIcon icon={faUser} /> Approved By (optional)
               </label>
               <input
                 type="text"
-                name="user_name"
-                value={generalInfo.user_name}
+                name="approved_by"
+                value={generalInfo.approved_by}
                 onChange={handleGeneralChange}
-                placeholder="Enter your full name"
-                required
+                placeholder="Only if someone else approved - otherwise your name is saved"
               />
             </div>
 

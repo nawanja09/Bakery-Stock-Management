@@ -158,7 +158,7 @@ const IssueToDepartment = () => {
     const payload = {
       issuance_date: formData.issuance_date,
       issuance_time: formData.issuance_time,
-      issued_by: currentUser.id,
+      // Issued By is the signed-in user - the server takes it from the login.
       department_id: formData.department_id,
       received_by: formData.received_by,
       remarks: formData.remarks,

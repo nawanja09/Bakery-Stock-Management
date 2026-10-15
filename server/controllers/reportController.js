@@ -111,7 +111,7 @@ const getStockReport = async (req, res) => {
         LEFT JOIN (
           SELECT wi.item_id, SUM(wi.quantity) AS total_wasted
           FROM wastage_items wi
-          JOIN wastages w ON wi.wastage_id = w.id
+          JOIN wastages w ON wi.wastage_id = w.id AND COALESCE(w.status, 1) = 1
           WHERE DATE(w.date) <= ?
           GROUP BY wi.item_id
         ) wastage ON i2.id = wastage.item_id
@@ -161,7 +161,7 @@ const getStockReport = async (req, res) => {
       LEFT JOIN (
         SELECT wi.item_id, SUM(wi.quantity) AS total_wasted
         FROM wastage_items wi
-        JOIN wastages w ON wi.wastage_id = w.id
+        JOIN wastages w ON wi.wastage_id = w.id AND COALESCE(w.status, 1) = 1
         WHERE DATE(w.date) = ?
         GROUP BY wi.item_id
       ) wastage ON i.id = wastage.item_id
@@ -335,14 +335,14 @@ const getStockReportByRangeAndItem = async (req, res) => {
       ? await pool.query(
           `SELECT SUM(wi.quantity) AS wasted
            FROM wastage_items wi
-           JOIN wastages w ON wi.wastage_id = w.id
+           JOIN wastages w ON wi.wastage_id = w.id AND COALESCE(w.status, 1) = 1
            WHERE wi.item_id = ? AND DATE(w.date) < ?`,
           [itemId, startDate]
         )
       : await pool.query(
           `SELECT SUM(wi.quantity) AS wasted
            FROM wastage_items wi
-           JOIN wastages w ON wi.wastage_id = w.id
+           JOIN wastages w ON wi.wastage_id = w.id AND COALESCE(w.status, 1) = 1
            JOIN items it ON wi.item_id = it.id
            WHERE it.auto_add_to_stock = 1 AND (it.deleted = FALSE OR it.deleted IS NULL)
              AND DATE(w.date) < ?`,
@@ -473,14 +473,14 @@ const getStockReportByRangeAndItem = async (req, res) => {
         ? await pool.query(
             `SELECT SUM(wi.quantity) AS wasted
              FROM wastage_items wi
-             JOIN wastages w ON wi.wastage_id = w.id
+             JOIN wastages w ON wi.wastage_id = w.id AND COALESCE(w.status, 1) = 1
              WHERE wi.item_id = ? AND DATE(w.date) = ?`,
             [itemId, date]
           )
         : await pool.query(
             `SELECT SUM(wi.quantity) AS wasted
              FROM wastage_items wi
-             JOIN wastages w ON wi.wastage_id = w.id
+             JOIN wastages w ON wi.wastage_id = w.id AND COALESCE(w.status, 1) = 1
              JOIN items it ON wi.item_id = it.id
              WHERE it.auto_add_to_stock = 1 AND (it.deleted = FALSE OR it.deleted IS NULL)
                AND DATE(w.date) = ?`,
@@ -1016,7 +1016,7 @@ const getWastageReport = async (req, res) => {
         w.approved_by,
         w.reason,
         w.remarks,
-        u.username AS entered_by
+        COALESCE(u.name, u.username) AS entered_by
       FROM wastages w
       JOIN users u ON w.entered_by = u.id
       WHERE w.date BETWEEN ? AND ?

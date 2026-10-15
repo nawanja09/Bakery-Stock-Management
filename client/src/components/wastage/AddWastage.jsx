@@ -186,12 +186,12 @@ const AddWastage = () => {
           </div>
 
           <div className="form-group">
-            <label>Approved By</label>
+            <label>Approved By (optional)</label>
             <input
               type="text"
               value={formData.approved_by}
               onChange={(e) => setFormData({ ...formData, approved_by: e.target.value })}
-              required
+              placeholder="Only if someone else approved - otherwise your name is saved"
             />
           </div>
           <div className="form-group">

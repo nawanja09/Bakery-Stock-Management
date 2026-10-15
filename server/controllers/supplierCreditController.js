@@ -293,14 +293,16 @@ const createOverpayment = async (req, res) => {
 
 // POST /api/suppliers/settle-credit
 const settleCreditToInvoice = async (req, res) => {
-  const { purchase_id, credits, settlement_date, settled_by, notes } = req.body;
+  const { purchase_id, credits, settlement_date, notes } = req.body;
+  // Settled By = the signed-in user, never a value from the form.
+  const settled_by = actorId(req);
 
   if (!purchase_id) return res.status(400).json({ error: 'Purchase ID is required' });
   if (!Array.isArray(credits) || credits.length === 0) {
     return res.status(400).json({ error: 'At least one credit must be selected' });
   }
   if (!settlement_date) return res.status(400).json({ error: 'Settlement date is required' });
-  if (!settled_by) return res.status(400).json({ error: 'Settled by is required' });
+  if (!settled_by) return res.status(401).json({ error: 'Please log in again' });
 
   const connection = await pool.getConnection();
   try {
@@ -317,6 +319,8 @@ const settleCreditToInvoice = async (req, res) => {
 
     let totalSettled = 0;
     let remainingInvoiceBalance = formatNum(invoice.balance_amount);
+    // One Payment History row per credit used, so the invoice shows each source.
+    const settlementRows = [];
 
     for (const credit of credits) {
       const amount = formatNum(credit.amount);
@@ -355,6 +359,7 @@ const settleCreditToInvoice = async (req, res) => {
              allocated_amount, settlement_date, settled_by, notes)
           VALUES ('overpayment', ?, NULL, ?, ?, ?, ?, ?)
         `, [op.id, purchase_id, amount, settlement_date, settled_by, notes || null]);
+        settlementRows.push({ method: 'ADVANCE_PAYMENT', label: 'Advance payment', reference: op.overpayment_number, amount });
       } else if (credit.credit_type === 'return_credit') {
         const [[rc]] = await connection.query(
           'SELECT * FROM purchase_return_credits WHERE id = ? FOR UPDATE',
@@ -382,8 +387,9 @@ const settleCreditToInvoice = async (req, res) => {
           INSERT INTO credit_allocations
             (credit_type, overpayment_id, return_credit_id, purchase_id,
              allocated_amount, settlement_date, settled_by, notes)
-          VALUES ('return_credit', NULL, ?, ?, ?, ?, ?)
+          VALUES ('return_credit', NULL, ?, ?, ?, ?, ?, ?)
         `, [rc.id, purchase_id, amount, settlement_date, settled_by, notes || null]);
+        settlementRows.push({ method: 'PURCHASE_RETURN', label: 'Purchase return credit', reference: rc.credit_number, amount });
       } else {
         await connection.rollback();
         return res.status(400).json({ error: `Unknown credit_type: ${credit.credit_type}` });
@@ -405,11 +411,20 @@ const settleCreditToInvoice = async (req, res) => {
       [newPaidAmount, newBalance, newBalanceStatus, newPaymentStatus, purchase_id]
     );
 
-    await connection.query(`
-      INSERT INTO payment_history
-        (purchase_id, payment_date, amount, payment_method, notes, created_by)
-      VALUES (?, ?, ?, 'CREDIT', ?, ?)
-    `, [purchase_id, settlement_date, totalSettled, `Credit settlement: ${notes || 'Applied supplier credit'}`, settled_by]);
+    // No money moves now: it left when the advance was paid, and a return never
+    // moves cash. ADVANCE_PAYMENT / PURCHASE_RETURN (services/settlementPaymentMethods.js)
+    // keep these rows out of the Cash / Bank ledger and out of payment adjustments.
+    for (const row of settlementRows) {
+      await connection.query(`
+        INSERT INTO payment_history
+          (purchase_id, payment_date, amount, payment_method, check_number, notes, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `, [
+        purchase_id, settlement_date, row.amount, row.method, row.reference || null,
+        `Credit settlement: ${row.label}${row.reference ? ` ${row.reference}` : ''} applied${notes ? ` - ${notes}` : ''}`,
+        settled_by
+      ]);
+    }
 
     await connection.commit();
     res.json({

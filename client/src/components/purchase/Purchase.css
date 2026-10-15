@@ -1116,6 +1116,10 @@
 .erp-purchase-details .payment-method-badge.bank_transfer { background: var(--color-primary-100); color: var(--color-primary-dark); }
 .erp-purchase-details .payment-method-badge.cheque { background: #fef9c3; color: #854d0e; }
 .erp-purchase-details .payment-method-badge.credit_card { background: #ede9fe; color: #6d28d9; }
+/* Settlements - no new money moved: an advance / overpayment or a purchase return applied. */
+.erp-purchase-details .payment-method-badge.advance_payment,
+.erp-purchase-details .payment-method-badge.supplier_credit { background: var(--color-accent-light); color: var(--color-primary); }
+.erp-purchase-details .payment-method-badge.purchase_return { background: var(--color-primary-50); color: var(--color-primary-dark); border: 1px solid var(--color-primary-border); }
 
 /* ---------- Items summary stats ---------- */
 .erp-purchase-details .items-summary {

@@ -452,9 +452,39 @@ const ensurePaymentHistorySchema = async () => {
       await pool.query('ALTER TABLE expenses_cheque_registry ADD COLUMN bank_id INT NULL AFTER bank');
     } catch (_) {}
   }
+
+  // Supplier payment Idempotency-Key: the same key twice records one payment
+  // (purchaseController.makePayment). See migrations/034_payment_history_request_id.sql.
+  try {
+    await pool.query('ALTER TABLE payment_history ADD COLUMN IF NOT EXISTS request_id VARCHAR(64) NULL');
+    await pool.query('ALTER TABLE payment_history ADD UNIQUE KEY IF NOT EXISTS uq_payment_history_request (request_id)');
+  } catch (error) {
+    console.warn('payment_history.request_id schema check skipped:', error.message);
+  }
+
+  // Settlement payment methods (ADVANCE_PAYMENT / PURCHASE_RETURN / SUPPLIER_CREDIT)
+  // and the repair of rows saved before them - services/settlementPaymentMethods.js.
+  try {
+    await require('../services/settlementPaymentMethods').ensureSettlementPaymentMethods(pool);
+  } catch (error) {
+    console.warn('payment_history settlement methods check skipped:', error.message);
+  }
 };
 
-ensurePaymentHistorySchema();
+// Resolves once payment_history has its optional columns - tests/db wait for it.
+pool.paymentHistorySchemaReady = ensurePaymentHistorySchema();
+
+// Stock adjustments: the signed-in user who saved it (user_name is the approver
+// typed on the form, or that user). See migrations/036_stock_adjustments_created_by.sql.
+const ensureStockAdjustmentCreatedBy = async () => {
+  try {
+    await pool.query('ALTER TABLE stock_adjustments ADD COLUMN IF NOT EXISTS created_by INT NULL');
+  } catch (error) {
+    console.warn('stock_adjustments.created_by schema check skipped:', error.message);
+  }
+};
+pool.stockAdjustmentSchemaReady = ensureStockAdjustmentCreatedBy();
+pool.ensurePaymentHistorySchema = ensurePaymentHistorySchema;
 
 // --- Connect the Expenses modules to Finance -------------------------------
 // Adds the columns each expense table needs to post a Cash/Bank ledger entry:

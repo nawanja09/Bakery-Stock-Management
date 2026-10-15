@@ -145,8 +145,7 @@ const FundTransfer = () => {
         amount:       amt,
         date:         formData.date,
         remark:       formData.remark || null,
-        cheque_number: formData.direction === 'BANK_TO_CASH' ? formData.cheque_number.trim() : null,
-        created_by:   currentUser.id
+        cheque_number: formData.direction === 'BANK_TO_CASH' ? formData.cheque_number.trim() : null
       });
 
       setMessage({

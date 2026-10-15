@@ -12,7 +12,6 @@ import './SettleNowModal.css';
 
 const SettleNowModal = ({ isOpen, onClose, invoice, supplierId, onSuccess }) => {
   const { showPopup } = usePopup();
-  const currentUser = JSON.parse(localStorage.getItem('user'));
 
   const [credits, setCredits] = useState([]);
   const [allocations, setAllocations] = useState({});
@@ -101,7 +100,6 @@ const SettleNowModal = ({ isOpen, onClose, invoice, supplierId, onSuccess }) => 
       const response = await api.post('/suppliers/settle-credit', {
         purchase_id: invoice.id,
         settlement_date: dayjs().format('YYYY-MM-DD'),
-        settled_by: currentUser.id,
         notes: `Settled from available supplier credits`,
         credits: creditsToApply
       });

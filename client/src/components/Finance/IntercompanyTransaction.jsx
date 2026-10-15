@@ -188,8 +188,7 @@ const IntercompanyTransaction = () => {
         to_bank_id: form.to_item === 'BANK' ? Number(form.to_bank_id) : null,
         amount: parseFloat(form.amount),
         date: form.date,
-        description: form.description.trim(),
-        created_by: currentUser.id
+        description: form.description.trim()
       });
       showPopup('success', 'Intercompany transaction recorded successfully!');
       setForm(emptyForm());

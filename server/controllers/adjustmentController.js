@@ -2,6 +2,7 @@ const pool = require('../config/db');
 const { recordRmAdjustment, recordFinancialAdjustment, sameValue } = require('../utils/rmAdjustmentAudit');
 const { checkDuplicateReference } = require('../services/referenceValidationService');
 const otherLedgerService = require('../services/otherLedgerService');
+const { actorId, approverName } = require('../utils/actor');
 
 const FINANCIAL_ADJUSTMENT_CATEGORIES = new Set(['Cash Receive', 'Bank Receive']);
 const FINANCIAL_ADJUSTMENT_SOURCES = new Set(['finance', 'card']);
@@ -307,13 +308,19 @@ const getAdjustmentValues = ({ system_qty, actual_qty, unit_price }) => {
 
 // Create a new stock adjustment
 const createAdjustment = async (req, res) => {
-  const { date, user_name, reference_note, item_id, system_qty, actual_qty, variance, unit_price, amount, reason } = req.body;
+  const { date, reference_note, item_id, system_qty, actual_qty, variance, unit_price, amount, reason } = req.body;
   const requestId = req.get('Idempotency-Key') || req.body.request_id || null;
+  // Saved by = the signed-in user, never a value from the form.
+  const createdBy = actorId(req);
+  if (!createdBy) return res.status(401).json({ error: 'Please log in again' });
 
   const connection = await pool.getConnection();
 
   try {
     await connection.beginTransaction();
+
+    // Approved By (user_name): the approver named on the form, otherwise the signed-in user.
+    const user_name = await approverName(connection, req, req.body.approved_by);
 
     if (requestId) {
       const [existing] = await connection.query(
@@ -334,10 +341,10 @@ const createAdjustment = async (req, res) => {
 
     // 1. Insert into stock_adjustments table for history
     const [result] = await connection.query(
-      `INSERT INTO stock_adjustments 
-      (date, user_name, reference_note, item_id, system_qty, actual_qty, variance, unit_price, amount, reason, request_id) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [date, user_name, reference_note, item_id, values.systemQuantity, values.actualQuantity, values.variance, values.unitPrice, values.amount, reason, requestId]
+      `INSERT INTO stock_adjustments
+      (date, user_name, reference_note, item_id, system_qty, actual_qty, variance, unit_price, amount, reason, request_id, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [date, user_name, reference_note, item_id, values.systemQuantity, values.actualQuantity, values.variance, values.unitPrice, values.amount, reason, requestId, createdBy]
     );
 
     // 2. Log the adjustment as a stock movement. Opening balances remain one-time item balances.
@@ -349,7 +356,7 @@ const createAdjustment = async (req, res) => {
     );
 
     await recordRmAdjustment(connection, {
-      category: 'Department', sourceRecordId: result.insertId, referenceId: requestId, updatedBy: null
+      category: 'Department', sourceRecordId: result.insertId, referenceId: requestId, updatedBy: createdBy
     });
 
     await connection.commit();
@@ -387,11 +394,14 @@ const getAdjustments = async (req, res) => {
         sa.unit_price,
         sa.amount,
         sa.reason,
+        sa.created_by,
+        COALESCE(cu.name, cu.username) AS created_by_name,
         i.name AS item_name,
         i.item_code AS item_code,
         i.unit
       FROM stock_adjustments sa
       JOIN items i ON sa.item_id = i.id
+      LEFT JOIN users cu ON cu.id = sa.created_by
       WHERE 1=1
     `;
 
@@ -635,7 +645,7 @@ const getSystemQuantity = async (req, res) => {
       LEFT JOIN (
         SELECT wi.item_id, SUM(wi.quantity) AS total_wasted
         FROM wastage_items wi
-        JOIN wastages w ON wi.wastage_id = w.id
+        JOIN wastages w ON wi.wastage_id = w.id AND COALESCE(w.status, 1) = 1
         WHERE wi.item_id = ?
         GROUP BY wi.item_id
       ) wastage ON i.id = wastage.item_id
@@ -698,11 +708,14 @@ const getAdjustmentById = async (req, res) => {
         sa.unit_price,
         sa.amount,
         sa.reason,
+        sa.created_by,
+        COALESCE(cu.name, cu.username) AS created_by_name,
         i.name AS item_name,
         i.item_code AS item_code,
         i.unit
       FROM stock_adjustments sa
       JOIN items i ON sa.item_id = i.id
+      LEFT JOIN users cu ON cu.id = sa.created_by
       WHERE sa.id = ?`,
       [id]
     );
@@ -722,7 +735,6 @@ const updateAdjustment = async (req, res) => {
   const { id } = req.params;
   const {
     date,
-    user_name,
     reference_note,
     item_id,
     system_qty,
@@ -732,11 +744,15 @@ const updateAdjustment = async (req, res) => {
     amount,
     reason
   } = req.body;
+  if (!actorId(req)) return res.status(401).json({ error: 'Please log in again' });
 
   const connection = await pool.getConnection();
 
   try {
     await connection.beginTransaction();
+
+    // Approved By (user_name): the approver named on the form, otherwise the signed-in user.
+    const user_name = await approverName(connection, req, req.body.approved_by);
 
     const [existingRows] = await connection.query(
       `SELECT item_id, request_id FROM stock_adjustments WHERE id = ? FOR UPDATE`,

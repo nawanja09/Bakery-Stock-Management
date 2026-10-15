@@ -144,7 +144,7 @@ exports.getDashboardOverview = async (req, res) => {
             (SELECT COALESCE(SUM(quantity), 0) FROM opening_balances WHERE item_id = i.id) +
             (SELECT COALESCE(SUM(pi.quantity), 0) FROM purchase_items pi JOIN purchases p ON pi.purchase_id = p.id WHERE pi.item_id = i.id) -
             (SELECT COALESCE(SUM(ii.quantity), 0) FROM issuance_items ii JOIN issuances iss ON ii.issuance_id = iss.id WHERE ii.item_id = i.id) -
-            (SELECT COALESCE(SUM(wi.quantity), 0) FROM wastage_items wi JOIN wastages w ON wi.wastage_id = w.id WHERE wi.item_id = i.id) +
+            (SELECT COALESCE(SUM(wi.quantity), 0) FROM wastage_items wi JOIN wastages w ON wi.wastage_id = w.id AND COALESCE(w.status, 1) = 1 WHERE wi.item_id = i.id) +
             (SELECT COALESCE(SUM(ri.quantity), 0) FROM return_items ri JOIN returns r ON ri.return_id = r.id WHERE ri.item_id = i.id),
           0) AS current_stock
         FROM items i

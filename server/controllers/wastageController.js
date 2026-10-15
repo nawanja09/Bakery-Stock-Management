@@ -1,17 +1,23 @@
 const pool = require('../config/db');
 const { v4: uuidv4 } = require('uuid');
 const { isRmAdjustmentRequest, recordRmAdjustment, sameItems, sameValue } = require('../utils/rmAdjustmentAudit');
+const { actorId, approverName } = require('../utils/actor');
 
 // Create wastage
 const createWastage = async (req, res) => {
-  const { date, approved_by, reason, remarks, items } = req.body;
-  const user_id = req.user.userId;
+  const { date, reason, remarks, items } = req.body;
+  // Entered By = the signed-in user, never a value from the form.
+  const user_id = actorId(req);
+  if (!user_id) return res.status(401).json({ error: 'Please log in again' });
   const wastage_note_number = `WN-${uuidv4().substr(0, 8).toUpperCase()}`;
 
   const connection = await pool.getConnection();
 
   try {
     await connection.beginTransaction();
+
+    // Approved By: the approver named on the form, otherwise the signed-in user.
+    const approved_by = await approverName(connection, req, req.body.approved_by);
 
     const [wastageResult] = await connection.query(
       `INSERT INTO wastages 
@@ -72,7 +78,7 @@ const getAllWastages = async (req, res) => {
         w.reason,
         w.remarks,
         COALESCE(w.status, 1) AS status,
-        u.username AS entered_by,
+        COALESCE(u.name, u.username) AS entered_by,
         COALESCE((
           SELECT SUM(wi.estimated_loss) 
           FROM wastage_items wi 
@@ -144,7 +150,7 @@ const getWastageById = async (req, res) => {
   try {
     const [wastage] = await pool.query(`
       SELECT 
-        w.*, u.username AS entered_by
+        w.*, COALESCE(u.name, u.username) AS entered_by
       FROM wastages w
       LEFT JOIN users u ON w.entered_by = u.id
       WHERE w.id = ? AND COALESCE(w.status, 1) = 1
@@ -176,12 +182,16 @@ const getWastageById = async (req, res) => {
 // UPDATE wastage
 const updateWastage = async (req, res) => {
   const { id } = req.params;
-  const { date, approved_by, reason, remarks, items } = req.body;
+  const { date, reason, remarks, items } = req.body;
+  if (!actorId(req)) return res.status(401).json({ error: 'Please log in again' });
 
   const connection = await pool.getConnection();
 
   try {
     await connection.beginTransaction();
+
+    // Approved By: the approver named on the form, otherwise the signed-in user.
+    const approved_by = await approverName(connection, req, req.body.approved_by);
 
     const trackRmAdjustment = isRmAdjustmentRequest(req);
 
@@ -245,7 +255,7 @@ const updateWastage = async (req, res) => {
     );
     if (wastageChanged) {
       await recordRmAdjustment(connection, {
-        category: 'Wastage', sourceRecordId: id, referenceId: wastageNoteNumber, updatedBy: req.user?.userId
+        category: 'Wastage', sourceRecordId: id, referenceId: wastageNoteNumber, updatedBy: actorId(req)
       });
     }
 
@@ -266,37 +276,9 @@ const updateWastage = async (req, res) => {
   }
 };
 
-// Soft delete wastage
-const deleteWastage = async (req, res) => {
-  const { id } = req.params;
-
-  try {
-    const [checkResult] = await pool.query(
-      `SELECT id FROM wastages WHERE id = ? AND COALESCE(status, 1) = 1`,
-      [id]
-    );
-
-    if (checkResult.length === 0) {
-      return res.status(404).json({ error: 'Wastage not found or already deleted' });
-    }
-
-    await pool.query(
-      `UPDATE wastages SET status = 0 WHERE id = ? AND COALESCE(status, 1) = 1`,
-      [id]
-    );
-
-    res.json({ message: 'Wastage deleted successfully' });
-
-  } catch (error) {
-    console.error('Error deleting wastage:', error.stack);
-    res.status(500).json({ error: 'Server error' });
-  }
-};
-
 module.exports = {
   createWastage,
   getAllWastages,
   getWastageById,
-  updateWastage,
-  deleteWastage
+  updateWastage
 };

@@ -251,7 +251,7 @@ const getBalanceSheet = async (req, res) => {
         LEFT JOIN (
           SELECT wi.item_id, SUM(wi.quantity) AS total_wasted
           FROM wastage_items wi
-          JOIN wastages w ON wi.wastage_id = w.id
+          JOIN wastages w ON wi.wastage_id = w.id AND COALESCE(w.status, 1) = 1
           WHERE DATE(w.date) <= ?
           GROUP BY wi.item_id
         ) wastage ON wastage.item_id = i.id

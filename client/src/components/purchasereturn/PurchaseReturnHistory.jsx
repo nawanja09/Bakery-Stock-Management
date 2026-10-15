@@ -151,16 +151,12 @@ const PurchaseReturnHistory = () => {
     if (!settlingReturn) return;
     
     try {
-      // Get current user
-      const user = JSON.parse(localStorage.getItem('user'));
-      
-      // Prepare settlement payload
+      // Prepare settlement payload (Settled By = the signed-in user, set by the server)
       const payload = {
         settlements: settlementData.settlements,
         payment_method: settlementData.payment_method || 'CASH',
         settlement_date: settlementData.settlement_date || dayjs().format('YYYY-MM-DD'),
-        notes: settlementData.note,
-        settled_by: user?.id
+        notes: settlementData.note
       };
       
       // Call API to add settlement

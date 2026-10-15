@@ -1,24 +1,30 @@
 const pool = require('../config/db');
 const { isRmAdjustmentRequest, recordRmAdjustment, sameItems, sameValue } = require('../utils/rmAdjustmentAudit');
+const { actorId, approverName } = require('../utils/actor');
 
 // Create new issuance
 const createIssuance = async (req, res) => {
-  const { 
+  const {
     issuance_date,  // "2026-07-02" (date only)
     issuance_time,  // "14:30" (time only)
-    issued_by, 
-    department_id, 
-    received_by, 
-    remarks, 
-    approved_by,
+    department_id,
+    received_by,
+    remarks,
     check_number,
-    items 
+    items
   } = req.body;
 
+  // Issued By = the signed-in user, never a value from the form.
+  const issued_by = actorId(req);
+  if (!issued_by) return res.status(401).json({ error: 'Please log in again' });
+
   const connection = await pool.getConnection();
-  
+
   try {
     await connection.beginTransaction();
+
+    // Approved By: the approver named on the form, otherwise the signed-in user.
+    const approved_by = await approverName(connection, req, req.body.approved_by);
 
     // Combine date and time into one datetime
     const datetime = issuance_time 
@@ -76,6 +82,7 @@ const getAllIssuances = async (req, res) => {
         DATE_FORMAT(i.issuance_date, '%Y-%m-%d') AS issuance_date_only,
         TIME_FORMAT(i.issuance_date, '%H:%i') AS issuance_time,
         u.username AS issued_by_email,
+        u.name AS issued_by_name,
         d.name AS department_name,
         i.department_id,
         i.received_by,
@@ -145,6 +152,7 @@ const getIssuanceById = async (req, res) => {
         DATE_FORMAT(i.issuance_date, '%Y-%m-%d') AS issuance_date_only,
         TIME_FORMAT(i.issuance_date, '%H:%i') AS issuance_time,
         u.username AS issued_by_email,
+        u.name AS issued_by_name,
         d.name AS department_name
       FROM issuances i
       JOIN users u ON i.issued_by = u.id
@@ -181,22 +189,27 @@ const getIssuanceById = async (req, res) => {
 // Update issuance
 const updateIssuance = async (req, res) => {
   const { id } = req.params;
-  const { 
+  const {
     issuance_date,
     issuance_time,
-    issued_by, 
-    department_id, 
-    received_by, 
-    remarks, 
-    approved_by, 
+    department_id,
+    received_by,
+    remarks,
     check_number,
-    items 
+    items
   } = req.body;
 
+  // The editor is the signed-in user; Issued By stays the user who made the note.
+  const editorId = actorId(req);
+  if (!editorId) return res.status(401).json({ error: 'Please log in again' });
+
   const connection = await pool.getConnection();
-  
+
   try {
     await connection.beginTransaction();
+
+    // Approved By: the approver named on the form, otherwise the signed-in user.
+    const approved_by = await approverName(connection, req, req.body.approved_by);
 
     const trackRmAdjustment = isRmAdjustmentRequest(req);
     let originalIssuance = null;
@@ -216,10 +229,10 @@ const updateIssuance = async (req, res) => {
     // Update issuance
     await connection.query(
       `UPDATE issuances 
-       SET issuance_date = ?, issued_by = ?, department_id = ?, received_by = ?, 
+       SET issuance_date = ?, department_id = ?, received_by = ?,
            remarks = ?, approved_by = ?, check_number = ?
        WHERE id = ?`,
-      [datetime, issued_by, department_id, received_by, remarks, approved_by, check_number, id]
+      [datetime, department_id, received_by, remarks, approved_by, check_number, id]
     );
 
     // Delete existing items
@@ -240,7 +253,6 @@ const updateIssuance = async (req, res) => {
 
     const issuanceChanged = trackRmAdjustment && originalIssuance && (
       !sameValue(originalIssuance.issuance_date, datetime) ||
-      !sameValue(originalIssuance.issued_by, issued_by) ||
       !sameValue(originalIssuance.department_id, department_id) ||
       !sameValue(originalIssuance.received_by, received_by) ||
       !sameValue(originalIssuance.remarks, remarks) ||
@@ -250,7 +262,7 @@ const updateIssuance = async (req, res) => {
     );
     if (issuanceChanged) {
       await recordRmAdjustment(connection, {
-        category: 'Issuance', sourceRecordId: id, referenceId: String(id), updatedBy: issued_by
+        category: 'Issuance', sourceRecordId: id, referenceId: String(id), updatedBy: editorId
       });
     }
 
@@ -301,7 +313,7 @@ const getItemsWithStock = async (req, res) => {
         COALESCE(
           (SELECT SUM(wi.quantity) 
            FROM wastage_items wi 
-           JOIN wastages w ON wi.wastage_id = w.id 
+           JOIN wastages w ON wi.wastage_id = w.id AND COALESCE(w.status, 1) = 1 
            WHERE wi.item_id = i.id AND w.date <= CURDATE()
           ), 0
         ) AS current_stock

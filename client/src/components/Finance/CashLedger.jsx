@@ -144,8 +144,7 @@ const CashLedger = () => {
       await api.post('/finance/cash/opening-balance', {
         company_id: companyId,
         date: openingDate,
-        amount: amt,
-        created_by: currentUser.id
+        amount: amt
       });
       setShowOpeningForm(false);
       setOpeningAmount('');

@@ -24,7 +24,7 @@ const EditAdjustment = () => {
   const [success, setSuccess] = useState('');
   const [formData, setFormData] = useState({
     date: '',
-    user_name: '',
+    approved_by: '',
     reference_note: '',
     item_id: '',
     item_name: '',
@@ -52,7 +52,7 @@ const EditAdjustment = () => {
 
         setFormData({
           date: parsedDate,
-          user_name: adjustment.user_name || '',
+          approved_by: adjustment.user_name || '',
           reference_note: adjustment.reference_note || '',
           item_id: adjustment.item_id || '',
           item_name: adjustment.item_name || '',
@@ -109,7 +109,7 @@ const EditAdjustment = () => {
 
       const payload = {
         date: formData.date,
-        user_name: formData.user_name,
+        approved_by: formData.approved_by,
         reference_note: formData.reference_note,
         item_id: formData.item_id,
         system_qty: formData.system_qty,
@@ -183,9 +183,15 @@ const EditAdjustment = () => {
 
             <div className="form-group">
               <label>
-                <FontAwesomeIcon icon={faUser} /> Adjusted By
+                <FontAwesomeIcon icon={faUser} /> Approved By (optional)
               </label>
-              <input type="text" name="user_name" value={formData.user_name} onChange={handleChange} required />
+              <input
+                type="text"
+                name="approved_by"
+                value={formData.approved_by}
+                onChange={handleChange}
+                placeholder="Only if someone else approved - otherwise your name is saved"
+              />
             </div>
 
             <div className="form-group full-width">

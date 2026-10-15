@@ -473,7 +473,6 @@ const AddPurchase = () => {
 
     const submitData = {
       ...formData,
-      prepared_by: currentUser.id,
       company_id: formData.company_id || null,
       order_id: formData.order_id || null,
       items: formData.items.map(item => ({

@@ -98,8 +98,7 @@ const BankTransfer = () => {
         amount:        amt,
         date:          formData.date,
         reference_number: formData.reference_number || null,
-        remark:        formData.remark || null,
-        created_by:    currentUser.id
+        remark:        formData.remark || null
       });
 
       setMessage({ type: 'success', text: 'Bank-to-Bank transfer completed successfully!' });

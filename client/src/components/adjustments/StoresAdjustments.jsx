@@ -599,8 +599,12 @@ const StoresAdjustments = () => {
           </div>
           <div className="details-grid">
             <div className="detail-item">
-              <span className="detail-label">Adjusted By</span>
+              <span className="detail-label">Approved By</span>
               <span className="detail-value">{selectedAdjustment.user_name || 'N/A'}</span>
+            </div>
+            <div className="detail-item">
+              <span className="detail-label">Entered By</span>
+              <span className="detail-value">{selectedAdjustment.created_by_name || 'N/A'}</span>
             </div>
             <div className="detail-item">
               <span className="detail-label">Date & Time</span>

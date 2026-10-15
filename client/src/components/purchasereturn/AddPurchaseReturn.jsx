@@ -274,7 +274,6 @@ const AddPurchaseReturn = () => {
       return_date: returnDate,
       items: itemsToReturn,
       remarks: remarks || null,
-      returned_by: currentUser.id,
       payment_method: formData.payment_method,
       company_id: formData.company_id || null,
       check_number: formData.check_number || null

@@ -176,7 +176,7 @@ const EditIssuance = ({ embeddedId, onSaved, onCancel, isRmAdjustment = false } 
     const payload = {
       issuance_date: formData.issuance_date,
       issuance_time: formData.issuance_time,
-      issued_by: currentUser.id,
+      // Issued By stays the user who made the note - the server keeps it.
       department_id: formData.department_id,
       received_by: formData.received_by,
       remarks: formData.remarks,

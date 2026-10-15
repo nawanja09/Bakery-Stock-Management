@@ -271,11 +271,6 @@ const EditWastage = ({ embeddedId, onSaved, onCancel, isRmAdjustment = false } =
       return;
     }
 
-    if (!formData.approved_by.trim()) {
-      showPopup('error', 'Please enter the approver name');
-      return;
-    }
-
     const hasEmptyItem = formData.items.some(item => !item.item_id);
     if (hasEmptyItem) {
       showPopup('error', 'Please select an item for all rows');
@@ -412,14 +407,13 @@ const EditWastage = ({ embeddedId, onSaved, onCancel, isRmAdjustment = false } =
                 <div className="erp-input-group">
                   <label>
                     <FontAwesomeIcon icon={faUserCircle} className="erp-label-icon" />
-                    Approved By <span className="erp-required">*</span>
+                    Approved By (optional)
                   </label>
                   <input
                     type="text"
                     value={formData.approved_by}
                     onChange={(e) => setFormData({ ...formData, approved_by: e.target.value })}
-                    required
-                    placeholder="Enter approver name"
+                    placeholder="Only if someone else approved - otherwise your name is saved"
                     className="erp-input"
                   />
                 </div>

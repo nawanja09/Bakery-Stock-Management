@@ -5,6 +5,13 @@ const { normalizePaymentMethodValue } = require('../utils/paymentMethodUtils');
 const { recordCashTransaction, recordBankTransaction } = require('../utils/financeLedger');
 const { checkDuplicateReference, DuplicateReferenceError } = require('../services/referenceValidationService');
 const { isRmAdjustmentRequest, recordRmAdjustment, sameItems, sameValue } = require('../utils/rmAdjustmentAudit');
+const { SETTLEMENT_PAYMENT_METHODS, isSettlementPaymentMethod } = require('../services/settlementPaymentMethods');
+
+// Advance / purchase-return settlements moved no money from Cash or Bank, so
+// Purchasing Payment adjustments (which re-post the ledger) must not touch them.
+const SETTLEMENT_NOT_ADJUSTABLE =
+  'This row is an Advance Payment / Purchase Return settlement, not money paid from Cash or Bank, '
+  + 'so it cannot be changed in Purchasing Payment adjustments.';
 
 const calculatePaymentState = (paidAmount, totalAmount) => {
   const parsedPaidAmount = parseFloat(paidAmount) || 0;
@@ -782,6 +789,44 @@ const getPendingInvoicesBySupplier = async (req, res) => {
 };
 
 // MAKE PAYMENT (supports multi-invoice allocation)
+// Money in 1/10000 units: purchases and allocations are DECIMAL(…,4), so amounts
+// compare exactly instead of drifting as JS floats.
+const toUnits = (value) => Math.round((parseFloat(value) || 0) * 10000);
+const fromUnits = (units) => units / 10000;
+// A sub-cent difference between a 2-decimal amount typed by the user and a
+// 4-decimal balance (1234.57 against 1234.5678) is rounding, not an overpayment.
+const UNIT_TOLERANCE = 50; // Rs. 0.005
+
+// Paying more than the selected invoices owe keeps the excess as supplier credit
+// (supplier_overpayments). Only for money that leaves now and that
+// supplier_overpayments can record: a cheque is posted when it is released, and
+// a card payment never reaches the cash or bank book.
+const EXCESS_CREDIT_METHODS = ['CASH', 'BANK_TRANSFER'];
+
+class PaymentRequestError extends Error {
+  constructor(status, message) {
+    super(message);
+    this.name = 'PaymentRequestError';
+    this.status = status;
+  }
+}
+
+// Idempotency-Key (header) or request_id (body): the same key sent twice -
+// a double-click, a retried request - records the payment only once.
+const readRequestId = (req) => {
+  const raw = req.get('Idempotency-Key') || req.body?.request_id;
+  if (raw === undefined || raw === null || raw === '') return null;
+  const value = String(raw).trim();
+  if (!value || value.length > 64) throw new PaymentRequestError(400, 'Invalid Idempotency-Key');
+  return value;
+};
+
+const duplicatePaymentResponse = (paymentId) => ({
+  message: 'This payment was already recorded.',
+  payment_id: paymentId,
+  duplicate: true
+});
+
 const makePayment = async (req, res) => {
   const { id } = req.params;
   const {
@@ -798,24 +843,22 @@ const makePayment = async (req, res) => {
 
   const normalizedPaymentMethod = normalizePaymentMethodValue(payment_method);
   const validMethods = ['CASH', 'BANK_TRANSFER', 'CHEQUE', 'CREDIT'];
-  
-  // Handle allocations properly
-  let normalizedAllocations = [];
-  
-  if (Array.isArray(invoice_allocations) && invoice_allocations.length > 0) {
-    normalizedAllocations = invoice_allocations
-      .map((allocation) => ({
-        purchase_id: allocation.purchase_id || allocation.id,
-        amount: parseFloat(allocation.amount) || 0
-      }))
-      .filter((allocation) => allocation.purchase_id && allocation.amount > 0);
-  } else if (id) {
-    // Single invoice payment (backward compatibility)
-    normalizedAllocations = [{
-      purchase_id: parseInt(id),
-      amount: parseFloat(amount) || 0
-    }];
+
+  let requestId;
+  try {
+    requestId = readRequestId(req);
+  } catch (error) {
+    return res.status(error.status).json({ error: error.message });
   }
+
+  // One entry per invoice, amounts in 1/10000 units.
+  const allocations = (Array.isArray(invoice_allocations) && invoice_allocations.length > 0
+    ? invoice_allocations.map((allocation) => ({
+      purchase_id: Number(allocation?.purchase_id || allocation?.id),
+      units: toUnits(allocation?.amount)
+    }))
+    : id ? [{ purchase_id: Number(id), units: toUnits(amount) }] : []
+  ).filter((allocation) => allocation.units > 0);
 
   if (!payment_date) {
     return res.status(400).json({ error: 'Payment date is required' });
@@ -823,8 +866,14 @@ const makePayment = async (req, res) => {
   if (!normalizedPaymentMethod || !validMethods.includes(normalizedPaymentMethod)) {
     return res.status(400).json({ error: 'Payment method is invalid' });
   }
-  if (normalizedAllocations.length === 0) {
+  if (allocations.length === 0) {
     return res.status(400).json({ error: 'At least one invoice allocation is required' });
+  }
+  if (allocations.some((allocation) => !Number.isInteger(allocation.purchase_id) || allocation.purchase_id <= 0)) {
+    return res.status(400).json({ error: 'Invalid invoice in the payment' });
+  }
+  if (new Set(allocations.map((allocation) => allocation.purchase_id)).size !== allocations.length) {
+    return res.status(400).json({ error: 'The same invoice is selected twice in this payment' });
   }
   if (normalizedPaymentMethod === 'BANK_TRANSFER' && !bank_id) {
     return res.status(400).json({ error: 'Bank account is required for bank payments' });
@@ -833,10 +882,53 @@ const makePayment = async (req, res) => {
     return res.status(400).json({ error: 'Cheque number is required for cheque payments' });
   }
 
+  // The payment amount covers the allocations; anything above them is excess.
+  const allocatedUnits = allocations.reduce((sum, allocation) => sum + allocation.units, 0);
+  const paymentUnits = parseFloat(amount) > 0 ? toUnits(amount) : allocatedUnits;
+  if (paymentUnits + 1 < allocatedUnits) {
+    return res.status(400).json({ error: 'The payment amount is less than the amount allocated to the invoices' });
+  }
+  const excessUnits = paymentUnits - allocatedUnits > UNIT_TOLERANCE ? paymentUnits - allocatedUnits : 0;
+  if (excessUnits > 0 && !EXCESS_CREDIT_METHODS.includes(normalizedPaymentMethod)) {
+    return res.status(400).json({
+      error: 'Paying more than the invoices owe is only possible by Cash or Bank transfer. '
+        + 'Pay the invoice balance, and record the rest as an Advance Payment.'
+    });
+  }
+
+  const resolvedCreatedBy = actorId(req); // the signed-in user, never the client's created_by
+  if (!resolvedCreatedBy) {
+    return res.status(400).json({ error: 'No valid user found for payment audit' });
+  }
+
   const connection = await pool.getConnection();
 
   try {
     await connection.beginTransaction();
+
+    // Lock every selected invoice FIRST, in id order, before any other read in
+    // this transaction. A second payment of the same invoice (a double-click,
+    // another user) waits here until this one commits, and then reads the
+    // invoice as already paid. Reading anything earlier would fix the
+    // transaction's REPEATABLE READ snapshot before the other payment committed,
+    // and both payments would go through.
+    const purchaseIds = allocations.map((allocation) => allocation.purchase_id).sort((a, b) => a - b);
+    const [lockedRows] = await connection.query(
+      'SELECT * FROM purchases WHERE id IN (?) ORDER BY id FOR UPDATE',
+      [purchaseIds]
+    );
+
+    if (requestId) {
+      const [existing] = await connection.query('SELECT id FROM payment_history WHERE request_id = ?', [requestId]);
+      if (existing.length > 0) {
+        await connection.commit();
+        return res.json(duplicatePaymentResponse(existing[0].id));
+      }
+    }
+
+    if (lockedRows.length !== purchaseIds.length) {
+      throw new PaymentRequestError(404, 'One or more selected invoices could not be found');
+    }
 
     // Supplier + Company restriction: every invoice in this payment must
     // belong to the same supplier AND the same company - a supplier can
@@ -844,165 +936,97 @@ const makePayment = async (req, res) => {
     // separate checks, not one. This must be enforced here, not just in
     // the UI, since a direct API call could otherwise bypass the
     // frontend's selection lock.
-    const purchaseIds = normalizedAllocations.map((a) => a.purchase_id);
-    const [invoiceCheckRows] = await connection.query(
-      `SELECT id, invoice_no, supplier_id, company_id, balance_amount, payment_status
-       FROM purchases WHERE id IN (${purchaseIds.map(() => '?').join(',')})`,
-      purchaseIds
-    );
-
-    if (invoiceCheckRows.length !== purchaseIds.length) {
-      await connection.rollback();
-      return res.status(404).json({ error: 'One or more selected invoices could not be found' });
+    if (new Set(lockedRows.map((r) => r.supplier_id)).size > 1) {
+      throw new PaymentRequestError(400,
+        'You cannot make one payment for invoices belonging to different suppliers or companies. Please select invoices from the same supplier/company.');
+    }
+    if (new Set(lockedRows.map((r) => String(r.company_id || ''))).size > 1) {
+      throw new PaymentRequestError(400,
+        'You can only make a payment for one company at a time. Please deselect the current company invoices before selecting invoices from another company.');
     }
 
-    const uniqueSupplierIds = [...new Set(invoiceCheckRows.map((r) => r.supplier_id))];
-    if (uniqueSupplierIds.length > 1) {
-      await connection.rollback();
-      return res.status(400).json({
-        error: 'You cannot make one payment for invoices belonging to different suppliers or companies. Please select invoices from the same supplier/company.'
-      });
-    }
-
-    const uniqueCompanyIds = [...new Set(invoiceCheckRows.map((r) => String(r.company_id || '')))];
-    if (uniqueCompanyIds.length > 1) {
-      await connection.rollback();
-      return res.status(400).json({
-        error: 'You can only make a payment for one company at a time. Please deselect the current company invoices before selecting invoices from another company.'
-      });
-    }
-
-    const alreadyPaidInvoice = invoiceCheckRows.find(
-      (r) => r.payment_status === 'Paid' || parseFloat(r.balance_amount) <= 0
-    );
-    if (alreadyPaidInvoice) {
-      await connection.rollback();
-      return res.status(400).json({
-        error: `Invoice ${alreadyPaidInvoice.invoice_no} is already fully paid and cannot be selected for payment.`
-      });
+    const purchaseById = new Map(lockedRows.map((row) => [Number(row.id), row]));
+    const alreadyPaid = lockedRows.find((r) => r.payment_status === 'Paid' || parseFloat(r.balance_amount) <= 0);
+    if (alreadyPaid) {
+      throw new PaymentRequestError(409,
+        `Invoice ${alreadyPaid.invoice_no} is already fully paid - someone may have just paid it. Refresh the invoices and try again.`);
     }
 
     if (voucher_number) {
       await checkDuplicateReference(connection, voucher_number);
     }
 
-    const normalizedPaymentAmount = parseFloat(amount) > 0
-      ? parseFloat(amount)
-      : normalizedAllocations.reduce((sum, allocation) => sum + (parseFloat(allocation.amount) || 0), 0);
-
-    if (normalizedPaymentAmount <= 0) {
-      await connection.rollback();
-      return res.status(400).json({ error: 'Payment amount must be greater than 0' });
+    // Work out every invoice's new position BEFORE the first write. Never trust
+    // the stored paid_amount/balance_amount blindly - reconcile against the real
+    // allocated payment records first (a stale stored total could otherwise
+    // redirect a legitimate payment).
+    const plans = [];
+    for (const allocation of allocations) {
+      const currentPurchase = purchaseById.get(allocation.purchase_id);
+      const invoiceTotal = resolveInvoiceTotalAmount(currentPurchase);
+      const reconciled = await reconcilePurchasePaymentState(
+        connection, currentPurchase.id, invoiceTotal, currentPurchase.paid_amount
+      );
+      const outstandingUnits = toUnits(reconciled.balance_amount);
+      if (allocation.units > outstandingUnits + UNIT_TOLERANCE) {
+        throw new PaymentRequestError(409,
+          `Invoice ${currentPurchase.invoice_no} owes Rs. ${fromUnits(Math.max(outstandingUnits, 0)).toFixed(2)}, `
+          + `less than the Rs. ${fromUnits(allocation.units).toFixed(2)} allocated to it - someone may have just paid it. `
+          + 'Refresh the invoices and try again.');
+      }
+      const applyUnits = Math.min(allocation.units, outstandingUnits);
+      if (applyUnits <= 0) continue;
+      plans.push({ purchase: currentPurchase, outstandingUnits, paidUnits: toUnits(reconciled.paid_amount), applyUnits });
     }
 
-    const paymentHistoryPurchaseId = normalizedAllocations[0]?.purchase_id || null;
-    const resolvedCreatedBy = actorId(req); // the signed-in user, never the client's created_by
+    const appliedUnits = plans.reduce((sum, plan) => sum + plan.applyUnits, 0);
+    if (appliedUnits <= 0) {
+      throw new PaymentRequestError(400, 'Payment amount must be greater than 0');
+    }
+    const appliedAmount = fromUnits(appliedUnits);
+    const excessAmount = fromUnits(excessUnits);
+
+    const supplierIdForCredit = plans[0].purchase.supplier_id || null;
+    const companyIdForLedger = plans.find((plan) => plan.purchase.company_id)?.purchase.company_id || null;
+    const paymentHistoryPurchaseId = allocations[0].purchase_id;
     const normalizedPaymentMethodForHistory = normalizePaymentMethodForHistory(normalizedPaymentMethod);
 
-    if (!resolvedCreatedBy) {
-      await connection.rollback();
-      return res.status(400).json({ error: 'No valid user found for payment audit' });
-    }
-
-    // Insert payment history with the actual payment amount entered by the user.
+    // payment_history.amount = what reached the invoices. Any excess is its own
+    // supplier-credit record below, so the Supplier Ledger never counts it twice.
     let paymentResult;
     try {
       [paymentResult] = await connection.query(
         `INSERT INTO payment_history
-           (purchase_id, payment_date, amount, payment_method, check_number, bank_id, voucher_number, notes, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [paymentHistoryPurchaseId, payment_date, normalizedPaymentAmount, normalizedPaymentMethodForHistory,
-         check_number || null, bank_id || null, voucher_number || null, notes || null, resolvedCreatedBy]
+           (purchase_id, payment_date, amount, payment_method, check_number, bank_id, voucher_number, notes, created_by, request_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [paymentHistoryPurchaseId, payment_date, appliedAmount, normalizedPaymentMethodForHistory,
+         check_number || null, bank_id || null, voucher_number || null, notes || null, resolvedCreatedBy, requestId]
       );
     } catch (colErr) {
-      console.warn('voucher_number/bank_id column not found, using fallback:', colErr.message);
+      if (colErr.code !== 'ER_BAD_FIELD_ERROR') throw colErr;
+      console.warn('payment_history column not found, using fallback:', colErr.message);
       [paymentResult] = await connection.query(
         `INSERT INTO payment_history
            (purchase_id, payment_date, amount, payment_method, check_number, notes, created_by)
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [paymentHistoryPurchaseId, payment_date, normalizedPaymentAmount, normalizedPaymentMethodForHistory,
+        [paymentHistoryPurchaseId, payment_date, appliedAmount, normalizedPaymentMethodForHistory,
          check_number || null, notes || null, resolvedCreatedBy]
       );
     }
 
     const paymentHistoryId = paymentResult.insertId;
-    console.log('✅ Payment history inserted with ID:', paymentHistoryId);
-
-    let remainingPaymentAmount = normalizedPaymentAmount;
-    let totalApplied = 0;
     const updatedInvoices = [];
-    let supplierIdForCredit = null;
-    let companyIdForLedger = null;
     const invoiceNumbersForLedger = [];
 
-    for (const allocation of normalizedAllocations) {
-      const purchaseId = allocation.purchase_id;
-      const requestedAmount = Math.max(0, parseFloat(allocation.amount) || 0);
-
-      const [purchaseRows] = await connection.query(
-        'SELECT * FROM purchases WHERE id = ? FOR UPDATE',
-        [purchaseId]
-      );
-
-      if (purchaseRows.length === 0) {
-        await connection.rollback();
-        return res.status(404).json({ error: `Purchase ${purchaseId} not found` });
-      }
-
-      const currentPurchase = purchaseRows[0];
-      if (!supplierIdForCredit && currentPurchase.supplier_id) {
-        supplierIdForCredit = currentPurchase.supplier_id;
-      }
-      if (!companyIdForLedger && currentPurchase.company_id) {
-        companyIdForLedger = currentPurchase.company_id;
-      }
-      invoiceNumbersForLedger.push(currentPurchase.invoice_no);
-
-      const invoiceTotal = resolveInvoiceTotalAmount(currentPurchase);
-
-      // Never trust the stored paid_amount/balance_amount blindly - reconcile against
-      // the real allocated payment records first. Otherwise a stale/corrupted stored
-      // total (e.g. leftover from old data) can make currentOutstanding compute to 0,
-      // silently redirecting an entire legitimate payment into supplier credit instead
-      // of applying it to the invoice.
-      const reconciledBeforePayment = await reconcilePurchasePaymentState(
-        connection, purchaseId, invoiceTotal, currentPurchase.paid_amount, paymentHistoryId
-      );
-      const currentBalance = reconciledBeforePayment.balance_amount;
-      const currentPaid = reconciledBeforePayment.paid_amount;
-      const currentOutstanding = currentBalance;
-
-      const amountToApply = Math.min(requestedAmount, remainingPaymentAmount);
-      if (amountToApply <= 0.001) {
-        continue;
-      }
-
-      remainingPaymentAmount = Math.max(0, remainingPaymentAmount - amountToApply);
-
-      console.log(`📊 Purchase ${currentPurchase.invoice_no}:`, {
-        currentBalance,
-        currentPaid,
-        invoiceTotal,
-        currentOutstanding,
-        requestedAmount,
-        amountToApply
-      });
-
-      const newPaidAmount = currentPaid + amountToApply;
-      const newBalanceAmount = currentOutstanding - amountToApply;
-
+    for (const { purchase, outstandingUnits, paidUnits, applyUnits } of plans) {
+      const newBalanceUnits = outstandingUnits - applyUnits;
+      const newPaidUnits = paidUnits + applyUnits;
       let newPaymentStatus = 'Non-Paid';
-      if (newBalanceAmount <= 0.001) {
+      if (newBalanceUnits <= 10) {
         newPaymentStatus = 'Paid';
-      } else if (newPaidAmount > 0) {
+      } else if (newPaidUnits > 0) {
         newPaymentStatus = 'Partially Paid';
       }
-
-      console.log(`📊 Updated ${currentPurchase.invoice_no}:`, {
-        newPaidAmount,
-        newBalanceAmount,
-        newPaymentStatus
-      });
 
       await connection.query(
         `UPDATE purchases
@@ -1011,39 +1035,33 @@ const makePayment = async (req, res) => {
                balance_status = ?,
                payment_status = ?
          WHERE id = ?`,
-        [newPaidAmount, newBalanceAmount, newBalanceAmount > 0 ? 1 : 0, newPaymentStatus, purchaseId]
+        [fromUnits(newPaidUnits), fromUnits(newBalanceUnits), newBalanceUnits > 0 ? 1 : 0, newPaymentStatus, purchase.id]
       );
 
       await connection.query(
         `INSERT INTO purchase_payment_allocations (payment_history_id, purchase_id, allocated_amount)
          VALUES (?, ?, ?)`,
-        [paymentHistoryId, purchaseId, amountToApply]
+        [paymentHistoryId, purchase.id, fromUnits(applyUnits)]
       );
 
-      totalApplied += amountToApply;
-
+      invoiceNumbersForLedger.push(purchase.invoice_no);
       updatedInvoices.push({
-        purchase_id: purchaseId,
-        invoice_no: currentPurchase.invoice_no,
-        old_balance: currentOutstanding,
-        new_balance: newBalanceAmount,
+        purchase_id: purchase.id,
+        invoice_no: purchase.invoice_no,
+        old_balance: fromUnits(outstandingUnits),
+        new_balance: fromUnits(newBalanceUnits),
         payment_status: newPaymentStatus,
-        applied_amount: amountToApply
+        applied_amount: fromUnits(applyUnits)
       });
     }
-
-    // Advance Payments are now handled via a dedicated flow.
 
     const [verifyPurchase] = await connection.query(
       `SELECT id, invoice_no, total_with_vat, paid_amount, balance_amount, payment_status
        FROM purchases WHERE id = ?`,
-      [normalizedAllocations[0]?.purchase_id]
+      [paymentHistoryPurchaseId]
     );
 
-    console.log('✅ Verification after update:', verifyPurchase[0]);
-
-    // Post the actual money movement (the full amount paid out, including any
-    // portion that became supplier credit) to the relevant Cash/Bank ledger.
+    // Post the money that reached the invoices to the Cash/Bank ledger.
     // Money going OUT is a Credit under this ledger's convention.
     let ledgerBalance = null;
     const invoiceNumberForLedger = invoiceNumbersForLedger.filter(Boolean).join(', ') || null;
@@ -1059,34 +1077,62 @@ const makePayment = async (req, res) => {
       supplierNameForLedger = supplierRowsForLedger[0]?.name || null;
     }
 
-    if (normalizedPaymentMethod === 'CASH' && companyIdForLedger) {
-      ledgerBalance = await recordCashTransaction(connection, {
-        companyId: companyIdForLedger,
+    const postLedger = (entry) => {
+      if (normalizedPaymentMethod === 'CASH' && companyIdForLedger) {
+        return recordCashTransaction(connection, { companyId: companyIdForLedger, ...entry });
+      }
+      if (normalizedPaymentMethod === 'BANK_TRANSFER' && bank_id) {
+        return recordBankTransaction(connection, { bankId: bank_id, ...entry });
+      }
+      return null;
+    };
+
+    ledgerBalance = await postLedger({
+      date: payment_date,
+      remark: ledgerRemark,
+      credit: appliedAmount,
+      transactionType: 'RM Purchase Payment',
+      referenceNumber: voucher_number || check_number || null,
+      invoiceNumber: invoiceNumberForLedger,
+      partyName: supplierNameForLedger,
+      referenceType: 'PURCHASE_PAYMENT',
+      referenceId: paymentHistoryId,
+      createdBy: resolvedCreatedBy
+    });
+
+    // Excess above what the invoices owe: kept as supplier credit (the payment
+    // screen says so), recorded and posted exactly like an Advance Payment so
+    // it can be settled against the supplier's next invoices.
+    let supplierCredit = null;
+    if (excessUnits > 0) {
+      if (!supplierIdForCredit) {
+        throw new PaymentRequestError(400, 'Supplier credit needs a supplier on the invoice');
+      }
+      const overpaymentNumber = `ADV-${String(payment_date).replace(/-/g, '')}-P${paymentHistoryId}`;
+      const [overpayResult] = await connection.query(
+        `INSERT INTO supplier_overpayments
+           (overpayment_number, supplier_id, company_id, payment_date, payment_method,
+            voucher_number, reference_number, original_amount, remaining_credit, status, notes, created_by)
+         VALUES (?, ?, ?, ?, ?, NULL, NULL, ?, ?, 'Active', ?, ?)`,
+        [
+          overpaymentNumber, supplierIdForCredit, companyIdForLedger, payment_date, normalizedPaymentMethod,
+          excessAmount, excessAmount,
+          `Excess of supplier payment #${paymentHistoryId}${invoiceNumberForLedger ? ` (Invoice ${invoiceNumberForLedger})` : ''}`,
+          resolvedCreatedBy
+        ]
+      );
+      ledgerBalance = await postLedger({
         date: payment_date,
-        remark: ledgerRemark,
-        credit: normalizedPaymentAmount,
-        transactionType: 'RM Purchase Payment',
-        referenceNumber: voucher_number || check_number || null,
-        invoiceNumber: invoiceNumberForLedger,
+        remark: `Advance payment to supplier "${supplierNameForLedger || 'Supplier'}" (${overpaymentNumber}) - excess of payment #${paymentHistoryId}`,
+        credit: excessAmount,
+        transactionType: 'Supplier Advance Payment',
+        referenceNumber: voucher_number || null,
         partyName: supplierNameForLedger,
-        referenceType: 'PURCHASE_PAYMENT',
-        referenceId: paymentHistoryId,
+        referenceType: 'SUPPLIER_ADVANCE',
+        referenceId: overpayResult.insertId,
         createdBy: resolvedCreatedBy
-      });
-    } else if (normalizedPaymentMethod === 'BANK_TRANSFER' && bank_id) {
-      ledgerBalance = await recordBankTransaction(connection, {
-        bankId: bank_id,
-        date: payment_date,
-        remark: ledgerRemark,
-        credit: normalizedPaymentAmount,
-        transactionType: 'RM Purchase Payment',
-        referenceNumber: voucher_number || check_number || null,
-        invoiceNumber: invoiceNumberForLedger,
-        partyName: supplierNameForLedger,
-        referenceType: 'PURCHASE_PAYMENT',
-        referenceId: paymentHistoryId,
-        createdBy: resolvedCreatedBy
-      });
+      }) ?? ledgerBalance;
+      supplierCredit = { id: overpayResult.insertId, overpayment_number: overpaymentNumber, amount: excessAmount };
     }
 
     await connection.commit();
@@ -1122,7 +1168,7 @@ const makePayment = async (req, res) => {
             payment_date,
             supplierNameForLedger || 'Supplier',
             String(check_number).trim(),
-            normalizedPaymentAmount,
+            appliedAmount,
             bankName,
             bank_id || null
           ]
@@ -1133,11 +1179,15 @@ const makePayment = async (req, res) => {
     }
 
     res.json({
-      message: 'Payment recorded successfully!',
+      message: supplierCredit
+        ? `Payment recorded successfully! Rs. ${excessAmount.toFixed(2)} above the invoice balance was kept as supplier credit (${supplierCredit.overpayment_number}).`
+        : 'Payment recorded successfully!',
       payment_id: paymentHistoryId,
-      amount: normalizedPaymentAmount,
-      applied_amount: totalApplied,
-      invoice_count: normalizedAllocations.length,
+      amount: fromUnits(paymentUnits),
+      applied_amount: appliedAmount,
+      supplier_credit_amount: supplierCredit ? excessAmount : 0,
+      supplier_credit: supplierCredit,
+      invoice_count: plans.length,
       updated_invoices: updatedInvoices,
       verification: verifyPurchase[0],
       ledger_balance: ledgerBalance
@@ -1145,18 +1195,29 @@ const makePayment = async (req, res) => {
 
   } catch (error) {
     await connection.rollback();
+
+    if (error instanceof PaymentRequestError) {
+      return res.status(error.status).json({ error: error.message });
+    }
+
+    // The same Idempotency-Key committed by a concurrent request.
+    if (error.code === 'ER_DUP_ENTRY' && requestId && /request/i.test(error.message)) {
+      const [existing] = await pool.query('SELECT id FROM payment_history WHERE request_id = ?', [requestId]);
+      if (existing.length > 0) return res.json(duplicatePaymentResponse(existing[0].id));
+    }
+
     console.error('Error adding payment:', error);
-    
+
     if (error.code === 'ER_DUP_ENTRY' || error.name === 'DuplicateReferenceError') {
-      return res.status(400).json({ 
-        error: error.name === 'DuplicateReferenceError' ? error.message : 'Voucher number already exists. Please use a unique voucher number.' 
+      return res.status(400).json({
+        error: error.name === 'DuplicateReferenceError' ? error.message : 'Voucher number already exists. Please use a unique voucher number.'
       });
     }
 
     if (error.name === 'InsufficientBalanceError') {
       return res.status(400).json({ error: error.message });
     }
-    res.status(500).json({ error: 'Server error: ' + error.message });
+    res.status(500).json({ error: 'Server error' });
   } finally {
     connection.release();
   }
@@ -1301,20 +1362,20 @@ const addSettlementToReturn = async (req, res) => {
     await connection.beginTransaction();
 
     const { id } = req.params;
-    const { 
-      settlements, 
-      payment_method, 
+    const {
+      settlements,
       settlement_date,
-      notes,
-      settled_by 
+      notes
     } = req.body;
+    // Settled By = the signed-in user, never a value from the form.
+    const settled_by = actorId(req);
 
     if (!id || !settlements || settlements.length === 0) {
       throw new Error('Return ID and settlements are required');
     }
 
     if (!settled_by) {
-      throw new Error('User ID is required');
+      throw new Error('Please log in again');
     }
 
     const [returns] = await connection.query(
@@ -1429,15 +1490,17 @@ const addSettlementToReturn = async (req, res) => {
           [newBalance, newPaid, newBalanceStatus, paymentStatus, settlement.purchase_id]
         );
 
+        // PURCHASE_RETURN, never the form's payment method: a return moves no
+        // cash (services/settlementPaymentMethods.js).
         const [settlementPaymentResult] = await connection.query(
-          `INSERT INTO payment_history 
-           (purchase_id, payment_date, amount, payment_method, notes, created_by)
-           VALUES (?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO payment_history
+           (purchase_id, payment_date, amount, payment_method, check_number, notes, created_by)
+           VALUES (?, ?, ?, 'PURCHASE_RETURN', ?, ?, ?)`,
           [
             settlement.purchase_id,
             settlementDate,
             settlementAmount,
-            payment_method || 'CASH',
+            purchaseReturn.return_number,
             notes || `Additional settlement for return #${purchaseReturn.return_number}`,
             settled_by
           ]
@@ -1513,9 +1576,10 @@ const getAdjustablePayments = async (req, res) => {
       LEFT JOIN purchase_payment_allocations ppa ON ppa.payment_history_id = ph.id
       JOIN purchases p ON p.id = COALESCE(ppa.purchase_id, ph.purchase_id)
       LEFT JOIN supplier s ON s.id = p.supplier_id
+      WHERE ph.payment_method <> '' AND ph.payment_method NOT IN (?)
       ORDER BY ph.payment_date DESC, ph.created_at DESC
       LIMIT 500
-    `);
+    `, [SETTLEMENT_PAYMENT_METHODS]);
     res.json(rows || []);
   } catch (error) {
     console.error('Error fetching adjustable payments:', error);
@@ -1544,6 +1608,9 @@ const getPaymentAdjustmentDetail = async (req, res) => {
       return res.status(404).json({ error: 'Payment record not found' });
     }
     const payment = paymentRows[0];
+    if (isSettlementPaymentMethod(payment.payment_method)) {
+      return res.status(409).json({ error: SETTLEMENT_NOT_ADJUSTABLE });
+    }
 
     const [purchaseRows] = await pool.query(
       `SELECT p.id, p.invoice_no, p.total_with_vat, p.balance_amount, p.paid_amount,
@@ -1650,6 +1717,10 @@ const adjustPurchasePayment = async (req, res) => {
       return res.status(404).json({ error: 'Payment record not found' });
     }
     const payment = paymentRows[0];
+    if (isSettlementPaymentMethod(payment.payment_method)) {
+      await connection.rollback();
+      return res.status(409).json({ error: SETTLEMENT_NOT_ADJUSTABLE });
+    }
 
     const [purchaseRows] = await connection.query(
       'SELECT * FROM purchases WHERE id = ? FOR UPDATE', [purchaseId]

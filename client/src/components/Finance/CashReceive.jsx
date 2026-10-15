@@ -118,7 +118,6 @@ const CashReceive = ({ modal = false, defaultCompanyId = '', onClose, onSaved })
         amount: amt,
         reference_number: formData.reference_number || null,
         remark: formData.remark || null,
-        created_by: currentUser.id,
         classification: usingOtherLedger ? 'other_ledger' : 'receive_type'
       };
       if (usingOtherLedger) payload.other_ledger_id = formData.other_ledger_id;

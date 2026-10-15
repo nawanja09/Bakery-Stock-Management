@@ -59,7 +59,7 @@ const getAllItemsWithStock = async (connection = pool) => {
     LEFT JOIN (
       SELECT wi.item_id, SUM(wi.quantity) AS total_wasted
       FROM wastage_items wi
-      JOIN wastages w ON wi.wastage_id = w.id
+      JOIN wastages w ON wi.wastage_id = w.id AND COALESCE(w.status, 1) = 1
       GROUP BY wi.item_id
     ) wastage ON i.id = wastage.item_id
     LEFT JOIN (
@@ -104,7 +104,7 @@ const getItemStock = async (connection, itemId) => {
     LEFT JOIN (SELECT item_id, SUM(quantity) AS total_opening FROM opening_balances WHERE item_id = ? GROUP BY item_id) ob ON i.id = ob.item_id
     LEFT JOIN (SELECT pi.item_id, SUM(pi.quantity) AS total_purchased FROM purchase_items pi JOIN purchases p ON pi.purchase_id = p.id WHERE pi.item_id = ? GROUP BY pi.item_id) purchases ON i.id = purchases.item_id
     LEFT JOIN (SELECT ii.item_id, SUM(ii.quantity) AS total_issued FROM issuance_items ii JOIN issuances iss ON ii.issuance_id = iss.id WHERE ii.item_id = ? GROUP BY ii.item_id) issues ON i.id = issues.item_id
-    LEFT JOIN (SELECT wi.item_id, SUM(wi.quantity) AS total_wasted FROM wastage_items wi JOIN wastages w ON wi.wastage_id = w.id WHERE wi.item_id = ? GROUP BY wi.item_id) wastage ON i.id = wastage.item_id
+    LEFT JOIN (SELECT wi.item_id, SUM(wi.quantity) AS total_wasted FROM wastage_items wi JOIN wastages w ON wi.wastage_id = w.id AND COALESCE(w.status, 1) = 1 WHERE wi.item_id = ? GROUP BY wi.item_id) wastage ON i.id = wastage.item_id
     LEFT JOIN (SELECT ri.item_id, SUM(ri.quantity) AS total_returned FROM return_items ri JOIN returns r ON ri.return_id = r.id WHERE ri.item_id = ? GROUP BY ri.item_id) returns ON i.id = returns.item_id
     LEFT JOIN (SELECT pri.item_id, SUM(pri.quantity) AS total_purchase_returned FROM purchase_return_items pri JOIN purchase_returns pr ON pri.return_id = pr.id WHERE pri.item_id = ? GROUP BY pri.item_id) purchase_returns ON i.id = purchase_returns.item_id
     LEFT JOIN (SELECT item_id, SUM(variance) AS total_adjusted FROM stock_adjustments WHERE item_id = ? GROUP BY item_id) adjustments ON i.id = adjustments.item_id

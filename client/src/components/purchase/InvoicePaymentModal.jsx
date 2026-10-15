@@ -46,6 +46,9 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
     bank_id: ''
   });
   const [submitting, setSubmitting] = useState(false);
+  // One id per opening of this form: a double-click or a retried request is
+  // recorded by the server as ONE payment.
+  const paymentRequestIdRef = useRef(null);
   const dialogRef = useRef(null);
   // Escape closes (not while saving); focus moves in; Tab and page scroll stay put.
   useDialog(dialogRef, { open: Boolean(isOpen), onClose: submitting ? undefined : onClose });
@@ -106,6 +109,12 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
     }
   }, [isOpen, totalBalance]);
 
+  useEffect(() => {
+    if (isOpen) {
+      paymentRequestIdRef.current = window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const computeAllocations = () => {
@@ -158,6 +167,13 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
     if (formData.payment_method === 'Bank' && !formData.bank_id) {
       return showPopup('error', 'Please select a bank account');
     }
+    if (formData.amount - totalBalance > 0.005 && !isCashMethod && !isBankMethod) {
+      return showPopup(
+        'error',
+        'Paying more than the balance is only possible by Cash or Bank. ' +
+        'Pay the balance, and record the rest as an Advance Payment.'
+      );
+    }
     if (!currentUser?.id) return showPopup('error', 'Please login again');
 
     setSubmitting(true);
@@ -197,8 +213,8 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
         check_number: formData.check_number || null,
         voucher_number: formData.voucher_number || null,
         notes: formData.notes || null,
-        created_by: currentUser.id,
         invoice_allocations: payloadAllocations,
+        request_id: paymentRequestIdRef.current,
         bank_id: (normalizedPaymentMethod === 'BANK_TRANSFER' || normalizedPaymentMethod === 'CHEQUE') ? (formData.bank_id || null) : null
       });
 
@@ -341,7 +357,7 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
                   Full Amount
                 </button>
               </div>
-              <span className="ipm-hint">Any amount above the invoice balance will be stored as supplier credit.</span>
+              <span className="ipm-hint">Any amount above the invoice balance will be stored as supplier credit (Cash or Bank only).</span>
             </div>
 
             {isChequeMethod && (

@@ -472,7 +472,6 @@ const EditPurchase = ({ embeddedId, onSaved, onCancel, isRmAdjustment = false } 
 
     const submitData = {
       ...formData,
-      prepared_by: currentUser.id,
       company_id: formData.company_id || null,
       items: formData.items.map(item => ({
         item_id: item.id,

@@ -97,3 +97,22 @@ export const formatPurchasingCurrency = (value, currencyPrefix = 'Rs.') => (
 // Real number rounded to 4 decimal places, for use in report/export cells
 // on Purchasing pages (never a string).
 export const toPurchasingExportNumber = (value) => toExportNumber(value, PURCHASING_DECIMALS);
+
+// payment_history.payment_method -> the label shown in invoice payment history.
+// The last three are settlements, not money paid now: an advance / overpayment
+// or a purchase return applied to the invoice, or an older combined settlement.
+const PAYMENT_METHOD_LABELS = {
+  CASH: 'Cash',
+  BANK_TRANSFER: 'Bank Transfer',
+  CHEQUE: 'Cheque',
+  CREDIT_CARD: 'Credit Card',
+  ADVANCE_PAYMENT: 'Advance Payment',
+  PURCHASE_RETURN: 'Purchase Return',
+  SUPPLIER_CREDIT: 'Supplier Credit'
+};
+
+export const formatPaymentMethodLabel = (method) => {
+  const key = String(method || '').trim().toUpperCase();
+  if (!key) return '-';
+  return PAYMENT_METHOD_LABELS[key] || key.replace(/_/g, ' ');
+};

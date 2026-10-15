@@ -107,6 +107,10 @@ const IssuanceDetailsModal = ({ id, onClose }) => {
           <span className="detail-label">Time of Day</span>
           <span className="detail-value">{issuance.remarks || 'N/A'}</span>
         </div>
+        <div className="detail-info-card">
+          <span className="detail-label">Issued By</span>
+          <span className="detail-value">{issuance.issued_by_name || issuance.issued_by_email || 'N/A'}</span>
+        </div>
         {issuance.approved_by && (
           <div className="detail-info-card">
             <span className="detail-label">Approved By</span>
