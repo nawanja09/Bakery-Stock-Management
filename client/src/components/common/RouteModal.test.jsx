@@ -43,3 +43,20 @@ test('Escape in an open dropdown closes only the dropdown; the next Escape close
   fireEvent.keyDown(input, { key: 'Escape' });
   expect(mockNavigate).toHaveBeenCalledWith(-1);
 });
+
+test('a form popup keeps its backdrop inert; a read-only popup may close on it', () => {
+  const { unmount } = renderWithSelect();
+  // The backdrop has no role, so it is reached through the dialog.
+  fireEvent.mouseDown(screen.getByRole('dialog').parentElement); // eslint-disable-line testing-library/no-node-access
+  expect(mockNavigate).not.toHaveBeenCalled();
+  unmount();
+
+  render(<RouteModal title="Purchase Details" closeOnOverlay>details</RouteModal>);
+  fireEvent.mouseDown(screen.getByRole('dialog').parentElement); // eslint-disable-line testing-library/no-node-access
+  expect(mockNavigate).toHaveBeenCalledWith(-1);
+});
+
+test('focus moves into the popup when it opens', () => {
+  renderWithSelect();
+  expect(screen.getByRole('dialog')).toContainElement(document.activeElement);
+});

@@ -1,11 +1,12 @@
 // src/components/purchase/PayNowModal.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTimes, faPaperPlane, faInfoCircle, faMoneyBillWave, faSpinner } from '@fortawesome/free-solid-svg-icons';
 import dayjs from 'dayjs';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
+import useDialog from '../common/ui/useDialog';
 import usePaymentMethods from '../../utils/usePaymentMethods';
 import './PayNowModal.css';
 
@@ -28,6 +29,9 @@ const PayNowModal = ({ isOpen, onClose, suppliers = [], companies = [], supplier
 
   const [formData, setFormData] = useState(defaultForm);
   const [submitting, setSubmitting] = useState(false);
+  const dialogRef = useRef(null);
+  // Escape closes (not while saving); focus moves in; Tab and page scroll stay put.
+  useDialog(dialogRef, { open: Boolean(isOpen) && !embedded, onClose: submitting ? undefined : onClose });
   const [bankAccounts, setBankAccounts] = useState([]);
   const [loadingBanks, setLoadingBanks] = useState(false);
   const [cashBalance, setCashBalance] = useState(null);
@@ -163,8 +167,13 @@ const PayNowModal = ({ isOpen, onClose, suppliers = [], companies = [], supplier
   };
 
   return createPortal((
-    <div className={embedded ? 'pnm-page-container' : 'pnm-overlay'} onClick={embedded ? undefined : onClose}>
-      <div className={`${embedded ? 'pnm-page-card' : 'pnm-modal'} erp-payment-modal`} onClick={e => e.stopPropagation()}>
+    // Backdrop is inert: an outside click must not discard what was typed.
+    <div className={embedded ? 'pnm-page-container' : 'pnm-overlay'}>
+      <div
+        ref={dialogRef}
+        className={`${embedded ? 'pnm-page-card' : 'pnm-modal'} erp-payment-modal`}
+        {...(embedded ? {} : { role: 'dialog', 'aria-modal': true, 'aria-label': 'Pay Now' })}
+      >
 
         <div className="pnm-header">
           <h3>

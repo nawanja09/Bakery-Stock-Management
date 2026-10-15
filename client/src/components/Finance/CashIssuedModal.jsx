@@ -4,10 +4,11 @@
 // The server posts ONE Cash Ledger credit plus its linked Other Ledger debit in
 // a single DB transaction (POST /finance/cash/issued). With `record` set the
 // same form edits that transaction in place (PUT /finance/cash/issued/:id).
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faMoneyBillTransfer, faSpinner, faTimes, faCheck } from '@fortawesome/free-solid-svg-icons';
 import api from '../../api';
+import useDialog from '../common/ui/useDialog';
 import './FinanceForm.css';
 import './StaffLoans.css'; // shared modal look (sl-modal*)
 
@@ -18,6 +19,9 @@ const CashIssuedModal = ({ defaultCompanyId = '', record = null, onClose, onSave
   const [otherLedgers, setOtherLedgers] = useState([]);
   const [balance, setBalance] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const dialogRef = useRef(null);
+  // Escape closes (not while saving); focus moves in; Tab and page scroll stay put.
+  useDialog(dialogRef, { open: true, onClose: submitting ? undefined : onClose });
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
     company_id: record ? String(record.company_id) : (defaultCompanyId ? String(defaultCompanyId) : ''),
@@ -106,8 +110,9 @@ const CashIssuedModal = ({ defaultCompanyId = '', record = null, onClose, onSave
   };
 
   return (
-    <div className="sl-modal-overlay" onClick={onClose}>
-      <div className="sl-modal" role="dialog" aria-modal="true" aria-labelledby="ci-title" onClick={(e) => e.stopPropagation()}>
+    // Backdrop is inert: an outside click must not discard what was typed.
+    <div className="sl-modal-overlay">
+      <div ref={dialogRef} className="sl-modal" role="dialog" aria-modal="true" aria-labelledby="ci-title">
         <div className="sl-modal-header">
           <h3 id="ci-title">
             <FontAwesomeIcon icon={faMoneyBillTransfer} style={{ color: '#dc2626', marginRight: '8px' }} />

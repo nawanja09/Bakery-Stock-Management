@@ -1,5 +1,5 @@
 // src/components/purchase/InvoicePaymentModal.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -8,6 +8,7 @@ import {
 import dayjs from 'dayjs';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
+import useDialog from '../common/ui/useDialog';
 import usePaymentMethods from '../../utils/usePaymentMethods';
 import './InvoicePaymentModal.css';
 
@@ -45,6 +46,9 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
     bank_id: ''
   });
   const [submitting, setSubmitting] = useState(false);
+  const dialogRef = useRef(null);
+  // Escape closes (not while saving); focus moves in; Tab and page scroll stay put.
+  useDialog(dialogRef, { open: Boolean(isOpen), onClose: submitting ? undefined : onClose });
   const [bankAccounts, setBankAccounts] = useState([]);
   const [loadingBanks, setLoadingBanks] = useState(false);
   const [cashBalance, setCashBalance] = useState(null);
@@ -225,8 +229,9 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
   };
 
   return createPortal((
-    <div className="ipm-overlay" onClick={onClose}>
-      <div className="ipm-modal erp-payment-modal" onClick={e => e.stopPropagation()}>
+    // Backdrop is inert: an outside click must not discard what was typed.
+    <div className="ipm-overlay">
+      <div ref={dialogRef} className="ipm-modal erp-payment-modal" role="dialog" aria-modal="true" aria-label="Invoice Payment">
 
         <div className="ipm-header">
           <h3>

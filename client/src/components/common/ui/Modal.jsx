@@ -1,10 +1,9 @@
-import React, { useEffect, useId, useRef } from 'react';
+import React, { useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTimes } from '@fortawesome/free-solid-svg-icons';
+import useDialog from './useDialog';
 import './ui.css';
-
-const FOCUSABLE = 'input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])';
 
 /**
  * The one dialog shell for the app.
@@ -14,6 +13,8 @@ const FOCUSABLE = 'input:not([disabled]):not([type="hidden"]), select:not([disab
  *
  * Form dialogs should keep closeOnOverlay={false} (the default) so a stray
  * click outside does not throw away what the user typed.
+ *
+ * Escape, focus on open/close, the Tab trap and the scroll lock come from useDialog.
  */
 const Modal = ({
   open = true,
@@ -33,30 +34,7 @@ const Modal = ({
   const titleId = useId();
   const dialogRef = useRef(null);
 
-  useEffect(() => {
-    if (!open) return undefined;
-
-    const previousOverflow = document.body.style.overflow;
-    const previousFocus = document.activeElement;
-    document.body.style.overflow = 'hidden';
-
-    const firstField = dialogRef.current?.querySelector(`.ui-modal-body ${FOCUSABLE.split(', ').join(', .ui-modal-body ')}`);
-    (firstField || dialogRef.current)?.focus?.();
-
-    const onKeyDown = (event) => {
-      if (event.key === 'Escape' && closeOnEsc && onClose) {
-        event.stopPropagation();
-        onClose();
-      }
-    };
-    document.addEventListener('keydown', onKeyDown);
-
-    return () => {
-      document.removeEventListener('keydown', onKeyDown);
-      document.body.style.overflow = previousOverflow;
-      if (previousFocus && typeof previousFocus.focus === 'function') previousFocus.focus();
-    };
-  }, [open, closeOnEsc, onClose]);
+  useDialog(dialogRef, { open, onClose, closeOnEsc, initialFocus: '.ui-modal-body' });
 
   if (!open) return null;
 

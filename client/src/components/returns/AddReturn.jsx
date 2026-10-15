@@ -230,82 +230,85 @@ const AddReturn = () => {
         </div>
 
         <h3>Returned Items</h3>
-        <table className="item-table">
-          <thead>
-            <tr>
-              <th>Item Name</th>
-              <th>Current Stock</th>
-              <th>Quantity</th>
-              <th>Unit</th>
-              <th>Reason for Return</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {formData.items.map((item, index) => (
-              <tr key={index}>
-                <td style={{ minWidth: 300 }}>
-                  <Select
-                    options={itemOptions}
-                    value={itemOptions.find(opt => String(opt.value) === String(item.item_id)) || null}
-                    onChange={(selected) => handleItemChange(index, 'item_id', selected ? selected.value : '')}
-                    isSearchable
-                    placeholder="Search or select item..."
-                    menuPortalTarget={document.body}
-                    styles={selectStyles}
-                  />
-                </td>
-                <td>
-                  <span className="current-stock-display">
-                    {item.item_id ? (itemStockMap[item.item_id] || 0) : '-'}
-                  </span>
-                </td>
-                <td>
-                  <input
-                    type="number"
-                    min="0.001"
-                    step="0.001"
-                    value={item.quantity}
-                    onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
-                    required
-                  />
-                </td>
-                <td>
-                  <input
-                    type="text"
-                    value={item.unit}
-                    readOnly
-                    className="unit-display"
-                  />
-                </td>
-                <td>
-                  <select
-                    value={item.reason}
-                    onChange={(e) => handleItemChange(index, 'reason', e.target.value)}
-                    required
-                  >
-                    <option value="Excess">Excess</option>
-                    <option value="Damaged">Damaged</option>
-                    <option value="Wrong Issue">Wrong Issue</option>
-                    <option value="Expired">Expired</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </td>
-                <td>
-                  <button
-                    type="button"
-                    className="btn-remove"
-                    onClick={() => removeItemRow(index)}
-                    disabled={formData.items.length <= 1}
-                    title="Remove item"
-                  >
-                    <FaTrash />
-                  </button>
-                </td>
+        {/* Scrolls sideways on narrow screens instead of being cut off */}
+        <div style={{ overflowX: 'auto' }}>
+          <table className="item-table">
+            <thead>
+              <tr>
+                <th>Item Name</th>
+                <th>Current Stock</th>
+                <th>Quantity</th>
+                <th>Unit</th>
+                <th>Reason for Return</th>
+                <th>Action</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {formData.items.map((item, index) => (
+                <tr key={index}>
+                  <td style={{ minWidth: 300 }}>
+                    <Select
+                      options={itemOptions}
+                      value={itemOptions.find(opt => String(opt.value) === String(item.item_id)) || null}
+                      onChange={(selected) => handleItemChange(index, 'item_id', selected ? selected.value : '')}
+                      isSearchable
+                      placeholder="Search or select item..."
+                      menuPortalTarget={document.body}
+                      styles={selectStyles}
+                    />
+                  </td>
+                  <td>
+                    <span className="current-stock-display">
+                      {item.item_id ? (itemStockMap[item.item_id] || 0) : '-'}
+                    </span>
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      min="0.001"
+                      step="0.001"
+                      value={item.quantity}
+                      onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
+                      required
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="text"
+                      value={item.unit}
+                      readOnly
+                      className="unit-display"
+                    />
+                  </td>
+                  <td>
+                    <select
+                      value={item.reason}
+                      onChange={(e) => handleItemChange(index, 'reason', e.target.value)}
+                      required
+                    >
+                      <option value="Excess">Excess</option>
+                      <option value="Damaged">Damaged</option>
+                      <option value="Wrong Issue">Wrong Issue</option>
+                      <option value="Expired">Expired</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      className="btn-remove"
+                      onClick={() => removeItemRow(index)}
+                      disabled={formData.items.length <= 1}
+                      title="Remove item"
+                    >
+                      <FaTrash />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
         <button type="button" className="btn-add" onClick={addItemRow}>
           + Add Item

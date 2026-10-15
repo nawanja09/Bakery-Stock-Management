@@ -466,11 +466,11 @@ const PettyCash = () => {
         </div>
       </header>
 
-      <div className="card" style={{ display: 'flex', alignItems: 'center', padding: 'var(--spacing-lg)', gap: 'var(--spacing-xl)', marginBottom: 'var(--spacing-md)' }}>
+      <div className="card" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', padding: 'var(--spacing-lg)', gap: 'var(--spacing-md) var(--spacing-xl)', marginBottom: 'var(--spacing-md)' }}>
         <div style={{ fontSize: '48px', color: 'var(--color-primary)', opacity: 0.8 }}><FontAwesomeIcon icon={faMoneyBillWave} /></div>
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: '1 1 180px', minWidth: 0 }}>
           <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', fontWeight: 'var(--font-weight-medium)' }}>Current Petty Cash Balance</div>
-          <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'var(--color-text-primary)', margin: 'var(--spacing-xs) 0' }}>{formatCurrency(balance)}</div>
+          <div style={{ fontSize: 'clamp(22px, 6.5vw, 32px)', fontWeight: 'bold', color: 'var(--color-text-primary)', margin: 'var(--spacing-xs) 0', overflowWrap: 'anywhere' }}>{formatCurrency(balance)}</div>
         </div>
         <div>
           <button className="btn btn-secondary" onClick={fetchPettyCashData} disabled={isFetching} title="Refresh Balance">
@@ -479,7 +479,7 @@ const PettyCash = () => {
         </div>
       </div>
 
-      <div className="expense-view-tabs" style={{ display: 'flex', gap: '10px', marginBottom: 'var(--spacing-md)' }}>
+      <div className="expense-view-tabs" style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: 'var(--spacing-md)' }}>
         <button className={`btn ${activeTab === 'voucher' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab('voucher')}><FontAwesomeIcon icon={faReceipt} style={{ marginRight: '8px' }} /> Petty Cash Voucher</button>
         <button className={`btn ${activeTab === 'reimbursement' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab('reimbursement')}><FontAwesomeIcon icon={faHistory} style={{ marginRight: '8px' }} /> Reimbursement</button>
       </div>
@@ -541,9 +541,9 @@ const PettyCash = () => {
           </div>
 
           <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
-            <div className="form-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
+            <div className="form-section-title" style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--spacing-sm)', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
               <div><h3>Recent Vouchers</h3></div>
-              <div className="report-filter-actions">
+              <div className="report-filter-actions" style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--spacing-sm)' }}>
                 <button className="btn btn-secondary" onClick={fetchPettyCashData} disabled={isFetching}><FontAwesomeIcon icon={isFetching ? faSpinner : faSync} spin={isFetching} /></button>
                 <button className="btn btn-secondary" onClick={handlePrintVouchers}><FontAwesomeIcon icon={faPrint} /> Print</button>
                 <button className="btn btn-success" onClick={handleExportVouchers}><FontAwesomeIcon icon={faFileExcel} /> Export</button>
@@ -674,9 +674,9 @@ const PettyCash = () => {
           </div>
 
           <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
-            <div className="form-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
+            <div className="form-section-title" style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--spacing-sm)', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}>
               <div><h3>Reimbursement Details</h3></div>
-              <div className="report-filter-actions">
+              <div className="report-filter-actions" style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--spacing-sm)' }}>
                 <button className="btn btn-secondary" onClick={fetchPettyCashData}><FontAwesomeIcon icon={faSync} /> Refresh</button>
               </div>
             </div>

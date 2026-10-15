@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { usePopup } from '../../context/PopupContext';
 import api from '../../../api';
 import './AddTransferForm.css';
+import { Modal } from '../../common/ui';
 
 const AddTransferForm = ({ onSubmit, onCancel }) => {
   const [formData, setFormData] = useState({
@@ -123,206 +124,195 @@ const AddTransferForm = ({ onSubmit, onCancel }) => {
 
   if (loading) {
     return (
-      <div className="form-overlay">
-        <div className="form-container">
-          <div className="loading">Loading form data...</div>
-        </div>
-      </div>
+      <Modal title="Add New Transfer" size="xl" onClose={onCancel} className="cutlery-form-modal">
+        <div className="loading">Loading form data...</div>
+      </Modal>
     );
   }
 
   return (
-    <div className="form-overlay">
-      <div className="form-container">
-        <div className="form-header">
-          <h3>Add New Transfer</h3>
-          <button 
-            type="button" 
-            className="btn-close" 
-            onClick={onCancel} 
-            disabled={submitting}
-          >
-            ×
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="form-body">
-          <section className="form-section">
-            <h4>Transfer Information</h4>
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="transfer_date">Transfer Date *</label>
-                <input
-                  type="date"
-                  id="transfer_date"
-                  name="transfer_date"
-                  value={formData.transfer_date}
-                  onChange={handleChange}
-                  disabled={submitting}
-                  required
-                />
-              </div>
-              <div className="form-group">
-                <label htmlFor="transferred_by">Transferred By *</label>
-                <input
-                  type="text"
-                  id="transferred_by"
-                  name="transferred_by"
-                  value={formData.transferred_by}
-                  onChange={handleChange}
-                  placeholder="Enter name"
-                  disabled={submitting}
-                  required
-                />
-              </div>
-              <div className="form-group">
-                <label htmlFor="status">Status *</label>
-                <select
-                  id="status"
-                  name="status"
-                  value={formData.status}
-                  onChange={handleChange}
-                  disabled={submitting}
-                  required
-                >
-                  <option value="Pending">Pending</option>
-                  <option value="Completed">Completed</option>
-                  <option value="Cancelled">Cancelled</option>
-                </select>
-              </div>
-            </div>
-          </section>
-
-          <section className="form-section">
-            <h4>Location Details</h4>
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="location_from_id">From Location *</label>
-                <select
-                  id="location_from_id"
-                  name="location_from_id"
-                  value={formData.location_from_id}
-                  onChange={handleChange}
-                  disabled={submitting}
-                  required
-                >
-                  <option value="">Select Source</option>
-                  {formOptions.locations && formOptions.locations.map(loc => (
-                    <option key={loc.id} value={loc.id}>
-                      {loc.location_name} ({loc.location_id})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-group">
-                <label htmlFor="location_to_id">To Location *</label>
-                <select
-                  id="location_to_id"
-                  name="location_to_id"
-                  value={formData.location_to_id}
-                  onChange={handleChange}
-                  disabled={submitting}
-                  required
-                >
-                  <option value="">Select Destination</option>
-                  {formOptions.locations && formOptions.locations.map(loc => (
-                    <option key={loc.id} value={loc.id}>
-                      {loc.location_name} ({loc.location_id})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </section>
-
-          <section className="form-section">
-            <div className="assets-header">
-              <h4>Asset Details</h4>
-              <button
-                type="button"
-                className="btn-add-asset"
-                onClick={addItem}
-                disabled={submitting}
-              >
-                + Add Asset
-              </button>
-            </div>
-            
-            {formData.items.map((item, index) => (
-              <div key={index} className="asset-item-row">
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Asset *</label>
-                    <select
-                      value={item.asset_id}
-                      onChange={(e) => handleItemChange(index, 'asset_id', e.target.value)}
-                      disabled={submitting}
-                      required
-                    >
-                      <option value="">Select Asset</option>
-                      {formOptions.assets && formOptions.assets.map(asset => (
-                        <option key={asset.id} value={asset.id}>
-                          {asset.asset_name} ({asset.asset_id})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label>Quantity *</label>
-                    <input
-                      type="number"
-                      value={item.quantity}
-                      onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
-                      min="1"
-                      step="1"
-                      disabled={submitting}
-                      required
-                    />
-                  </div>
-                </div>
-                {formData.items.length > 1 && (
-                  <button
-                    type="button"
-                    className="btn-remove-item"
-                    onClick={() => removeItem(index)}
-                    disabled={submitting}
-                    title="Remove Asset"
-                  >
-                    Remove
-                  </button>
-                )}
-              </div>
-            ))}
-          </section>
-
-          <section className="form-section">
-            <h4>Additional Information</h4>
+    <Modal
+      title="Add New Transfer"
+      size="xl"
+      onClose={submitting ? undefined : onCancel}
+      className="cutlery-form-modal"
+    >
+      <form onSubmit={handleSubmit} className="form-body">
+        <section className="form-section">
+          <h4>Transfer Information</h4>
+          <div className="form-row">
             <div className="form-group">
-              <label htmlFor="notes">Notes</label>
-              <textarea
-                id="notes"
-                name="notes"
-                value={formData.notes}
+              <label htmlFor="transfer_date">Transfer Date *</label>
+              <input
+                type="date"
+                id="transfer_date"
+                name="transfer_date"
+                value={formData.transfer_date}
                 onChange={handleChange}
-                placeholder="Optional notes"
-                rows="3"
                 disabled={submitting}
+                required
               />
             </div>
-          </section>
+            <div className="form-group">
+              <label htmlFor="transferred_by">Transferred By *</label>
+              <input
+                type="text"
+                id="transferred_by"
+                name="transferred_by"
+                value={formData.transferred_by}
+                onChange={handleChange}
+                placeholder="Enter name"
+                disabled={submitting}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="status">Status *</label>
+              <select
+                id="status"
+                name="status"
+                value={formData.status}
+                onChange={handleChange}
+                disabled={submitting}
+                required
+              >
+                <option value="Pending">Pending</option>
+                <option value="Completed">Completed</option>
+                <option value="Cancelled">Cancelled</option>
+              </select>
+            </div>
+          </div>
+        </section>
 
-          <div className="form-actions">
+        <section className="form-section">
+          <h4>Location Details</h4>
+          <div className="form-row">
+            <div className="form-group">
+              <label htmlFor="location_from_id">From Location *</label>
+              <select
+                id="location_from_id"
+                name="location_from_id"
+                value={formData.location_from_id}
+                onChange={handleChange}
+                disabled={submitting}
+                required
+              >
+                <option value="">Select Source</option>
+                {formOptions.locations && formOptions.locations.map(loc => (
+                  <option key={loc.id} value={loc.id}>
+                    {loc.location_name} ({loc.location_id})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label htmlFor="location_to_id">To Location *</label>
+              <select
+                id="location_to_id"
+                name="location_to_id"
+                value={formData.location_to_id}
+                onChange={handleChange}
+                disabled={submitting}
+                required
+              >
+                <option value="">Select Destination</option>
+                {formOptions.locations && formOptions.locations.map(loc => (
+                  <option key={loc.id} value={loc.id}>
+                    {loc.location_name} ({loc.location_id})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </section>
+
+        <section className="form-section">
+          <div className="assets-header">
+            <h4>Asset Details</h4>
             <button
-              type="submit"
-              className="btn-submit"
+              type="button"
+              className="btn-add-asset"
+              onClick={addItem}
               disabled={submitting}
             >
-              {submitting ? 'Creating...' : 'Create Transfer'}
+              + Add Asset
             </button>
           </div>
-        </form>
-      </div>
-    </div>
+          
+          {formData.items.map((item, index) => (
+            <div key={index} className="asset-item-row">
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Asset *</label>
+                  <select
+                    value={item.asset_id}
+                    onChange={(e) => handleItemChange(index, 'asset_id', e.target.value)}
+                    disabled={submitting}
+                    required
+                  >
+                    <option value="">Select Asset</option>
+                    {formOptions.assets && formOptions.assets.map(asset => (
+                      <option key={asset.id} value={asset.id}>
+                        {asset.asset_name} ({asset.asset_id})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Quantity *</label>
+                  <input
+                    type="number"
+                    value={item.quantity}
+                    onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
+                    min="1"
+                    step="1"
+                    disabled={submitting}
+                    required
+                  />
+                </div>
+              </div>
+              {formData.items.length > 1 && (
+                <button
+                  type="button"
+                  className="btn-remove-item"
+                  onClick={() => removeItem(index)}
+                  disabled={submitting}
+                  title="Remove Asset"
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+          ))}
+        </section>
+
+        <section className="form-section">
+          <h4>Additional Information</h4>
+          <div className="form-group">
+            <label htmlFor="notes">Notes</label>
+            <textarea
+              id="notes"
+              name="notes"
+              value={formData.notes}
+              onChange={handleChange}
+              placeholder="Optional notes"
+              rows="3"
+              disabled={submitting}
+            />
+          </div>
+        </section>
+
+        <div className="form-actions">
+          <button
+            type="submit"
+            className="btn-submit"
+            disabled={submitting}
+          >
+            {submitting ? 'Creating...' : 'Create Transfer'}
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 };
 

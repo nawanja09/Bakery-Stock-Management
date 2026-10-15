@@ -1,5 +1,6 @@
 import React from 'react';
 import './ViewDamage.css';
+import { Modal } from '../../common/ui';
 
 const ViewDamage = ({ damage, onClose, onEdit }) => {
   const formatCurrency = (amount) => {
@@ -34,123 +35,122 @@ const ViewDamage = ({ damage, onClose, onEdit }) => {
   };
 
   return (
-    <div className="view-damage-overlay">
-      <div className="view-damage-container">
-        <header className="view-damage-header">
-          <h3>Damage Record Details</h3>
-          <button className="btn-close" onClick={onClose}>×</button>
-        </header>
-
-        <section className="damage-details">
-          {/* Damage Info */}
-          <div className="detail-section">
-            <h4>Damage Information</h4>
-            <div className="detail-grid">
-              <div className="detail-item">
-                <label>Damage ID</label>
-                <span className="damage-id">{damage.damage_id}</span>
-              </div>
-              <div className="detail-item">
-                <label>Date</label>
-                <span>{new Date(damage.damage_date).toLocaleDateString()}</span>
-              </div>
-              <div className="detail-item">
-                <label>Location</label>
-                <span>{damage.location_name}</span>
-              </div>
-              <div className="detail-item">
-                <label>Total Loss</label>
-                <span className="total-loss">{formatCurrency(damage.total_loss || damage.estimated_loss)}</span>
-              </div>
+    <Modal
+      title="Damage Record Details"
+      size="lg"
+      onClose={onClose}
+      className="cutlery-form-modal"
+      closeOnOverlay
+    >
+      <section className="damage-details">
+        {/* Damage Info */}
+        <div className="detail-section">
+          <h4>Damage Information</h4>
+          <div className="detail-grid">
+            <div className="detail-item">
+              <label>Damage ID</label>
+              <span className="damage-id">{damage.damage_id}</span>
+            </div>
+            <div className="detail-item">
+              <label>Date</label>
+              <span>{new Date(damage.damage_date).toLocaleDateString()}</span>
+            </div>
+            <div className="detail-item">
+              <label>Location</label>
+              <span>{damage.location_name}</span>
+            </div>
+            <div className="detail-item">
+              <label>Total Loss</label>
+              <span className="total-loss">{formatCurrency(damage.total_loss || damage.estimated_loss)}</span>
             </div>
           </div>
+        </div>
 
-          {/* Damage Details */}
-          <div className="detail-section">
-            <h4>Damage Details</h4>
-            <div className="detail-grid">
-              <div className="detail-item">
-                <label>Reason</label>
-                {getReasonBadge(damage.reason)}
-              </div>
-              <div className="detail-item">
-                <label>Status</label>
-                {getStatusBadge(damage.status)}
-              </div>
-              <div className="detail-item">
-                <label>Reported By</label>
-                <span>{damage.reported_by}</span>
-              </div>
+        {/* Damage Details */}
+        <div className="detail-section">
+          <h4>Damage Details</h4>
+          <div className="detail-grid">
+            <div className="detail-item">
+              <label>Reason</label>
+              {getReasonBadge(damage.reason)}
+            </div>
+            <div className="detail-item">
+              <label>Status</label>
+              {getStatusBadge(damage.status)}
+            </div>
+            <div className="detail-item">
+              <label>Reported By</label>
+              <span>{damage.reported_by}</span>
             </div>
           </div>
+        </div>
 
-          {/* Damaged Items */}
-          <div className="detail-section">
-            <h4>Damaged Items ({damage.items?.length || 0})</h4>
-            {damage.items?.length > 0 ? (
-              <div className="items-table">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>Asset</th>
-                      <th>Qty</th>
-                      <th>Unit Price</th>
-                      <th>Total</th>
-                      <th>Notes</th>
+        {/* Damaged Items */}
+        <div className="detail-section">
+          <h4>Damaged Items ({damage.items?.length || 0})</h4>
+          {damage.items?.length > 0 ? (
+            <div className="items-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Asset</th>
+                    <th>Qty</th>
+                    <th>Unit Price</th>
+                    <th>Total</th>
+                    <th>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {damage.items.map((item, index) => (
+                    <tr key={item.id || index}>
+                      <td className="index">{index + 1}</td>
+                      <td>
+                        <div className="asset-info">
+                          <div className="asset-name">{item.asset_name || 'Unknown'}</div>
+                          <div className="asset-code">{item.asset_code || 'N/A'}</div>
+                        </div>
+                      </td>
+                      <td>{item.quantity}</td>
+                      <td>{formatCurrency(item.unit_price)}</td>
+                      <td>{formatCurrency(item.total_loss)}</td>
+                      <td className="item-notes">{item.notes || '-'}</td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {damage.items.map((item, index) => (
-                      <tr key={item.id || index}>
-                        <td className="index">{index + 1}</td>
-                        <td>
-                          <div className="asset-info">
-                            <div className="asset-name">{item.asset_name || 'Unknown'}</div>
-                            <div className="asset-code">{item.asset_code || 'N/A'}</div>
-                          </div>
-                        </td>
-                        <td>{item.quantity}</td>
-                        <td>{formatCurrency(item.unit_price)}</td>
-                        <td>{formatCurrency(item.total_loss)}</td>
-                        <td className="item-notes">{item.notes || '-'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr>
-                      <td colSpan="4" className="total-label">Total Loss</td>
-                      <td colSpan="2" className="grand-total">{formatCurrency(damage.total_loss || damage.estimated_loss)}</td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            ) : (
-              <div className="no-items">No items found</div>
-            )}
-          </div>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td colSpan="4" className="total-label">Total Loss</td>
+                    <td colSpan="2" className="grand-total">{formatCurrency(damage.total_loss || damage.estimated_loss)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          ) : (
+            <div className="no-items">No items found</div>
+          )}
+        </div>
 
-          {/* System Info */}
-          <div className="detail-section">
-            <h4>System Information</h4>
-            <div className="detail-grid">
-              <div className="detail-item">
-                <label>Created</label>
-                <span>{new Date(damage.created_at).toLocaleString()}</span>
-              </div>
-              <div className="detail-item">
-                <label>Last Updated</label>
-                <span>{new Date(damage.updated_at).toLocaleString()}</span>
-              </div>
+        {/* System Info */}
+        <div className="detail-section">
+          <h4>System Information</h4>
+          <div className="detail-grid">
+            <div className="detail-item">
+              <label>Created</label>
+              <span>{new Date(damage.created_at).toLocaleString()}</span>
+            </div>
+            <div className="detail-item">
+              <label>Last Updated</label>
+              <span>{new Date(damage.updated_at).toLocaleString()}</span>
             </div>
           </div>
-        </section>
+        </div>
+      </section>
 
-        <footer className="damage-actions">
-          <button className="btn-edit" onClick={onEdit}>Edit Record</button>
-        </footer>
-      </div>
-    </div>
+      <footer className="damage-actions">
+        <button className="btn-edit" onClick={onEdit}>Edit Record</button>
+      </footer>
+    </Modal>
   );
 };
 

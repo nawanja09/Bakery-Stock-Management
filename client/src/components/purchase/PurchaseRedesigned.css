@@ -1,2 +1,22 @@
 @import './Purchase.css';
 @import '../common/FormStyles.css';
+
+/* ── Loading skeleton (shown while the purchase list loads) ── */
+.loading-container-responsive {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  padding: var(--spacing-lg);
+}
+.loading-shimmer { display: flex; flex-direction: column; gap: var(--spacing-md); }
+.loading-shimmer .shimmer-header { width: min(320px, 60%); height: 32px; }
+.loading-shimmer .shimmer-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--spacing-md);
+}
+.loading-shimmer .shimmer-stats > * { height: 84px; }
+.loading-shimmer .shimmer-filters { height: 52px; }
+.loading-shimmer .shimmer-content { display: flex; flex-direction: column; gap: 8px; }
+.loading-shimmer .shimmer-content > * { height: 44px; }
+.loading-container-responsive .loading-text { margin: 0; color: var(--color-text-secondary); text-align: center; }

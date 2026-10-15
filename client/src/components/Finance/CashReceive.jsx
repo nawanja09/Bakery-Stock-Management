@@ -7,10 +7,11 @@
 // behaviour, unchanged) OR by an Other Ledger (Cash Ledger debit + Other Ledger
 // credit, posted by the server as one linked transaction). The two are mutually
 // exclusive: choosing one disables the other, and one of them is required.
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faHandHoldingDollar, faSpinner, faCheckCircle, faTimes, faCheck } from '@fortawesome/free-solid-svg-icons';
 import api from '../../api';
+import useDialog from '../common/ui/useDialog';
 import './FinanceForm.css';
 import './StaffLoans.css'; // shared modal look (sl-modal*)
 
@@ -23,6 +24,16 @@ const CashReceive = ({ modal = false, defaultCompanyId = '', onClose, onSaved })
   const [loadingBalance, setLoadingBalance] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState(null);
+  const dialogRef = useRef(null);
+  const errorRef = useRef(null);
+
+  // Escape closes the popup, except while the receipt is being saved.
+  useDialog(dialogRef, { open: modal, onClose: submitting ? undefined : onClose });
+
+  // A validation error must be seen: bring it into view whenever it changes.
+  useEffect(() => {
+    if (message?.type === 'error') errorRef.current?.scrollIntoView?.({ block: 'nearest' });
+  }, [message]);
 
   const [formData, setFormData] = useState({
     company_id: defaultCompanyId ? String(defaultCompanyId) : '',
@@ -89,12 +100,14 @@ const CashReceive = ({ modal = false, defaultCompanyId = '', onClose, onSaved })
     e.preventDefault();
     setMessage(null);
 
-    if (!formData.company_id) return setMessage({ type: 'error', text: 'Please select a company' });
-    if (!formData.date) return setMessage({ type: 'error', text: 'Date is required' });
+    // `field` marks the input the message is about (aria-invalid).
+    const fail = (field, text) => setMessage({ type: 'error', text, field });
+    if (!formData.company_id) return fail('company_id', 'Please select a company');
+    if (!formData.date) return fail('date', 'Date is required');
     const amt = parseFloat(formData.amount);
-    if (!amt || amt <= 0) return setMessage({ type: 'error', text: 'Amount must be greater than 0' });
-    if (usingReceiveType && usingOtherLedger) return setMessage({ type: 'error', text: 'Select either a Receive Type or an Other Ledger, not both' });
-    if (!usingReceiveType && !usingOtherLedger) return setMessage({ type: 'error', text: 'Please select a Receive Type or an Other Ledger' });
+    if (!amt || amt <= 0) return fail('amount', 'Amount must be greater than 0');
+    if (usingReceiveType && usingOtherLedger) return fail('classification', 'Select either a Receive Type or an Other Ledger, not both');
+    if (!usingReceiveType && !usingOtherLedger) return fail('classification', 'Please select a Receive Type or an Other Ledger');
     if (!currentUser?.id) return setMessage({ type: 'error', text: 'Please login again' });
 
     setSubmitting(true);
@@ -128,8 +141,12 @@ const CashReceive = ({ modal = false, defaultCompanyId = '', onClose, onSaved })
 
   const gridClass = modal ? 'form-grid' : 'form-grid two-col';
 
+  const invalid = (...names) => (message?.type === 'error' && names.includes(message.field)
+    ? { 'aria-invalid': true, 'aria-describedby': 'cr-error' }
+    : {});
+
   const alertBox = message && (
-    <div className={`alert ${message.type === 'success' ? 'alert-success' : 'alert-error'}`} role="alert" style={{ padding: 'var(--spacing-md)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--spacing-md)', backgroundColor: message.type === 'success' ? '#d4edda' : '#f8d7da', color: message.type === 'success' ? '#155724' : '#721c24' }}>
+    <div ref={errorRef} id="cr-error" className={`alert ${message.type === 'success' ? 'alert-success' : 'alert-error'}`} role="alert" style={{ padding: 'var(--spacing-md)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--spacing-md)', backgroundColor: message.type === 'success' ? '#d4edda' : '#f8d7da', color: message.type === 'success' ? '#155724' : '#721c24' }}>
       {message.type === 'success' && <FontAwesomeIcon icon={faCheckCircle} style={{ marginRight: '8px' }} />} {message.text}
     </div>
   );
@@ -139,20 +156,20 @@ const CashReceive = ({ modal = false, defaultCompanyId = '', onClose, onSaved })
       <div className={gridClass}>
         <div className="form-group">
           <label>Company <span className="required">*</span></label>
-          <select name="company_id" value={formData.company_id} onChange={handleChange} required className="form-select">
+          <select name="company_id" value={formData.company_id} onChange={handleChange} required className="form-select" {...invalid('company_id')}>
             <option value="">Select Company</option>
             {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </div>
         <div className="form-group">
           <label>Date <span className="required">*</span></label>
-          <input type="date" name="date" value={formData.date} onChange={handleChange} required className="form-input" />
+          <input type="date" name="date" value={formData.date} onChange={handleChange} required className="form-input" {...invalid('date')} />
         </div>
       </div>
       <div className={gridClass}>
         <div className="form-group">
           <label>Receive Type {!usingOtherLedger && <span className="required">*</span>}</label>
-          <select name="receive_type" value={formData.receive_type} onChange={handleChange} disabled={usingOtherLedger} className="form-select">
+          <select name="receive_type" value={formData.receive_type} onChange={handleChange} disabled={usingOtherLedger} className="form-select" {...invalid('classification')}>
             <option value="">Select type</option>
             {receiveTypes.map(type => (
               <option key={type.id} value={type.type_name}>{type.type_name}</option>
@@ -161,7 +178,7 @@ const CashReceive = ({ modal = false, defaultCompanyId = '', onClose, onSaved })
         </div>
         <div className="form-group">
           <label>Other Ledger {!usingReceiveType && <span className="required">*</span>}</label>
-          <select name="other_ledger_id" value={formData.other_ledger_id} onChange={handleChange} disabled={usingReceiveType} className="form-select">
+          <select name="other_ledger_id" value={formData.other_ledger_id} onChange={handleChange} disabled={usingReceiveType} className="form-select" {...invalid('classification')}>
             <option value="">Select Other Ledger</option>
             {otherLedgers.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
           </select>
@@ -176,7 +193,7 @@ const CashReceive = ({ modal = false, defaultCompanyId = '', onClose, onSaved })
       <div className={gridClass}>
         <div className="form-group">
           <label>Amount (Rs.) <span className="required">*</span></label>
-          <input type="number" name="amount" min="0.01" step="0.01" value={formData.amount} onChange={handleChange} placeholder="0.00" required className="form-input" />
+          <input type="number" name="amount" min="0.01" step="0.01" value={formData.amount} onChange={handleChange} placeholder="0.00" required className="form-input" {...invalid('amount')} />
         </div>
         <div className="form-group">
           <label>Reference No (Optional)</label>
@@ -192,8 +209,9 @@ const CashReceive = ({ modal = false, defaultCompanyId = '', onClose, onSaved })
 
   if (modal) {
     return (
-      <div className="sl-modal-overlay" onClick={onClose}>
-        <div className="sl-modal" role="dialog" aria-modal="true" aria-labelledby="cr-title" onClick={(e) => e.stopPropagation()}>
+      // The backdrop is inert: a stray click outside must not discard the typed receipt.
+      <div className="sl-modal-overlay">
+        <div ref={dialogRef} className="sl-modal" role="dialog" aria-modal="true" aria-labelledby="cr-title">
           <div className="sl-modal-header">
             <h3 id="cr-title">
               <FontAwesomeIcon icon={faHandHoldingDollar} style={{ color: '#059669', marginRight: '8px' }} />
@@ -203,6 +221,8 @@ const CashReceive = ({ modal = false, defaultCompanyId = '', onClose, onSaved })
           </div>
           <form onSubmit={handleSubmit} noValidate>
             <div className="sl-modal-body">
+              {/* At the top of the form so it is not hidden below the fold */}
+              {message && message.type === 'error' && <div ref={errorRef} id="cr-error" className="sl-modal-error" role="alert">{message.text}</div>}
               {formData.company_id && (
                 <div className="sl-summary-card">
                   <div className="sl-summary-row">
@@ -212,7 +232,6 @@ const CashReceive = ({ modal = false, defaultCompanyId = '', onClose, onSaved })
                 </div>
               )}
               {fields}
-              {message && message.type === 'error' && <div className="sl-modal-error" role="alert">{message.text}</div>}
             </div>
             <div className="sl-modal-footer">
               <button type="button" className="btn btn-secondary" onClick={onClose} disabled={submitting}>Cancel</button>

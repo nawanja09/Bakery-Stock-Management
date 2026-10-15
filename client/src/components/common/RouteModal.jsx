@@ -1,52 +1,40 @@
-import React, { useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import React, { useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTimes } from '@fortawesome/free-solid-svg-icons';
 import { createPortal } from 'react-dom';
+import useDialog from './ui/useDialog';
 import './RouteModal.css';
 
-const OPEN_DROPDOWN_SELECTOR = '[aria-expanded="true"][role="combobox"], [role="listbox"], [role="menu"]';
-
-const RouteModal = ({ children, title = 'Details', size = 'large' }) => {
-  const location = useLocation();
+/**
+ * Shell for a route opened as a popup over the page it was opened from.
+ * Escape (but not Escape inside an open dropdown), focus, the Tab trap and the
+ * scroll lock come from useDialog.
+ *
+ * closeOnOverlay: only for read-only popups. Form popups keep the backdrop inert
+ * so a stray click outside does not throw away what the user typed.
+ */
+const RouteModal = ({ children, title = 'Details', size = 'large', closeOnOverlay = false }) => {
   const navigate = useNavigate();
+  const sectionRef = useRef(null);
+  const close = useCallback(() => navigate(-1), [navigate]);
 
-  useEffect(() => {
-    // An open dropdown (react-select, listbox, menu) uses Escape to close itself.
-    // Its menu state is read in the capture phase, before the dropdown handles the
-    // key and collapses, so that Escape closes only the menu and not the popup.
-    let escapeHandledByDropdown = false;
-    const handleKeyDownCapture = (event) => {
-      if (event.key !== 'Escape') return;
-      const target = event.target;
-      escapeHandledByDropdown = Boolean(
-        target && typeof target.closest === 'function'
-          && target.closest(OPEN_DROPDOWN_SELECTOR)
-      );
-    };
-    const handleKeyDown = (event) => {
-      if (event.key !== 'Escape' || escapeHandledByDropdown) return;
-      navigate(-1);
-    };
-    document.addEventListener('keydown', handleKeyDownCapture, true);
-    document.addEventListener('keydown', handleKeyDown);
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.removeEventListener('keydown', handleKeyDownCapture, true);
-      document.removeEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [navigate]);
+  useDialog(sectionRef, { onClose: close, initialFocus: '.route-modal-body' });
 
-  const close = () => navigate(-1);
   const modalRoot = document.getElementById('modal-root') || document.body;
 
   return createPortal(
-    <div className="route-modal-overlay" role="dialog" aria-modal="true" onMouseDown={(event) => {
-      if (event.target === event.currentTarget) close();
+    <div className="route-modal-overlay" onMouseDown={(event) => {
+      if (closeOnOverlay && event.target === event.currentTarget) close();
     }}>
-      <section className={`route-modal route-modal-${size}`} aria-labelledby="route-modal-title">
+      <section
+        ref={sectionRef}
+        className={`route-modal route-modal-${size}`}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="route-modal-title"
+        tabIndex={-1}
+      >
         <header className="route-modal-header">
           <div>
             <span className="route-modal-kicker">Bakery stock management</span>
@@ -63,6 +51,9 @@ const RouteModal = ({ children, title = 'Details', size = 'large' }) => {
   );
 };
 
-export const modalRouteState = (location) => ({ backgroundLocation: location });
+// A popup opened from inside another popup keeps the original page behind it.
+export const modalRouteState = (location) => ({
+  backgroundLocation: location.state?.backgroundLocation || location,
+});
 
 export default RouteModal;

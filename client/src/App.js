@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, matchPath } from 'react-router-dom';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import AddPurchase from './components/purchase/NewPurchase';
@@ -113,6 +113,7 @@ import './styles/pages/fg-finance-ui.css';
 // Must stay the last stylesheet: gives every legacy popup the shared <Modal> look.
 import './styles/legacy-dialogs.css';
 import RouteModal from './components/common/RouteModal';
+import useModalRouting, { PageKeyContext } from './components/common/useModalRouting';
 import RouteAccessGuard from './components/common/RouteAccessGuard';
 import usePermissions from './hooks/usePermissions';
 
@@ -180,18 +181,42 @@ const PublicOnlyRoute = ({ children }) => {
   return children;
 };
 
-const ModalRoute = ({ children, title, size = 'large' }) => {
-  const location = useLocation();
-  return location.state?.backgroundLocation
-    ? <RouteModal title={title} size={size}>{children}</RouteModal>
-    : children;
-};
+// Routes that open as a popup over the current page when a link passes
+// state.backgroundLocation (ModalLink, modalRouteState), and as a full page when
+// opened directly. Read-only popups may close on a backdrop click.
+const POPUP_ROUTES = [
+  { path: 'purchase/new', title: 'Add New Purchase', element: <PermittedRoute><AddPurchase /></PermittedRoute> },
+  { path: 'purchase/edit/:id', title: 'Edit Purchase', element: <RawMaterialRoute><EditPurchase /></RawMaterialRoute> },
+  { path: 'purchase/:id', title: 'Purchase Details', closeOnOverlay: true, element: <RawMaterialRoute><PurchaseDetails /></RawMaterialRoute> },
+  { path: 'items/add', title: 'Add New Item', size: 'medium', element: <RawMaterialRoute><AddItem /></RawMaterialRoute> },
+  { path: 'items/edit/:id', title: 'Edit Item', size: 'medium', element: <RawMaterialRoute><EditItem /></RawMaterialRoute> },
+  { path: 'opening/add', title: 'Add Opening Balance', size: 'medium', element: <RawMaterialRoute><AddOpeningBalance /></RawMaterialRoute> },
+  { path: 'issuance/issue', title: 'Add New Issuance', element: <RawMaterialRoute><IssueToDepartment /></RawMaterialRoute> },
+  { path: 'issuance/edit/:id', title: 'Edit Issuance', element: <RawMaterialRoute><EditIssuance /></RawMaterialRoute> },
+  { path: 'wastage/add', title: 'Add New Wastage', element: <RawMaterialRoute><AddWastage /></RawMaterialRoute> },
+  { path: 'returns/add', title: 'Add New Return', element: <RawMaterialRoute><AddReturn /></RawMaterialRoute> },
+  { path: 'cutlery/assets/view/:id', title: 'Asset Details', size: 'medium', closeOnOverlay: true, element: <ViewAsset /> },
+  { path: 'cutlery/assets/edit/:id', title: 'Edit Asset', element: <EditAsset /> },
+  { path: 'cutlery/transfer/view/:id', title: 'Transfer Details', size: 'medium', closeOnOverlay: true, element: <ViewCutleryTransfer /> },
+  { path: 'purchase-returns/add', title: 'Add New Purchase Return', element: <RawMaterialRoute><AddPurchaseReturn /></RawMaterialRoute> },
+  { path: 'wastage/edit/:id', title: 'Edit Wastage', element: <EditWastage /> },
+  { path: 'adjustments/edit/:id', title: 'Edit Adjustment', element: <AdjustmentsRoute><EditAdjustment /></AdjustmentsRoute> },
+];
 
-function App() {
+const isPopupPath = (pathname) => POPUP_ROUTES.some(({ path }) => matchPath(`/${path}`, pathname));
+
+export const AppRoutes = () => {
+  const modalRouting = useModalRouting();
+  const { location, pageKey } = modalRouting;
+  // Only a known popup URL is drawn over the page; anything else renders normally.
+  const backgroundLocation = modalRouting.backgroundLocation && isPopupPath(location.pathname)
+    ? modalRouting.backgroundLocation
+    : null;
+
   return (
-    <BrowserRouter>
       <div className="app">
-        <Routes>
+        <PageKeyContext.Provider value={pageKey}>
+        <Routes location={backgroundLocation || location}>
           <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
           <Route path="/auth-check" element={<AuthCheck />} />
           {UiPreview && (
@@ -209,18 +234,14 @@ function App() {
           >
             
             <Route path="dashboard" element={<Dashboard />} />
+            {POPUP_ROUTES.map(({ path, element }) => <Route key={path} path={path} element={element} />)}
             <Route path="management" element={<ManagementLanding />} />
-            <Route path="purchase/new" element={<PermittedRoute><ModalRoute title="Add New Purchase"><AddPurchase /></ModalRoute></PermittedRoute>} />
-            <Route path="purchase/edit/:id" element={<RawMaterialRoute><ModalRoute title="Edit Purchase"><EditPurchase /></ModalRoute></RawMaterialRoute>} />
             <Route path="purchase/history" element={<RawMaterialRoute><PurchaseHistory /></RawMaterialRoute>} />
             <Route path="purchase/orders" element={<RawMaterialRoute><OrdersPage /></RawMaterialRoute>} />
             <Route path="purchase/advance-payment" element={<RawMaterialRoute><AdvancePaymentPage /></RawMaterialRoute>} />
             <Route path="purchase/record-payment" element={<RawMaterialRoute><RecordPaymentPage /></RawMaterialRoute>} />
-            <Route path="purchase/:id" element={<RawMaterialRoute><ModalRoute title="Purchase Details"><PurchaseDetails /></ModalRoute></RawMaterialRoute>} />
             <Route path="suppliers" element={<RawMaterialRoute><Suppliers /></RawMaterialRoute>} />
-            <Route path="items/add" element={<RawMaterialRoute><ModalRoute title="Add New Item" size="medium"><AddItem /></ModalRoute></RawMaterialRoute>} />
             <Route path="items" element={<PermittedRoute><ViewItems /></PermittedRoute>} />
-            <Route path="items/edit/:id" element={<RawMaterialRoute><ModalRoute title="Edit Item" size="medium"><EditItem /></ModalRoute></RawMaterialRoute>} />
             <Route path="item-types" element={<RawMaterialRoute><ItemTypes /></RawMaterialRoute>} />
             <Route path="departments" element={<RawMaterialRoute><Departments /></RawMaterialRoute>} />
             <Route path="companies" element={<RawMaterialRoute><Companies /></RawMaterialRoute>} />
@@ -229,12 +250,8 @@ function App() {
             <Route path="expense-payees-management" element={<ExpensePayeeManagement />} />
             <Route path="bank-charges-type-management" element={<BankChargesTypeManagement />} />
             <Route path="admin/password" element={<ChangePassword />} />
-            <Route path="opening/add" element={<RawMaterialRoute><ModalRoute title="Add Opening Balance" size="medium"><AddOpeningBalance /></ModalRoute></RawMaterialRoute>} />
             <Route path="opening/history" element={<RawMaterialRoute><OpeningBalanceHistory /></RawMaterialRoute>} />
-            <Route path="issuance/issue" element={<RawMaterialRoute><ModalRoute title="Add New Issuance"><IssueToDepartment /></ModalRoute></RawMaterialRoute>} />
-            <Route path="issuance/edit/:id" element={<RawMaterialRoute><ModalRoute title="Edit Issuance"><EditIssuance /></ModalRoute></RawMaterialRoute>} />
             <Route path="issuance/history" element={<RawMaterialRoute><IssuanceHistory /></RawMaterialRoute>} />
-            <Route path="wastage/add" element={<RawMaterialRoute><ModalRoute title="Add New Wastage"><AddWastage /></ModalRoute></RawMaterialRoute>} />
             <Route path="wastage/history" element={<RawMaterialRoute><WastageHistory /></RawMaterialRoute>} />
             <Route path="reports/stock" element={<RawMaterialRoute><StockReport /></RawMaterialRoute>} />
             <Route path="reports/department" element={<DepartmentIssuesReport />} />
@@ -246,22 +263,17 @@ function App() {
 
             <Route path="/reports/department-usage" element={<DepartmentUsageReport />} />
 
-            <Route path="returns/add" element={<RawMaterialRoute><ModalRoute title="Add New Return"><AddReturn /></ModalRoute></RawMaterialRoute>} />
             <Route path="returns/history" element={<RawMaterialRoute><ReturnsHistory /></RawMaterialRoute>} />
 
             <Route path="cutlery/locations" element={<Locations />} />
             <Route path="cutlery/assets" element={<Assets />} />
-            <Route path="cutlery/assets/view/:id" element={<ModalRoute title="Asset Details" size="medium"><ViewAsset /></ModalRoute>} />
-            <Route path="cutlery/assets/edit/:id" element={<ModalRoute title="Edit Asset"><EditAsset /></ModalRoute>} />
             <Route path="cutlery/transfer" element={<Transfers />} />
-            <Route path="cutlery/transfer/view/:id" element={<ModalRoute title="Transfer Details" size="medium"><ViewCutleryTransfer /></ModalRoute>} />
             <Route path="cutlery/purchasing" element={<Purchases />} />
             <Route path="cutlery/damage" element={<Damages />} />
             <Route path="cutlery/reports/inventory" element={<CutleryStockReport />} />
             <Route path="cutlery/reports/stock" element={<CutleryStockReport />} />
 
             <Route path="reports/vat" element={<VATReport />} />
-            <Route path="purchase-returns/add" element={<RawMaterialRoute><ModalRoute title="Add New Purchase Return"><AddPurchaseReturn /></ModalRoute></RawMaterialRoute>} />
             <Route path="purchase-returns/history" element={<RawMaterialRoute><PurchaseReturnHistory /></RawMaterialRoute>} />
             <Route path="reports/purchase-vat" element={<PurchaseVATReport />} />
 
@@ -284,11 +296,9 @@ function App() {
             <Route path="finance/bank-receive" element={<Navigate to="/finance/bank" replace />} />
             <Route path="finance/transfer" element={<FinanceRoute><FundTransfer /></FinanceRoute>} />
             <Route path="finance/income" element={<FinanceRoute><IncomePage /></FinanceRoute>} />
-            <Route path="wastage/edit/:id" element={<ModalRoute title="Edit Wastage"><EditWastage /></ModalRoute>} />
 
             <Route path="adjustments/stores-balance" element={<AdjustmentsRoute><StoresBalance /></AdjustmentsRoute>} />
             <Route path="adjustments/stores-adjustments" element={<AdjustmentsRoute><StoresAdjustments /></AdjustmentsRoute>} />
-            <Route path="adjustments/edit/:id" element={<ModalRoute title="Edit Adjustment"><AdjustmentsRoute><EditAdjustment /></AdjustmentsRoute></ModalRoute>} />
             <Route path="adjustments/payment-methods" element={<AdjustmentsRoute><PaymentMethodManagement /></AdjustmentsRoute>} />
             <Route path="adjustments/inhand" element={<AdjustmentsRoute><InhandAdjustments /></AdjustmentsRoute>} />
             <Route path="/reports/department-return-item-wise" element={<DepartmentReturnItemWiseReport />} />
@@ -316,7 +326,34 @@ function App() {
 
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
+        </PageKeyContext.Provider>
+
+        {backgroundLocation && (
+          <Routes>
+            {POPUP_ROUTES.map(({ path, title, size = 'large', closeOnOverlay, element }) => (
+              <Route
+                key={path}
+                path={`/${path}`}
+                element={(
+                  <ProtectedRoute>
+                    <RouteModal title={title} size={size} closeOnOverlay={closeOnOverlay}>
+                      {/* Popups render outside Layout, so they need its role check too. */}
+                      <RouteAccessGuard>{element}</RouteAccessGuard>
+                    </RouteModal>
+                  </ProtectedRoute>
+                )}
+              />
+            ))}
+          </Routes>
+        )}
       </div>
+  );
+};
+
+function App() {
+  return (
+    <BrowserRouter>
+      <AppRoutes />
     </BrowserRouter>
   );
 }

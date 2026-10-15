@@ -751,3 +751,42 @@
   font-size: var(--font-size-xs);
   color: var(--color-text-tertiary);
 }
+
+/* ── In-hand entry details (shared <Modal size="drawer">) ── */
+.ih-details-modal .ih-detail-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+	gap: 12px 16px;
+	margin-bottom: 18px;
+}
+.ih-details-modal .ih-detail-item {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+	min-width: 0;
+}
+.ih-details-modal .ih-detail-item.full-width { grid-column: 1 / -1; }
+.ih-details-modal .ih-detail-item > span {
+	color: var(--color-text-secondary);
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: .04em;
+	text-transform: uppercase;
+}
+.ih-details-modal .ih-detail-item > strong {
+	color: var(--color-text-primary);
+	font-size: 14px;
+	overflow-wrap: anywhere;
+}
+.ih-details-modal .ih-drawer-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; padding: 0; border-top: 0; background: none; }
+.ih-details-modal .ih-audit-toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	padding: 6px 0;
+	border: 0;
+	background: none;
+	color: var(--color-primary);
+	font-weight: 600;
+	cursor: pointer;
+}

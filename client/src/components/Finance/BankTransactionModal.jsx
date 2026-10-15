@@ -13,6 +13,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faLandmark, faMoneyBillTransfer, faSpinner, faTimes, faCheck } from '@fortawesome/free-solid-svg-icons';
 import api from '../../api';
+import useDialog from '../common/ui/useDialog';
 import './FinanceForm.css';
 import './StaffLoans.css'; // shared modal look (sl-modal*)
 
@@ -28,6 +29,9 @@ const BankTransactionModal = ({ mode = 'receive', defaultBank = null, onClose, o
   const [loadingBanks, setLoadingBanks] = useState(false);
   const [bankLoadError, setBankLoadError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const dialogRef = useRef(null);
+  // Escape closes (not while saving); focus moves in; Tab and page scroll stay put.
+  useDialog(dialogRef, { open: true, onClose: submitting ? undefined : onClose });
   const [error, setError] = useState('');
   // Bank account picked on the ledger page; preselected once its company's accounts load.
   const preferredBankId = useRef(defaultBank ? String(defaultBank.id) : '');
@@ -155,8 +159,9 @@ const BankTransactionModal = ({ mode = 'receive', defaultBank = null, onClose, o
   const title = isReceive ? 'Bank Received' : 'Bank Issued';
 
   return (
-    <div className="sl-modal-overlay" onClick={onClose}>
-      <div className="sl-modal" role="dialog" aria-modal="true" aria-labelledby="bt-title" onClick={(e) => e.stopPropagation()}>
+    // Backdrop is inert: an outside click must not discard what was typed.
+    <div className="sl-modal-overlay">
+      <div ref={dialogRef} className="sl-modal" role="dialog" aria-modal="true" aria-labelledby="bt-title">
         <div className="sl-modal-header">
           <h3 id="bt-title">
             <FontAwesomeIcon

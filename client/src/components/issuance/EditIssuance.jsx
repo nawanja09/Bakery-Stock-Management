@@ -267,7 +267,7 @@ const EditIssuance = ({ embeddedId, onSaved, onCancel, isRmAdjustment = false } 
       <div className="header-with-actions">
         <h2>Edit RM Issue</h2>
         {!embeddedId && (
-          <button onClick={goBack} className="btn-secondary">
+          <button type="button" onClick={goBack} className="btn btn-secondary">
             ← Back to History
           </button>
         )}
@@ -406,7 +406,7 @@ const EditIssuance = ({ embeddedId, onSaved, onCancel, isRmAdjustment = false } 
 
         <button
           type="submit"
-          className="btn-submit"
+          className="btn btn-primary"
           disabled={isSubmitting}
         >
           {isSubmitting ? 'Updating...' : 'Update Issuance'}

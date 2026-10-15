@@ -385,7 +385,7 @@ const IssueToDepartment = () => {
 
         <button
           type="submit"
-          className="btn-submit"
+          className="btn btn-primary"
           disabled={isSubmitting}
         >
           {isSubmitting ? 'Submitting...' : (id ? 'Update Issuance' : 'Save Issuance')}

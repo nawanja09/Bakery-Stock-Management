@@ -1,5 +1,5 @@
 // src/components/purchase/PaymentModal.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
@@ -14,6 +14,7 @@ import {
 import dayjs from 'dayjs';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
+import useDialog from '../common/ui/useDialog';
 import usePaymentMethods from '../../utils/usePaymentMethods';
 import './PaymentModal.css';
 
@@ -29,6 +30,9 @@ const PaymentModal = ({ purchase, onClose, onPaymentComplete }) => {
   const [paymentHistory, setPaymentHistory] = useState([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const dialogRef = useRef(null);
+  // Escape closes (not while saving); focus moves in; Tab and page scroll stay put.
+  useDialog(dialogRef, { open: true, onClose: submitting ? undefined : onClose });
   const [showHistory, setShowHistory] = useState(false);
   
   const { showPopup } = usePopup();
@@ -152,8 +156,9 @@ const PaymentModal = ({ purchase, onClose, onPaymentComplete }) => {
   };
 
   return createPortal((
-    <div className="payment-modal-overlay" onClick={onClose}>
-      <div className="payment-modal" onClick={(e) => e.stopPropagation()}>
+    // Backdrop is inert: an outside click must not discard what was typed.
+    <div className="payment-modal-overlay">
+      <div ref={dialogRef} className="payment-modal" role="dialog" aria-modal="true" aria-label="Make Payment">
         
         <div className="payment-modal-header">
           <h3>

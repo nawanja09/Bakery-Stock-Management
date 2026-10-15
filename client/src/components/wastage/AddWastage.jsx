@@ -223,96 +223,99 @@ const AddWastage = () => {
         </div>
 
         <h3>Wasted Items</h3>
-        <table className="item-table">
-          <thead>
-            <tr>
-              <th style={{ width: '30%' }}>Item Name</th>
-              <th style={{ width: '12%' }}>Quantity</th>
-              <th style={{ width: '10%' }}>Unit</th>
-              <th style={{ width: '15%' }}>Unit Price (Rs.)</th>
-              <th style={{ width: '18%' }}>Estimated Loss (Rs.)</th>
-              <th style={{ width: '10%' }}>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {formData.items.map((item, index) => (
-              <tr key={index}>
-                <td>
-                  <Select
-                    options={itemOptions}
-                    value={itemOptions.find(opt => String(opt.value) === String(item.item_id)) || null}
-                    onChange={(selected) => handleItemSelect(index, selected)}
-                    isSearchable
-                    isClearable
-                    placeholder="Select item..."
-                    styles={{
-                      control: (base) => ({
-                        ...base,
-                        minHeight: '38px',
-                        borderColor: '#ced4da'
-                      }),
-                      menuPortal: (base) => ({ ...base, zIndex: 'var(--z-popover)' })
-                    }}
-                    menuPortalTarget={document.body}
-                  />
-                </td>
-                <td>
-                  <input
-                    type="number"
-                    min="0.001"
-                    step="0.001"
-                    value={item.quantity}
-                    onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
-                    required
-                  />
-                </td>
-                <td>
-                  <input
-                    type="text"
-                    value={item.unit}
-                    readOnly
-                    className="unit-display"
-                  />
-                </td>
-                <td>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={item.unit_price}
-                    onChange={(e) => handleItemChange(index, 'unit_price', e.target.value)}
-                    placeholder="0.00"
-                  />
-                  {item.item_id && (
-                    <small className="price-hint">
-                      Latest: Rs. {getUnitPriceDisplay(item.item_id)}
-                    </small>
-                  )}
-                </td>
-                <td>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={item.estimated_loss}
-                    readOnly
-                    className="estimated-loss-display"
-                  />
-                </td>
-                <td>
-                  <button
-                    type="button"
-                    className="btn-remove"
-                    onClick={() => removeItemRow(index)}
-                    disabled={formData.items.length <= 1}
-                  >
-                    Remove
-                  </button>
-                </td>
+        {/* Scrolls sideways on narrow screens instead of being cut off */}
+        <div style={{ overflowX: 'auto' }}>
+          <table className="item-table">
+            <thead>
+              <tr>
+                <th style={{ width: '30%' }}>Item Name</th>
+                <th style={{ width: '12%' }}>Quantity</th>
+                <th style={{ width: '10%' }}>Unit</th>
+                <th style={{ width: '15%' }}>Unit Price (Rs.)</th>
+                <th style={{ width: '18%' }}>Estimated Loss (Rs.)</th>
+                <th style={{ width: '10%' }}>Action</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {formData.items.map((item, index) => (
+                <tr key={index}>
+                  <td>
+                    <Select
+                      options={itemOptions}
+                      value={itemOptions.find(opt => String(opt.value) === String(item.item_id)) || null}
+                      onChange={(selected) => handleItemSelect(index, selected)}
+                      isSearchable
+                      isClearable
+                      placeholder="Select item..."
+                      styles={{
+                        control: (base) => ({
+                          ...base,
+                          minHeight: '38px',
+                          borderColor: '#ced4da'
+                        }),
+                        menuPortal: (base) => ({ ...base, zIndex: 'var(--z-popover)' })
+                      }}
+                      menuPortalTarget={document.body}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      min="0.001"
+                      step="0.001"
+                      value={item.quantity}
+                      onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
+                      required
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="text"
+                      value={item.unit}
+                      readOnly
+                      className="unit-display"
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={item.unit_price}
+                      onChange={(e) => handleItemChange(index, 'unit_price', e.target.value)}
+                      placeholder="0.00"
+                    />
+                    {item.item_id && (
+                      <small className="price-hint">
+                        Latest: Rs. {getUnitPriceDisplay(item.item_id)}
+                      </small>
+                    )}
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={item.estimated_loss}
+                      readOnly
+                      className="estimated-loss-display"
+                    />
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      className="btn-remove"
+                      onClick={() => removeItemRow(index)}
+                      disabled={formData.items.length <= 1}
+                    >
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
         <button
           type="button"

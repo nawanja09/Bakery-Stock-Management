@@ -1,11 +1,12 @@
 // src/components/Income/NewIncomeModal.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTimes, faSave, faSpinner, faSackDollar } from '@fortawesome/free-solid-svg-icons';
 import dayjs from 'dayjs';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
+import useDialog from '../common/ui/useDialog';
 
 const defaultForm = () => ({
   income_date: dayjs().format('YYYY-MM-DD'),
@@ -18,6 +19,9 @@ const NewIncomeModal = ({ isOpen, record, onClose, companies = [], departments =
   const { showPopup } = usePopup();
   const [formData, setFormData] = useState(defaultForm());
   const [submitting, setSubmitting] = useState(false);
+  const dialogRef = useRef(null);
+  // Escape closes (not while saving); focus moves in; Tab and page scroll stay put.
+  useDialog(dialogRef, { open: Boolean(isOpen), onClose: submitting ? undefined : onClose });
 
   useEffect(() => {
     if (isOpen) {
@@ -69,8 +73,9 @@ const NewIncomeModal = ({ isOpen, record, onClose, companies = [], departments =
   };
 
   return createPortal(
-    <div className="inc-overlay" onClick={onClose}>
-      <div className="inc-modal" onClick={(event) => event.stopPropagation()}>
+    // Backdrop is inert: an outside click must not discard what was typed.
+    <div className="inc-overlay">
+      <div ref={dialogRef} className="inc-modal" role="dialog" aria-modal="true" aria-label={record ? 'Edit Income' : 'Add New Income'}>
         <div className="inc-header">
           <h3><FontAwesomeIcon icon={faSackDollar} /> {record ? 'Edit Income' : 'Add New Income'}</h3>
           <button type="button" className="inc-close" onClick={onClose}><FontAwesomeIcon icon={faTimes} /></button>

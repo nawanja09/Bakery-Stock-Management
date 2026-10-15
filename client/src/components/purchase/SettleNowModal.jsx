@@ -1,11 +1,12 @@
 // src/components/purchase/SettleNowModal.jsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTimes, faBalanceScale, faCheckCircle, faSpinner, faBoxOpen, faWallet } from '@fortawesome/free-solid-svg-icons';
 import dayjs from 'dayjs';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
+import useDialog from '../common/ui/useDialog';
 import { formatPurchasingCurrency as formatCurrency } from '../../utils/formatters';
 import './SettleNowModal.css';
 
@@ -17,6 +18,9 @@ const SettleNowModal = ({ isOpen, onClose, invoice, supplierId, onSuccess }) => 
   const [allocations, setAllocations] = useState({});
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const dialogRef = useRef(null);
+  // Escape closes (not while saving); focus moves in; Tab and page scroll stay put.
+  useDialog(dialogRef, { open: Boolean(isOpen && invoice), onClose: submitting ? undefined : onClose });
 
   const fetchCredits = useCallback(async () => {
     setLoading(true);
@@ -122,8 +126,9 @@ const SettleNowModal = ({ isOpen, onClose, invoice, supplierId, onSuccess }) => 
   };
 
   return createPortal((
-    <div className="snm-overlay" onClick={onClose}>
-      <div className="snm-modal" onClick={e => e.stopPropagation()}>
+    // Backdrop is inert: an outside click must not discard what was typed.
+    <div className="snm-overlay">
+      <div ref={dialogRef} className="snm-modal" role="dialog" aria-modal="true" aria-label="Settle Now">
         
         <div className="snm-header">
           <h3>

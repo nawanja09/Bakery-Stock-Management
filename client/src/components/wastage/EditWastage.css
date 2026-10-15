@@ -1,2 +1,219 @@
 @import './Wastage.css';
 @import '../common/FormStyles.css';
+
+/* ============================================================================
+   EDIT WASTAGE (erp-* screen) - layout and look on the shared tokens.
+   Works as a full page and inside the route popup.
+   ============================================================================ */
+.erp-wastage-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  padding: var(--spacing-lg);
+  color: var(--color-text-primary);
+}
+
+/* Header */
+.erp-page-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--spacing-md); }
+.erp-header-left { display: flex; flex-wrap: wrap; align-items: center; gap: var(--spacing-md); min-width: 0; }
+.erp-back-btn { width: 40px; padding: 0; }
+.erp-title-group h1 { margin: 2px 0 0; font-size: clamp(1.25rem, 2vw, 1.6rem); color: var(--color-heading); }
+.erp-breadcrumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; color: var(--color-text-secondary); }
+.erp-breadcrumb-separator { font-size: 9px; color: var(--color-text-tertiary); }
+.erp-breadcrumb-active { color: var(--color-primary); font-weight: 600; }
+.erp-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--color-primary-50);
+  color: var(--color-primary);
+  font-size: 12px;
+  font-weight: 600;
+}
+.erp-note-number { display: flex; flex-direction: column; align-items: flex-end; }
+.erp-note-label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--color-text-secondary); }
+.erp-note-value { font-size: 1.1rem; font-weight: 700; color: var(--color-primary-deep); }
+
+/* Two-column layout: form + summary */
+.erp-form-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: var(--spacing-lg);
+  align-items: start;
+}
+.erp-main-content { display: flex; flex-direction: column; gap: var(--spacing-lg); min-width: 0; }
+.erp-sidebar { position: sticky; top: var(--spacing-md); }
+
+/* Cards */
+.erp-card,
+.erp-summary-panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+.erp-card-header,
+.erp-summary-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-bottom: 1px solid var(--color-border);
+}
+.erp-flex-between { justify-content: space-between; }
+.erp-card-header h2,
+.erp-summary-header h3 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 1rem; color: var(--color-heading); }
+.erp-card-icon,
+.erp-summary-header-icon { color: var(--color-accent-dark); }
+.erp-card-body,
+.erp-summary-body { padding: var(--spacing-lg); }
+
+/* Fields */
+.erp-form-grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--spacing-md); }
+.erp-input-group { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.erp-input-group label { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--color-text-secondary); }
+.erp-label-icon { color: var(--color-text-tertiary); }
+.erp-required { color: var(--color-danger); }
+.erp-input,
+.erp-select,
+.erp-textarea,
+.erp-number-input,
+.erp-search-input {
+  width: 100%;
+  min-height: var(--input-height, 40px);
+  padding: 8px 12px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font: inherit;
+  box-sizing: border-box;
+}
+.erp-textarea { min-height: 96px; resize: vertical; }
+.erp-input:focus,
+.erp-select:focus,
+.erp-textarea:focus,
+.erp-number-input:focus,
+.erp-search-input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-focus-ring);
+}
+.erp-char-count { margin-top: 6px; font-size: 12px; color: var(--color-text-tertiary); text-align: right; }
+
+/* Items table */
+.erp-table-container { overflow: visible; }
+.erp-data-table { width: 100%; border-collapse: collapse; }
+.erp-data-table th {
+  padding: 10px 12px;
+  text-align: left;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  background: var(--color-surface-hover);
+  border-bottom: 1px solid var(--color-border);
+}
+.erp-data-table td { padding: 10px 12px; border-bottom: 1px solid var(--color-border-light); vertical-align: top; }
+.erp-search-widget { position: relative; }
+.erp-search-icon { position: absolute; left: 12px; top: 13px; color: var(--color-text-tertiary); pointer-events: none; }
+.erp-search-input { padding-left: 34px; }
+.erp-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: var(--z-dropdown);
+  max-height: 260px;
+  overflow-y: auto;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+}
+.erp-dropdown-item { display: flex; justify-content: space-between; gap: 12px; padding: 9px 12px; cursor: pointer; }
+.erp-dropdown-item:hover { background: var(--color-primary-50); }
+.erp-dropdown-empty { padding: 12px; color: var(--color-text-secondary); }
+.erp-item-info,
+.erp-item-meta { display: flex; flex-direction: column; min-width: 0; }
+.erp-item-meta { align-items: flex-end; }
+.erp-item-code,
+.erp-item-unit { font-size: 11px; color: var(--color-text-secondary); }
+.erp-item-name { font-weight: 600; }
+.erp-item-price { font-size: 12px; color: var(--color-primary); }
+.erp-readonly-badge { display: inline-block; padding: 8px 10px; border-radius: var(--radius-md); background: var(--color-surface-strong); }
+.erp-price-input-group { display: flex; align-items: center; gap: 6px; }
+.erp-currency { font-size: 12px; color: var(--color-text-secondary); }
+.erp-latest-price-hint { margin-top: 4px; font-size: 11px; color: var(--color-text-tertiary); }
+.erp-loss-highlight { padding: 8px 0; font-weight: 700; color: var(--color-danger); white-space: nowrap; }
+.erp-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+.erp-btn-danger { color: var(--color-danger); }
+.erp-btn-danger:hover:not(:disabled) { background: var(--color-danger-light); }
+.erp-icon-btn:disabled { opacity: .45; cursor: not-allowed; }
+.erp-table-footer { padding: var(--spacing-md) var(--spacing-lg); }
+
+/* Summary */
+.erp-summary-icon-wrapper { display: inline-flex; }
+.erp-summary-body { display: flex; flex-direction: column; gap: var(--spacing-sm); }
+.erp-stat-card { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: var(--radius-md); background: var(--color-surface-hover); }
+.erp-stat-primary { background: var(--color-danger-light); }
+.erp-stat-label { font-size: 12px; color: var(--color-text-secondary); }
+.erp-stat-value { font-size: 1.1rem; font-weight: 700; color: var(--color-heading); }
+.erp-text-danger { color: var(--color-danger); }
+
+/* Actions stay reachable at the bottom of the page or popup */
+.erp-action-bar {
+  grid-column: 1 / -1;
+  position: sticky;
+  bottom: 0;
+  padding: var(--spacing-md) 0;
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+}
+.erp-action-bar-content { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--spacing-sm); }
+
+/* Loading skeleton */
+.erp-skeleton-header,
+.erp-skeleton-card { display: flex; flex-direction: column; gap: 10px; }
+.erp-skeleton-title,
+.erp-skeleton-breadcrumb,
+.erp-skeleton-row,
+.erp-skeleton-card {
+  border-radius: var(--radius-md);
+  background: linear-gradient(90deg, var(--color-border) 0%, var(--color-border-light) 50%, var(--color-border) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+.erp-skeleton-title { width: 240px; max-width: 70%; height: 28px; }
+.erp-skeleton-breadcrumb { width: 160px; height: 12px; }
+.erp-skeleton-card { min-height: 120px; padding: var(--spacing-lg); }
+.erp-skeleton-row { height: 40px; }
+.erp-skeleton-tall { min-height: 260px; }
+
+@media (max-width: 960px) {
+  .erp-form-layout { grid-template-columns: minmax(0, 1fr); }
+  .erp-sidebar { position: static; }
+  /* The item table scrolls sideways on narrow screens */
+  .erp-table-container { overflow-x: auto; }
+  .erp-data-table { min-width: 720px; }
+}
+
+@media (max-width: 560px) {
+  .erp-wastage-container { padding: var(--spacing-md); }
+  .erp-note-number { align-items: flex-start; }
+  .erp-action-bar-content > .btn { flex: 1 1 auto; }
+}

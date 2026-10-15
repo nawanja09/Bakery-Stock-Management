@@ -24,6 +24,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCreditCard, faSpinner, faCheck, faTimes } from '@fortawesome/free-solid-svg-icons';
 import api from '../../api';
+import useDialog from '../common/ui/useDialog';
 import { usePopup } from '../context/PopupContext';
 import './FinanceForm.css';
 import './CardLedger.css';
@@ -154,6 +155,9 @@ const CardLedger = () => {
   const [realiseError, setRealiseError] = useState('');
   const [realising, setRealising] = useState(false);
   const submittingRef = useRef(false); // blocks a double click before React re-renders
+  const realiseDialogRef = useRef(null);
+  // Escape (not while saving), focus, Tab trap and scroll lock; closeRealise is declared below.
+  useDialog(realiseDialogRef, { open: realiseOpen, onClose: () => closeRealise() });
 
   // ------------------------------------------------------------------ data
   const fetchPending = useCallback(async () => {
@@ -710,8 +714,9 @@ const CardLedger = () => {
 
       {/* ------------------------- REALISE CARD TRANSACTION ------------------------- */}
       {realiseOpen && group && (
-        <div className="cl-modal-overlay" onClick={closeRealise}>
-          <div className="cl-modal cl-modal-wide" role="dialog" aria-modal="true" aria-labelledby="cl-realise-title" onClick={(e) => e.stopPropagation()}>
+        // Backdrop is inert: an outside click must not discard the typed amount.
+        <div className="cl-modal-overlay">
+          <div ref={realiseDialogRef} className="cl-modal cl-modal-wide" role="dialog" aria-modal="true" aria-labelledby="cl-realise-title">
             <div className="cl-modal-header">
               <div>
                 <h3 id="cl-realise-title">Realise Card Transaction</h3>

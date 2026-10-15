@@ -644,16 +644,21 @@ const PurchaseHistory = () => {
     }
   }, [selectedPurchases, confirm]);
 
-  // ── Loading state
+  // ── Loading state: a page-shaped skeleton, so the screen is never blank
   if (loading) {
     return (
-      <div className="loading-container-responsive">
-        <div className="loading-shimmer">
-          <div className="shimmer-header" />
-          <div className="shimmer-stats" />
-          <div className="shimmer-filters" />
-          <div className="shimmer-content" />
+      <div className="loading-container-responsive" role="status" aria-live="polite">
+        <div className="loading-shimmer" aria-hidden="true">
+          <div className="skeleton-loader shimmer-header" />
+          <div className="shimmer-stats">
+            {[0, 1, 2, 3].map(i => <div key={i} className="skeleton-loader" />)}
+          </div>
+          <div className="skeleton-loader shimmer-filters" />
+          <div className="shimmer-content">
+            {[0, 1, 2, 3, 4, 5].map(i => <div key={i} className="skeleton-loader" />)}
+          </div>
         </div>
+        <p className="loading-text">Loading purchases…</p>
       </div>
     );
   }

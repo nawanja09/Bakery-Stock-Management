@@ -353,7 +353,7 @@ const EditWastage = ({ embeddedId, onSaved, onCancel, isRmAdjustment = false } =
       <div className="erp-page-header">
         <div className="erp-header-left">
           {!embeddedId && (
-            <button onClick={goBack} className="erp-back-btn">
+            <button type="button" onClick={goBack} className="btn btn-secondary erp-back-btn" aria-label="Back to wastage history">
               <FontAwesomeIcon icon={faArrowLeft} />
             </button>
           )}
@@ -572,6 +572,7 @@ const EditWastage = ({ embeddedId, onSaved, onCancel, isRmAdjustment = false } =
                         <button
                           type="button"
                           className="erp-icon-btn erp-btn-danger"
+                          aria-label="Remove item"
                           onClick={() => removeItemRow(index)}
                           disabled={formData.items.length <= 1}
                           title={formData.items.length <= 1 ? "At least one item required" : "Remove item"}
@@ -588,7 +589,7 @@ const EditWastage = ({ embeddedId, onSaved, onCancel, isRmAdjustment = false } =
             <div className="erp-table-footer">
               <button
                 type="button"
-                className="erp-btn erp-btn-secondary"
+                className="btn btn-secondary"
                 onClick={addItemRow}
               >
                 <FontAwesomeIcon icon={faPlus} />
@@ -659,13 +660,13 @@ const EditWastage = ({ embeddedId, onSaved, onCancel, isRmAdjustment = false } =
             <button
               type="button"
               onClick={goBack}
-              className="erp-btn erp-btn-ghost"
+              className="btn btn-secondary"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className={`erp-btn erp-btn-primary ${isSubmitting ? 'erp-btn-loading' : ''}`}
+              className="btn btn-primary"
               disabled={isSubmitting}
             >
               {isSubmitting ? (

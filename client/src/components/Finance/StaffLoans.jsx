@@ -7,10 +7,11 @@
 //   repayment shown here is read back from the API after each change.
 // * Receive Cash posts the repayment AND the matching Cash Book entry in one
 //   backend transaction (see server/controllers/staffLoanController.js).
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faHandHoldingDollar, faSpinner, faCheck, faHistory, faTimes } from '@fortawesome/free-solid-svg-icons';
 import api from '../../api';
+import useDialog from '../common/ui/useDialog';
 import { usePopup } from '../context/PopupContext';
 import './FinanceForm.css';
 import './StaffLoans.css';
@@ -103,6 +104,12 @@ const StaffLoans = () => {
   const [historyLoan, setHistoryLoan] = useState(null);
   const [history, setHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+
+  // Escape, focus, Tab trap and scroll lock for both popups (handlers are declared below).
+  const receiveDialogRef = useRef(null);
+  const historyDialogRef = useRef(null);
+  useDialog(receiveDialogRef, { open: Boolean(receiveLoan), onClose: () => closeReceiveModal() });
+  useDialog(historyDialogRef, { open: Boolean(historyLoan), onClose: () => setHistoryLoan(null) });
 
   const fetchLoans = useCallback(async () => {
     try {
@@ -417,8 +424,9 @@ const StaffLoans = () => {
 
       {/* ════════════ Receive Cash Modal ════════════ */}
       {receiveLoan && (
-        <div className="sl-modal-overlay" onClick={closeReceiveModal}>
-          <div className="sl-modal" role="dialog" aria-modal="true" aria-labelledby="sl-receive-title" onClick={(e) => e.stopPropagation()}>
+        // Backdrop is inert: an outside click must not discard the typed amount.
+        <div className="sl-modal-overlay">
+          <div ref={receiveDialogRef} className="sl-modal" role="dialog" aria-modal="true" aria-labelledby="sl-receive-title">
             <div className="sl-modal-header">
               <h3 id="sl-receive-title">
                 <FontAwesomeIcon icon={faHandHoldingDollar} style={{ color: '#059669', marginRight: '8px' }} />
@@ -496,7 +504,7 @@ const StaffLoans = () => {
       {/* ════════════ Repayment History Modal ════════════ */}
       {historyLoan && (
         <div className="sl-modal-overlay" onClick={() => setHistoryLoan(null)}>
-          <div className="sl-modal sl-modal-wide" role="dialog" aria-modal="true" aria-labelledby="sl-history-title" onClick={(e) => e.stopPropagation()}>
+          <div ref={historyDialogRef} className="sl-modal sl-modal-wide" role="dialog" aria-modal="true" aria-labelledby="sl-history-title" onClick={(e) => e.stopPropagation()}>
             <div className="sl-modal-header">
               <h3 id="sl-history-title">
                 <FontAwesomeIcon icon={faHistory} style={{ marginRight: '8px' }} />

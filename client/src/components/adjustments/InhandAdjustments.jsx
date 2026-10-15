@@ -8,11 +8,12 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faPlus, faSearch, faFilter, faSync, faEye, faEdit, faCheckCircle,
   faPaperPlane, faBan, faMoneyBillWave, faUniversity, faClock,
-  faExclamationCircle, faInfoCircle, faSpinner, faHistory, faTimes
+  faExclamationCircle, faInfoCircle, faSpinner, faHistory
 } from '@fortawesome/free-solid-svg-icons';
 import api from '../../api';
 import InhandEntryForm from './InhandEntryForm';
 import InhandAuditLog  from './InhandAuditLog';
+import { Modal } from '../common/ui';
 import './Adjustments.css';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -67,19 +68,16 @@ const DetailDrawer = ({ entry, onClose, onAction }) => {
   const canCancel  = ['Draft','Pending','Approved'].includes(entry.status);
 
   return (
-    <div className="ih-drawer-overlay" onClick={onClose}>
-      <div className="ih-drawer" onClick={e => e.stopPropagation()}>
-        <div className="ih-drawer-header">
-          <div>
-            <h3>
-              <FontAwesomeIcon icon={isCash ? faMoneyBillWave : faUniversity} />
-              &nbsp;{entry.reference_no}
-            </h3>
-            <StatusBadge status={entry.status} />
-          </div>
-          <button className="ih-close-btn" onClick={onClose}><FontAwesomeIcon icon={faTimes} /></button>
-        </div>
-
+    // Read-only details: the side panel may close on a backdrop click.
+    <Modal
+      size="drawer"
+      title={entry.reference_no}
+      subtitle={<StatusBadge status={entry.status} />}
+      icon={<FontAwesomeIcon icon={isCash ? faMoneyBillWave : faUniversity} />}
+      onClose={onClose}
+      closeOnOverlay
+      className="ih-details-modal"
+    >
         <div className="ih-drawer-body">
           {/* Core Details */}
           <div className="ih-detail-grid">
@@ -141,8 +139,7 @@ const DetailDrawer = ({ entry, onClose, onAction }) => {
           </button>
           {auditOpen && <InhandAuditLog inhandId={entry.id} />}
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 };
 

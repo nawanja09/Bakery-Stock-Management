@@ -25,6 +25,8 @@
   animation: route-modal-scale-in 200ms ease-out;
 }
 
+.route-modal:focus { outline: none; }
+
 .route-modal-medium { width: min(100%, 900px); }
 .route-modal-small { width: min(100%, 620px); }
 

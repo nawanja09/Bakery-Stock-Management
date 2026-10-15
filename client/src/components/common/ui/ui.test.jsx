@@ -95,3 +95,57 @@ describe('EmptyState', () => {
     expect(screen.getByRole('button', { name: 'Add' })).toBeInTheDocument();
   });
 });
+
+describe('Modal keyboard handling', () => {
+  test('Tab from the last control returns to the first, and Shift+Tab from the first goes to the last', () => {
+    render(
+      <Modal title="Form" onClose={() => {}} footer={<button type="button">Save</button>}>
+        <input aria-label="Name" />
+      </Modal>
+    );
+    const close = screen.getByRole('button', { name: 'Close' }); // header ×, first in the dialog
+    const save = screen.getByRole('button', { name: 'Save' });
+
+    save.focus();
+    fireEvent.keyDown(save, { key: 'Tab' });
+    expect(close).toHaveFocus();
+
+    fireEvent.keyDown(close, { key: 'Tab', shiftKey: true });
+    expect(save).toHaveFocus();
+  });
+
+  test('Tab from outside the dialog is brought back inside', () => {
+    render(
+      <>
+        <button type="button">Page button</button>
+        <Modal title="Form" onClose={() => {}}><input aria-label="Name" /></Modal>
+      </>
+    );
+    const outside = screen.getByRole('button', { name: 'Page button', hidden: true });
+    outside.focus();
+    fireEvent.keyDown(outside, { key: 'Tab' });
+    expect(screen.getByRole('dialog')).toContainElement(document.activeElement);
+  });
+
+  test('Escape closes only the dialog opened last (e.g. a confirmation over a form)', () => {
+    const closeOuter = jest.fn();
+    const closeInner = jest.fn();
+    const ui = (inner) => (
+      <Modal title="Outer" onClose={closeOuter}>
+        {inner && <Modal title="Inner" onClose={closeInner}>inner</Modal>}
+      </Modal>
+    );
+    const { rerender } = render(ui(false));
+    rerender(ui(true));
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    expect(closeInner).toHaveBeenCalledTimes(1);
+    expect(closeOuter).not.toHaveBeenCalled();
+  });
+
+  test('a new onClose on every parent render does not move focus back to the first field', () => {
+    const { rerender } = render(<Modal title="Form" onClose={() => {}}><input aria-label="Name" /><input aria-label="Notes" /></Modal>);
+    screen.getByLabelText('Notes').focus();
+    rerender(<Modal title="Form" onClose={() => {}}><input aria-label="Name" /><input aria-label="Notes" /></Modal>);
+    expect(screen.getByLabelText('Notes')).toHaveFocus();
+  });
+});

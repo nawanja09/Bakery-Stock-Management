@@ -310,7 +310,8 @@ const RecordAdjustmentsTab = ({ category }) => {
         )}
       </div>
       {editingExpenseId !== null && (
-        <div role="dialog" aria-modal="true" aria-label="Edit expense adjustment" className="modal-overlay" onClick={() => setEditingExpenseId(null)}>
+        // Backdrop is inert: an outside click must not discard the edits.
+        <div role="dialog" aria-modal="true" aria-label="Edit expense adjustment" className="modal-overlay">
           <div className="modal-content" style={{ width: 'min(960px, 96vw)', maxWidth: '960px', maxHeight: '90vh', overflowY: 'auto' }} onClick={(event) => event.stopPropagation()}>
             <ExpenseBillAdjustmentEditor
               embeddedId={editingExpenseId}
@@ -321,7 +322,8 @@ const RecordAdjustmentsTab = ({ category }) => {
         </div>
       )}
       {editingFinancialRecord !== null && (
-        <div role="dialog" aria-modal="true" aria-label="Edit financial receive adjustment" className="modal-overlay" onClick={() => setEditingFinancialRecord(null)}>
+        // Backdrop is inert: an outside click must not discard the edits.
+        <div role="dialog" aria-modal="true" aria-label="Edit financial receive adjustment" className="modal-overlay">
           <div className="modal-content" style={{ width: 'min(960px, 96vw)', maxWidth: '960px', maxHeight: '90vh', overflowY: 'auto' }} onClick={(event) => event.stopPropagation()}>
             <FinancialReceiptAdjustmentEditor
               embeddedId={editingFinancialRecord.id}

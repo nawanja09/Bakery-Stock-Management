@@ -1511,7 +1511,8 @@ const NewExpenses = () => {
 
       {/* Payment Details Modal */}
       {showPaymentModal && (
-        <div className="payment-modal-overlay" onClick={handleClosePaymentModal}>
+        // Form popups below: the backdrop is inert so an outside click does not discard what was typed.
+        <div className="payment-modal-overlay">
           <div className="payment-modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="payment-modal-header">
               <h3>
@@ -1765,7 +1766,7 @@ const NewExpenses = () => {
 
       {/* Credit Note - create / view modal (one Credit Note per Expense Detail) */}
       {showCreditNoteModal && creditNoteSourceBill && (
-        <div className="payment-modal-overlay cn-modal" onClick={handleCloseCreditNoteModal}>
+        <div className="payment-modal-overlay cn-modal">
           <div className="payment-modal-content" style={{ maxWidth: '480px' }} onClick={(e) => e.stopPropagation()}>
             <div className="payment-modal-header">
               <h3><FontAwesomeIcon icon={faFileInvoice} /> Credit Note</h3>
@@ -1872,7 +1873,7 @@ const NewExpenses = () => {
 
       {/* Credit Note - apply (set-off) modal */}
       {showApplyCreditNoteModal && applyCreditNoteBill && (
-        <div className="payment-modal-overlay cn-modal cn-modal-wide" onClick={handleCloseApplyCreditNoteModal}>
+        <div className="payment-modal-overlay cn-modal cn-modal-wide">
           <div className="payment-modal-content" style={{ maxWidth: '560px' }} onClick={(e) => e.stopPropagation()}>
             <div className="payment-modal-header">
               <h3><FontAwesomeIcon icon={faRightLeft} /> Apply Credit Note</h3>
@@ -1958,7 +1959,7 @@ const NewExpenses = () => {
 
       {/* Quick-add Payee modal */}
       {showAddPayee && (
-        <div className="payment-modal-overlay" onClick={() => setShowAddPayee(false)}>
+        <div className="payment-modal-overlay">
           <div className="payment-modal-content" style={{ maxWidth: '380px' }} onClick={(e) => e.stopPropagation()}>
             <div className="payment-modal-header">
               <h3>Add Payee</h3>
@@ -1983,7 +1984,7 @@ const NewExpenses = () => {
 
       {/* Quick-add Expense Type modal */}
       {showAddType && (
-        <div className="payment-modal-overlay" onClick={() => setShowAddType(false)}>
+        <div className="payment-modal-overlay">
           <div className="payment-modal-content" style={{ maxWidth: '380px' }} onClick={(e) => e.stopPropagation()}>
             <div className="payment-modal-header">
               <h3>Add Expense Type</h3>

@@ -87,64 +87,67 @@ const OpeningBalanceHistory = () => {
       ) : filteredBalances.length === 0 ? (
         <p>No matching opening balances found</p>
       ) : (
-        <table className="opening-balance-table">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Item Code</th>
-              <th>Item Name</th>
-              <th>Quantity</th>
-              <th>Unit</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredBalances.map(balance => (
-              <tr key={balance.id}>
-                <td>
-                  {editing === balance.id ? (
-                    <input
-                      type="date"
-                      name="date"
-                      value={editData.date}
-                      onChange={handleEditChange}
-                    />
-                  ) : (
-                    new Date(balance.date).toLocaleDateString()
-                  )}
-                </td>
-                <td>{balance.item_code}</td>
-                <td>{balance.item_name}</td>
-                <td style={{
-                  color: Number(balance.quantity) < 0 ? 'red' : Number(balance.quantity) === 0 ? 'orange' : 'green',
-                  fontWeight: 'bold'
-                }}>
-                  {editing === balance.id ? (
-                    <input
-                      type="number"
-                      name="quantity"
-                      value={editData.quantity}
-                      onChange={handleEditChange}
-                    />
-                  ) : (
-                    formatQuantity(balance.quantity)
-                  )}
-                </td>
-                <td>{balance.unit}</td>
-                <td>
-                  {editing === balance.id ? (
-                    <>
-                      <button onClick={() => handleUpdate(balance.id)}>Save</button>
-                      <button onClick={() => setEditing(null)}>Cancel</button>
-                    </>
-                  ) : (
-                    <button onClick={() => handleEditClick(balance)}>Edit</button>
-                  )}
-                </td>
+        // Scrolls sideways on narrow screens instead of being cut off
+        <div style={{ overflowX: 'auto' }}>
+          <table className="opening-balance-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Item Code</th>
+                <th>Item Name</th>
+                <th>Quantity</th>
+                <th>Unit</th>
+                <th>Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filteredBalances.map(balance => (
+                <tr key={balance.id}>
+                  <td>
+                    {editing === balance.id ? (
+                      <input
+                        type="date"
+                        name="date"
+                        value={editData.date}
+                        onChange={handleEditChange}
+                      />
+                    ) : (
+                      new Date(balance.date).toLocaleDateString()
+                    )}
+                  </td>
+                  <td>{balance.item_code}</td>
+                  <td>{balance.item_name}</td>
+                  <td style={{
+                    color: Number(balance.quantity) < 0 ? 'red' : Number(balance.quantity) === 0 ? 'orange' : 'green',
+                    fontWeight: 'bold'
+                  }}>
+                    {editing === balance.id ? (
+                      <input
+                        type="number"
+                        name="quantity"
+                        value={editData.quantity}
+                        onChange={handleEditChange}
+                      />
+                    ) : (
+                      formatQuantity(balance.quantity)
+                    )}
+                  </td>
+                  <td>{balance.unit}</td>
+                  <td>
+                    {editing === balance.id ? (
+                      <>
+                        <button onClick={() => handleUpdate(balance.id)}>Save</button>
+                        <button onClick={() => setEditing(null)}>Cancel</button>
+                      </>
+                    ) : (
+                      <button onClick={() => handleEditClick(balance)}>Edit</button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
