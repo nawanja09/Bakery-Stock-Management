@@ -5,18 +5,35 @@ import { faTimes } from '@fortawesome/free-solid-svg-icons';
 import { createPortal } from 'react-dom';
 import './RouteModal.css';
 
+const OPEN_DROPDOWN_SELECTOR = '[aria-expanded="true"][role="combobox"], [role="listbox"], [role="menu"]';
+
 const RouteModal = ({ children, title = 'Details', size = 'large' }) => {
   const location = useLocation();
   const navigate = useNavigate();
 
   useEffect(() => {
-    const handleKeyDown = (event) => {
-      if (event.key === 'Escape') navigate(-1);
+    // An open dropdown (react-select, listbox, menu) uses Escape to close itself.
+    // Its menu state is read in the capture phase, before the dropdown handles the
+    // key and collapses, so that Escape closes only the menu and not the popup.
+    let escapeHandledByDropdown = false;
+    const handleKeyDownCapture = (event) => {
+      if (event.key !== 'Escape') return;
+      const target = event.target;
+      escapeHandledByDropdown = Boolean(
+        target && typeof target.closest === 'function'
+          && target.closest(OPEN_DROPDOWN_SELECTOR)
+      );
     };
+    const handleKeyDown = (event) => {
+      if (event.key !== 'Escape' || escapeHandledByDropdown) return;
+      navigate(-1);
+    };
+    document.addEventListener('keydown', handleKeyDownCapture, true);
     document.addEventListener('keydown', handleKeyDown);
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
+      document.removeEventListener('keydown', handleKeyDownCapture, true);
       document.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = previousOverflow;
     };

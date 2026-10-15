@@ -115,7 +115,8 @@
 }
 .cash-ledger-page .ledger-filter-row {
 	display: grid;
-	grid-template-columns: minmax(135px, 0.8fr) minmax(135px, 0.8fr) minmax(210px, 1.35fr) minmax(190px, 1.1fr) minmax(150px, 0.85fr);
+	/* auto-fit lets the filters wrap onto a second line instead of running past the card on laptop screens */
+	grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 	gap: 10px;
 	width: 100%;
 }
@@ -366,7 +367,8 @@
 }
 .bank-ledger-page .ledger-filter-row {
 	display: grid;
-	grid-template-columns: minmax(135px, 0.8fr) minmax(135px, 0.8fr) minmax(210px, 1.35fr) minmax(190px, 1.1fr) minmax(150px, 0.85fr);
+	/* auto-fit lets the filters wrap onto a second line instead of running past the card on laptop screens */
+	grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 	gap: 10px;
 	width: 100%;
 }

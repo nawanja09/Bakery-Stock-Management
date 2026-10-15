@@ -309,7 +309,8 @@
   background-color: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  overflow: hidden;
+  /* Wide tables scroll sideways instead of hiding their right-hand columns */
+  overflow-x: auto;
   box-shadow: var(--shadow-sm);
 }
 

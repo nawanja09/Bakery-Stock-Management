@@ -145,9 +145,13 @@
   --transition-fast:  150ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-base:  220ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow:  320ms cubic-bezier(0.4, 0, 0.2, 1);
+  /* Stacking scale - always use these, never raw numbers.
+     page dropdowns < navbar < modal (Modal, RouteModal) < popover (select menus
+     portaled out of a modal) < tooltip < toast */
   --z-dropdown: 1000;
+  --z-navbar:   1030;
   --z-modal:    1050;
   --z-popover:  1060;
   --z-tooltip:  1070;
-  --z-navbar:   1030;
+  --z-toast:    1080;
 }

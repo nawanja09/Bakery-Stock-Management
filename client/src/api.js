@@ -18,6 +18,13 @@ api.interceptors.request.use(config => {
   return config;
 });
 
+// A 401 from POST /login means wrong credentials, not an expired session: it
+// must reach Login.jsx so the error can be shown instead of reloading the page.
+const isLoginRequest = config => {
+  const path = String(config?.url || '').split('?')[0].replace(/\/+$/, '');
+  return path === '/login' || path === 'login' || path.endsWith('/api/login');
+};
+
 // Handle 401 errors globally — token expired or invalid
 api.interceptors.response.use(
   response => response,
@@ -28,7 +35,7 @@ api.interceptors.response.use(
     ) {
       window.alert(error.response.data.error);
     }
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 && !isLoginRequest(error.config)) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       // Encode the current page so Login can redirect back after re-authentication.

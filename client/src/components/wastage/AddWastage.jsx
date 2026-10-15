@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Select from 'react-select';
 import './Wastage.css';
@@ -10,6 +10,8 @@ const AddWastage = () => {
   const [items, setItems] = useState([]);
   const [itemPrices, setItemPrices] = useState({});
   const { showPopup } = usePopup();
+  const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
 
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -110,6 +112,8 @@ const AddWastage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    // A second click while the first POST is in flight must not record the wastage twice
+    if (submittingRef.current) return;
     
     // Validate that all items have an item_id
     const hasEmptyItem = formData.items.some(item => !item.item_id);
@@ -127,6 +131,8 @@ const AddWastage = () => {
       }))
     };
 
+    submittingRef.current = true;
+    setSubmitting(true);
     try {
       const response = await api.post('/wastages', submitData);
       
@@ -144,6 +150,9 @@ const AddWastage = () => {
         const errorMessage = error.response?.data?.error || 'Server error';
         showPopup('error', `Error: ${errorMessage}`);
       }
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
     }
   };
 
@@ -242,7 +251,7 @@ const AddWastage = () => {
                         minHeight: '38px',
                         borderColor: '#ced4da'
                       }),
-                      menuPortal: (base) => ({ ...base, zIndex: 9999 })
+                      menuPortal: (base) => ({ ...base, zIndex: 'var(--z-popover)' })
                     }}
                     menuPortalTarget={document.body}
                   />
@@ -320,7 +329,9 @@ const AddWastage = () => {
           </div>
         </div>
 
-        <button type="submit" className="btn-submit">Save Wastage</button>
+        <button type="submit" className="btn btn-primary" disabled={submitting}>
+          {submitting ? 'Saving...' : 'Save Wastage'}
+        </button>
       </form>
     </div>
   );

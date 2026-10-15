@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api';
 import { usePopup } from '../context/PopupContext';
@@ -13,6 +13,8 @@ const AddOpeningBalance = () => {
   });
 
   const [items, setItems] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   const { showPopup } = usePopup();
   const navigate = useNavigate();
 
@@ -39,18 +41,25 @@ const AddOpeningBalance = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    try {
-      if (isNaN(formData.quantity)) {
-        showPopup('error', 'Quantity must be a valid number');
-        return;
-      }
+    // A second click while the first POST is in flight must not add the balance twice
+    if (submittingRef.current) return;
+    if (isNaN(formData.quantity)) {
+      showPopup('error', 'Quantity must be a valid number');
+      return;
+    }
 
+    submittingRef.current = true;
+    setSubmitting(true);
+    try {
       await api.post('/opening-balance', formData);
       showPopup('success', 'Opening balance added!');
       navigate('/opening/history');
     } catch (err) {
       console.error(err);
       showPopup('error', err.response?.data?.error || 'Error adding opening balance');
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
     }
   };
 
@@ -107,8 +116,8 @@ const AddOpeningBalance = () => {
         </div>
 
         <div className="ob-button-wrapper">
-          <button type="submit" className="ob-btn-submit">
-            Add Balance
+          <button type="submit" className="btn btn-primary" disabled={submitting}>
+            {submitting ? 'Saving...' : 'Add Balance'}
           </button>
         </div>
 

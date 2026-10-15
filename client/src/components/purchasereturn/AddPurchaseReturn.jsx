@@ -467,7 +467,7 @@ const AddPurchaseReturn = () => {
                                 minHeight: '36px',
                                 fontSize: '13px'
                               }),
-                              menuPortal: (base) => ({ ...base, zIndex: 9999 })
+                              menuPortal: (base) => ({ ...base, zIndex: 'var(--z-popover)' })
                             }}
                             menuPortalTarget={document.body}
                           />

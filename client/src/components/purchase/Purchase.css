@@ -494,7 +494,7 @@
 
 .purchase-item-select .react-select__menu {
   position: absolute;
-  z-index: 10000;
+  z-index: var(--z-popover);
   max-height: 240px;
   overflow: hidden;
   background: #fff;

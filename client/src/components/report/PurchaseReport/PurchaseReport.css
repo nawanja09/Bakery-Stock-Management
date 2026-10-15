@@ -95,7 +95,8 @@
 
 .report-table-shell {
 	border-radius: 10px;
-	overflow: hidden;
+	/* the table is min 1040px wide: scroll it instead of clipping Total Amount */
+	overflow-x: auto;
 	border: 1px solid var(--color-border);
 	box-shadow: var(--shadow-xs);
 }

@@ -1,2 +1,40 @@
 @import '../Cutlery.css';
 @import '../../common/FormStyles.css';
+
+/* Image picker inside the shared Modal */
+.add-asset-modal .file-input { display: none; }
+
+.add-asset-modal .image-upload-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 140px;
+  padding: var(--spacing-md);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-hover);
+  cursor: pointer;
+  text-align: center;
+}
+
+.add-asset-modal .image-upload-wrapper:hover { border-color: var(--color-accent); }
+.add-asset-modal .image-placeholder p { margin: 6px 0 2px; color: var(--color-text-secondary); }
+.add-asset-modal .image-placeholder small { color: var(--color-text-tertiary); }
+.add-asset-modal .upload-icon { font-size: 28px; }
+
+.add-asset-modal .image-preview { position: relative; }
+.add-asset-modal .image-preview img { display: block; max-width: 100%; max-height: 220px; border-radius: var(--radius-md); }
+.add-asset-modal .btn-remove-image {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--color-danger);
+  color: var(--color-text-inverse);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}

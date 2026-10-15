@@ -60,7 +60,7 @@ export const purchaseItemSelectStyles = {
     boxShadow: '0 10px 24px rgba(15, 23, 42, 0.14)',
     overflow: 'hidden',
     backgroundColor: '#fff',
-    zIndex: 10000
+    zIndex: 'var(--z-popover)'
   }),
   menuList: (base) => ({
     ...base,
@@ -76,6 +76,6 @@ export const purchaseItemSelectStyles = {
   }),
   menuPortal: (base) => ({
     ...base,
-    zIndex: 10000
+    zIndex: 'var(--z-popover)'
   })
 };

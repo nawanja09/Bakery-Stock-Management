@@ -196,7 +196,7 @@ const IssueToDepartment = () => {
   }));
 
   const selectStyles = {
-    menuPortal: base => ({ ...base, zIndex: 9999 }),
+    menuPortal: base => ({ ...base, zIndex: 'var(--z-popover)' }),
     control: (base) => ({
       ...base,
       minHeight: 40,

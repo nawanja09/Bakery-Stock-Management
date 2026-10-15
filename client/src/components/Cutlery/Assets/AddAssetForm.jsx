@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import ReactDOM from 'react-dom';
+import React, { useState, useRef, useCallback } from 'react';
+import { Modal } from '../../common/ui';
 import './AddAssetForm.css';
 
 const AddAssetForm = ({ onSubmit, onCancel }) => {
@@ -10,6 +10,7 @@ const AddAssetForm = ({ onSubmit, onCancel }) => {
   });
   const [imagePreview, setImagePreview] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   const fileInputRef = useRef(null);
 
   const handleChange = (e) => {
@@ -50,102 +51,98 @@ const AddAssetForm = ({ onSubmit, onCancel }) => {
       return;
     }
 
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setSubmitting(true);
     try {
       await onSubmit(formData);
     } catch (error) {
       console.error('Error submitting form:', error);
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
 
   const triggerFileInput = () => fileInputRef.current?.click();
-  useEffect(() => {
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    const handleKey = (e) => {
-      if (e.key === 'Escape') onCancel();
-    };
-    window.addEventListener('keydown', handleKey);
-    return () => {
-      document.body.style.overflow = originalOverflow;
-      window.removeEventListener('keydown', handleKey);
-    };
+
+  // Stable so the Modal does not re-run its focus/Escape effect on every render;
+  // closing is ignored while the upload is in flight.
+  const handleClose = useCallback(() => {
+    if (!submittingRef.current) onCancel();
   }, [onCancel]);
 
-  const inner = (
-    <div className="add-asset-overlay" onClick={onCancel}>
-      <div className="add-asset-card erp-asset-form" onClick={(e) => e.stopPropagation()}>
-        <div className="add-asset-header">
-          <h2>Add New Asset</h2>
-          <button className="btn-close" onClick={onCancel} disabled={submitting}>×</button>
+  return (
+    <Modal
+      title="Add New Asset"
+      size="md"
+      onClose={handleClose}
+      className="add-asset-modal"
+      footer={(
+        <>
+          <button type="button" className="btn btn-secondary" onClick={handleClose} disabled={submitting}>
+            Cancel
+          </button>
+          <button type="submit" form="add-asset-form" className="btn btn-primary" disabled={submitting || !formData.asset_name.trim()}>
+            {submitting ? 'Adding...' : 'Add Asset'}
+          </button>
+        </>
+      )}
+    >
+      <form id="add-asset-form" className="add-asset-form" onSubmit={handleSubmit}>
+        <div className="form-group">
+          <label htmlFor="asset_name">Asset Name *</label>
+          <input
+            type="text"
+            id="asset_name"
+            name="asset_name"
+            value={formData.asset_name}
+            onChange={handleChange}
+            placeholder="Enter asset name"
+            disabled={submitting}
+          />
+          <small>Asset ID will be automatically generated (A001, A002, etc.)</small>
         </div>
 
-        <form className="add-asset-form" onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label htmlFor="asset_name">Asset Name *</label>
+        <div className="form-group">
+          <label>Asset Image</label>
+          <div className="image-upload-wrapper" onClick={triggerFileInput}>
             <input
-              type="text"
-              id="asset_name"
-              name="asset_name"
-              value={formData.asset_name}
-              onChange={handleChange}
-              placeholder="Enter asset name"
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageChange}
+              className="file-input"
               disabled={submitting}
             />
-            <small>Asset ID will be automatically generated (A001, A002, etc.)</small>
-          </div>
 
-          <div className="form-group">
-            <label>Asset Image</label>
-            <div className="image-upload-wrapper" onClick={triggerFileInput}>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleImageChange}
-                className="file-input"
-                disabled={submitting}
-              />
-
-              {imagePreview ? (
-                <div className="image-preview">
-                  <img src={imagePreview} alt="Preview" />
-                  <button
-                    type="button"
-                    className="btn-remove-image"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleRemoveImage();
-                    }}
-                    disabled={submitting}
-                  >
-                    ×
-                  </button>
-                </div>
-              ) : (
-                <div className="image-placeholder">
-                  <div className="upload-icon">📁</div>
-                  <p>Click to upload image</p>
-                  <small>JPG, PNG, GIF (Max 5MB)</small>
-                </div>
-              )}
-            </div>
+            {imagePreview ? (
+              <div className="image-preview">
+                <img src={imagePreview} alt="Preview" />
+                <button
+                  type="button"
+                  className="btn-remove-image"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRemoveImage();
+                  }}
+                  disabled={submitting}
+                >
+                  ×
+                </button>
+              </div>
+            ) : (
+              <div className="image-placeholder">
+                <div className="upload-icon">📁</div>
+                <p>Click to upload image</p>
+                <small>JPG, PNG, GIF (Max 5MB)</small>
+              </div>
+            )}
           </div>
-
-          <div className="form-actions">
-            <button type="submit" className="btn-submit" disabled={submitting || !formData.asset_name.trim()}>
-              {submitting ? 'Adding...' : 'Add Asset'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        </div>
+      </form>
+    </Modal>
   );
-
-  if (typeof document === 'undefined') return inner;
-  return ReactDOM.createPortal(inner, document.body);
 };
 
 export default AddAssetForm;

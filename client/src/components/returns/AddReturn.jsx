@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePopup } from '../context/PopupContext';
 import './Returns.css';
@@ -13,6 +13,8 @@ const AddReturn = () => {
   const [currentUser, setCurrentUser] = useState(null);
   const [itemStockMap, setItemStockMap] = useState({});
   const { showPopup } = usePopup();
+  const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
 
   const [formData, setFormData] = useState({
     return_date: new Date().toLocaleDateString('en-CA'),
@@ -121,6 +123,8 @@ const AddReturn = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    // A second click while the first POST is in flight must not record the return twice
+    if (submittingRef.current) return;
 
     if (!currentUser || !currentUser.id) {
       showPopup('error', 'User information is missing. Please login again.');
@@ -142,6 +146,8 @@ const AddReturn = () => {
       items: validItems
     };
 
+    submittingRef.current = true;
+    setSubmitting(true);
     try {
       const response = await api.post('/returns', payload);
       
@@ -153,6 +159,9 @@ const AddReturn = () => {
     } catch (error) {
       console.error('Error creating return:', error);
       showPopup('error', 'Failed to record return');
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
     }
   };
 
@@ -163,7 +172,7 @@ const AddReturn = () => {
   }));
 
   const selectStyles = {
-    menuPortal: base => ({ ...base, zIndex: 9999 })
+    menuPortal: base => ({ ...base, zIndex: 'var(--z-popover)' })
   };
 
   return (
@@ -303,8 +312,8 @@ const AddReturn = () => {
         </button>
 
         <div className="form-actions">
-          <button type="submit" className="btn-submit">
-            Save Return
+          <button type="submit" className="btn btn-primary" disabled={submitting}>
+            {submitting ? 'Saving...' : 'Save Return'}
           </button>
         </div>
       </form>
