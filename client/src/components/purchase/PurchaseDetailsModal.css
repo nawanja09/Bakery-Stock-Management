@@ -1,2 +1,86 @@
 @import './Purchase.css';
 @import '../common/CommonComponents.css';
+
+/* ---------- Purchase Details popup (VAT report) ----------
+   Shell comes from RouteModal.css; these rules only fit the embedded
+   PurchaseDetails view inside it. */
+
+.purchase-details-modal .erp-purchase-details.modal-view {
+  max-width: none;
+  margin: 0;
+  padding: 22px 26px 28px;
+  gap: 20px;
+}
+
+/* The popup header already has the close button */
+.purchase-details-modal .erp-purchase-details.modal-view .back-button {
+  display: none;
+}
+
+.purchase-details-modal .erp-purchase-details.modal-view > .page-header {
+  min-height: 0;
+  margin-bottom: 0;
+}
+
+.purchase-details-modal .erp-purchase-details.modal-view .page-header h1 {
+  font-size: 18px;
+}
+
+/* Cards: inner sections carry their own padding, so the card headers
+   (Financial Summary, Purchased Items) run edge to edge */
+.purchase-details-modal .erp-purchase-details.modal-view .detail-card,
+.purchase-details-modal .erp-purchase-details.modal-view .items-card,
+.purchase-details-modal .erp-purchase-details.modal-view .remarks-card {
+  padding: 0;
+}
+
+.purchase-details-modal .erp-purchase-details.modal-view .tabs-container {
+  flex-wrap: wrap;
+}
+
+/* Loading / error / not-found render outside .erp-purchase-details */
+.purchase-details-modal .route-modal-body > .loading-container,
+.purchase-details-modal .route-modal-body > .error-container,
+.purchase-details-modal .route-modal-body > .not-found-container {
+  align-items: center;
+  color: var(--color-text-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  justify-content: center;
+  min-height: 240px;
+  padding: 32px 24px;
+  text-align: center;
+}
+
+.purchase-details-modal .route-modal-body > .error-container h3,
+.purchase-details-modal .route-modal-body > .not-found-container h3 {
+  color: var(--color-heading);
+  margin: 0;
+}
+
+.purchase-details-modal .route-modal-body > .error-container p,
+.purchase-details-modal .route-modal-body > .not-found-container p {
+  margin: 0;
+}
+
+.purchase-details-modal .error-icon,
+.purchase-details-modal .not-found-icon {
+  font-size: 40px;
+}
+
+@media (max-width: 700px) {
+  .purchase-details-modal .erp-purchase-details.modal-view {
+    padding: 16px 14px 20px;
+    gap: 16px;
+  }
+
+  .purchase-details-modal .erp-purchase-details .info-row .label {
+    min-width: 110px;
+  }
+
+  .purchase-details-modal .erp-purchase-details .payment-status-banner {
+    flex-wrap: wrap;
+    padding: 10px 14px;
+  }
+}
