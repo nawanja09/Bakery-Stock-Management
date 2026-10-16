@@ -6,6 +6,7 @@ const multer = require('multer');
 const { assertProductionSecrets } = require('./config/secrets');
 const { serveSignedUploads } = require('./utils/signedUploads');
 const { applyHttpSecurity } = require('./middleware/httpSecurity');
+const { auditTrail } = require('./services/auditLog');
 
 const authRoutes = require('./routes/authRoutes');
 const purchaseRoutes = require('./routes/purchaseRoutes');
@@ -92,6 +93,9 @@ applyHttpSecurity(app);
 // to signed-in users (utils/signedUploads.js) - never public.
 app.use('/uploads', serveSignedUploads(path.join(__dirname, 'uploads')));
 
+// Audit Trail: records every sign-in event, data change and refused request
+// once its response is sent (services/auditLog.js). Must stay before the routes.
+app.use('/api', auditTrail);
 app.use('/api', authRoutes);
 app.use('/api', readOnly);
 // Central RBAC gate: every /api route below this line requires a valid token AND
@@ -158,6 +162,7 @@ app.use('/api/analyst', analystRoutes);
 app.use('/api/incomes', incomeRoutes);
 app.use('/api/cash-expenses', cashExpenseRoutes);
 app.use('/api/hidden-expenses', hiddenExpenseRoutes);
+app.use('/api/audit-logs', require('./routes/auditLogRoutes'));
 
 
 // Error handling middleware for file uploads

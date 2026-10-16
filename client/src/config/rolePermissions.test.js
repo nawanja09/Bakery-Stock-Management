@@ -42,3 +42,13 @@ describe('Collection navigation', () => {
     expect(canAccessPath('Staff', '/collection')).toBe(false);
   });
 });
+
+describe('Audit Trail access', () => {
+  test('only Admin and Super Admin can open the Audit Trail', () => {
+    expect(canAccessPath(ROLES.ADMIN, '/audit-trail')).toBe(true);
+    expect(canAccessPath(ROLES.SUPER_ADMIN, '/audit-trail')).toBe(true);
+    [ROLES.ACCOUNTANT, ROLES.STORES, ROLES.FINANCE_USER, ROLES.QB].forEach((role) => {
+      expect(canAccessPath(role, '/audit-trail')).toBe(false);
+    });
+  });
+});

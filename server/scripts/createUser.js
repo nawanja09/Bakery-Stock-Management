@@ -125,4 +125,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { ROLES, PASSWORD_MIN, passwordProblem, parseArgs, createOrReset };
+module.exports = { ROLES, PASSWORD_MIN, passwordProblem, parseArgs, createOrReset, askHidden };

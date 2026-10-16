@@ -47,9 +47,11 @@ import {
   faFileInvoiceDollar,
   faIdCard,
   faSackDollar,
-  faUserSecret
+  faUserSecret,
+  faUserShield
 } from '@fortawesome/free-solid-svg-icons';
 import bakeryLogo from '../images/icon.jpeg';
+import api from '../api';
 import usePermissions from '../hooks/usePermissions';
 import useIntegrationAccess from '../hooks/useIntegrationAccess';
 import './NavigationBar.css';
@@ -122,6 +124,13 @@ const NavigationBar = () => {
   }, [location.pathname]);
 
   const handleLogout = () => {
+    // Recorded in the Audit Trail. The token is passed explicitly because it is
+    // removed below before the request interceptor would read it; a failure never
+    // blocks signing out.
+    const token = localStorage.getItem('token');
+    if (token) {
+      api.post('/logout', null, { headers: { Authorization: `Bearer ${token}` } }).catch(() => {});
+    }
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     navigate('/login');
@@ -572,6 +581,16 @@ const NavigationBar = () => {
               </li>
               {!isCollapsed && activeModule === 'analyst' && <div className="module-content">{renderAnalystContent()}</div>}
             </>
+          )}
+
+          {/* Audit Trail (Admin / Super Admin) */}
+          {can('/audit-trail') && (
+            <li>
+              <NavLink to="/audit-trail" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`} title="Audit Trail">
+                <span className="icon-container"><FontAwesomeIcon icon={faUserShield} /></span>
+                <span>Audit Trail</span>
+              </NavLink>
+            </li>
           )}
 
           <div className="section-separator"></div>

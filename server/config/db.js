@@ -484,6 +484,10 @@ const ensureStockAdjustmentCreatedBy = async () => {
   }
 };
 pool.stockAdjustmentSchemaReady = ensureStockAdjustmentCreatedBy();
+
+// Audit Trail (append-only) - services/auditLog.js, migrations/037_audit_log.sql.
+pool.auditLogSchemaReady = require('../services/auditLog').ensureAuditLogSchema(pool)
+  .catch((error) => console.warn('audit_log schema check skipped:', error.message));
 pool.ensurePaymentHistorySchema = ensurePaymentHistorySchema;
 
 // --- Connect the Expenses modules to Finance -------------------------------

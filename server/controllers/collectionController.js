@@ -373,7 +373,11 @@ const getPending = async (req, res) => {
     if (String(req.query.refresh ?? '0') === '1') {
       const startedAt = new Date().toISOString();
       const { window, sources, systems } = await syncCollections({
-        fromDate: filters.fromDate, toDate: filters.toDate, userId, allowed: integrationAccess.allowedSources(access)
+        fromDate: filters.fromDate, toDate: filters.toDate, userId, allowed: integrationAccess.allowedSources(access),
+        // for the Audit Trail row of this sync run
+        request: {
+          ip: req.ip, userAgent: req.headers?.['user-agent'], forwardedFor: req.headers?.['x-forwarded-for'], sessionId: req.user?.sid
+        }
       });
       sync = {
         startedAt,

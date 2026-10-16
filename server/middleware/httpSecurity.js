@@ -31,8 +31,26 @@ const securityHeaders = (req, res, next) => {
   next();
 };
 
-const applyHttpSecurity = (app, { origins = allowedOrigins() } = {}) => {
+// TRUST_PROXY (.env): which reverse proxies (nginx, a load balancer) may tell us
+// the real client address in X-Forwarded-For. Without it every request behind a
+// proxy looks like it comes from the proxy: the Audit Trail shows the proxy's IP
+// and the per-IP sign-in limit is shared by all users. Never trust the header
+// when there is no proxy - anyone could then claim any address.
+//   unset / 'false'          no proxy (default)
+//   'loopback'               nginx on the same server (127.0.0.1 / ::1)
+//   '1', '2' ...             number of proxies in front of the app
+//   '10.0.0.5, 10.0.0.0/24'  these proxy addresses / ranges
+const trustProxySetting = (value = process.env.TRUST_PROXY) => {
+  const text = String(value ?? '').trim();
+  if (!text || text.toLowerCase() === 'false') return false;
+  if (/^\d+$/.test(text)) return Number(text);
+  if (text.toLowerCase() === 'true') return true;
+  return text.split(',').map((part) => part.trim()).filter(Boolean);
+};
+
+const applyHttpSecurity = (app, { origins = allowedOrigins(), trustProxy = trustProxySetting() } = {}) => {
   app.disable('x-powered-by');
+  app.set('trust proxy', trustProxy);
   app.use(cors({
     origin: (origin, callback) => callback(null, !origin || origins.includes(origin)),
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
@@ -43,4 +61,4 @@ const applyHttpSecurity = (app, { origins = allowedOrigins() } = {}) => {
   app.use(express.json({ limit: '100kb' }));
 };
 
-module.exports = { applyHttpSecurity, allowedOrigins, securityHeaders };
+module.exports = { applyHttpSecurity, allowedOrigins, securityHeaders, trustProxySetting };

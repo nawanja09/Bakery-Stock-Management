@@ -31,14 +31,16 @@ export const MODULES = Object.freeze({
   // Inside Management, but HR data - Admin / Super Admin only.
   EMPLOYEES: 'employees',
   // Collection: Accountant, Admin, Super Admin and QB (view only). Approve = Accountant only.
-  COLLECTION: 'collection'
+  COLLECTION: 'collection',
+  // Audit Trail page: Admin / Super Admin only.
+  AUDIT: 'audit'
 });
 
 const M = MODULES;
 
 const ADMIN_MODULES = [
   M.MANAGEMENT, M.RAW_MATERIAL, M.EXPENSES, M.FINANCE,
-  M.CUTLERY, M.FG_PRODUCTION, M.ADJUSTMENTS, M.VAT, M.SETTINGS, M.EMPLOYEES, M.COLLECTION
+  M.CUTLERY, M.FG_PRODUCTION, M.ADJUSTMENTS, M.VAT, M.SETTINGS, M.EMPLOYEES, M.COLLECTION, M.AUDIT
 ];
 
 // `settings` = the "Settings / Admin" group (only holds Change Password).
@@ -218,7 +220,10 @@ export const ROUTE_RULES = [
   rule('/adjustments', { all: [M.ADJUSTMENTS] }),
   rule('/reports/vat', { all: [M.VAT] }),
   rule('/reports/purchase-vat', { all: [M.VAT] }),
-  rule('/analyst', { all: [M.ANALYST] })
+  rule('/analyst', { all: [M.ANALYST] }),
+
+  // ---- Audit Trail (Admin / Super Admin) ----
+  rule('/audit-trail', { all: [M.AUDIT] })
 ];
 
 const cleanPath = (pathname = '') => {

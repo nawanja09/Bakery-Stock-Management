@@ -1,6 +1,7 @@
 //server/controllers/authController.js
 
 const pool = require('../config/db');
+const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { getRoleModules } = require('../config/rolePermissions');
@@ -28,14 +29,23 @@ const tooMany = (res, retryAfterSeconds) => {
 
 const loginUser = async (req, res) => {
   const { username, password } = req.body;
+  // Audit Trail (services/auditLog.js reads res.locals.audit when the response is sent).
+  const audit = (details) => {
+    res.locals = res.locals || {};
+    res.locals.audit = { username: typeof username === 'string' ? username : undefined, ...details };
+  };
 
   if (typeof username !== 'string' || typeof password !== 'string' || !username.trim() || !password) {
+    audit({ action: 'LOGIN_FAILED' });
     return res.status(400).json({ error: 'Username and password are required' });
   }
 
   const attempt = { username, ip: req.ip };
   const limit = loginThrottle.check(attempt);
-  if (limit.blocked) return tooMany(res, limit.retryAfterSeconds);
+  if (limit.blocked) {
+    audit({ action: 'LOGIN_BLOCKED' });
+    return tooMany(res, limit.retryAfterSeconds);
+  }
 
   try {
     const [rows] = await pool.query(
@@ -47,6 +57,7 @@ const loginUser = async (req, res) => {
 
     if (!user || !match) {
       loginThrottle.recordFailure(attempt);
+      audit({ action: 'LOGIN_FAILED', userId: user?.id, message: user ? 'Wrong password' : 'Unknown username' });
       return res.status(401).json({ error: 'Invalid credentials' });
     }
     loginThrottle.recordSuccess(attempt);
@@ -54,17 +65,22 @@ const loginUser = async (req, res) => {
     // Checked only after the password, so the response never reveals whether
     // an account exists or is inactive to someone who does not know its password.
     if (Number(user.status) !== 1) {
+      audit({ action: 'LOGIN_FAILED', userId: user.id, userName: user.name, role: user.role });
       return res.status(403).json({ error: 'This account is inactive' });
     }
 
     const permissions = ['dashboard', ...getRoleModules(user.role)];
+    // sid = this sign-in's session id: every Audit Trail row made with this
+    // token (and its refreshes) carries it, so one session can be followed.
+    const sid = crypto.randomBytes(16).toString('hex');
     // tv = users.token_version: middleware/authenticate.js refuses the token
     // once it changes (password change / forced sign-out).
     const token = jwt.sign(
-      { userId: user.id, username: user.username, role: user.role, permissions, tv: Number(user.token_version) || 0 },
+      { userId: user.id, username: user.username, role: user.role, permissions, tv: Number(user.token_version) || 0, sid },
       getJwtSecret(),
       JWT_SIGN_OPTIONS
     );
+    audit({ action: 'LOGIN', userId: user.id, username: user.username, userName: user.name, role: user.role, sessionId: sid });
 
     // ONLY when RAVON_LOGIN_RELAY=on (off by default - production uses the
     // server key, see integrationAuthService.loginRelayEnabled):
@@ -92,8 +108,15 @@ const loginUser = async (req, res) => {
     });
   } catch (error) {
     console.error(error);
+    audit({ action: 'LOGIN_FAILED', message: 'Server error during sign-in' });
     res.status(500).json({ error: 'Server error' });
   }
+};
+
+// Sign-out: nothing to revoke server-side (the token simply stops being sent),
+// but the Audit Trail records it (services/auditLog.js, action LOGOUT).
+const logoutUser = (req, res) => {
+  res.json({ message: 'Signed out' });
 };
 
 const changePassword = async (req, res) => {
@@ -160,4 +183,4 @@ const changePassword = async (req, res) => {
   }
 };
 
-module.exports = { loginUser, changePassword };
+module.exports = { loginUser, logoutUser, changePassword };

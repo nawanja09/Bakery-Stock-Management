@@ -52,7 +52,9 @@ const MODULES = Object.freeze({
   // Collection (POS collections -> ledgers). Its own module so access is
   // exactly: Accountant, Admin, Super Admin and QB (view only). Approving
   // (posting to the ledgers) is Accountant only - see API_RULES.
-  COLLECTION: 'collection'
+  COLLECTION: 'collection',
+  // Audit Trail page (who did what, from sign-in onward): Admin / Super Admin only.
+  AUDIT: 'audit'
 });
 
 const M = MODULES;
@@ -60,7 +62,7 @@ const M = MODULES;
 // Everything except Analyst.
 const ADMIN_MODULES = [
   M.MANAGEMENT, M.RAW_MATERIAL, M.EXPENSES, M.FINANCE,
-  M.CUTLERY, M.FG_PRODUCTION, M.ADJUSTMENTS, M.VAT, M.SETTINGS, M.EMPLOYEES, M.COLLECTION
+  M.CUTLERY, M.FG_PRODUCTION, M.ADJUSTMENTS, M.VAT, M.SETTINGS, M.EMPLOYEES, M.COLLECTION, M.AUDIT
 ];
 
 // NOTE: `settings` is the "Settings / Admin" group, which only contains Change
@@ -206,7 +208,10 @@ const API_RULES = [
   { prefix: '/inhand', modules: [M.ADJUSTMENTS] },
 
   // ---- Analyst (Super Admin only) ------------------------------------------
-  { prefix: '/analyst', modules: [M.ANALYST] }
+  { prefix: '/analyst', modules: [M.ANALYST] },
+
+  // ---- Audit Trail (Admin / Super Admin; read-only) ------------------------
+  { prefix: '/audit-logs', modules: [M.AUDIT] }
 ];
 
 const READ_METHODS = ['GET', 'HEAD', 'OPTIONS'];

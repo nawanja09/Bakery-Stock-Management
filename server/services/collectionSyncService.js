@@ -442,6 +442,42 @@ const syncSystem = async (system, context) => {
   return summarize(system, sources);
 };
 
+// Audit Trail (services/auditLog.js): one SYNC row per system and run, with the
+// counts, the rejected records (first MAX_REPORTED_INVALID, with reasons) and any
+// error - so a failing or partly rejected import is visible after the fact, not
+// only on the server console. `request` = { ip, userAgent, forwardedFor, sessionId }.
+const recordSyncRun = (systems, { window, userId, request = {} }) => {
+  const { record } = require('./auditLog');
+  for (const s of systems) {
+    if (s.skipped && !s.error) continue; // not configured / no access: nothing was attempted
+    const counts = `${s.fetched} fetched, ${s.created} new, ${s.updated} updated, ${s.invalid} rejected, ${s.unmapped} unmapped`;
+    record({
+      eventType: 'SYNC',
+      action: 'SYNC',
+      module: `Collection - ${s.label || s.system}`,
+      recordType: 'Collection import',
+      recordLabel: `${s.label || s.system} collections ${window.start_date} to ${window.end_date}`,
+      userId,
+      sessionId: request.sessionId,
+      outcome: s.error || s.invalid > 0 ? 'FAILED' : 'SUCCESS',
+      message: s.error ? `${s.error}${s.partial ? ' (partly loaded)' : ''} - ${counts}` : counts,
+      requestBody: { system: s.system, window },
+      responseBody: {
+        fetched: s.fetched, created: s.created, updated: s.updated, duplicates: s.duplicates,
+        rejected: s.invalid, unmapped: s.unmapped, excluded: s.excluded, error: s.error || null, code: s.code || null,
+        sources: (s.sources || []).map((src) => ({
+          source: src.source, fetched: src.fetched, inserted: src.inserted, updated: src.updated,
+          rejected: src.invalid, rejectedRecords: src.invalidSamples, unmappedBranches: src.unmappedBranches,
+          excludedReasons: src.excludedReasons, error: src.error || null, code: src.errorCode || null
+        }))
+      },
+      ip: request.ip,
+      forwardedFor: request.forwardedFor,
+      userAgent: request.userAgent
+    });
+  }
+};
+
 // One run per date window (and requesting user) at a time.
 const inFlight = new Map();
 
@@ -459,7 +495,7 @@ const inFlight = new Map();
  *   systems - one entry per system: { system, configured, fetched, created,
  *             updated, duplicates, unmapped, invalid, excluded, sources[], error?, code? }
  */
-const syncCollections = async ({ fromDate, toDate, userId = null, allowed = null } = {}) => {
+const syncCollections = async ({ fromDate, toDate, userId = null, allowed = null, request } = {}) => {
   const window = dateWindow(new Date(), { fromDate, toDate });
   const key = `${window.start_date}..${window.end_date}:${userId ?? ''}:${allowed ? JSON.stringify(allowed) : '*'}`;
   if (inFlight.has(key)) return inFlight.get(key);
@@ -481,7 +517,12 @@ const syncCollections = async ({ fromDate, toDate, userId = null, allowed = null
       await linkDeductionsToShifts(pool);
     } catch (error) {
       logOnce('link', `linking deductions to shifts failed: ${error.message}`);
+      require('./auditLog').record({
+        eventType: 'SYNC', action: 'SYNC', module: 'Collection', userId, sessionId: request?.sessionId,
+        outcome: 'FAILED', message: `Linking deductions to shifts failed: ${error.message}`, ip: request?.ip
+      });
     }
+    recordSyncRun(systems, { window, userId, request });
     // Backward compatible `sources`: the POS sources (or the POS-level failure on each).
     const pos = systems.find((s) => s.system === SYSTEMS.POS);
     const sources = pos.sources.length || (!pos.error && !pos.skipped) ? pos.sources
@@ -497,5 +538,6 @@ const syncCollections = async ({ fromDate, toDate, userId = null, allowed = null
 };
 
 module.exports = {
-  syncCollections, stagePending, linkDeductionsToShifts, fetchAllRecords, ENDPOINTS, SYSTEM_CONFIG, dateWindow, MAX_RANGE_DAYS
+  syncCollections, stagePending, linkDeductionsToShifts, fetchAllRecords, ENDPOINTS, SYSTEM_CONFIG, dateWindow, MAX_RANGE_DAYS,
+  recordSyncRun
 };

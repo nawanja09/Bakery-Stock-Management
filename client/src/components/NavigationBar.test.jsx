@@ -62,3 +62,27 @@ test('tablets start with the icon-only sidebar, laptops and desktops with the fu
   renderAt(1280);
   expect(sidebar()).not.toHaveClass('collapsed');
 });
+
+describe('Audit Trail link and sign-out', () => {
+  const api = require('../api').default;
+  afterEach(() => localStorage.clear());
+
+  test('Admin sees the Audit Trail link; signing out is sent to the server for the Audit Trail', () => {
+    localStorage.setItem('token', 'session-token');
+    localStorage.setItem('user', JSON.stringify({ role: 'Admin' }));
+    api.post.mockResolvedValue({ data: {} });
+    renderAt(1280);
+
+    expect(screen.getByRole('link', { name: /Audit Trail/ })).toHaveAttribute('href', '/audit-trail');
+
+    fireEvent.click(screen.getByRole('button', { name: /Logout/ }));
+    expect(api.post).toHaveBeenCalledWith('/logout', null, { headers: { Authorization: 'Bearer session-token' } });
+    expect(localStorage.getItem('token')).toBeNull();
+  });
+
+  test('other roles do not see the Audit Trail link', () => {
+    localStorage.setItem('user', JSON.stringify({ role: 'Accountant' }));
+    renderAt(1280);
+    expect(screen.queryByRole('link', { name: /Audit Trail/ })).not.toBeInTheDocument();
+  });
+});
