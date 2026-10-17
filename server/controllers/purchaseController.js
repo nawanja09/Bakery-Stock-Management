@@ -2,7 +2,7 @@
 const pool = require('../config/db');
 const { actorId } = require('../utils/actor');
 const { normalizePaymentMethodValue } = require('../utils/paymentMethodUtils');
-const { recordCashTransaction, recordBankTransaction } = require('../utils/financeLedger');
+const { recordCashTransaction, recordBankTransaction, refreshBalancesOfReference } = require('../utils/financeLedger');
 const { checkDuplicateReference, DuplicateReferenceError } = require('../services/referenceValidationService');
 const { isRmAdjustmentRequest, recordRmAdjustment, sameItems, sameValue } = require('../utils/rmAdjustmentAudit');
 const { SETTLEMENT_PAYMENT_METHODS, isSettlementPaymentMethod } = require('../services/settlementPaymentMethods');
@@ -1869,7 +1869,7 @@ const adjustPurchasePayment = async (req, res) => {
         remark: `Supplier payment - Invoice ${purchase.invoice_no}`, credit: newTransactionAmount,
         transactionType: 'RM Purchase Payment', referenceNumber: voucher_number || payment.check_number || null,
         invoiceNumber: purchase.invoice_no, partyName: null, referenceType: 'PURCHASE_PAYMENT',
-        referenceId: paymentId, createdBy: payment.created_by
+        referenceId: paymentId, createdBy: payment.created_by, periodActor: actorId(req)
       });
       ledgerUpdated = true;
     } else if (finRows.length === 0 && targetAccountType === 'BANK') {
@@ -1878,10 +1878,14 @@ const adjustPurchasePayment = async (req, res) => {
         remark: `Supplier payment - Invoice ${purchase.invoice_no}`, credit: newTransactionAmount,
         transactionType: 'RM Purchase Payment', referenceNumber: voucher_number || payment.check_number || null,
         invoiceNumber: purchase.invoice_no, partyName: null, referenceType: 'PURCHASE_PAYMENT',
-        referenceId: paymentId, createdBy: payment.created_by
+        referenceId: paymentId, createdBy: payment.created_by, periodActor: actorId(req)
       });
       ledgerUpdated = true;
     }
+
+    // The row above was edited in place (date / amount / account / void): refresh the
+    // stored running balances of the account it was in and the one it is in now.
+    await refreshBalancesOfReference(connection, 'PURCHASE_PAYMENT', paymentId, finRows);
 
     // Excess above the invoice balance is preserved as supplier credit,
     // using the same supplier_overpayments mechanism the system already

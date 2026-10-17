@@ -44,7 +44,7 @@ const parseBody = (body = {}) => {
 };
 
 const requireDepartment = async (connection, departmentId) => {
-  const [rows] = await connection.query('SELECT id FROM departments WHERE id = ?', [departmentId]);
+  const [rows] = await connection.query('SELECT id FROM departments WHERE is_deleted = 0 AND id = ?', [departmentId]);
   if (rows.length === 0) throw new HttpError(400, 'The selected Branch / Department does not exist');
 };
 

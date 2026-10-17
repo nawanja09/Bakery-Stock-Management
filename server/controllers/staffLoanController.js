@@ -126,7 +126,7 @@ const getFormOptions = async (req, res) => {
     const [companies] = await pool.query(
       `SELECT c.id, c.name
        FROM company c
-       WHERE EXISTS (SELECT 1 FROM cash_accounts ca WHERE ca.company_id = c.id)
+       WHERE c.is_deleted = 0 AND EXISTS (SELECT 1 FROM cash_accounts ca WHERE ca.company_id = c.id)
        ORDER BY c.name ASC`
     );
 

@@ -26,15 +26,15 @@ const checkDuplicateReference = async (connection, referenceNo, excludeConfig = 
 
   const queries = [
     { table: 'purchases', column: 'invoice_no' },
-    { table: 'petty_cash_vouchers', column: 'voucher_number' },
-    { table: 'cheque_expenses', column: 'voucher_number' },
-    { table: 'online_expense_payments', column: 'voucher_number' },
-    { table: 'online_expense_payments', column: 'reference_number' },
+    { table: 'petty_cash_vouchers', column: 'voucher_number', softDeleted: true },
+    { table: 'cheque_expenses', column: 'voucher_number', softDeleted: true },
+    { table: 'online_expense_payments', column: 'voucher_number', softDeleted: true },
+    { table: 'online_expense_payments', column: 'reference_number', softDeleted: true },
     { table: 'payment_history', column: 'voucher_number' },
     { table: 'supplier_overpayments', column: 'voucher_number' },
     { table: 'supplier_overpayments', column: 'reference_number' },
     { table: 'petty_cash_reimbursements', column: 'reference_number' },
-    { table: 'bank_charges', column: 'reference_number' },
+    { table: 'bank_charges', column: 'reference_number', softDeleted: true },
     { table: 'inhand_adjustments', column: 'reference_no' }
   ];
 
@@ -48,12 +48,13 @@ const checkDuplicateReference = async (connection, referenceNo, excludeConfig = 
     );
   }
 
-  for (const { table, column } of queries) {
+  for (const { table, column, softDeleted } of queries) {
     if (unavailableReferenceTables.has(table)) continue;
 
     // Treat surrounding whitespace and letter case consistently, so " INV-1 "
     // and "inv-1" cannot be used to bypass the validation.
-    let query = `SELECT id FROM ?? WHERE LOWER(TRIM(??)) = LOWER(?)`;
+    // A soft-deleted voucher no longer holds its number (as when it was removed for good).
+    let query = `SELECT id FROM ?? WHERE LOWER(TRIM(??)) = LOWER(?)${softDeleted ? ' AND is_deleted = 0' : ''}`;
     let params = [table, column, ref];
 
     // If updating an existing record, exclude its ID from the check for its specific table

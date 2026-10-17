@@ -189,7 +189,7 @@ const getItemCurrentStock = async (req, res) => {
           ELSE 0
         END), 0) AS calculated_stock
       FROM stock_movements
-      WHERE item_id = ?
+      WHERE is_deleted = 0 AND item_id = ?
     `, [itemId]);
 
     // Return both values for debugging
@@ -231,7 +231,7 @@ const syncAllStock = async (req, res) => {
             ELSE 0
           END), 0) AS calculated_stock
         FROM stock_movements
-        WHERE item_id = ?
+        WHERE is_deleted = 0 AND item_id = ?
       `, [item.id]);
       
       const calculatedStock = parseFloat(movementResult[0].calculated_stock) || 0;

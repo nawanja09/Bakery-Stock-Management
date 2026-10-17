@@ -137,7 +137,9 @@ const diffSnapshots = (before, after) => {
       .map((id) => ({ before: oldRows.get(id), after: newRows.get(id) }));
     if (added.length || removed.length || changed.length) children[table] = { added, removed, changed };
   }
-  return { deleted: Boolean(before && !after), fields, children };
+  // Removed for good, or soft-deleted (is_deleted 0 -> 1, services/softDelete.js): either way "deleted".
+  const softDeleted = Boolean(before && after) && Number(oldRow.is_deleted) === 0 && Number(newRow.is_deleted) === 1;
+  return { deleted: Boolean(before && !after) || softDeleted, fields, children };
 };
 
 module.exports = { snapshotTargetOf, takeSnapshot, diffSnapshots, RULES };

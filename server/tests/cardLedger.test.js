@@ -32,6 +32,14 @@ const conn = {
       const sum = db.ledger.filter(r => r.bank_id === params[0] && r.status === 1).reduce((a, r) => a + r.debit - r.credit, 0);
       return [[{ current_balance: sum }]];
     }
+    // balance at the row's own date / rows dated later (utils/financeLedger)
+    if (s.includes('FROM finance_transactions WHERE account_type = ? AND bank_id = ? AND status = 1 AND transaction_date <=')) {
+      const sum = db.ledger.filter(r => r.bank_id === params[1] && r.status === 1 && String(r.date) <= params[2]).reduce((a, r) => a + r.debit - r.credit, 0);
+      return [[{ balance: sum }]];
+    }
+    if (s.includes('FROM finance_transactions WHERE account_type = ? AND bank_id = ? AND status = 1 AND transaction_date >')) {
+      return [db.ledger.filter(r => r.bank_id === params[1] && r.status === 1 && String(r.date) > params[2]).map(() => ({ 1: 1 }))];
+    }
     if (s.startsWith('SELECT id FROM company WHERE name')) return [[{ id: 1 }]];
     if (s.startsWith('INSERT INTO finance_transactions')) {
       // companyId, bankId, date, type, ref, invoice, party, direction, remark, debit, credit, balance, refType, refId, createdBy

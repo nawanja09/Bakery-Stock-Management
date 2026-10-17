@@ -60,6 +60,8 @@ const incomeRoutes = require('./routes/incomeRoutes');
 const readOnly = require('./middleware/readOnly');
 const authenticate = require('./middleware/authenticate');
 const authorizeApi = require('./middleware/authorizeApi');
+const periodGuard = require('./middleware/periodGuard');
+const { periodErrorTranslator } = periodGuard;
 const cashExpenseRoutes = require('./routes/cashExpenseRoutes');
 const hiddenExpenseRoutes = require('./routes/hiddenExpenseRoutes');
 const { ensureChequeReleaseSchema, startChequeReleaseProcessor } = require('./services/chequeReleaseService');
@@ -102,6 +104,9 @@ app.use('/api', readOnly);
 // a role that is allowed to use that path/method (see config/rolePermissions.js).
 // View-only roles (QB) are rejected on every POST/PUT/PATCH/DELETE.
 app.use('/api', authenticate, authorizeApi);
+// Period close: a data change dated in a closed month (or editing a record that is) is
+// refused unless an approved re-open covers it (services/periodLock.js).
+app.use('/api', periodErrorTranslator, periodGuard);
 // Payment adjustment routes must be mounted before purchaseRoutes: the latter
 // has a generic GET /:id route, which would otherwise treat
 // "/payment-adjustments" as a purchase ID and return 404.
@@ -163,6 +168,7 @@ app.use('/api/incomes', incomeRoutes);
 app.use('/api/cash-expenses', cashExpenseRoutes);
 app.use('/api/hidden-expenses', hiddenExpenseRoutes);
 app.use('/api/audit-logs', require('./routes/auditLogRoutes'));
+app.use('/api/period-close', require('./routes/periodCloseRoutes'));
 
 
 // Error handling middleware for file uploads

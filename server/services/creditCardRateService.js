@@ -66,7 +66,7 @@ const loadDepartmentRates = async (connection, departmentIds) => {
   if (ids.length === 0) return result;
 
   const [departments] = await connection.query(
-    'SELECT id, name FROM departments WHERE id IN (?)',
+    'SELECT id, name FROM departments WHERE is_deleted = 0 AND id IN (?)',
     [ids]
   );
   departments.forEach((d) => result.set(Number(d.id), {

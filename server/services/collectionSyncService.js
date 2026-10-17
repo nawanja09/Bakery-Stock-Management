@@ -501,9 +501,9 @@ const syncCollections = async ({ fromDate, toDate, userId = null, allowed = null
   if (inFlight.has(key)) return inFlight.get(key);
   const run = (async () => {
     await pool.collectionsSchemaReady;
-    const [companies] = await pool.query('SELECT id, name FROM company');
+    const [companies] = await pool.query('SELECT id, name FROM company WHERE is_deleted = 0 ');
     const companyByName = new Map(companies.map((c) => [normName(c.name), c.id]));
-    const [departments] = await pool.query('SELECT id, name FROM departments');
+    const [departments] = await pool.query('SELECT id, name FROM departments WHERE is_deleted = 0 ');
     const context = { companyByName, matchDepartment: createDepartmentMatcher(departments), window, userId, allowed };
 
     const order = [SYSTEMS.POS, SYSTEMS.RESTAURANT];

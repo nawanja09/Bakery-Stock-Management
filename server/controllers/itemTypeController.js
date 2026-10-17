@@ -1,12 +1,13 @@
 //server/controllers/itemTypeController.js
 
 const pool = require('../config/db');
+const { softDelete, restoreByName, findUse, inUseMessage } = require('../services/softDelete');
 
 // Get all RM item types
 const getAllItemTypes = async (req, res) => {
   try {
     const [rows] = await pool.query(
-      'SELECT id, type_name, created_at FROM item_types ORDER BY type_name ASC'
+      'SELECT id, type_name, created_at FROM item_types  WHERE is_deleted = 0 ORDER BY type_name ASC'
     );
     res.json(rows);
   } catch (error) {
@@ -27,7 +28,7 @@ const createItemType = async (req, res) => {
     const trimmedName = type_name.trim();
 
     const [existing] = await pool.query(
-      'SELECT id FROM item_types WHERE LOWER(type_name) = LOWER(?)',
+      'SELECT id FROM item_types WHERE is_deleted = 0 AND LOWER(type_name) = LOWER(?)',
       [trimmedName]
     );
 
@@ -35,13 +36,15 @@ const createItemType = async (req, res) => {
       return res.status(400).json({ error: 'RM Type already exists' });
     }
 
-    const [result] = await pool.query(
-      'INSERT INTO item_types (type_name) VALUES (?)',
-      [trimmedName]
-    );
+    // A deleted RM type with this name (names are UNIQUE) is brought back, history intact.
+    const result = { insertId: await restoreByName(pool, 'item_types', 'type_name', trimmedName) };
+    if (!result.insertId) {
+      const [inserted] = await pool.query('INSERT INTO item_types (type_name) VALUES (?)', [trimmedName]);
+      result.insertId = inserted.insertId;
+    }
 
     const [rows] = await pool.query(
-      'SELECT id, type_name, created_at FROM item_types WHERE id = ?',
+      'SELECT id, type_name, created_at FROM item_types WHERE is_deleted = 0 AND id = ?',
       [result.insertId]
     );
 
@@ -72,7 +75,7 @@ const updateItemType = async (req, res) => {
     const trimmedName = type_name.trim();
 
     const [existing] = await pool.query(
-      'SELECT id FROM item_types WHERE LOWER(type_name) = LOWER(?) AND id != ?',
+      'SELECT id FROM item_types WHERE is_deleted = 0 AND LOWER(type_name) = LOWER(?) AND id != ?',
       [trimmedName, id]
     );
 
@@ -102,9 +105,12 @@ const updateItemType = async (req, res) => {
 const deleteItemType = async (req, res) => {
   try {
     const { id } = req.params;
-    const [result] = await pool.query('DELETE FROM item_types WHERE id = ?', [id]);
+    const use = await findUse(pool, 'item_types', id);
+    if (use) return res.status(409).json({ error: inUseMessage('RM type', use) });
 
-    if (result.affectedRows === 0) {
+    const deleted = await softDelete(pool, 'item_types', { id, userId: req.user?.userId });
+
+    if (deleted === 0) {
       return res.status(404).json({ error: 'RM Type not found' });
     }
 

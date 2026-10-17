@@ -14,6 +14,7 @@ const getStockReport = async (req, res) => {
     const [locations] = await pool.query(`
       SELECT id, location_id, location_name 
       FROM cutlery_locations 
+      WHERE is_deleted = 0
       ORDER BY id
     `);
     
@@ -105,7 +106,7 @@ const getStockReport = async (req, res) => {
         cd.damage_date
       FROM cutlery_damages cd
       JOIN cutlery_damage_items cdi ON cd.id = cdi.damage_id
-      WHERE DATE(cd.damage_date) <= ?
+      WHERE cd.is_deleted = 0 AND DATE(cd.damage_date) <= ?
     `, [targetDateStr]);
     
     console.log('Found damages up to date:', allDamages.length);
@@ -307,7 +308,7 @@ const getStockReportByDateRange = async (req, res) => {
           SELECT SUM(cdi.quantity)
           FROM cutlery_damages cd
           JOIN cutlery_damage_items cdi ON cd.id = cdi.damage_id
-          WHERE cdi.asset_id = ca.id
+          WHERE cd.is_deleted = 0 AND cdi.asset_id = ca.id
             AND cd.location_id = cl.id
             AND DATE(cd.damage_date) = dates.date
         ), 0) as damages_today,
@@ -358,7 +359,7 @@ const getStockReportByDateRange = async (req, res) => {
             SELECT SUM(cdi.quantity)
             FROM cutlery_damages cd
             JOIN cutlery_damage_items cdi ON cd.id = cdi.damage_id
-            WHERE cdi.asset_id = ca.id
+            WHERE cd.is_deleted = 0 AND cdi.asset_id = ca.id
               AND cd.location_id = cl.id
               AND DATE(cd.damage_date) = dates.date
           ), 0)
@@ -379,7 +380,7 @@ const getStockReportByDateRange = async (req, res) => {
       ) dates
       CROSS JOIN cutlery_assets ca
       CROSS JOIN cutlery_locations cl
-      WHERE 1=1 ${assetFilter}
+      WHERE cl.is_deleted = 0 ${assetFilter}
       ORDER BY dates.date, ca.asset_code, cl.location_name
     `;
     
@@ -495,7 +496,7 @@ const getStockReportByAsset = async (req, res) => {
         FROM cutlery_damages cd
         JOIN cutlery_damage_items cdi ON cd.id = cdi.damage_id
         JOIN cutlery_locations cl ON cd.location_id = cl.id
-        WHERE cdi.asset_id = ?
+        WHERE cd.is_deleted = 0 AND cdi.asset_id = ?
         AND DATE(cd.damage_date) <= ?
       )
       ORDER BY date ASC
@@ -725,7 +726,7 @@ async function getStockReportInternal(dateStr) {
     FROM cutlery_damages cd
     JOIN cutlery_damage_items cdi ON cd.id = cdi.damage_id
     JOIN cutlery_locations cl ON cd.location_id = cl.id
-    WHERE cdi.asset_id = ? AND DATE(cd.damage_date) <= ?
+    WHERE cd.is_deleted = 0 AND cdi.asset_id = ? AND DATE(cd.damage_date) <= ?
     GROUP BY cl.location_name
   `, [assetId, dateStr]);
   

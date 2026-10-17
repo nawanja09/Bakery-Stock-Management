@@ -40,10 +40,10 @@ const createIncome = async (req, res) => {
     const parsedAmount = number(amount);
     if (!parsedAmount || parsedAmount <= 0) return res.status(400).json({ error: 'Amount must be greater than 0' });
 
-    const [companyRows] = await pool.query('SELECT id, name FROM company WHERE id = ?', [company_id]);
+    const [companyRows] = await pool.query('SELECT id, name FROM company WHERE is_deleted = 0 AND id = ?', [company_id]);
     if (!companyRows.length) return res.status(400).json({ error: 'Selected company was not found' });
 
-    const [deptRows] = await pool.query('SELECT id, name FROM departments WHERE id = ?', [department_id]);
+    const [deptRows] = await pool.query('SELECT id, name FROM departments WHERE is_deleted = 0 AND id = ?', [department_id]);
     if (!deptRows.length) return res.status(400).json({ error: 'Selected department was not found' });
 
     const [result] = await pool.query(
@@ -71,9 +71,9 @@ const createIncome = async (req, res) => {
 };
 
 const validateIncomeReferences = async (companyId, departmentId) => {
-  const [companyRows] = await pool.query('SELECT id, name FROM company WHERE id = ?', [companyId]);
+  const [companyRows] = await pool.query('SELECT id, name FROM company WHERE is_deleted = 0 AND id = ?', [companyId]);
   if (!companyRows.length) throw new Error('Selected company was not found');
-  const [deptRows] = await pool.query('SELECT id, name FROM departments WHERE id = ?', [departmentId]);
+  const [deptRows] = await pool.query('SELECT id, name FROM departments WHERE is_deleted = 0 AND id = ?', [departmentId]);
   if (!deptRows.length) throw new Error('Selected department was not found');
   return { company: companyRows[0], department: deptRows[0] };
 };

@@ -89,10 +89,10 @@ const loadExpenseRecords = async ({ methods, fromDate, toDate }) => {
   if (include('petty_cash')) {
     // Match the Petty Cash voucher source: include every stored voucher and
     // report its status as data instead of filtering it out here.
-    sources.push({ sql: `SELECT pv.id, ${day('pv.voucher_date')} AS date, pv.voucher_number AS reference, 'Petty Cash' AS expense_method, pv.expense_type, pv.sub_expense_type, COALESCE(pv.description, '') AS description, 'Petty Cash' AS payment_source, pv.amount, COALESCE(pv.status, 'Pending') AS status, pv.company_id, comp.name AS company_name FROM petty_cash_vouchers pv LEFT JOIN company comp ON comp.id = pv.company_id WHERE 1 = 1${range('pv.voucher_date')}`, params: rangeParams() });
+    sources.push({ sql: `SELECT pv.id, ${day('pv.voucher_date')} AS date, pv.voucher_number AS reference, 'Petty Cash' AS expense_method, pv.expense_type, pv.sub_expense_type, COALESCE(pv.description, '') AS description, 'Petty Cash' AS payment_source, pv.amount, COALESCE(pv.status, 'Pending') AS status, pv.company_id, comp.name AS company_name FROM petty_cash_vouchers pv LEFT JOIN company comp ON comp.id = pv.company_id WHERE pv.is_deleted = 0 AND 1 = 1${range('pv.voucher_date')}`, params: rangeParams() });
   }
   if (include('bank_charges')) {
-    sources.push({ sql: `SELECT bc.id, ${day('bc.charge_date')} AS date, bc.reference_number AS reference, 'Bank Charges' AS expense_method, bc.charges_type AS expense_type, NULL AS sub_expense_type, COALESCE(bc.description, '') AS description, COALESCE(bc.bank_name, 'Bank Account') AS payment_source, bc.amount, 'Recorded' AS status, bc.company_id, comp.name AS company_name FROM bank_charges bc LEFT JOIN company comp ON comp.id = bc.company_id WHERE 1 = 1${range('bc.charge_date')}`, params: rangeParams() });
+    sources.push({ sql: `SELECT bc.id, ${day('bc.charge_date')} AS date, bc.reference_number AS reference, 'Bank Charges' AS expense_method, bc.charges_type AS expense_type, NULL AS sub_expense_type, COALESCE(bc.description, '') AS description, COALESCE(bc.bank_name, 'Bank Account') AS payment_source, bc.amount, 'Recorded' AS status, bc.company_id, comp.name AS company_name FROM bank_charges bc LEFT JOIN company comp ON comp.id = bc.company_id WHERE bc.is_deleted = 0 AND 1 = 1${range('bc.charge_date')}`, params: rangeParams() });
   }
   if (include('cash_expenses')) {
     sources.push({ sql: `SELECT ce.id, ${day('ce.expense_date')} AS date, ce.voucher_number AS reference, 'Cash Expenses' AS expense_method, ce.expense_type, ce.sub_expense_type, COALESCE(ce.description, '') AS description, 'Cash Expense' AS payment_source, ce.amount, 'Recorded' AS status, ce.company_id, comp.name AS company_name FROM cash_expenses ce LEFT JOIN company comp ON comp.id = ce.company_id WHERE ce.status = 1${range('ce.expense_date')}`, params: rangeParams() });
@@ -272,7 +272,7 @@ const getBalanceSheet = async (req, res) => {
         LEFT JOIN (
           SELECT item_id, SUM(variance) AS total_adjusted
           FROM stock_adjustments
-          WHERE DATE(date) <= ?
+          WHERE is_deleted = 0 AND DATE(date) <= ?
           GROUP BY item_id
         ) adjustments ON adjustments.item_id = i.id
         WHERE i.auto_add_to_stock = 1

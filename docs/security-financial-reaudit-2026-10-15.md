@@ -31,7 +31,7 @@ So brief domains 2–4 (valuation, double entry, P&L) are mostly **design gaps**
 | H4 | HIGH | No stock-availability check or item lock; adjustments trust client `system_qty`; no approval step | carried |
 | H5 | HIGH | No expense maker–checker; ledger rows hard-deleted (see R8) | carried |
 | H6 | **Mostly fixed** 2026-10-16 (was HIGH) | Audit trail opt-in (`X-RM-Adjustment` header) and mutable; sync rejects go only to `console.warn`. **Now:** append-only `audit_log` (UPDATE/DELETE refused by triggers) written by the server for every sign-in event (success, failure, lock-out), sign-out, password change, data change and refused (403) request, with user, sign-in session, IP, browser, redacted request / response data and result (`services/auditLog.js`). Data views are not recorded (business decision). Audit Trail page for Admin / Super Admin (`/audit-trail`). **Follow-ups done 2026-10-16:** (1) every POS / Restaurant sync run is an Audit Trail row (event SYNC) with counts, rejected records + reasons and errors; (2) edits / deletes / pay / settle of a single record store the record before and after (`services/auditSnapshots.js`, ~50 routes incl. line items) and the page shows field-by-field old -> new; (3) `scripts/createAppDbUser.js` + `AUDIT_DB`: audit_log in its own schema where the app account has SELECT, INSERT only (no UPDATE / DELETE / ALTER / DROP / TRIGGER) - the test (`tests/db/appDbUser.test.js`) is skipped on the local XAMPP server because `mysql.db` is corrupt, so this part is **not yet verified against a live server**; (4) `TRUST_PROXY` (.env) so the Audit Trail and the per-IP sign-in limit see the real client address behind nginx. **Owner action:** set `TRUST_PROXY` in production, run `createAppDbUser.js --apply` and switch `.env` to the new account | carried |
-| H7 | HIGH | No period close; back-dating allowed everywhere; `balance_after` wrong for back-dated rows | carried |
+| H7 | **Fixed** 2026-10-16 (was HIGH) | No period close; back-dating allowed everywhere; `balance_after` wrong for back-dated rows | carried |
 | **R4** | **Fixed** 2026-10-15 (was MEDIUM) | Actor spoofing survived the N4 sweep: `issued_by`, `approved_by`, `user_name`, `settled_by` (written into `payment_history.created_by`) | **new** |
 | **R5** | MEDIUM | `InsufficientBalanceError` is never thrown, so Cash in Hand can be driven negative; every "insufficient balance" handler is dead code | **new** |
 | **R6** | MEDIUM | `GET /api/cutlery-reports/stock-report/test` writes fake purchases, transfers and damages into production data | **new** |
@@ -223,9 +223,23 @@ Apply it at all 14 sites listed above. Also require a reason on delete and recor
 - **H4:** `issuanceController.createIssuance` (`:5-60`) has no stock check and no item lock. `adjustmentController.createAdjustment` (`:309-368`) computes `variance = actual_qty - system_qty` from the **client's** `system_qty`, takes `user_name` from the body, and records `updatedBy: null` (`:352`). Adjustments are limited to the Adjustments module (Admin and Super Admin), which reduces the exposure. Fix as in the 10-12 report: recompute `system_qty` server-side under `SELECT … FROM items WHERE id = ? FOR UPDATE`, and add a `pending → approved` status that only a second user can approve.
 - **H5:** there is no approval state on any expense (`newExpenseRoutes`, `expenseRoutes`, `cashExpenseRoutes`). 23 `DELETE FROM` statements remain. The ones that matter most: petty cash voucher (`expenseRoutes.js:519`), cheque expense (`:894`), online expense and its payments (`:1422-1427`), stock adjustment (`adjustmentController.js:796`) and R8.
 - **H6:** `utils/rmAdjustmentAudit.js:1` still records only when the client sends `X-RM-Adjustment: true`. Sync problems still only `console.warn` (`collectionSyncService.js:295`). There is no `audit_log` table.
-- **H7:** see the period-lock fix below.
+- **H7:** fixed 2026-10-16, see below. The design that follows is the original proposal; what was built is described in the box.
 
 #### H7 fix: a lock date that every money/stock write checks
+> **Fixed (2026-10-16, uncommitted). Built differently from the proposal below, to the owner's rules:**
+> - **A rolling window, not a manual lock date.** Only the current month and the month before it are open (`PERIOD_OPEN_MONTHS`, default 2). On 2026-10-16 everything before 2026-09-01 is closed. It moves by itself at the start of each month.
+> - **Closed means closed for everyone**, Admin included: nothing dated in a closed month can be created, edited, moved out of it, or voided.
+> - **To correct a closed month:** an Admin (or the Super Admin) sends a re-open request (months + reason, `/period-close`), **only the Super Admin approves** (for 1-168 hours, default 24) or rejects, and either can close it again early. While it is open, **only an Admin / Super Admin** can post or edit in it; Accountant, Stores and the rest stay blocked. Every step is also recorded by the Audit Trail.
+> - **Enforced twice:** `middleware/periodGuard.js` checks every data-changing request (the dates in its body, and the date of the record it edits or voids) before the controller runs; `utils/financeLedger.js` checks every Cash / Bank posting again, whatever route made it. A refusal is a `409` with the reason; a controller's catch-all `500` is turned into that same `409` (`services/requestContext.js`). If the check itself fails, the change is refused.
+> - **Covered:** purchases and payments, purchase returns and settlements, supplier advance / settle credit, issue notes, wastage, department returns, opening balances, stock adjustments, all Expenses modules (bills, petty cash, cheques, bank charges, online, cash, hidden, credit notes), Finance (cash / bank receive, issue, transfers, intercompany, card realisation, cheque release), staff loans, income, in-hand adjustments, collection approval.
+> - **Not covered:** Cutlery (purchases, transfers, damages), Orders, Employees and master data (items, suppliers, payees ...). Add a module by listing its path in `GUARDED_PREFIXES` (and its table + date column in `RECORD_DATES`) in `middleware/periodGuard.js`.
+> - **The automatic cheque release** skips (and logs) a cheque whose release date is in a closed month instead of posting behind the closed books, and no longer lets one such cheque roll back the whole batch.
+> - **`balance_after` fixed.** A row posted with an earlier date than rows already in the ledger got the account total, and the rows after it kept stale balances. New postings now get the balance at their own date and the later rows are rebuilt (`rebuildBalanceAfter`, a window-function UPDATE in ledger order `transaction_date, created_at, id`). Rows that are edited, moved or voided in place (payment adjustments, petty cash reimbursement, bank charge, bank opening balance, cheque release) are refreshed too. The Cash / Bank ledger screens already computed running balances themselves, so what was wrong was the stored value, which any export or direct query would have shown.
+> - **Existing data:** `node scripts/rebuildLedgerBalances.js` is a dry run (counts only); `--apply` repairs. On the local copy of production data the dry run found **931 rows with a wrong stored balance in 8 accounts**. **Not applied** - back up first, then run it.
+> - **Operational:** after deploy, anything dated before the window needs a re-open: for example approving an old POS collection, releasing an old cheque, or an old opening balance. Set `PERIOD_OPEN_MONTHS` in `.env` to change the window.
+> - Tests: `tests/periodLock.test.js` (24 unit), `tests/db/periodClose.test.js` (22 database, through the real routers and ledger), `client/src/components/PeriodClose/PeriodClose.test.jsx` (14). Each defect was re-introduced once to check a test fails (lock off, anyone may edit, Admin may approve, wrong balance_after, cheque job not skipping).
+
+The original proposal, kept for reference:
 ```sql
 CREATE TABLE accounting_period_lock (
   company_id INT NOT NULL PRIMARY KEY,
@@ -367,7 +381,7 @@ After that, `REVOKE DELETE ON bsms.finance_transactions FROM 'bsms_app'@'%'` (ru
 | 3. Double entry / CoA | Absent (C4). AP and cash book can diverge silently (R1, H3). |
 | 3. Approval workflows | Collections: Accountant-only approve (good). Expenses: none (H5). Supplier payments: Store Keeper can pay (R2, accepted 2026-10-15). |
 | 4. P&L / precision | No P&L engine. Money handled as floats in JS (M5). Columns are `DECIMAL`. The expense-payment path already uses cents (`newExpenseRoutes.js:273`). |
-| 4. Period close | None (H7). Fix above. |
+| 4. Period close | **Fixed 2026-10-16** (H7): rolling 2-month window, Super Admin-approved re-opens, Admin-only edits inside them. |
 | 5. RBAC | Central default-deny table. Role re-read from the DB on every request (N3 fixed). Store Keeper pays suppliers by design (R2, accepted 2026-10-15). |
 | 5. IDOR / branches | Collections are row-filtered in per-user mode. All Accountants see all branches (accepted 2026-10-14). Everything else has no company scoping (M8). |
 | 6. Audit trail | Opt-in by header and mutable (H6). Ledger rows hard-deleted (R8). Sync rejects not persisted (H6). |
@@ -380,7 +394,7 @@ After that, `REVOKE DELETE ON bsms.finance_transactions FROM 'bsms_app'@'%'` (ru
 |---|---|
 | **Now** | R3 done (route removed); check production for `wastages.status = 0`. R6 (delete the test route). Run the R1 data-check SQL on production. |
 | **This week** | R1 done (lock first, cap, excess → supplier credit, request_id). R4 (`actorId`). R5 (negative cash guard). R7 (line validation + server-side totals). R8 (void, not delete) + least-privilege DB user. |
-| **2–4 weeks** | H7 period lock. H5 expense approval + void-not-delete everywhere. H6 `audit_log` + `integration_sync_log`. M3 payload hash. R9 reference registry. M7 single stock definition (also removes R10). |
+| **2–4 weeks** | H7 done. H5 expense approval + void-not-delete everywhere. H6 `audit_log` + `integration_sync_log`. M3 payload hash. R9 reference registry. M7 single stock definition (also removes R10). |
 | **Quarter** | C4 GL and posting map. C5 WAC + RAVON sale lines. M5 money migration. M8 company scoping. BSMS-SIG-2. |
 
 *All line numbers are for commit `1b56c0c`.*

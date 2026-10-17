@@ -81,7 +81,7 @@ router.post('/', async (req, res) => {
   }
 
   try {
-    const [companies] = await pool.query('SELECT id FROM company WHERE id = ?', [company_id]);
+    const [companies] = await pool.query('SELECT id FROM company WHERE is_deleted = 0 AND id = ?', [company_id]);
     if (companies.length === 0) {
       return res.status(400).json({ error: 'Selected company was not found' });
     }
@@ -134,7 +134,7 @@ router.put('/:id', async (req, res) => {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
-    const [companies] = await connection.query('SELECT id FROM company WHERE id = ?', [company_id]);
+    const [companies] = await connection.query('SELECT id FROM company WHERE is_deleted = 0 AND id = ?', [company_id]);
     if (companies.length === 0) {
       await connection.rollback();
       return res.status(400).json({ error: 'Selected company was not found' });
@@ -950,7 +950,7 @@ router.post('/credit-notes', async (req, res) => {
   try {
     await connection.beginTransaction();
 
-    const [companies] = await connection.query('SELECT id FROM company WHERE id = ?', [company_id]);
+    const [companies] = await connection.query('SELECT id FROM company WHERE is_deleted = 0 AND id = ?', [company_id]);
     if (companies.length === 0) {
       await connection.rollback();
       return res.status(400).json({ error: 'Selected company was not found' });

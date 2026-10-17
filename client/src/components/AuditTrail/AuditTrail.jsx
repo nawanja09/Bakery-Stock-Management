@@ -26,6 +26,7 @@ export const ACTION_LABELS = {
   REJECT: 'Rejected',
   RESTORE: 'Restored',
   CANCEL: 'Cancelled',
+  CLOSE: 'Closed again',
   SUBMIT: 'Submitted',
   PAY: 'Payment',
   SETTLE: 'Settlement',

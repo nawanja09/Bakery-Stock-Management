@@ -30,6 +30,20 @@ export const PopupProvider = ({ children }) => {
     });
   };
 
+  // A change refused because its month is closed (api.js): always say why, whatever the page shows.
+  useEffect(() => {
+    const onPeriodClosed = (event) => setPopup({
+      show: true,
+      type: 'error',
+      title: 'Cannot save: period closed',
+      message: event.detail?.message || 'This month is closed, so it cannot be changed.',
+      confirmText: 'OK',
+      duration: 10000
+    });
+    window.addEventListener('bsms:period-closed', onPeriodClosed);
+    return () => window.removeEventListener('bsms:period-closed', onPeriodClosed);
+  }, []);
+
   useEffect(() => {
     if (!popup.show) {
       document.body.classList.remove('modal-open');

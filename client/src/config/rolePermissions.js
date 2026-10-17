@@ -33,14 +33,16 @@ export const MODULES = Object.freeze({
   // Collection: Accountant, Admin, Super Admin and QB (view only). Approve = Accountant only.
   COLLECTION: 'collection',
   // Audit Trail page: Admin / Super Admin only.
-  AUDIT: 'audit'
+  AUDIT: 'audit',
+  // Period Close page: Admin / Super Admin only (approving = Super Admin only).
+  PERIOD_CLOSE: 'periodClose'
 });
 
 const M = MODULES;
 
 const ADMIN_MODULES = [
   M.MANAGEMENT, M.RAW_MATERIAL, M.EXPENSES, M.FINANCE,
-  M.CUTLERY, M.FG_PRODUCTION, M.ADJUSTMENTS, M.VAT, M.SETTINGS, M.EMPLOYEES, M.COLLECTION, M.AUDIT
+  M.CUTLERY, M.FG_PRODUCTION, M.ADJUSTMENTS, M.VAT, M.SETTINGS, M.EMPLOYEES, M.COLLECTION, M.AUDIT, M.PERIOD_CLOSE
 ];
 
 // `settings` = the "Settings / Admin" group (only holds Change Password).
@@ -223,7 +225,10 @@ export const ROUTE_RULES = [
   rule('/analyst', { all: [M.ANALYST] }),
 
   // ---- Audit Trail (Admin / Super Admin) ----
-  rule('/audit-trail', { all: [M.AUDIT] })
+  rule('/audit-trail', { all: [M.AUDIT] }),
+
+  // ---- Period Close (Admin / Super Admin) ----
+  rule('/period-close', { all: [M.PERIOD_CLOSE] })
 ];
 
 const cleanPath = (pathname = '') => {

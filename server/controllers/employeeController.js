@@ -186,7 +186,7 @@ const createEmployee = async (req, res) => {
     }
 
     if (department_id !== null) {
-      const [dept] = await pool.query('SELECT id FROM departments WHERE id = ?', [department_id]);
+      const [dept] = await pool.query('SELECT id FROM departments WHERE is_deleted = 0 AND id = ?', [department_id]);
       if (dept.length === 0) {
         return res.status(400).json({ error: 'Selected Department does not exist' });
       }
@@ -273,7 +273,7 @@ const updateEmployee = async (req, res) => {
     }
 
     if (department_id !== null) {
-      const [dept] = await pool.query('SELECT id FROM departments WHERE id = ?', [department_id]);
+      const [dept] = await pool.query('SELECT id FROM departments WHERE is_deleted = 0 AND id = ?', [department_id]);
       if (dept.length === 0) {
         return res.status(400).json({ error: 'Selected Department does not exist' });
       }

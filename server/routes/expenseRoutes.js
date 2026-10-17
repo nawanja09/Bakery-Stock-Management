@@ -8,7 +8,9 @@ const restrictRoles = require('../middleware/restrictRoles');
 // cash float). Petty Cash Vouchers/Expenses and standalone Petty Cash
 // Payments are paid out of the petty cash float itself and must never post
 // to the Cash Ledger.
-const { recordBankTransaction, recordCashTransaction, calculateRunningBalances } = require('../utils/financeLedger');
+const periodLock = require('../services/periodLock');
+const { softDelete } = require('../services/softDelete');
+const { recordBankTransaction, recordCashTransaction, calculateRunningBalances, refreshBalancesOfReference, refreshAccounts } = require('../utils/financeLedger');
 const { checkDuplicateReference, DuplicateReferenceError } = require('../services/referenceValidationService');
 const { getActiveBankAccounts } = require('../services/bankAccountService');
 const { isRmAdjustmentRequest, recordFinancialAdjustment, sameValue } = require('../utils/rmAdjustmentAudit');
@@ -27,7 +29,7 @@ router.get('/petty-cash/balance', async (req, res) => {
     const totalReimbursements = parseFloat(reimbursementRows[0].total) || 0;
 
     const [voucherRows] = await pool.query(
-      'SELECT SUM(amount) as total FROM petty_cash_vouchers'
+      'SELECT SUM(amount) as total FROM petty_cash_vouchers WHERE is_deleted = 0 '
     );
     const totalVouchers = parseFloat(voucherRows[0].total) || 0;
 
@@ -50,7 +52,7 @@ router.get('/petty-cash/balance', async (req, res) => {
 router.get('/petty-cash/next-voucher-number', async (req, res) => {
   try {
     const [rows] = await pool.query(
-      "SELECT voucher_number FROM petty_cash_vouchers ORDER BY id DESC LIMIT 1"
+      "SELECT voucher_number FROM petty_cash_vouchers WHERE is_deleted = 0 ORDER BY id DESC LIMIT 1"
     );
     
     let nextNumber = 'PC-001';
@@ -123,7 +125,8 @@ router.get('/petty-cash/vouchers', async (req, res) => {
         comp.name as company_name,
         DATE_FORMAT(v.created_at, '%Y-%m-%d') as created_date
        FROM petty_cash_vouchers v
-       LEFT JOIN company comp ON v.company_id = comp.id
+       LEFT JOIN company comp ON v.company_id = comp.id WHERE v.is_deleted = 0
+       
        ORDER BY v.created_at DESC 
        LIMIT 100`
     );
@@ -243,7 +246,7 @@ router.get('/petty-cash/transactions', async (req, res) => {
          v.company_id,
          comp.name AS company_name
        FROM petty_cash_vouchers v
-       LEFT JOIN company comp ON v.company_id = comp.id`
+       LEFT JOIN company comp ON v.company_id = comp.id WHERE v.is_deleted = 0 `
     );
 
     // Chronological order (oldest first) so the running balance builds up
@@ -340,7 +343,7 @@ router.post('/petty-cash/voucher', authenticate, async (req, res) => {
     await checkDuplicateReference(connection, voucher_number);
 
     // Only confirm the company exists (no Cash Ledger / cash_accounts lookup).
-    const [companyRows] = await connection.query('SELECT id, name FROM company WHERE id = ?', [company_id]);
+    const [companyRows] = await connection.query('SELECT id, name FROM company WHERE is_deleted = 0 AND id = ?', [company_id]);
     if (companyRows.length === 0) {
       await connection.rollback();
       return res.status(400).json({ error: 'Selected Company is not valid' });
@@ -432,7 +435,7 @@ router.put('/petty-cash/voucher/:id', authenticate, async (req, res) => {
 
     await checkDuplicateReference(connection, voucher_number, { table: 'petty_cash_vouchers', id });
 
-    const [oldRows] = await connection.query('SELECT * FROM petty_cash_vouchers WHERE id = ? FOR UPDATE', [id]);
+    const [oldRows] = await connection.query('SELECT * FROM petty_cash_vouchers WHERE is_deleted = 0 AND id = ? FOR UPDATE', [id]);
     if (oldRows.length === 0) {
       await connection.rollback();
       return res.status(404).json({ error: 'Voucher not found' });
@@ -509,16 +512,14 @@ router.delete('/petty-cash/voucher/:id', authenticate, async (req, res) => {
   try {
     await connection.beginTransaction();
 
-    const [oldRows] = await connection.query('SELECT amount FROM petty_cash_vouchers WHERE id = ? FOR UPDATE', [id]);
+    const [oldRows] = await connection.query('SELECT amount FROM petty_cash_vouchers WHERE is_deleted = 0 AND id = ? FOR UPDATE', [id]);
     if (oldRows.length === 0) {
       await connection.rollback();
       return res.status(404).json({ error: 'Voucher not found' });
     }
 
-    await connection.query(
-      'DELETE FROM petty_cash_vouchers WHERE id = ?',
-      [id]
-    );
+    // Soft delete: the voucher stays in the database, flagged deleted, and drops out of every list and total.
+    await softDelete(connection, 'petty_cash_vouchers', { id, userId: req.user.userId });
 
     await connection.commit();
     await updatePettyCashBalance();
@@ -558,7 +559,7 @@ router.post('/petty-cash/reimbursement', authenticate, async (req, res) => {
 
     await checkDuplicateReference(connection, reference_number);
 
-    const [companyRows] = await connection.query('SELECT id, name FROM company WHERE id = ?', [company_id]);
+    const [companyRows] = await connection.query('SELECT id, name FROM company WHERE is_deleted = 0 AND id = ?', [company_id]);
     if (companyRows.length === 0) {
       await connection.rollback();
       return res.status(400).json({ error: 'Selected Company is not valid' });
@@ -682,6 +683,9 @@ router.put('/petty-cash/reimbursement/:id', authenticate, async (req, res) => {
       }
     }
 
+    // The ledger row above was edited in place: refresh its stored running balances.
+    await refreshBalancesOfReference(connection, 'PETTY_CASH_REIMBURSEMENT', id);
+
     await connection.commit();
     await updatePettyCashBalance();
     
@@ -705,7 +709,7 @@ router.put('/petty-cash/reimbursement/:id', authenticate, async (req, res) => {
 async function updatePettyCashBalance() {
   try {
     const [voucherTotal] = await pool.query(
-      `SELECT COALESCE(SUM(amount), 0) as total FROM petty_cash_vouchers`
+      `SELECT COALESCE(SUM(amount), 0) as total FROM petty_cash_vouchers WHERE is_deleted = 0 `
     );
     
     const [reimbursementTotal] = await pool.query(
@@ -715,7 +719,7 @@ async function updatePettyCashBalance() {
     const [todayVoucherTotal] = await pool.query(
       `SELECT COALESCE(SUM(amount), 0) as total 
        FROM petty_cash_vouchers 
-       WHERE DATE(voucher_date) = CURDATE()`
+       WHERE is_deleted = 0 AND DATE(voucher_date) = CURDATE()`
     );
 
     const [todayReimbursementTotal] = await pool.query(
@@ -761,7 +765,7 @@ router.get('/cheque/vouchers', async (req, res) => {
               voucher_number, cheque_number, payee_name, 
               total_bill_amount as amount, is_realised
        FROM cheque_expenses 
-       ORDER BY created_at DESC`
+        WHERE is_deleted = 0 ORDER BY created_at DESC`
     );
     res.json(rows || []);
   } catch (error) {
@@ -782,7 +786,7 @@ router.get('/cheque/unrealised', async (req, res) => {
               ce.company_id, c.name as company_name
        FROM cheque_expenses ce
        LEFT JOIN company c ON ce.company_id = c.id
-       WHERE ce.is_realised = 0
+       WHERE ce.is_deleted = 0 AND ce.is_realised = 0
        ORDER BY ce.bill_date DESC`
     );
     res.json(rows || []);
@@ -805,7 +809,7 @@ router.get('/cheque/realised', async (req, res) => {
        FROM cheque_expenses ce
        LEFT JOIN company c ON ce.company_id = c.id
        LEFT JOIN bank_details bd ON ce.bank_id = bd.id
-       WHERE ce.is_realised = 1
+       WHERE ce.is_deleted = 0 AND ce.is_realised = 1
        ORDER BY ce.realise_date DESC`
     );
     res.json(rows || []);
@@ -826,7 +830,7 @@ router.get('/cheque/voucher/:id', async (req, res) => {
               cheque_number, is_realised, DATE_FORMAT(realise_date, '%Y-%m-%d') as realise_date,
               company_id, bank_id
        FROM cheque_expenses
-       WHERE id = ?`,
+       WHERE is_deleted = 0 AND id = ?`,
       [id]
     );
     if (rows.length === 0) {
@@ -890,12 +894,9 @@ router.delete('/cheque/voucher/:id', authenticate, async (req, res) => {
   const { id } = req.params;
 
   try {
-    const [result] = await pool.query(
-      'DELETE FROM cheque_expenses WHERE id = ?',
-      [id]
-    );
+    const deleted = await softDelete(pool, 'cheque_expenses', { id, userId: req.user.userId });
 
-    if (result.affectedRows === 0) {
+    if (deleted === 0) {
       return res.status(404).json({ error: 'Cheque voucher not found' });
     }
 
@@ -960,7 +961,7 @@ router.put('/cheque/realise/:id', authenticate, async (req, res) => {
     await connection.beginTransaction();
 
     const [chequeRows] = await connection.query(
-      'SELECT id, payee_name, total_bill_amount, cheque_number, is_realised FROM cheque_expenses WHERE id = ? FOR UPDATE',
+      'SELECT id, payee_name, total_bill_amount, cheque_number, is_realised FROM cheque_expenses WHERE is_deleted = 0 AND id = ? FOR UPDATE',
       [id]
     );
     if (chequeRows.length === 0) {
@@ -1037,7 +1038,8 @@ router.get('/bank-charges', async (req, res) => {
               bc.bank_name, bc.bank_id, bc.reference_number, bc.charges_type, bc.bank_charge_type_id,
               bc.description, bc.amount, bc.company_id, c.name AS company_name
        FROM bank_charges bc
-       LEFT JOIN company c ON c.id = bc.company_id
+       LEFT JOIN company c ON c.id = bc.company_id WHERE bc.is_deleted = 0
+       
        ORDER BY bc.charge_date DESC, bc.created_at DESC`
     );
     res.json(rows || []);
@@ -1060,7 +1062,7 @@ router.post('/bank-charges', authenticate, async (req, res) => {
   try {
     await connection.beginTransaction();
 
-    const [companies] = await connection.query('SELECT id FROM company WHERE id = ?', [company_id]);
+    const [companies] = await connection.query('SELECT id FROM company WHERE is_deleted = 0 AND id = ?', [company_id]);
     if (companies.length === 0) {
       await connection.rollback();
       return res.status(400).json({ error: 'Selected company was not found' });
@@ -1128,7 +1130,7 @@ router.put('/bank-charges/:id', authenticate, async (req, res) => {
   try {
     await connection.beginTransaction();
 
-    const [companies] = await connection.query('SELECT id FROM company WHERE id = ?', [company_id]);
+    const [companies] = await connection.query('SELECT id FROM company WHERE is_deleted = 0 AND id = ?', [company_id]);
     if (companies.length === 0) {
       await connection.rollback();
       return res.status(400).json({ error: 'Selected company was not found' });
@@ -1142,7 +1144,7 @@ router.put('/bank-charges/:id', authenticate, async (req, res) => {
 
     await checkDuplicateReference(connection, reference_number, { table: 'bank_charges', id });
 
-    const [oldRows] = await connection.query('SELECT amount, bank_id FROM bank_charges WHERE id = ? FOR UPDATE', [id]);
+    const [oldRows] = await connection.query('SELECT amount, bank_id FROM bank_charges WHERE is_deleted = 0 AND id = ? FOR UPDATE', [id]);
     if (oldRows.length === 0) {
       await connection.rollback();
       return res.status(404).json({ error: 'Bank charge not found' });
@@ -1205,6 +1207,10 @@ router.put('/bank-charges/:id', authenticate, async (req, res) => {
       });
     }
 
+    // The charge's ledger row was edited / moved in place: refresh the running balances of
+    // the bank it was in and the bank it is in now.
+    await refreshBalancesOfReference(connection, 'BANK_CHARGE', id, oldBankId ? [{ account_type: 'BANK', bank_id: oldBankId }] : []);
+
     await connection.commit();
     res.json({ message: 'Bank charge updated successfully' });
   } catch (error) {
@@ -1224,13 +1230,13 @@ router.delete('/bank-charges/:id', authenticate, async (req, res) => {
   try {
     await connection.beginTransaction();
 
-    const [oldRows] = await connection.query('SELECT amount, bank_id FROM bank_charges WHERE id = ? FOR UPDATE', [id]);
+    const [oldRows] = await connection.query('SELECT amount, bank_id FROM bank_charges WHERE is_deleted = 0 AND id = ? FOR UPDATE', [id]);
     if (oldRows.length === 0) {
       await connection.rollback();
       return res.status(404).json({ error: 'Bank charge not found' });
     }
 
-    await connection.query('DELETE FROM bank_charges WHERE id = ?', [id]);
+    await softDelete(connection, 'bank_charges', { id, userId: req.user.userId });
     
     if (oldRows[0].bank_id) {
       const [finRows] = await connection.query(
@@ -1239,8 +1245,10 @@ router.delete('/bank-charges/:id', authenticate, async (req, res) => {
       if (finRows.length > 0) {
         const oldCredit = parseFloat(finRows[0].credit) || 0;
         await connection.query('UPDATE bank_details SET current_balance = current_balance + ? WHERE id = ?', [oldCredit, oldRows[0].bank_id]);
-        await connection.query('DELETE FROM finance_transactions WHERE id = ?', [finRows[0].id]);
+        // Void, never delete: the ledger row stays (status 0 = excluded from every balance).
+        await connection.query('UPDATE finance_transactions SET status = 0 WHERE id = ?', [finRows[0].id]);
       }
+      await refreshAccounts(connection, [{ account_type: 'BANK', bank_id: oldRows[0].bank_id }]);
     }
     
     await connection.commit();
@@ -1268,7 +1276,7 @@ router.get('/online', async (req, res) => {
               balance, description, payment_status, paid_amount,
               DATE_FORMAT(payment_date, '%Y-%m-%d') as payment_date
        FROM online_expenses 
-       ORDER BY bill_date DESC, created_at DESC`
+        WHERE is_deleted = 0 ORDER BY bill_date DESC, created_at DESC`
     );
     res.json(rows || []);
   } catch (error) {
@@ -1352,7 +1360,7 @@ router.put('/online/:id', authenticate, async (req, res) => {
   try {
     // ✅ Get current expense data
     const [currentExpense] = await pool.query(
-      'SELECT total_bill_amount, paid_amount, balance FROM online_expenses WHERE id = ?',
+      'SELECT total_bill_amount, paid_amount, balance FROM online_expenses WHERE is_deleted = 0 AND id = ?',
       [id]
     );
 
@@ -1417,18 +1425,11 @@ router.delete('/online/:id', authenticate, async (req, res) => {
   const { id } = req.params;
 
   try {
-    // ✅ First delete all associated payments
-    await pool.query(
-      'DELETE FROM online_expense_payments WHERE expense_id = ?',
-      [id]
-    );
-
-    const [result] = await pool.query(
-      'DELETE FROM online_expenses WHERE id = ?',
-      [id]
-    );
+    // Soft delete the expense and its payments (flagged deleted, never removed).
+    await softDelete(pool, 'online_expense_payments', { where: 'expense_id = ?', params: [id], userId: req.user.userId });
+    const deleted = await softDelete(pool, 'online_expenses', { id, userId: req.user.userId });
     
-    if (result.affectedRows === 0) {
+    if (deleted === 0) {
       return res.status(404).json({ error: 'Online expense not found' });
     }
     
@@ -1498,7 +1499,7 @@ router.post('/online/pay', authenticate, async (req, res) => {
     const [expenses] = await connection.query(
       `SELECT id, balance, total_bill_amount, paid_amount, payee_name, bill_number
        FROM online_expenses 
-       WHERE id IN (${placeholders})`,
+       WHERE is_deleted = 0 AND id IN (${placeholders})`,
       expense_ids
     );
 
@@ -1626,7 +1627,7 @@ router.get('/online/:id/payments', async (req, res) => {
               amount, bank_name, voucher_number, reference_number, status,
               DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s') as created_at
        FROM online_expense_payments 
-       WHERE expense_id = ?
+       WHERE is_deleted = 0 AND expense_id = ?
        ORDER BY payment_date DESC, created_at DESC`,
       [id]
     );
@@ -1800,6 +1801,16 @@ router.put('/banks/:id', authenticate, async (req, res) => {
 
     const recalculatedCurrentBalance = Number((newOpening + existingTransactions).toFixed(2));
 
+    // Changing the opening balance changes the opening row, which is dated in the past:
+    // that month must be open (services/periodLock.js).
+    if (Math.abs(newOpening - oldOpening) > 0.004) {
+      const [openingDates] = await pool.query(
+        "SELECT DATE_FORMAT(transaction_date, '%Y-%m-%d') AS d FROM finance_transactions WHERE bank_id = ? AND reference_type = 'OPENING_BALANCE' AND status = 1",
+        [id]
+      );
+      await periodLock.assertOpen(pool, req.user.userId, openingDates.map((row) => row.d));
+    }
+
     const [result] = await pool.query(
       `UPDATE bank_details 
        SET bank_name = ?, account_number = ?, branch_name = ?, 
@@ -1858,9 +1869,12 @@ router.put('/banks/:id', authenticate, async (req, res) => {
         [companyRows[0]?.id || null, id, direction, debit, credit, recalculatedCurrentBalance, req.user?.userId || null]
       );
     }
+    // The opening row was changed / added: refresh the running balances after it.
+    await refreshAccounts(pool, [{ account_type: 'BANK', bank_id: id }]);
     
     res.json({ message: 'Bank updated successfully', current_balance: recalculatedCurrentBalance });
   } catch (error) {
+    if (error.name === 'PeriodClosedError') return res.status(409).json({ error: error.message, code: error.code });
     console.error('Error updating bank:', error);
     if (error.code === 'ER_DUP_ENTRY') {
       return res.status(400).json({ error: 'Bank name already exists' });

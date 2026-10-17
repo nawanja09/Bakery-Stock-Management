@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { softDelete } = require('../services/softDelete');
 
 const getDamages = async (req, res) => {
   try {
@@ -10,7 +11,8 @@ const getDamages = async (req, res) => {
         (SELECT SUM(total_loss) FROM cutlery_damage_items WHERE damage_id = cd.id) as total_loss
       FROM cutlery_damages cd
       LEFT JOIN cutlery_locations cl ON cd.location_id = cl.id
-      LEFT JOIN users u ON cd.created_by = u.id
+      LEFT JOIN users u ON cd.created_by = u.id WHERE cd.is_deleted = 0
+      
       ORDER BY cd.damage_date DESC, cd.created_at DESC
     `);
     
@@ -135,7 +137,7 @@ const updateDamage = async (req, res) => {
 
     // Check if damage exists
     const [existingDamage] = await connection.query(
-      'SELECT * FROM cutlery_damages WHERE id = ?',
+      'SELECT * FROM cutlery_damages WHERE is_deleted = 0 AND id = ?',
       [id]
     );
 
@@ -219,7 +221,7 @@ const deleteDamage = async (req, res) => {
 
     // Check if damage exists
     const [existingDamage] = await connection.query(
-      'SELECT * FROM cutlery_damages WHERE id = ?',
+      'SELECT * FROM cutlery_damages WHERE is_deleted = 0 AND id = ?',
       [id]
     );
 
@@ -227,17 +229,9 @@ const deleteDamage = async (req, res) => {
       return res.status(404).json({ error: 'Damage record not found' });
     }
 
-    // Delete damage items (cascade should handle this, but we do it explicitly)
-    await connection.query(
-      'DELETE FROM cutlery_damage_items WHERE damage_id = ?',
-      [id]
-    );
-
-    // Delete damage
-    const [result] = await connection.query(
-      'DELETE FROM cutlery_damages WHERE id = ?',
-      [id]
-    );
+    // Soft delete: the damage record (and its items) stay in the database, flagged deleted, and drop out of
+    // every list and of the stock report.
+    await softDelete(connection, 'cutlery_damages', { id, userId: req.user?.userId });
 
     await connection.commit();
 
@@ -263,7 +257,7 @@ const getDamageWithItems = async (connection, damageId) => {
     FROM cutlery_damages cd
     LEFT JOIN cutlery_locations cl ON cd.location_id = cl.id
     LEFT JOIN users u ON cd.created_by = u.id
-    WHERE cd.id = ?
+    WHERE cd.is_deleted = 0 AND cd.id = ?
   `, [damageId]);
 
   // Get damage items with asset name
@@ -300,7 +294,7 @@ const getDamageById = async (req, res) => {
       FROM cutlery_damages cd
       LEFT JOIN cutlery_locations cl ON cd.location_id = cl.id
       LEFT JOIN users u ON cd.created_by = u.id
-      WHERE cd.id = ?
+      WHERE cd.is_deleted = 0 AND cd.id = ?
     `, [id]);
 
     if (damageRows.length === 0) {
@@ -335,7 +329,7 @@ const getDamageById = async (req, res) => {
 // Helper function to get form data for dropdowns
 const getDamageFormData = async (req, res) => {
   try {
-    const [locations] = await pool.query('SELECT id, location_id, location_name FROM cutlery_locations ORDER BY location_name');
+    const [locations] = await pool.query('SELECT id, location_id, location_name FROM cutlery_locations  WHERE is_deleted = 0 ORDER BY location_name');
     const [assets] = await pool.query('SELECT id, asset_id, asset_name FROM cutlery_assets ORDER BY asset_name');
     
     res.json({

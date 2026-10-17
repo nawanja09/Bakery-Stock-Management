@@ -404,7 +404,7 @@ const approveCollections = async (connection, { items, userId }) => {
     if (!companyId) {
       const chosen = optionalId(input.company_id);
       if (!chosen) throw new HttpError(400, `Select a company for collection ${label(row)}`);
-      const [company] = await connection.query('SELECT id FROM company WHERE id = ?', [chosen]);
+      const [company] = await connection.query('SELECT id FROM company WHERE is_deleted = 0 AND id = ?', [chosen]);
       if (!company.length) throw new HttpError(400, `Company not found for collection ${label(row)}`);
       companyId = company[0].id;
     }

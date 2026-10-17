@@ -1,5 +1,6 @@
 const pool = require('../config/db');
-const { recordCashTransaction, recordBankTransaction } = require('../utils/financeLedger');
+const { recordCashTransaction, recordBankTransaction, rebuildBalanceAfter } = require('../utils/financeLedger');
+const { PeriodClosedError } = require('./periodLock');
 const { toYmd, todayYmd } = require('../utils/dateOnly');
 
 const ensureChequeReleaseSchema = async () => {
@@ -91,22 +92,10 @@ const ensureChequeReleaseSchema = async () => {
   } catch (_) {}
 };
 
-const rebuildAccountBalance = async (connection, accountType, accountId) => {
-  const accountColumn = accountType === 'BANK' ? 'bank_id' : 'company_id';
-  const [rows] = await connection.query(
-    `SELECT COALESCE(SUM(debit - credit), 0) AS balance
-     FROM finance_transactions
-     WHERE status = 1 AND account_type = ? AND ${accountColumn} = ?`,
-    [accountType, accountId]
-  );
-  const balance = Number.parseFloat(rows[0]?.balance || 0);
-
-  if (accountType === 'BANK') {
-    await connection.query('UPDATE bank_details SET current_balance = ? WHERE id = ?', [balance, accountId]);
-  } else {
-    await connection.query('UPDATE cash_accounts SET current_balance = ? WHERE company_id = ?', [balance, accountId]);
-  }
-};
+// Refreshes the account's cached balance AND every row's stored running balance
+// (a release moves ledger rows to the release date).
+const rebuildAccountBalance = (connection, accountType, accountId) =>
+  rebuildBalanceAfter(connection, accountType, accountId);
 
 const getLedgerReferenceTypes = (sourceType) => {
   if (sourceType === 'PURCHASING_PAYMENT') return ['PURCHASE_PAYMENT', 'PURCHASING_PAYMENT'];
@@ -274,7 +263,9 @@ const resolveCashCompany = async (connection, source) => {
   return rows[0]?.company_id || null;
 };
 
-const postChequeRelease = async (connection, chequeOrId, releaseDate) => {
+// actorUserId = the signed-in user releasing it; system = the due-cheque job. Both are
+// only used by the period lock (the ledger rows stay attributed to source.created_by).
+const postChequeRelease = async (connection, chequeOrId, releaseDate, { actorUserId = null, system = false } = {}) => {
   let cheque = chequeOrId;
   if (typeof chequeOrId === 'number' || typeof chequeOrId === 'string') {
     const [rows] = await connection.query(
@@ -345,7 +336,9 @@ const postChequeRelease = async (connection, chequeOrId, releaseDate) => {
         partyName: cheque.name,
         referenceType: canonicalRef,
         referenceId,
-        createdBy: source.created_by
+        createdBy: source.created_by,
+        periodActor: actorUserId,
+        system
       });
       await rebuildAccountBalance(connection, 'BANK', source.bank_id);
     }
@@ -369,7 +362,9 @@ const postChequeRelease = async (connection, chequeOrId, releaseDate) => {
         partyName: cheque.name,
         referenceType: canonicalRef,
         referenceId,
-        createdBy: source.created_by
+        createdBy: source.created_by,
+        periodActor: actorUserId,
+        system
       });
     }
 
@@ -397,7 +392,9 @@ const postChequeRelease = async (connection, chequeOrId, releaseDate) => {
         partyName: cheque.name || source.party_name,
         referenceType: canonicalRef,
         referenceId,
-        createdBy: source.created_by
+        createdBy: source.created_by,
+        periodActor: actorUserId,
+        system
       });
     }
     await rebuildAccountBalance(connection, 'BANK', source.bank_id);
@@ -423,7 +420,9 @@ const postChequeRelease = async (connection, chequeOrId, releaseDate) => {
         partyName: cheque.name || source.party_name,
         referenceType: canonicalRef,
         referenceId,
-        createdBy: source.created_by
+        createdBy: source.created_by,
+        periodActor: actorUserId,
+        system
       });
     }
     if (companyId) {
@@ -494,10 +493,10 @@ const unreleaseCheque = async (connection, chequeOrId, newStatus = 'Pending') =>
   return true;
 };
 
-const postChequeIfDue = async (connection, cheque, today) => {
+const postChequeIfDue = async (connection, cheque, today, actorUserId = null) => {
   const releaseDate = toYmd(cheque.release_date);
   if (!releaseDate || releaseDate > today) return false;
-  return postChequeRelease(connection, cheque, releaseDate);
+  return postChequeRelease(connection, cheque, releaseDate, { actorUserId });
 };
 
 const processDueCheques = async () => {
@@ -516,7 +515,17 @@ const processDueCheques = async () => {
     );
 
     for (const cheque of cheques) {
-      await postChequeRelease(connection, cheque, cheque.release_date);
+      // A cheque whose release date is in a CLOSED month is not posted behind the
+      // closed books (services/periodLock.js): it stays Pending, and the other due
+      // cheques still go through. An Admin releases it once the month is re-opened.
+      await connection.query('SAVEPOINT due_cheque');
+      try {
+        await postChequeRelease(connection, cheque, cheque.release_date);
+      } catch (error) {
+        if (!(error instanceof PeriodClosedError)) throw error;
+        await connection.query('ROLLBACK TO SAVEPOINT due_cheque');
+        console.warn(`Cheque ${cheque.cheque_number || cheque.id} not released automatically: ${error.message}`);
+      }
     }
     await connection.commit();
   } catch (error) {

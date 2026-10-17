@@ -406,7 +406,7 @@ const getTransferFormData = async (req, res) => {
     const [locations] = await pool.query(`
       SELECT id, location_id, location_name 
       FROM cutlery_locations 
-      WHERE COALESCE(status, 1) = 1
+      WHERE is_deleted = 0 AND COALESCE(status, 1) = 1
       ORDER BY location_name
     `);
     

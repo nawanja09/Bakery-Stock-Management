@@ -10,6 +10,10 @@
 // A test that installs its own fake pool afterwards (require.cache) still wins.
 const path = require('path');
 
+// Period close (services/periodLock.js) is relative to "today": pin it so tests that use fixed
+// dates keep passing as the calendar moves (the open window is then Sept + Oct 2026).
+process.env.PERIOD_LOCK_TODAY = process.env.PERIOD_LOCK_TODAY || '2026-10-16';
+
 const dbPath = path.join(__dirname, '..', '..', 'config', 'db.js');
 const refuse = (what) => () => Promise.reject(new Error(
   `${what} was called from a unit test - unit tests run without a database (tests/helpers/noDatabase.js). `

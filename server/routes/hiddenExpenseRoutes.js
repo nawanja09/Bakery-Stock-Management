@@ -70,7 +70,7 @@ router.post('/', async (req, res) => {
   }
 
   try {
-    const [companies] = await pool.query('SELECT id FROM company WHERE id = ?', [company_id]);
+    const [companies] = await pool.query('SELECT id FROM company WHERE is_deleted = 0 AND id = ?', [company_id]);
     if (!companies.length) return res.status(400).json({ error: 'Selected Company does not exist' });
     // No Cash/Bank ledger call here by design — Hidden Expenses never
     // touch cash_transactions / bank_transactions / finance_transactions.
@@ -108,7 +108,7 @@ router.put('/:id', async (req, res) => {
   }
 
   try {
-    const [companies] = await pool.query('SELECT id FROM company WHERE id = ?', [company_id]);
+    const [companies] = await pool.query('SELECT id FROM company WHERE is_deleted = 0 AND id = ?', [company_id]);
     if (!companies.length) return res.status(400).json({ error: 'Selected Company does not exist' });
     // No Cash/Bank ledger call here by design.
     const [result] = await pool.query(

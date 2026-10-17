@@ -9,6 +9,7 @@
 // When released, ledger entries are posted using the release_date and account balances updated.
 
 const pool = require('../config/db');
+const { actorId } = require('../utils/actor');
 const { toYmd, todayYmd } = require('../utils/dateOnly');
 const {
   postChequeRelease,
@@ -123,7 +124,7 @@ const updateChequeRegistryRecord = async (req, res) => {
     // Handle transition to Released (either explicit status = 'Released' or setting release_date with status = 'Released')
     else if (requestedStatus === 'Released' && !isNowReturned) {
       const effectiveDate = requestedReleaseDate || toYmd(current.release_date) || todayYmd();
-      await postChequeRelease(connection, current, effectiveDate);
+      await postChequeRelease(connection, current, effectiveDate, { actorUserId: actorId(req) });
     }
     // Handle transition back to Pending/Unreleased
     else if (requestedStatus === 'Pending' && current.status === 'Released') {
@@ -131,7 +132,7 @@ const updateChequeRegistryRecord = async (req, res) => {
     }
     // If already released, but release date changed
     else if (current.status === 'Released' && requestedReleaseDate && requestedReleaseDate !== toYmd(current.release_date)) {
-      await postChequeRelease(connection, current, requestedReleaseDate);
+      await postChequeRelease(connection, current, requestedReleaseDate, { actorUserId: actorId(req) });
     }
 
     // Update metadata fields on expenses_cheque_registry

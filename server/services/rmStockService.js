@@ -76,7 +76,7 @@ const getAllItemsWithStock = async (connection = pool) => {
     ) purchase_returns ON i.id = purchase_returns.item_id
     LEFT JOIN (
       SELECT item_id, SUM(variance) AS total_adjusted
-      FROM stock_adjustments GROUP BY item_id
+      FROM stock_adjustments WHERE is_deleted = 0 GROUP BY item_id
     ) adjustments ON i.id = adjustments.item_id
     WHERE i.deleted = FALSE AND i.is_active = TRUE
   `);
@@ -107,7 +107,7 @@ const getItemStock = async (connection, itemId) => {
     LEFT JOIN (SELECT wi.item_id, SUM(wi.quantity) AS total_wasted FROM wastage_items wi JOIN wastages w ON wi.wastage_id = w.id AND COALESCE(w.status, 1) = 1 WHERE wi.item_id = ? GROUP BY wi.item_id) wastage ON i.id = wastage.item_id
     LEFT JOIN (SELECT ri.item_id, SUM(ri.quantity) AS total_returned FROM return_items ri JOIN returns r ON ri.return_id = r.id WHERE ri.item_id = ? GROUP BY ri.item_id) returns ON i.id = returns.item_id
     LEFT JOIN (SELECT pri.item_id, SUM(pri.quantity) AS total_purchase_returned FROM purchase_return_items pri JOIN purchase_returns pr ON pri.return_id = pr.id WHERE pri.item_id = ? GROUP BY pri.item_id) purchase_returns ON i.id = purchase_returns.item_id
-    LEFT JOIN (SELECT item_id, SUM(variance) AS total_adjusted FROM stock_adjustments WHERE item_id = ? GROUP BY item_id) adjustments ON i.id = adjustments.item_id
+    LEFT JOIN (SELECT item_id, SUM(variance) AS total_adjusted FROM stock_adjustments WHERE is_deleted = 0 AND item_id = ? GROUP BY item_id) adjustments ON i.id = adjustments.item_id
     WHERE i.id = ? AND i.deleted = FALSE
     `,
     [itemId, itemId, itemId, itemId, itemId, itemId, itemId, itemId]

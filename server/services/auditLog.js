@@ -88,6 +88,7 @@ const VERB_ACTIONS = {
   reject: 'REJECT',
   restore: 'RESTORE',
   cancel: 'CANCEL',
+  close: 'CLOSE',
   submit: 'SUBMIT',
   pay: 'PAY',
   'pay-multiple': 'PAY',

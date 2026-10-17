@@ -54,7 +54,10 @@ const MODULES = Object.freeze({
   // (posting to the ledgers) is Accountant only - see API_RULES.
   COLLECTION: 'collection',
   // Audit Trail page (who did what, from sign-in onward): Admin / Super Admin only.
-  AUDIT: 'audit'
+  AUDIT: 'audit',
+  // Period Close page (closed months, re-open requests): Admin / Super Admin only.
+  // Approving or rejecting a re-open request is Super Admin only - see API_RULES.
+  PERIOD_CLOSE: 'periodClose'
 });
 
 const M = MODULES;
@@ -62,7 +65,7 @@ const M = MODULES;
 // Everything except Analyst.
 const ADMIN_MODULES = [
   M.MANAGEMENT, M.RAW_MATERIAL, M.EXPENSES, M.FINANCE,
-  M.CUTLERY, M.FG_PRODUCTION, M.ADJUSTMENTS, M.VAT, M.SETTINGS, M.EMPLOYEES, M.COLLECTION, M.AUDIT
+  M.CUTLERY, M.FG_PRODUCTION, M.ADJUSTMENTS, M.VAT, M.SETTINGS, M.EMPLOYEES, M.COLLECTION, M.AUDIT, M.PERIOD_CLOSE
 ];
 
 // NOTE: `settings` is the "Settings / Admin" group, which only contains Change
@@ -211,7 +214,12 @@ const API_RULES = [
   { prefix: '/analyst', modules: [M.ANALYST] },
 
   // ---- Audit Trail (Admin / Super Admin; read-only) ------------------------
-  { prefix: '/audit-logs', modules: [M.AUDIT] }
+  { prefix: '/audit-logs', modules: [M.AUDIT] },
+
+  // ---- Period close (Admin / Super Admin; approve / reject = Super Admin only) ----------
+  { prefix: '/period-close', modules: [M.PERIOD_CLOSE] },
+  { prefix: '/period-close/approve', modules: [M.PERIOD_CLOSE], writeRoles: [ROLES.SUPER_ADMIN] },
+  { prefix: '/period-close/reject', modules: [M.PERIOD_CLOSE], writeRoles: [ROLES.SUPER_ADMIN] }
 ];
 
 const READ_METHODS = ['GET', 'HEAD', 'OPTIONS'];

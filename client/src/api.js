@@ -25,10 +25,22 @@ const isLoginRequest = config => {
   return path === '/login' || path === 'login' || path.endsWith('/api/login');
 };
 
+// Period close: the server refuses (409, code PERIOD_CLOSED) a change dated in a closed month.
+// Many pages answer any failure with a fixed text ("Failed to update..."), so the reason is
+// announced here too; PopupProvider shows it. Sent a tick later so it replaces, not precedes,
+// the page's own message.
+export const PERIOD_CLOSED_EVENT = 'bsms:period-closed';
+const announcePeriodClosed = (error) => {
+  const data = error.response?.data;
+  if (error.response?.status !== 409 || data?.code !== 'PERIOD_CLOSED') return;
+  setTimeout(() => window.dispatchEvent(new CustomEvent(PERIOD_CLOSED_EVENT, { detail: { message: data.error } })), 0);
+};
+
 // Handle 401 errors globally — token expired or invalid
 api.interceptors.response.use(
   response => response,
   error => {
+    announcePeriodClosed(error);
     if (
       error.response?.status === 403 &&
       error.response?.data?.error === 'You have view-only access. You do not have permission to edit or delete this information.'

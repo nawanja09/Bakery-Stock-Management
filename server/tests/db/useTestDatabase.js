@@ -46,3 +46,6 @@ try {
 // connects to the test database.
 process.env.DB_NAME = target;
 process.env.BSMS_TEST_DATABASE = target;
+// Period close (services/periodLock.js) is relative to "today". Pin it so tests that use fixed
+// dates keep passing as the calendar moves (the open window is then Sept + Oct 2026).
+process.env.PERIOD_LOCK_TODAY = process.env.PERIOD_LOCK_TODAY || '2026-10-16';

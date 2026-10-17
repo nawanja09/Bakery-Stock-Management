@@ -48,7 +48,8 @@ import {
   faIdCard,
   faSackDollar,
   faUserSecret,
-  faUserShield
+  faUserShield,
+  faCalendarCheck
 } from '@fortawesome/free-solid-svg-icons';
 import bakeryLogo from '../images/icon.jpeg';
 import api from '../api';
@@ -589,6 +590,16 @@ const NavigationBar = () => {
               <NavLink to="/audit-trail" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`} title="Audit Trail">
                 <span className="icon-container"><FontAwesomeIcon icon={faUserShield} /></span>
                 <span>Audit Trail</span>
+              </NavLink>
+            </li>
+          )}
+
+          {/* Period Close (Admin / Super Admin) */}
+          {can('/period-close') && (
+            <li>
+              <NavLink to="/period-close" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`} title="Period Close">
+                <span className="icon-container"><FontAwesomeIcon icon={faCalendarCheck} /></span>
+                <span>Period Close</span>
               </NavLink>
             </li>
           )}

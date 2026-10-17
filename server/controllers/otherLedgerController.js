@@ -80,7 +80,7 @@ const validateCompanyIds = async (queryable, raw) => {
   if (!ids.length || ids.some((id) => !Number.isInteger(id) || id <= 0)) {
     throw new OtherLedgerError('Select at least one company for this Other Ledger');
   }
-  const [rows] = await queryable.query('SELECT id FROM company WHERE id IN (?)', [ids]);
+  const [rows] = await queryable.query('SELECT id FROM company WHERE is_deleted = 0 AND id IN (?)', [ids]);
   if (rows.length !== ids.length) throw new OtherLedgerError('One or more selected companies were not found');
   return ids;
 };

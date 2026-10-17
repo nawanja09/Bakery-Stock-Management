@@ -1,13 +1,14 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
+const { softDelete, restoreByName, findUse, inUseMessage } = require('../services/softDelete');
 
 // Get all locations
 router.get('/', async (req, res) => {
   try {
     const [rows] = await pool.query(`
       SELECT * FROM cutlery_locations 
-      ORDER BY created_at DESC
+       WHERE is_deleted = 0 ORDER BY created_at DESC
     `);
     res.json(rows);
   } catch (err) {
@@ -23,6 +24,13 @@ router.post('/', async (req, res) => {
 
     if (!location_name) {
       return res.status(400).json({ error: 'Location name is required' });
+    }
+
+    // A deleted location with this name is brought back (its name is UNIQUE) instead of failing.
+    const restoredId = await restoreByName(pool, 'cutlery_locations', 'location_name', location_name, 'status = 1');
+    if (restoredId) {
+      const [[restored]] = await pool.query('SELECT id, location_id, location_name FROM cutlery_locations WHERE is_deleted = 0 AND id = ?', [restoredId]);
+      return res.status(201).json({ message: 'Location added successfully', location: restored });
     }
 
     // Get the next location ID (L001, L002, etc.)
@@ -68,12 +76,14 @@ router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-    const [result] = await pool.query(
-      'DELETE FROM cutlery_locations WHERE id = ?',
-      [id]
-    );
+    // Same protection the foreign keys gave the old hard delete: a location still in use stays.
+    const use = await findUse(pool, 'cutlery_locations', id);
+    if (use) return res.status(409).json({ error: inUseMessage('location', use) });
 
-    if (result.affectedRows === 0) {
+    const deleted = await softDelete(pool, 'cutlery_locations', { id, userId: req.user?.userId });
+    if (deleted) await pool.query('UPDATE cutlery_locations SET status = 0 WHERE id = ?', [id]);
+
+    if (deleted === 0) {
       return res.status(404).json({ error: 'Location not found' });
     }
 

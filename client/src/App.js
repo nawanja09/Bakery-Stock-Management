@@ -106,6 +106,7 @@ import FGRecipeReport from './components/FGProduction/FGRecipesReports';
 import AnalystPage from './components/Analyst/AnalystPage';
 import AnalystIncomePage from './components/Analyst/AnalystIncomePage';
 import AuditTrail from './components/AuditTrail/AuditTrail';
+import PeriodClose from './components/PeriodClose/PeriodClose';
 import IncomePage from './components/Income/IncomePage';
 
 import './App.css';
@@ -321,6 +322,7 @@ export const AppRoutes = () => {
             <Route path="analyst/balance-sheet" element={<AnalystRoute><AnalystPage /></AnalystRoute>} />
 
             <Route path="/audit-trail" element={<PermittedRoute><AuditTrail /></PermittedRoute>} />
+            <Route path="/period-close" element={<PermittedRoute><PeriodClose /></PermittedRoute>} />
 
             <Route path="/fg-production/recipes" element={<FgProductionRoute><FGRecipes /></FgProductionRoute>} />
             <Route path="/fg-production/reports" element={<FgProductionRoute><FGRecipeReport /></FgProductionRoute>} />

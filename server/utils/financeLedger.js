@@ -1,4 +1,6 @@
 const pool = require('../config/db');
+const periodLock = require('../services/periodLock');
+const { toYmd } = require('./dateOnly');
 
 class InsufficientBalanceError extends Error {
   constructor(message) {
@@ -69,6 +71,98 @@ const calculateRunningBalances = (rows = [], openingBalance = 0) => {
 };
 
 /**
+ * Re-computes the stored balance_after of every ACTIVE row of one account, in
+ * ledger order (transaction_date, created_at, id) - the order the Cash / Bank
+ * ledger screens show - and, with it, the account's cached current_balance.
+ *
+ * Call it after anything that changes a row's date, amount or status, and after
+ * posting a BACK-DATED row: that row sits in the middle of the ledger, so every
+ * row after it has a new running balance. Needs an open transaction.
+ */
+const rebuildBalanceAfter = async (connection, accountType, accountId) => {
+  const isBank = accountType === 'BANK';
+  const keyColumn = isBank ? 'bank_id' : 'company_id';
+  await connection.query(
+    `UPDATE finance_transactions ft
+       JOIN (
+         SELECT id,
+                SUM(CAST(debit AS DECIMAL(14,2)) - CAST(credit AS DECIMAL(14,2)))
+                  OVER (ORDER BY transaction_date, created_at, id ROWS UNBOUNDED PRECEDING) AS running
+           FROM finance_transactions
+          WHERE account_type = ? AND ${keyColumn} = ? AND status = 1
+       ) r ON r.id = ft.id
+        SET ft.balance_after = r.running
+      WHERE ft.balance_after <> r.running`,
+    [accountType, accountId]
+  );
+  const [rows] = await connection.query(
+    `SELECT COALESCE(SUM(CAST(debit AS DECIMAL(14,2)) - CAST(credit AS DECIMAL(14,2))), 0) AS balance
+       FROM finance_transactions WHERE account_type = ? AND ${keyColumn} = ? AND status = 1`,
+    [accountType, accountId]
+  );
+  const balance = Number(Number.parseFloat(rows[0]?.balance ?? 0).toFixed(2));
+  await connection.query(
+    isBank ? 'UPDATE bank_details SET current_balance = ? WHERE id = ?'
+           : 'UPDATE cash_accounts SET current_balance = ? WHERE company_id = ?',
+    [balance, accountId]
+  );
+  return balance;
+};
+
+/**
+ * balance_after for a row about to be inserted: the account's balance AFTER that
+ * row, in ledger order. A new row sorts after every row dated on or before its own
+ * date, so that is the sum of those rows plus the row itself - not the account's
+ * total, which also counts rows dated later.
+ */
+const balanceAtDate = async (connection, accountType, accountId, date, effect) => {
+  const keyColumn = accountType === 'BANK' ? 'bank_id' : 'company_id';
+  const [rows] = await connection.query(
+    `SELECT COALESCE(SUM(CAST(debit AS DECIMAL(14,2)) - CAST(credit AS DECIMAL(14,2))), 0) AS balance
+       FROM finance_transactions
+      WHERE account_type = ? AND ${keyColumn} = ? AND status = 1 AND transaction_date <= ?`,
+    [accountType, accountId, date]
+  );
+  return Number((Number.parseFloat(rows[0]?.balance ?? 0) + effect).toFixed(2));
+};
+
+const hasRowsAfterDate = async (connection, accountType, accountId, date) => {
+  const keyColumn = accountType === 'BANK' ? 'bank_id' : 'company_id';
+  const [rows] = await connection.query(
+    `SELECT 1 FROM finance_transactions
+      WHERE account_type = ? AND ${keyColumn} = ? AND status = 1 AND transaction_date > ? LIMIT 1`,
+    [accountType, accountId, date]
+  );
+  return rows.length > 0;
+};
+
+/** rebuildBalanceAfter for each distinct account in rows of { account_type, company_id, bank_id }. */
+const refreshAccounts = async (connection, accounts) => {
+  const done = new Set();
+  for (const account of accounts) {
+    const type = account.account_type;
+    const id = type === 'BANK' ? account.bank_id : account.company_id;
+    if (!type || !id || done.has(`${type}:${id}`)) continue;
+    done.add(`${type}:${id}`);
+    await rebuildBalanceAfter(connection, type, id);
+  }
+};
+
+/**
+ * After a ledger row was edited, moved to another date / account, or voided in
+ * place: refresh the stored running balances of every account that row touches
+ * (voided rows included) and of `before` (the account(s) it was in earlier).
+ */
+const refreshBalancesOfReference = async (connection, referenceTypes, referenceId, before = []) => {
+  const [rows] = await connection.query(
+    `SELECT DISTINCT account_type, company_id, bank_id FROM finance_transactions
+      WHERE reference_type IN (?) AND reference_id = ?`,
+    [[].concat(referenceTypes), referenceId]
+  );
+  await refreshAccounts(connection, [...before, ...rows]);
+};
+
+/**
  * Records a cash transaction and updates the running balance.
  * Requires an active transaction connection.
  */
@@ -84,8 +178,14 @@ const recordCashTransaction = async (connection, {
   partyName = null,
   referenceType = null,
   referenceId = null,
-  createdBy
+  createdBy,
+  periodActor = null,
+  system = false
 }) => {
+  // Period close: nothing is posted into a closed month (services/periodLock.js).
+  // periodActor = the signed-in user when the row is attributed to someone else.
+  await periodLock.assertOpen(connection, periodActor ?? createdBy, date, { system });
+
   const [balanceRows] = await connection.query(
     `SELECT COALESCE(SUM(CAST(debit AS DECIMAL(14,2)) - CAST(credit AS DECIMAL(14,2))), 0) AS current_balance
      FROM finance_transactions
@@ -97,6 +197,11 @@ const recordCashTransaction = async (connection, {
   const debitAmt = parseFloat(debit) || 0;
   const creditAmt = parseFloat(credit) || 0;
   const newBalance = Number((currentBalance + debitAmt - creditAmt).toFixed(2));
+  // The row's own balance_after is the balance at ITS date, not the account total.
+  const ymd = toYmd(date);
+  const balanceAfter = ymd
+    ? await balanceAtDate(connection, 'CASH', companyId, ymd, debitAmt - creditAmt)
+    : newBalance;
 
   const direction = debitAmt > 0 ? 'IN' : 'OUT';
 
@@ -108,7 +213,7 @@ const recordCashTransaction = async (connection, {
      VALUES ('CASH', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       companyId, date, transactionType, referenceNumber, invoiceNumber, partyName,
-      direction, remark, debitAmt, creditAmt, newBalance, referenceType, referenceId, createdBy
+      direction, remark, debitAmt, creditAmt, balanceAfter, referenceType, referenceId, createdBy
     ]
   );
 
@@ -116,6 +221,10 @@ const recordCashTransaction = async (connection, {
     'UPDATE cash_accounts SET current_balance = ? WHERE company_id = ?',
     [newBalance, companyId]
   );
+  // A back-dated row sits in the middle of the ledger: every later row's running balance changes.
+  if (ymd && await hasRowsAfterDate(connection, 'CASH', companyId, ymd)) {
+    await rebuildBalanceAfter(connection, 'CASH', companyId);
+  }
 
   return newBalance;
 };
@@ -136,8 +245,14 @@ const recordBankTransaction = async (connection, {
   partyName = null,
   referenceType = null,
   referenceId = null,
-  createdBy
+  createdBy,
+  periodActor = null,
+  system = false
 }) => {
+  // Period close: nothing is posted into a closed month (services/periodLock.js).
+  // periodActor = the signed-in user when the row is attributed to someone else.
+  await periodLock.assertOpen(connection, periodActor ?? createdBy, date, { system });
+
   const [bankRows] = await connection.query(
     "SELECT company FROM bank_details WHERE id = ? AND status = 'Active' AND COALESCE(record_status, 1) = 1 FOR UPDATE",
     [bankId]
@@ -163,6 +278,11 @@ const recordBankTransaction = async (connection, {
   const debitAmt = parseFloat(debit) || 0;
   const creditAmt = parseFloat(credit) || 0;
   const newBalance = Number((currentBalance + debitAmt - creditAmt).toFixed(2));
+  // The row's own balance_after is the balance at ITS date, not the account total.
+  const ymd = toYmd(date);
+  const balanceAfter = ymd
+    ? await balanceAtDate(connection, 'BANK', bankId, ymd, debitAmt - creditAmt)
+    : newBalance;
 
   const direction = debitAmt > 0 ? 'IN' : 'OUT';
 
@@ -174,7 +294,7 @@ const recordBankTransaction = async (connection, {
      VALUES ('BANK', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       companyId, bankId, date, transactionType, referenceNumber, invoiceNumber, partyName,
-      direction, remark, debitAmt, creditAmt, newBalance, referenceType, referenceId, createdBy
+      direction, remark, debitAmt, creditAmt, balanceAfter, referenceType, referenceId, createdBy
     ]
   );
 
@@ -182,6 +302,10 @@ const recordBankTransaction = async (connection, {
     'UPDATE bank_details SET current_balance = ? WHERE id = ?',
     [newBalance, bankId]
   );
+  // A back-dated row sits in the middle of the ledger: every later row's running balance changes.
+  if (ymd && await hasRowsAfterDate(connection, 'BANK', bankId, ymd)) {
+    await rebuildBalanceAfter(connection, 'BANK', bankId);
+  }
 
   return newBalance;
 };
@@ -192,5 +316,8 @@ module.exports = {
   calculateDateRangeBalance,
   calculateRunningBalances,
   recordCashTransaction,
-  recordBankTransaction
+  recordBankTransaction,
+  rebuildBalanceAfter,
+  refreshAccounts,
+  refreshBalancesOfReference
 };

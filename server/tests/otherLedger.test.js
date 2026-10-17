@@ -26,6 +26,9 @@ const connection = {
     if (/SELECT LAST_INSERT_ID/.test(s)) return [[{ id: 55 }]];
     if (/FROM finance_transactions WHERE account_type = 'CASH' AND company_id = \? AND status = 1 FOR UPDATE/.test(s)) return [[{ current_balance: 100000 }]];
     if (/FROM finance_transactions WHERE account_type = 'CASH' AND company_id = \? AND status = 1 ORDER BY/.test(s)) return [[]];
+    // balance at the row's own date (utils/financeLedger.balanceAtDate) = today's balance; nothing is dated later
+    if (/FROM finance_transactions WHERE account_type = \? AND company_id = \? AND status = 1 AND transaction_date <= \?/.test(s)) return [[{ balance: 100000 }]];
+    if (/FROM finance_transactions WHERE account_type = \? AND bank_id = \? AND status = 1 AND transaction_date <= \?/.test(s)) return [[{ balance: 50000 }]];
     if (/FROM finance_transactions WHERE id = \? AND account_type = 'CASH' AND reference_type = 'CASH_ISSUED'/.test(s)) return [[{ id: 55 }]];
     if (/FROM finance_transactions WHERE id = \? AND account_type = 'CASH' AND reference_type = \? AND status = 1/.test(s)) return [[{ id: 55, company_id: 1, status: 1 }]];
     if (/FROM other_ledger_company_map WHERE other_ledger_id = \? AND company_id = \?/.test(s)) return [mappedCompanies.includes(Number(params[1])) ? [{ 1: 1 }] : []];

@@ -76,7 +76,7 @@ const createCashIssued = async (req, res) => {
     const { date, amount, reference, remark } = readCommonFields(req.body);
 
     await connection.beginTransaction();
-    const [companies] = await connection.query('SELECT id FROM company WHERE id = ?', [companyId]);
+    const [companies] = await connection.query('SELECT id FROM company WHERE is_deleted = 0 AND id = ?', [companyId]);
     if (!companies.length) throw new ol.OtherLedgerError('Company not found', 404);
     await checkDuplicateReference(connection, reference, { includeLedger: true });
     const ledger = await ol.requireActiveLedger(connection, otherLedgerId, { companyId });

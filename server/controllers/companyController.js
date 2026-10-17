@@ -1,12 +1,13 @@
 //server/controllers/companyController.js
 
 const pool = require('../config/db');
+const { softDelete, findUse, inUseMessage } = require('../services/softDelete');
 
 // Get all companies
 const getAllCompanies = async (req, res) => {
   try {
     const [rows] = await pool.query(
-      'SELECT id, name, created_at FROM company ORDER BY name ASC'
+      'SELECT id, name, created_at FROM company  WHERE is_deleted = 0 ORDER BY name ASC'
     );
     res.json(rows);
   } catch (error) {
@@ -28,7 +29,7 @@ const createCompany = async (req, res) => {
 
     // The `company` table has no unique constraint on name, so check manually
     const [existing] = await pool.query(
-      'SELECT id FROM company WHERE LOWER(name) = LOWER(?)',
+      'SELECT id FROM company WHERE is_deleted = 0 AND LOWER(name) = LOWER(?)',
       [trimmedName]
     );
 
@@ -42,7 +43,7 @@ const createCompany = async (req, res) => {
     );
 
     const [rows] = await pool.query(
-      'SELECT id, name, created_at FROM company WHERE id = ?',
+      'SELECT id, name, created_at FROM company WHERE is_deleted = 0 AND id = ?',
       [result.insertId]
     );
 
@@ -72,7 +73,7 @@ const updateCompany = async (req, res) => {
 
     const trimmedName = name.trim();
     const [existing] = await pool.query(
-      'SELECT id FROM company WHERE LOWER(name) = LOWER(?) AND id != ?',
+      'SELECT id FROM company WHERE is_deleted = 0 AND LOWER(name) = LOWER(?) AND id != ?',
       [trimmedName, id]
     );
 
@@ -102,9 +103,22 @@ const updateCompany = async (req, res) => {
 const deleteCompany = async (req, res) => {
   try {
     const { id } = req.params;
-    const [result] = await pool.query('DELETE FROM company WHERE id = ?', [id]);
+    // A company with cash / bank books, invoices or other records stays: the foreign keys used to refuse it.
+    const use = await findUse(pool, 'company', id, { extra: [
+      { table: 'purchases', column: 'company_id', where: 'COALESCE(deleted, 0) = 0' },
+      { table: 'expenses', column: 'company_id', where: 'is_deleted = 0' },
+      { table: 'finance_transactions', column: 'company_id', where: 'status = 1' },
+      { table: 'petty_cash_vouchers', column: 'company_id', where: 'is_deleted = 0' },
+      { table: 'cash_expenses', column: 'company_id', where: 'status = 1' },
+      { table: 'bank_charges', column: 'company_id', where: 'is_deleted = 0' },
+      { table: 'cheque_expenses', column: 'company_id', where: 'is_deleted = 0' },
+      { table: 'collections', column: 'company_id' }
+    ] });
+    if (use) return res.status(409).json({ error: inUseMessage('company', use) });
 
-    if (result.affectedRows === 0) {
+    const deleted = await softDelete(pool, 'company', { id, userId: req.user?.userId });
+
+    if (deleted === 0) {
       return res.status(404).json({ error: 'Company not found' });
     }
 

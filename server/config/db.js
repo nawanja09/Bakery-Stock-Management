@@ -485,6 +485,35 @@ const ensureStockAdjustmentCreatedBy = async () => {
 };
 pool.stockAdjustmentSchemaReady = ensureStockAdjustmentCreatedBy();
 
+// Period close (services/periodLock.js): requests to re-open a closed month.
+// See migrations/038_period_reopen_requests.sql.
+const ensurePeriodLockSchema = async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS period_reopen_requests (
+        id INT NOT NULL AUTO_INCREMENT,
+        period_from DATE NOT NULL,
+        period_to DATE NOT NULL,
+        reason VARCHAR(500) NOT NULL,
+        status ENUM('Pending','Approved','Rejected','Closed') NOT NULL DEFAULT 'Pending',
+        requested_by INT NOT NULL,
+        requested_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        decided_by INT NULL,
+        decided_at DATETIME NULL,
+        decision_note VARCHAR(500) NULL,
+        expires_at DATETIME NULL,
+        closed_by INT NULL,
+        closed_at DATETIME NULL,
+        PRIMARY KEY (id),
+        KEY idx_period_reopen_status (status, expires_at)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+  } catch (error) {
+    console.warn('period_reopen_requests schema check skipped:', error.message);
+  }
+};
+pool.periodLockSchemaReady = ensurePeriodLockSchema();
+
 // Audit Trail (append-only) - services/auditLog.js, migrations/037_audit_log.sql.
 pool.auditLogSchemaReady = require('../services/auditLog').ensureAuditLogSchema(pool)
   .catch((error) => console.warn('audit_log schema check skipped:', error.message));
