@@ -479,11 +479,41 @@ pool.paymentHistorySchemaReady = ensurePaymentHistorySchema();
 const ensureStockAdjustmentCreatedBy = async () => {
   try {
     await pool.query('ALTER TABLE stock_adjustments ADD COLUMN IF NOT EXISTS created_by INT NULL');
+    // Soft delete (audit H5): a deleted adjustment stays in the table, flagged, with who / when / why.
+    // See migrations/039_stock_adjustments_soft_delete.sql.
+    for (const table of ['stock_adjustments', 'stock_movements']) {
+      await pool.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS is_deleted TINYINT(1) NOT NULL DEFAULT 0`);
+      await pool.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS deleted_at DATETIME NULL`);
+      await pool.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS deleted_by INT NULL`);
+    }
+    await pool.query('ALTER TABLE stock_adjustments ADD COLUMN IF NOT EXISTS delete_reason VARCHAR(500) NULL');
   } catch (error) {
-    console.warn('stock_adjustments.created_by schema check skipped:', error.message);
+    console.warn('stock_adjustments soft-delete schema check skipped:', error.message);
   }
 };
 pool.stockAdjustmentSchemaReady = ensureStockAdjustmentCreatedBy();
+
+// Item lines replaced when an invoice / note is edited are copied here first (services/lineHistory.js).
+const ensureLineHistorySchema = async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS record_line_history (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        source_table VARCHAR(60) NOT NULL,
+        record_id INT NOT NULL,
+        line_count INT NOT NULL,
+        lines_json LONGTEXT NOT NULL,
+        archived_by INT NULL,
+        archived_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        KEY idx_line_history_record (source_table, record_id, archived_at)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+  } catch (error) {
+    console.warn('record_line_history schema check skipped:', error.message);
+  }
+};
+pool.lineHistorySchemaReady = ensureLineHistorySchema();
 
 // Period close (services/periodLock.js): requests to re-open a closed month.
 // See migrations/038_period_reopen_requests.sql.

@@ -5,6 +5,7 @@
 // impact of a Cash Receive (Other Ledger) or Cash Issued (see otherLedgerService
 // and financeController / cashIssuedController). Balances are always derived.
 const pool = require('../config/db');
+const { archiveLines } = require('../services/lineHistory');
 const {
   OtherLedgerError,
   normalizeName,
@@ -190,7 +191,7 @@ const createOtherLedger = async (req, res) => {
 
 // Replaces a ledger's company links. A company that already has active entries
 // on this ledger cannot be unlinked - its history and balance must stay valid.
-const syncCompanyLinks = async (connection, ledgerId, companyIds) => {
+const syncCompanyLinks = async (connection, ledgerId, companyIds, userId = null) => {
   const [current] = await connection.query(
     'SELECT company_id FROM other_ledger_company_map WHERE other_ledger_id = ? FOR UPDATE', [ledgerId]
   );
@@ -204,6 +205,7 @@ const syncCompanyLinks = async (connection, ledgerId, companyIds) => {
     if (used.length) {
       throw new OtherLedgerError(`Cannot unlink ${used.map((r) => r.name).join(', ')}: this ledger already has transactions for that company`);
     }
+    await archiveLines(connection, 'other_ledger_company_map', ledgerId, { userId, extraWhere: 'company_id IN (?)', extraParams: [removed] });
     await connection.query(
       'DELETE FROM other_ledger_company_map WHERE other_ledger_id = ? AND company_id IN (?)', [ledgerId, removed]
     );
@@ -228,7 +230,7 @@ const updateOtherLedger = async (req, res) => {
     }
     await connection.query('UPDATE other_ledgers SET name = ? WHERE id = ?', [name, req.params.id]);
     if (req.body?.company_ids !== undefined) {
-      await syncCompanyLinks(connection, rows[0].id, await validateCompanyIds(connection, req.body.company_ids));
+      await syncCompanyLinks(connection, rows[0].id, await validateCompanyIds(connection, req.body.company_ids), req.user?.userId ?? null);
     }
 
     // Cash / Bank Ledger rows created by this feature show the ledger name as

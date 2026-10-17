@@ -1,6 +1,7 @@
 const pool = require('../config/db');
 const { isRmAdjustmentRequest, recordRmAdjustment, sameItems, sameValue } = require('../utils/rmAdjustmentAudit');
 const { actorId, approverName } = require('../utils/actor');
+const { archiveLines } = require('../services/lineHistory');
 
 // Create new issuance
 const createIssuance = async (req, res) => {
@@ -235,7 +236,8 @@ const updateIssuance = async (req, res) => {
       [datetime, department_id, received_by, remarks, approved_by, check_number, id]
     );
 
-    // Delete existing items
+    // Replace the lines: the old ones are kept in record_line_history first
+    await archiveLines(connection, 'issuance_items', id, { userId: editorId });
     await connection.query(
       `DELETE FROM issuance_items WHERE issuance_id = ?`,
       [id]
@@ -307,7 +309,7 @@ const getItemsWithStock = async (req, res) => {
         COALESCE(
           (SELECT SUM(sa.variance)
            FROM stock_adjustments sa
-           WHERE sa.item_id = i.id AND DATE(sa.date) <= CURDATE()
+           WHERE sa.is_deleted = 0 AND sa.item_id = i.id AND DATE(sa.date) <= CURDATE()
           ), 0
         ) -
         COALESCE(

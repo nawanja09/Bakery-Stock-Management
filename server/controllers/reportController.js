@@ -132,7 +132,7 @@ const getStockReport = async (req, res) => {
         LEFT JOIN (
           SELECT item_id, SUM(variance) AS total_adjusted
           FROM stock_adjustments
-          WHERE DATE(date) <= ?
+          WHERE is_deleted = 0 AND DATE(date) <= ?
           GROUP BY item_id
         ) adjustments ON i2.id = adjustments.item_id
         WHERE i2.deleted = FALSE
@@ -182,7 +182,7 @@ const getStockReport = async (req, res) => {
       LEFT JOIN (
         SELECT item_id, SUM(variance) AS total_adjusted
         FROM stock_adjustments
-        WHERE DATE(date) = ?
+        WHERE is_deleted = 0 AND DATE(date) = ?
         GROUP BY item_id
       ) adjustments ON i.id = adjustments.item_id
       WHERE i.auto_add_to_stock = 1
@@ -389,14 +389,14 @@ const getStockReportByRangeAndItem = async (req, res) => {
       ? await pool.query(
           `SELECT SUM(variance) AS adjusted
            FROM stock_adjustments
-           WHERE item_id = ? AND DATE(date) < ?`,
+           WHERE is_deleted = 0 AND item_id = ? AND DATE(date) < ?`,
           [itemId, startDate]
         )
       : await pool.query(
           `SELECT SUM(variance) AS adjusted
            FROM stock_adjustments sa
            JOIN items it ON sa.item_id = it.id
-           WHERE it.auto_add_to_stock = 1 AND (it.deleted = FALSE OR it.deleted IS NULL)
+           WHERE sa.is_deleted = 0 AND it.auto_add_to_stock = 1 AND (it.deleted = FALSE OR it.deleted IS NULL)
              AND DATE(sa.date) < ?`,
           [startDate]
         );
@@ -527,14 +527,14 @@ const getStockReportByRangeAndItem = async (req, res) => {
         ? await pool.query(
             `SELECT SUM(variance) AS adjusted
              FROM stock_adjustments
-             WHERE item_id = ? AND DATE(date) = ?`,
+             WHERE is_deleted = 0 AND item_id = ? AND DATE(date) = ?`,
             [itemId, date]
           )
         : await pool.query(
             `SELECT SUM(variance) AS adjusted
              FROM stock_adjustments sa
              JOIN items it ON sa.item_id = it.id
-             WHERE it.auto_add_to_stock = 1 AND (it.deleted = FALSE OR it.deleted IS NULL)
+             WHERE sa.is_deleted = 0 AND it.auto_add_to_stock = 1 AND (it.deleted = FALSE OR it.deleted IS NULL)
                AND DATE(sa.date) = ?`,
             [date]
           );

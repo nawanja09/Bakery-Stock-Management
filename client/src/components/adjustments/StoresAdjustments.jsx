@@ -242,7 +242,7 @@ const StoresAdjustments = () => {
       isOpen: true,
       type: 'danger',
       title: 'Confirm Delete',
-      message: `Are you sure you want to delete adjustment #${adjustment.id}? This action cannot be undone.`,
+      message: `Delete adjustment #${adjustment.id}? It is taken out of the stock and the reports, but the record is kept in the database (with your name and the time).`,
       onConfirm: () => confirmDelete(adjustment.id)
     });
   };

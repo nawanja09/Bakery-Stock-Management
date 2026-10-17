@@ -3,6 +3,7 @@ const { recordRmAdjustment, recordFinancialAdjustment, sameValue } = require('..
 const { checkDuplicateReference } = require('../services/referenceValidationService');
 const otherLedgerService = require('../services/otherLedgerService');
 const { actorId, approverName } = require('../utils/actor');
+const { softDelete } = require('../services/softDelete');
 
 const FINANCIAL_ADJUSTMENT_CATEGORIES = new Set(['Cash Receive', 'Bank Receive']);
 const FINANCIAL_ADJUSTMENT_SOURCES = new Set(['finance', 'card']);
@@ -402,7 +403,7 @@ const getAdjustments = async (req, res) => {
       FROM stock_adjustments sa
       JOIN items i ON sa.item_id = i.id
       LEFT JOIN users cu ON cu.id = sa.created_by
-      WHERE 1=1
+      WHERE sa.is_deleted = 0
     `;
 
     const params = [];
@@ -460,7 +461,7 @@ const getRmAdjustmentSummary = async (req, res) => {
         FROM rm_adjustment_records rar
         JOIN stock_adjustments sa ON sa.id = rar.source_record_id
         JOIN items i ON i.id = sa.item_id
-        WHERE rar.category = 'Department'`;
+        WHERE rar.category = 'Department' AND sa.is_deleted = 0`;
       const params = [];
       if (startDate) { query += ' AND DATE(rar.updated_at) >= ?'; params.push(startDate); }
       if (endDate) { query += ' AND DATE(rar.updated_at) <= ?'; params.push(endDate); }
@@ -666,7 +667,7 @@ const getSystemQuantity = async (req, res) => {
       LEFT JOIN (
         SELECT item_id, SUM(variance) AS total_adjusted
         FROM stock_adjustments
-        WHERE item_id = ?
+        WHERE is_deleted = 0 AND item_id = ?
         GROUP BY item_id
       ) adjustments ON i.id = adjustments.item_id
       WHERE i.id = ? AND i.deleted = FALSE
@@ -716,7 +717,7 @@ const getAdjustmentById = async (req, res) => {
       FROM stock_adjustments sa
       JOIN items i ON sa.item_id = i.id
       LEFT JOIN users cu ON cu.id = sa.created_by
-      WHERE sa.id = ?`,
+      WHERE sa.id = ? AND sa.is_deleted = 0`,
       [id]
     );
     
@@ -755,7 +756,7 @@ const updateAdjustment = async (req, res) => {
     const user_name = await approverName(connection, req, req.body.approved_by);
 
     const [existingRows] = await connection.query(
-      `SELECT item_id, request_id FROM stock_adjustments WHERE id = ? FOR UPDATE`,
+      `SELECT item_id, request_id FROM stock_adjustments WHERE id = ? AND is_deleted = 0 FOR UPDATE`,
       [id]
     );
 
@@ -801,24 +802,31 @@ const updateAdjustment = async (req, res) => {
   }
 };
 
+// Soft delete: the adjustment and its stock movement stay in the database, flagged
+// is_deleted = 1 with who deleted it, when and why; stock, lists and reports no longer count them.
 const deleteAdjustment = async (req, res) => {
   const { id } = req.params;
+  const deletedBy = actorId(req);
+  if (!deletedBy) return res.status(401).json({ error: 'Please log in again' });
+  const reason = String(req.body?.reason ?? '').trim().slice(0, 500) || null;
 
   const connection = await pool.getConnection();
 
   try {
     await connection.beginTransaction();
 
-    const [result] = await connection.query('DELETE FROM stock_adjustments WHERE id = ?', [id]);
+    const deleted = await softDelete(connection, 'stock_adjustments', { id, userId: deletedBy });
 
-    if (result.affectedRows === 0) {
+    if (deleted === 0) {
       await connection.rollback();
-      return res.status(404).json({ error: 'Adjustment not found' });
+      return res.status(404).json({ error: 'Adjustment not found or already deleted' });
     }
+    await connection.query('UPDATE stock_adjustments SET delete_reason = ? WHERE id = ?', [reason, id]);
 
     await connection.query(
-      `DELETE FROM stock_movements WHERE reference_type = 'stock_adjustments' AND reference_id = ?`,
-      [id]
+      `UPDATE stock_movements SET is_deleted = 1, deleted_at = NOW(), deleted_by = ?
+        WHERE reference_type = 'stock_adjustments' AND reference_id = ? AND is_deleted = 0`,
+      [deletedBy, id]
     );
 
     await connection.commit();

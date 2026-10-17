@@ -49,7 +49,7 @@ const conn = {
     }
     if (s.startsWith('UPDATE bank_details SET current_balance')) return [{}];
 
-    if (s.startsWith('SELECT id, name FROM departments WHERE id IN')) {
+    if (s.startsWith('SELECT id, name FROM departments WHERE is_deleted = 0 AND id IN')) {
       return [params[0].filter(id => db.departments[id]).map(id => ({ id, name: db.departments[id] }))];
     }
     if (s.startsWith('SELECT id, department_id, rate FROM credit_card_rates WHERE status = 1')) {

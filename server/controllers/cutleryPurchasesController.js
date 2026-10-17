@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { archiveLines } = require('../services/lineHistory');
 
 const getPurchases = async (req, res) => {
   try {
@@ -234,7 +235,8 @@ const updatePurchase = async (req, res) => {
 
     // Update items if provided
     if (items && Array.isArray(items)) {
-      // Delete existing items
+      // Replace the lines: the old ones are kept in record_line_history first
+      await archiveLines(connection, 'cutlery_purchase_items', id, { userId: req.user?.userId });
       await connection.query(
         'DELETE FROM cutlery_purchase_items WHERE purchase_id = ?',
         [id]

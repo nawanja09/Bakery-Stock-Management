@@ -328,6 +328,12 @@ const auditTrail = (req, res, next) => {
     if (target && res.locals.auditBefore !== undefined) {
       try {
         newValues = await takeSnapshot(db(), target);
+        // A soft delete keeps the row and flags it (is_deleted 0 -> 1, services/softDelete.js):
+        // record it as deleted, the same as a row that was removed.
+        if (newValues && req.method === 'DELETE'
+            && Number(res.locals.auditBefore?.row?.is_deleted) === 0 && Number(newValues.row?.is_deleted) === 1) {
+          newValues = null;
+        }
       } catch (error) {
         newValues = undefined;
       }

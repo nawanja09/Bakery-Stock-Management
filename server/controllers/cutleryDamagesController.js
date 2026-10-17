@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { archiveLines } = require('../services/lineHistory');
 const { softDelete } = require('../services/softDelete');
 
 const getDamages = async (req, res) => {
@@ -175,7 +176,8 @@ const updateDamage = async (req, res) => {
 
     // Update items if provided
     if (items && Array.isArray(items)) {
-      // Delete existing items
+      // Replace the lines: the old ones are kept in record_line_history first
+      await archiveLines(connection, 'cutlery_damage_items', id, { userId: req.user?.userId });
       await connection.query(
         'DELETE FROM cutlery_damage_items WHERE damage_id = ?',
         [id]

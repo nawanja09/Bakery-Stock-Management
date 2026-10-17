@@ -560,108 +560,6 @@ const getStockReportByAsset = async (req, res) => {
   }
 };
 
-// Test function to verify stock logic
-const testStockLogic = async (req, res) => {
-  try {
-    // Create test scenario
-    const testDate = req.query.date || new Date().toISOString().split('T')[0];
-    
-    // 1. Add a test purchase
-    const [testAsset] = await pool.query('SELECT id FROM cutlery_assets LIMIT 1');
-    const [testUser] = await pool.query('SELECT id FROM users LIMIT 1');
-    const [storesLocation] = await pool.query('SELECT id FROM cutlery_locations WHERE location_name = "Stores" LIMIT 1');
-    const [cafeLocation] = await pool.query('SELECT id FROM cutlery_locations WHERE location_name LIKE "%Café%" LIMIT 1');
-    
-    if (!testAsset[0] || !testUser[0] || !storesLocation[0] || !cafeLocation[0]) {
-      return res.json({
-        success: false,
-        message: 'Missing test data'
-      });
-    }
-    
-    const assetId = testAsset[0].id;
-    const userId = testUser[0].id;
-    const storesId = storesLocation[0].id;
-    const cafeId = cafeLocation[0].id;
-    
-    // Clean up any existing test data
-    await pool.query('DELETE FROM cutlery_purchases WHERE invoice_number LIKE "TEST-%"');
-    await pool.query('DELETE FROM cutlery_transfers WHERE transfer_id LIKE "TEST-%"');
-    await pool.query('DELETE FROM cutlery_damages WHERE damage_id LIKE "TEST-%"');
-    
-    // Create test purchase (10 units to Stores)
-    const purchaseResult = await pool.query(
-      `INSERT INTO cutlery_purchases 
-       (purchase_id, purchase_date, supplier_id, invoice_number, total_amount, payment_status, created_by) 
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      ['TEST-P001', testDate, 1, 'TEST-PURCHASE-001', 1000.00, 'PAID', userId]
-    );
-    
-    await pool.query(
-      `INSERT INTO cutlery_purchase_items (purchase_id, asset_id, quantity, unit_price)
-       VALUES (?, ?, ?, ?)`,
-      [purchaseResult[0].insertId, assetId, 10, 100.00]
-    );
-    
-    // Create test transfer (5 units from Stores to Café)
-    const transferResult = await pool.query(
-      `INSERT INTO cutlery_transfers 
-       (transfer_id, transfer_date, location_from_id, location_to_id, transferred_by, status, created_by) 
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      ['TEST-T001', testDate, storesId, cafeId, 'Test User', 'Completed', userId]
-    );
-    
-    await pool.query(
-      `INSERT INTO cutlery_transfer_items (transfer_id, asset_id, quantity)
-       VALUES (?, ?, ?)`,
-      [transferResult[0].insertId, assetId, 5]
-    );
-    
-    // Create test damage (2 units at Café)
-    const damageResult = await pool.query(
-      `INSERT INTO cutlery_damages 
-       (damage_id, damage_date, location_id, reason, reported_by, status, created_by) 
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      ['TEST-D001', testDate, cafeId, 'Broken', 'Test User', 'Reported', userId]
-    );
-    
-    await pool.query(
-      `INSERT INTO cutlery_damage_items (damage_id, asset_id, quantity, unit_price)
-       VALUES (?, ?, ?, ?)`,
-      [damageResult[0].insertId, assetId, 2, 100.00]
-    );
-    
-    // Calculate expected stock
-    const expectedStock = {
-      Stores: 10 - 5, // Purchase 10, transfer out 5
-      Café: 5 - 2 // Transfer in 5, damage 2
-    };
-    
-    // Get actual stock from our calculation
-    const stockReport = await getStockReportInternal(testDate);
-    
-    res.json({
-      success: true,
-      test_scenario: {
-        purchase: '10 units to Stores',
-        transfer: '5 units from Stores to Café',
-        damage: '2 units at Café'
-      },
-      expected_stock: expectedStock,
-      calculated_stock: stockReport,
-      message: 'Test completed. Check expected vs calculated stock.'
-    });
-    
-  } catch (err) {
-    console.error('Test error:', err);
-    res.status(500).json({ 
-      success: false,
-      error: 'Test failed',
-      message: err.message 
-    });
-  }
-};
-
 // Helper function for internal stock calculation
 async function getStockReportInternal(dateStr) {
   const [locations] = await pool.query('SELECT id, location_name FROM cutlery_locations');
@@ -747,6 +645,5 @@ async function getStockReportInternal(dateStr) {
 module.exports = {
   getStockReport,
   getStockReportByDateRange,
-  getStockReportByAsset,
-  testStockLogic
+  getStockReportByAsset
 };

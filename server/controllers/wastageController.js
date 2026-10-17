@@ -2,6 +2,7 @@ const pool = require('../config/db');
 const { v4: uuidv4 } = require('uuid');
 const { isRmAdjustmentRequest, recordRmAdjustment, sameItems, sameValue } = require('../utils/rmAdjustmentAudit');
 const { actorId, approverName } = require('../utils/actor');
+const { archiveLines } = require('../services/lineHistory');
 
 // Create wastage
 const createWastage = async (req, res) => {
@@ -225,7 +226,8 @@ const updateWastage = async (req, res) => {
       [date, approved_by, reason, remarks, id]
     );
 
-    // Delete existing items
+    // Replace the lines: the old ones are kept in record_line_history first
+    await archiveLines(connection, 'wastage_items', id, { userId: actorId(req) });
     await connection.query(
       `DELETE FROM wastage_items WHERE wastage_id = ?`,
       [id]

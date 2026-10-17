@@ -1,6 +1,7 @@
 // controllers/purchaseController.js
 const pool = require('../config/db');
 const { actorId } = require('../utils/actor');
+const { archiveLines } = require('../services/lineHistory');
 const { normalizePaymentMethodValue } = require('../utils/paymentMethodUtils');
 const { recordCashTransaction, recordBankTransaction, refreshBalancesOfReference } = require('../utils/financeLedger');
 const { checkDuplicateReference, DuplicateReferenceError } = require('../services/referenceValidationService');
@@ -583,6 +584,8 @@ const updatePurchase = async (req, res) => {
        payment_method, check_number, remarks, resolvedPreparedBy, company_id, normalizedPaymentStatus, id]
     );
 
+    // Replace the lines: the old ones are kept in record_line_history first
+    await archiveLines(connection, 'purchase_items', id, { userId: resolvedPreparedBy });
     await connection.query(`DELETE FROM purchase_items WHERE purchase_id = ?`, [id]);
 
     for (const item of items) {
