@@ -2,6 +2,7 @@ const pool = require('../config/db');
 const periodLock = require('../services/periodLock');
 const requestContext = require('../services/requestContext');
 const { toYmd } = require('./dateOnly');
+const moneyMath = require('./money');
 
 class InsufficientBalanceError extends Error {
   constructor(message) {
@@ -45,8 +46,7 @@ const getCashBalance = async (companyId) => {
     [companyId]
   );
 
-  const balance = Number.parseFloat(rows[0]?.balance ?? 0) || 0;
-  return Number(balance.toFixed(2));
+  return moneyMath.round2(rows[0]?.balance);
 };
 
 /**
@@ -62,20 +62,17 @@ const getBankBalance = async (bankId) => {
     [bankId]
   );
 
-  const balance = Number.parseFloat(rows[0]?.balance ?? 0) || 0;
-  return Number(balance.toFixed(2));
+  return moneyMath.round2(rows[0]?.balance);
 };
 
-const safeNumber = (value) => {
-  const parsed = Number.parseFloat(value ?? 0);
-  return Number.isFinite(parsed) ? parsed : 0;
-};
+// Exact decimal parse (utils/money.js): not a number -> 0, otherwise at most 4 decimals.
+const safeNumber = (value) => moneyMath.round(value);
 
 const calculateDateRangeBalance = ({ closingBalance = 0, creditAfterDate = 0, debitAfterDate = 0 }) => {
   const base = safeNumber(closingBalance);
   const credits = safeNumber(creditAfterDate);
   const debits = safeNumber(debitAfterDate);
-  return Number((base + debits - credits).toFixed(2));
+  return moneyMath.round2(moneyMath.sub(moneyMath.add(base, debits), credits));
 };
 
 const calculateRunningBalances = (rows = [], openingBalance = 0) => {
@@ -84,7 +81,7 @@ const calculateRunningBalances = (rows = [], openingBalance = 0) => {
   return rows.map((row) => {
     const debit = safeNumber(row.debit);
     const credit = safeNumber(row.credit);
-    previousBalance = Number((previousBalance + debit - credit).toFixed(2));
+    previousBalance = moneyMath.round2(moneyMath.sub(moneyMath.add(previousBalance, debit), credit));
 
     return {
       ...row,
@@ -123,7 +120,7 @@ const rebuildBalanceAfter = async (connection, accountType, accountId) => {
        FROM finance_transactions WHERE account_type = ? AND ${keyColumn} = ? AND status = 1`,
     [accountType, accountId]
   );
-  const balance = Number(Number.parseFloat(rows[0]?.balance ?? 0).toFixed(2));
+  const balance = moneyMath.round2(rows[0]?.balance);
   await connection.query(
     isBank ? 'UPDATE bank_details SET current_balance = ? WHERE id = ?'
            : 'UPDATE cash_accounts SET current_balance = ? WHERE company_id = ?',
@@ -146,7 +143,7 @@ const balanceAtDate = async (connection, accountType, accountId, date, effect) =
       WHERE account_type = ? AND ${keyColumn} = ? AND status = 1 AND transaction_date <= ?`,
     [accountType, accountId, date]
   );
-  return Number((Number.parseFloat(rows[0]?.balance ?? 0) + effect).toFixed(2));
+  return moneyMath.round2(moneyMath.add(rows[0]?.balance, effect));
 };
 
 const hasRowsAfterDate = async (connection, accountType, accountId, date) => {
@@ -216,17 +213,17 @@ const recordCashTransaction = async (connection, {
     [companyId]
   );
 
-  const currentBalance = Number.parseFloat(balanceRows[0]?.current_balance ?? 0) || 0;
-  const debitAmt = parseFloat(debit) || 0;
-  const creditAmt = parseFloat(credit) || 0;
-  const newBalance = Number((currentBalance + debitAmt - creditAmt).toFixed(2));
+  const currentBalance = moneyMath.round2(balanceRows[0]?.current_balance);
+  const debitAmt = moneyMath.round2(debit);
+  const creditAmt = moneyMath.round2(credit);
+  const newBalance = moneyMath.round2(moneyMath.sub(moneyMath.add(currentBalance, debitAmt), creditAmt));
   // The row's own balance_after is the balance at ITS date, not the account total.
   const ymd = toYmd(date);
   const balanceAfter = ymd
-    ? await balanceAtDate(connection, 'CASH', companyId, ymd, debitAmt - creditAmt)
+    ? await balanceAtDate(connection, 'CASH', companyId, ymd, moneyMath.sub(debitAmt, creditAmt))
     : newBalance;
 
-  if (cashOverdrawn(currentBalance, newBalance)) throw refuseOverdraft(currentBalance, newBalance, creditAmt - debitAmt);
+  if (cashOverdrawn(currentBalance, newBalance)) throw refuseOverdraft(currentBalance, newBalance, moneyMath.sub(creditAmt, debitAmt));
 
   const direction = debitAmt > 0 ? 'IN' : 'OUT';
 
@@ -294,19 +291,19 @@ const recordBankTransaction = async (connection, {
     [bankId]
   );
 
-  const currentBalance = Number.parseFloat(balanceRows[0]?.current_balance ?? 0) || 0;
+  const currentBalance = moneyMath.round2(balanceRows[0]?.current_balance);
   const companyName = bankRows[0].company;
 
   const [compRows] = await connection.query('SELECT id FROM company WHERE name = ?', [companyName]);
   const companyId = compRows.length ? compRows[0].id : 1;
 
-  const debitAmt = parseFloat(debit) || 0;
-  const creditAmt = parseFloat(credit) || 0;
-  const newBalance = Number((currentBalance + debitAmt - creditAmt).toFixed(2));
+  const debitAmt = moneyMath.round2(debit);
+  const creditAmt = moneyMath.round2(credit);
+  const newBalance = moneyMath.round2(moneyMath.sub(moneyMath.add(currentBalance, debitAmt), creditAmt));
   // The row's own balance_after is the balance at ITS date, not the account total.
   const ymd = toYmd(date);
   const balanceAfter = ymd
-    ? await balanceAtDate(connection, 'BANK', bankId, ymd, debitAmt - creditAmt)
+    ? await balanceAtDate(connection, 'BANK', bankId, ymd, moneyMath.sub(debitAmt, creditAmt))
     : newBalance;
 
   const direction = debitAmt > 0 ? 'IN' : 'OUT';

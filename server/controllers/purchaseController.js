@@ -9,6 +9,7 @@ const { checkDuplicateReference, DuplicateReferenceError } = require('../service
 const { isRmAdjustmentRequest, recordRmAdjustment, sameItems, sameValue } = require('../utils/rmAdjustmentAudit');
 const { SETTLEMENT_PAYMENT_METHODS, isSettlementPaymentMethod } = require('../services/settlementPaymentMethods');
 const { DocumentError, preparePricedLines, totalPricedLines } = require('../utils/documentLines');
+const moneyMath = require('../utils/money');
 
 // Advance / purchase-return settlements moved no money from Cash or Bank, so
 // Purchasing Payment adjustments (which re-post the ledger) must not touch them.
@@ -17,9 +18,10 @@ const SETTLEMENT_NOT_ADJUSTABLE =
   + 'so it cannot be changed in Purchasing Payment adjustments.';
 
 const calculatePaymentState = (paidAmount, totalAmount) => {
-  const parsedPaidAmount = parseFloat(paidAmount) || 0;
-  const parsedTotalAmount = parseFloat(totalAmount) || 0;
-  const balanceAmount = parsedTotalAmount - parsedPaidAmount;
+  // Exact decimal arithmetic (utils/money.js), stored rounded to the DECIMAL(10,2) columns.
+  const parsedPaidAmount = moneyMath.round2(paidAmount);
+  const parsedTotalAmount = moneyMath.round2(totalAmount);
+  const balanceAmount = moneyMath.round2(moneyMath.sub(parsedTotalAmount, parsedPaidAmount));
   const balanceStatus = balanceAmount > 0 ? 1 : 0;
 
   let paymentStatus = 'Non-Paid';
@@ -38,14 +40,14 @@ const calculatePaymentState = (paidAmount, totalAmount) => {
 };
 
 const resolveInvoiceTotalAmount = (purchaseRow = {}) => {
-  const parsedTotalWithVat = parseFloat(purchaseRow.total_with_vat) || 0;
-  const parsedBillAmount = parseFloat(purchaseRow.bill_amount) || 0;
-  const parsedSubtotal = parseFloat(purchaseRow.subtotal) || 0;
-  const parsedVatAmount = parseFloat(purchaseRow.vat_amount) || 0;
+  const parsedTotalWithVat = moneyMath.round2(purchaseRow.total_with_vat);
+  const parsedBillAmount = moneyMath.round2(purchaseRow.bill_amount);
+  const parsedSubtotal = moneyMath.round2(purchaseRow.subtotal);
+  const parsedVatAmount = moneyMath.round2(purchaseRow.vat_amount);
 
   if (parsedTotalWithVat > 0) return parsedTotalWithVat;
   if (parsedBillAmount > 0) return parsedBillAmount;
-  return parsedSubtotal + parsedVatAmount;
+  return moneyMath.add(parsedSubtotal, parsedVatAmount);
 };
 
 // The true amount paid toward a specific invoice is the SUM of what was actually
@@ -523,8 +525,8 @@ const getPurchaseById = async (req, res) => {
       payments: payments || [],
       returns: returns || [],
       summary: {
-        total_paid: payments.reduce((sum, p) => sum + parseFloat(p.paid_amount ?? p.amount), 0),
-        total_returns: returns.reduce((sum, r) => sum + parseFloat(r.return_total), 0),
+        total_paid: payments.reduce((sum, p) => moneyMath.add(sum, p.paid_amount ?? p.amount), 0),
+        total_returns: returns.reduce((sum, r) => moneyMath.add(sum, r.return_total), 0),
         net_paid: parseFloat(purchase[0].paid_amount),
         net_balance: parseFloat(purchase[0].balance_amount)
       }
@@ -1476,8 +1478,8 @@ const addSettlementToReturn = async (req, res) => {
       }
     }
 
-    const totalSettledAmount = currentSettledAmount + newSettledAmount;
-    const newBalanceAmount = totalAmount - totalSettledAmount;
+    const totalSettledAmount = moneyMath.add(currentSettledAmount, newSettledAmount);
+    const newBalanceAmount = moneyMath.sub(totalAmount, totalSettledAmount);
 
     await connection.query(
       `UPDATE purchase_returns 
@@ -1515,7 +1517,7 @@ const addSettlementToReturn = async (req, res) => {
         }
 
         const newBalance = Math.max(0, currentBalance - settlementAmount);
-        const newPaid = Math.min(currentPaid + settlementAmount, invoiceTotal);
+        const newPaid = Math.min(moneyMath.add(currentPaid, settlementAmount), invoiceTotal);
         const newBalanceStatus = newBalance > 0 ? 1 : 0;
 
         let paymentStatus = 'Non-Paid';

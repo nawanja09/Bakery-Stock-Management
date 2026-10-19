@@ -154,16 +154,18 @@ const pickAmountRaw = (raw, aliases) => {
 };
 
 // "1,250.50" / 1250.5 / "1250.50" -> 1250.5 ; garbage -> NaN ; missing -> 0.
+const money = require('../utils/money');
+
 const toMoney = (value) => {
   if (isEmpty(value)) return 0;
-  if (typeof value === 'number') return Number.isFinite(value) ? Number(value.toFixed(2)) : NaN;
+  if (typeof value === 'number') return Number.isFinite(value) ? money.round2(value) : NaN;
   if (typeof value !== 'string') return NaN;
   const cleaned = value.trim().replace(/,/g, '').replace(/^(rs\.?|lkr)\s*/i, '');
   if (!/^[-+]?\d+(\.\d+)?$/.test(cleaned)) return NaN;
-  return Number(Number(cleaned).toFixed(2));
+  return money.round2(cleaned);
 };
 
-const round2 = (n) => Number((Number(n) || 0).toFixed(2));
+const round2 = (n) => money.round2(n);
 
 const BUSINESS_TIMEZONE = () => process.env.RAVON_POS_TIMEZONE || 'Asia/Colombo';
 

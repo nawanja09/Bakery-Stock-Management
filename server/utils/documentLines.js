@@ -1,4 +1,5 @@
 const { toYmd } = require('./dateOnly');
+const money = require('./money');
 
 class DocumentError extends Error {
   constructor(message, status = 400) {
@@ -130,16 +131,20 @@ const preparePricedLines = async (connection, items) => {
 // the client claims the totals are (audit finding R7). VAT applies only to a line
 // whose item is vat_applicable, and only when the supplier is VAT-registered.
 const totalPricedLines = (lines, { vatRate = 0, supplierVatRegistered = false } = {}) => {
+  // Exact decimal arithmetic carried at 4 decimals (utils/money.js); rounded to the 2 decimals the
+  // purchases columns store only at the end, so the stored total is always subtotal + VAT.
   let subtotal = 0;
   let vatAmount = 0;
   for (const line of lines) {
-    const amount = Number((line.quantity * line.unitPrice).toFixed(2));
-    subtotal = Number((subtotal + amount).toFixed(2));
+    const amount = money.mul(line.quantity, line.unitPrice);
+    subtotal = money.add(subtotal, amount);
     if (supplierVatRegistered && line.vatApplicable) {
-      vatAmount = Number((vatAmount + amount * (vatRate / 100)).toFixed(2));
+      vatAmount = money.add(vatAmount, money.percent(amount, vatRate));
     }
   }
-  return { subtotal, vatAmount, totalWithVat: Number((subtotal + vatAmount).toFixed(2)) };
+  const roundedSubtotal = money.round2(subtotal);
+  const roundedVat = money.round2(vatAmount);
+  return { subtotal: roundedSubtotal, vatAmount: roundedVat, totalWithVat: money.round2(money.add(roundedSubtotal, roundedVat)) };
 };
 
 module.exports = {

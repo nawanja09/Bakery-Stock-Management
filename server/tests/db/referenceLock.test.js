@@ -41,11 +41,11 @@ const saveWith = async (check, ref, pauseMs) => {
 
 test.before(async () => {
   await pool.referenceLocksSchemaReady;
-  await pool.query('DELETE FROM petty_cash_reimbursements WHERE reference_number LIKE ?', [`${PREFIX}%`]);
+  await pool.query('DELETE FROM petty_cash_reimbursements WHERE TRIM(reference_number) LIKE ?', [`${PREFIX}%`]);
 });
 
 test.after(async () => {
-  await pool.query('DELETE FROM petty_cash_reimbursements WHERE reference_number LIKE ?', [`${PREFIX}%`]);
+  await pool.query('DELETE FROM petty_cash_reimbursements WHERE TRIM(reference_number) LIKE ?', [`${PREFIX}%`]);
   await pool.end();
 });
 
