@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { currentStockSql } = require('../services/stockRules');
 const { isRmAdjustmentRequest, recordRmAdjustment, sameItems, sameValue } = require('../utils/rmAdjustmentAudit');
 const { actorId, approverName } = require('../utils/actor');
 const { archiveLines } = require('../services/lineHistory');
@@ -311,48 +312,21 @@ const updateIssuance = async (req, res) => {
 // Get items with current stock
 const getItemsWithStock = async (req, res) => {
   try {
+    // The same number the availability check enforces when the issuance is saved
+    // (services/stockAvailability.js -> rmStockService -> services/stockRules.js). This list used to
+    // ignore returns and purchase returns and cut off at today, so it could offer more than a save accepted.
+    const { joins, expr, params } = currentStockSql();
     const [items] = await pool.query(`
-      SELECT 
+      SELECT
         i.*,
-        COALESCE(
-          (SELECT SUM(ob.quantity) 
-           FROM opening_balances ob 
-           WHERE ob.item_id = i.id AND ob.date <= CURDATE()
-          ), 0
-        ) + 
-        COALESCE(
-          (SELECT SUM(pi.quantity) 
-           FROM purchase_items pi 
-           JOIN purchases p ON pi.purchase_id = p.id 
-           WHERE pi.item_id = i.id AND DATE(p.purchase_date) <= CURDATE()
-          ), 0
-        ) - 
-        COALESCE(
-          (SELECT SUM(ii.quantity) 
-           FROM issuance_items ii 
-           JOIN issuances iss ON ii.issuance_id = iss.id 
-           WHERE ii.item_id = i.id AND DATE(iss.issuance_date) <= CURDATE()
-          ), 0
-        ) +
-        COALESCE(
-          (SELECT SUM(sa.variance)
-           FROM stock_adjustments sa
-           WHERE sa.is_deleted = 0 AND sa.status = 'Approved' AND sa.item_id = i.id AND DATE(sa.date) <= CURDATE()
-          ), 0
-        ) -
-        COALESCE(
-          (SELECT SUM(wi.quantity) 
-           FROM wastage_items wi 
-           JOIN wastages w ON wi.wastage_id = w.id AND COALESCE(w.status, 1) = 1 
-           WHERE wi.item_id = i.id AND w.date <= CURDATE()
-          ), 0
-        ) AS current_stock
+        ${expr} AS current_stock
       FROM items i
+      ${joins}
       WHERE i.deleted = FALSE
         AND i.is_active = TRUE
       ORDER BY i.name
-    `);
-    
+    `, params);
+
     res.json(items);
   } catch (error) {
     console.error('Error fetching items with stock:', error);

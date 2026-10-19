@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { RULES } = require('../services/stockRules');
 const { sendServerError } = require('../utils/safeError');
 const { normalizePaymentMethodValue } = require('../utils/paymentMethodUtils');
 const { loadExpenseRecords, dateFilters } = require('./analystController');
@@ -70,7 +71,7 @@ const getStockReport = async (req, res) => {
           FROM purchase_items pi
           JOIN purchases p ON pi.purchase_id = p.id
           WHERE pi.item_id = i.id 
-            AND DATE(p.purchase_date) <= ?
+            AND DATE(p.purchase_date) <= ? AND ${RULES.purchases('p')}
           ORDER BY p.purchase_date DESC, pi.id DESC 
           LIMIT 1
         ) AS unit_price
@@ -99,7 +100,7 @@ const getStockReport = async (req, res) => {
           FROM purchase_items pi
           JOIN purchases p ON pi.purchase_id = p.id
           JOIN items i ON pi.item_id = i.id
-          WHERE DATE(p.purchase_date) <= ? AND (p.deleted = FALSE OR p.deleted IS NULL)
+          WHERE DATE(p.purchase_date) <= ? AND ${RULES.purchases('p')}
           GROUP BY i.id
         ) purchases ON i2.id = purchases.item_id
         LEFT JOIN (
@@ -112,7 +113,7 @@ const getStockReport = async (req, res) => {
         LEFT JOIN (
           SELECT wi.item_id, SUM(wi.quantity) AS total_wasted
           FROM wastage_items wi
-          JOIN wastages w ON wi.wastage_id = w.id AND COALESCE(w.status, 1) = 1
+          JOIN wastages w ON wi.wastage_id = w.id AND ${RULES.wastage('w')}
           WHERE DATE(w.date) <= ?
           GROUP BY wi.item_id
         ) wastage ON i2.id = wastage.item_id
@@ -133,7 +134,7 @@ const getStockReport = async (req, res) => {
         LEFT JOIN (
           SELECT item_id, SUM(variance) AS total_adjusted
           FROM stock_adjustments
-          WHERE is_deleted = 0 AND status = 'Approved' AND DATE(date) <= ?
+          WHERE ${RULES.adjustments('stock_adjustments')} AND DATE(date) <= ?
           GROUP BY item_id
         ) adjustments ON i2.id = adjustments.item_id
         WHERE i2.deleted = FALSE
@@ -149,7 +150,7 @@ const getStockReport = async (req, res) => {
         FROM purchase_items pi
         JOIN purchases p ON pi.purchase_id = p.id
         JOIN items i ON pi.item_id = i.id
-        WHERE DATE(p.purchase_date) = ? AND (p.deleted = FALSE OR p.deleted IS NULL)
+        WHERE DATE(p.purchase_date) = ? AND ${RULES.purchases('p')}
         GROUP BY i.id
       ) purchases ON i.id = purchases.item_id
       LEFT JOIN (
@@ -162,7 +163,7 @@ const getStockReport = async (req, res) => {
       LEFT JOIN (
         SELECT wi.item_id, SUM(wi.quantity) AS total_wasted
         FROM wastage_items wi
-        JOIN wastages w ON wi.wastage_id = w.id AND COALESCE(w.status, 1) = 1
+        JOIN wastages w ON wi.wastage_id = w.id AND ${RULES.wastage('w')}
         WHERE DATE(w.date) = ?
         GROUP BY wi.item_id
       ) wastage ON i.id = wastage.item_id
@@ -183,7 +184,7 @@ const getStockReport = async (req, res) => {
       LEFT JOIN (
         SELECT item_id, SUM(variance) AS total_adjusted
         FROM stock_adjustments
-        WHERE is_deleted = 0 AND status = 'Approved' AND DATE(date) = ?
+        WHERE ${RULES.adjustments('stock_adjustments')} AND DATE(date) = ?
         GROUP BY item_id
       ) adjustments ON i.id = adjustments.item_id
       WHERE i.auto_add_to_stock = 1
@@ -301,7 +302,7 @@ const getStockReportByRangeAndItem = async (req, res) => {
           `SELECT SUM(pi.quantity) AS purchased
            FROM purchase_items pi
            JOIN purchases p ON pi.purchase_id = p.id
-           WHERE pi.item_id = ? AND DATE(p.purchase_date) < ? AND (p.deleted = FALSE OR p.deleted IS NULL)`,
+           WHERE pi.item_id = ? AND DATE(p.purchase_date) < ? AND ${RULES.purchases('p')}`,
           [itemId, startDate]
         )
       : await pool.query(
@@ -310,7 +311,7 @@ const getStockReportByRangeAndItem = async (req, res) => {
            JOIN purchases p ON pi.purchase_id = p.id
            JOIN items i ON pi.item_id = i.id
            WHERE i.auto_add_to_stock = 1 AND (i.deleted = FALSE OR i.deleted IS NULL)
-             AND DATE(p.purchase_date) < ? AND (p.deleted = FALSE OR p.deleted IS NULL)`,
+             AND DATE(p.purchase_date) < ? AND ${RULES.purchases('p')}`,
           [startDate]
         );
 
@@ -336,14 +337,14 @@ const getStockReportByRangeAndItem = async (req, res) => {
       ? await pool.query(
           `SELECT SUM(wi.quantity) AS wasted
            FROM wastage_items wi
-           JOIN wastages w ON wi.wastage_id = w.id AND COALESCE(w.status, 1) = 1
+           JOIN wastages w ON wi.wastage_id = w.id AND ${RULES.wastage('w')}
            WHERE wi.item_id = ? AND DATE(w.date) < ?`,
           [itemId, startDate]
         )
       : await pool.query(
           `SELECT SUM(wi.quantity) AS wasted
            FROM wastage_items wi
-           JOIN wastages w ON wi.wastage_id = w.id AND COALESCE(w.status, 1) = 1
+           JOIN wastages w ON wi.wastage_id = w.id AND ${RULES.wastage('w')}
            JOIN items it ON wi.item_id = it.id
            WHERE it.auto_add_to_stock = 1 AND (it.deleted = FALSE OR it.deleted IS NULL)
              AND DATE(w.date) < ?`,
@@ -390,14 +391,14 @@ const getStockReportByRangeAndItem = async (req, res) => {
       ? await pool.query(
           `SELECT SUM(variance) AS adjusted
            FROM stock_adjustments
-           WHERE is_deleted = 0 AND status = 'Approved' AND item_id = ? AND DATE(date) < ?`,
+           WHERE ${RULES.adjustments('stock_adjustments')} AND item_id = ? AND DATE(date) < ?`,
           [itemId, startDate]
         )
       : await pool.query(
           `SELECT SUM(variance) AS adjusted
            FROM stock_adjustments sa
            JOIN items it ON sa.item_id = it.id
-           WHERE sa.is_deleted = 0 AND sa.status = 'Approved' AND it.auto_add_to_stock = 1 AND (it.deleted = FALSE OR it.deleted IS NULL)
+           WHERE ${RULES.adjustments('sa')} AND it.auto_add_to_stock = 1 AND (it.deleted = FALSE OR it.deleted IS NULL)
              AND DATE(sa.date) < ?`,
           [startDate]
         );
@@ -439,7 +440,7 @@ const getStockReportByRangeAndItem = async (req, res) => {
             `SELECT SUM(pi.quantity) AS purchased
              FROM purchase_items pi
              JOIN purchases p ON pi.purchase_id = p.id
-             WHERE pi.item_id = ? AND DATE(p.purchase_date) = ? AND (p.deleted = FALSE OR p.deleted IS NULL)`,
+             WHERE pi.item_id = ? AND DATE(p.purchase_date) = ? AND ${RULES.purchases('p')}`,
             [itemId, date]
           )
         : await pool.query(
@@ -448,7 +449,7 @@ const getStockReportByRangeAndItem = async (req, res) => {
              JOIN purchases p ON pi.purchase_id = p.id
              JOIN items i ON pi.item_id = i.id
              WHERE i.auto_add_to_stock = 1 AND (i.deleted = FALSE OR i.deleted IS NULL)
-               AND DATE(p.purchase_date) = ? AND (p.deleted = FALSE OR p.deleted IS NULL)`,
+               AND DATE(p.purchase_date) = ? AND ${RULES.purchases('p')}`,
             [date]
           );
 
@@ -474,14 +475,14 @@ const getStockReportByRangeAndItem = async (req, res) => {
         ? await pool.query(
             `SELECT SUM(wi.quantity) AS wasted
              FROM wastage_items wi
-             JOIN wastages w ON wi.wastage_id = w.id AND COALESCE(w.status, 1) = 1
+             JOIN wastages w ON wi.wastage_id = w.id AND ${RULES.wastage('w')}
              WHERE wi.item_id = ? AND DATE(w.date) = ?`,
             [itemId, date]
           )
         : await pool.query(
             `SELECT SUM(wi.quantity) AS wasted
              FROM wastage_items wi
-             JOIN wastages w ON wi.wastage_id = w.id AND COALESCE(w.status, 1) = 1
+             JOIN wastages w ON wi.wastage_id = w.id AND ${RULES.wastage('w')}
              JOIN items it ON wi.item_id = it.id
              WHERE it.auto_add_to_stock = 1 AND (it.deleted = FALSE OR it.deleted IS NULL)
                AND DATE(w.date) = ?`,
@@ -528,14 +529,14 @@ const getStockReportByRangeAndItem = async (req, res) => {
         ? await pool.query(
             `SELECT SUM(variance) AS adjusted
              FROM stock_adjustments
-             WHERE is_deleted = 0 AND status = 'Approved' AND item_id = ? AND DATE(date) = ?`,
+             WHERE ${RULES.adjustments('stock_adjustments')} AND item_id = ? AND DATE(date) = ?`,
             [itemId, date]
           )
         : await pool.query(
             `SELECT SUM(variance) AS adjusted
              FROM stock_adjustments sa
              JOIN items it ON sa.item_id = it.id
-             WHERE sa.is_deleted = 0 AND sa.status = 'Approved' AND it.auto_add_to_stock = 1 AND (it.deleted = FALSE OR it.deleted IS NULL)
+             WHERE ${RULES.adjustments('sa')} AND it.auto_add_to_stock = 1 AND (it.deleted = FALSE OR it.deleted IS NULL)
                AND DATE(sa.date) = ?`,
             [date]
           );
@@ -592,7 +593,7 @@ const getDailyPurchaseTransactions = async (req, res) => {
       JOIN supplier s ON p.supplier_id = s.id
       WHERE DATE(p.purchase_date) = ? 
         AND pi.item_id = ?
-        AND (p.deleted = FALSE OR p.deleted IS NULL)
+        AND ${RULES.purchases('p')}
       ORDER BY p.invoice_no
     `, [date, itemId]);
 
@@ -653,7 +654,7 @@ const getDailyWastageTransactions = async (req, res) => {
         wi.estimated_loss
       FROM wastages w
       JOIN wastage_items wi ON w.id = wi.wastage_id
-      WHERE DATE(w.date) = ? 
+      WHERE DATE(w.date) = ? AND ${RULES.wastage('w')}
         AND wi.item_id = ?
       ORDER BY w.wastage_note_number
     `, [date, itemId]);
@@ -803,7 +804,7 @@ const getPurchasingReport = async (req, res) => {
       -- ✅ LEFT JOIN to payment_history for actual payments
       LEFT JOIN payment_history ph ON p.id = ph.purchase_id
       WHERE p.purchase_date BETWEEN ? AND ?
-        AND (p.deleted = FALSE OR p.deleted IS NULL)
+        AND ${RULES.purchases('p')}
       GROUP BY 
         p.id, p.invoice_no, p.purchase_date, s.name, s.vat_number,
         p.payment_method, p.total_with_vat, p.bill_amount, p.check_number,
@@ -888,7 +889,7 @@ const getPurchasingReport = async (req, res) => {
       -- ✅ LEFT JOIN to payment_history for actual payments
       LEFT JOIN payment_history ph ON p.id = ph.purchase_id
       WHERE COALESCE(p.invoice_date, p.purchase_date) BETWEEN ? AND ?
-        AND (p.deleted = FALSE OR p.deleted IS NULL)
+        AND ${RULES.purchases('p')}
     `;
 
     const params = [startDate, endDate];
@@ -1020,7 +1021,7 @@ const getWastageReport = async (req, res) => {
         COALESCE(u.name, u.username) AS entered_by
       FROM wastages w
       JOIN users u ON w.entered_by = u.id
-      WHERE w.date BETWEEN ? AND ?
+      WHERE w.date BETWEEN ? AND ? AND ${RULES.wastage('w')}
       ORDER BY w.date ASC, w.id ASC
     `, [startDate, endDate]);
 
@@ -1479,7 +1480,7 @@ const getPurchaseReport = async (req, res) => {
         LEFT JOIN purchase_payment_allocations ppa ON ppa.payment_history_id = ph.id
         GROUP BY COALESCE(ppa.purchase_id, ph.purchase_id)
       ) pay ON pay.purchase_id = p.id
-      WHERE (p.deleted = FALSE OR p.deleted IS NULL)
+      WHERE ${RULES.purchases('p')}
     `;
 
     const params = [];

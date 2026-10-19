@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { RULES } = require('../services/stockRules');
 
 const VALID_METHODS = new Set(['all', 'petty_cash', 'bank_charges', 'cash_expenses', 'hidden_expenses', 'purchasing', 'other_expenses']);
 const isValidDate = (value) => /^\d{4}-\d{2}-\d{2}$/.test(value || '') && !Number.isNaN(Date.parse(`${value}T00:00:00Z`));
@@ -223,7 +224,7 @@ const getBalanceSheet = async (req, res) => {
             SELECT pi.unit_price
             FROM purchase_items pi
             JOIN purchases p ON pi.purchase_id = p.id
-            WHERE pi.item_id = i.id AND DATE(p.purchase_date) <= ?
+            WHERE pi.item_id = i.id AND DATE(p.purchase_date) <= ? AND ${RULES.purchases('p')}
             ORDER BY p.purchase_date DESC, pi.id DESC
             LIMIT 1
           ) AS unit_price
@@ -238,7 +239,7 @@ const getBalanceSheet = async (req, res) => {
           SELECT pi.item_id, SUM(pi.quantity) AS total_purchased
           FROM purchase_items pi
           JOIN purchases p ON pi.purchase_id = p.id
-          WHERE DATE(p.purchase_date) <= ? AND (p.deleted = FALSE OR p.deleted IS NULL)
+          WHERE DATE(p.purchase_date) <= ? AND ${RULES.purchases('p')}
           GROUP BY pi.item_id
         ) purchases ON purchases.item_id = i.id
         LEFT JOIN (
@@ -251,7 +252,7 @@ const getBalanceSheet = async (req, res) => {
         LEFT JOIN (
           SELECT wi.item_id, SUM(wi.quantity) AS total_wasted
           FROM wastage_items wi
-          JOIN wastages w ON wi.wastage_id = w.id AND COALESCE(w.status, 1) = 1
+          JOIN wastages w ON wi.wastage_id = w.id AND ${RULES.wastage('w')}
           WHERE DATE(w.date) <= ?
           GROUP BY wi.item_id
         ) wastage ON wastage.item_id = i.id
@@ -272,7 +273,7 @@ const getBalanceSheet = async (req, res) => {
         LEFT JOIN (
           SELECT item_id, SUM(variance) AS total_adjusted
           FROM stock_adjustments
-          WHERE is_deleted = 0 AND status = 'Approved' AND DATE(date) <= ?
+          WHERE ${RULES.adjustments('stock_adjustments')} AND DATE(date) <= ?
           GROUP BY item_id
         ) adjustments ON adjustments.item_id = i.id
         WHERE i.auto_add_to_stock = 1

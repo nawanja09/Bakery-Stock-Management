@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { currentStockSql } = require('../services/stockRules');
 
 const VALID_UNITS = new Set(['kg', 'g', 'L', 'ml', 'quantity']);
 
@@ -85,40 +86,21 @@ const getAllItems = async (req, res) => {
   try {
     const { auto_add_only, include_inactive } = req.query;
 
+    const stock = currentStockSql();
     let query = `
-      SELECT 
-        i.id, 
-        i.item_code, 
-        i.name, 
+      SELECT
+        i.id,
+        i.item_code,
+        i.name,
         i.unit,
         i.item_type,
         i.vat_applicable,
         i.auto_add_to_stock,
         i.reorder_level,
         i.is_active,
-        COALESCE(
-          (SELECT COALESCE(SUM(quantity), 0) FROM opening_balances WHERE item_id = i.id) +
-          (SELECT COALESCE(SUM(pi.quantity), 0) 
-           FROM purchase_items pi 
-           JOIN purchases p ON pi.purchase_id = p.id 
-           WHERE pi.item_id = i.id) -
-          (SELECT COALESCE(SUM(ii.quantity), 0) 
-           FROM issuance_items ii 
-           JOIN issuances iss ON ii.issuance_id = iss.id 
-           WHERE ii.item_id = i.id) -
-          (SELECT COALESCE(SUM(wi.quantity), 0) 
-           FROM wastage_items wi 
-           JOIN wastages w ON wi.wastage_id = w.id AND COALESCE(w.status, 1) = 1 
-           WHERE wi.item_id = i.id) +
-          (SELECT COALESCE(SUM(ri.quantity), 0) 
-           FROM return_items ri 
-           JOIN returns r ON ri.return_id = r.id 
-           WHERE ri.item_id = i.id) +
-          (SELECT COALESCE(SUM(sa.variance), 0)
-           FROM stock_adjustments sa
-           WHERE sa.is_deleted = 0 AND sa.status = 'Approved' AND sa.item_id = i.id),
-        0) AS current_stock
+        ${stock.expr} AS current_stock
       FROM items i
+      ${stock.joins}
       WHERE i.deleted = FALSE
     `;
 
@@ -132,7 +114,7 @@ const getAllItems = async (req, res) => {
 
     query += ' ORDER BY i.item_code';
 
-    const [rows] = await pool.query(query);
+    const [rows] = await pool.query(query, stock.params);
     res.json(rows);
   } catch (error) {
     console.error('Error fetching items:', error);
@@ -147,42 +129,23 @@ const getItemById = async (req, res) => {
   const { id } = req.params;
 
   try {
+    const stock = currentStockSql({ itemId: id });
     const [rows] = await pool.query(`
-      SELECT 
-        i.id, 
-        i.item_code, 
-        i.name, 
+      SELECT
+        i.id,
+        i.item_code,
+        i.name,
         i.unit,
         i.item_type,
         i.vat_applicable,
         i.auto_add_to_stock,
         i.reorder_level,
         i.is_active,
-        COALESCE(
-          (SELECT COALESCE(SUM(quantity), 0) FROM opening_balances WHERE item_id = i.id) +
-          (SELECT COALESCE(SUM(pi.quantity), 0) 
-           FROM purchase_items pi 
-           JOIN purchases p ON pi.purchase_id = p.id 
-           WHERE pi.item_id = i.id) -
-          (SELECT COALESCE(SUM(ii.quantity), 0) 
-           FROM issuance_items ii 
-           JOIN issuances iss ON ii.issuance_id = iss.id 
-           WHERE ii.item_id = i.id) -
-          (SELECT COALESCE(SUM(wi.quantity), 0) 
-           FROM wastage_items wi 
-           JOIN wastages w ON wi.wastage_id = w.id AND COALESCE(w.status, 1) = 1 
-           WHERE wi.item_id = i.id) +
-          (SELECT COALESCE(SUM(ri.quantity), 0) 
-           FROM return_items ri 
-           JOIN returns r ON ri.return_id = r.id 
-           WHERE ri.item_id = i.id) +
-          (SELECT COALESCE(SUM(sa.variance), 0)
-           FROM stock_adjustments sa
-           WHERE sa.is_deleted = 0 AND sa.status = 'Approved' AND sa.item_id = i.id),
-        0) AS current_stock
+        ${stock.expr} AS current_stock
       FROM items i
+      ${stock.joins}
       WHERE i.id = ? AND i.deleted = FALSE
-    `, [id]);
+    `, [...stock.params, id]);
 
     if (rows.length === 0) {
       return res.status(404).json({ error: 'Item not found' });

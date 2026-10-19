@@ -1,5 +1,6 @@
 // controllers/purchaseReturnController.js
 const pool = require('../config/db');
+const { currentStockSql } = require('../services/stockRules');
 const { sendServerError, ClientError } = require('../utils/safeError');
 const { actorId } = require('../utils/actor');
 const { DocumentError } = require('../utils/documentLines');
@@ -866,40 +867,19 @@ const getPurchaseReturnsForBill = async (req, res) => {
 // Get current stock for all items
 const getCurrentStock = async (req, res) => {
   try {
+    // The one stock formula (services/stockRules.js). The old query left out returns and adjustments.
+    const { joins, expr, params } = currentStockSql();
     const [stock] = await pool.query(`
-      SELECT 
+      SELECT
         i.id AS item_id,
         i.name AS item_name,
         i.unit,
-        COALESCE(ob.quantity, 0) + 
-        COALESCE((
-          SELECT COALESCE(SUM(pi.quantity), 0)
-          FROM purchase_items pi 
-          JOIN purchases p ON pi.purchase_id = p.id 
-          WHERE pi.item_id = i.id
-            AND (p.deleted = FALSE OR p.deleted IS NULL)
-        ), 0) - 
-        COALESCE((
-          SELECT COALESCE(SUM(ii.quantity), 0)
-          FROM issuance_items ii 
-          WHERE ii.item_id = i.id
-        ), 0) - 
-        COALESCE((
-          SELECT COALESCE(SUM(pri.quantity), 0)
-          FROM purchase_return_items pri 
-          WHERE pri.item_id = i.id
-        ), 0) - 
-        COALESCE((
-          SELECT COALESCE(SUM(wi.quantity), 0)
-          FROM wastage_items wi 
-          JOIN wastages w ON wi.wastage_id = w.id AND COALESCE(w.status, 1) = 1
-          WHERE wi.item_id = i.id
-        ), 0) AS quantity
+        ${expr} AS quantity
       FROM items i
-      LEFT JOIN opening_balances ob ON i.id = ob.item_id
+      ${joins}
       WHERE (i.deleted = FALSE OR i.deleted IS NULL)
-    `);
-    
+    `, params);
+
     const formattedStock = stock.map(item => ({
       item_id: item.item_id,
       item_name: item.item_name,
@@ -919,37 +899,14 @@ const getItemStock = async (req, res) => {
   const { itemId } = req.params;
   
   try {
+    const { joins, expr, params } = currentStockSql({ itemId });
     const [stock] = await pool.query(`
-      SELECT 
-        COALESCE(ob.quantity, 0) + 
-        COALESCE((
-          SELECT COALESCE(SUM(pi.quantity), 0)
-          FROM purchase_items pi 
-          JOIN purchases p ON pi.purchase_id = p.id 
-          WHERE pi.item_id = ?
-            AND (p.deleted = FALSE OR p.deleted IS NULL)
-        ), 0) - 
-        COALESCE((
-          SELECT COALESCE(SUM(ii.quantity), 0)
-          FROM issuance_items ii 
-          WHERE ii.item_id = ?
-        ), 0) - 
-        COALESCE((
-          SELECT COALESCE(SUM(pri.quantity), 0)
-          FROM purchase_return_items pri 
-          WHERE pri.item_id = ?
-        ), 0) - 
-        COALESCE((
-          SELECT COALESCE(SUM(wi.quantity), 0)
-          FROM wastage_items wi 
-          JOIN wastages w ON wi.wastage_id = w.id AND COALESCE(w.status, 1) = 1
-          WHERE wi.item_id = ?
-        ), 0) AS quantity
+      SELECT ${expr} AS quantity
       FROM items i
-      LEFT JOIN opening_balances ob ON i.id = ob.item_id
+      ${joins}
       WHERE i.id = ?
-    `, [itemId, itemId, itemId, itemId, itemId]);
-    
+    `, [...params, itemId]);
+
     const quantity = stock.length > 0 ? (parseFloat(stock[0].quantity) || 0) : 0;
     
     res.json({ 
