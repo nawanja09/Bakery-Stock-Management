@@ -100,6 +100,8 @@ test.before(async () => {
   const [i] = await pool.query(`INSERT INTO items (item_code, name, unit, reorder_level) VALUES (?, ?, 'kg', 0)`, [`PC-${RUN}`, `Flour ${RUN}`]);
   itemId = i.insertId;
   created.items.push(itemId);
+  // Enough opening stock for the issuance tests (audit H4 now checks real availability).
+  await pool.query(`INSERT INTO opening_balances (date, item_id, quantity) VALUES ('2026-01-01', ?, 1000)`, [itemId]);
 
   const app = express();
   app.use(express.json());
@@ -145,6 +147,7 @@ test.after(async () => {
   await del('DELETE FROM bank_details WHERE id IN (?)', created.banks);
   await del('DELETE FROM company WHERE id IN (?)', created.companies);
   await del('DELETE FROM departments WHERE id IN (?)', created.departments);
+  await del('DELETE FROM opening_balances WHERE item_id IN (?)', created.items);
   await del('DELETE FROM items WHERE id IN (?)', created.items);
   await del('DELETE FROM users WHERE id IN (?)', created.users);
   await pool.end();

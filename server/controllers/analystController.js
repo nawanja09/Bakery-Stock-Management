@@ -272,7 +272,7 @@ const getBalanceSheet = async (req, res) => {
         LEFT JOIN (
           SELECT item_id, SUM(variance) AS total_adjusted
           FROM stock_adjustments
-          WHERE is_deleted = 0 AND DATE(date) <= ?
+          WHERE is_deleted = 0 AND status = 'Approved' AND DATE(date) <= ?
           GROUP BY item_id
         ) adjustments ON adjustments.item_id = i.id
         WHERE i.auto_add_to_stock = 1

@@ -1,5 +1,5 @@
 const pool = require('../config/db');
-const { recordCashTransaction, recordBankTransaction, rebuildBalanceAfter } = require('../utils/financeLedger');
+const { recordCashTransaction, recordBankTransaction, rebuildBalanceAfter, InsufficientBalanceError } = require('../utils/financeLedger');
 const { PeriodClosedError } = require('./periodLock');
 const { toYmd, todayYmd } = require('../utils/dateOnly');
 
@@ -518,11 +518,13 @@ const processDueCheques = async () => {
       // A cheque whose release date is in a CLOSED month is not posted behind the
       // closed books (services/periodLock.js): it stays Pending, and the other due
       // cheques still go through. An Admin releases it once the month is re-opened.
+      // The same when the cash book cannot cover it: it stays Pending and is tried again
+      // on the next run, instead of failing every other due cheque.
       await connection.query('SAVEPOINT due_cheque');
       try {
         await postChequeRelease(connection, cheque, cheque.release_date);
       } catch (error) {
-        if (!(error instanceof PeriodClosedError)) throw error;
+        if (!(error instanceof PeriodClosedError) && !(error instanceof InsufficientBalanceError)) throw error;
         await connection.query('ROLLBACK TO SAVEPOINT due_cheque');
         console.warn(`Cheque ${cheque.cheque_number || cheque.id} not released automatically: ${error.message}`);
       }

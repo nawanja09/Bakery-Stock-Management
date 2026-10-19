@@ -487,6 +487,14 @@ const ensureStockAdjustmentCreatedBy = async () => {
       await pool.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS deleted_by INT NULL`);
     }
     await pool.query('ALTER TABLE stock_adjustments ADD COLUMN IF NOT EXISTS delete_reason VARCHAR(500) NULL');
+    // Maker-checker (audit H4): a new adjustment is Pending and has no stock effect
+    // (every "current stock" query also requires status = 'Approved') until a user
+    // OTHER than the one who created it approves it. Existing rows default to
+    // 'Approved' so historical stock is not changed retroactively.
+    // See migrations/040_stock_adjustment_approval.sql.
+    await pool.query("ALTER TABLE stock_adjustments ADD COLUMN IF NOT EXISTS status ENUM('Pending','Approved') NOT NULL DEFAULT 'Approved'");
+    await pool.query('ALTER TABLE stock_adjustments ADD COLUMN IF NOT EXISTS approved_by INT NULL');
+    await pool.query('ALTER TABLE stock_adjustments ADD COLUMN IF NOT EXISTS approved_at DATETIME NULL');
   } catch (error) {
     console.warn('stock_adjustments soft-delete schema check skipped:', error.message);
   }

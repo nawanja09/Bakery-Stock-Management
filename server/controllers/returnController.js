@@ -1,5 +1,6 @@
 const pool = require('../config/db');
 const { v4: uuidv4 } = require('uuid');
+const { requireDate, requireDepartment, prepareStockLines } = require('../utils/documentLines');
 
 // Create new return
 const createReturn = async (req, res) => {
@@ -18,6 +19,12 @@ const createReturn = async (req, res) => {
   
   try {
     await connection.beginTransaction();
+
+    // Checked on the server (audit finding R7): a real date and department, real items, quantities above 0.
+    requireDate(return_date, 'Return date');
+    await requireDepartment(connection, department_id);
+    const items = (await prepareStockLines(connection, req.body.items))
+      .map((line) => ({ item_id: line.itemId, quantity: line.quantity, reason: line.source.reason }));
 
     // Insert return record
     const [returnResult] = await connection.query(
@@ -65,6 +72,7 @@ const createReturn = async (req, res) => {
     
   } catch (error) {
     await connection.rollback();
+    if (error.name === 'DocumentError') return res.status(error.status).json({ error: error.message });
     console.error('Error creating return:', error);
     res.status(500).json({ error: 'Server error' });
   } finally {

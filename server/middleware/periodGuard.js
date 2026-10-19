@@ -49,6 +49,7 @@ const RECORD_DATES = [
   { path: /^\/wastages\/(\d+)$/, table: 'wastages', column: 'date' },
   { path: /^\/opening-balance\/(\d+)$/, table: 'opening_balances', column: 'date' },
   { path: /^\/adjustments\/(\d+)$/, table: 'stock_adjustments', column: 'date' },
+  { path: /^\/adjustments\/(\d+)\/approve$/, table: 'stock_adjustments', column: 'date' },
   { path: /^\/adjustments\/records\/[^/]+\/finance\/(\d+)$/, table: 'finance_transactions', column: 'transaction_date' },
   { path: /^\/adjustments\/records\/[^/]+\/card\/(\d+)$/, table: 'card_transactions', column: 'transaction_date' },
   { path: /^\/new-expenses\/(\d+)$/, table: 'expenses', column: 'bill_date' },
@@ -138,6 +139,12 @@ const periodErrorTranslator = (req, res, next) => requestContext.runWithStore(()
       const error = store.periodError;
       res.status(409);
       return send({ error: error.message, code: error.code, closed_before: error.closedBefore });
+    }
+    // Cash in hand would go negative (utils/financeLedger.js): 400 with the real reason.
+    if (res.statusCode >= 500 && store?.insufficientError) {
+      const error = store.insufficientError;
+      res.status(400);
+      return send({ error: error.message, code: error.code });
     }
     return send(body);
   };

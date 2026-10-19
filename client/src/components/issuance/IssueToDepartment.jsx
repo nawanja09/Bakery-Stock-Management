@@ -182,7 +182,7 @@ const IssueToDepartment = () => {
       navigate('/issuance/history');
     } catch (error) {
       console.error('Error creating/updating issuance:', error);
-      showPopup('error', 'Server error');
+      showPopup('error', error.response?.data?.error || 'Server error');
     } finally {
       setIsSubmitting(false);
     }

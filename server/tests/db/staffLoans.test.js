@@ -140,7 +140,7 @@ test.before(async () => {
   const connection = await pool.getConnection();
   try {
     await recordCashTransaction(connection, {
-      companyId, date: '2026-10-01', remark: 'Opening Balance', debit: 100000,
+      companyId, date: '2026-10-01', remark: 'Opening Balance', debit: 1000000,
       transactionType: 'Opening Balance', createdBy: created.users[1]
     });
   } finally {

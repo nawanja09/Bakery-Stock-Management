@@ -1,13 +1,36 @@
 const pool = require('../config/db');
 const periodLock = require('../services/periodLock');
+const requestContext = require('../services/requestContext');
 const { toYmd } = require('./dateOnly');
 
 class InsufficientBalanceError extends Error {
   constructor(message) {
     super(message);
     this.name = 'InsufficientBalanceError';
+    this.status = 400;
+    this.code = 'INSUFFICIENT_CASH';
   }
 }
+
+const money = (value) => Number(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+// Cash in hand cannot be negative (audit finding R5): a posting that would take the cash book's
+// total below zero is refused. Only the TOTAL counts, not the balance at the posting's date -
+// payments are often recorded before the collection that covers them is approved, so past dates
+// do dip below zero in normal use. Money coming in is never refused. Bank accounts can have an
+// overdraft and are not checked. CASH_ALLOW_NEGATIVE=on in .env switches the check off.
+const cashOverdrawn = (currentBalance, newBalance) =>
+  String(process.env.CASH_ALLOW_NEGATIVE || '').toLowerCase() !== 'on' && newBalance < -0.005 && newBalance < currentBalance;
+
+const refuseOverdraft = (currentBalance, newBalance, spent) => {
+  const error = new InsufficientBalanceError(
+    `Not enough cash in hand: this payment of Rs. ${money(spent)} needs more than the Rs. ${money(Math.max(currentBalance, 0))} available. `
+    + 'Record the cash received first (for example approve the collection), then try again.'
+  );
+  const store = requestContext.currentStore();
+  if (store) store.insufficientError = error; // so a controller's catch-all 500 still reaches the user as this 400
+  return error;
+};
 
 /**
  * Gets the current balance for a cash account from the ledger itself.
@@ -203,6 +226,8 @@ const recordCashTransaction = async (connection, {
     ? await balanceAtDate(connection, 'CASH', companyId, ymd, debitAmt - creditAmt)
     : newBalance;
 
+  if (cashOverdrawn(currentBalance, newBalance)) throw refuseOverdraft(currentBalance, newBalance, creditAmt - debitAmt);
+
   const direction = debitAmt > 0 ? 'IN' : 'OUT';
 
   await connection.query(
@@ -317,6 +342,7 @@ module.exports = {
   calculateRunningBalances,
   recordCashTransaction,
   recordBankTransaction,
+  InsufficientBalanceError,
   rebuildBalanceAfter,
   refreshAccounts,
   refreshBalancesOfReference

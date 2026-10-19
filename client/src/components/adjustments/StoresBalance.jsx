@@ -278,10 +278,11 @@ const StoresBalance = () => {
         });
       }
 
+      // A different user must approve it (maker-checker) before it counts toward stock.
       showMessage(
         rows.length === 1
-          ? 'Stock balance adjustment saved successfully!'
-          : `${rows.length} stock balance adjustments saved successfully!`,
+          ? 'Stock balance adjustment saved - pending approval by another user before it affects stock.'
+          : `${rows.length} stock balance adjustments saved - pending approval by another user before they affect stock.`,
         'success'
       );
 

@@ -47,14 +47,20 @@ const call = async (method, urlPath, body, who = 'admin') => {
   return { status: response.status, body: await response.json().catch(() => null) };
 };
 
-// An adjustment that takes `variance` kg off the item's stock (system 10, actual 10 + variance).
+// An APPROVED adjustment that takes `variance` kg off the item's stock. 'admin' creates
+// it and 'admin2' approves it (maker-checker, audit H4 - a Pending adjustment has no
+// stock effect, and the creator can never approve their own), so these tests can still
+// assert an immediate effect on stock.
 const adjust = async (variance, date = '2026-10-10 10:00:00') => {
-  const response = await call('POST', '/adjustments', {
+  const currentStock = await systemQty();
+  const created = await call('POST', '/adjustments', {
     date, approved_by: '', reference_note: `soft-${RUN}`, item_id: itemId,
-    system_qty: 10, actual_qty: 10 + variance, unit_price: 100, reason: 'count'
+    actual_qty: currentStock + variance, unit_price: 100, reason: 'count'
   });
-  assert.equal(response.status, 201, JSON.stringify(response.body));
-  return response.body.adjustment_id;
+  assert.equal(created.status, 201, JSON.stringify(created.body));
+  const approved = await call('PATCH', `/adjustments/${created.body.adjustment_id}/approve`, undefined, 'admin2');
+  assert.equal(approved.status, 200, JSON.stringify(approved.body));
+  return created.body.adjustment_id;
 };
 
 const systemQty = async () => num((await call('GET', `/adjustments/system-stock/${itemId}`)).body.system_qty);
@@ -66,7 +72,9 @@ test.before(async () => {
   await pool.lineHistorySchemaReady;
 
   const hash = await bcrypt.hash(crypto.randomBytes(16).toString('hex'), 4);
-  for (const [key, role] of [['admin', 'Admin'], ['stores', 'Store Keeper']]) {
+  // admin2: a SECOND Admin to approve what 'admin' creates (maker-checker, audit H4) -
+  // the person who enters an adjustment can never also approve it.
+  for (const [key, role] of [['admin', 'Admin'], ['admin2', 'Admin'], ['stores', 'Store Keeper']]) {
     const [u] = await pool.query(
       'INSERT INTO users (name, username, password, role, status) VALUES (?, ?, ?, ?, 1)',
       [`${role} ${RUN}`, `${key}-sd-${RUN}`, hash, role]);
@@ -79,6 +87,9 @@ test.before(async () => {
   const [i] = await pool.query(`INSERT INTO items (item_code, name, unit, reorder_level) VALUES (?, ?, 'kg', 0)`, [`SD-${RUN}`, `Flour ${RUN}`]);
   itemId = i.insertId;
   created.items.push(itemId);
+  // Enough opening stock for the issuance tests (audit H4 now checks real availability)
+  // even after the adjustment tests above leave this item's approved stock negative.
+  await pool.query(`INSERT INTO opening_balances (date, item_id, quantity) VALUES ('2026-01-01', ?, 1000)`, [itemId]);
 
   const app = express();
   app.use(express.json());
@@ -106,6 +117,7 @@ test.after(async () => {
   await del('DELETE FROM wastages WHERE id IN (?)', created.wastages);
   await del("DELETE FROM record_line_history WHERE archived_by IN (?)", created.users);
   await del('DELETE FROM departments WHERE id IN (?)', created.departments);
+  await del('DELETE FROM opening_balances WHERE item_id IN (?)', created.items);
   await del('DELETE FROM items WHERE id IN (?)', created.items);
   await del('DELETE FROM users WHERE id IN (?)', created.users);
   await pool.end();

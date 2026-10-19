@@ -2,6 +2,7 @@ const pool = require('../config/db');
 const { isRmAdjustmentRequest, recordRmAdjustment, sameItems, sameValue } = require('../utils/rmAdjustmentAudit');
 const { actorId, approverName } = require('../utils/actor');
 const { archiveLines } = require('../services/lineHistory');
+const { lockAndCheckAvailability, StockError } = require('../services/stockAvailability');
 
 // Create new issuance
 const createIssuance = async (req, res) => {
@@ -24,42 +25,52 @@ const createIssuance = async (req, res) => {
   try {
     await connection.beginTransaction();
 
+    // Stock availability (audit H4) is the FIRST query of the transaction, before
+    // ANY other read on this connection - even one on an unrelated table (e.g.
+    // looking up the signed-in user's name below). Under REPEATABLE READ, every
+    // later non-locking read in a transaction shares the snapshot taken by the
+    // FIRST one; if that read happened first, the stock check could see stock as
+    // it was before this transaction even started, missing another issuance that
+    // committed in the meantime. Locked here, it always sees the truth.
+    const lines = await lockAndCheckAvailability(connection, items);
+
     // Approved By: the approver named on the form, otherwise the signed-in user.
     const approved_by = await approverName(connection, req, req.body.approved_by);
 
     // Combine date and time into one datetime
-    const datetime = issuance_time 
+    const datetime = issuance_time
       ? `${issuance_date} ${issuance_time}:00`
       : `${issuance_date} 00:00:00`;
 
     // Insert issuance
     const [issuanceResult] = await connection.query(
-      `INSERT INTO issuances 
-      (issuance_date, issued_by, department_id, received_by, remarks, approved_by, check_number) 
+      `INSERT INTO issuances
+      (issuance_date, issued_by, department_id, received_by, remarks, approved_by, check_number)
       VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [datetime, issued_by, department_id, received_by, remarks, approved_by, check_number]
     );
-    
+
     const issuanceId = issuanceResult.insertId;
 
     // Insert issuance items
-    for (const item of items) {
+    for (const { itemId, quantity } of lines) {
       await connection.query(
-        `INSERT INTO issuance_items 
-        (issuance_id, item_id, quantity) 
+        `INSERT INTO issuance_items
+        (issuance_id, item_id, quantity)
         VALUES (?, ?, ?)`,
-        [issuanceId, item.item_id, item.quantity]
+        [issuanceId, itemId, quantity]
       );
     }
 
     await connection.commit();
-    res.status(201).json({ 
-      message: 'Issuance created successfully!', 
-      issuance_id: issuanceId 
+    res.status(201).json({
+      message: 'Issuance created successfully!',
+      issuance_id: issuanceId
     });
-    
+
   } catch (error) {
     await connection.rollback();
+    if (error instanceof StockError) return res.status(error.status).json({ error: error.message });
     console.error('Error creating issuance:', error);
     res.status(500).json({ error: 'Server error' });
   } finally {
@@ -209,27 +220,43 @@ const updateIssuance = async (req, res) => {
   try {
     await connection.beginTransaction();
 
+    // The issuance's OWN current lines never count against it: they are being
+    // replaced, not added on top of (audit H4 - see lockAndCheckAvailability).
+    // Locked (FOR UPDATE), not just read: this is the FIRST query of the
+    // transaction, and it - along with the stock check right after - must stay
+    // the first ones. A plain (non-locking) read anywhere before them, even on an
+    // unrelated table such as the approver lookup below, would anchor this
+    // transaction's REPEATABLE READ snapshot too early and the stock check could
+    // still see stock as it was before this transaction even started.
+    const [itemRows] = await connection.query('SELECT item_id, quantity FROM issuance_items WHERE issuance_id = ? FOR UPDATE', [id]);
+    const originalItems = itemRows;
+    const creditBack = new Map();
+    for (const row of originalItems) {
+      const itemId = Number(row.item_id);
+      creditBack.set(itemId, (creditBack.get(itemId) || 0) + Number(row.quantity));
+    }
+
+    // Stock availability (audit H4): locked and checked before anything changes.
+    const lines = await lockAndCheckAvailability(connection, items, { creditBack });
+
     // Approved By: the approver named on the form, otherwise the signed-in user.
     const approved_by = await approverName(connection, req, req.body.approved_by);
 
     const trackRmAdjustment = isRmAdjustmentRequest(req);
     let originalIssuance = null;
-    let originalItems = [];
     if (trackRmAdjustment) {
       const [issuanceRows] = await connection.query('SELECT * FROM issuances WHERE id = ? FOR UPDATE', [id]);
       originalIssuance = issuanceRows[0] || null;
-      const [itemRows] = await connection.query('SELECT item_id, quantity FROM issuance_items WHERE issuance_id = ?', [id]);
-      originalItems = itemRows;
     }
 
     // Combine date and time into one datetime
-    const datetime = issuance_time 
+    const datetime = issuance_time
       ? `${issuance_date} ${issuance_time}:00`
       : `${issuance_date} 00:00:00`;
 
     // Update issuance
     await connection.query(
-      `UPDATE issuances 
+      `UPDATE issuances
        SET issuance_date = ?, department_id = ?, received_by = ?,
            remarks = ?, approved_by = ?, check_number = ?
        WHERE id = ?`,
@@ -244,12 +271,12 @@ const updateIssuance = async (req, res) => {
     );
 
     // Insert updated items
-    for (const item of items) {
+    for (const { itemId, quantity } of lines) {
       await connection.query(
-        `INSERT INTO issuance_items 
-        (issuance_id, item_id, quantity) 
+        `INSERT INTO issuance_items
+        (issuance_id, item_id, quantity)
         VALUES (?, ?, ?)`,
-        [id, item.item_id, item.quantity]
+        [id, itemId, quantity]
       );
     }
 
@@ -270,9 +297,10 @@ const updateIssuance = async (req, res) => {
 
     await connection.commit();
     res.json({ message: 'Issuance updated successfully!' });
-    
+
   } catch (error) {
     await connection.rollback();
+    if (error instanceof StockError) return res.status(error.status).json({ error: error.message });
     console.error('Error updating issuance:', error);
     res.status(500).json({ error: 'Server error' });
   } finally {
@@ -309,7 +337,7 @@ const getItemsWithStock = async (req, res) => {
         COALESCE(
           (SELECT SUM(sa.variance)
            FROM stock_adjustments sa
-           WHERE sa.is_deleted = 0 AND sa.item_id = i.id AND DATE(sa.date) <= CURDATE()
+           WHERE sa.is_deleted = 0 AND sa.status = 'Approved' AND sa.item_id = i.id AND DATE(sa.date) <= CURDATE()
           ), 0
         ) -
         COALESCE(

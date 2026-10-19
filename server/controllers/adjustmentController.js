@@ -4,6 +4,7 @@ const { checkDuplicateReference } = require('../services/referenceValidationServ
 const otherLedgerService = require('../services/otherLedgerService');
 const { actorId, approverName } = require('../utils/actor');
 const { softDelete } = require('../services/softDelete');
+const { getItemStock } = require('../services/rmStockService');
 
 const FINANCIAL_ADJUSTMENT_CATEGORIES = new Set(['Cash Receive', 'Bank Receive']);
 const FINANCIAL_ADJUSTMENT_SOURCES = new Set(['finance', 'card']);
@@ -292,13 +293,14 @@ const recalculateFinanceAccountBalance = async (connection, accountType, account
   );
 };
 
-const getAdjustmentValues = ({ system_qty, actual_qty, unit_price }) => {
-  const systemQuantity = Number(system_qty);
+// systemQuantity is always resolved by the SERVER (live stock, under the item's
+// lock) - never taken from the request. See resolveSystemQuantity below.
+const getAdjustmentValues = ({ systemQuantity, actual_qty, unit_price }) => {
   const actualQuantity = Number(actual_qty);
   const unitPrice = Number(unit_price);
 
   if (![systemQuantity, actualQuantity, unitPrice].every(Number.isFinite)) {
-    throw new Error('system_qty, actual_qty, and unit_price must be valid numbers');
+    throw new Error('actual_qty and unit_price must be valid numbers');
   }
 
   const variance = Number((actualQuantity - systemQuantity).toFixed(3));
@@ -307,21 +309,33 @@ const getAdjustmentValues = ({ system_qty, actual_qty, unit_price }) => {
   return { systemQuantity, actualQuantity, unitPrice, variance, amount };
 };
 
+// Locks the item (serializes against a concurrent issuance / adjustment on the
+// same item) and returns its live, APPROVED-only current stock (audit H4: the
+// client's system_qty is never trusted). Throws if the item does not exist.
+const resolveSystemQuantity = async (connection, itemId) => {
+  const [rows] = await connection.query('SELECT id FROM items WHERE id = ? AND deleted = FALSE FOR UPDATE', [itemId]);
+  if (rows.length === 0) throw new Error('Item not found');
+  // forUpdate: true - a plain read here could still see a stale snapshot from an
+  // earlier, unrelated read in this same transaction (see rmStockService.js).
+  const stock = await getItemStock(connection, itemId, { forUpdate: true });
+  return Number(stock?.current_stock ?? 0);
+};
+
 // Create a new stock adjustment
 const createAdjustment = async (req, res) => {
-  const { date, reference_note, item_id, system_qty, actual_qty, variance, unit_price, amount, reason } = req.body;
+  const { date, reference_note, item_id, actual_qty, unit_price, reason } = req.body;
   const requestId = req.get('Idempotency-Key') || req.body.request_id || null;
   // Saved by = the signed-in user, never a value from the form.
   const createdBy = actorId(req);
   if (!createdBy) return res.status(401).json({ error: 'Please log in again' });
 
+  const itemId = Number(item_id);
+  if (!Number.isInteger(itemId) || itemId <= 0) return res.status(400).json({ error: 'A valid item is required' });
+
   const connection = await pool.getConnection();
 
   try {
     await connection.beginTransaction();
-
-    // Approved By (user_name): the approver named on the form, otherwise the signed-in user.
-    const user_name = await approverName(connection, req, req.body.approved_by);
 
     if (requestId) {
       const [existing] = await connection.query(
@@ -338,22 +352,34 @@ const createAdjustment = async (req, res) => {
       }
     }
 
-    const values = getAdjustmentValues({ system_qty, actual_qty, unit_price });
+    // The item's live, approved stock (never the client's system_qty) - audit H4.
+    // Resolved BEFORE any plain (non-locking) read on this connection - even one on
+    // an unrelated table, like the approver lookup below. Under REPEATABLE READ, a
+    // transaction's first plain read anchors the snapshot every later plain read
+    // shares; if that happened first, this stock read could still see stock as it
+    // was before this transaction even started.
+    const systemQuantity = await resolveSystemQuantity(connection, itemId);
+    const values = getAdjustmentValues({ systemQuantity, actual_qty, unit_price });
 
-    // 1. Insert into stock_adjustments table for history
+    // Approved By (user_name): the approver named on the form, otherwise the signed-in user.
+    const user_name = await approverName(connection, req, req.body.approved_by);
+
+    // Maker-checker (audit H4): saved Pending. It has no stock effect (every
+    // "current stock" query requires status = 'Approved') until a user OTHER
+    // than createdBy approves it - see approveAdjustment.
     const [result] = await connection.query(
       `INSERT INTO stock_adjustments
-      (date, user_name, reference_note, item_id, system_qty, actual_qty, variance, unit_price, amount, reason, request_id, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [date, user_name, reference_note, item_id, values.systemQuantity, values.actualQuantity, values.variance, values.unitPrice, values.amount, reason, requestId, createdBy]
+      (date, user_name, reference_note, item_id, system_qty, actual_qty, variance, unit_price, amount, reason, request_id, created_by, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending')`,
+      [date, user_name, reference_note, itemId, values.systemQuantity, values.actualQuantity, values.variance, values.unitPrice, values.amount, reason, requestId, createdBy]
     );
 
     // 2. Log the adjustment as a stock movement. Opening balances remain one-time item balances.
     await connection.query(
-      `INSERT INTO stock_movements 
+      `INSERT INTO stock_movements
        (item_id, quantity, movement_type, reference_id, reference_type, movement_date, notes)
        VALUES (?, ?, 'ADJUSTMENT', ?, 'stock_adjustments', ?, ?)`,
-      [item_id, values.variance, result.insertId, date, reason]
+      [itemId, values.variance, result.insertId, date, reason]
     );
 
     await recordRmAdjustment(connection, {
@@ -369,6 +395,7 @@ const createAdjustment = async (req, res) => {
 
   } catch (error) {
     await connection.rollback();
+    if (error.message === 'Item not found') return res.status(404).json({ error: error.message });
     console.error('Error creating adjustment:', error);
     res.status(500).json({ error: 'Server error: ' + error.message });
   } finally {
@@ -397,12 +424,17 @@ const getAdjustments = async (req, res) => {
         sa.reason,
         sa.created_by,
         COALESCE(cu.name, cu.username) AS created_by_name,
+        sa.status,
+        sa.approved_by,
+        COALESCE(au.name, au.username) AS approved_by_name,
+        sa.approved_at,
         i.name AS item_name,
         i.item_code AS item_code,
         i.unit
       FROM stock_adjustments sa
       JOIN items i ON sa.item_id = i.id
       LEFT JOIN users cu ON cu.id = sa.created_by
+      LEFT JOIN users au ON au.id = sa.approved_by
       WHERE sa.is_deleted = 0
     `;
 
@@ -667,7 +699,7 @@ const getSystemQuantity = async (req, res) => {
       LEFT JOIN (
         SELECT item_id, SUM(variance) AS total_adjusted
         FROM stock_adjustments
-        WHERE is_deleted = 0 AND item_id = ?
+        WHERE is_deleted = 0 AND status = 'Approved' AND item_id = ?
         GROUP BY item_id
       ) adjustments ON i.id = adjustments.item_id
       WHERE i.id = ? AND i.deleted = FALSE
@@ -711,12 +743,17 @@ const getAdjustmentById = async (req, res) => {
         sa.reason,
         sa.created_by,
         COALESCE(cu.name, cu.username) AS created_by_name,
+        sa.status,
+        sa.approved_by,
+        COALESCE(au.name, au.username) AS approved_by_name,
+        sa.approved_at,
         i.name AS item_name,
         i.item_code AS item_code,
         i.unit
       FROM stock_adjustments sa
       JOIN items i ON sa.item_id = i.id
       LEFT JOIN users cu ON cu.id = sa.created_by
+      LEFT JOIN users au ON au.id = sa.approved_by
       WHERE sa.id = ? AND sa.is_deleted = 0`,
       [id]
     );
@@ -738,11 +775,8 @@ const updateAdjustment = async (req, res) => {
     date,
     reference_note,
     item_id,
-    system_qty,
     actual_qty,
-    variance,
     unit_price,
-    amount,
     reason
   } = req.body;
   if (!actorId(req)) return res.status(401).json({ error: 'Please log in again' });
@@ -752,11 +786,8 @@ const updateAdjustment = async (req, res) => {
   try {
     await connection.beginTransaction();
 
-    // Approved By (user_name): the approver named on the form, otherwise the signed-in user.
-    const user_name = await approverName(connection, req, req.body.approved_by);
-
     const [existingRows] = await connection.query(
-      `SELECT item_id, request_id FROM stock_adjustments WHERE id = ? AND is_deleted = 0 FOR UPDATE`,
+      `SELECT item_id, request_id, status FROM stock_adjustments WHERE id = ? AND is_deleted = 0 FOR UPDATE`,
       [id]
     );
 
@@ -764,9 +795,24 @@ const updateAdjustment = async (req, res) => {
       await connection.rollback();
       return res.status(404).json({ error: 'Adjustment not found' });
     }
+    // Once approved it has already affected stock (audit H4) - immutable from here;
+    // delete it and create a fresh one if it needs to change.
+    if (existingRows[0].status === 'Approved') {
+      await connection.rollback();
+      return res.status(409).json({ error: 'This adjustment is already approved and cannot be edited.' });
+    }
 
-    const values = getAdjustmentValues({ system_qty, actual_qty, unit_price });
-    const adjustmentItemId = item_id || existingRows[0].item_id;
+    const adjustmentItemId = Number(item_id) || existingRows[0].item_id;
+    // The item's live, approved stock (never the client's system_qty) - audit H4.
+    // A Pending adjustment (this one included) has no stock effect yet, so nothing
+    // needs to be credited back before resolving it. Resolved BEFORE any plain
+    // (non-locking) read on this connection, including the approver lookup below -
+    // see the matching comment in createAdjustment.
+    const systemQuantity = await resolveSystemQuantity(connection, adjustmentItemId);
+    const values = getAdjustmentValues({ systemQuantity, actual_qty, unit_price });
+
+    // Approved By (user_name): the approver named on the form, otherwise the signed-in user.
+    const user_name = await approverName(connection, req, req.body.approved_by);
 
     const [result] = await connection.query(
       `UPDATE stock_adjustments
@@ -795,6 +841,7 @@ const updateAdjustment = async (req, res) => {
     res.json({ message: 'Adjustment updated successfully.' });
   } catch (error) {
     await connection.rollback();
+    if (error.message === 'Item not found') return res.status(404).json({ error: error.message });
     console.error('Error updating adjustment:', error);
     res.status(500).json({ error: 'Server error: ' + error.message });
   } finally {
@@ -840,6 +887,56 @@ const deleteAdjustment = async (req, res) => {
   }
 };
 
+// Maker-checker (audit H4): a Pending adjustment counts toward stock only once a
+// user OTHER than whoever created it approves it. Re-checked here even though
+// only Admin / Super Admin hold the Adjustments module, in case the same person
+// holds both roles on different accounts.
+const approveAdjustment = async (req, res) => {
+  const { id } = req.params;
+  const approvedBy = actorId(req);
+  if (!approvedBy) return res.status(401).json({ error: 'Please log in again' });
+
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const [rows] = await connection.query(
+      'SELECT id, created_by, status FROM stock_adjustments WHERE id = ? AND is_deleted = 0 FOR UPDATE',
+      [id]
+    );
+    if (rows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ error: 'Adjustment not found' });
+    }
+    const adjustment = rows[0];
+    if (adjustment.status === 'Approved') {
+      await connection.rollback();
+      return res.status(409).json({ error: 'This adjustment is already approved.' });
+    }
+    if (adjustment.created_by && Number(adjustment.created_by) === Number(approvedBy)) {
+      await connection.rollback();
+      return res.status(403).json({
+        error: 'A different user must approve this adjustment - the person who entered it cannot also approve it.'
+      });
+    }
+
+    await connection.query(
+      `UPDATE stock_adjustments SET status = 'Approved', approved_by = ?, approved_at = NOW() WHERE id = ?`,
+      [approvedBy, id]
+    );
+
+    await connection.commit();
+    res.json({ message: 'Adjustment approved. It now counts toward stock.' });
+  } catch (error) {
+    await connection.rollback();
+    console.error('Error approving adjustment:', error);
+    res.status(500).json({ error: 'Server error: ' + error.message });
+  } finally {
+    connection.release();
+  }
+};
+
 module.exports = {
   createAdjustment,
   getAdjustments,
@@ -851,5 +948,6 @@ module.exports = {
   getAdjustmentById,
   updateAdjustment,
   deleteAdjustment,
+  approveAdjustment,
   getAdjustmentValues
 };

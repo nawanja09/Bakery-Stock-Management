@@ -76,7 +76,7 @@ const getAllItemsWithStock = async (connection = pool) => {
     ) purchase_returns ON i.id = purchase_returns.item_id
     LEFT JOIN (
       SELECT item_id, SUM(variance) AS total_adjusted
-      FROM stock_adjustments WHERE is_deleted = 0 GROUP BY item_id
+      FROM stock_adjustments WHERE is_deleted = 0 AND status = 'Approved' GROUP BY item_id
     ) adjustments ON i.id = adjustments.item_id
     WHERE i.deleted = FALSE AND i.is_active = TRUE
   `);
@@ -86,7 +86,16 @@ const getAllItemsWithStock = async (connection = pool) => {
 
 // Live stock + reorder_level for a single item (used when snapshotting an
 // Order at creation time).
-const getItemStock = async (connection, itemId) => {
+//
+// `forUpdate` (audit H4): under REPEATABLE READ, a transaction's non-locking reads
+// all share the snapshot taken by the FIRST non-locking read ANYWHERE in that
+// transaction - even one on a completely different table, run earlier for something
+// else (e.g. looking up a user's name). Locking an item row first is not enough on
+// its own to make THIS read see a concurrent write that just committed: this read
+// must also be a locking read to bypass that stale snapshot. Callers that checked
+// availability before writing (services/stockAvailability.js, the stock-adjustment
+// controller) pass forUpdate: true; plain reporting reads leave it off.
+const getItemStock = async (connection, itemId, { forUpdate = false } = {}) => {
   const [rows] = await connection.query(
     `
     SELECT
@@ -107,8 +116,9 @@ const getItemStock = async (connection, itemId) => {
     LEFT JOIN (SELECT wi.item_id, SUM(wi.quantity) AS total_wasted FROM wastage_items wi JOIN wastages w ON wi.wastage_id = w.id AND COALESCE(w.status, 1) = 1 WHERE wi.item_id = ? GROUP BY wi.item_id) wastage ON i.id = wastage.item_id
     LEFT JOIN (SELECT ri.item_id, SUM(ri.quantity) AS total_returned FROM return_items ri JOIN returns r ON ri.return_id = r.id WHERE ri.item_id = ? GROUP BY ri.item_id) returns ON i.id = returns.item_id
     LEFT JOIN (SELECT pri.item_id, SUM(pri.quantity) AS total_purchase_returned FROM purchase_return_items pri JOIN purchase_returns pr ON pri.return_id = pr.id WHERE pri.item_id = ? GROUP BY pri.item_id) purchase_returns ON i.id = purchase_returns.item_id
-    LEFT JOIN (SELECT item_id, SUM(variance) AS total_adjusted FROM stock_adjustments WHERE is_deleted = 0 AND item_id = ? GROUP BY item_id) adjustments ON i.id = adjustments.item_id
+    LEFT JOIN (SELECT item_id, SUM(variance) AS total_adjusted FROM stock_adjustments WHERE is_deleted = 0 AND status = 'Approved' AND item_id = ? GROUP BY item_id) adjustments ON i.id = adjustments.item_id
     WHERE i.id = ? AND i.deleted = FALSE
+    ${forUpdate ? 'FOR UPDATE' : ''}
     `,
     [itemId, itemId, itemId, itemId, itemId, itemId, itemId, itemId]
   );

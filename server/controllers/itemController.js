@@ -116,7 +116,7 @@ const getAllItems = async (req, res) => {
            WHERE ri.item_id = i.id) +
           (SELECT COALESCE(SUM(sa.variance), 0)
            FROM stock_adjustments sa
-           WHERE sa.is_deleted = 0 AND sa.item_id = i.id),
+           WHERE sa.is_deleted = 0 AND sa.status = 'Approved' AND sa.item_id = i.id),
         0) AS current_stock
       FROM items i
       WHERE i.deleted = FALSE
@@ -178,7 +178,7 @@ const getItemById = async (req, res) => {
            WHERE ri.item_id = i.id) +
           (SELECT COALESCE(SUM(sa.variance), 0)
            FROM stock_adjustments sa
-           WHERE sa.is_deleted = 0 AND sa.item_id = i.id),
+           WHERE sa.is_deleted = 0 AND sa.status = 'Approved' AND sa.item_id = i.id),
         0) AS current_stock
       FROM items i
       WHERE i.id = ? AND i.deleted = FALSE

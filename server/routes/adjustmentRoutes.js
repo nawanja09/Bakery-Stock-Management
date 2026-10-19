@@ -29,6 +29,9 @@ router.get('/system-stock/:itemId', adjustmentController.getSystemQuantity);
 router.put('/:id', adjustmentController.updateAdjustment);
 router.delete('/:id', adjustmentController.deleteAdjustment);
 
+// Maker-checker (audit H4): a different user approves it before it affects stock.
+router.patch('/:id/approve', adjustmentController.approveAdjustment);
+
 // Get single adjustment for editing
 router.get('/:id', adjustmentController.getAdjustmentById);
 

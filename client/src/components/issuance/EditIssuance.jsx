@@ -193,7 +193,7 @@ const EditIssuance = ({ embeddedId, onSaved, onCancel, isRmAdjustment = false } 
       goAfterSave();
     } catch (error) {
       console.error('Error updating issuance:', error);
-      showPopup('error', 'Server error');
+      showPopup('error', error.response?.data?.error || 'Server error');
     } finally {
       setIsSubmitting(false);
     }

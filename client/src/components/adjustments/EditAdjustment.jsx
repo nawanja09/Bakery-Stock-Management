@@ -125,7 +125,7 @@ const EditAdjustment = () => {
       setTimeout(() => navigate('/adjustments/stores-adjustments'), 600);
     } catch (err) {
       console.error('Error updating adjustment:', err);
-      setError('Unable to save the changes. Please try again.');
+      setError(err.response?.data?.error || 'Unable to save the changes. Please try again.');
     } finally {
       setSaving(false);
     }

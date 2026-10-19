@@ -269,6 +269,44 @@ const StoresAdjustments = () => {
     }
   };
 
+  // Maker-checker (audit H4): a Pending adjustment only counts toward stock once a
+  // DIFFERENT user approves it - never the person who entered it.
+  const currentUser = useMemo(() => {
+    try { return JSON.parse(localStorage.getItem('user')); } catch { return null; }
+  }, []);
+
+  const handleApprove = (adjustment) => {
+    setModalConfig({
+      isOpen: true,
+      type: 'warning',
+      title: 'Approve this adjustment?',
+      message: `Approving adjustment #${adjustment.id} will count it toward the stock of ${adjustment.item_name}. Make sure the count is correct first - this cannot be undone by editing.`,
+      onConfirm: () => confirmApprove(adjustment.id)
+    });
+  };
+
+  const confirmApprove = async (id) => {
+    try {
+      await api.patch(`/adjustments/${id}/approve`);
+      setModalConfig({ isOpen: false });
+      fetchAdjustments();
+      setModalConfig({
+        isOpen: true,
+        type: 'success',
+        title: 'Approved',
+        message: 'The adjustment now counts toward stock.'
+      });
+    } catch (error) {
+      console.error('Error approving adjustment:', error);
+      setModalConfig({
+        isOpen: true,
+        type: 'error',
+        title: 'Approval Failed',
+        message: error.response?.data?.error || 'Unable to approve the adjustment. Please try again.'
+      });
+    }
+  };
+
   const handleViewDetails = (adjustment) => {
     setSelectedAdjustment(selectedAdjustment?.id === adjustment.id ? null : adjustment);
   };
@@ -498,25 +536,41 @@ const StoresAdjustments = () => {
                           <td className="truncate-text" title={adj.reason}>{adj.reason}</td>
                           <td onClick={(e) => e.stopPropagation()}>
                             <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                              <button 
-                                className="btn btn-sm btn-outline" 
+                              {adj.status === 'Pending' && String(adj.created_by) !== String(currentUser?.id) && (
+                                <button
+                                  className="btn btn-sm btn-success"
+                                  onClick={() => handleApprove(adj)}
+                                  title="Approve (count it toward stock)"
+                                >
+                                  <FontAwesomeIcon icon={faCheckCircle} />
+                                </button>
+                              )}
+                              {adj.status === 'Pending' && String(adj.created_by) === String(currentUser?.id) && (
+                                <span className="btn btn-sm btn-outline" style={{ cursor: 'default', opacity: 0.6 }}
+                                  title="A different user must approve this - it is not yet counted toward stock">
+                                  <FontAwesomeIcon icon={faClock} />
+                                </span>
+                              )}
+                              <button
+                                className="btn btn-sm btn-outline"
                                 onClick={() => handleViewDetails(adj)}
                                 title="View Details"
                               >
                                 <FontAwesomeIcon icon={faEye} />
                               </button>
-                              <button 
-                                className="btn btn-sm btn-secondary" 
+                              <button
+                                className="btn btn-sm btn-secondary"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   navigate(`/adjustments/edit/${adj.id}`, { state: { backgroundLocation: location } });
                                 }}
                                 title="Edit"
+                                disabled={adj.status === 'Approved'}
                               >
                                 <FontAwesomeIcon icon={faEdit} />
                               </button>
-                              <button 
-                                className="btn btn-sm btn-danger" 
+                              <button
+                                className="btn btn-sm btn-danger"
                                 onClick={() => handleDelete(adj)}
                                 title="Delete"
                               >
