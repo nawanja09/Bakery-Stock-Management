@@ -1,5 +1,6 @@
 // controllers/purchaseReturnController.js
 const pool = require('../config/db');
+const { sendServerError, ClientError } = require('../utils/safeError');
 const { actorId } = require('../utils/actor');
 const { DocumentError } = require('../utils/documentLines');
 
@@ -41,7 +42,7 @@ const getPurchasesForReturn = async (req, res) => {
     res.json(purchases);
   } catch (error) {
     console.error('Error fetching purchases for return:', error);
-    res.status(500).json({ error: 'Server error: ' + error.message });
+    sendServerError(res, error);
   }
 };
 
@@ -98,7 +99,7 @@ const getPurchaseItemsForReturn = async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching purchase items for return:', error);
-    res.status(500).json({ error: 'Server error: ' + error.message });
+    sendServerError(res, error);
   }
 };
 
@@ -127,7 +128,7 @@ const getSupplierBillsWithBalance = async (req, res) => {
     res.json(bills);
   } catch (error) {
     console.error('Error fetching supplier bills:', error);
-    res.status(500).json({ error: 'Server error: ' + error.message });
+    sendServerError(res, error);
   }
 };
 
@@ -157,21 +158,21 @@ const createPurchaseReturn = async (req, res) => {
 
     // Validate required fields
     if (!return_number) {
-      throw new Error('Return number is required');
+      throw new ClientError('Return number is required', 400);
     }
     if (!supplier_id) {
-      throw new Error('Supplier ID is required');
+      throw new ClientError('Supplier ID is required', 400);
     }
     if (!return_date) {
-      throw new Error('Return date is required');
+      throw new ClientError('Return date is required', 400);
     }
     if (!items || items.length === 0) {
-      throw new Error('At least one item is required');
+      throw new ClientError('At least one item is required', 400);
     }
     // Returned By = the signed-in user, never a value from the form.
     const returned_by = actorId(req);
     if (!returned_by) {
-      throw new Error('Please log in again');
+      throw new ClientError('Please log in again', 401);
     }
 
     // ─── Re-verify supplier VAT registration directly from DB ──────────────
@@ -182,7 +183,7 @@ const createPurchaseReturn = async (req, res) => {
       [supplier_id]
     );
     if (supplierRows.length === 0) {
-      throw new Error('Supplier not found');
+      throw new ClientError('Supplier not found', 404);
     }
     const supplierVatRegistered = supplierRows[0].vat_registered === 1 || supplierRows[0].vat_registered === true;
 
@@ -450,9 +451,7 @@ const createPurchaseReturn = async (req, res) => {
       });
     }
     
-    res.status(500).json({ 
-      error: 'Server error: ' + error.message 
-    });
+    sendServerError(res, error);
   } finally {
     connection.release();
   }
@@ -544,7 +543,7 @@ const getAllPurchaseReturns = async (req, res) => {
     res.json(formattedReturns);
   } catch (error) {
     console.error('Error fetching purchase returns:', error);
-    res.status(500).json({ error: 'Server error: ' + error.message });
+    sendServerError(res, error);
   }
 };
 
@@ -605,10 +604,7 @@ const getPurchaseReturnById = async (req, res) => {
     res.json(purchaseReturn);
   } catch (error) {
     console.error('Error fetching purchase return:', error);
-    res.status(500).json({ 
-      error: 'Server error', 
-      details: error.message 
-    });
+    sendServerError(res, error);
   }
 };
 
@@ -668,7 +664,7 @@ const getPurchaseReturnByNumber = async (req, res) => {
     res.json(purchaseReturn);
   } catch (error) {
     console.error('Error fetching purchase return:', error);
-    res.status(500).json({ error: 'Server error: ' + error.message });
+    sendServerError(res, error);
   }
 };
 
@@ -800,7 +796,7 @@ const getVATReturns = async (req, res) => {
     res.json(formattedRows);
   } catch (error) {
     console.error('Error fetching VAT returns:', error);
-    res.status(500).json({ error: 'Server error: ' + error.message });
+    sendServerError(res, error);
   }
 };
 
@@ -863,7 +859,7 @@ const getPurchaseReturnsForBill = async (req, res) => {
     res.json(returns);
   } catch (error) {
     console.error('Error fetching purchase returns:', error);
-    res.status(500).json({ error: 'Server error: ' + error.message });
+    sendServerError(res, error);
   }
 };
 
@@ -914,7 +910,7 @@ const getCurrentStock = async (req, res) => {
     res.json(formattedStock);
   } catch (error) {
     console.error('Error fetching current stock:', error);
-    res.status(500).json({ error: 'Server error: ' + error.message });
+    sendServerError(res, error);
   }
 };
 
@@ -962,7 +958,7 @@ const getItemStock = async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching item stock:', error);
-    res.status(500).json({ error: 'Server error: ' + error.message });
+    sendServerError(res, error);
   }
 };
 
@@ -994,7 +990,7 @@ const getVATReturnsSummary = async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching VAT summary:', error);
-    res.status(500).json({ error: 'Server error: ' + error.message });
+    sendServerError(res, error);
   }
 };
 
@@ -1083,7 +1079,7 @@ const getReturnVATReport = async (req, res) => {
     res.json(formatted);
   } catch (error) {
     console.error('Error fetching Return VAT report:', error);
-    res.status(500).json({ error: 'Server error: ' + error.message });
+    sendServerError(res, error);
   }
 };
 
@@ -1144,7 +1140,7 @@ const getReturnVATSummary = async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching Return VAT summary:', error);
-    res.status(500).json({ error: 'Server error: ' + error.message });
+    sendServerError(res, error);
   }
 };
 
@@ -1314,9 +1310,7 @@ const addSettlementToPurchaseReturn = async (req, res) => {
   } catch (error) {
     await connection.rollback();
     console.error('Error adding settlement:', error);
-    res.status(500).json({ 
-      error: 'Server error: ' + error.message 
-    });
+    sendServerError(res, error);
   } finally {
     connection.release();
   }

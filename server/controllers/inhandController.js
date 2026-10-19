@@ -4,6 +4,7 @@
 // Integrates with the Finance Module via inhandPostingService.
 
 const pool = require('../config/db');
+const { sendServerError } = require('../utils/safeError');
 const {
   generateReferenceNo,
   postInhand,
@@ -121,7 +122,7 @@ const createInhand = async (req, res) => {
   } catch (error) {
     await connection.rollback();
     console.error('createInhand error:', error);
-    res.status(500).json({ error: 'Server error: ' + error.message });
+    sendServerError(res, error);
   } finally {
     connection.release();
   }
@@ -240,7 +241,7 @@ const updateInhand = async (req, res) => {
   } catch (error) {
     await connection.rollback();
     console.error('updateInhand error:', error);
-    res.status(500).json({ error: 'Server error: ' + error.message });
+    sendServerError(res, error);
   } finally {
     connection.release();
   }
@@ -282,7 +283,7 @@ const submitInhand = async (req, res) => {
   } catch (error) {
     await connection.rollback();
     console.error('submitInhand error:', error);
-    res.status(500).json({ error: 'Server error: ' + error.message });
+    sendServerError(res, error);
   } finally {
     connection.release();
   }

@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { sendServerError } = require('../utils/safeError');
 const { v4: uuidv4 } = require('uuid');
 const { isRmAdjustmentRequest, recordRmAdjustment, sameItems, sameValue } = require('../utils/rmAdjustmentAudit');
 const { actorId, approverName } = require('../utils/actor');
@@ -160,7 +161,7 @@ const getAllWastages = async (req, res) => {
 
   } catch (error) {
     console.error('Error fetching wastages:', error.stack);
-    res.status(500).json({ error: 'Server error: ' + error.message });
+    sendServerError(res, error);
   }
 };
 

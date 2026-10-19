@@ -1,3 +1,5 @@
+const crypto = require('crypto');
+
 class DuplicateReferenceError extends Error {
   constructor(message) {
     super(message);
@@ -8,6 +10,44 @@ class DuplicateReferenceError extends Error {
 // Some deployments do not install every optional finance module. A missing
 // optional table must not block edits to an otherwise available module.
 const unavailableReferenceTables = new Set();
+let referenceLocksUnavailable = false;
+
+/**
+ * Takes a row lock on the normalised reference number (table reference_locks) that the
+ * transaction keeps until it commits or rolls back. Two requests saving the same number
+ * therefore run one after the other, and the second one finds the first one's record.
+ * Outside a transaction the lock is released at once (nothing to protect there).
+ */
+const lockReference = async (connection, ref) => {
+  if (referenceLocksUnavailable) return;
+  const normalised = ref.trim().toLowerCase();
+  // PRIMARY KEY is VARCHAR(100): hash anything longer so distinct long numbers never collide by truncation.
+  const key = normalised.length <= 100
+    ? normalised
+    : `sha256:${crypto.createHash('sha256').update(normalised).digest('hex')}`;
+  try {
+    await connection.query(
+      'INSERT INTO reference_locks (ref_norm) VALUES (?) ON DUPLICATE KEY UPDATE locked_at = CURRENT_TIMESTAMP',
+      [key]
+    );
+  } catch (error) {
+    if (error.code === 'ER_NO_SUCH_TABLE') {
+      referenceLocksUnavailable = true;
+      console.warn('reference_locks table is missing (migrations/041_reference_locks.sql): duplicate references are checked without a lock');
+      return;
+    }
+    throw error;
+  }
+};
+
+// The numbers committed by other transactions RIGHT NOW. The transaction's own connection reads
+// from the snapshot it took earlier (REPEATABLE READ), which cannot show a record another request
+// committed after that - so the check is repeated here on a separate connection. A plain read:
+// it takes no locks on the 11 tables.
+const committedReader = (connection) => {
+  const pool = require('../config/db');
+  return connection === pool ? connection : pool;
+};
 
 /**
  * Checks if a given reference number is already used in any of the financial transactions across the system.
@@ -48,7 +88,13 @@ const checkDuplicateReference = async (connection, referenceNo, excludeConfig = 
     );
   }
 
-  for (const { table, column, softDeleted } of queries) {
+  await lockReference(connection, ref);
+
+  const readers = [connection];
+  const latest = committedReader(connection);
+  if (latest !== connection) readers.push(latest);
+
+  for (const reader of readers) for (const { table, column, softDeleted } of queries) {
     if (unavailableReferenceTables.has(table)) continue;
 
     // Treat surrounding whitespace and letter case consistently, so " INV-1 "
@@ -67,7 +113,7 @@ const checkDuplicateReference = async (connection, referenceNo, excludeConfig = 
 
     let rows;
     try {
-      [rows] = await connection.query(query, params);
+      [rows] = await reader.query(query, params);
     } catch (error) {
       if (error.code === 'ER_NO_SUCH_TABLE' || error.code === 'ER_BAD_FIELD_ERROR') {
         unavailableReferenceTables.add(table);
@@ -85,5 +131,6 @@ const checkDuplicateReference = async (connection, referenceNo, excludeConfig = 
 
 module.exports = {
   checkDuplicateReference,
+  lockReference,
   DuplicateReferenceError
 };

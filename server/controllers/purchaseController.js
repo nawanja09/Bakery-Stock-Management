@@ -1,5 +1,6 @@
 // controllers/purchaseController.js
 const pool = require('../config/db');
+const { sendServerError, ClientError } = require('../utils/safeError');
 const { actorId } = require('../utils/actor');
 const { archiveLines } = require('../services/lineHistory');
 const { normalizePaymentMethodValue } = require('../utils/paymentMethodUtils');
@@ -299,7 +300,7 @@ const createPurchase = async (req, res) => {
       });
     }
     
-    res.status(500).json({ error: 'Server error: ' + error.message });
+    sendServerError(res, error);
   } finally {
     connection.release();
   }
@@ -416,7 +417,7 @@ const getAllPurchases = async (req, res) => {
     res.json(purchases);
   } catch (error) {
     console.error('Error fetching purchases:', error);
-    res.status(500).json({ error: 'Server error: ' + error.message });
+    sendServerError(res, error);
   }
 };
 
@@ -533,7 +534,7 @@ const getPurchaseById = async (req, res) => {
     
   } catch (error) {
     console.error('Error fetching purchase:', error);
-    res.status(500).json({ error: 'Server error: ' + error.message });
+    sendServerError(res, error);
   }
 };
 
@@ -789,7 +790,7 @@ const getNonPaidPurchases = async (req, res) => {
     res.json(purchases);
   } catch (error) {
     console.error('Error fetching non-paid purchases:', error);
-    res.status(500).json({ error: 'Server error: ' + error.message });
+    sendServerError(res, error);
   }
 };
 
@@ -828,7 +829,7 @@ const getPendingInvoicesBySupplier = async (req, res) => {
     })));
   } catch (error) {
     console.error('Error fetching pending invoices:', error);
-    res.status(500).json({ error: 'Server error: ' + error.message });
+    sendServerError(res, error);
   }
 };
 
@@ -1346,7 +1347,7 @@ const getPurchaseReturnsForBill = async (req, res) => {
     res.json(returns);
   } catch (error) {
     console.error('Error fetching purchase returns:', error);
-    res.status(500).json({ error: 'Server error: ' + error.message });
+    sendServerError(res, error);
   }
 };
 
@@ -1394,7 +1395,7 @@ const getSupplierBills = async (req, res) => {
     res.json(formattedBills);
   } catch (error) {
     console.error('Error fetching supplier bills:', error);
-    res.status(500).json({ error: 'Server error: ' + error.message });
+    sendServerError(res, error);
   }
 };
 
@@ -1415,11 +1416,11 @@ const addSettlementToReturn = async (req, res) => {
     const settled_by = actorId(req);
 
     if (!id || !settlements || settlements.length === 0) {
-      throw new Error('Return ID and settlements are required');
+      throw new ClientError('Return ID and settlements are required', 400);
     }
 
     if (!settled_by) {
-      throw new Error('Please log in again');
+      throw new ClientError('Please log in again', 401);
     }
 
     const [returns] = await connection.query(
@@ -1428,7 +1429,7 @@ const addSettlementToReturn = async (req, res) => {
     );
 
     if (returns.length === 0) {
-      throw new Error('Purchase return not found');
+      throw new ClientError('Purchase return not found', 404);
     }
 
     const purchaseReturn = returns[0];
@@ -1577,9 +1578,7 @@ const addSettlementToReturn = async (req, res) => {
   } catch (error) {
     await connection.rollback();
     console.error('Error adding settlement to return:', error);
-    res.status(500).json({ 
-      error: 'Server error: ' + error.message 
-    });
+    sendServerError(res, error);
   } finally {
     connection.release();
   }

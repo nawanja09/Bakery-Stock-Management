@@ -4,6 +4,7 @@ const router = express.Router();
 const purchaseController = require('../controllers/purchaseController');
 const paymentHistoryController = require('../controllers/paymentHistoryController');
 const pool = require('../config/db');
+const { sendServerError } = require('../utils/safeError');
 const { rawMaterialAccess } = require('../middleware/moduleAccess');
 
 router.use(...rawMaterialAccess);
@@ -103,7 +104,7 @@ router.get('/details/:id', async (req, res) => {
     
   } catch (error) {
     console.error('Error fetching purchase details:', error);
-    res.status(500).json({ error: 'Server error: ' + error.message });
+    sendServerError(res, error);
   }
 });
 

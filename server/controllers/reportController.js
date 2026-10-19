@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { sendServerError } = require('../utils/safeError');
 const { normalizePaymentMethodValue } = require('../utils/paymentMethodUtils');
 const { loadExpenseRecords, dateFilters } = require('./analystController');
 
@@ -221,7 +222,7 @@ const getStockReport = async (req, res) => {
 
   } catch (error) {
     console.error('Error generating stock report:', error.message, error.stack);
-    res.status(500).json({ error: 'Server error: ' + error.message });
+    sendServerError(res, error);
   }
 };
 
@@ -565,7 +566,7 @@ const getStockReportByRangeAndItem = async (req, res) => {
     res.json(report);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Server error: ' + err.message });
+    sendServerError(res, err);
   }
 };
 
@@ -1336,7 +1337,7 @@ const getDepartmentReturnItemWiseReport = async (req, res) => {
 
   } catch (error) {
     console.error('Error generating department return item wise report:', error);
-    res.status(500).json({ error: 'Server error: ' + error.message });
+    sendServerError(res, error);
   }
 };
 
@@ -1398,7 +1399,7 @@ const getLastIssueDateReport = async (req, res) => {
     res.json(data);
   } catch (error) {
     console.error('Error generating last issue date report:', error);
-    res.status(500).json({ error: 'Server error: ' + error.message });
+    sendServerError(res, error);
   }
 };
 
@@ -1559,7 +1560,7 @@ const getPurchaseReport = async (req, res) => {
     res.json({ invoices, grandTotal, vatTotal, withoutVatTotal, dateType });
   } catch (error) {
     console.error('Error generating purchase report:', error);
-    res.status(500).json({ error: 'Server error: ' + error.message });
+    sendServerError(res, error);
   }
 };
 
@@ -1834,7 +1835,7 @@ const getExpensesReport = async (req, res) => {
     res.json({ expenses, grandTotal, pettyCashTotal, otherTotal, bankChargesTotal, cashExpensesTotal, rmPurchasingTotal, hiddenExpensesTotal });
   } catch (error) {
     console.error('Error generating expenses report:', error);
-    res.status(500).json({ error: 'Server error: ' + error.message });
+    sendServerError(res, error);
   }
 };
 
@@ -2049,7 +2050,7 @@ const sumExpenseTotals = (rows) => ({
 const sendExpenseSummaryError = (res, error, label) => {
   const isBadRequest = error.message.startsWith('Invalid') || error.message.includes('cannot be');
   if (!isBadRequest) console.error(`Error generating ${label}:`, error);
-  res.status(isBadRequest ? 400 : 500).json({ error: isBadRequest ? error.message : 'Server error: ' + error.message });
+  res.status(isBadRequest ? 400 : 500).json({ error: isBadRequest ? error.message : 'Server error' });
 };
 
 const getExpenseSummaryReport = async (req, res) => {

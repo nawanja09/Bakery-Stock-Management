@@ -1,5 +1,6 @@
 // server/controllers/financeController.js
 const pool = require('../config/db');
+const { sendServerError } = require('../utils/safeError');
 const { actorId } = require('../utils/actor');
 const {
   recordCashTransaction,
@@ -289,7 +290,7 @@ const setCashOpeningBalance = async (req, res) => {
   } catch (error) {
     await connection.rollback();
     console.error('Error setting cash opening balance:', error);
-    res.status(500).json({ error: 'Server error: ' + error.message });
+    sendServerError(res, error);
   } finally {
     connection.release();
   }

@@ -1,5 +1,6 @@
 // controllers/supplierCreditController.js
 const pool = require('../config/db');
+const { sendServerError } = require('../utils/safeError');
 const { actorId } = require('../utils/actor');
 const { normalizePaymentMethodValue } = require('../utils/paymentMethodUtils');
 const { recordCashTransaction, recordBankTransaction } = require('../utils/financeLedger');
@@ -109,7 +110,7 @@ const getSupplierCredits = async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching supplier credits:', error);
-    res.status(500).json({ error: 'Server error: ' + error.message });
+    sendServerError(res, error);
   }
 };
 
@@ -157,7 +158,7 @@ const getSupplierOutstanding = async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching supplier outstanding:', error);
-    res.status(500).json({ error: 'Server error: ' + error.message });
+    sendServerError(res, error);
   }
 };
 
@@ -285,7 +286,7 @@ const createOverpayment = async (req, res) => {
       return res.status(400).json({ error: error.message });
     }
     console.error('Error creating overpayment:', error);
-    res.status(500).json({ error: 'Server error: ' + error.message });
+    sendServerError(res, error);
   } finally {
     connection.release();
   }
@@ -436,7 +437,7 @@ const settleCreditToInvoice = async (req, res) => {
   } catch (error) {
     await connection.rollback();
     console.error('Error settling credit:', error);
-    res.status(500).json({ error: 'Server error: ' + error.message });
+    sendServerError(res, error);
   } finally {
     connection.release();
   }
@@ -472,7 +473,7 @@ const getSupplierCreditHistory = async (req, res) => {
     res.json(history);
   } catch (error) {
     console.error('Error fetching credit history:', error);
-    res.status(500).json({ error: 'Server error: ' + error.message });
+    sendServerError(res, error);
   }
 };
 
@@ -606,7 +607,7 @@ const getAllOutstandingRecords = async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching all outstanding records:', error);
-    res.status(500).json({ error: 'Server error: ' + error.message });
+    sendServerError(res, error);
   }
 };
 

@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { sendServerError, ClientError } = require('../utils/safeError');
 const { recordRmAdjustment, recordFinancialAdjustment, sameValue } = require('../utils/rmAdjustmentAudit');
 const { checkDuplicateReference } = require('../services/referenceValidationService');
 const otherLedgerService = require('../services/otherLedgerService');
@@ -300,7 +301,7 @@ const getAdjustmentValues = ({ systemQuantity, actual_qty, unit_price }) => {
   const unitPrice = Number(unit_price);
 
   if (![systemQuantity, actualQuantity, unitPrice].every(Number.isFinite)) {
-    throw new Error('actual_qty and unit_price must be valid numbers');
+    throw new ClientError('actual_qty and unit_price must be valid numbers', 400);
   }
 
   const variance = Number((actualQuantity - systemQuantity).toFixed(3));
@@ -314,7 +315,7 @@ const getAdjustmentValues = ({ systemQuantity, actual_qty, unit_price }) => {
 // client's system_qty is never trusted). Throws if the item does not exist.
 const resolveSystemQuantity = async (connection, itemId) => {
   const [rows] = await connection.query('SELECT id FROM items WHERE id = ? AND deleted = FALSE FOR UPDATE', [itemId]);
-  if (rows.length === 0) throw new Error('Item not found');
+  if (rows.length === 0) throw new ClientError('Item not found', 404);
   // forUpdate: true - a plain read here could still see a stale snapshot from an
   // earlier, unrelated read in this same transaction (see rmStockService.js).
   const stock = await getItemStock(connection, itemId, { forUpdate: true });
@@ -397,7 +398,7 @@ const createAdjustment = async (req, res) => {
     await connection.rollback();
     if (error.message === 'Item not found') return res.status(404).json({ error: error.message });
     console.error('Error creating adjustment:', error);
-    res.status(500).json({ error: 'Server error: ' + error.message });
+    sendServerError(res, error);
   } finally {
     connection.release();
   }
@@ -843,7 +844,7 @@ const updateAdjustment = async (req, res) => {
     await connection.rollback();
     if (error.message === 'Item not found') return res.status(404).json({ error: error.message });
     console.error('Error updating adjustment:', error);
-    res.status(500).json({ error: 'Server error: ' + error.message });
+    sendServerError(res, error);
   } finally {
     connection.release();
   }
@@ -881,7 +882,7 @@ const deleteAdjustment = async (req, res) => {
   } catch (error) {
     await connection.rollback();
     console.error('Error deleting adjustment:', error);
-    res.status(500).json({ error: 'Server error: ' + error.message });
+    sendServerError(res, error);
   } finally {
     connection.release();
   }
@@ -931,7 +932,7 @@ const approveAdjustment = async (req, res) => {
   } catch (error) {
     await connection.rollback();
     console.error('Error approving adjustment:', error);
-    res.status(500).json({ error: 'Server error: ' + error.message });
+    sendServerError(res, error);
   } finally {
     connection.release();
   }

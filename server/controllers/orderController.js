@@ -9,6 +9,7 @@
 // (controllers/purchaseController.js:createPurchase), exactly as before.
 
 const pool = require('../config/db');
+const { sendServerError } = require('../utils/safeError');
 const { actorId } = require('../utils/actor');
 const { getAllItemsWithStock, getItemStock } = require('../services/rmStockService');
 
@@ -161,7 +162,7 @@ const createOrder = async (req, res) => {
   } catch (error) {
     await connection.rollback();
     console.error('Error creating order:', error);
-    res.status(500).json({ error: 'Server error: ' + error.message });
+    sendServerError(res, error);
   } finally {
     connection.release();
   }
@@ -351,7 +352,7 @@ const cancelOrder = async (req, res) => {
   } catch (error) {
     await connection.rollback();
     console.error('Error cancelling order:', error);
-    res.status(500).json({ error: 'Server error: ' + error.message });
+    sendServerError(res, error);
   } finally {
     connection.release();
   }

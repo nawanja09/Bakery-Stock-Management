@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { sendServerError } = require('../utils/safeError');
 
 // Helper function to get date range
 const getDateRange = (days = 7) => {
@@ -87,7 +88,7 @@ exports.getDashboardStats = async (req, res) => {
 
   } catch (error) {
     console.error("Error in getDashboardStats:", error);
-    res.status(500).json({ error: 'Server error', details: error.message });
+    sendServerError(res, error);
   }
 };
 
@@ -123,7 +124,7 @@ exports.getGeneralStats = async (req, res) => {
 
   } catch (error) {
     console.error("Error in getGeneralStats:", error);
-    res.status(500).json({ error: 'Server error', details: error.message });
+    sendServerError(res, error);
   }
 };
 
@@ -221,7 +222,7 @@ exports.getDashboardOverview = async (req, res) => {
     });
   } catch (error) {
     console.error('Error in getDashboardOverview:', error);
-    res.status(500).json({ error: 'Server error', details: error.message });
+    sendServerError(res, error);
   }
 };
 
@@ -427,7 +428,7 @@ exports.getTopItems = async (req, res) => {
     });
   } catch (error) {
     console.error('Error in getTopItems:', error);
-    res.status(500).json({ error: 'Server error', details: error.message });
+    sendServerError(res, error);
   }
 };
 
@@ -502,6 +503,6 @@ exports.getChartData = async (req, res) => {
 
   } catch (error) {
     console.error("Error in getChartData:", error);
-    res.status(500).json({ error: 'Server error', details: error.message });
+    sendServerError(res, error);
   }
 };

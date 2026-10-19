@@ -552,6 +552,16 @@ const ensurePeriodLockSchema = async () => {
 };
 pool.periodLockSchemaReady = ensurePeriodLockSchema();
 
+// Row-lock handles for duplicate voucher / invoice numbers (audit R9a) -
+// services/referenceValidationService.js, migrations/041_reference_locks.sql.
+pool.referenceLocksSchemaReady = pool.query(`
+  CREATE TABLE IF NOT EXISTS reference_locks (
+    ref_norm VARCHAR(100) NOT NULL,
+    locked_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (ref_norm)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin
+`).catch((error) => console.warn('reference_locks schema check skipped:', error.message));
+
 // Audit Trail (append-only) - services/auditLog.js, migrations/037_audit_log.sql.
 pool.auditLogSchemaReady = require('../services/auditLog').ensureAuditLogSchema(pool)
   .catch((error) => console.warn('audit_log schema check skipped:', error.message));
