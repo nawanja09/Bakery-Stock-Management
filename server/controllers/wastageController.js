@@ -3,6 +3,16 @@ const { v4: uuidv4 } = require('uuid');
 const { isRmAdjustmentRequest, recordRmAdjustment, sameItems, sameValue } = require('../utils/rmAdjustmentAudit');
 const { actorId, approverName } = require('../utils/actor');
 const { archiveLines } = require('../services/lineHistory');
+const { DocumentError, requireDate, prepareStockLines } = require('../utils/documentLines');
+
+// estimated_loss is a cost figure the client computes (quantity x a recent unit
+// cost) - the server has no single authoritative unit cost to recompute it from
+// (that gap is tracked separately, audit findings C4/C5), so it is only range
+// checked here, never recomputed (audit finding R7).
+const validEstimatedLoss = (value) => {
+  const loss = Number(value ?? 0);
+  return Number.isFinite(loss) && loss >= 0 && loss <= 1e8;
+};
 
 // Create wastage
 const createWastage = async (req, res) => {
@@ -17,12 +27,22 @@ const createWastage = async (req, res) => {
   try {
     await connection.beginTransaction();
 
+    // Checked on the server (audit finding R7): a real date, real items, quantities
+    // above 0, and an estimated loss that is at least a sane, non-negative number.
+    requireDate(date, 'Wastage date');
+    const lines = await prepareStockLines(connection, items);
+    for (const [index, line] of lines.entries()) {
+      if (!validEstimatedLoss(line.source.estimated_loss)) {
+        throw new DocumentError(`Line ${index + 1}: estimated loss must be a valid, non-negative number`);
+      }
+    }
+
     // Approved By: the approver named on the form, otherwise the signed-in user.
     const approved_by = await approverName(connection, req, req.body.approved_by);
 
     const [wastageResult] = await connection.query(
-      `INSERT INTO wastages 
-      (wastage_note_number, date, approved_by, reason, remarks, entered_by) 
+      `INSERT INTO wastages
+      (wastage_note_number, date, approved_by, reason, remarks, entered_by)
       VALUES (?, ?, ?, ?, ?, ?)`,
       [wastage_note_number, date, approved_by, reason, remarks, user_id]
     );
@@ -31,17 +51,16 @@ const createWastage = async (req, res) => {
 
     let totalEstimatedLoss = 0;
 
-    for (const item of items) {
+    for (const line of lines) {
+      const estimatedLoss = Number(line.source.estimated_loss ?? 0);
       await connection.query(
-        `INSERT INTO wastage_items 
-        (wastage_id, item_id, quantity, estimated_loss) 
+        `INSERT INTO wastage_items
+        (wastage_id, item_id, quantity, estimated_loss)
         VALUES (?, ?, ?, ?)`,
-        [wastageId, item.item_id, item.quantity, item.estimated_loss]
+        [wastageId, line.itemId, line.quantity, estimatedLoss]
       );
 
-      if (item.estimated_loss) {
-        totalEstimatedLoss += parseFloat(item.estimated_loss);
-      }
+      totalEstimatedLoss += estimatedLoss;
     }
 
     await connection.commit();
@@ -54,6 +73,7 @@ const createWastage = async (req, res) => {
 
   } catch (error) {
     await connection.rollback();
+    if (error.name === 'DocumentError') return res.status(error.status).json({ error: error.message });
     console.error('Error creating wastage:', error.stack);
     res.status(500).json({ error: 'Server error' });
   } finally {
@@ -191,6 +211,15 @@ const updateWastage = async (req, res) => {
   try {
     await connection.beginTransaction();
 
+    // Checked on the server (audit finding R7), same rule as createWastage.
+    requireDate(date, 'Wastage date');
+    const lines = await prepareStockLines(connection, items);
+    for (const [index, line] of lines.entries()) {
+      if (!validEstimatedLoss(line.source.estimated_loss)) {
+        throw new DocumentError(`Line ${index + 1}: estimated loss must be a valid, non-negative number`);
+      }
+    }
+
     // Approved By: the approver named on the form, otherwise the signed-in user.
     const approved_by = await approverName(connection, req, req.body.approved_by);
 
@@ -235,17 +264,16 @@ const updateWastage = async (req, res) => {
 
     // Insert updated items
     let totalEstimatedLoss = 0;
-    for (const item of items) {
+    for (const line of lines) {
+      const estimatedLoss = Number(line.source.estimated_loss ?? 0);
       await connection.query(
-        `INSERT INTO wastage_items 
-        (wastage_id, item_id, quantity, estimated_loss) 
+        `INSERT INTO wastage_items
+        (wastage_id, item_id, quantity, estimated_loss)
         VALUES (?, ?, ?, ?)`,
-        [id, item.item_id, item.quantity, item.estimated_loss]
+        [id, line.itemId, line.quantity, estimatedLoss]
       );
 
-      if (item.estimated_loss) {
-        totalEstimatedLoss += parseFloat(item.estimated_loss);
-      }
+      totalEstimatedLoss += estimatedLoss;
     }
 
     const wastageChanged = trackRmAdjustment && originalWastage && (
@@ -271,6 +299,7 @@ const updateWastage = async (req, res) => {
 
   } catch (error) {
     await connection.rollback();
+    if (error.name === 'DocumentError') return res.status(error.status).json({ error: error.message });
     console.error('Error updating wastage:', error.stack);
     res.status(500).json({ error: 'Server error' });
   } finally {

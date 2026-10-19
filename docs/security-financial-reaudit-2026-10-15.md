@@ -35,7 +35,7 @@ So brief domains 2–4 (valuation, double entry, P&L) are mostly **design gaps**
 | **R4** | **Fixed** 2026-10-15 (was MEDIUM) | Actor spoofing survived the N4 sweep: `issued_by`, `approved_by`, `user_name`, `settled_by` (written into `payment_history.created_by`) | **new** |
 | **R5** | **Fixed** 2026-10-19 (was MEDIUM) | `InsufficientBalanceError` was never thrown, so Cash in Hand can be driven negative; every "insufficient balance" handler is dead code | **new** |
 | **R6** | **Fixed** 2026-10-17 (route removed) | `GET /api/cutlery-reports/stock-report/test` writes fake purchases, transfers and damages into production data | **new** |
-| **R7** | MEDIUM | GRN, issuance, wastage and return payloads are not validated: negative quantities, and client-supplied subtotal/VAT/total | **new** |
+| **R7** | **Fixed** 2026-10-19 (was MEDIUM) | GRN, issuance, wastage and return payloads are not validated: negative quantities, and client-supplied subtotal/VAT/total | **new** |
 | **R8** | **Fixed** (void, not delete) | Deleting a bank charge hard-deleted its `finance_transactions` row | **new** (H5 instance) |
 | H3 | MEDIUM (latent) | `paid_amount` client-set on create/update; "Initial payment" not booked in the cash book | carried |
 | M3 | MEDIUM | Approver can post amounts they never reviewed (pending rows are re-synced in place) | carried |
@@ -170,7 +170,7 @@ Store Keeper POST /api/purchases/pay-multiple     => allowed
 Store Keeper POST /api/suppliers/pay-now          => allowed   (advance payment, posts Cash/Bank)
 Store Keeper POST /api/purchase-returns/5/settle  => allowed
 ```
-**Impact:** the same person can raise a GRN (supplier, quantities and prices are all client-set, see R7) **and** release Cash/Bank against it. This is the classic fictitious-vendor and inflated-invoice fraud path. The 10-14 decision applied segregation of duties to collections. AP has none.
+**Impact:** the same person can raise a GRN (supplier and quantities are client-chosen; R7 now validates and server-recomputes the numbers, but does not require a second person) **and** release Cash/Bank against it. This is the classic fictitious-vendor and inflated-invoice fraud path. The 10-14 decision applied segregation of duties to collections. AP has none.
 
 **Fix:** keep GRN entry with Stores, and move money-out to Accountant (and Admin) with `writeRoles`. No controller change is needed:
 ```js
@@ -333,37 +333,13 @@ Add an `allowNegative = false` parameter. Leave bank accounts permissive unless 
 **Fix:** delete the route and the function. If it is needed, move it to a script that runs against the `_test` database only (`tests/db/useTestDatabase.js`).
 
 ### R7: GRN and stock-movement payloads are not validated
-- `createPurchase` / `updatePurchase` (`purchaseController.js:170,226-233,556,581-588`): `items[].quantity` and `unit_price` are inserted as-is (negative, zero or text). `subtotal`, `vat_amount` and `total_with_vat` are stored as the client sent them and never recomputed from the lines. A negative quantity on a GRN **reduces** stock. An inflated `total_with_vat` raises the amount payable (and with R2, the person who typed it can pay it).
-- Issuance, wastage and return items have the same gap. A negative issuance quantity **adds** stock.
-
-```js
-// utils/validateLines.js
-const toCents = (v) => Math.round(Number(v) * 100);
-const validateLines = (items, { needsPrice }) => {
-  if (!Array.isArray(items) || items.length === 0 || items.length > 500) throw httpError(400, 'At least one item is required');
-  return items.map((it, i) => {
-    const itemId = Number(it.item_id);
-    const qty = Number(it.quantity);
-    if (!Number.isInteger(itemId) || itemId <= 0) throw httpError(400, `Line ${i + 1}: invalid item`);
-    if (!Number.isFinite(qty) || qty <= 0 || qty > 1e6 || Math.round(qty * 1000) !== qty * 1000) throw httpError(400, `Line ${i + 1}: quantity must be > 0 (max 3 decimals)`);
-    if (!needsPrice) return { item_id: itemId, quantity: qty };
-    const price = Number(it.unit_price);
-    if (!Number.isFinite(price) || price < 0 || price > 1e8) throw httpError(400, `Line ${i + 1}: invalid unit price`);
-    return { item_id: itemId, quantity: qty, unit_price: price, lineCents: Math.round(qty * price * 100) };
-  });
-};
-// createPurchase / updatePurchase
-const lines = validateLines(items, { needsPrice: true });
-const subtotalCents = lines.reduce((s, l) => s + l.lineCents, 0);
-const vatRate = Number(vat_rate);
-if (![0, 18].includes(vatRate)) throw httpError(400, 'Unsupported VAT rate');   // confirm the allowed rates
-const vatCents = Math.round(subtotalCents * vatRate / 100);
-if (Math.abs(toCents(total_with_vat) - (subtotalCents + vatCents)) > 1) {
-  throw httpError(400, 'Invoice total does not match its lines. Re-check quantities, prices and VAT.');
-}
-// store subtotalCents/100, vatCents/100, (subtotalCents+vatCents)/100 - never the client's numbers
-```
-Also confirm that each `item_id` exists and is active, and that `supplier_id` / `company_id` exist (`SELECT … FOR SHARE`). Check the supplier's invoice before deploying: some suppliers round VAT per line. If so, allow ±1 cent per line rather than ±1 overall.
+> **Fixed (2026-10-19, uncommitted).** Every document that carries item lines now validates each one server-side (`utils/documentLines.js`) - `item_id` must be a real, non-deleted item; `quantity` must be a plain positive number with at most 3 decimal places (so a negative or zero quantity can never reduce or increase stock); a priced line's `unit_price` must be a valid, non-negative number. The client's numbers are never trusted past that point:
+> - **Purchase (`createPurchase`/`updatePurchase`)**: `subtotal`, `vat_amount` and `total_with_vat` are always **recomputed from the validated lines** (`preparePricedLines` + `totalPricedLines`), never stored as the client sent them - an inflated `total_with_vat` can no longer raise the amount payable. The supplier's VAT registration is re-verified from the database (never trusted from the client, same rule Purchase Return already followed), and VAT is applied per line only when that line's item is itself `vat_applicable` in the `items` table - not whatever the client claims about it. `vat_rate` itself is still a trusted input (the system supports more than the single 18% rate); only the computed totals are never trusted.
+> - **Issuance** already got the equivalent fix as part of H4 (`services/stockAvailability.js` locks and validates every line before writing). **Return** (`returnController.js`) already used `prepareStockLines` from an earlier fix in this engagement. This pass closes the three remaining gaps:
+>   - **Wastage (`createWastage`/`updateWastage`)**: quantity validated the same way; `estimated_loss` is range-checked (a valid, non-negative number) but not recomputed - there is no single authoritative unit cost to recompute it from yet (tracked separately as the valuation/COGS design gap, C4/C5).
+>   - **Purchase Return (`createPurchaseReturn`)**: `return_quantity` and `unit_price` validated the same way. Before the fix, a negative `return_quantity` would flow through to `purchase_return_items`, and since stock reads **subtract** that column, it would silently **add** stock back instead of recording a return - the mirror image of the issuance bug.
+> - Tests: `tests/documentLines.test.js` (12, pure unit tests of the shared helpers) and `tests/db/lineValidation.test.js` (9, over real HTTP against the test database) - bad quantity/price rejected for all three documents, unknown item/supplier rejected, and the purchase-totals recomputation specifically mutation-tested (reverting the fix makes that test fail, confirming it actually catches the regression). Full unit suite (267) and full DB suite (122, 2 skipped) both pass with no regressions.
+> - **Not covered:** Wastage and Return still have no stock-availability check (same note as H4) - they can reduce stock below zero; Purchase's `item_name` (a free-text display column) is trusted from the client when present, and only falls back to the item's real name when absent, so a mismatched display name is still possible (cosmetic, not a stock or money risk).
 
 ### R8: Bank-charge delete removes the ledger row
 `routes/expenseRoutes.js:1220-1253` runs `DELETE FROM bank_charges` and then **`DELETE FROM finance_transactions`** (`:1242`), and patches the `bank_details.current_balance` cache by hand. The cash/bank ledger is the only book of record, and a row disappears from it with no trace. Every other void in the codebase (`cashOtherLedgerController.voidCashIssued`, `financeController`) reverses with `status = 0` or a contra row.
@@ -401,9 +377,9 @@ After that, `REVOKE DELETE ON bsms.finance_transactions FROM 'bsms_app'@'%'` (ru
 |---|---|
 | 1. Ingestion auth | **Good.** ECDSA P-256 signed pulls with nonce and 5-min window. Strict same-origin pagination and HTTPS in production (N1 fixed). Host not yet signed (low). |
 | 1. Idempotency | **Good for collections.** `UNIQUE(source_system, source_type, source_id)`, unique completed reference (N2), `FOR UPDATE` in id order with per-record savepoints. Supplier payments: fixed 2026-10-15 (R1: invoice lock first, `request_id` UNIQUE). |
-| 1. Payload validation | Collections: heuristic mapping (M4), POS total cross-check before approval (`collectionService.js:410-414`). GRNs and stock lines: **none** (R7). |
+| 1. Payload validation | Collections: heuristic mapping (M4), POS total cross-check before approval (`collectionService.js:410-414`). GRNs and stock lines: **fixed 2026-10-19** (R7: item/quantity/price validated, purchase totals server-recomputed). |
 | 2. Valuation / COGS | Not implemented (C5). Last-price valuation, and the balance-sheet stores value is skewed by deleted wastage (R3). |
-| 2. Atomic stock reductions | Issue to Department: **fixed 2026-10-19** (H4: item lock + live availability check before writing). Wastage / Return: still none. Negative quantities accepted (R7). |
+| 2. Atomic stock reductions | Issue to Department: **fixed 2026-10-19** (H4: item lock + live availability check before writing). Wastage / Return: no availability check yet, but negative quantities are now rejected (**fixed 2026-10-19**, R7). |
 | 2. Adjustments / write-offs | **Fixed 2026-10-19** (H4): server-resolved `system_qty`, maker-checker approval (no stock effect until a different user approves). Deleted wastage still reduces stock (R3). No loss-ledger posting (C4). |
 | 3. Double entry / CoA | Absent (C4). AP and cash book can diverge silently (R1, H3). |
 | 3. Approval workflows | Collections: Accountant-only approve (good). Expenses: none (H5). Supplier payments: Store Keeper can pay (R2, accepted 2026-10-15). |
@@ -420,7 +396,7 @@ After that, `REVOKE DELETE ON bsms.finance_transactions FROM 'bsms_app'@'%'` (ru
 | When | Action |
 |---|---|
 | **Now** | R3 done (route removed); check production for `wastages.status = 0`. R6 (delete the test route). Run the R1 data-check SQL on production. |
-| **This week** | R1 done (lock first, cap, excess → supplier credit, request_id). R4 (`actorId`). R5 (negative cash guard). R7 (line validation + server-side totals). R8 (void, not delete) + least-privilege DB user. |
+| **This week** | R1 done (lock first, cap, excess → supplier credit, request_id). R4 (`actorId`). R5 (negative cash guard). R7 done (line validation + server-side totals). R8 (void, not delete) + least-privilege DB user. |
 | **2–4 weeks** | H7 done. H4 done (issuance availability lock + adjustment maker-checker; same pattern still needed for Wastage/Return). H5 expense approval + void-not-delete everywhere. H6 `audit_log` + `integration_sync_log`. M3 payload hash. R9 reference registry. M7 single stock definition (also removes R10). |
 | **Quarter** | C4 GL and posting map. C5 WAC + RAVON sale lines. M5 money migration. M8 company scoping. BSMS-SIG-2. |
 

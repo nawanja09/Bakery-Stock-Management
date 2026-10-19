@@ -1,6 +1,24 @@
 // controllers/purchaseReturnController.js
 const pool = require('../config/db');
 const { actorId } = require('../utils/actor');
+const { DocumentError } = require('../utils/documentLines');
+
+// Validates a return line's quantity and unit price server-side (audit finding
+// R7): a negative return_quantity would otherwise flow through to
+// purchase_return_items and, since getCurrentStock/getItemStock SUBTRACT that
+// column, silently ADD stock back instead of recording a return.
+const validateReturnLine = (item, index) => {
+  const quantity = Number(item?.return_quantity);
+  const unitPrice = Number(item?.unit_price);
+  if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 1e6
+    || Math.abs(quantity * 1000 - Math.round(quantity * 1000)) > 1e-8) {
+    throw new DocumentError(`Line ${index + 1}: quantity must be greater than 0 with at most 3 decimal places`);
+  }
+  if (!Number.isFinite(unitPrice) || unitPrice < 0 || unitPrice > 1e8) {
+    throw new DocumentError(`Line ${index + 1}: unit price must be a valid, non-negative number`);
+  }
+  return { quantity, unitPrice };
+};
 
 // Get all purchases for return selection
 const getPurchasesForReturn = async (req, res) => {
@@ -180,8 +198,7 @@ const createPurchaseReturn = async (req, res) => {
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
 
-      const quantity  = parseFloat(item.return_quantity) || 0;
-      const unitPrice = parseFloat(item.unit_price)      || 0;
+      const { quantity, unitPrice } = validateReturnLine(item, i);
       const amount    = quantity * unitPrice;
       subtotal += amount;
 
@@ -425,7 +442,8 @@ const createPurchaseReturn = async (req, res) => {
   } catch (error) {
     await connection.rollback();
     console.error('Error creating purchase return:', error);
-    
+
+    if (error.name === 'DocumentError') return res.status(error.status).json({ error: error.message });
     if (error.code === 'ER_DUP_ENTRY') {
       return res.status(400).json({ 
         error: 'Return number already exists. Please use a unique return number.' 

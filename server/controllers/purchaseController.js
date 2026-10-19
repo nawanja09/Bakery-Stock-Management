@@ -7,6 +7,7 @@ const { recordCashTransaction, recordBankTransaction, refreshBalancesOfReference
 const { checkDuplicateReference, DuplicateReferenceError } = require('../services/referenceValidationService');
 const { isRmAdjustmentRequest, recordRmAdjustment, sameItems, sameValue } = require('../utils/rmAdjustmentAudit');
 const { SETTLEMENT_PAYMENT_METHODS, isSettlementPaymentMethod } = require('../services/settlementPaymentMethods');
+const { DocumentError, preparePricedLines, totalPricedLines } = require('../utils/documentLines');
 
 // Advance / purchase-return settlements moved no money from Cash or Bank, so
 // Purchasing Payment adjustments (which re-post the ledger) must not touch them.
@@ -175,7 +176,35 @@ const createPurchase = async (req, res) => {
       }
     }
 
-    const effectiveInvoiceTotal = parseFloat(total_with_vat) || (parseFloat(subtotal || 0) + parseFloat(vat_amount || 0));
+    const resolvedPreparedBy = actorId(req); // the signed-in user, never the client's prepared_by
+
+    if (!resolvedPreparedBy) {
+      await connection.rollback();
+      return res.status(400).json({ error: 'No valid user found for purchase audit' });
+    }
+
+    // Re-verify the supplier's VAT registration from the DB - never trust the
+    // client for this (audit finding R7, same rule as purchase returns).
+    const [supplierRows] = await connection.query(
+      'SELECT vat_registered FROM supplier WHERE id = ?', [supplier_id]
+    );
+    if (supplierRows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ error: 'Supplier not found' });
+    }
+    const supplierVatRegistered = supplierRows[0].vat_registered === 1 || supplierRows[0].vat_registered === true;
+    // Same fallback as purchase returns (services/.../purchaseReturnController): the
+    // system-wide rate of 18 when the client sends nothing usable.
+    const resolvedVatRate = parseFloat(vat_rate) > 0 ? parseFloat(vat_rate) : 18;
+
+    // Every line is validated server-side (item exists, quantity > 0, unit price >= 0),
+    // and subtotal / VAT / grand total are computed from those lines - never trusted
+    // from the client (audit finding R7: an inflated total_with_vat raised the amount
+    // payable, and a negative quantity would reduce stock at receiving).
+    const lines = await preparePricedLines(connection, items);
+    const totals = totalPricedLines(lines, { vatRate: resolvedVatRate, supplierVatRegistered });
+    const effectiveInvoiceTotal = totals.totalWithVat;
+
     // The amount entered by the user can exceed this invoice's total (an overpayment).
     // The invoice's own paid_amount must never exceed its own total - any excess is
     // independent supplier credit, not part of this invoice's Paid Amount.
@@ -187,22 +216,16 @@ const createPurchase = async (req, res) => {
     const normalizedBalanceAmount = paymentState.balance_amount;
     const normalizedBalanceStatus = paymentState.balance_status;
     const normalizedPaymentStatus = paymentState.payment_status;
-    const resolvedPreparedBy = actorId(req); // the signed-in user, never the client's prepared_by
-
-    if (!resolvedPreparedBy) {
-      await connection.rollback();
-      return res.status(400).json({ error: 'No valid user found for purchase audit' });
-    }
 
     // Insert purchase
     const [purchaseResult] = await connection.query(
-      `INSERT INTO purchases 
-      (invoice_no, purchase_date, invoice_date, supplier_id, bill_amount, subtotal, vat_amount, 
-       total_with_vat, vat_rate, paid_amount, balance_amount, balance_status, 
-       payment_method, check_number, remarks, prepared_by, company_id, order_id, payment_status) 
+      `INSERT INTO purchases
+      (invoice_no, purchase_date, invoice_date, supplier_id, bill_amount, subtotal, vat_amount,
+       total_with_vat, vat_rate, paid_amount, balance_amount, balance_status,
+       payment_method, check_number, remarks, prepared_by, company_id, order_id, payment_status)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [invoice_no, purchase_date, invoice_date || null, supplier_id, total_with_vat, subtotal, vat_amount, 
-       total_with_vat, vat_rate, normalizedPaidAmount, normalizedBalanceAmount, normalizedBalanceStatus, 
+      [invoice_no, purchase_date, invoice_date || null, supplier_id, totals.totalWithVat, totals.subtotal, totals.vatAmount,
+       totals.totalWithVat, resolvedVatRate, normalizedPaidAmount, normalizedBalanceAmount, normalizedBalanceStatus,
        payment_method, check_number, remarks, resolvedPreparedBy, company_id, order_id || null, normalizedPaymentStatus]
     );
     
@@ -230,13 +253,13 @@ const createPurchase = async (req, res) => {
 
     // Advance Payments are now handled via a dedicated flow.
 
-    // Insert purchase items
-    for (const item of items) {
+    // Insert purchase items (validated lines, not the raw request)
+    for (const line of lines) {
       await connection.query(
-        `INSERT INTO purchase_items 
-        (purchase_id, item_name, quantity, unit_price, item_id) 
+        `INSERT INTO purchase_items
+        (purchase_id, item_name, quantity, unit_price, item_id)
         VALUES (?, ?, ?, ?, ?)`,
-        [purchaseId, item.item_name, item.quantity, item.unit_price, item.item_id]
+        [purchaseId, line.itemName, line.quantity, line.unitPrice, line.itemId]
       );
     }
 
@@ -268,9 +291,10 @@ const createPurchase = async (req, res) => {
   } catch (error) {
     await connection.rollback();
     console.error('Error creating purchase:', error);
-    
+
+    if (error.name === 'DocumentError') return res.status(error.status).json({ error: error.message });
     if (error.code === 'ER_DUP_ENTRY' || error.name === 'DuplicateReferenceError') {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Invoice number already exists. Please use a unique invoice number.'
       });
     }
@@ -561,7 +585,23 @@ const updatePurchase = async (req, res) => {
       return res.status(400).json({ error: 'No valid user found for purchase audit' });
     }
 
-    const effectiveInvoiceTotal = parseFloat(total_with_vat) || (parseFloat(subtotal || 0) + parseFloat(vat_amount || 0));
+    // Re-verify the supplier's VAT registration from the DB, and validate +
+    // recompute the lines and totals server-side - same rule as createPurchase
+    // (audit finding R7).
+    const [supplierRows] = await connection.query(
+      'SELECT vat_registered FROM supplier WHERE id = ?', [supplier_id]
+    );
+    if (supplierRows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ error: 'Supplier not found' });
+    }
+    const supplierVatRegistered = supplierRows[0].vat_registered === 1 || supplierRows[0].vat_registered === true;
+    const resolvedVatRate = parseFloat(vat_rate) > 0 ? parseFloat(vat_rate) : 18;
+
+    const lines = await preparePricedLines(connection, items);
+    const totals = totalPricedLines(lines, { vatRate: resolvedVatRate, supplierVatRegistered });
+    const effectiveInvoiceTotal = totals.totalWithVat;
+
     // Editing an invoice must never let its paid_amount exceed its own total -
     // any overpayment has to go through the payment/credit flow instead, which
     // records the excess separately as supplier credit.
@@ -573,14 +613,14 @@ const updatePurchase = async (req, res) => {
     const normalizedPaymentStatus = paymentState.payment_status;
 
     await connection.query(
-      `UPDATE purchases 
-       SET invoice_no = ?, purchase_date = ?, invoice_date = ?, supplier_id = ?, bill_amount = ?, subtotal = ?, 
-           vat_amount = ?, total_with_vat = ?, vat_rate = ?, paid_amount = ?, 
-           balance_amount = ?, balance_status = ?, payment_method = ?, check_number = ?, 
+      `UPDATE purchases
+       SET invoice_no = ?, purchase_date = ?, invoice_date = ?, supplier_id = ?, bill_amount = ?, subtotal = ?,
+           vat_amount = ?, total_with_vat = ?, vat_rate = ?, paid_amount = ?,
+           balance_amount = ?, balance_status = ?, payment_method = ?, check_number = ?,
            remarks = ?, prepared_by = ?, company_id = ?, payment_status = ?
        WHERE id = ?`,
-      [invoice_no, purchase_date, invoice_date || null, supplier_id, total_with_vat, subtotal, vat_amount, 
-       total_with_vat, vat_rate, normalizedPaidAmount, normalizedBalanceAmount, normalizedBalanceStatus, 
+      [invoice_no, purchase_date, invoice_date || null, supplier_id, totals.totalWithVat, totals.subtotal, totals.vatAmount,
+       totals.totalWithVat, resolvedVatRate, normalizedPaidAmount, normalizedBalanceAmount, normalizedBalanceStatus,
        payment_method, check_number, remarks, resolvedPreparedBy, company_id, normalizedPaymentStatus, id]
     );
 
@@ -588,12 +628,12 @@ const updatePurchase = async (req, res) => {
     await archiveLines(connection, 'purchase_items', id, { userId: resolvedPreparedBy });
     await connection.query(`DELETE FROM purchase_items WHERE purchase_id = ?`, [id]);
 
-    for (const item of items) {
+    for (const line of lines) {
       await connection.query(
-        `INSERT INTO purchase_items 
-        (purchase_id, item_name, quantity, unit_price, item_id) 
+        `INSERT INTO purchase_items
+        (purchase_id, item_name, quantity, unit_price, item_id)
         VALUES (?, ?, ?, ?, ?)`,
-        [id, item.item_name, item.quantity, item.unit_price, item.item_id]
+        [id, line.itemName, line.quantity, line.unitPrice, line.itemId]
       );
     }
 
@@ -601,10 +641,10 @@ const updatePurchase = async (req, res) => {
       !sameValue(originalPurchase.invoice_no, invoice_no) ||
       !sameValue(originalPurchase.purchase_date, purchase_date) ||
       !sameValue(originalPurchase.supplier_id, supplier_id) ||
-      !sameValue(originalPurchase.subtotal, subtotal) ||
-      !sameValue(originalPurchase.vat_amount, vat_amount) ||
-      !sameValue(originalPurchase.total_with_vat, total_with_vat) ||
-      !sameValue(originalPurchase.vat_rate, vat_rate) ||
+      !sameValue(originalPurchase.subtotal, totals.subtotal) ||
+      !sameValue(originalPurchase.vat_amount, totals.vatAmount) ||
+      !sameValue(originalPurchase.total_with_vat, totals.totalWithVat) ||
+      !sameValue(originalPurchase.vat_rate, resolvedVatRate) ||
       !sameValue(originalPurchase.paid_amount, normalizedPaidAmount) ||
       !sameValue(originalPurchase.payment_method, payment_method) ||
       !sameValue(originalPurchase.check_number, check_number) ||
@@ -628,10 +668,11 @@ const updatePurchase = async (req, res) => {
   } catch (error) {
     await connection.rollback();
     console.error('Error updating purchase:', error);
-    
+
+    if (error.name === 'DocumentError') return res.status(error.status).json({ error: error.message });
     if (error.code === 'ER_DUP_ENTRY' || error.name === 'DuplicateReferenceError') {
-      return res.status(400).json({ 
-        error: error.name === 'DuplicateReferenceError' ? error.message : 'Invoice number already exists. Please use a unique invoice number.' 
+      return res.status(400).json({
+        error: error.name === 'DuplicateReferenceError' ? error.message : 'Invoice number already exists. Please use a unique invoice number.'
       });
     }
     
