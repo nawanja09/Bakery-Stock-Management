@@ -10,6 +10,5 @@ router.post('/', authenticate, returnController.createReturn);
 router.get('/', authenticate, returnController.getAllReturns);
 router.get('/:id', authenticate, returnController.getReturnById);
 router.get('/item-stock/:itemId', authenticate, returnController.getItemCurrentStock);
-router.post('/sync-stock', authenticate, returnController.syncAllStock); // Add this route
 
 module.exports = router;

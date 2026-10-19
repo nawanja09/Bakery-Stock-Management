@@ -1,6 +1,16 @@
 const pool = require('../config/db');
 const { v4: uuidv4 } = require('uuid');
+const { getItemStock } = require('../services/rmStockService');
 const { requireDate, requireDepartment, prepareStockLines } = require('../utils/documentLines');
+
+// Live stock from the one shared formula (services/rmStockService), never the
+// stale items.current_stock column (audit finding R10).
+const attachLiveStock = async (lines) => {
+  for (const line of lines) {
+    const stock = await getItemStock(pool, line.item_id);
+    line.current_stock_quantity = stock ? Number(stock.current_stock) || 0 : 0;
+  }
+};
 
 // Create new return
 const createReturn = async (req, res) => {
@@ -44,14 +54,6 @@ const createReturn = async (req, res) => {
         (return_id, item_id, quantity, reason) 
         VALUES (?, ?, ?, ?)`,
         [returnId, item.item_id, item.quantity, item.reason]
-      );
-
-      // Update current_stock in items table (increase stock since items are being returned)
-      await connection.query(
-        `UPDATE items 
-         SET current_stock = current_stock + ? 
-         WHERE id = ?`,
-        [item.quantity, item.item_id]
       );
 
       // Record stock movement
@@ -107,13 +109,13 @@ const getAllReturns = async (req, res) => {
           ri.*, 
           i.item_code, 
           i.name AS item_name,
-          i.unit,
-          COALESCE(i.current_stock, 0) AS current_stock_quantity
-        FROM return_items ri
+          i.unit
+                  FROM return_items ri
         JOIN items i ON ri.item_id = i.id
         WHERE ri.return_id = ?
       `, [returnRecord.id]);
       
+      await attachLiveStock(items);
       returnRecord.items = items;
     }
     
@@ -149,13 +151,13 @@ const getReturnById = async (req, res) => {
         ri.*, 
         i.item_code, 
         i.name AS item_name,
-        i.unit,
-        COALESCE(i.current_stock, 0) AS current_stock_quantity
-      FROM return_items ri
+        i.unit
+              FROM return_items ri
       JOIN items i ON ri.item_id = i.id
       WHERE ri.return_id = ?
     `, [id]);
     
+    await attachLiveStock(items);
     res.json({
       ...returnRecord[0],
       items
@@ -167,105 +169,20 @@ const getReturnById = async (req, res) => {
   }
 };
 
-// Get item current stock - IMPROVED VERSION
+// Get item current stock (live, from rmStockService)
 const getItemCurrentStock = async (req, res) => {
-  const { itemId } = req.params;
-  
   try {
-    // First, check if we should calculate stock from movements or use current_stock field
-    const [result] = await pool.query(
-      `SELECT 
-        id, 
-        item_code, 
-        name,
-        COALESCE(current_stock, 0) AS current_stock 
-      FROM items 
-      WHERE id = ? AND deleted = FALSE`,
-      [itemId]
-    );
-    
-    if (result.length === 0) {
-      return res.status(404).json({ error: 'Item not found' });
-    }
-    
-    // Optional: Calculate actual stock from movements for verification
-    const [movementResult] = await pool.query(`
-      SELECT 
-        COALESCE(SUM(CASE 
-          WHEN movement_type IN ('PURCHASE', 'RETURN_FROM_DEPT', 'ADJUSTMENT_POSITIVE') THEN quantity
-          WHEN movement_type IN ('ISSUANCE', 'WASTAGE', 'RETURN_TO_SUPPLIER', 'ADJUSTMENT_NEGATIVE') THEN -quantity
-          ELSE 0
-        END), 0) AS calculated_stock
-      FROM stock_movements
-      WHERE is_deleted = 0 AND item_id = ?
-    `, [itemId]);
-
-    // Return both values for debugging
-    res.json({ 
-      item_id: itemId,
-      current_stock: parseFloat(result[0].current_stock) || 0,
-      calculated_stock: parseFloat(movementResult[0].calculated_stock) || 0,
-      item_code: result[0].item_code,
-      item_name: result[0].name
+    const stock = await getItemStock(pool, req.params.itemId);
+    if (!stock) return res.status(404).json({ error: 'Item not found' });
+    res.json({
+      item_id: req.params.itemId,
+      current_stock: Number(stock.current_stock) || 0,
+      item_code: stock.item_code,
+      item_name: stock.name
     });
-    
   } catch (error) {
     console.error('Error fetching current stock:', error);
     res.status(500).json({ error: 'Server error' });
-  }
-};
-
-// Calculate and update stock for all items (for initial stock sync)
-const syncAllStock = async (req, res) => {
-  const connection = await pool.getConnection();
-  
-  try {
-    await connection.beginTransaction();
-    
-    // Get all items
-    const [items] = await connection.query(
-      'SELECT id FROM items WHERE deleted = FALSE'
-    );
-    
-    let updatedCount = 0;
-    
-    for (const item of items) {
-      // Calculate stock from movements
-      const [movementResult] = await connection.query(`
-        SELECT 
-          COALESCE(SUM(CASE 
-            WHEN movement_type IN ('PURCHASE', 'RETURN_FROM_DEPT', 'ADJUSTMENT_POSITIVE') THEN quantity
-            WHEN movement_type IN ('ISSUANCE', 'WASTAGE', 'RETURN_TO_SUPPLIER', 'ADJUSTMENT_NEGATIVE') THEN -quantity
-            ELSE 0
-          END), 0) AS calculated_stock
-        FROM stock_movements
-        WHERE is_deleted = 0 AND item_id = ?
-      `, [item.id]);
-      
-      const calculatedStock = parseFloat(movementResult[0].calculated_stock) || 0;
-      
-      // Update current_stock
-      await connection.query(
-        'UPDATE items SET current_stock = ? WHERE id = ?',
-        [calculatedStock, item.id]
-      );
-      
-      updatedCount++;
-    }
-    
-    await connection.commit();
-    
-    res.json({ 
-      message: 'Stock synchronized successfully',
-      updated_count: updatedCount
-    });
-    
-  } catch (error) {
-    await connection.rollback();
-    console.error('Error syncing stock:', error);
-    res.status(500).json({ error: 'Server error' });
-  } finally {
-    connection.release();
   }
 };
 
@@ -273,6 +190,5 @@ module.exports = {
   createReturn,
   getAllReturns,
   getReturnById,
-  getItemCurrentStock,
-  syncAllStock  // Add this export
+  getItemCurrentStock
 };
