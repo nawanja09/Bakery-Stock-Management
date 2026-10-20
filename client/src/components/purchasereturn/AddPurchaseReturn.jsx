@@ -17,6 +17,7 @@ import Select from 'react-select';
 import dayjs from 'dayjs';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
+import { fetchVatRate, DEFAULT_VAT_RATE } from '../../utils/vatRate';
 import './AddPurchaseReturn.css';
 
 const AddPurchaseReturn = () => {
@@ -46,7 +47,9 @@ const AddPurchaseReturn = () => {
   const [returnItems, setReturnItems] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  const VAT_RATE = 18;
+  // Management-configured system-wide rate (client/src/utils/vatRate.js), not a
+  // hardcoded 18.
+  const [VAT_RATE, setVatRate] = useState(DEFAULT_VAT_RATE);
 
 
 
@@ -56,6 +59,7 @@ const AddPurchaseReturn = () => {
     const today = dayjs().format('YYYYMMDD');
     const randomNum = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
     setReturnNumber(`RTN-${today}-${randomNum}`);
+    fetchVatRate().then(setVatRate);
     fetchSuppliers();
     fetchCompanies().catch(err => console.warn('Companies feature not available:', err));
     fetchItems();

@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx';
 import api from '../../api';
 import PurchaseDetailsModal from '../purchase/PurchaseDetailsModal';
 import { formatNumber, toExportNumber } from '../../utils/formatters';
+import { DEFAULT_VAT_RATE } from '../../utils/vatRate';
 import './VATReport.css';
 
 const VATReport = () => {
@@ -118,9 +119,12 @@ const VATReport = () => {
         totalVATAmount = parseFloat(entry.vatAmount || entry.vat_amount || 0);
         totalDisallowableVAT = 0;
       } else if (entry.items && entry.items.length > 0) {
+        // Each purchase keeps the VAT rate it was created with (falls back to
+        // the management-configured default only for an old record with none).
+        const entryVatRate = parseFloat(entry.vat_rate) || DEFAULT_VAT_RATE;
         entry.items.forEach((item) => {
           const amount = parseFloat(item.quantity || 0) * parseFloat(item.unit_price || 0);
-          const vatAmount = amount * 0.18;
+          const vatAmount = amount * (entryVatRate / 100);
           const vatApplicable = item.vat_applicable !== undefined ? item.vat_applicable : true;
 
           totalNetAmount += amount;
@@ -190,7 +194,7 @@ const VATReport = () => {
       'Name of Supplier',
       'Description',
       'Net Amount (Rs.)',
-      'VAT Amount (18%) (Rs.)',
+      'VAT Amount (Rs.)',
       'Disallowable VAT Amount (Rs.)'
     ]);
 
@@ -373,7 +377,7 @@ const VATReport = () => {
                   <th className="text-left">Name of Supplier</th>
                   <th className="text-left">Description</th>
                   <th className="text-right">Net Amount (Rs.)</th>
-                  <th className="text-right">VAT Amount (18%) (Rs.)</th>
+                  <th className="text-right">VAT Amount (Rs.)</th>
                   <th className="text-right">Disallowable VAT Amount (Rs.)</th>
                 </tr>
               </thead>
@@ -414,7 +418,7 @@ const VATReport = () => {
               <div className="report-summary-value">Rs. {formatNumber(totalNetAmount, 2, 2)}</div>
             </div>
             <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
-              <div className="report-summary-label">Total VAT (18%)</div>
+              <div className="report-summary-label">Total VAT</div>
               <div className="report-summary-value text-primary">Rs. {formatNumber(totalVATAmount, 2, 2)}</div>
             </div>
             <div className="card" style={{ padding: 'var(--spacing-lg)' }}>

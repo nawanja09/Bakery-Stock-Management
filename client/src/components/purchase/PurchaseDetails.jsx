@@ -29,6 +29,7 @@ import { usePopup } from '../context/PopupContext';
 import api from '../../api';
 import './Purchase.css';
 import { formatQuantity, formatPaymentMethodLabel, PURCHASING_DECIMALS } from '../../utils/formatters';
+import { DEFAULT_VAT_RATE } from '../../utils/vatRate';
 
 const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
   const params = useParams();
@@ -177,7 +178,7 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
   const totalWithVat = parseFloat(purchase.total_with_vat || 0);
   const paidAmount = parseFloat(purchase.paid_amount || 0);
   const dueAmount = Math.max(0, totalWithVat - paidAmount);
-  const vatRate = parseFloat(purchase.vat_rate || 18);
+  const vatRate = parseFloat(purchase.vat_rate || DEFAULT_VAT_RATE);
   const statusInfo = getPaymentStatusInfo();
 
   // supplierDetails.vat_registered comes back from the API as a raw integer (0/1),
@@ -385,7 +386,7 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
                   <th className="text-right">Unit Price</th>
                   <th className="text-right">Amount</th>
                   {isVatRegisteredSupplier && (
-                    <th className="text-right vat-column">VAT 18%</th>
+                    <th className="text-right vat-column">VAT {vatRate}%</th>
                   )}
                   <th className="text-right total-column">Line Total</th>
                 </tr>

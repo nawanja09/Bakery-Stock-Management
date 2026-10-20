@@ -27,6 +27,7 @@ import {
   purchaseItemSelectComponents,
   purchaseItemSelectStyles
 } from './PurchaseItemSelect';
+import { fetchVatRate, DEFAULT_VAT_RATE } from '../../utils/vatRate';
 
 const AddPurchase = () => {
   const navigate = useNavigate();
@@ -48,7 +49,9 @@ const AddPurchase = () => {
   const [previousPurchasePrices, setPreviousPurchasePrices] = useState({});
   const [pendingRefreshKey, setPendingRefreshKey] = useState(0);
 
-  const VAT_RATE = 18;
+  // The management-configured system-wide rate (client/src/utils/vatRate.js),
+  // not a hardcoded 18 - loaded below and used for every VAT calculation on this form.
+  const [VAT_RATE, setVatRate] = useState(DEFAULT_VAT_RATE);
 
   const [formData, setFormData] = useState({
     purchase_date: new Date().toLocaleDateString('en-CA'),
@@ -89,17 +92,20 @@ const AddPurchase = () => {
 
     const fetchData = async () => {
       try {
-        const [suppliersRes, itemsRes, companiesRes, pricesRes] = await Promise.all([
+        const [suppliersRes, itemsRes, companiesRes, pricesRes, vatRate] = await Promise.all([
           api.get('/suppliers'),
           api.get('/items'),
           api.get('/purchases/companies'),
-          api.get('/purchases/previous-prices')
+          api.get('/purchases/previous-prices'),
+          fetchVatRate()
         ]);
 
         setSuppliers(suppliersRes.data);
         setItemsList(itemsRes.data);
         setCompanies(companiesRes.data);
         setPreviousPurchasePrices(pricesRes.data);
+        setVatRate(vatRate);
+        setFormData(prev => ({ ...prev, vat_rate: vatRate }));
       } catch (error) {
         console.error('Error fetching data:', error);
         showPopup('error', 'Failed to load form data');

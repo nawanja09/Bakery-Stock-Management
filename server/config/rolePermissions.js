@@ -219,7 +219,12 @@ const API_RULES = [
   // ---- Period close (Admin / Super Admin; approve / reject = Super Admin only) ----------
   { prefix: '/period-close', modules: [M.PERIOD_CLOSE] },
   { prefix: '/period-close/approve', modules: [M.PERIOD_CLOSE], writeRoles: [ROLES.SUPER_ADMIN] },
-  { prefix: '/period-close/reject', modules: [M.PERIOD_CLOSE], writeRoles: [ROLES.SUPER_ADMIN] }
+  { prefix: '/period-close/reject', modules: [M.PERIOD_CLOSE], writeRoles: [ROLES.SUPER_ADMIN] },
+
+  // ---- System-wide VAT rate (Purchases / Expenses) --------------------------
+  // Read: anyone who can see Purchases, Expenses or VAT reports (so the invoice
+  // forms can default to it). Update: Admin / Super Admin only.
+  { prefix: '/settings/vat-rate', modules: [M.RAW_MATERIAL, M.EXPENSES, M.VAT], writeRoles: [ROLES.ADMIN, ROLES.SUPER_ADMIN] }
 ];
 
 const READ_METHODS = ['GET', 'HEAD', 'OPTIONS'];

@@ -6,6 +6,7 @@ const { actorId } = require('../utils/actor');
 const { DocumentError } = require('../utils/documentLines');
 const moneyMath = require('../utils/money');
 const { lockAndCheckAvailability, StockError } = require('../services/stockAvailability');
+const { getCurrentVatRate } = require('../services/vatSettings');
 
 // Validates a return line's quantity and unit price server-side (audit finding
 // R7): a negative return_quantity would otherwise flow through to
@@ -155,9 +156,10 @@ const createPurchaseReturn = async (req, res) => {
       vat_rate: clientVatRate
     } = req.body;
 
-    // Use the rate sent by the client, defaulting to 18 (the system-wide rate).
-    // Never trust the client for supplier VAT registration status — always re-verify from DB.
-    const vatRate = parseFloat(clientVatRate) > 0 ? parseFloat(clientVatRate) : 18;
+    // Use the rate sent by the client, defaulting to the management-configured
+    // system-wide rate. Never trust the client for supplier VAT registration
+    // status — always re-verify from DB.
+    const vatRate = parseFloat(clientVatRate) > 0 ? parseFloat(clientVatRate) : await getCurrentVatRate(connection);
 
     // Validate required fields
     if (!return_number) {

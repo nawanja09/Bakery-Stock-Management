@@ -71,11 +71,11 @@ const Suppliers = () => {
       };
     }
     
-    // Check if it's exactly 9 digits
-    if (cleanVatNumber.length !== 9) {
-      return { 
-        isValid: false, 
-        message: 'VAT Number must be exactly 9 digits long' 
+    // Check if it's exactly 8 digits
+    if (cleanVatNumber.length !== 8) {
+      return {
+        isValid: false,
+        message: 'VAT Number must be exactly 8 digits long'
       };
     }
     
@@ -133,8 +133,8 @@ const Suppliers = () => {
       if (name === 'vat_number') {
         // Only allow digits
         const digitsOnly = value.replace(/\D/g, '');
-        // Limit to 9 digits
-        const limitedValue = digitsOnly.slice(0, 9);
+        // Limit to 8 digits
+        const limitedValue = digitsOnly.slice(0, 8);
         
         setNewSupplier(prev => ({ ...prev, [name]: limitedValue }));
         
@@ -346,10 +346,10 @@ const Suppliers = () => {
                       value={newSupplier.vat_number}
                       onChange={handleInputChange}
                       className={formErrors.vat_number ? 'error' : ''}
-                      placeholder="Enter 9-digit VAT number"
-                      maxLength="9"
+                      placeholder="Enter 8-digit VAT number"
+                      maxLength="8"
                     />
-                    <small className="input-hint">Must be exactly 9 digits (numbers only)</small>
+                    <small className="input-hint">Must be exactly 8 digits (numbers only)</small>
                     {formErrors.vat_number && (
                       <span className="error-message">{formErrors.vat_number}</span>
                     )}

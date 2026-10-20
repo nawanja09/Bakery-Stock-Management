@@ -628,6 +628,20 @@ pool.auditLogSchemaReady = require('../services/auditLog').ensureAuditLogSchema(
   .catch((error) => console.warn('audit_log schema check skipped:', error.message));
 pool.ensurePaymentHistorySchema = ensurePaymentHistorySchema;
 
+// System-wide VAT rate (Admin / Super Admin editable, default 18%) - replaces the
+// 18 hardcoded in Purchases / Expenses VAT calculations. services/vatSettings.js,
+// migrations/042_vat_rate_settings.sql. Single row, id = 1.
+pool.vatRateSettingsSchemaReady = pool.query(`
+  CREATE TABLE IF NOT EXISTS vat_rate_settings (
+    id INT PRIMARY KEY,
+    vat_rate DECIMAL(5,2) NOT NULL DEFAULT 18.00,
+    updated_by INT NULL,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+`).then(() => pool.query(
+  'INSERT INTO vat_rate_settings (id, vat_rate) VALUES (1, 18.00) ON DUPLICATE KEY UPDATE id = id'
+)).catch((error) => console.warn('vat_rate_settings schema check skipped:', error.message));
+
 // --- Connect the Expenses modules to Finance -------------------------------
 // Adds the columns each expense table needs to post a Cash/Bank ledger entry:
 //   - company_id: which company's Cash In Hand this expense belongs to

@@ -10,6 +10,7 @@ const { isRmAdjustmentRequest, recordRmAdjustment, sameItems, sameValue } = requ
 const { SETTLEMENT_PAYMENT_METHODS, isSettlementPaymentMethod } = require('../services/settlementPaymentMethods');
 const { DocumentError, preparePricedLines, totalPricedLines } = require('../utils/documentLines');
 const moneyMath = require('../utils/money');
+const { getCurrentVatRate } = require('../services/vatSettings');
 
 // Advance / purchase-return settlements moved no money from Cash or Bank, so
 // Purchasing Payment adjustments (which re-post the ledger) must not touch them.
@@ -197,8 +198,8 @@ const createPurchase = async (req, res) => {
     }
     const supplierVatRegistered = supplierRows[0].vat_registered === 1 || supplierRows[0].vat_registered === true;
     // Same fallback as purchase returns (services/.../purchaseReturnController): the
-    // system-wide rate of 18 when the client sends nothing usable.
-    const resolvedVatRate = parseFloat(vat_rate) > 0 ? parseFloat(vat_rate) : 18;
+    // management-configured system-wide rate when the client sends nothing usable.
+    const resolvedVatRate = parseFloat(vat_rate) > 0 ? parseFloat(vat_rate) : await getCurrentVatRate(connection);
 
     // Every line is validated server-side (item exists, quantity > 0, unit price >= 0),
     // and subtotal / VAT / grand total are computed from those lines - never trusted
@@ -583,7 +584,7 @@ const updatePurchase = async (req, res) => {
       return res.status(404).json({ error: 'Supplier not found' });
     }
     const supplierVatRegistered = supplierRows[0].vat_registered === 1 || supplierRows[0].vat_registered === true;
-    const resolvedVatRate = parseFloat(vat_rate) > 0 ? parseFloat(vat_rate) : 18;
+    const resolvedVatRate = parseFloat(vat_rate) > 0 ? parseFloat(vat_rate) : await getCurrentVatRate(connection);
 
     const lines = await preparePricedLines(connection, items);
     const totals = totalPricedLines(lines, { vatRate: resolvedVatRate, supplierVatRegistered });

@@ -1,0 +1,35 @@
+.vat-rate-card {
+  max-width: 480px;
+  padding: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.vat-rate-current {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.vat-rate-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.vat-rate-form-row {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: center;
+}
+
+.vat-rate-form-row input {
+  max-width: 160px;
+}
+
+.vat-rate-note {
+  font-size: 0.85rem;
+  color: var(--text-muted, #666);
+  margin: 0;
+}

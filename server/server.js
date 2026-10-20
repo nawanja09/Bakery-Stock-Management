@@ -169,6 +169,7 @@ app.use('/api/cash-expenses', cashExpenseRoutes);
 app.use('/api/hidden-expenses', hiddenExpenseRoutes);
 app.use('/api/audit-logs', require('./routes/auditLogRoutes'));
 app.use('/api/period-close', require('./routes/periodCloseRoutes'));
+app.use('/api/settings', require('./routes/vatSettingsRoutes'));
 
 
 // Error handling middleware for file uploads

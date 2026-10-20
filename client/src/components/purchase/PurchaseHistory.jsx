@@ -788,7 +788,7 @@ const PurchaseHistory = () => {
                         Amount {sortConfig.key === 'subtotal' && <FontAwesomeIcon icon={sortConfig.direction === 'asc' ? faArrowUp : faArrowDown} className="sort-indicator" />}
                       </th>
                       <th className="sortable-header amount-col text-right" onClick={() => handleSort('vat_amount')}>
-                        VAT 18% {sortConfig.key === 'vat_amount' && <FontAwesomeIcon icon={sortConfig.direction === 'asc' ? faArrowUp : faArrowDown} className="sort-indicator" />}
+                        VAT {sortConfig.key === 'vat_amount' && <FontAwesomeIcon icon={sortConfig.direction === 'asc' ? faArrowUp : faArrowDown} className="sort-indicator" />}
                       </th>
                       <th className="sortable-header amount-col text-right" onClick={() => handleSort('total_with_vat')}>
                         Total Amount {sortConfig.key === 'total_with_vat' && <FontAwesomeIcon icon={sortConfig.direction === 'asc' ? faArrowUp : faArrowDown} className="sort-indicator" />}

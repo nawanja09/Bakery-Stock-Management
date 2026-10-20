@@ -164,6 +164,7 @@ export const ROUTE_RULES = [
   rule('/suppliers', { all: [M.MANAGEMENT], any: RM }),
   rule('/departments', { all: [M.MANAGEMENT], any: RM }),
   rule('/companies', { all: [M.MANAGEMENT], any: [M.RAW_MATERIAL, M.EXPENSES, M.FINANCE] }),
+  rule('/vat-rate-settings', { all: [M.MANAGEMENT], any: [M.RAW_MATERIAL, M.EXPENSES] }),
   rule('/adjustments/payment-methods', { all: [M.MANAGEMENT], any: FIN_MASTER }),
   rule('/expenses/bank-details', { all: [M.MANAGEMENT], any: FIN_MASTER }),
   rule('/expense-types-management', { all: [M.MANAGEMENT], any: FIN_MASTER }),
@@ -278,7 +279,7 @@ export const NAV_MODULES = Object.freeze({
       '/adjustments/payment-methods', '/expenses/bank-details', '/expense-types-management',
       '/sub-expense-types-management', '/expense-payees-management',
       '/bank-charges-type-management', '/finance/receive-types', '/other-ledgers-management', '/credit-card-rate-management',
-      '/admin/employees'
+      '/admin/employees', '/vat-rate-settings'
     ]
   },
   raw: {

@@ -8,6 +8,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBoxOpen } from '@fortawesome/free-solid-svg-icons';
 import './PurchasingReport.css';
 import api from '../../../api';
+import { DEFAULT_VAT_RATE } from '../../../utils/vatRate';
 import { formatPurchasingNumber, toPurchasingExportNumber } from '../../../utils/formatters';
 import { filterItemByName, reportItemSelectStyles } from '../reportItemSelectHelper';
 
@@ -84,8 +85,9 @@ const PurchasingReport = () => {
         purchase.supplier_vat_registered === 1 || 
         purchase.supplier_vat_registered === true;
 
-      // Get supplier VAT rate
-      const vatRate = parseFloat(purchase.vat_rate) || 18;
+      // Get supplier VAT rate (each purchase keeps its own; this is only the
+      // fallback for an old record saved before vat_rate existed).
+      const vatRate = parseFloat(purchase.vat_rate) || DEFAULT_VAT_RATE;
 
       // Get total bill amount
       let totalBillAmount = 0;

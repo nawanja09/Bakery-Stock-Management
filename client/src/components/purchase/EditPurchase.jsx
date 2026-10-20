@@ -12,6 +12,7 @@ import {
   purchaseItemSelectComponents,
   purchaseItemSelectStyles
 } from './PurchaseItemSelect';
+import { fetchVatRate, DEFAULT_VAT_RATE } from '../../utils/vatRate';
 
 // props.embeddedId / props.onSaved / props.onCancel are optional.
 // When absent (standalone route usage via /purchase/edit/:id), behavior is unchanged.
@@ -34,7 +35,10 @@ const EditPurchase = ({ embeddedId, onSaved, onCancel, isRmAdjustment = false } 
   const [supplierVatNumber, setSupplierVatNumber] = useState('');
   const [previousPurchasePrices, setPreviousPurchasePrices] = useState({});
   
-  const VAT_RATE = 18;
+  // Fallback only - an existing purchase keeps its own stored vat_rate; this is
+  // just the management-configured default (client/src/utils/vatRate.js), not a
+  // hardcoded 18, used when a purchase has none.
+  const [VAT_RATE, setVatRate] = useState(DEFAULT_VAT_RATE);
 
   const [formData, setFormData] = useState({
     purchase_date: '',
@@ -64,16 +68,17 @@ const EditPurchase = ({ embeddedId, onSaved, onCancel, isRmAdjustment = false } 
       try {
         setLoading(true);
         
-        const [purchaseRes, suppliersRes, itemsRes, companiesRes, previousPricesRes] = await Promise.all([
+        const [purchaseRes, suppliersRes, itemsRes, companiesRes, previousPricesRes, defaultVatRate] = await Promise.all([
           api.get(`/purchases/${id}`),
           api.get('/suppliers'),
           api.get('/items'),
           api.get('/purchases/companies'),
-          api.get('/purchases/previous-prices')
+          api.get('/purchases/previous-prices'),
+          fetchVatRate()
         ]);
 
         const purchaseData = purchaseRes.data;
-        
+
         setSuppliers(suppliersRes.data);
         setItemsList(itemsRes.data);
         setCompanies(companiesRes.data);
@@ -84,16 +89,21 @@ const EditPurchase = ({ embeddedId, onSaved, onCancel, isRmAdjustment = false } 
         setSupplierVatRegistered(supplier?.vat_registered || false);
         setSupplierVatNumber(supplier?.vat_number || '');
 
+        // This invoice keeps the rate it was created with; the fetched setting is
+        // only the fallback for an old record saved before vat_rate existed.
+        const effectiveVatRate = parseFloat(purchaseData.vat_rate) || defaultVatRate;
+        setVatRate(effectiveVatRate);
+
         let processedItems = [];
-        
+
         if (purchaseData.items && purchaseData.items.length > 0) {
           processedItems = purchaseData.items.map(item => {
             const itemDetails = itemsRes.data.find(i => i.id === item.item_id) || {};
             const quantity = parseFloat(item.quantity) || 0;
             const unitPrice = parseFloat(item.unit_price) || 0;
             const amount = quantity * unitPrice;
-            const vat = (supplier?.vat_registered && (item.vat_applicable || itemDetails.vat_applicable)) ? 
-              amount * (VAT_RATE / 100) : 0;
+            const vat = (supplier?.vat_registered && (item.vat_applicable || itemDetails.vat_applicable)) ?
+              amount * (effectiveVatRate / 100) : 0;
             
             return {
               id: item.item_id,
@@ -135,7 +145,7 @@ const EditPurchase = ({ embeddedId, onSaved, onCancel, isRmAdjustment = false } 
           supplier_id: purchaseData.supplier_id,
           subtotal: subtotal,
           vat_amount: totalVat,
-          vat_rate: parseFloat(purchaseData.vat_rate) || VAT_RATE,
+          vat_rate: effectiveVatRate,
           total_with_vat: grandTotal,
           paid_amount: paidAmount,
           balance_amount: balanceAmount,

@@ -32,11 +32,11 @@ const validateVATNumber = (vatNumber, isVatRegistered) => {
     };
   }
   
-  // Check if it's exactly 9 digits
-  if (cleanVatNumber.length !== 9) {
-    return { 
-      isValid: false, 
-      message: 'VAT Number must be exactly 9 digits long' 
+  // Check if it's exactly 8 digits
+  if (cleanVatNumber.length !== 8) {
+    return {
+      isValid: false,
+      message: 'VAT Number must be exactly 8 digits long'
     };
   }
   

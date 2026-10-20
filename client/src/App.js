@@ -31,6 +31,7 @@ import EmployeeManagement from './components/Employees/EmployeeManagement';
 import ItemTypes from './components/RawMaterial/ItemTypes/ItemTypes';
 import Departments from './components/RawMaterial/Departments/Departments';
 import Companies from './components/RawMaterial/Companies/Companies';
+import VatRateSettings from './components/VatRateSettings/VatRateSettings';
 import ExpenseTypeManagement from './components/RawMaterial/ExpenseTypes/ExpenseTypeManagement';
 import SubExpenseTypeManagement from './components/RawMaterial/ExpenseTypes/SubExpenseTypeManagement';
 import ExpensePayeeManagement from './components/RawMaterial/ExpensePayees/ExpensePayeeManagement';
@@ -247,6 +248,7 @@ export const AppRoutes = () => {
             <Route path="item-types" element={<RawMaterialRoute><ItemTypes /></RawMaterialRoute>} />
             <Route path="departments" element={<RawMaterialRoute><Departments /></RawMaterialRoute>} />
             <Route path="companies" element={<RawMaterialRoute><Companies /></RawMaterialRoute>} />
+            <Route path="vat-rate-settings" element={<PermittedRoute><VatRateSettings /></PermittedRoute>} />
             <Route path="expense-types-management" element={<ExpenseTypeManagement />} />
             <Route path="sub-expense-types-management" element={<SubExpenseTypeManagement />} />
             <Route path="expense-payees-management" element={<ExpensePayeeManagement />} />
