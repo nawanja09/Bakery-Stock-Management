@@ -12,12 +12,26 @@
 // last_seen_at. Table: collection_data_issues (created in config/db.js).
 
 const crypto = require('crypto');
+const { redact, record: recordAuditEvent } = require('./auditLog');
 
 const KINDS = Object.freeze({ REJECTED: 'REJECTED', CHANGED_AFTER_APPROVAL: 'CHANGED_AFTER_APPROVAL', BURST: 'BURST' });
 const MAX_PAYLOAD_CHARS = 60000;
 
 const hashOf = (value) => crypto.createHash('sha256').update(String(value)).digest('hex');
 const payloadText = (payload) => (typeof payload === 'string' ? payload : JSON.stringify(payload ?? null));
+
+// Domain 1 L1 fix: reuse auditLog.js's redact() (the same secret-shaped-key
+// scrub the main audit trail already applies) so a token/PII RAVON happens
+// to embed in a malformed payload is never stored verbatim here. Only the
+// STORED text is redacted - the dedupe hash below still hashes the original,
+// so redaction can never merge two genuinely different payloads into one row.
+const redactedPayloadText = (payload) => {
+  if (payload && typeof payload === 'object') return JSON.stringify(redact(payload) ?? null);
+  if (typeof payload === 'string') {
+    try { return JSON.stringify(redact(JSON.parse(payload))); } catch { return payload; }
+  }
+  return payloadText(payload);
+};
 
 // Domain 1 M3 fix: the dedupe key already includes the payload hash, so a
 // compromised/buggy upstream sending a slightly different malformed payload
@@ -54,7 +68,7 @@ const isOverBurstLimit = (system, source, key) => {
 const recordBurst = async (queryable, { system, source, kind, reason, payload, sourceId }) => {
   const hourBucket = Math.floor(Date.now() / BURST_WINDOW_MS);
   const key = hashOf(`${system}|${source}|BURST|${hourBucket}`);
-  const text = payloadText(payload);
+  const text = redactedPayloadText(payload);
   await queryable.query(
     `INSERT INTO collection_data_issues
        (issue_key, source_system, source_type, source_id, kind, reason, fields, raw_payload, collection_id)
@@ -91,7 +105,7 @@ const recordIssue = async (queryable, {
        ON DUPLICATE KEY UPDATE seen_count = seen_count + 1, last_seen_at = NOW(),
          status = IF(status = 'RESOLVED', status, 'OPEN')`,
       [key, system, source, sourceId ? String(sourceId).slice(0, 100) : null, kind, String(reason).slice(0, 1000),
-        JSON.stringify(fields).slice(0, 2000), text.slice(0, MAX_PAYLOAD_CHARS), collectionId]
+        JSON.stringify(fields).slice(0, 2000), redactedPayloadText(payload).slice(0, MAX_PAYLOAD_CHARS), collectionId]
     );
     return true;
   } catch (error) {
@@ -128,7 +142,56 @@ const resolveIssue = async (queryable, id, { userId, note = null }) => {
   return result.affectedRows === 1;
 };
 
+// Domain 1 L2 fix: nothing paged/notified anyone about an OPEN issue sitting
+// unreviewed - it only surfaced if someone opened the quarantine screen. No
+// email/Slack integration exists anywhere in this project (checked - there is
+// no SMTP/webhook config to wire into), so rather than inventing a new
+// external channel and its secrets, this writes a digest into the same
+// audit_log an Admin/Super Admin already monitors (services/auditLog.js,
+// Domain 6), plus a console.warn for anyone watching server logs - both
+// channels this project already has.
+const STALE_OPEN_HOURS_DEFAULT = 24;
+
+const checkStaleOpenIssues = async (queryable, { olderThanHours } = {}) => {
+  const hours = Number.isFinite(olderThanHours) && olderThanHours > 0 ? olderThanHours : STALE_OPEN_HOURS_DEFAULT;
+  try {
+    const [rows] = await queryable.query(
+      `SELECT COUNT(*) AS count, MIN(first_seen_at) AS oldest
+         FROM collection_data_issues
+        WHERE status = 'OPEN' AND first_seen_at <= DATE_SUB(NOW(), INTERVAL ? HOUR)`,
+      [hours]
+    );
+    const count = Number(rows[0]?.count || 0);
+    if (count > 0) {
+      const message = `${count} quarantine issue(s) (REJECTED/CHANGED_AFTER_APPROVAL/BURST) have been OPEN for over ${hours}h `
+        + `(oldest since ${rows[0].oldest}) - review the Collection quarantine screen`;
+      console.warn(`Collection quarantine digest: ${message}`);
+      await recordAuditEvent({
+        at: Date.now(), eventType: 'ALERT', action: 'STALE_QUARANTINE', module: 'Collection',
+        message, outcome: 'SUCCESS'
+      }).catch((error) => console.warn('Collection quarantine digest - could not write the audit event:', error.message));
+    }
+    return count;
+  } catch (error) {
+    console.warn(`Collection quarantine digest check failed: ${error.message}`);
+    return 0;
+  }
+};
+
+/** Starts the daily digest check (server.js at boot). Returns the interval handle. */
+const DIGEST_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const startStaleIssueDigest = (queryable) => {
+  const run = () => checkStaleOpenIssues(queryable).catch((error) => {
+    console.error('Collection quarantine digest failed:', error.message);
+  });
+  run();
+  return setInterval(run, DIGEST_INTERVAL_MS);
+};
+
 // Test helper: clears the in-memory burst-tracking state between test runs.
 const resetBurstTracking = () => newIssueTracking.clear();
 
-module.exports = { KINDS, recordIssue, listIssues, getIssue, resolveIssue, hashOf, resetBurstTracking };
+module.exports = {
+  KINDS, recordIssue, listIssues, getIssue, resolveIssue, hashOf, resetBurstTracking,
+  checkStaleOpenIssues, startStaleIssueDigest
+};

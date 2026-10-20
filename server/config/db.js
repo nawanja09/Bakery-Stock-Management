@@ -582,7 +582,7 @@ const ensurePeriodLockSchema = async () => {
         period_from DATE NOT NULL,
         period_to DATE NOT NULL,
         reason VARCHAR(500) NOT NULL,
-        status ENUM('Pending','Approved','Rejected','Closed') NOT NULL DEFAULT 'Pending',
+        status ENUM('Pending','Approved','Rejected','Closed','Expired') NOT NULL DEFAULT 'Pending',
         requested_by INT NOT NULL,
         requested_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         decided_by INT NULL,
@@ -595,6 +595,18 @@ const ensurePeriodLockSchema = async () => {
         KEY idx_period_reopen_status (status, expires_at)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
+
+    // Domain 4 L5 fix: a table created before 'Expired' existed in the enum
+    // (the expiry sweep below, services/periodLock.js) needs it added.
+    const [statusColumn] = await pool.query(
+      `SELECT COLUMN_TYPE FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'period_reopen_requests' AND COLUMN_NAME = 'status'`
+    );
+    if (statusColumn[0] && !statusColumn[0].COLUMN_TYPE.includes("'Expired'")) {
+      await pool.query(
+        "ALTER TABLE period_reopen_requests MODIFY COLUMN status ENUM('Pending','Approved','Rejected','Closed','Expired') NOT NULL DEFAULT 'Pending'"
+      );
+    }
   } catch (error) {
     console.warn('period_reopen_requests schema check skipped:', error.message);
   }

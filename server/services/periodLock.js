@@ -150,6 +150,35 @@ const assertOpen = async (db, userId, dates, { system = false } = {}) => {
   }
 };
 
+// Domain 4 L5 fix: `is_active` is already computed correctly at read time
+// (status = 'Approved' AND expires_at > NOW()), so this changes nothing about
+// enforcement - it only flips the stored row itself to 'Expired' once its
+// grant has actually run out, so an operator looking at raw
+// period_reopen_requests rows (not the computed view) is not misled into
+// thinking a long-forgotten grant is still active.
+const expireOverdueGrants = async (db) => {
+  try {
+    const [result] = await db.query(
+      "UPDATE period_reopen_requests SET status = 'Expired' WHERE status = 'Approved' AND expires_at <= NOW()"
+    );
+    return result.affectedRows;
+  } catch (error) {
+    if (isMissingTable(error)) return 0;
+    throw error;
+  }
+};
+
+const EXPIRY_SWEEP_INTERVAL_MS = 15 * 60 * 1000;
+
+/** Starts the periodic sweep (server.js at boot). Returns the interval handle. */
+const startExpirySweep = (db) => {
+  const run = () => expireOverdueGrants(db).catch((error) => {
+    console.error('Period re-open expiry sweep failed:', error.message);
+  });
+  run();
+  return setInterval(run, EXPIRY_SWEEP_INTERVAL_MS);
+};
+
 module.exports = {
   DEFAULT_OPEN_MONTHS,
   DEFAULT_GRANT_HOURS,
@@ -167,5 +196,7 @@ module.exports = {
   monthLabel,
   canEditReopenedPeriod,
   activeGrants,
-  assertOpen
+  assertOpen,
+  expireOverdueGrants,
+  startExpirySweep
 };

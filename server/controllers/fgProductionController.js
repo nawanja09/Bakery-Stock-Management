@@ -44,6 +44,10 @@ const { isValidUnit, areCompatibleUnits, convertQuantity } = require('../utils/u
 const integrationAuth = require('../services/integrationAuthService');
 const { RULES } = require('../services/stockRules');
 
+// Domain 2 L3 fix: a recipe quantity edit whose line-cost swing is at least
+// this big gets flagged into the audit trail for review (see updateRecipe).
+const RECIPE_COST_IMPACT_THRESHOLD_PERCENT = 20;
+
 // Latest purchase price for an RM item, as of today - the same
 // "latest purchase price as of date" lookup reportController.js uses for
 // stock valuation (Domain 2 H1, accepted design). This is the single
@@ -559,6 +563,25 @@ const updateRecipe = async (req, res) => {
     // last_price is never taken from the request body - see addRecipe.
     const serverLastPrice = await getServerComputedUnitPrice(rm_item_id);
 
+    // Domain 2 L3 fix: a quantity edit has no second approver (unlike RM
+    // Stock Adjustments), which the audit accepted given the low blast radius
+    // - a recipe's quantities are visible on every recipe screen, unlike a
+    // hidden price override. Rather than adding a maker-checker workflow and
+    // new approval UI for a LOW/optional finding, a cost-impact swing above
+    // RECIPE_COST_IMPACT_THRESHOLD_PERCENT is instead flagged into the same
+    // audit trail an Admin/Super Admin already monitors (same pattern as the
+    // Domain 1 L2 digest above), so a large change is visible for review
+    // without blocking the edit or requiring a new approval step.
+    const [[oldRow]] = await pool.query(
+      'SELECT quantity, last_price FROM fg_production_recipes WHERE id = ? AND status = 1',
+      [recipeId]
+    );
+    const oldLineCost = Number(oldRow?.quantity || 0) * Number(oldRow?.last_price || 0);
+    const newLineCost = normalizedQuantity * Number(serverLastPrice || 0);
+    const costImpactPercent = oldLineCost > 0
+      ? (Math.abs(newLineCost - oldLineCost) / oldLineCost) * 100
+      : (newLineCost > 0 ? 100 : 0);
+
     const [result] = await pool.query(
       `UPDATE fg_production_recipes
         SET rm_item_id = ?, quantity = ?, recipe_unit = ?, last_price = ?, purchase_quantity = ?, purchase_unit = ?
@@ -570,6 +593,15 @@ const updateRecipe = async (req, res) => {
       return res.status(404).json({ error: 'Recipe item not found' });
     }
 
+    if (costImpactPercent >= RECIPE_COST_IMPACT_THRESHOLD_PERCENT) {
+      require('../services/auditLog').record({
+        at: Date.now(), userId: req.user?.userId || null, eventType: 'ALERT', action: 'RECIPE_COST_IMPACT',
+        module: 'FG Production', entityId: String(recipeId), recordType: 'fg_production_recipes',
+        message: `Recipe #${recipeId} (FG #${fgProductionId}) line cost moved from ${oldLineCost.toFixed(2)} to ${newLineCost.toFixed(2)} `
+          + `(${costImpactPercent.toFixed(0)}% change) with no second approver - review the recipe edit`,
+        outcome: 'SUCCESS'
+      }).catch((error) => console.warn('FG recipe cost-impact alert failed:', error.message));
+    }
 
     res.json({ message: 'Recipe item updated successfully' });
   } catch (error) {

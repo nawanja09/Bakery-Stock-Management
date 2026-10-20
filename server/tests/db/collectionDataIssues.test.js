@@ -21,6 +21,21 @@ test.after(async () => {
   await pool.end();
 });
 
+// Domain 1 L1 fix: a secret-shaped field in the payload is redacted before
+// storage, same as auditLog.js's redact(), but the dedupe key still hashes
+// the original (unredacted) content.
+test('a token-shaped field in the payload is redacted before storage', async () => {
+  const reason = `secret in payload ${RUN}`;
+  await quarantine.recordIssue(pool, {
+    system: 'POS', source: 'SHIFT', kind: quarantine.KINDS.REJECTED, reason,
+    payload: { shift_id: 901, run: RUN, api_key: 'super-secret-value' }
+  });
+  const [[row]] = await pool.query('SELECT raw_payload FROM collection_data_issues WHERE reason = ?', [reason]);
+  const stored = JSON.parse(row.raw_payload);
+  assert.equal(stored.api_key, '[REDACTED]');
+  assert.equal(stored.run, RUN);
+});
+
 test('the same rejected record is one issue whose seen_count rises; a new payload is a new issue', async () => {
   const base = { system: 'POS', source: 'SHIFT', kind: quarantine.KINDS.REJECTED, reason: `online is missing ${RUN}`, fields: ['shift_id'], sourceId: '900' };
   assert.equal(await quarantine.recordIssue(pool, { ...base, payload: { shift_id: 900, run: RUN } }), true);
@@ -66,6 +81,14 @@ test('a burst of distinct payloads from one (system, source) collapses into one 
   try {
     const system = 'RESTAURANT';
     const source = 'EMPLOYEE_DEDUCTION';
+    // The shared BURST row is keyed by (system, source, hour) - not by RUN -
+    // so re-running this suite inside the same hour reuses the same row;
+    // compare against its seen_count BEFORE this test's own calls, not 0.
+    const [[before]] = await pool.query(
+      "SELECT COALESCE((SELECT seen_count FROM collection_data_issues WHERE kind = 'BURST' AND source_system = ? AND source_type = ?), 0) AS seen_count",
+      [system, source]
+    );
+
     for (let i = 0; i < 5; i += 1) {
       assert.equal(await quarantine.recordIssue(pool, {
         system, source, kind: quarantine.KINDS.REJECTED,
@@ -84,8 +107,12 @@ test('a burst of distinct payloads from one (system, source) collapses into one 
       [system, source]
     );
     assert.equal(burstRows.length, 1, 'the remaining 3 variants collapse into one shared BURST row');
-    assert.equal(burstRows[0].seen_count, 3);
-    assert.equal(JSON.parse(burstRows[0].raw_payload).run, RUN);
+    assert.equal(burstRows[0].seen_count - before.seen_count, 3);
+    // raw_payload is never updated once written (M9 append-only protection) -
+    // only its FIRST sample within the hour is kept, which may be from an
+    // earlier run of this same suite inside the same hour; just check it is
+    // a real stored sample, not that it matches THIS run's payload.
+    assert.ok(typeof JSON.parse(burstRows[0].raw_payload).run === 'string');
   } finally {
     if (previousLimit === undefined) delete process.env.RAVON_QUARANTINE_BURST_LIMIT;
     else process.env.RAVON_QUARANTINE_BURST_LIMIT = previousLimit;

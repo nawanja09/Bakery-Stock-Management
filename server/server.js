@@ -202,6 +202,12 @@ const startServer = async () => {
     await ensureChequeReleaseSchema();
     app.listen(PORT, () => {
       startChequeReleaseProcessor();
+      // Domain 4 L5 fix: flips an overdue period re-open grant to 'Expired'
+      // in storage (enforcement already checks expires_at live either way).
+      require('./services/periodLock').startExpirySweep(require('./config/db'));
+      // Domain 1 L2 fix: daily digest of OPEN quarantine issues into the
+      // audit trail (and server log) - see collectionQuarantine.js.
+      require('./services/collectionQuarantine').startStaleIssueDigest(require('./config/db'));
       // POS / Restaurant sessions are per user (their own logins) and are loaded
       // on that user's first request; no credentials exist on the server.
       require('./services/integrationAuthService').warmUp();

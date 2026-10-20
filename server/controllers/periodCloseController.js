@@ -93,6 +93,19 @@ const requireSuperAdmin = async (db, userId) => {
   }
 };
 
+// Domain 3 L4 fix: approveRequest/rejectRequest both re-check their role
+// inside the controller, in addition to the route-level RBAC gate;
+// closeRequest did not, relying entirely on /period-close/close resolving to
+// the generic PERIOD_CLOSE rule (Admin/Super Admin). This closes that gap the
+// same way, so a routing-table change can't silently widen who may close a
+// re-opened month early.
+const requireAdminOrSuperAdmin = async (db, userId) => {
+  const role = await roleOf(db, userId);
+  if (role !== ROLES.ADMIN && role !== ROLES.SUPER_ADMIN) {
+    throw new HttpError(403, 'Only an Admin or Super Admin can close a re-opened period early');
+  }
+};
+
 // GET /api/period-close/status
 const getStatus = async (req, res) => {
   try {
@@ -244,6 +257,7 @@ const closeRequest = async (req, res) => {
     const userId = requireUser(req);
     const id = idOf(req.body?.id);
     const request = await inTransaction(async (connection) => {
+      await requireAdminOrSuperAdmin(connection, userId);
       await lockRequest(connection, id, ['Approved'], 'closed again');
       await connection.query(
         `UPDATE period_reopen_requests SET status = 'Closed', closed_by = ?, closed_at = NOW() WHERE id = ?`,
