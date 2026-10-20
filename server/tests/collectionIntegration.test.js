@@ -505,7 +505,7 @@ test('approval: one POS and one Restaurant shift with the same id get separate r
     shift_id: '211', shift_no: '0104', cashier_name: 'Imasha', employee_name: null, company_id: 1, pos_bank_account: null,
     pos_branch_name: 'Cafe - M', department_id: 7, cash_amount: 1000, card_amount: 810, bank_amount: 0, ar_amount: 0,
     short_excess_amount: 0, deduction_amount: 0, total_amount: 1810, pos_total_amount: 1810, linked_collection_id: null,
-    status: 'pending', raw_payload: JSON.stringify(payload)
+    status: 'pending', version: 'v1', raw_payload: JSON.stringify(payload)
   });
   const rows = { 1: rowFor(1, 'POS'), 2: rowFor(2, 'RESTAURANT') };
   const writes = { lines: [], card: [], ccp: [], cash: [], dupChecks: [] };
@@ -527,7 +527,7 @@ test('approval: one POS and one Restaurant shift with the same id get separate r
       return [[]];
     }
   };
-  const result = await approveCollections(connection, { items: [{ id: 1, card_bank_account_id: 3 }, { id: 2, card_bank_account_id: 3 }], userId: 9 });
+  const result = await approveCollections(connection, { items: [{ id: 1, version: 'v1', card_bank_account_id: 3 }, { id: 2, version: 'v1', card_bank_account_id: 3 }], userId: 9 });
   assert.deepEqual(result.approved.map((a) => a.reference), ['SHIFT-211-0104', 'RST-SHIFT-211-0104']);
   // Duplicate check per system.
   assert.deepEqual(writes.dupChecks.map((p) => p[2]), ['POS', 'RESTAURANT']);

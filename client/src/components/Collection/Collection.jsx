@@ -393,7 +393,7 @@ const Collection = () => {
     try {
       const items = selectedRows.map((r) => {
         const input = approveInputs[r.id] || {};
-        const item = { id: r.id };
+        const item = { id: r.id, version: r.version };
         if (!r.company_id && input.company_id) item.company_id = Number(input.company_id);
         if (input.bank_account_id && methodsOf(r).includes('BANK')) item.bank_account_id = Number(input.bank_account_id);
         if (input.card_bank_account_id && methodsOf(r).includes('CARD')) item.card_bank_account_id = Number(input.card_bank_account_id);

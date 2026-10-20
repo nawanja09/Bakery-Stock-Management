@@ -55,6 +55,7 @@ const { SYSTEMS, SOURCES, cardPaymentsOf, reconcileCard } = require('../services
 const { posCardKey, cardPaymentReference, ledgerReference } = require('../services/collectionService');
 const { approveCollections, rejectCollections, restoreCollections } = require('../services/collectionService');
 const integrationAccess = require('../services/integrationAccess');
+const { versionSql } = require('../services/collectionVersion');
 
 const SOURCE_VALUES = Object.values(SOURCES);
 
@@ -88,6 +89,7 @@ const HEADER_SELECT = `
          lc.source_type AS linked_source_type, lc.source_id AS linked_source_id,
          lc.reference_no AS linked_reference_no,
          c.status,
+         ${versionSql('c')} AS version,
          DATE_FORMAT(c.approved_at, '%Y-%m-%d %H:%i') AS approved_at, au.name AS approved_by_name,
          DATE_FORMAT(c.rejected_at, '%Y-%m-%d %H:%i') AS rejected_at, ru.name AS rejected_by_name,
          c.rejection_reason,

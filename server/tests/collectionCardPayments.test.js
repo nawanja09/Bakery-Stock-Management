@@ -91,7 +91,7 @@ const makeConnection = ({ payload, cardAmount = CARD_TOTAL, postedKeys = [], use
           shift_id: '211', shift_no: '0104', cashier_name: 'Imasha', employee_name: null, company_id: 1, pos_bank_account: null,
           pos_branch_name: 'Cafe - M', department_id: 7, cash_amount: 0, card_amount: cardAmount, bank_amount: 0,
           ar_amount: 0, short_excess_amount: 0, deduction_amount: 0, total_amount: cardAmount, pos_total_amount: null,
-          linked_collection_id: null, status: 'pending', raw_payload: JSON.stringify(payload)
+          linked_collection_id: null, status: 'pending', version: 'v1', raw_payload: JSON.stringify(payload)
         }]];
       }
       if (/SELECT id FROM collection_transactions WHERE collection_id/.test(s)) return [[]];
@@ -118,7 +118,7 @@ const makeConnection = ({ payload, cardAmount = CARD_TOTAL, postedKeys = [], use
 
 test('approve: every POS card payment becomes its own Card Ledger entry; the total is never posted as one', async () => {
   const { connection, writes } = makeConnection({ payload: shiftPayload() });
-  const result = await approveCollections(connection, { items: [{ id: 7, card_bank_account_id: 3 }], userId: 9 });
+  const result = await approveCollections(connection, { items: [{ id: 7, version: 'v1', card_bank_account_id: 3 }], userId: 9 });
 
   // One CARD summary line (amount = total) ...
   assert.equal(writes.lines.length, 1);
@@ -152,7 +152,7 @@ test('approve: every POS card payment becomes its own Card Ledger entry; the tot
 test('approve: payments that do not add up to the card total -> refused, nothing written', async () => {
   const { connection, writes } = makeConnection({ payload: shiftPayload(), cardAmount: CARD_TOTAL + 100 });
   await assert.rejects(
-    approveCollections(connection, { items: [{ id: 7, card_bank_account_id: 3 }], userId: 9 }),
+    approveCollections(connection, { items: [{ id: 7, version: 'v1', card_bank_account_id: 3 }], userId: 9 }),
     (e) => e.status === 400 && /card cannot be posted - the 4 individual card payments add up to 9400\.00, not the card total 9500\.00/.test(e.message)
   );
   assert.equal(writes.card.length + writes.ccp.length + writes.lines.length + writes.statusUpdates, 0);
@@ -163,7 +163,7 @@ test('approve: a shift without individual card payments is refused (the total is
   delete payload.card.transactions;
   const { connection, writes } = makeConnection({ payload });
   await assert.rejects(
-    approveCollections(connection, { items: [{ id: 7, card_bank_account_id: 3 }], userId: 9 }),
+    approveCollections(connection, { items: [{ id: 7, version: 'v1', card_bank_account_id: 3 }], userId: 9 }),
     /no individual card payments/
   );
   assert.equal(writes.card.length, 0);
@@ -172,7 +172,7 @@ test('approve: a shift without individual card payments is refused (the total is
 test('approve: a card payment already in the Card Ledger -> 409, nothing written', async () => {
   const { connection, writes } = makeConnection({ payload: shiftPayload(), postedKeys: ['SHIFT:211:order_advance-614'] });
   await assert.rejects(
-    approveCollections(connection, { items: [{ id: 7, card_bank_account_id: 3 }], userId: 9 }),
+    approveCollections(connection, { items: [{ id: 7, version: 'v1', card_bank_account_id: 3 }], userId: 9 }),
     (e) => e.status === 409 && /SHIFT:211:order_advance-614/.test(e.message)
   );
   assert.equal(writes.card.length + writes.lines.length, 0);
@@ -181,7 +181,7 @@ test('approve: a card payment already in the Card Ledger -> 409, nothing written
 test('approve: the existing Card Ledger reference check still guards duplicates', async () => {
   const { connection } = makeConnection({ payload: shiftPayload(), usedRefs: ['shift-211-0104/sale-21138'] });
   await assert.rejects(
-    approveCollections(connection, { items: [{ id: 7, card_bank_account_id: 3 }], userId: 9 }),
+    approveCollections(connection, { items: [{ id: 7, version: 'v1', card_bank_account_id: 3 }], userId: 9 }),
     /Reference number "SHIFT-211-0104\/SALE-21138" is already used/
   );
 });
@@ -189,7 +189,7 @@ test('approve: the existing Card Ledger reference check still guards duplicates'
 test('receipt numbers such as "CASH" (sent by the live POS, not unique) never clash: references use the POS sale id', async () => {
   const payments = [payment({ sale_id: 20835, receipt_no: 'CASH', amount: 660 }), payment({ sale_id: 20836, receipt_no: 'CASH', amount: 340 })];
   const { connection, writes } = makeConnection({ payload: shiftPayload(payments, 1000), cardAmount: 1000 });
-  await approveCollections(connection, { items: [{ id: 7, card_bank_account_id: 3 }], userId: 9 });
+  await approveCollections(connection, { items: [{ id: 7, version: 'v1', card_bank_account_id: 3 }], userId: 9 });
   assert.deepEqual(writes.card.map((c) => c.params[4]), ['SHIFT-211-0104/SALE-20835', 'SHIFT-211-0104/SALE-20836']);
   assert.match(writes.card[0].params[5], /receipt CASH/);
 });
@@ -222,7 +222,7 @@ test('atomic: a Card Ledger failure part-way through rolls the whole approval ba
   const controller = require('../controllers/collectionController');
   const res = { statusCode: 200, body: null, status(c) { this.statusCode = c; return this; }, json(b) { this.body = b; return this; } };
   try {
-    await controller.approve({ user: { userId: 9, role: 'Accountant' }, body: { items: [{ id: 7, card_bank_account_id: 3 }] } }, res);
+    await controller.approve({ user: { userId: 9, role: 'Accountant' }, body: { items: [{ id: 7, version: 'v1', card_bank_account_id: 3 }] } }, res);
   } finally {
     integrationAccess.getAccess = realGetAccess;
   }

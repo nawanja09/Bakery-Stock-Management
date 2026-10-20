@@ -136,7 +136,7 @@ const createPurchase = async (req, res) => {
     vat_amount,
     total_with_vat,
     vat_rate,
-    paid_amount, 
+    // paid_amount is deliberately NOT read from the request (audit H3)
     balance_amount,
     balance_status,
     payment_method, 
@@ -208,13 +208,11 @@ const createPurchase = async (req, res) => {
     const totals = totalPricedLines(lines, { vatRate: resolvedVatRate, supplierVatRegistered });
     const effectiveInvoiceTotal = totals.totalWithVat;
 
-    // The amount entered by the user can exceed this invoice's total (an overpayment).
-    // The invoice's own paid_amount must never exceed its own total - any excess is
-    // independent supplier credit, not part of this invoice's Paid Amount.
-    const requestedPaidAmount = parseFloat(paid_amount) || 0;
-    const appliedPaidAmount = requestedPaidAmount;
-    const excessPaidAmount = 0;
-    const paymentState = calculatePaymentState(appliedPaidAmount, effectiveInvoiceTotal);
+    // A new invoice is ALWAYS unpaid. Money paid is only ever recorded through the
+    // payment flow (makePayment), which posts to the Cash / Bank book and creates the
+    // allocation rows. A client-sent paid_amount used to mark an invoice paid with no
+    // payment behind it (audit finding H3).
+    const paymentState = calculatePaymentState(0, effectiveInvoiceTotal);
     const normalizedPaidAmount = paymentState.paid_amount;
     const normalizedBalanceAmount = paymentState.balance_amount;
     const normalizedBalanceStatus = paymentState.balance_status;
@@ -233,26 +231,6 @@ const createPurchase = async (req, res) => {
     );
     
     const purchaseId = purchaseResult.insertId;
-
-    // If payment was made, record in payment history (amount is always clamped to
-    // this invoice's own total - it is never mixed with the excess/credit amount)
-    if (normalizedPaidAmount > 0) {
-      const [initialPaymentResult] = await connection.query(
-        `INSERT INTO payment_history 
-        (purchase_id, payment_date, amount, payment_method, check_number, notes, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [purchaseId, purchase_date, normalizedPaidAmount, payment_method, check_number, 'Initial payment', resolvedPreparedBy]
-      );
-
-      // Record the explicit allocation so the Payment History tab's Paid Amount
-      // column always reads the allocated amount directly, rather than relying on
-      // a fallback that could show the raw (possibly larger) entered amount.
-      await connection.query(
-        `INSERT INTO purchase_payment_allocations (payment_history_id, purchase_id, allocated_amount)
-         VALUES (?, ?, ?)`,
-        [initialPaymentResult.insertId, purchaseId, normalizedPaidAmount]
-      );
-    }
 
     // Advance Payments are now handled via a dedicated flow.
 
@@ -553,7 +531,7 @@ const updatePurchase = async (req, res) => {
     vat_amount,
     total_with_vat,
     vat_rate,
-    paid_amount, 
+    // paid_amount is deliberately NOT read from the request (audit H3)
     balance_amount,
     balance_status,
     payment_method, 
@@ -570,8 +548,14 @@ const updatePurchase = async (req, res) => {
     const trackRmAdjustment = isRmAdjustmentRequest(req);
     let originalPurchase = null;
     let originalItems = [];
+    // Lock the invoice first so a payment made at the same moment cannot slip
+    // between the paid-amount read below and the UPDATE.
+    const [purchaseRows] = await connection.query('SELECT * FROM purchases WHERE id = ? FOR UPDATE', [id]);
+    if (purchaseRows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ error: 'Purchase not found' });
+    }
     if (trackRmAdjustment) {
-      const [purchaseRows] = await connection.query('SELECT * FROM purchases WHERE id = ? FOR UPDATE', [id]);
       originalPurchase = purchaseRows[0] || null;
       const [itemRows] = await connection.query(
         'SELECT item_id, item_name, quantity, unit_price FROM purchase_items WHERE purchase_id = ?', [id]
@@ -605,11 +589,19 @@ const updatePurchase = async (req, res) => {
     const totals = totalPricedLines(lines, { vatRate: resolvedVatRate, supplierVatRegistered });
     const effectiveInvoiceTotal = totals.totalWithVat;
 
-    // Editing an invoice must never let its paid_amount exceed its own total -
-    // any overpayment has to go through the payment/credit flow instead, which
-    // records the excess separately as supplier credit.
-    const clampedPaidAmount = Math.max(0, Math.min(parseFloat(paid_amount) || 0, effectiveInvoiceTotal));
-    const paymentState = calculatePaymentState(clampedPaidAmount, effectiveInvoiceTotal);
+    // Editing an invoice never changes what has been paid: paid_amount is whatever the
+    // real payments allocated to it add up to, and the request's paid_amount is ignored
+    // (audit finding H3). The total cannot be cut below what was already paid; that
+    // needs a purchase return or supplier credit instead.
+    const alreadyPaid = await getActualAllocatedPaidAmount(connection, id);
+    if (Math.round(effectiveInvoiceTotal * 100) < Math.round(alreadyPaid * 100)) {
+      await connection.rollback();
+      return res.status(409).json({
+        error: `This invoice already has ${alreadyPaid.toFixed(2)} paid against it, so its total cannot be lowered to `
+          + `${effectiveInvoiceTotal.toFixed(2)}. Use a purchase return instead.`
+      });
+    }
+    const paymentState = calculatePaymentState(alreadyPaid, effectiveInvoiceTotal);
     const normalizedPaidAmount = paymentState.paid_amount;
     const normalizedBalanceAmount = paymentState.balance_amount;
     const normalizedBalanceStatus = paymentState.balance_status;

@@ -23,7 +23,7 @@ const creditPaymentRow = (over = {}) => ({
   shift_id: null, cashier_name: 'Test Customer', employee_name: null, company_id: 2, pos_bank_account: null,
   pos_branch_name: null, department_id: null, cash_amount: 10000, card_amount: 0, bank_amount: 0, ar_amount: 0,
   short_excess_amount: 0, deduction_amount: 0, total_amount: 10000, pos_total_amount: 10000,
-  linked_collection_id: null, status: 'pending', raw_payload: '{}', ...over
+  linked_collection_id: null, status: 'pending', version: 'v1', raw_payload: '{}', ...over
 });
 
 const makeConnection = (row) => {
@@ -68,7 +68,7 @@ const makeConnection = (row) => {
 
 test('Credit Payment (cash): Cash Ledger DEBIT under the company + AR Account CREDIT of the same amount', async () => {
   const { connection, writes } = makeConnection(creditPaymentRow());
-  const result = await approveCollections(connection, { items: [{ id: 41 }], userId: 9 });
+  const result = await approveCollections(connection, { items: [{ id: 41, version: 'v1' }], userId: 9 });
 
   // Cash Ledger: one DEBIT of 10,000 for company 2, reference CP-CP-501.
   assert.equal(writes.cash.length, 1);
@@ -94,7 +94,7 @@ test('Credit Payment (cash): Cash Ledger DEBIT under the company + AR Account CR
 
 test('Credit Payment paid partly by bank transfer: Bank Ledger keeps the bank part; AR credit = whole amount received', async () => {
   const { connection, writes } = makeConnection(creditPaymentRow({ cash_amount: 2000, bank_amount: 8000 }));
-  await approveCollections(connection, { items: [{ id: 41, bank_account_id: 5 }], userId: 9 });
+  await approveCollections(connection, { items: [{ id: 41, version: 'v1', bank_account_id: 5 }], userId: 9 });
   assert.equal(writes.cash.length, 1);
   assert.equal(writes.cash[0].params[8], 2000);
   assert.equal(writes.bank.length, 1);
@@ -106,9 +106,9 @@ test('Credit Payment paid partly by bank transfer: Bank Ledger keeps the bank pa
 test('the same Credit Payment approved again creates no second Cash Ledger or AR entry', async () => {
   const row = creditPaymentRow();
   const { connection, writes } = makeConnection(row);
-  await approveCollections(connection, { items: [{ id: 41 }], userId: 9 });
+  await approveCollections(connection, { items: [{ id: 41, version: 'v1' }], userId: 9 });
   row.status = 'completed';
-  const again = await approveCollections(connection, { items: [{ id: 41 }], userId: 9 });
+  const again = await approveCollections(connection, { items: [{ id: 41, version: 'v1' }], userId: 9 });
   assert.equal(again.approved.length, 0);
   assert.equal(again.skipped[0].reason, 'already completed');
   assert.equal(writes.cash.length, 1);
@@ -120,7 +120,7 @@ test('Shift Collection and Employee Deduction approvals post no AR settlement (u
     source_type: 'SHIFT', source_id: '211', reference_no: '211-0104', department_id: 7, pos_branch_name: 'Cafe - M',
     cash_amount: 5000, ar_amount: 1500, total_amount: 6500, pos_total_amount: 6500
   }));
-  await approveCollections(shift.connection, { items: [{ id: 41 }], userId: 9 });
+  await approveCollections(shift.connection, { items: [{ id: 41, version: 'v1' }], userId: 9 });
   assert.deepEqual(shift.writes.lines.map((l) => l.method), ['CASH', 'AR']);
   assert.deepEqual(shift.writes.other.map((o) => [o.sourceType, o.debit, o.credit]), [['COLLECTION_AR', 1500, 0]]);
 
@@ -128,7 +128,7 @@ test('Shift Collection and Employee Deduction approvals post no AR settlement (u
     source_type: 'EMPLOYEE_DEDUCTION', source_id: '31', reference_no: null, cash_amount: 0, deduction_amount: 750,
     total_amount: 750, pos_total_amount: null, employee_name: 'Test Employee'
   }));
-  await approveCollections(ded.connection, { items: [{ id: 41 }], userId: 9 });
+  await approveCollections(ded.connection, { items: [{ id: 41, version: 'v1' }], userId: 9 });
   assert.deepEqual(ded.writes.lines.map((l) => l.method), ['SHORT_EXCESS']);
   assert.deepEqual(ded.writes.other.map((o) => [o.sourceType, o.debit, o.credit]), [['COLLECTION_SHORT_EXCESS', 0, 750]]);
   assert.equal(ded.writes.cash.length, 0);

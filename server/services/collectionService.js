@@ -60,6 +60,7 @@ const { createPendingCardTransaction } = require('./cardLedgerService');
 const ol = require('./otherLedgerService');
 const { SYSTEMS, SOURCES, PAYMENT_METHODS, postingsOf, cardPaymentsOf, reconcileCard } = require('./collectionMapper');
 const { HttpError } = require('../utils/staffLoanUtils');
+const { versionSql } = require('./collectionVersion');
 
 const MAX_BATCH = 100;
 const REASON_MAX = 255;
@@ -107,7 +108,8 @@ const lockCollection = async (connection, id) => {
     `SELECT id, source_system, source_type, source_id, reference_no, DATE_FORMAT(collection_date, '%Y-%m-%d') AS collection_date,
             shift_id, shift_no, cashier_name, employee_name, company_id, pos_bank_account, pos_branch_name, department_id,
             cash_amount, card_amount, bank_amount, ar_amount, short_excess_amount, deduction_amount,
-            total_amount, pos_total_amount, linked_collection_id, status, raw_payload
+            total_amount, pos_total_amount, linked_collection_id, status, raw_payload,
+            ${versionSql('collections')} AS version
        FROM collections WHERE id = ? FOR UPDATE`,
     [id]
   );
@@ -377,6 +379,19 @@ const approveCollections = async (connection, { items, userId }) => {
     }
     if (row.status !== 'pending') {
       throw new HttpError(409, `Collection ${label(row)} is ${row.status} and cannot be approved`);
+    }
+
+    // The figures the accountant reviewed must be the ones being posted (audit M3): the POS
+    // sync can rewrite a pending record at any time. A changed (or never-sent) version is
+    // skipped, not posted - refresh and review again.
+    if (!input.version || input.version !== row.version) {
+      skipped.push({
+        id, reference: label(row), changed: true,
+        reason: input.version
+          ? 'the record changed after you opened it (POS sync) - nothing was posted; refresh and review the new figures'
+          : 'the page did not send the record version - nothing was posted; refresh the page and try again'
+      });
+      continue;
     }
 
     // --- validation: everything is checked BEFORE the first write -------------

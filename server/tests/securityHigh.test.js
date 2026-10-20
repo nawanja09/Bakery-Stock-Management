@@ -100,7 +100,7 @@ const fakeApprovalConnection = ({ concurrentDup = [], alreadyApproved = [] } = {
     company_id: 1, pos_bank_account: null, pos_branch_name: 'Cafe', department_id: 3,
     cash_amount: '100.00', card_amount: '0.00', bank_amount: '0.00', ar_amount: '0.00',
     short_excess_amount: '0.00', deduction_amount: '0.00', total_amount: '100.00', pos_total_amount: null,
-    linked_collection_id: null, status: 'pending', raw_payload: '{}'
+    linked_collection_id: null, status: 'pending', raw_payload: '{}', version: 'v1'
   });
   const query = async (sql, params = []) => {
     const s = String(sql).replace(/\s+/g, ' ').trim();
@@ -129,7 +129,7 @@ const fakeApprovalConnection = ({ concurrentDup = [], alreadyApproved = [] } = {
 test('N2: a concurrent duplicate is skipped with the reason; only that record is rolled back, the batch is approved', async () => {
   const { approveCollections } = require('../services/collectionService');
   const { connection, log } = fakeApprovalConnection({ concurrentDup: [6] });
-  const result = await approveCollections(connection, { items: [{ id: 5 }, { id: 6 }, { id: 7 }], userId: 4 });
+  const result = await approveCollections(connection, { items: [5, 6, 7].map((id) => ({ id, version: 'v1' })), userId: 4 });
 
   assert.deepEqual(result.approved.map((a) => a.id), [5, 7]);
   assert.equal(result.skipped.length, 1);
@@ -151,7 +151,7 @@ test('N2: a concurrent duplicate is skipped with the reason; only that record is
 test('N2: a copy of an already-approved reference is skipped before anything is posted (no batch failure)', async () => {
   const { approveCollections } = require('../services/collectionService');
   const { connection, log } = fakeApprovalConnection({ alreadyApproved: [8] });
-  const result = await approveCollections(connection, { items: [{ id: 8 }, { id: 9 }], userId: 4 });
+  const result = await approveCollections(connection, { items: [8, 9].map((id) => ({ id, version: 'v1' })), userId: 4 });
 
   assert.deepEqual(result.approved.map((a) => a.id), [9]);
   assert.equal(result.skipped[0].id, 8);
