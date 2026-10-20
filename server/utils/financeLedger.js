@@ -74,6 +74,7 @@ const safeNumber = (value) => moneyMath.round(value);
 // app grows later still lands in a sensible bucket instead of silently being
 // skipped. Order matters - more specific keywords are checked first.
 const CONTRA_ACCOUNT_RULES = [
+  [/adjustment/i, 'INVENTORY-ADJUSTMENT'],
   [/opening/i, 'OPENING-BALANCE-EQUITY'],
   [/transfer|withdrawal|deposit/i, 'TRANSFER-CLEARING'],
   [/advance/i, 'SUPPLIER-ADVANCES'],
@@ -404,5 +405,6 @@ module.exports = {
   InsufficientBalanceError,
   rebuildBalanceAfter,
   refreshAccounts,
-  refreshBalancesOfReference
+  refreshBalancesOfReference,
+  postJournalEntry
 };

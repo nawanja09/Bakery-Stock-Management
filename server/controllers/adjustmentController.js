@@ -8,6 +8,7 @@ const otherLedgerService = require('../services/otherLedgerService');
 const { actorId, approverName } = require('../utils/actor');
 const { softDelete } = require('../services/softDelete');
 const { getItemStock } = require('../services/rmStockService');
+const { postJournalEntry } = require('../utils/financeLedger');
 
 const FINANCIAL_ADJUSTMENT_CATEGORIES = new Set(['Cash Receive', 'Bank Receive']);
 const FINANCIAL_ADJUSTMENT_SOURCES = new Set(['finance', 'card']);
@@ -850,7 +851,7 @@ const approveAdjustment = async (req, res) => {
     await connection.beginTransaction();
 
     const [rows] = await connection.query(
-      'SELECT id, created_by, status FROM stock_adjustments WHERE id = ? AND is_deleted = 0 FOR UPDATE',
+      'SELECT id, created_by, status, date, amount FROM stock_adjustments WHERE id = ? AND is_deleted = 0 FOR UPDATE',
       [id]
     );
     if (rows.length === 0) {
@@ -873,6 +874,24 @@ const approveAdjustment = async (req, res) => {
       `UPDATE stock_adjustments SET status = 'Approved', approved_by = ?, approved_at = NOW() WHERE id = ?`,
       [approvedBy, id]
     );
+
+    // Domain 2 M5 fix: the valuation impact approval already applies to stock
+    // (stockRules.js) also gets a journal line (Domain 3 H3's journal), so it
+    // shows up outside the inventory module too, not just in the stock count.
+    const amount = moneyMath.round2(adjustment.amount || 0);
+    if (amount !== 0) {
+      await postJournalEntry(connection, {
+        date: adjustment.date,
+        accountCode: 'INVENTORY',
+        debit: amount > 0 ? amount : 0,
+        credit: amount < 0 ? -amount : 0,
+        transactionType: 'Stock Adjustment',
+        remark: `Stock Adjustment #${id} approved`,
+        referenceType: 'STOCK_ADJUSTMENT',
+        referenceId: id,
+        createdBy: approvedBy
+      });
+    }
 
     await connection.commit();
     res.json({ message: 'Adjustment approved. It now counts toward stock.' });

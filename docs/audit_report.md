@@ -67,9 +67,9 @@ if (!moneyMath.isAmount(unit_price) || Number(unit_price) < 0) {
 }
 ```
 
-### [MEDIUM] M5 — Approved RM stock adjustments post to no ledger (narrowed 2026-10-20: journal table now exists via H3)
-`approveAdjustment` flips the adjustment to effective (it now counts in `stockRules.js`'s formula) but there is no corresponding financial posting (no COGS/inventory-value journal effect) — it never calls `recordCashTransaction`/`recordBankTransaction`, so H3's fix (which only wired that chokepoint) does not reach it.
-**Fix:** `journal_entries`/`journal_lines` exist now (H3) and `postJournalEntry` in `utils/financeLedger.js` can be called directly for a non-cash posting; an approved adjustment with a non-zero valuation impact should call it with a `STOCK-ADJUSTMENT` reference type and no corresponding Cash/Bank movement.
+### [FIXED] M5 — Approved RM stock adjustments posted to no ledger (fixed 2026-10-20)
+`approveAdjustment` flipped the adjustment to effective (it counts in `stockRules.js`'s formula from that point) but made no corresponding financial posting (no COGS/inventory-value journal effect) — it never calls `recordCashTransaction`/`recordBankTransaction`, so H3's fix alone (which only wired that chokepoint) didn't reach it.
+**Fix applied:** `adjustmentController.js`'s `approveAdjustment` now calls `postJournalEntry` (exported from `utils/financeLedger.js`, H3's helper) directly, in the same transaction as the approval, whenever the adjustment's stored `amount` (variance × unit price) is non-zero. It posts a balanced `INVENTORY` / `INVENTORY-ADJUSTMENT` pair (no Cash/Bank movement, since a stock count correction moves no money) tagged `reference_type = 'STOCK_ADJUSTMENT'`, `reference_id` = the adjustment's id — so every approved adjustment with a real valuation impact now has a matching, traceable journal line.
 
 ### [LOW] L3 — FG recipe quantity/ingredient-list changes have no maker-checker (narrowed 2026-10-20: `last_price` angle closed by H2)
 Unlike RM stock adjustments (maker ≠ checker enforced in `approveAdjustment`), editing a recipe's ingredient list or quantities in `fgProductionController.js` takes effect immediately with no second approver. The `last_price` angle this originally flagged is now moot — H2's fix removed manual price entry entirely, so there is no cost value left to self-approve. What remains: a quantity edit still changes RM cost roll-ups (via the now-live price lookup) with no second approver.
@@ -108,7 +108,7 @@ CREATE TABLE journal_lines (
 ```
 Each posting gets one `CASH` or `BANK-<id>` line plus a contra line whose `account_code` is keyword-matched off the same `transactionType` string every caller already passes (`CONTRA_ACCOUNT_RULES` in `financeLedger.js` — e.g. `*purchase*` → `ACCOUNTS-PAYABLE-RM`, `*expense*` → `EXPENSES`, `*transfer|withdrawal|deposit*` → `TRANSFER-CLEARING`, unmatched → `GENERAL`), so the sum of debits always equals the sum of credits for that entry by construction, not by convention. The journal write is non-blocking (wrapped in its own try/catch) so a journal problem can never roll back or refuse the real Cash/Bank posting it is describing — it mirrors the ledger, it does not gate it.
 
-**Scope / what's still open:** `card_transactions` and `other_ledger_transactions` are separate single-account ledgers that do not go through this chokepoint, so they are not yet mirrored into the journal — a future increment. RM stock adjustments still post no journal line either, since `approveAdjustment` never calls `recordCashTransaction`/`recordBankTransaction` (see M5 below) — the journal now exists for it to use, but that wiring wasn't done as part of this fix.
+**Scope / what's still open:** `card_transactions` and `other_ledger_transactions` are separate single-account ledgers that do not go through this chokepoint, so they are not yet mirrored into the journal — a future increment. RM stock adjustments are now wired too (see M5, fixed alongside this).
 
 ### [MEDIUM] M6 — Expense disbursement has no maker-checker; RBAC role is the only control
 `newExpenseRoutes.js`'s payment endpoint posts directly to `recordCashTransaction`/`recordBankTransaction` the moment it is called — the "approval" is simply "the caller holds the Expenses module and write capability" (`config/rolePermissions.js`), not a two-person create → approve flow like Collections (`collections/approve`, Accountant-only) or Stock Adjustments (`approveAdjustment`, self-approval rejected). This is consistent with the project's deliberate segregation-of-duties design (Finance role is excluded from Collection specifically so one person can't both record incoming cash and pay it out — see `rolePermissions.js` comment) and is **not** flagged as a defect on its own, but it means a single compromised/malicious Finance/Admin credential can disburse funds with no second signature.
@@ -215,7 +215,7 @@ await auditLog.record({
 | M2 | 1 | MEDIUM | No startup validation of integration URLs | Open |
 | M3 | 1 | MEDIUM | No rate limit on malformed-payload bursts into quarantine | Open |
 | M4 | 2 | MEDIUM | RM adjustment `unit_price` not sign/shape validated | Open |
-| M5 | 2 | MEDIUM | Approved RM adjustments post to no ledger | Open (narrowed - journal now exists, see H3) |
+| M5 | 2 | MEDIUM | Approved RM adjustments post to no ledger | **Fixed** (2026-10-20) |
 | M6 | 3 | MEDIUM | Expense disbursement has no maker-checker (RBAC-only) | Accepted design / optional |
 | M7 | 4 | MEDIUM | Inconsistent `isAmount()` enforcement across money inputs | Open |
 | M8 | 5 | MEDIUM | "Ingestion token scoping" ask doesn't map to pull-based architecture | Informational |
