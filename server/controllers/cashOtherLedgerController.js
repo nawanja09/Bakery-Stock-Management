@@ -15,6 +15,7 @@ const { actorId } = require('../utils/actor');
 const { recordCashTransaction } = require('../utils/financeLedger');
 const { checkDuplicateReference } = require('../services/referenceValidationService');
 const ol = require('../services/otherLedgerService');
+const moneyMath = require('../utils/money');
 
 const REFERENCE_MAX = 100;
 const REMARK_MAX = 255;
@@ -35,6 +36,10 @@ const isValidDate = (date) => {
 // Validates the shared fields; throws OtherLedgerError (400) with a clear message.
 const readCommonFields = (body) => {
   if (!isValidDate(body.date)) throw new ol.OtherLedgerError('A valid date is required');
+  // Domain 4 M7 fix: reject a malformed amount explicitly instead of relying
+  // on round2 silently treating it as 0 (which happened to fail the >0
+  // check below anyway, but gave no clear reason why).
+  if (!moneyMath.isAmount(body.amount)) throw new ol.OtherLedgerError('Amount must be a valid amount');
   const amount = ol.round2(body.amount);
   if (!(amount > 0) || amount > 999999999999.99) {
     throw new ol.OtherLedgerError('Amount must be greater than 0');

@@ -884,6 +884,22 @@ const makePayment = async (req, res) => {
   const normalizedPaymentMethod = normalizePaymentMethodValue(payment_method);
   const validMethods = ['CASH', 'BANK_TRANSFER', 'CHEQUE', 'CREDIT'];
 
+  // Domain 4 M7 fix: amount/invoice_allocations[].amount used to fall through
+  // toUnits()'s non-strict mode (invalid -> 0) straight into the allocation
+  // math below, instead of being rejected with a clear error like the other
+  // amount fields in this file (e.g. adjustPurchasePayment) already are.
+  if (amount !== undefined && amount !== null && amount !== '' && !moneyMath.isAmount(amount)) {
+    return res.status(400).json({ error: 'amount must be a valid amount' });
+  }
+  if (Array.isArray(invoice_allocations)) {
+    for (const allocation of invoice_allocations) {
+      if (allocation && allocation.amount !== undefined && allocation.amount !== null && allocation.amount !== ''
+        && !moneyMath.isAmount(allocation.amount)) {
+        return res.status(400).json({ error: 'invoice_allocations[].amount must be a valid amount' });
+      }
+    }
+  }
+
   let requestId;
   try {
     requestId = readRequestId(req);

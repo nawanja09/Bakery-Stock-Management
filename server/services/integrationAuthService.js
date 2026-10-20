@@ -146,8 +146,40 @@ class PosResponseError extends Error {
 // ---------------------------------------------------------------- config
 // Read at call time so tests (and a changed .env after restart) are honoured.
 const envFirst = (names) => names.map((n) => process.env[n]).find((v) => v && String(v).trim()) || '';
+
+// Domain 1 M2 fix: validate the SHAPE of each configured integration base URL
+// once, at startup (validateIntegrationUrls, called from warmUp), instead of
+// following a misconfigured or malicious value (e.g. pointing at an internal
+// host, or embedding credentials) silently on every request. An env that
+// fails this check is treated as unconfigured (that integration is skipped,
+// same as if the env were never set) rather than crashing the whole server -
+// matching this file's existing fail-safe pattern for an invalid private key.
+const invalidBaseUrlEnvs = new Set();
+const assertValidBaseUrl = (value, envName) => {
+  let parsed;
+  try { parsed = new URL(value); } catch { throw new Error(`${envName} is not a valid URL ("${value.slice(0, 60)}")`); }
+  if (parsed.username || parsed.password) throw new Error(`${envName} must not embed credentials (user:pass@host)`);
+  if (process.env.NODE_ENV === 'production' && parsed.protocol !== 'https:') {
+    throw new Error(`${envName} must be an https:// URL in production`);
+  }
+  if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error(`${envName} must be an http(s):// URL`);
+  return parsed;
+};
+const validateIntegrationUrls = () => {
+  for (const P of Object.values(PROVIDERS)) {
+    const envName = P.urlEnv.find((n) => process.env[n] && String(process.env[n]).trim());
+    if (!envName) continue;
+    try {
+      assertValidBaseUrl(process.env[envName].trim(), envName);
+    } catch (error) {
+      invalidBaseUrlEnvs.add(envName);
+      console.error(`CONFIG ERROR: ${error.message} - ${P.label} integration is disabled until this is fixed`);
+    }
+  }
+};
+
 const config = (P) => ({
-  baseUrl: envFirst(P.urlEnv).trim().replace(/\/+$/, ''),
+  baseUrl: P.urlEnv.some((n) => invalidBaseUrlEnvs.has(n)) ? '' : envFirst(P.urlEnv).trim().replace(/\/+$/, ''),
   loginPath: process.env[P.loginEnv] || '/api/login',
   timeoutMs: Number(process.env[P.timeoutEnv]) || Number(process.env.RAVON_POS_TIMEOUT_MS) || DEFAULT_TIMEOUT_MS
 });
@@ -186,14 +218,43 @@ const serviceKey = (P) => {
   }
   return parsedKeys.get(raw);
 };
-/** The headers that authenticate ONE request (new nonce and signature every time). */
+/** The headers that authenticate ONE request (new nonce and signature every time), plus the nonce/timestamp themselves so the response can be checked for freshness (Domain 1 M1). */
 const signedHeaders = (P, url) => {
   const u = new URL(url);
   const timestamp = String(Math.floor(Date.now() / 1000));
   const nonce = crypto.randomBytes(18).toString('base64url');
   const payload = [SIGNATURE_VERSION, 'GET', u.pathname, u.search.replace(/^\?/, ''), timestamp, nonce].join('\n');
   const signature = crypto.sign('sha256', Buffer.from(payload), serviceKey(P)).toString('base64');
-  return { Accept: 'application/json', 'X-BSMS-Timestamp': timestamp, 'X-BSMS-Nonce': nonce, 'X-BSMS-Signature': signature };
+  return {
+    headers: { Accept: 'application/json', 'X-BSMS-Timestamp': timestamp, 'X-BSMS-Nonce': nonce, 'X-BSMS-Signature': signature },
+    nonce,
+    issuedAtMs: Number(timestamp) * 1000
+  };
+};
+
+// Domain 1 M1 fix: the signature's nonce+timestamp are generated here and sent
+// with the request; this is the server-side re-check that a response actually
+// corresponds to a request issued within the same replay window RAVON itself
+// honours ("accepts only once, for a few minutes" - see signedHeaders above),
+// and that the exact same nonce has not been seen before. A captured/replayed
+// response (e.g. served back to BSMS over a path without strict TLS pinning)
+// either carries a stale timestamp or reuses a nonce already recorded here,
+// and is rejected before it reaches the sync pipeline.
+const REPLAY_WINDOW_MS = 5 * 60 * 1000;
+const seenNonces = new Map(); // nonce -> expiry ms
+const purgeSeenNonces = () => {
+  const now = Date.now();
+  for (const [nonce, expiresAt] of seenNonces) if (expiresAt <= now) seenNonces.delete(nonce);
+};
+const assertFreshResponse = (P, { nonce, issuedAtMs }) => {
+  purgeSeenNonces();
+  if (Date.now() - issuedAtMs > REPLAY_WINDOW_MS) {
+    throw new PosResponseError(`${P.label} signed response arrived outside the ${REPLAY_WINDOW_MS / 1000}s replay window - rejected`, 440, P.id);
+  }
+  if (seenNonces.has(nonce)) {
+    throw new PosResponseError(`${P.label} signed response reused a nonce already seen - rejected as a possible replay`, 440, P.id);
+  }
+  seenNonces.set(nonce, Date.now() + REPLAY_WINDOW_MS);
 };
 const usesServiceKey = (provider) => {
   const P = providerOf(provider);
@@ -646,7 +707,11 @@ const keyRefusedMessage = (P) => `${P.label} refused the Stock Management signat
  */
 const serviceGet = async (P, url) => {
   const target = integrationUrl(url);
-  const response = await fetchWithTransientRetry(P, target, () => ({ method: 'GET', headers: signedHeaders(P, target) }));
+  let signed;
+  const response = await fetchWithTransientRetry(P, target, () => {
+    signed = signedHeaders(P, target);
+    return { method: 'GET', headers: signed.headers };
+  });
   const payload = await readJson(response);
   if (isUnauthenticated(response.status, payload)) {
     throw new PosAuthError(keyRefusedMessage(P), codeOf(P, 'CREDENTIALS_INVALID'), P.id);
@@ -658,6 +723,7 @@ const serviceGet = async (P, url) => {
     throw new PosResponseError(describeDataFailure(P, response.status, payload, response), response.status, P.id);
   }
   if (payload === null) throw new PosResponseError(`${P.label} returned a response that is not valid JSON`, response.status, P.id);
+  assertFreshResponse(P, signed);
   return payload;
 };
 
@@ -960,7 +1026,10 @@ const connect = async (provider, { userId, username, password, role = null }) =>
  * request, so nothing is read or logged in here. Resolves whether any system
  * is configured. Never throws.
  */
-const warmUp = async () => PROVIDER_IDS.some((id) => Boolean(config(PROVIDERS[id]).baseUrl));
+const warmUp = async () => {
+  validateIntegrationUrls();
+  return PROVIDER_IDS.some((id) => Boolean(config(PROVIDERS[id]).baseUrl));
+};
 
 /** Resolves once every login started by loginAll() has finished (tests / sync). */
 const whenIdle = settleLogins;
@@ -969,6 +1038,8 @@ const whenIdle = settleLogins;
 const resetAuthState = () => {
   for (const id of PROVIDER_IDS) states[id] = newState();
   pendingLogins.clear();
+  invalidBaseUrlEnvs.clear();
+  seenNonces.clear();
 };
 
 module.exports = {
@@ -997,6 +1068,7 @@ module.exports = {
   getUserAccess,
   ABILITIES,
   warmUp,
+  validateIntegrationUrls,
   whenIdle,
   scrub,
   extractToken,

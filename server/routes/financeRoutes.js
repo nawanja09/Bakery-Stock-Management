@@ -7,6 +7,7 @@ const intercompanyController = require('../controllers/intercompanyController');
 const cashOtherLedgerController = require('../controllers/cashOtherLedgerController');
 const authenticate = require('../middleware/authenticate');
 const { financeReadAccess, financeWriteAccess } = require('../middleware/moduleAccess');
+const validateAmounts = require('../middleware/validateAmounts');
 
 // Every route below requires a valid login.
 router.use(authenticate);
@@ -27,35 +28,35 @@ router.get('/bank/accounts', ...financeReadOnly, financeController.getBankAccoun
 
 // Cash ledger (per company) - Finance module page
 router.get('/cash/ledger/:companyId', ...financeReadOnly, financeController.getCashLedger); // ?dateFrom=&dateTo=&referenceNumber=&transactionType=
-router.post('/cash/receive', ...financeOnly, financeController.receiveCash);
+router.post('/cash/receive', ...financeOnly, validateAmounts('amount'), financeController.receiveCash);
 // Other Ledger extensions: Cash Issued (cash out to an Other Ledger) and
 // edit/void of Cash Receives classified as an Other Ledger. Plain Receive-Type
 // receipts are untouched by these routes.
 router.get('/cash/issued', ...financeReadOnly, cashOtherLedgerController.getCashIssuedList);
 router.get('/cash/issued/:id', ...financeReadOnly, cashOtherLedgerController.getCashIssuedById);
-router.post('/cash/issued', ...financeOnly, cashOtherLedgerController.createCashIssued);
-router.put('/cash/issued/:id', ...financeOnly, cashOtherLedgerController.updateCashIssued);
+router.post('/cash/issued', ...financeOnly, validateAmounts('amount'), cashOtherLedgerController.createCashIssued);
+router.put('/cash/issued/:id', ...financeOnly, validateAmounts('amount'), cashOtherLedgerController.updateCashIssued);
 router.delete('/cash/issued/:id', ...financeOnly, cashOtherLedgerController.voidCashIssued);
-router.put('/cash/receive/:id', ...financeOnly, cashOtherLedgerController.updateOtherLedgerCashReceive);
+router.put('/cash/receive/:id', ...financeOnly, validateAmounts('amount'), cashOtherLedgerController.updateOtherLedgerCashReceive);
 router.delete('/cash/receive/:id', ...financeOnly, cashOtherLedgerController.voidOtherLedgerCashReceive);
-router.post('/cash/opening-balance', ...financeOnly, financeController.setCashOpeningBalance);
+router.post('/cash/opening-balance', ...financeOnly, validateAmounts('amount'), financeController.setCashOpeningBalance);
 
 // Bank ledger (per bank account) - Finance module page
 router.get('/bank/ledger/:bankId', ...financeReadOnly, financeController.getBankLedger); // ?dateFrom=&dateTo=&referenceNumber=&transactionType=
 router.get('/bank/accounts/all', ...financeReadOnly, financeController.getAllBankAccounts); // Bank ledger page's account picker
-router.post('/bank/receive', ...financeOnly, financeController.receiveBank);
-router.post('/bank/issued', ...financeOnly, financeController.issueBank);
+router.post('/bank/receive', ...financeOnly, validateAmounts('amount'), financeController.receiveBank);
+router.post('/bank/issued', ...financeOnly, validateAmounts('amount'), financeController.issueBank);
 
 // Cash <-> Bank transfer - Finance module page
-router.post('/transfer', ...financeOnly, financeController.transferFunds);
+router.post('/transfer', ...financeOnly, validateAmounts('amount'), financeController.transferFunds);
 
 // Bank-to-Bank transfer - Finance module page
-router.post('/bank/transfer', ...financeOnly, financeController.bankToBankTransfer);
+router.post('/bank/transfer', ...financeOnly, validateAmounts('amount'), financeController.bankToBankTransfer);
 
 // Intercompany Transaction - Finance module page. Moves funds between two
 // companies' Cash/Bank accounts; NOT an expense, excluded from the Expense Report.
 router.get('/intercompany', ...financeReadOnly, intercompanyController.getIntercompanyTransactions);
-router.post('/intercompany', ...financeOnly, intercompanyController.createIntercompanyTransaction);
+router.post('/intercompany', ...financeOnly, validateAmounts('amount'), intercompanyController.createIntercompanyTransaction);
 
 // Expenses Cheque Registry - Finance module page
 router.get('/cheque-registry', ...financeReadOnly, chequeRegistryController.getChequeRegistry);

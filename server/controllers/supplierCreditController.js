@@ -184,6 +184,10 @@ const createOverpayment = async (req, res) => {
   if (!supplier_id) return res.status(400).json({ error: 'Supplier is required' });
   if (!company_id) return res.status(400).json({ error: 'Company is required' });
   if (!payment_date) return res.status(400).json({ error: 'Payment date is required' });
+  // Domain 4 M7 fix: reject a malformed amount explicitly instead of relying
+  // on moneyMath.round2 silently treating it as 0 (which happened to fail
+  // the >0 check below anyway, but gave no clear reason why).
+  if (!moneyMath.isAmount(amount)) return res.status(400).json({ error: 'Amount must be a valid amount' });
   if (!amount || moneyMath.round2(amount) <= 0) return res.status(400).json({ error: 'Amount must be greater than 0' });
   if (!created_by) return res.status(400).json({ error: 'Created by is required' });
   if (!normalizedPaymentMethod || !isValidPaymentMethod(normalizedPaymentMethod)) {
@@ -305,6 +309,14 @@ const settleCreditToInvoice = async (req, res) => {
   }
   if (!settlement_date) return res.status(400).json({ error: 'Settlement date is required' });
   if (!settled_by) return res.status(401).json({ error: 'Please log in again' });
+  // Domain 4 M7 fix: a malformed credit.amount used to be silently skipped
+  // (formatNum -> 0 -> the `continue` below) rather than rejected, so a typo
+  // in one credit line could leave that credit silently unapplied.
+  for (const credit of credits) {
+    if (credit && credit.amount !== undefined && credit.amount !== null && !moneyMath.isAmount(credit.amount)) {
+      return res.status(400).json({ error: 'Each credit amount must be a valid amount' });
+    }
+  }
 
   const connection = await pool.getConnection();
   try {

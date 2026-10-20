@@ -305,6 +305,12 @@ const getAdjustmentValues = ({ systemQuantity, actual_qty, unit_price }) => {
   if (![systemQuantity, actualQuantity, unitPrice].every(Number.isFinite)) {
     throw new ClientError('actual_qty and unit_price must be valid numbers', 400);
   }
+  // Domain 2 M4 / Domain 4 M7 fix: unit_price feeds a valuation calculation
+  // (and, on approval, a journal posting) the same way a Financial Adjustment
+  // amount does elsewhere in this file, so it gets the same strict-amount gate.
+  if (!moneyMath.isAmount(unit_price) || unitPrice < 0) {
+    throw new ClientError('unit_price must be a non-negative amount', 400);
+  }
 
   const variance = moneyMath.round(moneyMath.sub(actualQuantity, systemQuantity), 3);
   const amount = moneyMath.round2(moneyMath.mul(variance, unitPrice));

@@ -1547,7 +1547,7 @@ const ensureCollectionsSchema = async () => {
         source_system    ENUM('POS','RESTAURANT') NOT NULL,
         source_type      ENUM('SHIFT','CREDIT_PAYMENT','EMPLOYEE_DEDUCTION') NOT NULL,
         source_id        VARCHAR(100) NULL,
-        kind             ENUM('REJECTED','CHANGED_AFTER_APPROVAL') NOT NULL,
+        kind             ENUM('REJECTED','CHANGED_AFTER_APPROVAL','BURST') NOT NULL,
         reason           VARCHAR(1000) NOT NULL,
         fields           VARCHAR(2000) NULL,
         raw_payload      MEDIUMTEXT NULL,
@@ -1564,6 +1564,63 @@ const ensureCollectionsSchema = async () => {
         KEY idx_collection_data_issues_status (status, last_seen_at)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
     `);
+
+    // Domain 1 M3 fix: a table created before 'BURST' existed in the enum
+    // (collectionQuarantine.js's burst-collapse row, see below) needs it added.
+    try {
+      const [kindColumn] = await pool.query(
+        `SELECT COLUMN_TYPE FROM information_schema.COLUMNS
+          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'collection_data_issues' AND COLUMN_NAME = 'kind'`
+      );
+      if (kindColumn[0] && !kindColumn[0].COLUMN_TYPE.includes("'BURST'")) {
+        await pool.query(
+          "ALTER TABLE collection_data_issues MODIFY COLUMN kind ENUM('REJECTED','CHANGED_AFTER_APPROVAL','BURST') NOT NULL"
+        );
+      }
+    } catch (kindErr) {
+      console.warn('collection_data_issues.kind BURST migration skipped:', kindErr.message);
+    }
+
+    // Domain 6 M9 fix: `collection_data_issues` is the primary record of "what
+    // did RAVON actually send us" and, unlike audit_log, had no DB-level
+    // protection - recordIssue()'s own ON DUPLICATE KEY UPDATE and
+    // resolveIssue()'s UPDATE are legitimate (re-sighting a known issue bumps
+    // seen_count/last_seen_at and may reopen it; resolving it sets
+    // status/resolved_*), so a blanket append-only trigger (like audit_log's)
+    // would break them. Instead: no row may ever be deleted, and the columns
+    // that describe WHAT WAS RECEIVED (the payload and its identity) can
+    // never be changed once written - only the resolution/tracking columns
+    // (status, resolved_*, seen_count, last_seen_at) may still move.
+    try {
+      const [triggers] = await pool.query(
+        `SELECT TRIGGER_NAME FROM information_schema.TRIGGERS
+          WHERE TRIGGER_SCHEMA = DATABASE() AND EVENT_OBJECT_TABLE = 'collection_data_issues'`
+      );
+      const existingTriggers = new Set(triggers.map((t) => t.TRIGGER_NAME));
+      if (!existingTriggers.has('collection_data_issues_no_delete')) {
+        await pool.query(`
+          CREATE TRIGGER collection_data_issues_no_delete BEFORE DELETE ON collection_data_issues FOR EACH ROW
+          SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'collection_data_issues is append-only (no deletes)'
+        `);
+      }
+      if (!existingTriggers.has('collection_data_issues_protect_payload')) {
+        await pool.query(`
+          CREATE TRIGGER collection_data_issues_protect_payload BEFORE UPDATE ON collection_data_issues FOR EACH ROW
+          BEGIN
+            IF NOT (OLD.issue_key <=> NEW.issue_key) OR NOT (OLD.source_system <=> NEW.source_system)
+               OR NOT (OLD.source_type <=> NEW.source_type) OR NOT (OLD.source_id <=> NEW.source_id)
+               OR NOT (OLD.kind <=> NEW.kind) OR NOT (OLD.reason <=> NEW.reason)
+               OR NOT (OLD.fields <=> NEW.fields) OR NOT (OLD.raw_payload <=> NEW.raw_payload)
+               OR NOT (OLD.collection_id <=> NEW.collection_id) OR NOT (OLD.first_seen_at <=> NEW.first_seen_at)
+            THEN
+              SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'collection_data_issues: the reported payload is append-only and cannot be modified';
+            END IF;
+          END
+        `);
+      }
+    } catch (triggerErr) {
+      console.warn('Collection quarantine append-only triggers skipped (needs the TRIGGER privilege):', triggerErr.message);
+    }
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS collection_transactions (

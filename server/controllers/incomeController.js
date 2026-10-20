@@ -38,6 +38,9 @@ const createIncome = async (req, res) => {
     if (!isValidDate(income_date)) return res.status(400).json({ error: 'A valid date is required' });
     if (!company_id) return res.status(400).json({ error: 'Company is required' });
     if (!department_id) return res.status(400).json({ error: 'Department is required' });
+    // Domain 4 M7 fix: reject a malformed amount explicitly instead of
+    // relying on number()/moneyMath.round2 silently treating it as 0.
+    if (!moneyMath.isAmount(amount)) return res.status(400).json({ error: 'Amount must be a valid amount' });
     const parsedAmount = number(amount);
     if (!parsedAmount || parsedAmount <= 0) return res.status(400).json({ error: 'Amount must be greater than 0' });
 
@@ -84,6 +87,7 @@ const validateIncomePayload = async (payload) => {
   if (!isValidDate(income_date)) throw new Error('A valid date is required');
   if (!company_id) throw new Error('Company is required');
   if (!department_id) throw new Error('Department is required');
+  if (!moneyMath.isAmount(amount)) throw new Error('Amount must be a valid amount');
   const parsedAmount = number(amount);
   if (!parsedAmount || parsedAmount <= 0) throw new Error('Amount must be greater than 0');
   const references = await validateIncomeReferences(company_id, department_id);

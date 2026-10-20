@@ -14,26 +14,17 @@ Scope: webhook/API authentication, idempotency and duplicate prevention, payload
 
 Architecture note: the integration is **pull-based**, not webhook-based — BSMS calls out to RAVON (per-user Bearer token, or an ECDSA P-256 signed server-key request with nonce + timestamp + same-origin pinning for unattended syncs). There is no public inbound webhook endpoint for this data, which removes an entire class of inbound-webhook-forgery risk by construction.
 
-### [MEDIUM] M1 — Signed server-key requests have no replay window enforcement at the HTTP layer
+### [FIXED] M1 — Signed server-key requests have no replay window enforcement at the HTTP layer (fixed 2026-10-20)
 The nonce + timestamp are generated and signed client-side (`integrationAuthService.js`), but the audit found no server-side evidence (on the BSMS side) that a *received* signed response's own freshness is independently re-checked before being trusted into the sync pipeline, beyond transport TLS. If RAVON's endpoint is ever reachable over a path without strict TLS pinning, a captured response could be replayed.
-**Fix:** record each inbound sync response's nonce/timestamp in a short-lived dedupe table (same pattern as `collection_data_issues`) and reject anything older than the sync interval or already seen.
+**Fix applied:** `signedHeaders()` now returns the nonce/timestamp it generated alongside the request headers, and `serviceGet()` keeps the exact pair used for whichever attempt actually succeeded (a retry signs again, never reusing one). Once a response comes back, `assertFreshResponse()` rejects it if it arrives more than `REPLAY_WINDOW_MS` (5 minutes — matching the "accepts only once, for a few minutes" window RAVON itself honours) after that request was signed, or if the same nonce has already been accepted once (tracked in a short-lived in-memory `seenNonces` map, purged as entries expire — the same short-lived-dedupe shape the fix note asked for, kept in memory rather than a table since nonces only need to live a few minutes). This closes the gap without changing anything about how RAVON verifies the request on its own side.
 
-### [MEDIUM] M2 — Sync credentials and base URLs are read from `.env` with no startup validation of shape
+### [FIXED] M2 — Sync credentials and base URLs are read from `.env` with no startup validation of shape (fixed 2026-10-20)
 `RAVON_POS_API_URL`, `RAVON_RESTAURANT_API_URL`, and login/timeout envs are consumed without format/scheme validation; a misconfigured or malicious URL (e.g. pointing at an internal host) would be followed silently.
-**Fix:**
-```js
-// server/services/integrationAuthService.js — near where urlEnv is read
-const assertHttpsUrl = (value, envName) => {
-  let parsed;
-  try { parsed = new URL(value); } catch { throw new Error(`${envName} is not a valid URL`); }
-  if (parsed.protocol !== 'https:') throw new Error(`${envName} must be an https:// URL`);
-  return parsed.toString();
-};
-```
+**Fix applied:** `validateIntegrationUrls()` (`integrationAuthService.js`) runs once from `warmUp()` at server start and checks each configured base URL: it must parse as a URL, must not embed `user:password@` credentials, and (in production) must use `https:`. A URL that fails is logged loudly (`console.error`) and that provider is then treated as unconfigured (`config()` returns `baseUrl: ''` for it) — the same fail-safe behaviour already used elsewhere in this file for an invalid signing key, rather than crashing the whole server over one misconfigured integration.
 
-### [MEDIUM] M3 — Payload contract validation rejects but does not rate-limit malformed bursts
+### [FIXED] M3 — Payload contract validation rejects but does not rate-limit malformed bursts (fixed 2026-10-20)
 `collectionSchema.js` validates the `ravon-collections-v1` contract and routes mismatches to quarantine (good — no silent drop), but a compromised or buggy upstream could flood `collection_data_issues` with distinct payloads (the dedupe key includes the payload hash, so every malformed variant creates a new row).
-**Fix:** cap new quarantine rows per `(system, source)` per hour; once exceeded, collapse further rejects into a single "burst" row referencing a sample payload.
+**Fix applied:** `collectionQuarantine.js`'s `recordIssue` (the one chokepoint every quarantine write already goes through) now tracks, in memory per `(system, source)` pair, how many DISTINCT new issue keys it has created in the current rolling hour (`RAVON_QUARANTINE_BURST_LIMIT`, default 50). A re-sighted issue is unaffected (it still just bumps `seen_count` on its own row). Once that pair's new-issue budget for the hour is used up, every further distinct variant is redirected to `recordBurst`, which upserts into one shared row per `(system, source, hour)` — `kind = 'BURST'` (added to the `kind` enum, with a start-up migration for a table created before it existed) — bumping its own `seen_count` and keeping the latest payload as a sample, instead of writing a new row per variant. A genuine flood now produces one growing row, not thousands.
 
 ### [LOW] L1 — Quarantine payloads are stored up to 60,000 chars unredacted
 `collectionQuarantine.js` stores `raw_payload` as-is (no secret redaction pass like `auditLog.js`'s `redact()`). If RAVON ever embeds a token/PII in a malformed payload, it would be stored verbatim in `collection_data_issues`.
@@ -58,14 +49,9 @@ There is no cost-layer table. RM cost is recomputed per query as `purchase_items
 `fgProductionController.js`'s recipe lines stored their own `last_price` per RM ingredient, entered/edited independently of `purchase_items.unit_price`. `rm_cost` roll-ups (and therefore FG margin) were computed against this manually-typed figure, not the real latest purchase price — so margin reporting could silently diverge from actual spend with no reconciliation or alert.
 **Fix applied:** `last_price` is no longer accepted from the client at all — `addRecipe`/`updateRecipe` now call `getServerComputedUnitPrice()`, the same "latest purchase price as of date" lookup Domain 2 H1 uses (`purchase_items` joined to `purchases`, `ORDER BY purchase_date DESC, pi.id DESC LIMIT 1`, filtered by `RULES.purchases('p')` to skip deleted invoices). `getRecipesForFg` and the `getRecipesReport` roll-up also recompute `last_price`/`line_cost`/`rm_cost` live via a correlated subquery instead of trusting the stored column, so a margin screen always reflects the current real purchase price, not a stale one from when the recipe line was last saved.
 
-### [MEDIUM] M4 — RM Stock Adjustment `unit_price` is not sign/shape validated
+### [FIXED] M4 — RM Stock Adjustment `unit_price` is not sign/shape validated (fixed 2026-10-20)
 `adjustmentController.js`'s `getAdjustmentValues` uses the raw `unit_price` without the same strict `moneyMath.isAmount()` gate applied to Financial Adjustment amounts elsewhere in the same file — a negative or non-numeric `unit_price` is not rejected before it feeds a valuation calculation.
-**Fix:**
-```js
-if (!moneyMath.isAmount(unit_price) || Number(unit_price) < 0) {
-  throw new HttpError(400, 'unit_price must be a non-negative amount');
-}
-```
+**Fix applied:** `getAdjustmentValues` (the one function both `createAdjustment` and `updateAdjustment` call) now rejects with 400 when `unit_price` fails `moneyMath.isAmount()` or is negative, before `variance`/`amount` are computed — closing this for every caller at the one chokepoint, rather than in each route.
 
 ### [FIXED] M5 — Approved RM stock adjustments posted to no ledger (fixed 2026-10-20)
 `approveAdjustment` flipped the adjustment to effective (it counts in `stockRules.js`'s formula from that point) but made no corresponding financial posting (no COGS/inventory-value journal effect) — it never calls `recordCashTransaction`/`recordBankTransaction`, so H3's fix alone (which only wired that chokepoint) didn't reach it.
@@ -141,9 +127,9 @@ RM valuation itself (Domain 2 H1) is an accepted "latest price as of date" desig
 Re-verified fresh against current code: `utils/money.js` parses every value as decimal **text** into a scaled `BigInt`, does all arithmetic on integers, and rounds half-away-from-zero (matching MySQL's own DECIMAL rounding) before converting back to a JS number — this avoids the classic `0.1 + 0.2` binary-float drift entirely. It is consistently used through `utils/financeLedger.js` for every cash/bank balance calculation (`round2`, `add`, `sub`, `mul`). Commits `22c1cb9` and `1d38484` (visible in git log) match this file's stated purpose. This closes the Arithmetic Precision ask; no further fix needed here.
 Residual note (not a new finding, just a boundary to keep in mind): callers that pass raw floats *into* `moneyMath` before it parses them (e.g. `Number(req.body.amount)`) still rely on `moneyMath.toUnits`'s own float round-trip at 6 decimals to catch drift — this is already handled (`parseDecimal` takes `.toFixed(6)` of a JS number before scaling), so no action required.
 
-### [MEDIUM] M7 — Inconsistent application of strict amount validation (re-states Domain 2 M4 at the Domain 4 level)
+### [FIXED] M7 — Inconsistent application of strict amount validation (re-states Domain 2 M4 at the Domain 4 level; fixed 2026-10-20)
 `moneyMath.isAmount()` strict-mode validation is applied to some money inputs (Financial Adjustments) and not others (RM Stock Adjustment `unit_price`, Domain 2 M4). Because P&L figures are only as trustworthy as their weakest input, this gap should be closed everywhere money enters the system, not just where it was first noticed.
-**Fix:** add a single Express body-validation middleware for all money-bearing routes that runs `moneyMath.isAmount()` over a declared list of fields per route, so new routes don't have to remember to add the check manually.
+**Fix applied:** added `middleware/validateAmounts.js` — a reusable Express middleware factory (`validateAmounts('amount', { allowNegative, required })`) that runs `moneyMath.isAmount()` over named body fields and rejects with 400 before the controller runs, so a new money-bearing route only has to add one line. Wired it onto every Cash/Bank-moving route in `financeRoutes.js` (cash/bank receive, issued, opening balance, transfer, bank-to-bank transfer, intercompany) that previously had no explicit amount-shape check (each had instead relied on `moneyMath.round2`'s silent "invalid input → 0" fallback happening to fail a later `> 0` test — safe by coincidence, not by design). Where the money field sits inside a per-controller helper rather than at the route (`incomeController.createIncome`/`validateIncomePayload`, `cashOtherLedgerController.readCommonFields`, `supplierCreditController.createOverpayment`/`settleCreditToInvoice`, `purchaseController.makePayment` and its `invoice_allocations[].amount`), added the same explicit `moneyMath.isAmount()` gate directly in that helper instead, for the same reason: `unit_price`/`amount` is already fixed at the Domain 2 M4 chokepoint (`adjustmentController.getAdjustmentValues`).
 
 ### [LOW] L5 — Period Closing Immutability is well-built; one gap in re-verification tooling
 Re-verified against the current code (not assumed from the prior audit doc): `periodGuard` blocks writes into closed months pre-controller, `periodLock`/`financeLedger.js` re-check at the point of actual posting, and re-opening a closed month requires a Super-Admin-approved, time-boxed `period_reopen_requests` grant — all matching the project's stated period-close rules exactly, and every step (request, approve, reject, close) is captured by the audit trail. The one gap: there is no scheduled job that automatically expires/closes a grant the moment its `expires_at` passes — `is_active` is computed correctly at read time (`expires_at > NOW()`), but nothing *proactively* flips `status` to `Expired` in the row, so a long-forgotten grant stays `Approved` in storage (though functionally inert) and an operator skimming raw `period_reopen_requests` rows rather than the computed view could be misled.
@@ -171,22 +157,9 @@ Per the accepted M8 design decision (no company/branch scoping — all users wit
 ### [RESOLVED] General audit trail (`audit_log`) is genuinely append-only and well-instrumented
 `services/auditLog.js` creates `BEFORE UPDATE` / `BEFORE DELETE` triggers on `audit_log` that `SIGNAL` an error, so **no application code path — not even an Admin — can alter or remove a row** short of direct DBA access with `TRIGGER`/`DROP` privilege, and the recommended setup (`AUDIT_DB`, `scripts/createAppDbUser.js`) restricts the app's own DB user to `SELECT`/`INSERT` only, removing even that path from the application's credentials. It captures: sign-in/out/password-change, every data-changing request (success or failure), every 403 denial, IP address, `X-Forwarded-For`, user agent, before/after snapshots of the touched record, and redacts secret-shaped fields (`password`, `token`, `apiKey`, `cvv`, etc.) before storage. This satisfies the Domain 6 ask in full for internal user actions.
 
-### [MEDIUM] M9 — The quarantine table for rejected/changed sales payloads (`collection_data_issues`) is mutable at the database layer, unlike `audit_log`
+### [FIXED] M9 — The quarantine table for rejected/changed sales payloads (`collection_data_issues`) is mutable at the database layer, unlike `audit_log` (fixed 2026-10-20)
 `services/collectionQuarantine.js`'s `resolveIssue` performs a plain `UPDATE ... SET status = 'RESOLVED', resolved_by = ?, resolution_note = ?` with no append-only trigger protecting the table, and `recordIssue`'s `ON DUPLICATE KEY UPDATE` path overwrites `seen_count`/`last_seen_at`/`status` on repeat sightings of the same payload rather than appending a new row. In isolation this is acceptable (the HTTP-level resolve action is still captured by the generic `auditTrail` middleware, since it's a `PATCH`/`PUT`), but the **row itself** — the primary record an investigator would open to see "what did RAVON actually send us and when was it resolved" — can be overwritten at the DB layer with no application-level trigger stopping it, which is inconsistent with the append-only guarantee Domain 6 asks for on "rejected payloads."
-**Fix:** either (a) make resolution additive — insert into a separate `collection_data_issue_resolutions(issue_id, resolved_by, resolved_at, note)` table and leave the issue row itself write-once after creation, or (b) add the same `BEFORE UPDATE`/`BEFORE DELETE` append-only trigger pattern already proven in `auditLog.js` to `collection_data_issues`, and move `status`/`resolved_*` to a joined row instead of in-place columns:
-```sql
--- minimal version: keep the table, stop allowing status to regress or payload to be touched
-ALTER TABLE collection_data_issues ADD COLUMN resolution_count INT NOT NULL DEFAULT 0;
--- resolveIssue becomes an INSERT into a new history table instead of an UPDATE of status in place
-CREATE TABLE collection_data_issue_resolutions (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  issue_id BIGINT UNSIGNED NOT NULL,
-  resolved_by INT NULL,
-  resolved_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  note VARCHAR(500) NULL,
-  FOREIGN KEY (issue_id) REFERENCES collection_data_issues(id)
-);
-```
+**Fix applied (option (b), adapted):** a full `audit_log`-style blanket append-only trigger would have broken `recordIssue`'s legitimate `ON DUPLICATE KEY UPDATE` (re-sighting a known issue bumps `seen_count`/`last_seen_at` and may flip `status` back to `OPEN`) and `resolveIssue`'s legitimate `UPDATE` of `status`/`resolved_*`. Instead, `config/db.js`'s schema setup now creates two triggers on `collection_data_issues`, following the same idempotent, `TRIGGER`-privilege-tolerant pattern as `auditLog.js`: `collection_data_issues_no_delete` refuses every `DELETE` outright, and `collection_data_issues_protect_payload` inspects every `UPDATE` and refuses it if any identity/forensic column changes (`issue_key`, `source_system`, `source_type`, `source_id`, `kind`, `reason`, `fields`, `raw_payload`, `collection_id`, `first_seen_at`) — "what RAVON actually sent us" can never be altered once written, while `status`, `resolved_by`, `resolved_at`, `resolution_note`, `seen_count` and `last_seen_at` can still move exactly as the existing resolve/re-sight workflow needs.
 
 ### [LOW] L7 — Sync-level events (a full pull cycle running, its duration, item counts) are not logged as their own audit event type
 `auditLog.js`'s `SPECIAL_PATHS`/`describeRequest` model records *user-initiated* HTTP requests well, but a background sync cycle triggered by a scheduler (not a user click) would not naturally produce a request to attribute — confirm whether `collectionSyncService.js`'s scheduled pulls (if any run outside a user-triggered "Connect"/"Sync Now" click) write their own `SYNC`-type row with item counts in/accepted/quarantined. If all syncs are currently user-triggered via an HTTP route, this is already covered by the existing middleware and no fix is needed; if a cron-driven path exists, it should call `auditLog.record()` directly with `eventType: 'SYNC'`.
@@ -211,15 +184,15 @@ await auditLog.record({
 | H2 | 2 | HIGH | FG recipe `last_price` unreconciled with real purchase price | **Fixed** (2026-10-20) |
 | H3 | 3 | HIGH | No Chart of Accounts / double-entry journal | **Fixed** (2026-10-20) |
 | H4 | 4 | HIGH | Revenue/COGS matching inherited H2's unreconciled FG recipe cost | **Fixed** (2026-10-20, with H2) |
-| M1 | 1 | MEDIUM | No replay-window check on signed sync responses | Open |
-| M2 | 1 | MEDIUM | No startup validation of integration URLs | Open |
-| M3 | 1 | MEDIUM | No rate limit on malformed-payload bursts into quarantine | Open |
-| M4 | 2 | MEDIUM | RM adjustment `unit_price` not sign/shape validated | Open |
+| M1 | 1 | MEDIUM | No replay-window check on signed sync responses | **Fixed** (2026-10-20) |
+| M2 | 1 | MEDIUM | No startup validation of integration URLs | **Fixed** (2026-10-20) |
+| M3 | 1 | MEDIUM | No rate limit on malformed-payload bursts into quarantine | **Fixed** (2026-10-20) |
+| M4 | 2 | MEDIUM | RM adjustment `unit_price` not sign/shape validated | **Fixed** (2026-10-20) |
 | M5 | 2 | MEDIUM | Approved RM adjustments post to no ledger | **Fixed** (2026-10-20) |
 | M6 | 3 | MEDIUM | Expense disbursement has no maker-checker (RBAC-only) | Accepted design / optional |
-| M7 | 4 | MEDIUM | Inconsistent `isAmount()` enforcement across money inputs | Open |
+| M7 | 4 | MEDIUM | Inconsistent `isAmount()` enforcement across money inputs | **Fixed** (2026-10-20) |
 | M8 | 5 | MEDIUM | "Ingestion token scoping" ask doesn't map to pull-based architecture | Informational |
-| M9 | 6 | MEDIUM | `collection_data_issues` is mutable, unlike `audit_log` | Open |
+| M9 | 6 | MEDIUM | `collection_data_issues` is mutable, unlike `audit_log` | **Fixed** (2026-10-20) |
 | L1–L7 | various | LOW | Hardening items, see body | Open |
 | — | 4 | RESOLVED | Arithmetic precision (`utils/money.js`, BigInt decimal math) | **Fixed** |
 | — | 5 | RESOLVED | Store Keeper / Finance RBAC separation | **Confirmed correct** |

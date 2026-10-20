@@ -13,11 +13,59 @@
 
 const crypto = require('crypto');
 
-const KINDS = Object.freeze({ REJECTED: 'REJECTED', CHANGED_AFTER_APPROVAL: 'CHANGED_AFTER_APPROVAL' });
+const KINDS = Object.freeze({ REJECTED: 'REJECTED', CHANGED_AFTER_APPROVAL: 'CHANGED_AFTER_APPROVAL', BURST: 'BURST' });
 const MAX_PAYLOAD_CHARS = 60000;
 
 const hashOf = (value) => crypto.createHash('sha256').update(String(value)).digest('hex');
 const payloadText = (payload) => (typeof payload === 'string' ? payload : JSON.stringify(payload ?? null));
+
+// Domain 1 M3 fix: the dedupe key already includes the payload hash, so a
+// compromised/buggy upstream sending a slightly different malformed payload
+// every time would create a brand NEW row forever (never deduped by the
+// UNIQUE key above). This caps how many DISTINCT new issues a single
+// (system, source) pair may create per rolling hour; once the cap is hit,
+// every further distinct variant in that hour collapses into one shared
+// "burst" row instead of its own row, so a flood produces one growing row
+// with a sample payload, not thousands of rows.
+const BURST_WINDOW_MS = 60 * 60 * 1000;
+const burstLimit = () => {
+  const n = Number(process.env.RAVON_QUARANTINE_BURST_LIMIT);
+  return Number.isInteger(n) && n > 0 ? n : 50;
+};
+// (system, source) -> { windowStart, keys: Set<issue_key> } seen so far this window.
+const newIssueTracking = new Map();
+
+/** Whether `key` is this (system, source) pair's Nth+1 DISTINCT new issue this hour (N = burstLimit()). */
+const isOverBurstLimit = (system, source, key) => {
+  const trackKey = `${system}|${source}`;
+  const now = Date.now();
+  let tracked = newIssueTracking.get(trackKey);
+  if (!tracked || now - tracked.windowStart >= BURST_WINDOW_MS) {
+    tracked = { windowStart: now, keys: new Set() };
+    newIssueTracking.set(trackKey, tracked);
+  }
+  if (tracked.keys.has(key)) return false; // already-seen issue, not a new distinct variant
+  if (tracked.keys.size >= burstLimit()) return true;
+  tracked.keys.add(key);
+  return false;
+};
+
+/** One shared row per (system, source, hour) that further burst variants collapse into. */
+const recordBurst = async (queryable, { system, source, kind, reason, payload, sourceId }) => {
+  const hourBucket = Math.floor(Date.now() / BURST_WINDOW_MS);
+  const key = hashOf(`${system}|${source}|BURST|${hourBucket}`);
+  const text = payloadText(payload);
+  await queryable.query(
+    `INSERT INTO collection_data_issues
+       (issue_key, source_system, source_type, source_id, kind, reason, fields, raw_payload, collection_id)
+     VALUES (?, ?, ?, ?, 'BURST', ?, ?, ?, NULL)
+     ON DUPLICATE KEY UPDATE seen_count = seen_count + 1, last_seen_at = NOW(),
+       status = IF(status = 'RESOLVED', status, 'OPEN')`,
+    [key, system, source, sourceId ? String(sourceId).slice(0, 100) : null,
+      `More than ${burstLimit()} distinct ${kind} payloads from ${system}/${source} in one hour - collapsed into this row (sample reason: ${String(reason).slice(0, 200)})`.slice(0, 1000),
+      JSON.stringify(['burst']), text.slice(0, MAX_PAYLOAD_CHARS)]
+  );
+};
 
 /**
  * Records (or re-confirms) one issue. Never throws: a failure to write the quarantine must not
@@ -30,6 +78,12 @@ const recordIssue = async (queryable, {
   try {
     const text = payloadText(payload);
     const key = hashOf(`${system}|${source}|${kind}|${collectionId ?? ''}|${text}`);
+
+    if (isOverBurstLimit(system, source, key)) {
+      await recordBurst(queryable, { system, source, kind, reason, payload, sourceId });
+      return true;
+    }
+
     await queryable.query(
       `INSERT INTO collection_data_issues
          (issue_key, source_system, source_type, source_id, kind, reason, fields, raw_payload, collection_id)
@@ -74,4 +128,7 @@ const resolveIssue = async (queryable, id, { userId, note = null }) => {
   return result.affectedRows === 1;
 };
 
-module.exports = { KINDS, recordIssue, listIssues, getIssue, resolveIssue, hashOf };
+// Test helper: clears the in-memory burst-tracking state between test runs.
+const resetBurstTracking = () => newIssueTracking.clear();
+
+module.exports = { KINDS, recordIssue, listIssues, getIssue, resolveIssue, hashOf, resetBurstTracking };
