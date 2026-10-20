@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const moneyMath = require('../utils/money');
 const { archiveLines } = require('../services/lineHistory');
 
 const getPurchases = async (req, res) => {
@@ -70,7 +71,7 @@ const getPurchaseById = async (req, res) => {
 
     // Calculate total from items if needed
     if (!purchase.total_amount && itemRows.length > 0) {
-      const total = itemRows.reduce((sum, item) => sum + (item.total_price || 0), 0);
+      const total = moneyMath.sum(itemRows, (item) => item.total_price || 0);
       purchase.total_amount = total;
     }
 

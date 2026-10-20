@@ -56,6 +56,7 @@
 //   card key "RESTAURANT:SHIFT:211:sale-1"), which also keeps them apart in the
 //   Card Ledger (its reference numbers are unique).
 const { recordCashTransaction, recordBankTransaction } = require('../utils/financeLedger');
+const moneyMath = require('../utils/money');
 const { createPendingCardTransaction } = require('./cardLedgerService');
 const ol = require('./otherLedgerService');
 const { SYSTEMS, SOURCES, PAYMENT_METHODS, postingsOf, cardPaymentsOf, reconcileCard } = require('./collectionMapper');
@@ -298,8 +299,8 @@ const RECEIVED_METHODS = [PAYMENT_METHODS.CASH, PAYMENT_METHODS.CARD, PAYMENT_ME
  */
 const settlementsOf = (row, postings) => {
   if (row.source_type !== SOURCES.CREDIT_PAYMENT) return [];
-  const received = postings.filter((p) => RECEIVED_METHODS.includes(p.method)).reduce((sum, p) => sum + p.amount, 0);
-  const amount = Number(received.toFixed(2));
+  const received = moneyMath.sum(postings.filter((p) => RECEIVED_METHODS.includes(p.method)), (p) => p.amount);
+  const amount = moneyMath.round2(received);
   return amount > 0 ? [{ method: PAYMENT_METHODS.AR_SETTLEMENT, amount }] : [];
 };
 

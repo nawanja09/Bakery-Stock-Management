@@ -9,6 +9,7 @@ const restrictRoles = require('../middleware/restrictRoles');
 // Payments are paid out of the petty cash float itself and must never post
 // to the Cash Ledger.
 const periodLock = require('../services/periodLock');
+const moneyMath = require('../utils/money');
 const { softDelete } = require('../services/softDelete');
 const { recordBankTransaction, recordCashTransaction, calculateRunningBalances, refreshBalancesOfReference, refreshAccounts } = require('../utils/financeLedger');
 const { checkDuplicateReference, DuplicateReferenceError } = require('../services/referenceValidationService');
@@ -578,7 +579,7 @@ router.post('/petty-cash/reimbursement', authenticate, async (req, res) => {
       companyId: company_id,
       date: reimbursement_date,
       remark: `Petty Cash Reimbursement - ${reference_number}`,
-      credit: parseFloat(amount),
+      credit: moneyMath.round2(amount),
       transactionType: 'Petty Cash Reimbursement',
       referenceNumber: reference_number,
       referenceType: 'PETTY_CASH_REIMBURSEMENT',
@@ -654,12 +655,12 @@ router.put('/petty-cash/reimbursement/:id', authenticate, async (req, res) => {
         'SELECT id, credit FROM finance_transactions WHERE reference_type = "PETTY_CASH_REIMBURSEMENT" AND reference_id = ? FOR UPDATE',
         [id]
       );
-      const newCredit = parseFloat(amount) || 0;
+      const newCredit = moneyMath.round2(amount);
 
       if (finRows.length > 0) {
         const finId = finRows[0].id;
-        const oldCredit = parseFloat(finRows[0].credit) || 0;
-        const difference = newCredit - oldCredit;
+        const oldCredit = moneyMath.round2(finRows[0].credit);
+        const difference = moneyMath.sub(newCredit, oldCredit);
         if (difference !== 0) {
           await connection.query('UPDATE cash_accounts SET current_balance = current_balance - ? WHERE company_id = ?', [difference, companyId]);
         }
@@ -992,7 +993,7 @@ router.put('/cheque/realise/:id', authenticate, async (req, res) => {
       bankId: bank_id,
       date: realise_date,
       remark: `Cheque expense - ${cheque.cheque_number}`,
-      credit: parseFloat(cheque.total_bill_amount),
+      credit: moneyMath.round2(cheque.total_bill_amount),
       transactionType: 'Cheque Expense',
       referenceNumber: cheque.cheque_number,
       partyName: cheque.payee_name,
@@ -1091,7 +1092,7 @@ router.post('/bank-charges', authenticate, async (req, res) => {
         bankId: bank_id,
         date,
         remark: `Bank charge - ${charges_type}`,
-        credit: parseFloat(amount),
+        credit: moneyMath.round2(amount),
         transactionType: 'Bank Charges',
         referenceNumber: reference_number || null,
         referenceType: 'BANK_CHARGE',
@@ -1170,11 +1171,11 @@ router.put('/bank-charges/:id', authenticate, async (req, res) => {
       );
       if (finRows.length > 0) {
         const finId = finRows[0].id;
-        const oldCredit = parseFloat(finRows[0].credit) || 0;
-        const newCredit = parseFloat(amount) || 0;
+        const oldCredit = moneyMath.round2(finRows[0].credit);
+        const newCredit = moneyMath.round2(amount);
         
         if (oldBankId === newBankId) {
-          const difference = newCredit - oldCredit;
+          const difference = moneyMath.sub(newCredit, oldCredit);
           if (difference !== 0) {
             await connection.query('UPDATE bank_details SET current_balance = current_balance - ? WHERE id = ?', [difference, oldBankId]);
           }
@@ -1198,7 +1199,7 @@ router.put('/bank-charges/:id', authenticate, async (req, res) => {
         bankId: newBankId,
         date,
         remark: `Bank charge - ${charges_type}`,
-        credit: parseFloat(amount),
+        credit: moneyMath.round2(amount),
         transactionType: 'Bank Charges',
         referenceNumber: reference_number || null,
         referenceType: 'BANK_CHARGE',
@@ -1370,11 +1371,10 @@ router.put('/online/:id', authenticate, async (req, res) => {
 
     const oldTotalBill = parseFloat(currentExpense[0].total_bill_amount) || 0;
     const paidAmount = parseFloat(currentExpense[0].paid_amount) || 0;
-    const newTotalBill = parseFloat(total_bill_amount) || 0;
+    const newTotalBill = moneyMath.round2(total_bill_amount);
 
-    // ✅ Recalculate balance: total_bill_amount - paid_amount
-    let newBalance = newTotalBill - paidAmount;
-    if (newBalance < 0) newBalance = 0;
+    // ✅ Recalculate balance: total_bill_amount - paid_amount (exact decimals, never below 0)
+    const newBalance = moneyMath.max(0, moneyMath.sub(newTotalBill, paidAmount));
 
     const [result] = await pool.query(
       `UPDATE online_expenses 
@@ -1479,7 +1479,7 @@ router.post('/online/pay', authenticate, async (req, res) => {
     return res.status(400).json({ error: 'Voucher number is required' });
   }
 
-  const amountToPay = parseFloat(transfer_amount) || 0;
+  const amountToPay = moneyMath.round2(transfer_amount);
   if (amountToPay <= 0) {
     return res.status(400).json({ error: 'Valid transfer amount is required' });
   }
@@ -1509,10 +1509,10 @@ router.post('/online/pay', authenticate, async (req, res) => {
     }
 
     // ✅ Calculate total balance of ALL selected expenses
-    const totalBalance = expenses.reduce((sum, exp) => sum + parseFloat(exp.balance || 0), 0);
+    const totalBalance = moneyMath.sum(expenses, (exp) => exp.balance || 0);
     
     // ✅ Check if transfer amount exceeds total balance
-    if (amountToPay > totalBalance) {
+    if (moneyMath.compare(amountToPay, totalBalance) > 0) {
       await connection.rollback();
       return res.status(400).json({ 
         error: `Transfer amount (${amountToPay}) exceeds total balance (${totalBalance})` 
@@ -1525,9 +1525,9 @@ router.post('/online/pay', authenticate, async (req, res) => {
     for (const expense of expenses) {
       if (remainingAmount <= 0) break;
 
-      const payAmount = Math.min(remainingAmount, parseFloat(expense.balance));
-      const newBalance = parseFloat(expense.balance) - payAmount;
-      const newPaidAmount = parseFloat(expense.paid_amount || 0) + payAmount;
+      const payAmount = moneyMath.min(remainingAmount, expense.balance);
+      const newBalance = moneyMath.sub(expense.balance, payAmount);
+      const newPaidAmount = moneyMath.add(expense.paid_amount || 0, payAmount);
       const totalBill = parseFloat(expense.total_bill_amount || 0);
 
       // ✅ Determine payment status based on new balance
@@ -1567,7 +1567,7 @@ router.post('/online/pay', authenticate, async (req, res) => {
         ]
       );
 
-      remainingAmount -= payAmount;
+      remainingAmount = moneyMath.sub(remainingAmount, payAmount);
 
       results.push({
         expense_id: expense.id,
@@ -1793,17 +1793,17 @@ router.put('/banks/:id', authenticate, async (req, res) => {
 
     const oldOpening = parseFloat(existingBank.opening_balance) || 0;
     const oldCurrent = parseFloat(existingBank.current_balance) || 0;
-    const existingTransactions = Number((oldCurrent - oldOpening).toFixed(2));
+    const existingTransactions = moneyMath.round2(moneyMath.sub(oldCurrent, oldOpening));
 
     const newOpening = opening_balance !== undefined && opening_balance !== null && Number.isFinite(parseFloat(opening_balance))
       ? parseFloat(opening_balance)
       : oldOpening;
 
-    const recalculatedCurrentBalance = Number((newOpening + existingTransactions).toFixed(2));
+    const recalculatedCurrentBalance = moneyMath.round2(moneyMath.add(newOpening, existingTransactions));
 
     // Changing the opening balance changes the opening row, which is dated in the past:
     // that month must be open (services/periodLock.js).
-    if (Math.abs(newOpening - oldOpening) > 0.004) {
+    if (moneyMath.compare(newOpening, oldOpening) !== 0) {
       const [openingDates] = await pool.query(
         "SELECT DATE_FORMAT(transaction_date, '%Y-%m-%d') AS d FROM finance_transactions WHERE bank_id = ? AND reference_type = 'OPENING_BALANCE' AND status = 1",
         [id]

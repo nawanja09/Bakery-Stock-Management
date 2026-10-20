@@ -1,5 +1,7 @@
 # BSMS — Security, Business-Logic & Financial-Integrity Audit
 
+> **Status update 2026-10-20:** this report is historical. Current fix status of every finding is in [security-financial-reaudit-2026-10-15.md](security-financial-reaudit-2026-10-15.md). Fixed since: H3, H4, H5 (hard deletes), H6 (mostly), H7, M3, M5, M7, R1–R10 and the C1–C3, N1–N9 items below. Accepted: M8 (no company scoping), R2 (Store Keeper pays suppliers). Still open: C4, C5 (design), H5 expense approval, M4, N1-tail (needs the RAVON Laravel apps).
+
 **Scope:** `server/` (Express 4 + mysql2, 24k LOC across controllers/services/routes/middleware), commit `189c342`, 2026-10-12.
 **Method:** Manual code review. RBAC findings were verified by executing the real `config/rolePermissions.js` and a live Express router. Secret findings were checked by key name and length only. No secret values were read.
 
@@ -49,7 +51,7 @@ Some items in the brief can't be "fixed" with a patch, because the feature they 
 | M2 | MED | BSMS login password relayed to two external systems; HTTPS not enforced on base URLs |
 | M3 | MED | Collection approval can post amounts the approver never saw (re-sync race, no version check) |
 | M4 | MED | External payload "validation" is fuzzy alias matching; upstream voids/refunds after approval are never detected |
-| M5 | MED | Floating-point money arithmetic (`parseFloat`/`toFixed`, ~220 sites) |
+| M5 | MED | Floating-point money arithmetic (`parseFloat`/`toFixed`, ~220 sites) - **fixed 2026-10-20** |
 | M6 | MED | No login throttling/lockout; no password policy on change-password |
 | M7 | MED | Two different "current stock" formulas (soft-deleted invoices counted in one, not the other) |
 | M8 | MED | No company/branch data isolation (horizontal IDOR across companies) |

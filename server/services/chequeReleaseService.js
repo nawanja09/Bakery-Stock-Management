@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const moneyMath = require('../utils/money');
 const { recordCashTransaction, recordBankTransaction, rebuildBalanceAfter, InsufficientBalanceError } = require('../utils/financeLedger');
 const { PeriodClosedError } = require('./periodLock');
 const { toYmd, todayYmd } = require('../utils/dateOnly');
@@ -277,7 +278,7 @@ const postChequeRelease = async (connection, chequeOrId, releaseDate, { actorUse
   }
 
   const source = await getChequeSource(connection, cheque);
-  const amount = Number.parseFloat(source.amount ?? cheque.amount) || 0;
+  const amount = moneyMath.round2(source.amount ?? cheque.amount);
   if (amount <= 0) throw new Error(`Cheque ${cheque.id} has an invalid amount`);
 
   // Dates may arrive as 'YYYY-MM-DD' strings or as Date objects read from the

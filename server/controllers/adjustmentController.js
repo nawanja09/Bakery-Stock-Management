@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const moneyMath = require('../utils/money');
 const { currentStockSql, RULES } = require('../services/stockRules');
 const { sendServerError, ClientError } = require('../utils/safeError');
 const { recordRmAdjustment, recordFinancialAdjustment, sameValue } = require('../utils/rmAdjustmentAudit');
@@ -123,8 +124,7 @@ const updateFinancialAdjustmentRecord = async (req, res) => {
       Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== String(date)) {
     return res.status(400).json({ error: 'A valid date is required' });
   }
-  const parsedAmount = Number(amount);
-  const normalizedAmount = Number.isFinite(parsedAmount) ? Number(parsedAmount.toFixed(2)) : NaN;
+  const normalizedAmount = moneyMath.isAmount(amount) && Number.isFinite(Number(amount)) ? moneyMath.round2(amount) : NaN;
   if (!Number.isFinite(normalizedAmount) || normalizedAmount <= 0 || normalizedAmount > 999999999999.99) {
     return res.status(400).json({ error: 'Enter an amount greater than 0 within the supported limit' });
   }
@@ -184,7 +184,7 @@ const updateFinancialAdjustmentRecord = async (req, res) => {
       date: originalDate,
       receive_type: existing.receive_type,
       reference_number: existing.reference_number,
-      amount: Number(Number(existing.amount || 0).toFixed(2)),
+      amount: moneyMath.round2(existing.amount || 0),
       remark: existing.remark
     };
     const updatedValues = {
@@ -284,7 +284,7 @@ const recalculateFinanceAccountBalance = async (connection, accountType, account
   );
   let balance = 0;
   for (const row of rows) {
-    balance = Number((balance + Number(row.debit || 0) - Number(row.credit || 0)).toFixed(2));
+    balance = moneyMath.round2(moneyMath.sub(moneyMath.add(balance, row.debit || 0), row.credit || 0));
     await connection.query('UPDATE finance_transactions SET balance_after = ? WHERE id = ?', [balance, row.id]);
   }
   await connection.query(
@@ -305,8 +305,8 @@ const getAdjustmentValues = ({ systemQuantity, actual_qty, unit_price }) => {
     throw new ClientError('actual_qty and unit_price must be valid numbers', 400);
   }
 
-  const variance = Number((actualQuantity - systemQuantity).toFixed(3));
-  const amount = Number((variance * unitPrice).toFixed(2));
+  const variance = moneyMath.round(moneyMath.sub(actualQuantity, systemQuantity), 3);
+  const amount = moneyMath.round2(moneyMath.mul(variance, unitPrice));
 
   return { systemQuantity, actualQuantity, unitPrice, variance, amount };
 };

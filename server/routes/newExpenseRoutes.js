@@ -25,6 +25,7 @@ const pool = require('../config/db');
 const authenticate = require('../middleware/authenticate');
 const restrictRoles = require('../middleware/restrictRoles');
 const { recordCashTransaction, recordBankTransaction } = require('../utils/financeLedger');
+const moneyMath = require('../utils/money');
 const { checkDuplicateReference, DuplicateReferenceError } = require('../services/referenceValidationService');
 const { isRmAdjustmentRequest, recordFinancialAdjustment, sameValue } = require('../utils/rmAdjustmentAudit');
 
@@ -70,11 +71,11 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ error: 'Bill date, payee, expense type, sub expense type and company are required' });
   }
 
-  const withoutVat = parseFloat(without_vat_amount) || 0;
-  const vat = parseFloat(vat_amount) || 0;
+  const withoutVat = moneyMath.round2(without_vat_amount);
+  const vat = moneyMath.round2(vat_amount);
   const totalBill = total_bill_amount !== undefined && total_bill_amount !== null && total_bill_amount !== ''
-    ? parseFloat(total_bill_amount)
-    : withoutVat + vat;
+    ? moneyMath.round2(total_bill_amount)
+    : moneyMath.round2(moneyMath.add(withoutVat, vat));
 
   if (!totalBill || totalBill <= 0) {
     return res.status(400).json({ error: 'A valid bill amount is required' });
@@ -167,14 +168,14 @@ router.put('/:id', async (req, res) => {
     // already been paid, instead of being overwritten with the raw total,
     // so a Paid bill whose total is edited doesn't silently reopen or
     // misstate its balance.
-    const paidSoFar = parseFloat(existingRows[0].paid_amount) || 0;
+    const paidSoFar = moneyMath.round2(existingRows[0].paid_amount);
 
-    const withoutVat = parseFloat(without_vat_amount) || 0;
-    const vat = parseFloat(vat_amount) || 0;
+    const withoutVat = moneyMath.round2(without_vat_amount);
+    const vat = moneyMath.round2(vat_amount);
     const totalBill = total_bill_amount !== undefined && total_bill_amount !== null && total_bill_amount !== ''
-      ? parseFloat(total_bill_amount)
-      : withoutVat + vat;
-    const newBalance = Number((totalBill - paidSoFar).toFixed(2));
+      ? moneyMath.round2(total_bill_amount)
+      : moneyMath.round2(moneyMath.add(withoutVat, vat));
+    const newBalance = moneyMath.round2(moneyMath.sub(totalBill, paidSoFar));
     const newPaymentStatus = newBalance <= 0
       ? 'Paid'
       : (paidSoFar > 0 ? 'Partially Paid' : 'Pending');
@@ -270,8 +271,9 @@ router.delete('/:id', async (req, res) => {
 // Money helpers - all payment maths is done in whole cents so partial
 // payments / overpayments never drift by a fraction of a cent.
 // =============================================
-const toCents = (v) => Math.round((parseFloat(v) || 0) * 100);
-const fromCents = (c) => Number((c / 100).toFixed(2));
+// Exact: parsed as decimal text, never through float (1.005 * 100 is 100.49999999999999).
+const toCents = (v) => Number(moneyMath.toUnits(v, 2));
+const fromCents = (c) => moneyMath.fromUnits(BigInt(Math.round(c)), 2);
 
 // Overpayment rows for a payee that still have credit left. Matches on
 // payee_id when both sides have one, otherwise on the payee name (legacy

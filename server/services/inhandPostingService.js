@@ -11,6 +11,7 @@
 //   5. Reversals                  – a contra-entry is created in finance_transactions,
 //                                   the balance is restored, and reversal_txn_id is set.
 
+const moneyMath = require('../utils/money');
 const {
   recordCashTransaction,
   recordBankTransaction
@@ -107,7 +108,7 @@ async function postInhand(connection, inhand, approvedBy) {
       companyId : company_id,
       date      : inhand.transaction_date,
       remark    : remark || `Cash In – Ref: ${reference_no}`,
-      debit     : parseFloat(amount),
+      debit     : moneyMath.round2(amount),
       credit    : 0,
       transactionType  : 'Cash In',
       referenceNumber  : reference_no,
@@ -151,7 +152,7 @@ async function postInhand(connection, inhand, approvedBy) {
       bankId    : bank_id,
       date      : inhand.transaction_date,
       remark    : remark || `Cheque In – ${bank_name} | Chq: ${cheque_number}`,
-      debit     : parseFloat(amount),
+      debit     : moneyMath.round2(amount),
       credit    : 0,
       transactionType  : 'Cheque In',
       referenceNumber  : cheque_number,
@@ -222,7 +223,7 @@ async function reverseInhand(connection, inhand, cancelledBy) {
       date      : now.toISOString().slice(0, 10),
       remark    : reversalRemark,
       debit     : 0,
-      credit    : parseFloat(amount),
+      credit    : moneyMath.round2(amount),
       transactionType  : 'Inhand Reversal',
       referenceNumber  : reference_no,
       referenceType    : 'INHAND_REVERSAL',
@@ -245,7 +246,7 @@ async function reverseInhand(connection, inhand, cancelledBy) {
       date      : now.toISOString().slice(0, 10),
       remark    : reversalRemark,
       debit     : 0,
-      credit    : parseFloat(amount),
+      credit    : moneyMath.round2(amount),
       transactionType  : 'Inhand Reversal',
       referenceNumber  : reference_no,
       referenceType    : 'INHAND_REVERSAL',

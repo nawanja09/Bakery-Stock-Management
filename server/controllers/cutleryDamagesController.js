@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const moneyMath = require('../utils/money');
 const { archiveLines } = require('../services/lineHistory');
 const { softDelete } = require('../services/softDelete');
 
@@ -277,7 +278,7 @@ const getDamageWithItems = async (connection, damageId) => {
   damage.items = itemRows;
 
   // Calculate total loss
-  const totalLoss = itemRows.reduce((sum, item) => sum + (item.total_loss || 0), 0);
+  const totalLoss = moneyMath.sum(itemRows, (item) => item.total_loss || 0);
   damage.total_loss = totalLoss;
 
   return damage;
@@ -318,7 +319,7 @@ const getDamageById = async (req, res) => {
     damage.items = itemRows;
 
     // Calculate total loss
-    const totalLoss = itemRows.reduce((sum, item) => sum + (item.total_loss || 0), 0);
+    const totalLoss = moneyMath.sum(itemRows, (item) => item.total_loss || 0);
     damage.total_loss = totalLoss;
 
     res.json(damage);

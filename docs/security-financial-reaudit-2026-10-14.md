@@ -1,5 +1,7 @@
 # BSMS: Security and Financial-Integrity Re-Audit
 
+> **Status update 2026-10-20:** this report is historical. Current fix status of every finding is in [security-financial-reaudit-2026-10-15.md](security-financial-reaudit-2026-10-15.md). Fixed since: H3, H4, H5 (hard deletes), H6 (mostly), H7, M3, M5, M7, R1–R10 and the C1–C3, N1–N9 items below. Accepted: M8 (no company scoping), R2 (Store Keeper pays suppliers). Still open: C4, C5 (design), H5 expense approval, M4, N1-tail (needs the RAVON Laravel apps).
+
 **Scope:** `server/` at `de0a965` (2026-10-14). This is a delta audit against [security-financial-audit-2026-10-12.md](security-financial-audit-2026-10-12.md) (written at `189c342`).
 **Method:** Manual review of every commit since `189c342` (`7fbe2d6`, `a48790c`, `57f2ffd`, `e290e50`, `d3d23c9`, `de0a965`). Each earlier finding was re-checked at HEAD. Exploitability was confirmed with `node` where possible. Secrets were compared by SHA-256 prefix only; no secret values were read or printed.
 
@@ -75,7 +77,7 @@ So domains 2–4 of the brief (valuation, double entry, P&L) are mainly **design
 | M2 | BSMS password relayed to RAVON | **Open (now by design in per-user mode)** | `authController.js:54-56`. Not used when service-key mode is configured (`integrationAuthService.js:867`). |
 | M3 | Approver can post amounts they never reviewed | **Open** | No version or hash check in `approveCollections`. |
 | M4 | Heuristic payload mapping | **Open** | `collectionMapper.js` alias lists unchanged. |
-| M5 | Floating-point money | **Open** | e.g. `collectionMapper.js:157-166`, `financeLedger.js:96-98`, `purchaseController.js:23-53`. |
+| M5 | Floating-point money | **Fixed 2026-10-20** (was Open) | e.g. `collectionMapper.js:157-166`, `financeLedger.js:96-98`, `purchaseController.js:23-53`. |
 | M6 | No login throttling or password policy | **Open** | `/api/login` has no limiter. `changePassword` (`authController.js:73-101`) has no strength rule and calls `bcrypt.hash(undefined)` when `newPassword` is missing. |
 | M7 | Two stock formulas | **Open** | Not touched. |
 | M8 | No company/branch isolation | **Open** | Unchanged. Service-key mode widens it for collections (N5). |

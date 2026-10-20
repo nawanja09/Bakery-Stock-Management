@@ -137,6 +137,8 @@ test.before(async () => {
     [`SC-${RUN}`, `Flour ${RUN}`]);
   itemId = i.insertId;
   created.items.push(itemId);
+  // Purchase returns now check the live stock (audit H4): give the test item some.
+  await pool.query(`INSERT INTO opening_balances (date, item_id, quantity) VALUES ('2026-01-01', ?, 1000)`, [itemId]);
 
   const connection = await pool.getConnection();
   try {
@@ -189,6 +191,7 @@ test.after(async () => {
     await pool.query('DELETE FROM company WHERE id IN (?)', [created.companies]);
   }
   if (created.suppliers.length) await pool.query('DELETE FROM supplier WHERE id IN (?)', [created.suppliers]);
+  if (created.items.length) await pool.query('DELETE FROM opening_balances WHERE item_id IN (?)', [created.items]);
   if (created.items.length) await pool.query('DELETE FROM items WHERE id IN (?)', [created.items]);
   if (created.users.length) await pool.query('DELETE FROM users WHERE id IN (?)', [created.users]);
   await pool.end();

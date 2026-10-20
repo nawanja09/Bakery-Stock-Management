@@ -28,6 +28,8 @@
 // Every function that writes takes an open transaction `connection`; none of
 // them commit, so they join the caller's DB transaction.
 
+const moneyMath = require('../utils/money');
+
 const SOURCE_CASH_RECEIVE = 'CASH_RECEIVE';
 const SOURCE_CASH_ISSUED = 'CASH_ISSUED';
 const SOURCE_BANK_RECEIVE = 'BANK_RECEIVE';
@@ -49,7 +51,7 @@ class OtherLedgerError extends Error {
   }
 }
 
-const round2 = (value) => Number((Number.parseFloat(value ?? 0) || 0).toFixed(2));
+const round2 = (value) => moneyMath.round2(value ?? 0);
 
 const normalizeName = (name) => String(name ?? '').trim().replace(/\s+/g, ' ');
 
@@ -240,7 +242,7 @@ const recalculateCashBalance = async (connection, companyId) => {
   );
   let balance = 0;
   for (const row of rows) {
-    balance = Number((balance + Number(row.debit || 0) - Number(row.credit || 0)).toFixed(2));
+    balance = moneyMath.round2(moneyMath.sub(moneyMath.add(balance, row.debit || 0), row.credit || 0));
     await connection.query('UPDATE finance_transactions SET balance_after = ? WHERE id = ?', [balance, row.id]);
   }
   await connection.query('UPDATE cash_accounts SET current_balance = ? WHERE company_id = ?', [balance, companyId]);
@@ -282,7 +284,7 @@ const withRunningBalance = (rows, normalBalance = 'DEBIT', opening = 0) => {
   let running = round2(opening);
   return rows.map((row) => {
     const effect = balanceEffect(row, normalBalance);
-    running = Number((running + effect).toFixed(2));
+    running = moneyMath.round2(moneyMath.add(running, effect));
     return { ...row, direction: effect >= 0 ? 'IN' : 'OUT', balance: running };
   });
 };

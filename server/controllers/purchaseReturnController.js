@@ -4,6 +4,8 @@ const { currentStockSql } = require('../services/stockRules');
 const { sendServerError, ClientError } = require('../utils/safeError');
 const { actorId } = require('../utils/actor');
 const { DocumentError } = require('../utils/documentLines');
+const moneyMath = require('../utils/money');
+const { lockAndCheckAvailability, StockError } = require('../services/stockAvailability');
 
 // Validates a return line's quantity and unit price server-side (audit finding
 // R7): a negative return_quantity would otherwise flow through to
@@ -176,6 +178,13 @@ const createPurchaseReturn = async (req, res) => {
       throw new ClientError('Please log in again', 401);
     }
 
+    // Stock availability (audit H4): goods going back to the supplier leave stock, so the
+    // items are locked and their live stock checked FIRST - before any other read of this
+    // transaction - and the return is refused if there is not enough. (Lines the page sends
+    // without an item_id are resolved by name further down and are not covered.)
+    const stockLines = items.filter((item) => item?.item_id).map((item) => ({ item_id: item.item_id, quantity: item.return_quantity }));
+    if (stockLines.length > 0) await lockAndCheckAvailability(connection, stockLines);
+
     // ─── Re-verify supplier VAT registration directly from DB ──────────────
     // This prevents the client from spoofing VAT status and ensures the
     // server is the single source of truth for this business rule.
@@ -201,15 +210,14 @@ const createPurchaseReturn = async (req, res) => {
       const item = items[i];
 
       const { quantity, unitPrice } = validateReturnLine(item, i);
-      const amount    = quantity * unitPrice;
-      subtotal += amount;
+      const amount    = moneyMath.mul(quantity, unitPrice);
+      subtotal = moneyMath.add(subtotal, amount);
 
       const isVatApplicable = item.vat_applicable === true || item.vat_applicable === 1;
       // VAT is charged only when the supplier is VAT-registered AND the item is VAT applicable
       const shouldApplyVat = supplierVatRegistered && isVatApplicable;
-      const vatAmount = shouldApplyVat ? (amount * (vatRate / 100)) : 0;
-      totalVat    += vatAmount;
-      totalAmount += amount + vatAmount;
+      const vatAmount = shouldApplyVat ? moneyMath.percent(amount, vatRate) : 0;
+      totalVat    = moneyMath.add(totalVat, vatAmount);
 
       processedItems.push({
         originalItem:  item,
@@ -217,9 +225,15 @@ const createPurchaseReturn = async (req, res) => {
         unit_price:    unitPrice,
         amount:        amount,
         vat_amount:    vatAmount,
-        total_amount:  amount + vatAmount
+        total_amount:  moneyMath.add(amount, vatAmount)
       });
     }
+
+    // Exact decimal arithmetic (utils/money.js); rounded to the stored 2 decimals only at the end,
+    // the same rule as an invoice (utils/documentLines totalPricedLines): total = subtotal + VAT.
+    subtotal = moneyMath.round2(subtotal);
+    totalVat = moneyMath.round2(totalVat);
+    totalAmount = moneyMath.round2(moneyMath.add(subtotal, totalVat));
 
     // Calculate settlement amounts and enhance with purchase details
     let settledAmount = 0;
@@ -227,8 +241,8 @@ const createPurchaseReturn = async (req, res) => {
     
     if (settlements && settlements.length > 0) {
       for (const settlement of settlements) {
-        const settlementAmount = parseFloat(settlement.amount) || 0;
-        settledAmount += settlementAmount;
+        const settlementAmount = moneyMath.round2(settlement.amount);
+        settledAmount = moneyMath.add(settledAmount, settlementAmount);
         
         // Get purchase details for this settlement
         const [purchaseDetails] = await connection.query(
@@ -254,7 +268,7 @@ const createPurchaseReturn = async (req, res) => {
       }
     }
 
-    const balanceAmount = totalAmount - settledAmount;
+    const balanceAmount = moneyMath.sub(totalAmount, settledAmount);
 
     // Insert purchase return
     // vat_rate column is added by migration 010_add_vat_rate_to_purchase_returns.sql.
@@ -370,7 +384,7 @@ const createPurchaseReturn = async (req, res) => {
     // the primary flow is: return amount becomes a supplier credit.
     if (settlements && settlements.length > 0) {
       for (const settlement of settlements) {
-        const settlementAmount = parseFloat(settlement.amount) || 0;
+        const settlementAmount = moneyMath.round2(settlement.amount);
 
         const [purchaseRows] = await connection.query(
           `SELECT balance_amount, paid_amount, total_with_vat FROM purchases WHERE id = ?`,
@@ -381,12 +395,12 @@ const createPurchaseReturn = async (req, res) => {
           const currentBalance = parseFloat(purchaseRows[0].balance_amount) || 0;
           const currentPaid    = parseFloat(purchaseRows[0].paid_amount)    || 0;
 
-          const newBalance      = Math.max(0, currentBalance - settlementAmount);
-          const newPaid         = currentPaid + settlementAmount;
+          const newBalance      = moneyMath.max(0, moneyMath.sub(currentBalance, settlementAmount));
+          const newPaid         = moneyMath.add(currentPaid, settlementAmount);
           const newBalanceStatus = newBalance > 0 ? 1 : 0;
 
           let paymentStatus = 'Non-Paid';
-          if (newPaid >= purchaseRows[0].total_with_vat) paymentStatus = 'Paid';
+          if (moneyMath.compare(newPaid, purchaseRows[0].total_with_vat) >= 0) paymentStatus = 'Paid';
           else if (newPaid > 0) paymentStatus = 'Partially Paid';
 
           await connection.query(
@@ -445,7 +459,7 @@ const createPurchaseReturn = async (req, res) => {
     await connection.rollback();
     console.error('Error creating purchase return:', error);
 
-    if (error.name === 'DocumentError') return res.status(error.status).json({ error: error.message });
+    if (error.name === 'DocumentError' || error instanceof StockError) return res.status(error.status).json({ error: error.message });
     if (error.code === 'ER_DUP_ENTRY') {
       return res.status(400).json({ 
         error: 'Return number already exists. Please use a unique return number.' 
@@ -1141,8 +1155,8 @@ const addSettlementToPurchaseReturn = async (req, res) => {
     let enhancedNewSettlements = [];
 
     for (const settlement of settlements) {
-      const settlementAmount = parseFloat(settlement.amount) || 0;
-      newSettlementAmount += settlementAmount;
+      const settlementAmount = moneyMath.round2(settlement.amount);
+      newSettlementAmount = moneyMath.add(newSettlementAmount, settlementAmount);
 
       // Get purchase details for this settlement
       const [purchaseDetails] = await connection.query(
@@ -1161,13 +1175,13 @@ const addSettlementToPurchaseReturn = async (req, res) => {
     }
 
     // Calculate new totals
-    const newTotalSettled = currentSettledAmount + newSettlementAmount;
-    const newBalanceAmount = totalReturnAmount - newTotalSettled;
+    const newTotalSettled = moneyMath.add(currentSettledAmount, newSettlementAmount);
+    const newBalanceAmount = moneyMath.sub(totalReturnAmount, newTotalSettled);
 
     // Validate settlement doesn't exceed total
-    if (newTotalSettled > totalReturnAmount) {
+    if (moneyMath.compare(newTotalSettled, totalReturnAmount) > 0) {
       return res.status(400).json({ 
-        error: `Settlement amount exceeds return total. Return total: Rs. ${totalReturnAmount.toFixed(4)}, Already settled: Rs. ${currentSettledAmount.toFixed(4)}, Remaining: Rs. ${(totalReturnAmount - currentSettledAmount).toFixed(4)}`
+        error: `Settlement amount exceeds return total. Return total: Rs. ${moneyMath.fixed(totalReturnAmount, 4)}, Already settled: Rs. ${moneyMath.fixed(currentSettledAmount, 4)}, Remaining: Rs. ${moneyMath.fixed(moneyMath.sub(totalReturnAmount, currentSettledAmount), 4)}`
       });
     }
 
@@ -1201,7 +1215,7 @@ const addSettlementToPurchaseReturn = async (req, res) => {
 
     // Update purchase balances if settlements were made
     for (const settlement of settlements) {
-      const settlementAmount = parseFloat(settlement.amount) || 0;
+      const settlementAmount = moneyMath.round2(settlement.amount);
 
       const [purchase] = await connection.query(
         `SELECT balance_amount, paid_amount, total_with_vat 
@@ -1213,12 +1227,12 @@ const addSettlementToPurchaseReturn = async (req, res) => {
         const currentBalance = parseFloat(purchase[0].balance_amount) || 0;
         const currentPaid = parseFloat(purchase[0].paid_amount) || 0;
 
-        const newBalance = currentBalance - settlementAmount;
-        const newPaid = currentPaid + settlementAmount;
+        const newBalance = moneyMath.sub(currentBalance, settlementAmount);
+        const newPaid = moneyMath.add(currentPaid, settlementAmount);
         const newBalanceStatus = newBalance > 0 ? 1 : 0;
 
         let paymentStatus = 'Non-Paid';
-        if (newPaid >= purchase[0].total_with_vat) {
+        if (moneyMath.compare(newPaid, purchase[0].total_with_vat) >= 0) {
           paymentStatus = 'Paid';
         } else if (newPaid > 0) {
           paymentStatus = 'Partially Paid';

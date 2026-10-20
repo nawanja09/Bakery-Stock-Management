@@ -9,6 +9,7 @@
 // and date. See services/cardLedgerService.js for the realise rules.
 
 const pool = require('../config/db');
+const moneyMath = require('../utils/money');
 const { realiseCardTransactions, previewCommission, displayRemark } = require('../services/cardLedgerService');
 const { HttpError } = require('../utils/staffLoanUtils');
 
@@ -64,7 +65,7 @@ const COMPLETED_SELECT = `
   LEFT JOIN bank_details bd ON bd.id = cr.bank_id
 `;
 
-const cents = (value) => Math.round((Number.parseFloat(value) || 0) * 100);
+const cents = (value) => Number(moneyMath.toUnits(value, 2));
 
 const sendError = (res, error, fallback) => {
   if (error instanceof HttpError) return res.status(error.status).json({ error: error.message });

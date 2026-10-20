@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const moneyMath = require('../utils/money');
 const { RULES } = require('../services/stockRules');
 
 const VALID_METHODS = new Set(['all', 'petty_cash', 'bank_charges', 'cash_expenses', 'hidden_expenses', 'purchasing', 'other_expenses']);
@@ -8,7 +9,7 @@ const dateFilters = (fromDate, toDate) => {
   if (toDate && !isValidDate(toDate)) throw new Error('Invalid to date');
   if (fromDate && toDate && fromDate > toDate) throw new Error('From date cannot be after to date');
 };
-const number = (value) => Number.parseFloat(value || 0) || 0;
+const number = (value) => moneyMath.round(value || 0);
 
 const getIncomes = async (req, res) => {
   try {
@@ -55,7 +56,7 @@ const getIncomes = async (req, res) => {
     const records = rows.map(row => ({ ...row, amount: number(row.amount) }));
     res.json({
       records,
-      totalIncome: records.reduce((sum, row) => sum + row.amount, 0),
+      totalIncome: moneyMath.sum(records, (row) => row.amount),
       transactionCount: records.length,
       company: company || 'all',
       department: department || 'all'
@@ -134,7 +135,7 @@ const getExpenses = async (req, res) => {
       String(a.date).localeCompare(String(b.date)) ||
       `${a.expense_method}-${a.id}`.localeCompare(`${b.expense_method}-${b.id}`)
     );
-    res.json({ records, totalExpenses: records.reduce((sum, row) => sum + number(row.amount), 0), transactionCount: records.length, method });
+    res.json({ records, totalExpenses: moneyMath.sum(records, (row) => row.amount), transactionCount: records.length, method });
   } catch (error) {
     const status = error.message.startsWith('Invalid') || error.message.includes('cannot be') ? 400 : 500;
     console.error('Analyst expense report error:', error);
@@ -323,19 +324,19 @@ const getBalanceSheet = async (req, res) => {
     const cashBooks = cashRows.map(row => ({ companyId: row.company_id, name: row.name, balance: number(row.balance) }));
     const cashBookJH = cashBooks.find(row => /jh/i.test(row.name))?.balance || 0;
     const cashBookRD = cashBooks.find(row => /rd/i.test(row.name))?.balance || 0;
-    const cashBookTotal = cashBookJH + cashBookRD;
-    const totalBankValues = bankRows.reduce((sum, row) => sum + number(row.balance), 0);
+    const cashBookTotal = moneyMath.add(cashBookJH, cashBookRD);
+    const totalBankValues = moneyMath.sum(bankRows, (row) => row.balance);
     const storesValue = number(storesRows[0]?.stores_value);
-    const totalAssets = cashBookTotal + storesValue + totalBankValues;
+    const totalAssets = moneyMath.add(cashBookTotal, storesValue, totalBankValues);
     const totalPurchasingValue = number(purchasingRows[0]?.total_purchasing_value);
     const totalPurchasingCompleted = number(purchasingRows[0]?.total_purchasing_completed);
     const totalPurchasingPending = number(purchasingRows[0]?.total_purchasing_pending);
     const completedPurchasingCount = Number(purchasingRows[0]?.completed_purchasing_count || 0);
     const pendingPurchasingCount = Number(purchasingRows[0]?.pending_purchasing_count || 0);
     // Reconciliation check: total purchasing value should equal completed value plus pending value.
-    const purchasingReconciliationDifference = totalPurchasingValue
-      - (totalPurchasingCompleted + totalPurchasingPending);
-    if (Math.abs(purchasingReconciliationDifference) > 0.01) {
+    const purchasingReconciliationDifference = moneyMath.sub(totalPurchasingValue,
+      moneyMath.add(totalPurchasingCompleted, totalPurchasingPending));
+    if (moneyMath.compare(purchasingReconciliationDifference, 0) !== 0) {
       console.warn('Balance sheet purchasing totals do not reconcile:', {
         totalPurchasingValue,
         totalPurchasingCompleted,
@@ -348,10 +349,10 @@ const getBalanceSheet = async (req, res) => {
     const outstandingInvoices = totalPurchasingPending;
     const purchasingPayable = outstandingInvoices;
     const purchasingAdvancePaymentBalance = number(advanceRows[0]?.advance_payment_balance);
-    const purchasingOverpayment = number(excessPaymentRows[0]?.payment_overpayment)
-      + number(purchasingRows[0]?.return_overpayment);
-    const totalPayables = purchasingPayable + purchasingOverpayment;
-    const netBalance = totalAssets - totalPayables;
+    const purchasingOverpayment = moneyMath.add(number(excessPaymentRows[0]?.payment_overpayment),
+      number(purchasingRows[0]?.return_overpayment));
+    const totalPayables = moneyMath.add(purchasingPayable, purchasingOverpayment);
+    const netBalance = moneyMath.sub(totalAssets, totalPayables);
     res.json({
       date, cashBookJH, cashBookRD, cashBookTotal, cashBooks,
       storesValue, banks: bankRows.map(row => ({ ...row, balance: number(row.balance) })),

@@ -126,6 +126,13 @@ const compare = (a, b, places = STORAGE_SCALE) => {
   return x < y ? -1 : x > y ? 1 : 0;
 };
 
+/** The smaller / larger of two amounts, compared exactly (4 decimals) - a float-safe Math.min / Math.max. */
+const min = (a, b) => (toUnits(a) <= toUnits(b) ? fromUnits(toUnits(a)) : fromUnits(toUnits(b)));
+const max = (a, b) => (toUnits(a) >= toUnits(b) ? fromUnits(toUnits(a)) : fromUnits(toUnits(b)));
+
+/** Exact sum of an array's amounts, optionally read through `pick` (e.g. (row) => row.balance). */
+const sum = (rows, pick = (v) => v) => add(...rows.map(pick));
+
 /** True when the value is a finite amount. */
 const isAmount = (value) => parseDecimal(value) !== null;
 
@@ -134,5 +141,5 @@ const fixed = (value, places = STORAGE_SCALE) => unitsToText(toUnits(value, plac
 
 module.exports = {
   SCALE, STORAGE_SCALE,
-  toUnits, fromUnits, round, round2, add, sub, mul, percent, compare, isAmount, fixed
+  toUnits, fromUnits, round, round2, add, sub, mul, percent, compare, min, max, sum, isAmount, fixed
 };

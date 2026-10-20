@@ -1,5 +1,6 @@
 // controllers/supplierCreditController.js
 const pool = require('../config/db');
+const moneyMath = require('../utils/money');
 const { sendServerError } = require('../utils/safeError');
 const { actorId } = require('../utils/actor');
 const { normalizePaymentMethodValue } = require('../utils/paymentMethodUtils');
@@ -183,7 +184,7 @@ const createOverpayment = async (req, res) => {
   if (!supplier_id) return res.status(400).json({ error: 'Supplier is required' });
   if (!company_id) return res.status(400).json({ error: 'Company is required' });
   if (!payment_date) return res.status(400).json({ error: 'Payment date is required' });
-  if (!amount || parseFloat(amount) <= 0) return res.status(400).json({ error: 'Amount must be greater than 0' });
+  if (!amount || moneyMath.round2(amount) <= 0) return res.status(400).json({ error: 'Amount must be greater than 0' });
   if (!created_by) return res.status(400).json({ error: 'Created by is required' });
   if (!normalizedPaymentMethod || !isValidPaymentMethod(normalizedPaymentMethod)) {
     return res.status(400).json({ error: 'Payment method is invalid' });
@@ -224,7 +225,7 @@ const createOverpayment = async (req, res) => {
     `, [
       overpayment_number, supplier_id, company_id, payment_date, normalizedPaymentMethod,
       voucher_number || null, reference_number || null,
-      parseFloat(amount), parseFloat(amount),
+      moneyMath.round2(amount), moneyMath.round2(amount),
       notes || null, created_by
     ]);
 
@@ -235,7 +236,7 @@ const createOverpayment = async (req, res) => {
         companyId: company_id,
         date: payment_date,
         remark: ledgerRemark,
-        credit: parseFloat(amount),
+        credit: moneyMath.round2(amount),
         transactionType: 'Supplier Advance Payment',
         referenceNumber: voucher_number || reference_number || null,
         partyName: supplierRows[0].name,
@@ -248,7 +249,7 @@ const createOverpayment = async (req, res) => {
         bankId: bank_id,
         date: payment_date,
         remark: ledgerRemark,
-        credit: parseFloat(amount),
+        credit: moneyMath.round2(amount),
         transactionType: 'Supplier Advance Payment',
         referenceNumber: voucher_number || reference_number || null,
         partyName: supplierRows[0].name,

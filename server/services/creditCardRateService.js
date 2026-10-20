@@ -14,6 +14,7 @@
 // where the database supports it - see config/db.js).
 
 const { HttpError } = require('../utils/staffLoanUtils');
+const moneyMath = require('../utils/money');
 
 const MAX_BASIS_POINTS = 10000; // 100.00 %
 
@@ -46,7 +47,7 @@ const parseRatePercent = (value) => {
 };
 
 /** Rate (%) from the database -> basis points (rates are entered with at most 2 decimals). */
-const rateToBasisPoints = (rate) => Math.round((Number.parseFloat(rate) || 0) * 100);
+const rateToBasisPoints = (rate) => Number(moneyMath.toUnits(rate ?? 0, 2));
 
 /** Basis points -> the rate (%) that is stored and shown (250 -> 2.5). */
 const basisPointsToRate = (bp) => Number((bp / 100).toFixed(2));

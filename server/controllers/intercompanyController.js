@@ -25,6 +25,7 @@
 // feature (financeController.transferFunds), not this one.
 
 const pool = require('../config/db');
+const moneyMath = require('../utils/money');
 const { actorId } = require('../utils/actor');
 const { recordCashTransaction, recordBankTransaction } = require('../utils/financeLedger');
 
@@ -117,11 +118,11 @@ const createIntercompanyTransaction = async (req, res) => {
   if (from_account_type === 'BANK' && !from_bank_id) return res.status(400).json({ error: 'From Bank Account is required' });
   if (to_account_type === 'BANK' && !to_bank_id) return res.status(400).json({ error: 'To Bank Account is required' });
   if (!date) return res.status(400).json({ error: 'Transaction Date is required' });
-  if (!amount || parseFloat(amount) <= 0) return res.status(400).json({ error: 'Amount must be greater than 0' });
+  if (!amount || moneyMath.round2(amount) <= 0) return res.status(400).json({ error: 'Amount must be greater than 0' });
   if (!description || !String(description).trim()) return res.status(400).json({ error: 'Description / Reference is required' });
   if (!created_by) return res.status(400).json({ error: 'Created by is required' });
 
-  const transferAmount = parseFloat(amount);
+  const transferAmount = moneyMath.round2(amount);
   const note = String(description).trim();
 
   const connection = await pool.getConnection();

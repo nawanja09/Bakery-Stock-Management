@@ -1,5 +1,6 @@
 // server/controllers/financeController.js
 const pool = require('../config/db');
+const moneyMath = require('../utils/money');
 const { sendServerError } = require('../utils/safeError');
 const { actorId } = require('../utils/actor');
 const {
@@ -163,7 +164,7 @@ const receiveCash = async (req, res) => {
 
   if (!company_id) return res.status(400).json({ error: 'Company is required' });
   if (!date) return res.status(400).json({ error: 'Date is required' });
-  if (!amount || parseFloat(amount) <= 0) return res.status(400).json({ error: 'Amount must be greater than 0' });
+  if (!amount || moneyMath.round2(amount) <= 0) return res.status(400).json({ error: 'Amount must be greater than 0' });
   if (!['receive_type', 'other_ledger'].includes(classification)) {
     return res.status(400).json({ error: 'Classification must be receive_type or other_ledger' });
   }
@@ -195,7 +196,7 @@ const receiveCash = async (req, res) => {
         companyId: company_id,
         date,
         remark: remark || null,
-        debit: parseFloat(amount),
+        debit: moneyMath.round2(amount),
         transactionType: otherLedger.OTHER_LEDGER_RECEIVE_TYPE,
         referenceNumber: reference_number || null,
         partyName: ledger.name,
@@ -209,7 +210,7 @@ const receiveCash = async (req, res) => {
         sourceType: otherLedger.SOURCE_CASH_RECEIVE,
         sourceId,
         date,
-        amount: parseFloat(amount),
+        amount: moneyMath.round2(amount),
         companyId: company_id,
         referenceNo: reference_number || null,
         remark: remark || null,
@@ -223,7 +224,7 @@ const receiveCash = async (req, res) => {
       companyId: company_id,
       date,
       remark: remark || null,
-      debit: parseFloat(amount),
+      debit: moneyMath.round2(amount),
       transactionType: receive_type,
       referenceNumber: reference_number || null,
       referenceType: 'CASH_RECEIVE',
@@ -248,7 +249,7 @@ const setCashOpeningBalance = async (req, res) => {
 
   if (!company_id) return res.status(400).json({ error: 'Company is required' });
   if (!date) return res.status(400).json({ error: 'Date is required' });
-  if (amount === undefined || amount === null || parseFloat(amount) < 0) {
+  if (amount === undefined || amount === null || moneyMath.round2(amount) < 0) {
     return res.status(400).json({ error: 'A valid opening balance amount is required' });
   }
   if (!created_by) return res.status(400).json({ error: 'Created by is required' });
@@ -279,7 +280,7 @@ const setCashOpeningBalance = async (req, res) => {
       companyId: company_id,
       date,
       remark: 'Opening Balance',
-      debit: parseFloat(amount),
+      debit: moneyMath.round2(amount),
       transactionType: 'Opening Balance',
       referenceType: 'OPENING_BALANCE',
       createdBy: created_by
@@ -414,7 +415,7 @@ const receiveBank = async (req, res) => {
   if (!company_id) return res.status(400).json({ error: 'Company is required' });
   if (!bank_id) return res.status(400).json({ error: 'Bank account is required' });
   if (!date) return res.status(400).json({ error: 'Date is required' });
-  if (!amount || parseFloat(amount) <= 0) return res.status(400).json({ error: 'Amount must be greater than 0' });
+  if (!amount || moneyMath.round2(amount) <= 0) return res.status(400).json({ error: 'Amount must be greater than 0' });
   if (!['receive_type', 'other_ledger'].includes(classification)) {
     return res.status(400).json({ error: 'Classification must be receive_type or other_ledger' });
   }
@@ -444,7 +445,7 @@ const receiveBank = async (req, res) => {
         bankId: bank_id,
         date,
         remark: remark || null,
-        debit: parseFloat(amount),
+        debit: moneyMath.round2(amount),
         transactionType: otherLedger.OTHER_LEDGER_RECEIVE_TYPE,
         referenceNumber: reference_number || null,
         partyName: ledger.name,
@@ -458,7 +459,7 @@ const receiveBank = async (req, res) => {
         sourceType: otherLedger.SOURCE_BANK_RECEIVE,
         sourceId,
         date,
-        amount: parseFloat(amount),
+        amount: moneyMath.round2(amount),
         companyId: company_id,
         referenceNo: reference_number || null,
         remark: remark || null,
@@ -476,7 +477,7 @@ const receiveBank = async (req, res) => {
         companyId: company_id,
         bankId: bank_id,
         date,
-        amount: parseFloat(amount),
+        amount: moneyMath.round2(amount),
         referenceNumber: reference_number || null,
         remark: remark || null,
         createdBy: created_by
@@ -493,7 +494,7 @@ const receiveBank = async (req, res) => {
       bankId: bank_id,
       date,
       remark: remark || null,
-      debit: parseFloat(amount),
+      debit: moneyMath.round2(amount),
       transactionType: receive_type,
       referenceNumber: reference_number || null,
       referenceType: 'BANK_RECEIVE',
@@ -524,7 +525,7 @@ const issueBank = async (req, res) => {
     return res.status(400).json({ error: 'Other Ledger is required' });
   }
   if (!date) return res.status(400).json({ error: 'Date is required' });
-  if (!amount || parseFloat(amount) <= 0) return res.status(400).json({ error: 'Amount must be greater than 0' });
+  if (!amount || moneyMath.round2(amount) <= 0) return res.status(400).json({ error: 'Amount must be greater than 0' });
   if (!created_by) return res.status(401).json({ error: 'Authenticated user is required' });
 
   const connection = await pool.getConnection();
@@ -541,7 +542,7 @@ const issueBank = async (req, res) => {
       bankId: bank_id,
       date,
       remark: remark || null,
-      credit: parseFloat(amount),
+      credit: moneyMath.round2(amount),
       transactionType: otherLedger.BANK_ISSUED_TYPE,
       referenceNumber: reference_number || null,
       partyName: ledger.name,
@@ -556,7 +557,7 @@ const issueBank = async (req, res) => {
       sourceType: otherLedger.SOURCE_BANK_ISSUED,
       sourceId,
       date,
-      amount: parseFloat(amount),
+      amount: moneyMath.round2(amount),
       companyId: company_id,
       referenceNo: reference_number || null,
       remark: remark || null,
@@ -588,14 +589,14 @@ const transferFunds = async (req, res) => {
   }
   if (!bank_id) return res.status(400).json({ error: 'Bank account is required for a Cash/Bank transfer' });
   if (!date) return res.status(400).json({ error: 'Date is required' });
-  if (!amount || parseFloat(amount) <= 0) return res.status(400).json({ error: 'Amount must be greater than 0' });
+  if (!amount || moneyMath.round2(amount) <= 0) return res.status(400).json({ error: 'Amount must be greater than 0' });
   if (!created_by) return res.status(400).json({ error: 'Created by is required' });
 
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
 
-    const transferAmount = parseFloat(amount);
+    const transferAmount = moneyMath.round2(amount);
     const isChequeTransfer = from_account === 'BANK'
       && to_account === 'CASH'
       && cheque_number
@@ -729,7 +730,7 @@ const bankToBankTransfer = async (req, res) => {
   if (String(from_bank_id) === String(to_bank_id))
     return res.status(400).json({ error: 'From and To bank accounts must be different' });
   if (!date) return res.status(400).json({ error: 'Transfer date is required' });
-  if (!amount || parseFloat(amount) <= 0)
+  if (!amount || moneyMath.round2(amount) <= 0)
     return res.status(400).json({ error: 'Transfer amount must be greater than 0' });
   if (!created_by) return res.status(400).json({ error: 'Created by is required' });
 
@@ -755,7 +756,7 @@ const bankToBankTransfer = async (req, res) => {
       await checkDuplicateReference(connection, reference_number, { includeLedger: true });
     }
 
-    const transferAmount = parseFloat(amount);
+    const transferAmount = moneyMath.round2(amount);
     const ref = reference_number || null;
     const note = remark || null;
 

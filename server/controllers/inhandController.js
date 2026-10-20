@@ -4,6 +4,7 @@
 // Integrates with the Finance Module via inhandPostingService.
 
 const pool = require('../config/db');
+const moneyMath = require('../utils/money');
 const { sendServerError } = require('../utils/safeError');
 const {
   generateReferenceNo,
@@ -70,7 +71,7 @@ const createInhand = async (req, res) => {
   if (!transaction_date) return res.status(400).json({ error: 'Transaction date is required.' });
   if (!payment_type || !['Cash In','Cheque In'].includes(payment_type))
     return res.status(400).json({ error: 'Payment type must be Cash In or Cheque In.' });
-  if (!amount || parseFloat(amount) <= 0)
+  if (!amount || moneyMath.round2(amount) <= 0)
     return res.status(400).json({ error: 'Amount must be greater than zero.' });
   if (!createdBy) return res.status(401).json({ error: 'Authentication required.' });
 
@@ -99,7 +100,7 @@ const createInhand = async (req, res) => {
         reference_no, transaction_date, payment_type,
         company_id || null, bank_id || null,
         cheque_number || null, bank_name || null, cheque_date || null,
-        parseFloat(amount), party_name || null, remark || null,
+        moneyMath.round2(amount), party_name || null, remark || null,
         createdBy
       ]
     );
@@ -231,7 +232,7 @@ const updateInhand = async (req, res) => {
         transaction_date, payment_type,
         company_id || null, bank_id || null,
         cheque_number || null, bank_name || null, cheque_date || null,
-        parseFloat(amount), party_name || null, remark || null,
+        moneyMath.round2(amount), party_name || null, remark || null,
         id
       ]
     );

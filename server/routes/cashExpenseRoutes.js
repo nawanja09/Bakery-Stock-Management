@@ -9,6 +9,7 @@ const router = express.Router();
 const pool = require('../config/db');
 const authenticate = require('../middleware/authenticate');
 const restrictRoles = require('../middleware/restrictRoles');
+const moneyMath = require('../utils/money');
 const { recordCashTransaction } = require('../utils/financeLedger');
 const { checkDuplicateReference } = require('../services/referenceValidationService');
 const { resolveExpenseClassification, ExpenseClassificationError } = require('../utils/expenseClassification');
@@ -96,7 +97,7 @@ router.post('/', async (req, res) => {
   if (!expense_date || !voucher_number || !company_id || !(expense_type || expense_type_id) || !amount) {
     return res.status(400).json({ error: 'Date, Voucher No., Company, Expense Type and Amount are required' });
   }
-  if (parseFloat(amount) <= 0) {
+  if (moneyMath.round2(amount) <= 0) {
     return res.status(400).json({ error: 'Amount must be greater than zero' });
   }
 
@@ -147,7 +148,7 @@ router.post('/', async (req, res) => {
       companyId:       company_id,
       date:            expense_date,
       remark:          `Cash Expense - ${expenseTypeName}`,
-      credit:          parseFloat(amount),
+      credit:          moneyMath.round2(amount),
       transactionType: 'Cash Expense',
       referenceNumber: voucher_number,
       referenceType:   'CASH_EXPENSE',
@@ -204,7 +205,7 @@ router.put('/:id', async (req, res) => {
   if (!expense_date || !voucher_number || !company_id || !(expense_type || expense_type_id) || !amount) {
     return res.status(400).json({ error: 'Date, Voucher No., Company, Expense Type and Amount are required' });
   }
-  if (parseFloat(amount) <= 0) {
+  if (moneyMath.round2(amount) <= 0) {
     return res.status(400).json({ error: 'Amount must be greater than zero' });
   }
 
@@ -232,9 +233,9 @@ router.put('/:id', async (req, res) => {
     );
     const expenseTypeName = classification.expenseTypeName;
 
-    const oldAmount    = parseFloat(oldRows[0].amount);
-    const newAmount    = parseFloat(amount);
-    const amountDelta  = newAmount - oldAmount;  // positive = more credit, negative = partial reversal
+    const oldAmount    = moneyMath.round2(oldRows[0].amount);
+    const newAmount    = moneyMath.round2(amount);
+    const amountDelta  = moneyMath.sub(newAmount, oldAmount);  // positive = more credit, negative = partial reversal
 
     // Update the expense row
     await connection.query(
@@ -335,7 +336,7 @@ router.delete('/:id', async (req, res) => {
       companyId:       company_id,
       date:            expense_date,
       remark:          `Cash Expense Reversal - ${expense_type}`,
-      debit:           parseFloat(amount),
+      debit:           moneyMath.round2(amount),
       transactionType: 'Cash Expense Reversal',
       referenceNumber: voucher_number,
       referenceType:   'CASH_EXPENSE',

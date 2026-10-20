@@ -94,7 +94,7 @@ const reconcilePurchasePaymentState = async (queryable, purchaseId, invoiceTotal
   const reconciledPaidAmount = Math.max(0, actualAllocatedTotal);
   const reconciledState = calculatePaymentState(reconciledPaidAmount, invoiceTotal);
 
-  const drifted = Math.abs((parseFloat(storedPaidAmount) || 0) - reconciledPaidAmount) > 0.01;
+  const drifted = moneyMath.compare(storedPaidAmount, reconciledPaidAmount) !== 0;
   if (drifted) {
     await queryable.query(
       `UPDATE purchases SET paid_amount = ?, balance_amount = ?, balance_status = ?, payment_status = ? WHERE id = ?`,
@@ -597,8 +597,8 @@ const updatePurchase = async (req, res) => {
     if (Math.round(effectiveInvoiceTotal * 100) < Math.round(alreadyPaid * 100)) {
       await connection.rollback();
       return res.status(409).json({
-        error: `This invoice already has ${alreadyPaid.toFixed(2)} paid against it, so its total cannot be lowered to `
-          + `${effectiveInvoiceTotal.toFixed(2)}. Use a purchase return instead.`
+        error: `This invoice already has ${moneyMath.fixed(alreadyPaid)} paid against it, so its total cannot be lowered to `
+          + `${moneyMath.fixed(effectiveInvoiceTotal)}. Use a purchase return instead.`
       });
     }
     const paymentState = calculatePaymentState(alreadyPaid, effectiveInvoiceTotal);
@@ -830,8 +830,9 @@ const getPendingInvoicesBySupplier = async (req, res) => {
 // MAKE PAYMENT (supports multi-invoice allocation)
 // Money in 1/10000 units: purchases and allocations are DECIMAL(…,4), so amounts
 // compare exactly instead of drifting as JS floats.
-const toUnits = (value) => Math.round((parseFloat(value) || 0) * 10000);
-const fromUnits = (units) => units / 10000;
+// Exact (utils/money.js): parsed as decimal text, never through a float multiply.
+const toUnits = (value) => Number(moneyMath.toUnits(value, 4));
+const fromUnits = (units) => moneyMath.fromUnits(BigInt(Math.round(units)), 4);
 // A sub-cent difference between a 2-decimal amount typed by the user and a
 // 4-decimal balance (1234.57 against 1234.5678) is rounding, not an overpayment.
 const UNIT_TOLERANCE = 50; // Rs. 0.005
@@ -1445,16 +1446,16 @@ const addSettlementToReturn = async (req, res) => {
     const enhancedSettlements = [...existingSettlements];
     
     for (const settlement of settlements) {
-      const settlementAmount = parseFloat(settlement.amount) || 0;
+      const settlementAmount = moneyMath.round2(settlement.amount);
       if (settlementAmount <= 0) continue;
       
-      newSettledAmount += settlementAmount;
+      newSettledAmount = moneyMath.add(newSettledAmount, settlementAmount);
       
       const existingIndex = existingSettlements.findIndex(s => s.purchase_id === settlement.purchase_id);
       
       if (existingIndex >= 0) {
         enhancedSettlements[existingIndex].amount = 
-          (enhancedSettlements[existingIndex].amount || 0) + settlementAmount;
+          moneyMath.add(enhancedSettlements[existingIndex].amount || 0, settlementAmount);
       } else {
         const [purchaseDetails] = await connection.query(
           `SELECT id, invoice_no, DATE(purchase_date) as purchase_date FROM purchases WHERE id = ?`,
@@ -1485,7 +1486,7 @@ const addSettlementToReturn = async (req, res) => {
     const settlementDate = settlement_date || purchaseReturn.return_date;
     
     for (const settlement of settlements) {
-      const requestedSettlementAmount = parseFloat(settlement.amount) || 0;
+      const requestedSettlementAmount = moneyMath.round2(settlement.amount);
       if (requestedSettlementAmount <= 0) continue;
 
       const [purchase] = await connection.query(
@@ -1501,15 +1502,15 @@ const addSettlementToReturn = async (req, res) => {
         // This invoice's own paid_amount must never exceed its own total - clamp the
         // amount actually applied to whatever is genuinely still outstanding, exactly
         // like the regular payment and credit-settlement flows do.
-        const currentOutstanding = currentBalance > 0 ? currentBalance : Math.max(0, invoiceTotal - currentPaid);
-        const settlementAmount = Math.min(requestedSettlementAmount, currentOutstanding);
+        const currentOutstanding = currentBalance > 0 ? currentBalance : moneyMath.max(0, moneyMath.sub(invoiceTotal, currentPaid));
+        const settlementAmount = moneyMath.min(requestedSettlementAmount, currentOutstanding);
 
         if (settlementAmount <= 0.001) {
           continue;
         }
 
-        const newBalance = Math.max(0, currentBalance - settlementAmount);
-        const newPaid = Math.min(moneyMath.add(currentPaid, settlementAmount), invoiceTotal);
+        const newBalance = moneyMath.max(0, moneyMath.sub(currentBalance, settlementAmount));
+        const newPaid = moneyMath.min(moneyMath.add(currentPaid, settlementAmount), invoiceTotal);
         const newBalanceStatus = newBalance > 0 ? 1 : 0;
 
         let paymentStatus = 'Non-Paid';
@@ -1685,7 +1686,7 @@ const getPaymentAdjustmentDetail = async (req, res) => {
 
     const invoiceTotal = resolveInvoiceTotalAmount(purchase);
     const actualAllocatedExcludingThis = await getActualAllocatedPaidAmount(pool, purchaseId, paymentId);
-    const availableBalance = Math.max(0, invoiceTotal - actualAllocatedExcludingThis);
+    const availableBalance = moneyMath.max(0, moneyMath.sub(invoiceTotal, actualAllocatedExcludingThis));
 
     res.json({
       payment_id: payment.payment_id,
@@ -1729,7 +1730,7 @@ const adjustPurchasePayment = async (req, res) => {
   if (!payment_date) {
     return res.status(400).json({ error: 'Payment Date is required' });
   }
-  const newAmount = parseFloat(amount);
+  const newAmount = moneyMath.isAmount(amount) ? moneyMath.round2(amount) : NaN;
   if (!Number.isFinite(newAmount) || newAmount <= 0) {
     return res.status(400).json({ error: 'Payment Amount must be a valid amount greater than 0' });
   }
@@ -1806,8 +1807,8 @@ const adjustPurchasePayment = async (req, res) => {
 
     // Cap what actually applies to the invoice at its own balance - existing
     // behavior: any amount above that is preserved as supplier credit.
-    const appliedAmount = Number(Math.min(newAmount, availableBalance).toFixed(2));
-    const excessAmount = Number((newAmount - appliedAmount).toFixed(2));
+    const appliedAmount = moneyMath.round2(moneyMath.min(newAmount, availableBalance));
+    const excessAmount = moneyMath.round2(moneyMath.sub(newAmount, appliedAmount));
 
     if (hasAllocationRow) {
       await connection.query(
@@ -1826,8 +1827,8 @@ const adjustPurchasePayment = async (req, res) => {
     // user's entered figure moved by for this invoice. Other invoices in a
     // split payment, if any, are never touched by this adjustment.
     const oldTransactionAmount = parseFloat(payment.amount) || 0;
-    const totalDelta = Number((newAmount - oldAllocatedAmount).toFixed(2));
-    const newTransactionAmount = Number((oldTransactionAmount + totalDelta).toFixed(2));
+    const totalDelta = moneyMath.round2(moneyMath.sub(newAmount, oldAllocatedAmount));
+    const newTransactionAmount = moneyMath.round2(moneyMath.add(oldTransactionAmount, totalDelta));
 
     await connection.query(
       `UPDATE payment_history SET payment_date = ?, amount = ?, payment_method = ?,
@@ -1851,7 +1852,7 @@ const adjustPurchasePayment = async (req, res) => {
       : normalizedMethod === 'BANK_TRANSFER' ? 'BANK' : null;
     if (finRows.length > 0 && targetAccountType) {
       const fin = finRows[0];
-      const newCredit = Number((parseFloat(fin.credit) + totalDelta).toFixed(2));
+      const newCredit = moneyMath.round2(moneyMath.add(fin.credit, totalDelta));
       const targetBankId = targetAccountType === 'BANK' ? Number(bank_id) : null;
       await connection.query(
         `UPDATE finance_transactions SET credit = ?, transaction_date = ?, account_type = ?,
@@ -1963,7 +1964,7 @@ const adjustPurchasePayment = async (req, res) => {
       [
         paymentId, purchaseId, purchase.invoice_no, purchase.supplier_id, supplierName, voucher_number || null,
         payment.payment_date, payment_date, oldAllocatedAmount, newAmount,
-        Number((newAmount - oldAllocatedAmount).toFixed(2)),
+        moneyMath.round2(moneyMath.sub(newAmount, oldAllocatedAmount)),
         excessAmount > 0 ? `Rs. ${excessAmount.toFixed(2)} recorded as supplier credit${overpaymentRecord ? ` (${overpaymentRecord.overpayment_number})` : ''}` : null,
         actorId(req)
       ]

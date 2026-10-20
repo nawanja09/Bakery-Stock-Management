@@ -80,3 +80,26 @@ test('units round-trip', () => {
   assert.equal(money.toUnits(-0.0001), -1n);
   assert.equal(money.toUnits(5, 2), 500n);
 });
+
+// ---- M5 (2026-10-20): min / max / sum, used wherever Math.min / Math.max / reduce touched money
+test('min / max compare exactly, so 0.1 + 0.2 equals 0.3', () => {
+  assert.equal(money.min(0.1 + 0.2, 0.3), 0.3);
+  assert.equal(money.max(0.1 + 0.2, 0.3), 0.3);
+  assert.equal(money.min('5', '5.001'), 5);
+  assert.equal(money.max('5', '5.001'), 5.001);
+  assert.equal(money.max(0, money.sub(10, 12.5)), 0);
+});
+
+test('sum adds thousands of cents without drift', () => {
+  const rows = Array.from({ length: 10000 }, () => ({ amount: 0.1 }));
+  assert.equal(rows.reduce((s, r) => s + r.amount, 0) === 1000, false, 'plain float addition drifts');
+  assert.equal(money.sum(rows, (r) => r.amount), 1000);
+  assert.equal(money.sum([]), 0);
+});
+
+test('whole-cent conversion is exact where float * 100 is not', () => {
+  assert.equal(Math.round(1.005 * 100), 100);
+  assert.equal(Number(money.toUnits('1.005', 2)), 101);
+  assert.equal(Number(money.toUnits('0.29', 2)), 29);
+  assert.equal(money.fromUnits(12345n, 2), 123.45);
+});

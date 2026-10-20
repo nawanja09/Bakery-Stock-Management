@@ -12,6 +12,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
+const moneyMath = require('../utils/money');
 const authenticate = require('../middleware/authenticate');
 const restrictRoles = require('../middleware/restrictRoles');
 
@@ -64,7 +65,7 @@ router.post('/', async (req, res) => {
   if (!company_id || !Number.isInteger(Number(company_id)) || Number(company_id) <= 0) {
     return res.status(400).json({ error: 'A valid Company is required' });
   }
-  const parsedAmount = parseFloat(amount);
+  const parsedAmount = moneyMath.round2(amount);
   if (!parsedAmount || parsedAmount <= 0) {
     return res.status(400).json({ error: 'Amount must be greater than zero' });
   }
@@ -102,7 +103,7 @@ router.put('/:id', async (req, res) => {
   if (!company_id || !Number.isInteger(Number(company_id)) || Number(company_id) <= 0) {
     return res.status(400).json({ error: 'A valid Company is required' });
   }
-  const parsedAmount = parseFloat(amount);
+  const parsedAmount = moneyMath.round2(amount);
   if (!parsedAmount || parsedAmount <= 0) {
     return res.status(400).json({ error: 'Amount must be greater than zero' });
   }

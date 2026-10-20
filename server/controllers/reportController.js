@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const moneyMath = require('../utils/money');
 const { RULES } = require('../services/stockRules');
 const { sendServerError } = require('../utils/safeError');
 const { normalizePaymentMethodValue } = require('../utils/paymentMethodUtils');
@@ -208,7 +209,7 @@ const getStockReport = async (req, res) => {
     const stockDataWithValue = rows.map(item => {
       const closingBalance = Number(item.closing_balance) || 0;
       const unitPrice = Number(item.unit_price) || 0;
-      const value = (closingBalance * unitPrice).toFixed(2);
+      const value = moneyMath.fixed(moneyMath.mul(closingBalance, unitPrice));
       
       return {
         ...item,
@@ -1404,7 +1405,7 @@ const getLastIssueDateReport = async (req, res) => {
   }
 };
 
-const roundMoney = (value) => Math.round((Number(value) || 0) * 100) / 100;
+const roundMoney = (value) => moneyMath.round2(value || 0);
 
 // Total is authoritative; Without VAT is derived from it so the three columns
 // always add up, even for legacy rows whose subtotal was never stored.
@@ -1554,9 +1555,9 @@ const getPurchaseReport = async (req, res) => {
       ...splitVat(row.total_amount, row.vat_amount)
     }));
 
-    const grandTotal = roundMoney(invoices.reduce((sum, inv) => sum + inv.total_amount, 0));
-    const vatTotal = roundMoney(invoices.reduce((sum, inv) => sum + inv.vat_amount, 0));
-    const withoutVatTotal = roundMoney(invoices.reduce((sum, inv) => sum + inv.without_vat_amount, 0));
+    const grandTotal = roundMoney(moneyMath.sum(invoices, (inv) => inv.total_amount));
+    const vatTotal = roundMoney(moneyMath.sum(invoices, (inv) => inv.vat_amount));
+    const withoutVatTotal = roundMoney(moneyMath.sum(invoices, (inv) => inv.without_vat_amount));
 
     res.json({ invoices, grandTotal, vatTotal, withoutVatTotal, dateType });
   } catch (error) {
@@ -1821,17 +1822,18 @@ const getExpensesReport = async (req, res) => {
       expense_type: row.expense_type,
       reference: row.reference,
       company_name: row.company_name || null,
-      amount: parseFloat(row.amount) || 0,
+      amount: moneyMath.round2(row.amount),
       status: row.status
     }));
 
-    const grandTotal = expenses.reduce((sum, e) => sum + e.amount, 0);
-    const pettyCashTotal = expenses.filter(e => e.type === 'Petty Cash').reduce((sum, e) => sum + e.amount, 0);
-    const otherTotal = expenses.filter(e => e.type === 'Other').reduce((sum, e) => sum + e.amount, 0);
-    const bankChargesTotal = expenses.filter(e => e.type === 'Bank Charges').reduce((sum, e) => sum + e.amount, 0);
-    const cashExpensesTotal = expenses.filter(e => e.type === 'Cash Expenses').reduce((sum, e) => sum + e.amount, 0);
-    const rmPurchasingTotal = expenses.filter(e => e.type === 'RM Purchasing').reduce((sum, e) => sum + e.amount, 0);
-    const hiddenExpensesTotal = expenses.filter(e => e.type === 'Hidden Expense').reduce((sum, e) => sum + e.amount, 0);
+    const typeTotal = (type) => moneyMath.sum(expenses.filter((e) => e.type === type), (e) => e.amount);
+    const grandTotal = moneyMath.sum(expenses, (e) => e.amount);
+    const pettyCashTotal = typeTotal('Petty Cash');
+    const otherTotal = typeTotal('Other');
+    const bankChargesTotal = typeTotal('Bank Charges');
+    const cashExpensesTotal = typeTotal('Cash Expenses');
+    const rmPurchasingTotal = typeTotal('RM Purchasing');
+    const hiddenExpensesTotal = typeTotal('Hidden Expense');
 
     res.json({ expenses, grandTotal, pettyCashTotal, otherTotal, bankChargesTotal, cashExpensesTotal, rmPurchasingTotal, hiddenExpensesTotal });
   } catch (error) {
@@ -2042,9 +2044,9 @@ const describeExpenseGroup = (rows) => {
 
 const sumExpenseTotals = (rows) => ({
   transaction_count: rows.length,
-  without_vat_amount: roundMoney(rows.reduce((sum, r) => sum + r.without_vat_amount, 0)),
-  vat_amount: roundMoney(rows.reduce((sum, r) => sum + r.vat_amount, 0)),
-  total_amount: roundMoney(rows.reduce((sum, r) => sum + r.total_amount, 0))
+  without_vat_amount: roundMoney(moneyMath.sum(rows, (r) => r.without_vat_amount)),
+  vat_amount: roundMoney(moneyMath.sum(rows, (r) => r.vat_amount)),
+  total_amount: roundMoney(moneyMath.sum(rows, (r) => r.total_amount))
 });
 
 // Same 400/500 split as Analyst -> Expenses

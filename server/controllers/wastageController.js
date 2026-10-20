@@ -5,6 +5,7 @@ const { isRmAdjustmentRequest, recordRmAdjustment, sameItems, sameValue } = requ
 const { actorId, approverName } = require('../utils/actor');
 const { archiveLines } = require('../services/lineHistory');
 const { DocumentError, requireDate, prepareStockLines } = require('../utils/documentLines');
+const { lockAndCheckAvailability, StockError } = require('../services/stockAvailability');
 
 // estimated_loss is a cost figure the client computes (quantity x a recent unit
 // cost) - the server has no single authoritative unit cost to recompute it from
@@ -27,6 +28,12 @@ const createWastage = async (req, res) => {
 
   try {
     await connection.beginTransaction();
+
+    // Stock availability (audit H4) is the FIRST query of the transaction: the items are
+    // locked and their live stock checked before any other read can anchor the snapshot.
+    // You cannot write off more than is in stock; two wastage notes for the same item at
+    // the same moment are serialized by the lock.
+    await lockAndCheckAvailability(connection, items);
 
     // Checked on the server (audit finding R7): a real date, real items, quantities
     // above 0, and an estimated loss that is at least a sane, non-negative number.
@@ -74,7 +81,7 @@ const createWastage = async (req, res) => {
 
   } catch (error) {
     await connection.rollback();
-    if (error.name === 'DocumentError') return res.status(error.status).json({ error: error.message });
+    if (error.name === 'DocumentError' || error instanceof StockError) return res.status(error.status).json({ error: error.message });
     console.error('Error creating wastage:', error.stack);
     res.status(500).json({ error: 'Server error' });
   } finally {
@@ -212,6 +219,18 @@ const updateWastage = async (req, res) => {
   try {
     await connection.beginTransaction();
 
+    // The note's OWN current lines never count against it (they are replaced, not added on
+    // top). Locked, and the FIRST queries of the transaction - see createWastage (audit H4).
+    const [ownLines] = await connection.query(
+      'SELECT item_id, quantity FROM wastage_items WHERE wastage_id = ? FOR UPDATE', [id]
+    );
+    const creditBack = new Map();
+    for (const row of ownLines) {
+      const itemId = Number(row.item_id);
+      creditBack.set(itemId, (creditBack.get(itemId) || 0) + Number(row.quantity));
+    }
+    await lockAndCheckAvailability(connection, items, { creditBack });
+
     // Checked on the server (audit finding R7), same rule as createWastage.
     requireDate(date, 'Wastage date');
     const lines = await prepareStockLines(connection, items);
@@ -300,7 +319,7 @@ const updateWastage = async (req, res) => {
 
   } catch (error) {
     await connection.rollback();
-    if (error.name === 'DocumentError') return res.status(error.status).json({ error: error.message });
+    if (error.name === 'DocumentError' || error instanceof StockError) return res.status(error.status).json({ error: error.message });
     console.error('Error updating wastage:', error.stack);
     res.status(500).json({ error: 'Server error' });
   } finally {

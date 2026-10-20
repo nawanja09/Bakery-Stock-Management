@@ -1,5 +1,6 @@
 // routes/purchaseRoutes.js
 const express = require('express');
+const moneyMath = require('../utils/money');
 const router = express.Router();
 const purchaseController = require('../controllers/purchaseController');
 const paymentHistoryController = require('../controllers/paymentHistoryController');
@@ -78,8 +79,8 @@ router.get('/details/:id', async (req, res) => {
     `, [id]);
 
     const itemsWithVAT = items.map(item => {
-      const amount = parseFloat(item.amount) || 0;
-      const vatAmount = item.vat_applicable ? amount * 0.18 : 0;
+      const amount = moneyMath.round(item.amount || 0);
+      const vatAmount = item.vat_applicable ? moneyMath.percent(amount, 18) : 0;
       return {
         ...item,
         amount,
@@ -96,7 +97,7 @@ router.get('/details/:id', async (req, res) => {
         vatAmount: parseFloat(purchases[0].vat_amount || 0),
         totalWithVat: parseFloat(purchases[0].total_with_vat || 0),
         paidAmount: parseFloat(purchases[0].paid_amount || 0),
-        dueAmount: parseFloat(purchases[0].total_with_vat || 0) - parseFloat(purchases[0].paid_amount || 0)
+        dueAmount: moneyMath.sub(purchases[0].total_with_vat || 0, purchases[0].paid_amount || 0)
       }
     };
 

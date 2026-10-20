@@ -7,6 +7,8 @@
 // and subtraction, so results such as 0.1 + 0.2 never leak floating-point
 // error into a balance check. The database column is DECIMAL(14,2).
 
+const moneyMath = require('./money');
+
 // DECIMAL(14,2) holds at most 12 integer digits.
 const MAX_INTEGER_DIGITS = 12;
 
@@ -57,10 +59,10 @@ const parsePositiveMoney = (value, label = 'Amount') => {
 };
 
 /** Converts a value read from the database (DECIMAL string/number) to cents. */
-const dbToCents = (value) => Math.round((Number.parseFloat(value ?? 0) || 0) * 100);
+const dbToCents = (value) => Number(moneyMath.toUnits(value ?? 0, 2));
 
 /** Cents -> a plain number with 2 decimal places of precision (e.g. 5000050 -> 50000.5). */
-const centsToNumber = (cents) => Number((cents / 100).toFixed(2));
+const centsToNumber = (cents) => moneyMath.fromUnits(BigInt(Math.round(cents)), 2);
 
 /** Cents -> "50,000.00" (used only in human-readable error messages). */
 const formatCents = (cents) =>

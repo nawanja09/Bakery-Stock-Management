@@ -1,7 +1,8 @@
 const pool = require('../config/db');
+const moneyMath = require('../utils/money');
 
 const isValidDate = (value) => /^\d{4}-\d{2}-\d{2}$/.test(value || '') && !Number.isNaN(Date.parse(`${value}T00:00:00Z`));
-const number = (value) => Number.parseFloat(value || 0) || 0;
+const number = (value) => moneyMath.round2(value || 0);
 
 // GET /api/incomes
 // Returns all income records entered through the New Income form, newest first.
@@ -21,7 +22,7 @@ const getIncomes = async (req, res) => {
       ORDER BY i.income_date DESC, i.id DESC
     `);
     const records = rows.map(row => ({ ...row, amount: number(row.amount) }));
-    res.json({ records, totalAmount: records.reduce((sum, row) => sum + row.amount, 0), count: records.length });
+    res.json({ records, totalAmount: moneyMath.sum(records, (row) => row.amount), count: records.length });
   } catch (error) {
     console.error('Income list error:', error);
     res.status(500).json({ error: 'Failed to load income records' });
