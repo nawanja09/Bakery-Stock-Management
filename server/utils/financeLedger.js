@@ -68,6 +68,56 @@ const getBankBalance = async (bankId) => {
 // Exact decimal parse (utils/money.js): not a number -> 0, otherwise at most 4 decimals.
 const safeNumber = (value) => moneyMath.round(value);
 
+// Domain 3 H3 fix: the GL account code for the "other side" of a cash/bank
+// movement, keyed off the same transactionType string every caller already
+// passes. Keyword-matched (not an exact lookup) so a new transactionType the
+// app grows later still lands in a sensible bucket instead of silently being
+// skipped. Order matters - more specific keywords are checked first.
+const CONTRA_ACCOUNT_RULES = [
+  [/opening/i, 'OPENING-BALANCE-EQUITY'],
+  [/transfer|withdrawal|deposit/i, 'TRANSFER-CLEARING'],
+  [/advance/i, 'SUPPLIER-ADVANCES'],
+  [/purchase/i, 'ACCOUNTS-PAYABLE-RM'],
+  [/collection/i, 'ACCOUNTS-RECEIVABLE'],
+  [/loan/i, 'STAFF-LOANS-RECEIVABLE'],
+  [/petty|reimbursement/i, 'PETTY-CASH'],
+  [/charge/i, 'BANK-CHARGES-EXPENSE'],
+  [/expense/i, 'EXPENSES'],
+  [/issued|receive/i, 'OTHER-LEDGER']
+];
+
+const contraAccountFor = (transactionType) => {
+  const match = CONTRA_ACCOUNT_RULES.find(([pattern]) => pattern.test(String(transactionType || '')));
+  return match ? match[1] : 'GENERAL';
+};
+
+/**
+ * Writes one balanced journal_entries + two journal_lines rows (the account
+ * side and its contra side) for a single finance_transactions posting. Never
+ * throws into the caller's transaction over a missing/odd schema state - the
+ * journal is a mirror of the ledger, not a gate on it, so a journal problem
+ * must not block the actual cash/bank posting it is describing.
+ */
+const postJournalEntry = async (connection, { date, accountCode, debit, credit, transactionType, remark, referenceType, referenceId, createdBy }) => {
+  try {
+    await pool.journalSchemaReady;
+    const [entry] = await connection.query(
+      `INSERT INTO journal_entries (entry_date, reference_type, reference_id, description, created_by)
+       VALUES (?, ?, ?, ?, ?)`,
+      [date, referenceType, referenceId, remark || transactionType || null, createdBy || null]
+    );
+    await connection.query(
+      `INSERT INTO journal_lines (entry_id, account_code, debit, credit) VALUES (?, ?, ?, ?), (?, ?, ?, ?)`,
+      [
+        entry.insertId, accountCode, debit, credit,
+        entry.insertId, contraAccountFor(transactionType), credit, debit
+      ]
+    );
+  } catch (error) {
+    console.warn('Journal posting skipped (finance_transactions row still recorded):', error.message);
+  }
+};
+
 const calculateDateRangeBalance = ({ closingBalance = 0, creditAfterDate = 0, debitAfterDate = 0 }) => {
   const base = safeNumber(closingBalance);
   const credits = safeNumber(creditAfterDate);
@@ -248,6 +298,12 @@ const recordCashTransaction = async (connection, {
     await rebuildBalanceAfter(connection, 'CASH', companyId);
   }
 
+  // Domain 3 H3 fix: mirror this posting as a balanced double-entry journal line.
+  await postJournalEntry(connection, {
+    date, accountCode: 'CASH', debit: debitAmt, credit: creditAmt,
+    transactionType, remark, referenceType, referenceId, createdBy
+  });
+
   return newBalance;
 };
 
@@ -328,6 +384,12 @@ const recordBankTransaction = async (connection, {
   if (ymd && await hasRowsAfterDate(connection, 'BANK', bankId, ymd)) {
     await rebuildBalanceAfter(connection, 'BANK', bankId);
   }
+
+  // Domain 3 H3 fix: mirror this posting as a balanced double-entry journal line.
+  await postJournalEntry(connection, {
+    date, accountCode: `BANK-${bankId}`, debit: debitAmt, credit: creditAmt,
+    transactionType, remark, referenceType, referenceId, createdBy
+  });
 
   return newBalance;
 };

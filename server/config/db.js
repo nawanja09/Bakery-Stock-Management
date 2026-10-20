@@ -407,6 +407,55 @@ const ensureFinanceSchema = async () => {
 // company) is in place - tests/db wait for it before creating fixtures.
 pool.financeSchemaReady = ensureFinanceSchema();
 
+// Domain 3 H3 fix: a Chart-of-Accounts-lite double-entry journal, mirroring
+// every finance_transactions row (Cash/Bank) with a balanced debit/credit
+// pair across two GL account codes, so a trial balance can be produced
+// across the whole business instead of per cash/bank account in isolation.
+// Scope: only the finance_transactions chokepoint (utils/financeLedger.js's
+// recordCashTransaction/recordBankTransaction) posts here. card_transactions
+// and other_ledger_transactions are separate single-account ledgers (per the
+// audit's Domain 3 H3 finding) and are not wired into this journal yet.
+const ensureJournalSchema = async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS journal_entries (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        entry_date DATE NOT NULL,
+        reference_type VARCHAR(50) NULL,
+        reference_id INT NULL,
+        description VARCHAR(255) NULL,
+        created_by INT NULL,
+        created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        KEY idx_journal_entries_reference (reference_type, reference_id),
+        KEY idx_journal_entries_date (entry_date)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS journal_lines (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        entry_id BIGINT UNSIGNED NOT NULL,
+        account_code VARCHAR(40) NOT NULL,
+        debit DECIMAL(14,2) NOT NULL DEFAULT 0,
+        credit DECIMAL(14,2) NOT NULL DEFAULT 0,
+        PRIMARY KEY (id),
+        KEY idx_journal_lines_entry (entry_id),
+        KEY idx_journal_lines_account (account_code),
+        CONSTRAINT fk_journal_lines_entry FOREIGN KEY (entry_id) REFERENCES journal_entries(id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    `);
+
+    console.log('Journal (Chart-of-Accounts-lite) schema ready');
+  } catch (error) {
+    console.warn('Journal schema check skipped:', error.message);
+  }
+};
+
+// Resolves once journal_entries/journal_lines exist - financeLedger.js's
+// chokepoint awaits this before posting, and tests/db wait for it too.
+pool.journalSchemaReady = ensureJournalSchema();
+
 const ensureAutoIncrementPrimaryKeys = async () => {
   const repairTables = [
     'bank_details',
