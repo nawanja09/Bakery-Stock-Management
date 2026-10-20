@@ -54,9 +54,9 @@ Scope: valuation method consistency, atomic stock reductions, stock-adjustment a
 ### [ACCEPTED DESIGN] H1 — "Latest purchase price as of date" valuation, not FIFO/WAC (re-states prior C5; accepted 2026-10-20)
 There is no cost-layer table. RM cost is recomputed per query as `purchase_items.unit_price` of the most recent purchase **on or before the date in question** (`reportController.js`: the stock-value query, the issuance-cost subquery, and the dedicated `getLatestUnitPrice` endpoint all filter `purchase_date <= <as-of date>` before taking the latest row) — this is a deliberate, consistently-applied project requirement, not an oversight, and is not a required fix. It differs from FIFO/WAC in one accepted way: a *backdated* purchase entered after the fact (a late-entered invoice whose `purchase_date` falls before an issuance that already happened) will change that past issuance's recomputed cost on next report run, since there is no per-movement pinned cost snapshot. This residual gap is accepted as part of the same design decision; no `stock_cost_layers` table or FIFO/WAC migration is wanted.
 
-### [HIGH] H2 — FG Production recipe `last_price` is a manually-typed, unreconciled cost
-`fgProductionController.js`'s recipe lines store their own `last_price` per RM ingredient, entered/edited independently of `purchase_items.unit_price`. `rm_cost` roll-ups (and therefore FG margin) are computed against this manually-typed figure, not the real latest purchase price — so margin reporting can silently diverge from actual spend with no reconciliation or alert.
-**Fix:** make `last_price` a read-only, server-computed column (`SELECT unit_price FROM purchase_items ... ORDER BY purchase_date DESC LIMIT 1`) refreshed whenever a new purchase for that item posts; if manual override must stay for exceptional cases, log the override delta to the audit trail with a reason.
+### [FIXED] H2 — FG Production recipe `last_price` is a manually-typed, unreconciled cost (fixed 2026-10-20)
+`fgProductionController.js`'s recipe lines stored their own `last_price` per RM ingredient, entered/edited independently of `purchase_items.unit_price`. `rm_cost` roll-ups (and therefore FG margin) were computed against this manually-typed figure, not the real latest purchase price — so margin reporting could silently diverge from actual spend with no reconciliation or alert.
+**Fix applied:** `last_price` is no longer accepted from the client at all — `addRecipe`/`updateRecipe` now call `getServerComputedUnitPrice()`, the same "latest purchase price as of date" lookup Domain 2 H1 uses (`purchase_items` joined to `purchases`, `ORDER BY purchase_date DESC, pi.id DESC LIMIT 1`, filtered by `RULES.purchases('p')` to skip deleted invoices). `getRecipesForFg` and the `getRecipesReport` roll-up also recompute `last_price`/`line_cost`/`rm_cost` live via a correlated subquery instead of trusting the stored column, so a margin screen always reflects the current real purchase price, not a stale one from when the recipe line was last saved.
 
 ### [MEDIUM] M4 — RM Stock Adjustment `unit_price` is not sign/shape validated
 `adjustmentController.js`'s `getAdjustmentValues` uses the raw `unit_price` without the same strict `moneyMath.isAmount()` gate applied to Financial Adjustment amounts elsewhere in the same file — a negative or non-numeric `unit_price` is not rejected before it feeds a valuation calculation.
@@ -71,9 +71,9 @@ if (!moneyMath.isAmount(unit_price) || Number(unit_price) < 0) {
 `approveAdjustment` flips the adjustment to effective (it now counts in `stockRules.js`'s formula) but there is no corresponding financial posting (no COGS/inventory-value journal effect) — consistent with Domain 3's finding that there is no general ledger/journal concept at all (see H3 below). This is the inventory-side symptom of the same root cause.
 **Fix:** tracked together with H3's recommendation (introduce a journal table); an approved adjustment with a non-zero valuation impact should post a journal line.
 
-### [LOW] L3 — FG recipe cost changes have no maker-checker
-Unlike RM stock adjustments (maker ≠ checker enforced in `approveAdjustment`), editing a recipe's `last_price`/ingredient list in `fgProductionController.js` takes effect immediately with no second approver, even though it feeds margin reporting.
-**Fix:** either require a second role to confirm recipe cost changes above a % threshold, or (preferred, see H2) remove manual entry entirely.
+### [LOW] L3 — FG recipe quantity/ingredient-list changes have no maker-checker (narrowed 2026-10-20: `last_price` angle closed by H2)
+Unlike RM stock adjustments (maker ≠ checker enforced in `approveAdjustment`), editing a recipe's ingredient list or quantities in `fgProductionController.js` takes effect immediately with no second approver. The `last_price` angle this originally flagged is now moot — H2's fix removed manual price entry entirely, so there is no cost value left to self-approve. What remains: a quantity edit still changes RM cost roll-ups (via the now-live price lookup) with no second approver.
+**Fix:** if desired, require a second role to confirm recipe quantity/ingredient changes above a % cost-impact threshold; optional given the low blast radius (quantities are visible on every recipe screen, unlike a hidden price override).
 
 **What's solid:** atomic `SELECT ... FOR UPDATE` locking that correctly defeats the MySQL REPEATABLE-READ stale-snapshot pitfall (`rmStockService.js`, `stockAvailability.js`), single source-of-truth stock formula (`stockRules.js`) reused everywhere, and genuine maker-checker on stock adjustment approval (self-approval rejected).
 
@@ -146,9 +146,8 @@ const request = await inTransaction(async (connection) => {
 
 ## Domain 4 — Real-Time P&L Engine & Financial Precision
 
-### [HIGH] H4 — Revenue vs. COGS matching inherits Domain 2's FG recipe cost gap (re-states H2 in this context; narrowed 2026-10-20)
-RM valuation itself (Domain 2 H1) is an accepted "latest price as of date" design and is not part of this gap. What remains open: FG recipe cost is a manually-typed, unreconciled figure (Domain 2 H2), so any P&L/margin screen that subtracts "cost" from "revenue" for a finished good can be matching today's sale against a cost figure that silently diverges from real RM spend. This is the Domain 4 "Revenue vs. COGS Matching" risk materializing from the Domain 2 H2 finding — fixing H2 (server-computed `last_price`) is the prerequisite for a trustworthy FG margin number.
-**Fix:** same as Domain 2 H2 — make `last_price` server-computed from `purchase_items`, or audit-log the override delta if manual entry must stay.
+### [FIXED] H4 — Revenue vs. COGS matching inherited Domain 2's FG recipe cost gap (re-states H2 in this context; resolved 2026-10-20 alongside H2)
+RM valuation itself (Domain 2 H1) is an accepted "latest price as of date" design and was never part of this gap. The remaining cause — FG recipe cost being a manually-typed, unreconciled figure (Domain 2 H2) — is now closed: `last_price` is server-computed from `purchase_items` (never client-supplied), and FG margin queries (`getRecipesForFg`, `getRecipesReport`) recompute it live rather than trusting a stored value. A P&L/margin screen for a finished good now matches revenue against the real current RM spend.
 
 ### [RESOLVED] Arithmetic Precision — `utils/money.js` and prior commits close this out
 Re-verified fresh against current code: `utils/money.js` parses every value as decimal **text** into a scaled `BigInt`, does all arithmetic on integers, and rounds half-away-from-zero (matching MySQL's own DECIMAL rounding) before converting back to a JS number — this avoids the classic `0.1 + 0.2` binary-float drift entirely. It is consistently used through `utils/financeLedger.js` for every cash/bank balance calculation (`round2`, `add`, `sub`, `mul`). Commits `22c1cb9` and `1d38484` (visible in git log) match this file's stated purpose. This closes the Arithmetic Precision ask; no further fix needed here.
@@ -221,9 +220,9 @@ await auditLog.record({
 | ID | Domain | Severity | Finding | Status |
 |----|--------|----------|---------|--------|
 | H1 | 2 | HIGH | "Latest price as of date" RM valuation (not FIFO/WAC) | **Accepted design** (= prior C5) |
-| H2 | 2 | HIGH | FG recipe `last_price` unreconciled with real purchase price | Open (new) |
+| H2 | 2 | HIGH | FG recipe `last_price` unreconciled with real purchase price | **Fixed** (2026-10-20) |
 | H3 | 3 | HIGH | No Chart of Accounts / double-entry journal | Open (= prior C4) |
-| H4 | 4 | HIGH | Revenue/COGS matching inherits H2's unreconciled FG recipe cost | Open (narrowed) |
+| H4 | 4 | HIGH | Revenue/COGS matching inherited H2's unreconciled FG recipe cost | **Fixed** (2026-10-20, with H2) |
 | M1 | 1 | MEDIUM | No replay-window check on signed sync responses | Open |
 | M2 | 1 | MEDIUM | No startup validation of integration URLs | Open |
 | M3 | 1 | MEDIUM | No rate limit on malformed-payload bursts into quarantine | Open |
