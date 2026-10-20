@@ -28,6 +28,11 @@ router.get('/pending', ...collectionReadAccess, controller.getPending);
 router.get('/completed', ...collectionReadAccess, controller.getCompleted);
 router.get('/rejected', ...collectionReadAccess, controller.getRejected);
 
+// Records the sync did not accept / approved collections that changed upstream (audit M4).
+router.get('/data-issues', ...collectionReadAccess, controller.getDataIssues);
+router.get('/data-issues/:id', ...collectionReadAccess, controller.getDataIssue);
+router.post('/data-issues/:id/resolve', ...collectionWriteAccess, controller.resolveDataIssue);
+
 router.post('/approve', ...collectionWriteAccess, controller.approve);
 router.post('/reject', ...collectionWriteAccess, controller.reject);
 router.post('/restore', ...collectionWriteAccess, controller.restore);

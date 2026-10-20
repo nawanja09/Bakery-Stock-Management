@@ -128,21 +128,21 @@ const startSystem = ({ prefix, accounts, branches }) => new Promise((resolve) =>
       if (url.pathname.includes('completed-shifts')) {
         const page = Number(url.searchParams.get('page') || 1);
         const data = page === 1
-          ? branches.map((b, i) => shift(i, b, '2026-10-01T03:00:00.000000Z'))
+          ? [...branches.map((b, i) => shift(i, b, '2026-10-01T03:00:00.000000Z')), ...(sys.extraShifts || [])]
           : [shift(9, branches[1 % branches.length], '2026-10-30T18:00:00.000000Z')]; // 23:30 on 30 Oct in Colombo
         return json(res, 200, { data, meta: { current_page: page, last_page: 2 } });
       }
       if (url.pathname.includes('credit-payments')) {
         return json(res, 200, { data: [
-          { id: 41, reference_no: 'CP-41', payment_date: '2026-10-03', payment_type: 'Cash', amount: '1500.00', branch: branches[1 % branches.length] },
-          { id: 42, reference_no: 'CP-42', payment_date: '2026-10-04', payment_type: 'Card', amount: 2500, branch: branches[0] }
+          { id: 41, reference_no: 'CP-41', date_time: '2026-10-03T05:00:00.000000Z', payment_method: 'Cash', cash: 1500, card: 0, bank_transfer: 0, setoff: 0, amount: 1500, collection: 1500, customer: { id: 3, name: 'Customer' }, branch: branches[1 % branches.length] },
+          { id: 42, reference_no: 'CP-42', date_time: '2026-10-04T05:00:00.000000Z', payment_method: 'Card', cash: 0, card: 2500, bank_transfer: 0, setoff: 0, amount: 2500, collection: 2500, customer: { id: 3, name: 'Customer' }, branch: branches[0] }
         ], meta: { current_page: 1, last_page: 1 } });
       }
       if (url.pathname.includes('employee-deductions')) {
         // Like the real POS: only "active" deductions unless status=all is asked for.
         const all = url.searchParams.get('status') === 'all';
-        const data = [{ id: 7, date: '2026-10-05', employee_name: 'Kamal', employee_id: 'E1', shift_id: '300', amount: 500, status: 'deducted', branch: branches[0] },
-          { id: 8, date: '2026-10-05', employee_name: 'Nimal', employee_id: 'E2', amount: 200, status: 'cancelled', branch: branches[0] }];
+        const data = [{ id: 7, deduction_date: '2026-10-05', employee: { id: 'E1', name: 'Kamal' }, source: { shift_id: '300' }, amount: 500, status: 'deducted', branch: branches[0] },
+          { id: 8, deduction_date: '2026-10-05', employee: { id: 'E2', name: 'Nimal' }, amount: 200, status: 'cancelled', branch: branches[0] }];
         return json(res, 200, { data: all ? data : [], meta: { current_page: 1, last_page: 1 } });
       }
       return json(res, 200, { data: [], meta: { current_page: 1, last_page: 1 } });
@@ -181,7 +181,7 @@ const reset = async ({ restaurant = true, financeLogin = true, connectRestaurant
   listQueries.length = 0;
   sqlLog.length = 0;
   for (const sys of [posSys, rstSys]) {
-    sys.logins.length = 0; sys.dataCalls.length = 0; sys.unauthorized = 0; sys.valid.clear(); sys.failData = null; sys.seq = 0;
+    sys.logins.length = 0; sys.dataCalls.length = 0; sys.unauthorized = 0; sys.valid.clear(); sys.failData = null; sys.seq = 0; sys.extraShifts = [];
     sys.tokenUser.clear(); sys.abilities = {};
   }
   auth.resetAuthState();
@@ -291,6 +291,41 @@ test('the same source_id in POS and Restaurant never collides', async () => {
   assert.equal(bySystem(again.body, 'POS').created, 0);
   assert.equal(bySystem(again.body, 'RESTAURANT').created, 0);
 });
+
+test('M4: a shift that does not match the RAVON contract is quarantined; the rest of the batch is staged',
+  async () => {
+    await reset();
+    // Online total renamed upstream: the old mapper would have read it as 0 and staged a wrong shift.
+    const renamed = shift(40, BRANCHES[0], '2026-10-01T03:00:00.000000Z');
+    delete renamed.online;
+    renamed.bank_online = { total: 0 };
+    // Parts that do not add up to the POS's own total.
+    const mismatched = { ...shift(41, BRANCHES[0], '2026-10-01T03:00:00.000000Z'), collection: 999 };
+    posSys.extraShifts = [renamed, mismatched];
+    const res = await pull();
+    const pos = bySystem(res.body, 'POS');
+    assert.equal(pos.invalid, 2);
+    assert.equal(pos.quarantined, 2);
+    assert.equal(pos.created, 5 + 2 + 1, 'the valid records are staged as before');
+    const shifts = pos.sources.find((src) => src.source === 'SHIFT');
+    assert.match(shifts.invalidSamples[0].reason, /^Does not match ravon-collections-v1: online is missing/);
+    assert.deepEqual(shifts.unknownFields, ['bank_online']);
+    assert.match(shifts.invalidSamples[1].reason, /does not equal collection/);
+    assert.equal(inserted.some((r) => ['340', '341'].includes(String(r.source_id))), false, 'neither bad record was staged');
+
+    // warn mode accepts them but reports; off mode skips the check
+    const before = process.env.COLLECTION_SCHEMA_MODE;
+    try {
+      process.env.COLLECTION_SCHEMA_MODE = 'warn';
+      await reset();
+      posSys.extraShifts = [mismatched];
+      const warned = bySystem((await pull()).body, 'POS').sources.find((src) => src.source === 'SHIFT');
+      assert.equal(warned.schemaWarnings, 1);
+      assert.equal(warned.invalid, 0);
+    } finally {
+      if (before === undefined) delete process.env.COLLECTION_SCHEMA_MODE; else process.env.COLLECTION_SCHEMA_MODE = before;
+    }
+  });
 
 test('duplicate prevention is per system: a completed POS reference blocks only POS', async () => {
   await reset();

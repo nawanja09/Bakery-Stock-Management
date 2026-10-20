@@ -1489,6 +1489,33 @@ const ensureCollectionsSchema = async () => {
       console.error('Collections completed-reference UNIQUE key FAILED - duplicate approvals are only checked in code:', refErr.message);
     }
 
+    // Records BSMS did not accept from POS / Restaurant, and approved collections that changed
+    // upstream afterwards (services/collectionQuarantine.js, audit M4).
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS collection_data_issues (
+        id               INT NOT NULL AUTO_INCREMENT,
+        issue_key        CHAR(64) NOT NULL,
+        source_system    ENUM('POS','RESTAURANT') NOT NULL,
+        source_type      ENUM('SHIFT','CREDIT_PAYMENT','EMPLOYEE_DEDUCTION') NOT NULL,
+        source_id        VARCHAR(100) NULL,
+        kind             ENUM('REJECTED','CHANGED_AFTER_APPROVAL') NOT NULL,
+        reason           VARCHAR(1000) NOT NULL,
+        fields           VARCHAR(2000) NULL,
+        raw_payload      MEDIUMTEXT NULL,
+        collection_id    INT NULL,
+        seen_count       INT NOT NULL DEFAULT 1,
+        first_seen_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        last_seen_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        status           ENUM('OPEN','RESOLVED') NOT NULL DEFAULT 'OPEN',
+        resolved_by      INT NULL,
+        resolved_at      DATETIME NULL,
+        resolution_note  VARCHAR(500) NULL,
+        PRIMARY KEY (id),
+        UNIQUE KEY uq_collection_data_issues_key (issue_key),
+        KEY idx_collection_data_issues_status (status, last_seen_at)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    `);
+
     await pool.query(`
       CREATE TABLE IF NOT EXISTS collection_transactions (
         id                          INT NOT NULL AUTO_INCREMENT,

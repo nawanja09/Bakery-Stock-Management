@@ -106,7 +106,7 @@ const startSystem = ({ publicKey, branches }) => new Promise((resolve) => {
         return json(res, 200, { data: [shift(300 + page, branchOf(page - 1))], next_page_url: next, meta: { current_page: page, last_page: 2 } });
       }
       if (path === '/credit-payments/collection') {
-        return json(res, 200, { data: [{ id: 41, reference_no: 'CP-41', payment_date: '2026-10-03', payment_type: 'Cash', amount: '1500.00', branch: branchOf(0) }] });
+        return json(res, 200, { data: [{ id: 41, reference_no: 'CP-41', date_time: '2026-10-03T05:00:00.000000Z', payment_method: 'Cash', cash: 1500, card: 0, bank_transfer: 0, setoff: 0, amount: 1500, collection: 1500, customer: { id: 3, name: 'Customer' }, branch: branchOf(0) }] });
       }
       if (path === '/employee-deductions') return json(res, 200, { data: [] });
       return json(res, 404, { message: 'Not found' });

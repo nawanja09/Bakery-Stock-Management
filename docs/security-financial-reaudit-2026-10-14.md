@@ -1,6 +1,6 @@
 # BSMS: Security and Financial-Integrity Re-Audit
 
-> **Status update 2026-10-20:** this report is historical. Current fix status of every finding is in [security-financial-reaudit-2026-10-15.md](security-financial-reaudit-2026-10-15.md). Fixed since: H3, H4, H5 (hard deletes), H6 (mostly), H7, M3, M5, M7, R1–R10 and the C1–C3, N1–N9 items below. Accepted: M8 (no company scoping), R2 (Store Keeper pays suppliers). Still open: C4, C5 (design), H5 expense approval, M4, N1-tail (needs the RAVON Laravel apps).
+> **Status update 2026-10-20:** this report is historical. Current fix status of every finding is in [security-financial-reaudit-2026-10-15.md](security-financial-reaudit-2026-10-15.md). Fixed since: H3, H4, H5 (hard deletes), H6 (mostly), H7, M3, M4, M5, M7, R1–R10 and the C1–C3, N1–N9 items below. Accepted: M8 (no company scoping), R2 (Store Keeper pays suppliers). Still open: C4, C5 (design), H5 expense approval, N1-tail (needs the RAVON Laravel apps).
 
 **Scope:** `server/` at `de0a965` (2026-10-14). This is a delta audit against [security-financial-audit-2026-10-12.md](security-financial-audit-2026-10-12.md) (written at `189c342`).
 **Method:** Manual review of every commit since `189c342` (`7fbe2d6`, `a48790c`, `57f2ffd`, `e290e50`, `d3d23c9`, `de0a965`). Each earlier finding was re-checked at HEAD. Exploitability was confirmed with `node` where possible. Secrets were compared by SHA-256 prefix only; no secret values were read or printed.

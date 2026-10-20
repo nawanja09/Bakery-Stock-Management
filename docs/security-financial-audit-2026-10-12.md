@@ -1,6 +1,6 @@
 # BSMS — Security, Business-Logic & Financial-Integrity Audit
 
-> **Status update 2026-10-20:** this report is historical. Current fix status of every finding is in [security-financial-reaudit-2026-10-15.md](security-financial-reaudit-2026-10-15.md). Fixed since: H3, H4, H5 (hard deletes), H6 (mostly), H7, M3, M5, M7, R1–R10 and the C1–C3, N1–N9 items below. Accepted: M8 (no company scoping), R2 (Store Keeper pays suppliers). Still open: C4, C5 (design), H5 expense approval, M4, N1-tail (needs the RAVON Laravel apps).
+> **Status update 2026-10-20:** this report is historical. Current fix status of every finding is in [security-financial-reaudit-2026-10-15.md](security-financial-reaudit-2026-10-15.md). Fixed since: H3, H4, H5 (hard deletes), H6 (mostly), H7, M3, M4, M5, M7, R1–R10 and the C1–C3, N1–N9 items below. Accepted: M8 (no company scoping), R2 (Store Keeper pays suppliers). Still open: C4, C5 (design), H5 expense approval, N1-tail (needs the RAVON Laravel apps).
 
 **Scope:** `server/` (Express 4 + mysql2, 24k LOC across controllers/services/routes/middleware), commit `189c342`, 2026-10-12.
 **Method:** Manual code review. RBAC findings were verified by executing the real `config/rolePermissions.js` and a live Express router. Secret findings were checked by key name and length only. No secret values were read.

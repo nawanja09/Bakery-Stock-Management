@@ -499,7 +499,7 @@ const Collection = () => {
   // the records already in Pending are simply shown.
   const loadedSources = syncSystems.flatMap((sys) => (sys.sources || []).map((s) => ({ ...s, system: sys.system })))
     .filter((s) => !s.error);
-  const syncProblems = loadedSources.filter((s) => s.invalid > 0 || s.duplicate > 0 || s.unmapped > 0);
+  const syncProblems = loadedSources.filter((s) => s.invalid > 0 || s.duplicate > 0 || s.unmapped > 0 || s.changedAfterApproval > 0);
 
   // POS / Restaurant connection badges. The browser never sees a token: only
   // connected / not connected / expired, the account name and branch scope.
@@ -634,7 +634,11 @@ const Collection = () => {
                 <>
                   {s.invalid} record{s.invalid === 1 ? '' : 's'} could not be read and {s.invalid === 1 ? 'was' : 'were'} skipped
                   {s.invalidSamples?.[0] && <> ({s.invalidSamples[0].reason}{s.invalidSamples[0].fields?.length ? `; fields: ${s.invalidSamples[0].fields.join(', ')}` : ''})</>}.
+                  {' '}They are kept for review (nothing was guessed or posted).
                 </>
+              )}
+              {s.changedAfterApproval > 0 && (
+                <> {s.changedAfterApproval} already-approved record{s.changedAfterApproval === 1 ? '' : 's'} changed in the POS after approval - the ledgers were not touched; ask an accountant to review.</>
               )}
               {s.duplicate > 0 && <> {s.duplicate} already-approved reference{s.duplicate === 1 ? '' : 's'} ignored.</>}
               {s.unmapped > 0 && (

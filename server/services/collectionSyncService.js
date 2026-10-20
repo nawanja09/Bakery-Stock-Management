@@ -68,6 +68,9 @@ const pool = require('../config/db');
 const integrationAuth = require('./integrationAuthService');
 const { SYSTEMS, SOURCES, mapSystemRecord, extractRecords } = require('./collectionMapper');
 const { createDepartmentMatcher, normalizePosBranchName } = require('./departmentMapper');
+const schema = require('./collectionSchema');
+const quarantine = require('./collectionQuarantine');
+const money = require('../utils/money');
 
 const MAX_PAGES = 200;
 const PER_PAGE = 200;
@@ -196,6 +199,26 @@ const COLUMNS = [
   'total_amount', 'pos_total_amount', 'raw_payload'
 ];
 
+const APPROVED_FIELDS = [
+  ['cash_amount', 'cash'], ['card_amount', 'card'], ['bank_amount', 'bank'], ['ar_amount', 'AR'],
+  ['short_excess_amount', 'short/excess'], ['deduction_amount', 'deduction'], ['total_amount', 'total']
+];
+
+/** What differs between an approved collection and the record the POS sends now ('' = nothing). */
+const approvedDifference = (approved, record) => {
+  const parts = [];
+  for (const [column, label] of APPROVED_FIELDS) {
+    if (record[column] === undefined) continue;
+    if (money.compare(approved[column] ?? 0, record[column] ?? 0) !== 0) {
+      parts.push(`${label} ${money.fixed(approved[column] ?? 0)} -> ${money.fixed(record[column] ?? 0)}`);
+    }
+  }
+  if (record.collection_date && approved.collection_date && approved.collection_date !== record.collection_date) {
+    parts.push(`date ${approved.collection_date} -> ${record.collection_date}`);
+  }
+  return parts.length ? `Approved collection changed in the POS after approval (the ledgers were not touched): ${parts.join('; ')}` : '';
+};
+
 /**
  * Stages one mapped record. Never inserts a duplicate:
  *   new                     -> inserted as pending
@@ -205,12 +228,15 @@ const COLUMNS = [
  * Records are identified by (source_system, source_type, source_id): a POS and a
  * Restaurant record with the same id never touch each other. A record without
  * source_system is a POS one (unchanged POS behaviour).
- * @returns {Promise<'inserted'|'updated'|'unchanged'|'duplicate'>}
+ * 'changed' = an APPROVED record whose figures differ in the POS now (see approvedDifference).
+ * @returns {Promise<'inserted'|'updated'|'unchanged'|'duplicate'|'changed'>}
  */
-const stagePending = async (queryable, record) => {
+const stagePending = async (queryable, record, { onChangedAfterApproval } = {}) => {
   const system = record.source_system || SYSTEMS.POS;
   const [existing] = await queryable.query(
-    `SELECT id, status, raw_payload, department_id, pos_branch_name, card_txn_count, card_txn_total FROM collections
+    `SELECT id, status, raw_payload, department_id, pos_branch_name, card_txn_count, card_txn_total,
+            cash_amount, card_amount, bank_amount, ar_amount, short_excess_amount, deduction_amount, total_amount,
+            DATE_FORMAT(collection_date, '%Y-%m-%d') AS collection_date FROM collections
       WHERE source_type = ? AND source_id = ? AND source_system = ?`,
     [record.source_type, record.source_id, system]
   );
@@ -238,7 +264,18 @@ const stagePending = async (queryable, record) => {
   }
 
   const current = existing[0];
-  if (current.status !== 'pending') return 'unchanged';
+  if (current.status !== 'pending') {
+    // Already approved (money is in the ledgers) but the POS now says something else: a later void,
+    // refund or correction. Nothing is changed here - it is reported for an accountant (audit M4).
+    if (current.status === 'completed' && typeof onChangedAfterApproval === 'function') {
+      const difference = approvedDifference(current, record);
+      if (difference) {
+        await onChangedAfterApproval({ collectionId: current.id, reason: difference });
+        return 'changed';
+      }
+    }
+    return 'unchanged';
+  }
   if (current.raw_payload === record.raw_payload) {
     // Same POS data; the department mapping / branch name normalization / card
     // payment summary may still have changed (e.g. a department was added,
@@ -299,14 +336,41 @@ const syncSource = async (system, source, endpoint, { companyByName, matchDepart
   const { provider } = SYSTEM_CONFIG[system];
   const result = {
     system, source, fetched: 0, inserted: 0, updated: 0, unchanged: 0, duplicate: 0,
-    invalid: 0, invalidSamples: [], excluded: 0, excludedReasons: [], unmapped: 0, unmappedBranches: []
+    invalid: 0, invalidSamples: [], excluded: 0, excludedReasons: [], unmapped: 0, unmappedBranches: [],
+    quarantined: 0, changedAfterApproval: 0, unknownFields: [], schemaWarnings: 0
   };
+  const schemaMode = schema.mode();
   try {
     if (!endpoint) throw new Error(`${SYSTEM_CONFIG[system].baseEnv} is not configured`);
     const url = withParams(endpoint, { ...window, per_page: PER_PAGE, ...(SOURCE_PARAMS[source] || {}) });
     const records = await fetchAllRecords(url, { provider, userId });
     result.fetched = records.length;
     for (let index = 0; index < records.length; index += 1) {
+      // Strict RAVON contract first (services/collectionSchema.js): a record that does not match is
+      // quarantined, never mapped by guesswork (audit M4).
+      if (schemaMode !== 'off') {
+        const contract = schema.checkContract(source, records[index]);
+        for (const field of contract.unknownFields) {
+          if (result.unknownFields.length < 20 && !result.unknownFields.includes(field)) result.unknownFields.push(field);
+        }
+        if (!contract.ok) {
+          const reason = `Does not match ${schema.CONTRACT_VERSION}: ${contract.problems.join('; ')}`;
+          if (schemaMode === 'strict') {
+            result.invalid += 1;
+            result.quarantined += 1;
+            if (result.invalidSamples.length < MAX_REPORTED_INVALID) {
+              result.invalidSamples.push({ index, reason, fields: Object.keys(records[index] || {}).slice(0, 40) });
+            }
+            await quarantine.recordIssue(pool, {
+              system, source, kind: quarantine.KINDS.REJECTED, reason,
+              fields: Object.keys(records[index] || {}).slice(0, 40), payload: records[index],
+              sourceId: records[index]?.shift_id ?? records[index]?.id
+            });
+            continue;
+          }
+          result.schemaWarnings += 1; // warn mode: accepted, but reported
+        }
+      }
       const mapped = mapSystemRecord(system, source, records[index]);
       if (mapped.excluded) {
         // Deliberately not a collection (e.g. overpayment set-off): counted, not an error.
@@ -321,6 +385,11 @@ const syncSource = async (system, source, endpoint, { companyByName, matchDepart
         if (result.invalidSamples.length < MAX_REPORTED_INVALID) {
           result.invalidSamples.push({ index, reason: mapped.reason, fields: mapped.fields });
         }
+        result.quarantined += 1;
+        await quarantine.recordIssue(pool, {
+          system, source, kind: quarantine.KINDS.REJECTED, reason: mapped.reason, fields: mapped.fields,
+          payload: records[index], sourceId: records[index]?.shift_id ?? records[index]?.id
+        });
         continue;
       }
       const record = mapped.record;
@@ -351,8 +420,18 @@ const syncSource = async (system, source, endpoint, { companyByName, matchDepart
         }
       }
 
-      const outcome = await stagePending(pool, record);
-      result[outcome] += 1;
+      const outcome = await stagePending(pool, record, {
+        onChangedAfterApproval: ({ collectionId, reason }) => quarantine.recordIssue(pool, {
+          system, source, kind: quarantine.KINDS.CHANGED_AFTER_APPROVAL, reason, payload: record.raw_payload,
+          collectionId, sourceId: record.source_id, fields: []
+        })
+      });
+      if (outcome === 'changed') {
+        result.changedAfterApproval += 1;
+        result.unchanged += 1; // the stored collection itself is untouched
+      } else {
+        result[outcome] += 1;
+      }
     }
   } catch (error) {
     const message = integrationAuth.scrub(error.message);
@@ -383,6 +462,8 @@ const summarize = (system, sources, extra = {}) => {
     duplicates: sum('duplicate'),
     unmapped: sum('unmapped'),
     invalid: sum('invalid'),
+    quarantined: sum('quarantined'),
+    changedAfterApproval: sum('changedAfterApproval'),
     excluded: sum('excluded'),
     sources,
     ...extra
@@ -450,7 +531,8 @@ const recordSyncRun = (systems, { window, userId, request = {} }) => {
   const { record } = require('./auditLog');
   for (const s of systems) {
     if (s.skipped && !s.error) continue; // not configured / no access: nothing was attempted
-    const counts = `${s.fetched} fetched, ${s.created} new, ${s.updated} updated, ${s.invalid} rejected, ${s.unmapped} unmapped`;
+    const counts = `${s.fetched} fetched, ${s.created} new, ${s.updated} updated, ${s.invalid} rejected, ${s.unmapped} unmapped`
+      + (s.changedAfterApproval ? `, ${s.changedAfterApproval} approved record(s) changed in the POS` : '');
     record({
       eventType: 'SYNC',
       action: 'SYNC',
@@ -459,15 +541,17 @@ const recordSyncRun = (systems, { window, userId, request = {} }) => {
       recordLabel: `${s.label || s.system} collections ${window.start_date} to ${window.end_date}`,
       userId,
       sessionId: request.sessionId,
-      outcome: s.error || s.invalid > 0 ? 'FAILED' : 'SUCCESS',
+      outcome: s.error || s.invalid > 0 || s.changedAfterApproval > 0 ? 'FAILED' : 'SUCCESS',
       message: s.error ? `${s.error}${s.partial ? ' (partly loaded)' : ''} - ${counts}` : counts,
       requestBody: { system: s.system, window },
       responseBody: {
         fetched: s.fetched, created: s.created, updated: s.updated, duplicates: s.duplicates,
-        rejected: s.invalid, unmapped: s.unmapped, excluded: s.excluded, error: s.error || null, code: s.code || null,
+        rejected: s.invalid, quarantined: s.quarantined, changedAfterApproval: s.changedAfterApproval,
+        unmapped: s.unmapped, excluded: s.excluded, error: s.error || null, code: s.code || null,
         sources: (s.sources || []).map((src) => ({
           source: src.source, fetched: src.fetched, inserted: src.inserted, updated: src.updated,
           rejected: src.invalid, rejectedRecords: src.invalidSamples, unmappedBranches: src.unmappedBranches,
+          changedAfterApproval: src.changedAfterApproval, unknownFields: src.unknownFields, schemaWarnings: src.schemaWarnings,
           excludedReasons: src.excludedReasons, error: src.error || null, code: src.errorCode || null
         }))
       },
@@ -538,6 +622,6 @@ const syncCollections = async ({ fromDate, toDate, userId = null, allowed = null
 };
 
 module.exports = {
-  syncCollections, stagePending, linkDeductionsToShifts, fetchAllRecords, ENDPOINTS, SYSTEM_CONFIG, dateWindow, MAX_RANGE_DAYS,
+  syncCollections, stagePending, approvedDifference, linkDeductionsToShifts, fetchAllRecords, ENDPOINTS, SYSTEM_CONFIG, dateWindow, MAX_RANGE_DAYS,
   recordSyncRun
 };

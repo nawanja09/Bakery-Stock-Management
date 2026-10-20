@@ -56,6 +56,7 @@ const { posCardKey, cardPaymentReference, ledgerReference } = require('../servic
 const { approveCollections, rejectCollections, restoreCollections } = require('../services/collectionService');
 const integrationAccess = require('../services/integrationAccess');
 const { versionSql } = require('../services/collectionVersion');
+const quarantine = require('../services/collectionQuarantine');
 
 const SOURCE_VALUES = Object.values(SOURCES);
 
@@ -344,6 +345,7 @@ const systemResult = (s) => ({
   system: s.system, label: s.label, configured: s.configured !== false, skipped: Boolean(s.skipped),
   fetched: s.fetched, created: s.created, updated: s.updated, duplicates: s.duplicates,
   unmapped: s.unmapped, invalid: s.invalid, excluded: s.excluded,
+  quarantined: s.quarantined || 0, changedAfterApproval: s.changedAfterApproval || 0,
   ...(s.message ? { message: s.message } : {}),
   ...(s.error ? { error: s.error, code: s.code || null, partial: Boolean(s.partial) } : {}),
   sources: s.sources
@@ -724,7 +726,50 @@ const restore = withAccess('Failed to move collections back to Pending', (req, r
   (ids) => ({ message: `${plural(ids.length, 'collection')} moved back to Pending`, ids })
 ));
 
+// Records BSMS did not accept from POS / Restaurant, and approved collections that changed upstream
+// afterwards (services/collectionQuarantine.js, audit M4). Read: every Collection reader; resolving
+// is a write (view-only roles are refused by the central RBAC gate).
+const getDataIssues = async (req, res) => {
+  try {
+    const status = String(req.query.status || 'OPEN').toUpperCase();
+    if (!['OPEN', 'RESOLVED', 'ALL'].includes(status)) throw new HttpError(400, 'status must be OPEN, RESOLVED or ALL');
+    const issues = await quarantine.listIssues(pool, { status, limit: req.query.limit });
+    res.json({ issues, count: issues.length });
+  } catch (error) {
+    sendError(res, error, 'Failed to load data issues');
+  }
+};
+
+const getDataIssue = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) throw new HttpError(400, 'Invalid id');
+    const issue = await quarantine.getIssue(pool, id);
+    if (!issue) throw new HttpError(404, 'Data issue not found');
+    res.json(issue);
+  } catch (error) {
+    sendError(res, error, 'Failed to load data issue');
+  }
+};
+
+const resolveDataIssue = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) throw new HttpError(400, 'Invalid id');
+    const note = String(req.body?.note || '').trim();
+    if (note.length < 3) throw new HttpError(400, 'Say what was checked (a short note is required)');
+    const done = await quarantine.resolveIssue(pool, id, { userId: req.user?.userId || null, note });
+    if (!done) throw new HttpError(404, 'Data issue not found or already resolved');
+    res.json({ message: 'Marked as reviewed.' });
+  } catch (error) {
+    sendError(res, error, 'Failed to resolve data issue');
+  }
+};
+
 module.exports = {
+  getDataIssues,
+  getDataIssue,
+  resolveDataIssue,
   getPending,
   getIntegrationsStatus,
   connectIntegration,
