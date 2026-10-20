@@ -42,6 +42,26 @@ const {
 } = require('../services/ravonPosService');
 const { isValidUnit, areCompatibleUnits, convertQuantity } = require('../utils/unitConversion');
 const integrationAuth = require('../services/integrationAuthService');
+const { RULES } = require('../services/stockRules');
+
+// Latest purchase price for an RM item, as of today - the same
+// "latest purchase price as of date" lookup reportController.js uses for
+// stock valuation (Domain 2 H1, accepted design). This is the single
+// source of truth for recipe RM cost: callers never trust a client-sent
+// last_price (Domain 2 H2 fix - last_price is read-only/server-computed).
+const LATEST_UNIT_PRICE_SQL = `
+  SELECT pi.unit_price
+  FROM purchase_items pi
+  JOIN purchases p ON pi.purchase_id = p.id
+  WHERE pi.item_id = ? AND DATE(p.purchase_date) <= CURDATE() AND ${RULES.purchases('p')}
+  ORDER BY p.purchase_date DESC, pi.id DESC
+  LIMIT 1
+`;
+
+const getServerComputedUnitPrice = async (itemId) => {
+  const [rows] = await pool.query(LATEST_UNIT_PRICE_SQL, [itemId]);
+  return rows.length > 0 ? Number(rows[0].unit_price) : 0;
+};
 
 // =============================================
 // Helpers
@@ -126,7 +146,9 @@ const posErrorResponse = (error) => {
   return { status: 500, error: 'Unable to load FG Items right now. Please try again.' };
 };
 
-const validateRecipeInput = ({ rm_item_id, quantity, recipe_unit, last_price }) => {
+// last_price is not validated as input - it is never accepted from the
+// client (Domain 2 H2 fix); see getServerComputedUnitPrice above.
+const validateRecipeInput = ({ rm_item_id, quantity, recipe_unit }) => {
   if (!rm_item_id) {
     return 'RM Item is required';
   }
@@ -136,10 +158,6 @@ const validateRecipeInput = ({ rm_item_id, quantity, recipe_unit, last_price }) 
   }
   if (!recipe_unit || !isValidUnit(recipe_unit)) {
     return 'A valid unit must be selected for the recipe quantity';
-  }
-  const price = toNumber(last_price, NaN);
-  if (!Number.isFinite(price) || price < 0) {
-    return 'Last Price must not be negative';
   }
   return null;
 };
@@ -367,6 +385,10 @@ const deleteFgProduction = async (req, res) => {
 const getRecipesForFg = async (req, res) => {
   const { id } = req.params;
   try {
+    // last_price/line_cost are recomputed live from the latest real
+    // purchase price (not the stored column) so margin reporting never
+    // drifts from actual spend - same pattern as Domain 2 H1 (accepted
+    // design) and the Domain 2 H2 fix in getServerComputedUnitPrice above.
     const [rows] = await pool.query(
       `SELECT
          r.id,
@@ -375,8 +397,7 @@ const getRecipesForFg = async (req, res) => {
          i.name AS rm_item_name,
          i.unit AS rm_unit,
          r.quantity,
-         r.last_price,
-         (r.quantity * r.last_price) AS line_cost,
+         COALESCE((${LATEST_UNIT_PRICE_SQL.replace('pi.item_id = ?', 'pi.item_id = r.rm_item_id')}), 0) AS last_price,
          r.purchase_quantity,
          r.purchase_unit,
          r.status,
@@ -389,7 +410,12 @@ const getRecipesForFg = async (req, res) => {
       [id]
     );
 
-    res.json(rows);
+    const withLineCost = rows.map(row => ({
+      ...row,
+      line_cost: Number(row.quantity) * Number(row.last_price)
+    }));
+
+    res.json(withLineCost);
   } catch (error) {
     console.error('[FG Production] Error fetching recipes:', error);
     res.status(500).json({ error: 'Server error' });
@@ -399,9 +425,9 @@ const getRecipesForFg = async (req, res) => {
 // POST /api/fg-production/:id/recipes
 const addRecipe = async (req, res) => {
   const { id } = req.params; // fg_production_id
-  const { rm_item_id, quantity, recipe_unit, last_price } = req.body;
+  const { rm_item_id, quantity, recipe_unit } = req.body;
 
-  const validationError = validateRecipeInput({ rm_item_id, quantity, recipe_unit, last_price });
+  const validationError = validateRecipeInput({ rm_item_id, quantity, recipe_unit });
   if (validationError) {
     return res.status(400).json({ error: validationError });
   }
@@ -455,11 +481,15 @@ const addRecipe = async (req, res) => {
       return res.status(400).json({ error: conversionError.message });
     }
 
+    // last_price is never taken from the request body - it is always the
+    // latest real purchase price for this RM item (Domain 2 H2 fix).
+    const serverLastPrice = await getServerComputedUnitPrice(rm_item_id);
+
     const [result] = await pool.query(
       `INSERT INTO fg_production_recipes
         (fg_production_id, rm_item_id, quantity, recipe_unit, last_price, purchase_quantity, purchase_unit, status)
        VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
-      [id, rm_item_id, normalizedQuantity, recipe_unit, toNumber(last_price), normalizedQuantity, baseUnit]
+      [id, rm_item_id, normalizedQuantity, recipe_unit, serverLastPrice, normalizedQuantity, baseUnit]
     );
 
     res.status(201).json({
@@ -475,9 +505,9 @@ const addRecipe = async (req, res) => {
 // PUT /api/fg-production/recipes/:recipeId
 const updateRecipe = async (req, res) => {
   const { recipeId } = req.params;
-  const { rm_item_id, quantity, recipe_unit, last_price } = req.body;
+  const { rm_item_id, quantity, recipe_unit } = req.body;
 
-  const validationError = validateRecipeInput({ rm_item_id, quantity, recipe_unit, last_price });
+  const validationError = validateRecipeInput({ rm_item_id, quantity, recipe_unit });
   if (validationError) {
     return res.status(400).json({ error: validationError });
   }
@@ -526,11 +556,14 @@ const updateRecipe = async (req, res) => {
       return res.status(400).json({ error: conversionError.message });
     }
 
+    // last_price is never taken from the request body - see addRecipe.
+    const serverLastPrice = await getServerComputedUnitPrice(rm_item_id);
+
     const [result] = await pool.query(
       `UPDATE fg_production_recipes
         SET rm_item_id = ?, quantity = ?, recipe_unit = ?, last_price = ?, purchase_quantity = ?, purchase_unit = ?
        WHERE id = ? AND status = 1`,
-      [rm_item_id, normalizedQuantity, recipe_unit, toNumber(last_price), normalizedQuantity, baseUnit, recipeId]
+      [rm_item_id, normalizedQuantity, recipe_unit, serverLastPrice, normalizedQuantity, baseUnit, recipeId]
     );
 
     if (result.affectedRows === 0) {
@@ -606,13 +639,15 @@ const getRecipesReport = async (req, res) => {
       params
     );
 
+    // rm_cost is recomputed live from the latest real purchase price per
+    // ingredient (not the stored last_price column) - see getRecipesForFg.
     const [recipeTotals] = await pool.query(
-      `SELECT fg_production_id,
+      `SELECT fpr.fg_production_id,
               COUNT(*) AS rm_recipes_count,
-              COALESCE(SUM(quantity * last_price), 0) AS rm_cost
-       FROM fg_production_recipes
-       WHERE status = 1
-       GROUP BY fg_production_id`
+              COALESCE(SUM(fpr.quantity * COALESCE((${LATEST_UNIT_PRICE_SQL.replace('pi.item_id = ?', 'pi.item_id = fpr.rm_item_id')}), 0)), 0) AS rm_cost
+       FROM fg_production_recipes fpr
+       WHERE fpr.status = 1
+       GROUP BY fpr.fg_production_id`
     );
     const totalsByFg = new Map(recipeTotals.map(row => [row.fg_production_id, row]));
 
