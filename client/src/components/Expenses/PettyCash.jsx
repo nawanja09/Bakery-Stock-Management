@@ -1,5 +1,5 @@
 // src/components/Expenses/PettyCash.jsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faSave, faTimes, faPlus, faHistory, faMoneyBillWave, faReceipt,
@@ -10,7 +10,8 @@ import { usePopup } from '../context/PopupContext';
 import api from '../../api';
 import useExpenseTypes, { withSavedOption, findExpenseTypeId } from './useExpenseTypes';
 
-import { useConfirm } from '../common/ui';
+import { useConfirm, ActionMenu } from '../common/ui';
+import useDialog from '../common/ui/useDialog';
 const RECENT_LIMIT = 10;
 
 const PettyCash = () => {
@@ -38,6 +39,8 @@ const PettyCash = () => {
   const [editingReimbursementId, setEditingReimbursementId] = useState(null);
   const [showViewModal, setShowViewModal] = useState(false);
   const [selectedReimbursement, setSelectedReimbursement] = useState(null);
+  const viewModalRef = useRef(null);
+  useDialog(viewModalRef, { open: showViewModal && Boolean(selectedReimbursement), onClose: () => setShowViewModal(false), initialFocus: '.pc-view-modal-body' });
 
   const [voucherForm, setVoucherForm] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -605,14 +608,13 @@ const PettyCash = () => {
                           <td className="amount-cell"><strong>{formatCurrency(t.balance)}</strong></td>
                           <td>
                             {!isReimbursement && (
-                              <div className="action-buttons">
-                                <button className="action-btn view-btn" title="View"><FontAwesomeIcon icon={faEye} /></button>
-                                {isAdmin() && (
-                                  <button className="action-btn delete-btn" title="Delete" onClick={() => handleDelete(t.id)}>
-                                    <FontAwesomeIcon icon={faTrash} />
-                                  </button>
-                                )}
-                              </div>
+                              <ActionMenu
+                                ariaLabel={`Actions for voucher ${t.reference_number}`}
+                                items={[
+                                  { label: 'View', icon: <FontAwesomeIcon icon={faEye} /> },
+                                  isAdmin() && { label: 'Delete', icon: <FontAwesomeIcon icon={faTrash} />, danger: true, onClick: () => handleDelete(t.id) }
+                                ]}
+                              />
                             )}
                           </td>
                         </tr>
@@ -692,7 +694,7 @@ const PettyCash = () => {
       {/* View Modal for Reimbursement Details */}
       {showViewModal && selectedReimbursement && (
         <div className="pc-view-modal-overlay" onClick={() => setShowViewModal(false)}>
-          <div className="pc-view-modal-content" onClick={(e) => e.stopPropagation()}>
+          <div ref={viewModalRef} className="pc-view-modal-content" role="dialog" aria-modal="true" tabIndex={-1} onClick={(e) => e.stopPropagation()}>
             <div className="pc-view-modal-header">
               <h3><FontAwesomeIcon icon={faInfoCircle} /> Reimbursement Details</h3>
               <button className="pc-view-modal-close" onClick={() => setShowViewModal(false)}>×</button>

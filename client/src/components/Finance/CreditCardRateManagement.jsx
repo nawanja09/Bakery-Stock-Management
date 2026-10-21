@@ -12,7 +12,7 @@ import api from '../../api';
 import { usePopup } from '../context/PopupContext';
 import { canWrite, getRawAuthRole } from '../../config/rolePermissions';
 
-import { useConfirm } from '../common/ui';
+import { useConfirm, ActionMenu } from '../common/ui';
 const EMPTY_FORM = { department_id: '', rate: '' };
 
 // Mirrors the server rule (services/creditCardRateService.js parseRatePercent).
@@ -234,21 +234,19 @@ const CreditCardRateManagement = () => {
                         <span className={`badge ${active ? 'badge-success' : 'badge-neutral'}`}>{active ? 'Active' : 'Inactive'}</span>
                       </td>
                       {writable && (
-                        <td>
-                          <div className="table-actions" style={{ justifyContent: 'flex-end' }}>
-                            <button type="button" className="btn-icon edit" onClick={() => openEdit(rec)} title="Edit" aria-label={`Edit ${rec.department_name}`}>
-                              <FiEdit size={14} />
-                            </button>
-                            <button
-                              type="button"
-                              className={`btn-icon ${active ? 'delete' : 'edit'}`}
-                              onClick={() => handleToggleStatus(rec)}
-                              title={active ? 'Deactivate' : 'Activate'}
-                              aria-label={`${active ? 'Deactivate' : 'Activate'} ${rec.department_name}`}
-                            >
-                              {active ? <FiToggleLeft size={14} /> : <FiToggleRight size={14} />}
-                            </button>
-                          </div>
+                        <td style={{ textAlign: 'right' }}>
+                          <ActionMenu
+                            ariaLabel={`Actions for ${rec.department_name}`}
+                            items={[
+                              { label: 'Edit', icon: <FiEdit size={14} />, onClick: () => openEdit(rec) },
+                              {
+                                label: active ? 'Deactivate' : 'Activate',
+                                icon: active ? <FiToggleLeft size={14} /> : <FiToggleRight size={14} />,
+                                danger: active,
+                                onClick: () => handleToggleStatus(rec)
+                              }
+                            ]}
+                          />
                         </td>
                       )}
                     </tr>

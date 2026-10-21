@@ -3,7 +3,7 @@ import { FiSearch, FiPlus, FiEdit, FiTrash2 } from 'react-icons/fi';
 import api from '../../../api';
 import { usePopup } from '../../context/PopupContext';
 import AddSimpleNameForm from './AddSimpleNameForm';
-import { PageHeader, EmptyState, StatusBadge, ConfirmDialog } from '../../common/ui';
+import { PageHeader, EmptyState, StatusBadge, ConfirmDialog, ActionMenu } from '../../common/ui';
 import './ManagementList.css';
 
 const RMManagementList = ({
@@ -184,27 +184,14 @@ const RMManagementList = ({
                     <td>
                       <StatusBadge status={rec.status || 'Active'} tone={rec.status === 'Inactive' ? 'neutral' : 'success'} />
                     </td>
-                    <td>
-                      <div className="table-actions" style={{ justifyContent: 'flex-end' }}>
-                        <button
-                          type="button"
-                          className="btn-icon edit"
-                          onClick={() => setEditingRecord(rec)}
-                          title="Edit"
-                          aria-label={`Edit ${rec[nameField]}`}
-                        >
-                          <FiEdit size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-icon delete"
-                          onClick={() => setPendingDelete(rec)}
-                          title="Delete"
-                          aria-label={`Delete ${rec[nameField]}`}
-                        >
-                          <FiTrash2 size={14} />
-                        </button>
-                      </div>
+                    <td style={{ textAlign: 'right' }}>
+                      <ActionMenu
+                        ariaLabel={`Actions for ${rec[nameField]}`}
+                        items={[
+                          { label: 'Edit', icon: <FiEdit size={14} />, onClick: () => setEditingRecord(rec) },
+                          { label: 'Delete', icon: <FiTrash2 size={14} />, danger: true, onClick: () => setPendingDelete(rec) }
+                        ]}
+                      />
                     </td>
                   </tr>
                 ))}

@@ -19,7 +19,7 @@ import './BankCharges.css';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
 
-import { useConfirm } from '../common/ui';
+import { useConfirm, ActionMenu } from '../common/ui';
 const BankCharges = () => {
   const confirm = useConfirm();
   const [isLoading, setIsLoading] = useState(false);
@@ -566,20 +566,13 @@ const BankCharges = () => {
                     <td className="description-cell">{charge.description || '-'}</td>
                     <td className="amount-cell">{formatCurrency(charge.amount)}</td>
                     <td className="action-cell">
-                      <button
-                        onClick={() => handleEdit(charge)}
-                        className="edit-btn"
-                        title="Edit"
-                      >
-                        <FontAwesomeIcon icon={faEdit} />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(charge.id)}
-                        className="delete-btn"
-                        title="Delete"
-                      >
-                        <FontAwesomeIcon icon={faTrash} />
-                      </button>
+                      <ActionMenu
+                        ariaLabel={`Actions for bank charge on ${charge.date}`}
+                        items={[
+                          { label: 'Edit', icon: <FontAwesomeIcon icon={faEdit} />, onClick: () => handleEdit(charge) },
+                          { label: 'Delete', icon: <FontAwesomeIcon icon={faTrash} />, danger: true, onClick: () => handleDelete(charge.id) }
+                        ]}
+                      />
                     </td>
                   </tr>
                 ))

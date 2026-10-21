@@ -4,7 +4,7 @@ import api from '../../../api';
 import { usePopup } from '../../context/PopupContext';
 import '../common/ManagementList.css';
 
-import { useConfirm } from '../../common/ui';
+import { useConfirm, ActionMenu } from '../../common/ui';
 const emptyForm = { expense_type_id: '', name: '', status: '1' };
 
 const SubExpenseTypeManagement = () => {
@@ -174,10 +174,15 @@ const SubExpenseTypeManagement = () => {
                     <td>{record.expense_type_name}</td>
                     <td><strong>{record.name}</strong></td>
                     <td><span className={`badge ${record.status ? 'badge-success' : 'badge-neutral'}`}>{record.status ? 'Active' : 'Inactive'}</span></td>
-                    <td><div className="table-actions" style={{ justifyContent: 'flex-end' }}>
-                      <button type="button" className="btn-icon edit" title="Edit" onClick={() => openEdit(record)}><FiEdit size={14} /></button>
-                      <button type="button" className={record.status ? 'btn-icon delete' : 'btn-icon edit'} title={record.status ? 'Deactivate' : 'Activate'} onClick={() => toggleStatus(record)}><FiPower size={14} /></button>
-                    </div></td>
+                    <td style={{ textAlign: 'right' }}>
+                      <ActionMenu
+                        ariaLabel={`Actions for ${record.name}`}
+                        items={[
+                          { label: 'Edit', icon: <FiEdit size={14} />, onClick: () => openEdit(record) },
+                          { label: record.status ? 'Deactivate' : 'Activate', icon: <FiPower size={14} />, danger: Boolean(record.status), onClick: () => toggleStatus(record) }
+                        ]}
+                      />
+                    </td>
                   </tr>
                 ))}
               </tbody>

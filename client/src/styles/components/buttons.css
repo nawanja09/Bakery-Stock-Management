@@ -85,3 +85,16 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 .btn-icon.delete:hover { background: var(--color-danger-light); border-color: rgba(194, 65, 59,0.25); color: var(--color-danger); }
 .btn-icon.view:hover { background: var(--color-success-light); border-color: rgba(35, 128, 93,0.25); color: var(--color-success); }
 .table-actions { display: inline-flex; align-items: center; gap: 5px; }
+
+/* TOGGLE SWITCH - used by several forms (Suppliers, Items) that referenced
+   .toggle-switch/.toggle-label/.toggle-slider with no CSS backing anywhere,
+   so it rendered as a bare native checkbox. */
+.toggle-label { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
+.toggle-switch { position: relative; display: inline-block; width: 42px; height: 24px; flex-shrink: 0; }
+.toggle-switch input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.toggle-slider { position: absolute; inset: 0; background: var(--color-border-strong); border-radius: var(--radius-full); transition: background var(--transition-fast); pointer-events: none; }
+.toggle-slider::before { content: ''; position: absolute; left: 3px; top: 3px; width: 18px; height: 18px; background: #fff; border-radius: 50%; box-shadow: var(--shadow-xs); transition: transform var(--transition-fast); }
+.toggle-switch input:checked + .toggle-slider { background: var(--color-primary); }
+.toggle-switch input:checked + .toggle-slider::before { transform: translateX(18px); }
+.toggle-switch input:focus-visible + .toggle-slider { box-shadow: 0 0 0 4px var(--color-focus-ring); }
+.toggle-switch input:disabled + .toggle-slider { opacity: 0.5; cursor: not-allowed; }

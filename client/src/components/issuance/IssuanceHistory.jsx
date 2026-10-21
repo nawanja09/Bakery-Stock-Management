@@ -8,6 +8,7 @@ import {
   faBuilding, faTimes, faTruckLoading, faFileAlt 
 } from '@fortawesome/free-solid-svg-icons';
 import { usePopup } from '../context/PopupContext';
+import { ActionMenu } from '../common/ui';
 import './Issuance.css';
 import api from '../../api';
 import { formatNumber, formatQuantity } from '../../utils/formatters';
@@ -406,24 +407,13 @@ const IssuanceHistory = () => {
                           </span>
                         </td>
                         <td className="text-center actions-column">
-                          <div className="table-actions" style={{ justifyContent: 'center' }}>
-                            <button 
-                              type="button"
-                              className="btn btn-sm btn-outline" 
-                              onClick={() => handleView(issuance.id)}
-                              title="View Issuance Details"
-                            >
-                              <FontAwesomeIcon icon={faEye} /> View
-                            </button>
-                            <button 
-                              type="button"
-                              className="btn btn-sm btn-secondary" 
-                              onClick={() => handleEdit(issuance.id)}
-                              title="Edit Issuance"
-                            >
-                              <FontAwesomeIcon icon={faEdit} /> Edit
-                            </button>
-                          </div>
+                          <ActionMenu
+                            ariaLabel={`Actions for issuance ${issuance.id}`}
+                            items={[
+                              { label: 'View', icon: <FontAwesomeIcon icon={faEye} />, onClick: () => handleView(issuance.id) },
+                              { label: 'Edit', icon: <FontAwesomeIcon icon={faEdit} />, onClick: () => handleEdit(issuance.id) }
+                            ]}
+                          />
                         </td>
                       </tr>
                     ))

@@ -1,1 +1,91 @@
 @import '../Report.css';
+
+/* Wastage Details modal - .wastage-details-modal, .detail-item and
+   .items-details-table had no CSS of their own; the equivalents in
+   purchasing-page-ui.css are scoped under .erp-purchase-details, which
+   this modal doesn't have. */
+.modal-large { width: min(900px, 100%); }
+
+.wastage-details-modal .detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-bottom: 14px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.wastage-details-modal .detail-header h3 {
+  margin: 0;
+  color: var(--color-heading);
+}
+
+.wastage-details-modal .detail-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  background: var(--color-warning-light);
+  color: var(--color-warning-dark);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+}
+
+.wastage-details-modal .details-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.wastage-details-modal .detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wastage-details-modal .detail-item label {
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-tertiary);
+}
+
+.wastage-details-modal .detail-item span {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+}
+
+.wastage-details-modal .remarks-section {
+  padding: 12px;
+  margin-bottom: 16px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-strong);
+}
+
+.wastage-details-modal .remarks-section label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--color-text-tertiary);
+}
+
+.wastage-details-modal .remarks-section p { margin: 0; color: var(--color-text-secondary); }
+
+.wastage-details-modal .items-table-wrapper h4 {
+  margin: 0 0 10px;
+  color: var(--color-heading);
+  font-size: var(--font-size-md);
+}
+
+.wastage-details-modal .items-table-scroll { overflow-x: auto; }
+
+@media (max-width: 640px) {
+  .wastage-details-modal .details-grid { grid-template-columns: 1fr; }
+}

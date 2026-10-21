@@ -21,7 +21,8 @@
    older page files that also define .empty-state (Adjustments.css,
    AdminSettings.css - CSS is global, the last one loaded used to win on
    every page) no longer change how it looks from page to page. */
-div.empty-state, div.no-data, div.no-records, div.no-results, div.no-items {
+div.empty-state, div.no-data, div.no-records, div.no-results, div.no-items,
+p.empty-state, p.no-data, p.no-records, p.no-results, p.no-items {
   display: flex;
   flex-direction: column;
   align-items: center;

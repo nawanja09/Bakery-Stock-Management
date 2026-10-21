@@ -359,6 +359,57 @@
   background: var(--erp-surface);
 }
 
+.erp-transaction-modal .modal-subtitle {
+  margin: 2px 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.erp-transaction-modal .modern-close-btn {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+  transition: color var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.erp-transaction-modal .modern-close-btn:hover {
+  color: var(--color-danger);
+  border-color: rgba(194, 65, 59, 0.3);
+  background: var(--color-danger-light);
+}
+
+.erp-transaction-modal .modal-section-title {
+  margin: -16px -16px 12px;
+  padding: 10px 14px;
+  border-radius: 8px 8px 0 0;
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  color: #fff;
+  background: var(--color-primary);
+}
+
+.erp-transaction-modal .modal-section-title.purchases-bg { background: var(--color-info); }
+.erp-transaction-modal .modal-section-title.issuance-bg { background: var(--color-primary); }
+.erp-transaction-modal .modal-section-title.wastage-bg { background: var(--color-danger); }
+.erp-transaction-modal .modal-section-title.returns-bg { background: var(--color-warning); }
+
+/* Not scoped to .erp-transaction-modal: while loading, the component
+   returns just this div with no overlay/backdrop wrapper around it yet. */
+.modal-loading {
+  padding: 40px;
+  text-align: center;
+  color: var(--color-text-secondary);
+}
+
 @media (max-width: 1100px) {
   .erp-purchase-page,
   .erp-return-page,

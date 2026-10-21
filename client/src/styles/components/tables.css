@@ -45,4 +45,12 @@ tfoot td, tr.total-row td, tr.totals-row td, tr.grand-total-row td {
 @media (max-width: 767px) {
   th, td { white-space: nowrap; padding: 10px 12px; }
   td .table-actions { flex-wrap: nowrap; width: auto; }
+
+  /* Safety net: give every table's direct parent horizontal scroll, even
+     when a page forgot to add its own .overflow-x-auto wrapper. Targets the
+     parent (not the table itself) so it never touches table/thead/tbody/tr
+     display types - sticky headers and table-layout:fixed keep working. */
+  :where(div, td, section, article, main, li):has(> table) {
+    overflow-x: auto;
+  }
 }

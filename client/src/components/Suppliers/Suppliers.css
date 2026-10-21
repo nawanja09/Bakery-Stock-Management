@@ -1,2 +1,83 @@
 @import '../common/FormStyles.css';
 @import '../purchase/Purchase.css';
+
+/* Suppliers.jsx's own markup (.suppliers-container, .search-box, .actions,
+   .supplier-table) had no rules anywhere - it inherited only the bare
+   element styling (table/th/td) from tables.css, so the header/search/
+   actions never got laid out. */
+.suppliers-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xl);
+  width: 100%;
+  max-width: 1560px;
+  margin: 0 auto;
+}
+
+.suppliers-container .header-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.suppliers-container .search-box {
+  flex: 1 1 260px;
+  min-width: 200px;
+}
+
+.suppliers-container .search-input {
+  width: 100%;
+  height: var(--input-height);
+  padding: 0 var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+  box-shadow: var(--shadow-xs);
+}
+
+.suppliers-container .search-input:focus {
+  outline: none;
+  border-color: var(--color-accent-dark);
+  box-shadow: 0 0 0 4px var(--color-focus-ring);
+}
+
+.suppliers-list {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+.table-responsive { overflow-x: auto; }
+
+.supplier-table .actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.supplier-table .vat-number { font-variant-numeric: tabular-nums; }
+
+.suppliers-container .no-results {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 48px 20px;
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+.table-footer {
+  padding: 12px 4px 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+@media (max-width: 640px) {
+  .suppliers-container .header-actions { width: 100%; }
+  .suppliers-container .search-box { flex: 1 1 100%; }
+}

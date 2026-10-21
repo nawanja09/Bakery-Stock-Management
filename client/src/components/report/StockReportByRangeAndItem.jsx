@@ -170,7 +170,7 @@ const TransactionDetailsModal = ({ date, itemId, itemName, onClose }) => {
 
           {/* SECTION: PURCHASE RETURNS */}
           <div className="modal-section">
-            <div className="modal-section-title" style={{ background: '#fd7e14' }}>
+            <div className="modal-section-title returns-bg">
               ↩️ Purchase Returns ({transactions.purchaseReturns.length})
             </div>
             {transactions.purchaseReturns.length > 0 ? (

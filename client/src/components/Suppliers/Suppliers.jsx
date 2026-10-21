@@ -5,7 +5,7 @@ import './Suppliers.css';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
 
-import { useConfirm } from '../common/ui';
+import { useConfirm, ActionMenu } from '../common/ui';
 const Suppliers = () => {
   const confirm = useConfirm();
   const [suppliers, setSuppliers] = useState([]);
@@ -329,7 +329,7 @@ const Suppliers = () => {
                       <input
                         type="checkbox"
                         name="vat_registered"
-                        checked={newSupplier.vat_registered}
+                        checked={Boolean(newSupplier.vat_registered)}
                         onChange={handleInputChange}
                       />
                       <span className="toggle-slider"></span>
@@ -337,7 +337,7 @@ const Suppliers = () => {
                   </label>
                 </div>
 
-                {newSupplier.vat_registered && (
+                {Boolean(newSupplier.vat_registered) && (
                   <div className="form-group">
                     <label>VAT Number *</label>
                     <input
@@ -462,20 +462,13 @@ const Suppliers = () => {
                         <td>{supplier.contact_name}</td>
                         <td>{supplier.contact_phone}</td>
                         <td className="actions">
-                          <button 
-                            className="btn-edit" 
-                            onClick={() => handleEdit(supplier)}
-                            title="Edit supplier"
-                          >
-                            <FontAwesomeIcon icon={faEdit} />
-                          </button>
-                          <button 
-                            className="btn-delete" 
-                            onClick={() => handleDelete(supplier.id, supplier.name)}
-                            title="Delete supplier"
-                          >
-                            <FontAwesomeIcon icon={faTrash} />
-                          </button>
+                          <ActionMenu
+                            ariaLabel={`Actions for ${supplier.name}`}
+                            items={[
+                              { label: 'Edit', icon: <FontAwesomeIcon icon={faEdit} />, onClick: () => handleEdit(supplier) },
+                              { label: 'Delete', icon: <FontAwesomeIcon icon={faTrash} />, danger: true, onClick: () => handleDelete(supplier.id, supplier.name) }
+                            ]}
+                          />
                         </td>
                       </tr>
                     ))}
