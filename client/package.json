@@ -15,7 +15,6 @@
     "chart.js": "^4.5.0",
     "date-fns": "^4.1.0",
     "dayjs": "^1.11.19",
-    "font-awesome": "^4.7.0",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.2",
     "react": "^19.1.0",

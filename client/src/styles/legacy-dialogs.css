@@ -9,135 +9,142 @@
 
    SKIN ONLY: colours, borders, radius, shadow. No widths, heights,
    padding or layout - those stay with each page so nothing reflows.
-   Loaded last (App.js) so it wins over the per-page files.
+
+   Every selector repeats its first class (e.g. `.sl-modal.sl-modal`) to
+   double its specificity. Each per-page CSS file this overrides only ever
+   targets these classes with plain single-class selectors, so this doubled
+   specificity makes this file win on its own merits - it no longer depends
+   on also being the last stylesheet imported in App.js. (A page-specific
+   rule can still win back a single property by being MORE specific itself,
+   e.g. scoping to its own page wrapper class.)
    When a popup is migrated to <Modal>, delete its selectors here.
    ============================================================================ */
 
 /* ---------- Backdrop ---------- */
-.modal-overlay,
-.payment-modal-overlay,
-.sl-modal-overlay,
-.cl-modal-overlay,
-.em-modal-overlay,
-.settlement-modal-overlay,
-.orders-modal-overlay,
-.fgprod-modal-overlay,
-.modern-modal-overlay,
-.issuance-modal-overlay,
-.ecr-release-modal-overlay,
-.ipm-overlay,
-.pnm-overlay,
-.snm-overlay,
-.inc-overlay,
-.ih-form-overlay,
-.ih-drawer-overlay,
-.ep-overlay,
-.edit-transfer-overlay,
-.edit-damage-overlay,
-.view-damage-overlay,
-.add-damage-form-overlay,
-.add-purchase-form-overlay,
-.add-asset-overlay,
-.form-overlay {
-  background: rgba(23, 42, 58, 0.48);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+.modal-overlay.modal-overlay,
+.payment-modal-overlay.payment-modal-overlay,
+.sl-modal-overlay.sl-modal-overlay,
+.cl-modal-overlay.cl-modal-overlay,
+.em-modal-overlay.em-modal-overlay,
+.settlement-modal-overlay.settlement-modal-overlay,
+.orders-modal-overlay.orders-modal-overlay,
+.fgprod-modal-overlay.fgprod-modal-overlay,
+.modern-modal-overlay.modern-modal-overlay,
+.issuance-modal-overlay.issuance-modal-overlay,
+.ecr-release-modal-overlay.ecr-release-modal-overlay,
+.ipm-overlay.ipm-overlay,
+.pnm-overlay.pnm-overlay,
+.snm-overlay.snm-overlay,
+.inc-overlay.inc-overlay,
+.ih-form-overlay.ih-form-overlay,
+.ih-drawer-overlay.ih-drawer-overlay,
+.ep-overlay.ep-overlay,
+.edit-transfer-overlay.edit-transfer-overlay,
+.edit-damage-overlay.edit-damage-overlay,
+.view-damage-overlay.view-damage-overlay,
+.add-damage-form-overlay.add-damage-form-overlay,
+.add-purchase-form-overlay.add-purchase-form-overlay,
+.add-asset-overlay.add-asset-overlay,
+.form-overlay.form-overlay {
+  background: var(--overlay-backdrop);
+  backdrop-filter: blur(var(--overlay-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--overlay-backdrop-blur));
 }
 
 /* ---------- Dialog card ---------- */
-.modal-content,
-.payment-modal-content,
-.sl-modal,
-.cl-modal,
-.em-modal-content,
-.settlement-modal,
-.orders-modal-content,
-.fgprod-modal-content,
-.modern-modal,
-.issuance-modal-content,
-.ecr-release-modal,
-.ipm-modal,
-.pnm-modal,
-.snm-modal,
-.inc-modal,
-.ih-form-modal,
-.ep-card,
-.edit-transfer-container,
-.edit-damage-container,
-.view-damage-container,
-.add-damage-form-container,
-.add-purchase-form-container,
-.add-asset-card,
-.form-overlay > .form-container {
+.modal-content.modal-content,
+.payment-modal-content.payment-modal-content,
+.sl-modal.sl-modal,
+.cl-modal.cl-modal,
+.em-modal-content.em-modal-content,
+.settlement-modal.settlement-modal,
+.orders-modal-content.orders-modal-content,
+.fgprod-modal-content.fgprod-modal-content,
+.modern-modal.modern-modal,
+.issuance-modal-content.issuance-modal-content,
+.ecr-release-modal.ecr-release-modal,
+.ipm-modal.ipm-modal,
+.pnm-modal.pnm-modal,
+.snm-modal.snm-modal,
+.inc-modal.inc-modal,
+.ih-form-modal.ih-form-modal,
+.ep-card.ep-card,
+.edit-transfer-container.edit-transfer-container,
+.edit-damage-container.edit-damage-container,
+.view-damage-container.view-damage-container,
+.add-damage-form-container.add-damage-form-container,
+.add-purchase-form-container.add-purchase-form-container,
+.add-asset-card.add-asset-card,
+.form-overlay.form-overlay > .form-container {
   background-color: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-2xl);
 }
 
-.ih-drawer {
+.ih-drawer.ih-drawer {
   background-color: var(--color-surface);
   border-left: 1px solid var(--color-border);
   box-shadow: var(--shadow-2xl);
 }
 
 /* ---------- Header (light headers; navy .payment-modal-header / .snm-header keep their brand fill) ---------- */
-.modal-header,
-.sl-modal-header,
-.cl-modal-header,
-.em-modal-header,
-.settlement-modal-header,
-.orders-modal-header,
-.fgprod-modal-header,
-.modern-modal-header,
-.ecr-release-modal-header,
-.ih-drawer-header,
-.ipm-header,
-.pnm-header,
-.inc-header,
-.edit-transfer-header,
-.edit-damage-header,
-.view-damage-header,
-.add-damage-form-header,
-.add-asset-header {
+.modal-header.modal-header,
+.sl-modal-header.sl-modal-header,
+.cl-modal-header.cl-modal-header,
+.em-modal-header.em-modal-header,
+.settlement-modal-header.settlement-modal-header,
+.orders-modal-header.orders-modal-header,
+.fgprod-modal-header.fgprod-modal-header,
+.modern-modal-header.modern-modal-header,
+.ecr-release-modal-header.ecr-release-modal-header,
+.ih-drawer-header.ih-drawer-header,
+.ipm-header.ipm-header,
+.pnm-header.pnm-header,
+.inc-header.inc-header,
+.edit-transfer-header.edit-transfer-header,
+.edit-damage-header.edit-damage-header,
+.view-damage-header.view-damage-header,
+.add-damage-form-header.add-damage-form-header,
+.add-asset-header.add-asset-header {
   background: linear-gradient(180deg, var(--color-primary-50), var(--color-surface));
   border-bottom: 1px solid var(--color-border);
 }
 
-.modal-header h2, .modal-header h3,
-.sl-modal-header h2, .sl-modal-header h3,
-.cl-modal-header h2, .cl-modal-header h3,
-.em-modal-header h2, .em-modal-header h3,
-.settlement-modal-header h2, .settlement-modal-header h3,
-.orders-modal-header h2, .orders-modal-header h3,
-.fgprod-modal-header h2, .fgprod-modal-header h3,
-.modern-modal-header h2, .modern-modal-header h3,
-.ecr-release-modal-header h2, .ecr-release-modal-header h3,
-.ipm-header h3, .pnm-header h3, .inc-header h3 {
+.modal-header.modal-header h2, .modal-header.modal-header h3,
+.sl-modal-header.sl-modal-header h2, .sl-modal-header.sl-modal-header h3,
+.cl-modal-header.cl-modal-header h2, .cl-modal-header.cl-modal-header h3,
+.em-modal-header.em-modal-header h2, .em-modal-header.em-modal-header h3,
+.settlement-modal-header.settlement-modal-header h2, .settlement-modal-header.settlement-modal-header h3,
+.orders-modal-header.orders-modal-header h2, .orders-modal-header.orders-modal-header h3,
+.fgprod-modal-header.fgprod-modal-header h2, .fgprod-modal-header.fgprod-modal-header h3,
+.modern-modal-header.modern-modal-header h2, .modern-modal-header.modern-modal-header h3,
+.ecr-release-modal-header.ecr-release-modal-header h2, .ecr-release-modal-header.ecr-release-modal-header h3,
+.ipm-header.ipm-header h3, .pnm-header.pnm-header h3, .inc-header.inc-header h3 {
   color: var(--color-primary-deep);
   letter-spacing: -0.02em;
 }
 
 /* ---------- Footer ---------- */
-.modal-footer,
-.sl-modal-footer,
-.cl-modal-footer,
-.em-modal-footer,
-.settlement-modal-footer,
-.orders-modal-footer,
-.fgprod-modal-footer,
-.payment-modal-footer,
-.ih-drawer-actions {
+.modal-footer.modal-footer,
+.sl-modal-footer.sl-modal-footer,
+.cl-modal-footer.cl-modal-footer,
+.em-modal-footer.em-modal-footer,
+.settlement-modal-footer.settlement-modal-footer,
+.orders-modal-footer.orders-modal-footer,
+.fgprod-modal-footer.fgprod-modal-footer,
+.payment-modal-footer.payment-modal-footer,
+.ih-drawer-actions.ih-drawer-actions {
   background: var(--color-surface-hover);
   border-top: 1px solid var(--color-border);
 }
 
 /* ---------- Close button ---------- */
-.modal-close,
-.sl-modal-close,
-.cl-modal-close,
-.orders-modal-close,
-.fgprod-modal-close {
+.modal-close.modal-close,
+.sl-modal-close.sl-modal-close,
+.cl-modal-close.cl-modal-close,
+.orders-modal-close.orders-modal-close,
+.fgprod-modal-close.fgprod-modal-close {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-surface);
@@ -145,11 +152,11 @@
   transition: color var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast);
 }
 
-.modal-close:hover,
-.sl-modal-close:hover,
-.cl-modal-close:hover,
-.orders-modal-close:hover,
-.fgprod-modal-close:hover {
+.modal-close.modal-close:hover,
+.sl-modal-close.sl-modal-close:hover,
+.cl-modal-close.cl-modal-close:hover,
+.orders-modal-close.orders-modal-close:hover,
+.fgprod-modal-close.fgprod-modal-close:hover {
   color: var(--color-danger);
   border-color: rgba(194, 65, 59, 0.3);
   background: var(--color-danger-light);

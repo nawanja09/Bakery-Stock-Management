@@ -154,7 +154,7 @@ const SettlementModal = ({
 
           {/* Bills list */}
           {loading ? (
-            <div className="loading">Loading bills from last 3 months...</div>
+            <div className="loading" role="status" aria-live="polite">Loading bills from last 3 months...</div>
           ) : error ? (
             <div className="error">{error}</div>
           ) : bills.length === 0 ? (

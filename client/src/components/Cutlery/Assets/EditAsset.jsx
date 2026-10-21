@@ -107,7 +107,7 @@ const EditAsset = () => {
   const handleCancel = () => navigate('/cutlery/assets');
   const triggerFileInput = () => fileInputRef.current?.click();
 
-  if (loading) return <div className="loading">Loading asset...</div>;
+  if (loading) return <div className="loading" role="status" aria-live="polite">Loading asset...</div>;
   if (!asset) return <div className="error">Asset not found</div>;
 
   return (

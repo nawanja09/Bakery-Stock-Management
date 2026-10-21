@@ -44,7 +44,7 @@ const ChartStats = ({ chartData }) => {
     ? issuesVsWastageData.labels
     : purchasingData.labels;
 
-  const primary = getThemeColor('--color-primary', '#355872');
+  const primary = getThemeColor('--color-primary', '#3B1F5E');
   const success = getThemeColor('--color-success', '#059669');
   const danger = getThemeColor('--color-danger', '#dc2626');
 

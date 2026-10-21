@@ -6,9 +6,9 @@
 /* MODAL & POPUP */
 .modal-overlay, .popup-overlay {
   position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(23, 42, 58, 0.48);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  background: var(--overlay-backdrop);
+  backdrop-filter: blur(var(--overlay-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--overlay-backdrop-blur));
   display: flex; align-items: center; justify-content: center;
   z-index: var(--z-modal); padding: var(--spacing-lg);
   animation: fadeIn var(--transition-base);

@@ -242,7 +242,7 @@ const PurchaseReturnHistory = () => {
 
   if (loading) {
     return (
-      <div className="loading-container">
+      <div className="loading-container" role="status" aria-live="polite">
         <div className="loading-spinner" />
         <p>Loading purchase returns…</p>
       </div>

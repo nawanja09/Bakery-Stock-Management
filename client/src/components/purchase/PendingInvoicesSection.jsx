@@ -1,5 +1,6 @@
 // src/components/purchase/PendingInvoicesSection.jsx
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { formatPurchasingCurrency as formatCurrency } from '../../utils/formatters';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faFileInvoiceDollar,
@@ -292,16 +293,6 @@ const PendingInvoicesSection = ({ supplierId, supplierName, suppliers = [], comp
     setActiveFilterId('');
     setSupplierSearch('');
     setSelectedInvoiceIds(new Set());
-  };
-
-  // Helpers
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-LK', {
-      style: 'currency',
-      currency: 'LKR',
-      minimumFractionDigits: 4,
-      maximumFractionDigits: 4
-    }).format(amount).replace('LKR', 'Rs.');
   };
 
   const getDocIcon = (type) => {

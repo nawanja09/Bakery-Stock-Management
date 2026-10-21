@@ -1023,8 +1023,9 @@ const Collection = () => {
       </div>
 
       {/* ------------------------------ APPROVE DIALOG ------------------------------ */}
+      {/* Form with per-row bank selections - no close-on-overlay-click, matching the project convention for data-entry dialogs. */}
       {approveOpen && (
-        <div className="cl-modal-overlay" onClick={() => !submitting && setApproveOpen(false)}>
+        <div className="cl-modal-overlay">
           <div className="cl-modal cl-modal-wide col-modal" role="dialog" aria-modal="true" aria-labelledby="col-approve-title" onClick={(e) => e.stopPropagation()}>
             <div className="cl-modal-header">
               <div>
@@ -1222,8 +1223,9 @@ const Collection = () => {
         </div>
       )}
 
+      {/* Has a required reason textarea - no close-on-overlay-click, matching the project convention for data-entry dialogs. */}
       {rejectOpen && (
-        <div className="cl-modal-overlay" onClick={() => !submitting && setRejectOpen(false)}>
+        <div className="cl-modal-overlay">
           <div className="cl-modal" role="dialog" aria-modal="true" aria-labelledby="col-reject-title" onClick={(e) => e.stopPropagation()}>
             <div className="cl-modal-header">
               <div>

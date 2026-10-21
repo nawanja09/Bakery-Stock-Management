@@ -21,7 +21,7 @@ const TopItemsChart = ({ items, loading, type }) => {
   if (loading) return <div className="chart-loading">Loading item quantities...</div>;
   if (!items.length) return <div className="chart-loading">No {type} item activity in this period.</div>;
 
-  const primary = getThemeColor('--color-primary', '#355872');
+  const primary = getThemeColor('--color-primary', '#3B1F5E');
   const data = {
     labels: items.map(item => item.itemName),
     datasets: [{

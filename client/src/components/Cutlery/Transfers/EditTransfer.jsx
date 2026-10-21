@@ -155,7 +155,7 @@ const EditTransfer = ({ transfer, onSubmit, onCancel }) => {
   if (loading) {
     return (
       <Modal title={`Edit Transfer - ${transfer?.transfer_id}`} size="xl" onClose={onCancel} className="cutlery-form-modal">
-        <div className="loading">Loading form data...</div>
+        <div className="loading" role="status" aria-live="polite">Loading form data...</div>
       </Modal>
     );
   }

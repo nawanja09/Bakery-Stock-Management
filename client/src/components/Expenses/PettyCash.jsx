@@ -691,80 +691,82 @@ const PettyCash = () => {
 
       {/* View Modal for Reimbursement Details */}
       {showViewModal && selectedReimbursement && (
-        <div className="modal-overlay" onClick={() => setShowViewModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
+        <div className="pc-view-modal-overlay" onClick={() => setShowViewModal(false)}>
+          <div className="pc-view-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="pc-view-modal-header">
               <h3><FontAwesomeIcon icon={faInfoCircle} /> Reimbursement Details</h3>
-              <button className="modal-close" onClick={() => setShowViewModal(false)}>×</button>
+              <button className="pc-view-modal-close" onClick={() => setShowViewModal(false)}>×</button>
             </div>
-            <div className="modal-body">
-              <div className="detail-row"><strong>Reference Number:</strong> {selectedReimbursement.reference_number}</div>
-              <div className="detail-row"><strong>Date:</strong> {formatDate(selectedReimbursement.reimbursement_date || selectedReimbursement.date)}</div>
-              <div className="detail-row"><strong>Company:</strong> {selectedReimbursement.company_name || selectedReimbursement.bank_name || 'Not recorded'}</div>
-              <div className="detail-row"><strong>Amount:</strong> {formatCurrency(selectedReimbursement.amount)}</div>
-              <div className="detail-row"><strong>Status:</strong> <span className={`status-badge status-${(selectedReimbursement.status || 'Completed').toLowerCase()}`}>{selectedReimbursement.status || 'Completed'}</span></div>
-              <div className="detail-row"><strong>Created Date:</strong> {selectedReimbursement.created_date || '-'}</div>
-              {selectedReimbursement.updated_at && <div className="detail-row"><strong>Last Updated:</strong> {new Date(selectedReimbursement.updated_at).toLocaleString()}</div>}
+            <div className="pc-view-modal-body">
+              <div className="pc-view-detail-row"><strong>Reference Number:</strong> {selectedReimbursement.reference_number}</div>
+              <div className="pc-view-detail-row"><strong>Date:</strong> {formatDate(selectedReimbursement.reimbursement_date || selectedReimbursement.date)}</div>
+              <div className="pc-view-detail-row"><strong>Company:</strong> {selectedReimbursement.company_name || selectedReimbursement.bank_name || 'Not recorded'}</div>
+              <div className="pc-view-detail-row"><strong>Amount:</strong> {formatCurrency(selectedReimbursement.amount)}</div>
+              <div className="pc-view-detail-row"><strong>Status:</strong> <span className={`status-badge status-${(selectedReimbursement.status || 'Completed').toLowerCase()}`}>{selectedReimbursement.status || 'Completed'}</span></div>
+              <div className="pc-view-detail-row"><strong>Created Date:</strong> {selectedReimbursement.created_date || '-'}</div>
+              {selectedReimbursement.updated_at && <div className="pc-view-detail-row"><strong>Last Updated:</strong> {new Date(selectedReimbursement.updated_at).toLocaleString()}</div>}
             </div>
-            <div className="modal-footer">
+            <div className="pc-view-modal-footer">
               <button className="btn-secondary" onClick={() => setShowViewModal(false)}>Close</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Simple CSS for modal */}
+      {/* Scoped CSS for this view modal only - prefixed pc-view- so it can never
+          collide with the app-wide .modal-overlay/.modal-content classes that
+          styles/legacy-dialogs.css and other popups rely on. */}
       <style>{`
-        .modal-overlay {
+        .pc-view-modal-overlay {
           position: fixed;
           top: 0;
           left: 0;
           right: 0;
           bottom: 0;
-          background: rgba(0,0,0,0.5);
+          background: rgba(29, 14, 48, 0.52);
           display: flex;
           align-items: center;
           justify-content: center;
-          z-index: 1000;
+          z-index: var(--z-modal);
         }
-        .modal-content {
-          background: white;
+        .pc-view-modal-content {
+          background: var(--color-surface);
           border-radius: 12px;
           width: 90%;
           max-width: 500px;
           max-height: 80vh;
           overflow-y: auto;
-          box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+          box-shadow: var(--shadow-xl);
         }
-        .modal-header {
+        .pc-view-modal-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
           padding: 16px 20px;
-          border-bottom: 1px solid #e9ecef;
+          border-bottom: 1px solid var(--color-border);
         }
-        .modal-header h3 {
+        .pc-view-modal-header h3 {
           margin: 0;
-          color: #2c3e50;
+          color: var(--color-heading);
         }
-        .modal-close {
+        .pc-view-modal-close {
           background: none;
           border: none;
           font-size: 24px;
           cursor: pointer;
-          color: #6c757d;
+          color: var(--color-text-secondary);
         }
-        .modal-body {
+        .pc-view-modal-body {
           padding: 20px;
         }
-        .detail-row {
+        .pc-view-detail-row {
           margin-bottom: 12px;
           padding: 6px 0;
-          border-bottom: 1px solid #f0f0f0;
+          border-bottom: 1px solid var(--color-border-light);
         }
-        .modal-footer {
+        .pc-view-modal-footer {
           padding: 16px 20px;
-          border-top: 1px solid #e9ecef;
+          border-top: 1px solid var(--color-border);
           text-align: right;
         }
       `}</style>

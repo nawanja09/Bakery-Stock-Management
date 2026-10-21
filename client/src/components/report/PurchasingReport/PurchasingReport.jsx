@@ -547,7 +547,7 @@ const PurchasingReport = () => {
 
       {/* Table */}
       {loading ? (
-        <div className="loading-state">Loading report data...</div>
+        <div className="loading-state" role="status" aria-live="polite">Loading report data...</div>
       ) : filteredItems.length > 0 ? (
         <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
           <div style={{ overflowX: 'auto' }}>

@@ -29,7 +29,7 @@ const ReturnDetailsModal = ({ id, onClose }) => {
     return num.toFixed(3);
   };
 
-  if (loading) return <div className="loading">Loading...</div>;
+  if (loading) return <div className="loading" role="status" aria-live="polite">Loading...</div>;
   if (!returnRecord) return <div>No return data found</div>;
 
   return (
@@ -139,7 +139,7 @@ const ReturnsHistory = () => {
     return matchesDate && matchesDepartment;
   });
 
-  if (loading) return <div className="loading">Loading...</div>;
+  if (loading) return <div className="loading" role="status" aria-live="polite">Loading...</div>;
 
   return (
     <div className="returns-container erp-department-return-summary">

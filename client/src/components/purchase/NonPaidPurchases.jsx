@@ -1,6 +1,7 @@
 // src/components/purchase/NonPaidPurchases.jsx
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { formatPurchasingCurrency as formatCurrency } from '../../utils/formatters';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faMoneyBillWave, 
@@ -114,15 +115,6 @@ const NonPaidPurchases = () => {
     fetchData(); // Refresh the list
   };
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-LK', {
-      style: 'currency',
-      currency: 'LKR',
-      minimumFractionDigits: 4,
-      maximumFractionDigits: 4
-    }).format(amount).replace('LKR', 'Rs.');
-  };
-
   const formatDate = (date) => {
     return dayjs(date).format('DD MMM YYYY');
   };
@@ -149,7 +141,7 @@ const NonPaidPurchases = () => {
 
   if (loading) {
     return (
-      <div className="loading-container">
+      <div className="loading-container" role="status" aria-live="polite">
         <div className="loading-spinner"></div>
         <p>Loading outstanding bills...</p>
       </div>

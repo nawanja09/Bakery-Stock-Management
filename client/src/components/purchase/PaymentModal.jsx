@@ -16,7 +16,7 @@ import { usePopup } from '../context/PopupContext';
 import api from '../../api';
 import useDialog from '../common/ui/useDialog';
 import usePaymentMethods from '../../utils/usePaymentMethods';
-import { formatPaymentMethodLabel } from '../../utils/formatters';
+import { formatPaymentMethodLabel, formatPurchasingCurrency as formatCurrency } from '../../utils/formatters';
 import './PaymentModal.css';
 
 const PaymentModal = ({ purchase, onClose, onPaymentComplete }) => {
@@ -134,14 +134,6 @@ const PaymentModal = ({ purchase, onClose, onPaymentComplete }) => {
     }));
   };
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-LK', {
-      style: 'currency',
-      currency: 'LKR',
-      minimumFractionDigits: 4,
-      maximumFractionDigits: 4
-    }).format(amount).replace('LKR', 'Rs.');
-  };
 
   const formatDate = (date) => {
     return dayjs(date).format('DD MMM YYYY');

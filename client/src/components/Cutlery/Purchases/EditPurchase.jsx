@@ -130,7 +130,7 @@ const EditPurchase = ({ purchase, onSubmit, onCancel }) => {
   if (loading) {
     return (
       <Modal title="Edit Purchase" size="xl" onClose={onCancel} className="cutlery-form-modal">
-        <div className="loading">Loading…</div>
+        <div className="loading" role="status" aria-live="polite">Loading…</div>
       </Modal>
     );
   }

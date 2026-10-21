@@ -258,7 +258,7 @@ const DepartmentIssuesReport = () => {
       </div>
 
       {loading ? (
-        <div className="loading">Loading report data...</div>
+        <div className="loading" role="status" aria-live="polite">Loading report data...</div>
       ) : reportData.length > 0 ? (
         <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
           <div style={{ overflowX: 'auto' }}>

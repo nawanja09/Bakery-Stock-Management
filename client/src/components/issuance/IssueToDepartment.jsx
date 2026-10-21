@@ -249,7 +249,7 @@ const IssueToDepartment = () => {
     })
   };
 
-  if (loading) return <div className="loading">Loading...</div>;
+  if (loading) return <div className="loading" role="status" aria-live="polite">Loading...</div>;
 
   return (
     <div className="issuance-container">

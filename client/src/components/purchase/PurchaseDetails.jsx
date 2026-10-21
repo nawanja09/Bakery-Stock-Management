@@ -28,7 +28,7 @@ import dayjs from 'dayjs';
 import { usePopup } from '../context/PopupContext';
 import api from '../../api';
 import './Purchase.css';
-import { formatQuantity, formatPaymentMethodLabel, PURCHASING_DECIMALS } from '../../utils/formatters';
+import { formatQuantity, formatPaymentMethodLabel, formatPurchasingCurrency as formatCurrency, PURCHASING_DECIMALS } from '../../utils/formatters';
 import { DEFAULT_VAT_RATE } from '../../utils/vatRate';
 
 const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
@@ -83,15 +83,6 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
     }
   }, [id]);
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-LK', {
-      style: 'currency',
-      currency: 'LKR',
-      minimumFractionDigits: 4,
-      maximumFractionDigits: 4
-    }).format(amount).replace('LKR', 'Rs.');
-  };
-
   const formatDate = (date) => {
     return dayjs(date).format('DD MMMM YYYY');
   };
@@ -140,7 +131,7 @@ const PurchaseDetails = ({ purchaseId, isModal = false, onClose }) => {
 
   if (loading) {
     return (
-      <div className="loading-container">
+      <div className="loading-container" role="status" aria-live="polite">
         <div className="loading-spinner"></div>
         <p>Loading purchase details...</p>
       </div>

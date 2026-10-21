@@ -1,6 +1,7 @@
 // src/components/purchase/NewPurchase.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { formatPurchasingCurrency as formatCurrency } from '../../utils/formatters';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faSave,
@@ -526,15 +527,6 @@ const AddPurchase = () => {
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-LK', {
-      style: 'currency',
-      currency: 'LKR',
-      minimumFractionDigits: 4,
-      maximumFractionDigits: 4
-    }).format(amount).replace('LKR', 'Rs.');
   };
 
   const itemOptions = itemsList.map(itm => ({

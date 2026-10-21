@@ -113,7 +113,9 @@ import IncomePage from './components/Income/IncomePage';
 import './App.css';
 import './styles/pages/purchasing-page-ui.css';
 import './styles/pages/fg-finance-ui.css';
-// Must stay the last stylesheet: gives every legacy popup the shared <Modal> look.
+// Gives every legacy popup the shared <Modal> look. Its own selectors are
+// double-class (e.g. `.sl-modal.sl-modal`) so it wins on specificity, not on
+// being imported last - kept last anyway as the conventional place for it.
 import './styles/legacy-dialogs.css';
 import RouteModal from './components/common/RouteModal';
 import useModalRouting, { PageKeyContext } from './components/common/useModalRouting';

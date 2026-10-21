@@ -180,7 +180,7 @@ const WastageReport = () => {
   if (loading) {
     return (
       <div className="page-container">
-        <div className="loading-state">
+        <div className="loading-state" role="status" aria-live="polite">
           <div className="loading-spinner"></div>
           <p>Loading wastage report...</p>
         </div>
@@ -359,7 +359,7 @@ const WastageReport = () => {
             </div>
             <div className="modal-body">
               {modalLoading && (
-                <div className="loading-container">
+                <div className="loading-container" role="status" aria-live="polite">
                   <div className="loading-spinner"></div>
                   <p>Loading details...</p>
                 </div>

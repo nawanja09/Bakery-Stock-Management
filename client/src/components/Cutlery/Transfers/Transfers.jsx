@@ -144,7 +144,7 @@ const Transfers = () => {
   };
 
   if (loading && transfers.length === 0) {
-    return <div className="loading">Loading transfers…</div>;
+    return <div className="loading" role="status" aria-live="polite">Loading transfers…</div>;
   }
 
   return (

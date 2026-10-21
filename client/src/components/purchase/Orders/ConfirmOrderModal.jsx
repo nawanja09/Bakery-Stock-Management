@@ -1,15 +1,19 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import ReactDOM from 'react-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faExclamationTriangle, faTimes } from '@fortawesome/free-solid-svg-icons';
+import useDialog from '../../common/ui/useDialog';
 
 // Shared confirmation dialog for "Cancel Order" and "Order Complete" (spec
 // sections 26/31). `order` supplies the details table; `message` is the
 // exact confirmation copy for the action being confirmed.
 const ConfirmOrderModal = ({ order, message, confirmLabel, onCancel, onConfirm, submitting }) => {
+  const dialogRef = useRef(null);
+  useDialog(dialogRef, { open: true, onClose: submitting ? undefined : onCancel, initialFocus: '.orders-modal-body' });
+
   return ReactDOM.createPortal(
     <div className="orders-modal-overlay" onClick={submitting ? undefined : onCancel}>
-      <div className="orders-modal-content orders-confirm-modal" onClick={(e) => e.stopPropagation()}>
+      <div ref={dialogRef} className="orders-modal-content orders-confirm-modal" role="dialog" aria-modal="true" tabIndex={-1} onClick={(e) => e.stopPropagation()}>
         <div className="orders-modal-header">
           <h2><FontAwesomeIcon icon={faExclamationTriangle} /> Confirm</h2>
           <button type="button" className="orders-modal-close" onClick={onCancel} disabled={submitting}>

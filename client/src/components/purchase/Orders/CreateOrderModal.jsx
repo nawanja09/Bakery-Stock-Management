@@ -1,17 +1,20 @@
 // Create Purchase Order modal - opens over the Low Stock tab without
 // navigating away (spec section 6/7/51).
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import ReactDOM from 'react-dom';
 import Select from 'react-select';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTimes, faBoxes } from '@fortawesome/free-solid-svg-icons';
 import { formatPurchasingNumber } from '../../../utils/formatters';
+import useDialog from '../../common/ui/useDialog';
 
 const CreateOrderModal = ({ item, suppliers, onClose, onSubmit, submitting }) => {
   const [orderQty, setOrderQty] = useState(item.required_qty);
   const [supplierId, setSupplierId] = useState(null);
   const [expectedDate, setExpectedDate] = useState('');
   const [error, setError] = useState('');
+  const dialogRef = useRef(null);
+  useDialog(dialogRef, { open: true, onClose: submitting ? undefined : onClose, initialFocus: '.orders-modal-body' });
 
   const supplierOptions = suppliers.map(s => ({ value: s.id, label: s.name }));
 
@@ -37,9 +40,10 @@ const CreateOrderModal = ({ item, suppliers, onClose, onSubmit, submitting }) =>
     });
   };
 
+  // Data-entry form - no close-on-overlay-click, matching the project convention for form dialogs (see Modal.jsx/RouteModal.jsx).
   return ReactDOM.createPortal(
-    <div className="orders-modal-overlay" onClick={submitting ? undefined : onClose}>
-      <div className="orders-modal-content" onClick={(e) => e.stopPropagation()}>
+    <div className="orders-modal-overlay">
+      <div ref={dialogRef} className="orders-modal-content" role="dialog" aria-modal="true" tabIndex={-1} onClick={(e) => e.stopPropagation()}>
         <div className="orders-modal-header">
           <h2><FontAwesomeIcon icon={faBoxes} /> Create Purchase Order</h2>
           <button type="button" className="orders-modal-close" onClick={onClose} disabled={submitting}>

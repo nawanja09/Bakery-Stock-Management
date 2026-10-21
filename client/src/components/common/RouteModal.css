@@ -6,9 +6,9 @@
   align-items: center;
   justify-content: center;
   padding: clamp(12px, 3vw, 40px);
-  background: rgba(23, 42, 58, 0.48);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  background: var(--overlay-backdrop);
+  backdrop-filter: blur(var(--overlay-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--overlay-backdrop-blur));
   animation: route-modal-fade-in 180ms ease-out;
 }
 

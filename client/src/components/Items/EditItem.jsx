@@ -117,7 +117,7 @@ const EditItem = () => {
   if (loading) {
     return (
       <div className="page-container item-management-page">
-        <div className="loading-state">
+        <div className="loading-state" role="status" aria-live="polite">
           <div className="loading-spinner"></div>
           <p>Loading item details...</p>
         </div>

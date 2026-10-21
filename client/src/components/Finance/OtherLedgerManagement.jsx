@@ -186,7 +186,7 @@ const OtherLedgerManagement = () => {
 
       <div className="card">
         {loading ? (
-          <div className="loading-state"><div className="loading-spinner"></div>Loading Other Ledgers…</div>
+          <div className="loading-state" role="status" aria-live="polite"><div className="loading-spinner"></div>Loading Other Ledgers…</div>
         ) : filteredRecords.length === 0 ? (
           <div className="empty-state">
             <p>{records.length === 0 ? 'No Other Ledgers yet. Add your first one to get started.' : `No results for "${searchTerm}".`}</p>

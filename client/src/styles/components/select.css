@@ -51,7 +51,7 @@
   border-radius: var(--radius-md) !important;
   box-shadow: var(--shadow-lg) !important;
   overflow: hidden;
-  z-index: 100;
+  z-index: var(--z-popover);
 }
 
 .react-select__menu-list {

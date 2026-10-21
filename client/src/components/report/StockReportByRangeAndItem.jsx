@@ -517,7 +517,7 @@ const StockReportByRangeAndItem = () => {
 
       {/* Data Table */}
       {loading ? (
-        <div className="loading-state">Loading data...</div>
+        <div className="loading-state" role="status" aria-live="polite">Loading data...</div>
       ) : stockData.length > 0 ? (
         <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
           <div style={{ overflowX: 'auto' }}>

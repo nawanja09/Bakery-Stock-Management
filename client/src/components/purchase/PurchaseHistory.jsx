@@ -1,6 +1,7 @@
 // src/components/purchase/PurchaseHistory.jsx
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { formatPurchasingCurrency } from '../../utils/formatters';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faSearch,
@@ -54,15 +55,7 @@ dayjs.extend(isYesterday);
 const PAGE_SIZE = 50;
 
 // ─── Helpers (defined once at module level — never recreated) ────────────────
-const formatCurrency = (amount) => {
-  const numAmount = parseFloat(amount) || 0;
-  return new Intl.NumberFormat('en-LK', {
-    style: 'currency',
-    currency: 'LKR',
-    minimumFractionDigits: 4,
-    maximumFractionDigits: 4,
-  }).format(numAmount);
-};
+const formatCurrency = (amount) => formatPurchasingCurrency(parseFloat(amount) || 0);
 
 const formatCompactCurrency = (amount) => {
   const num = parseFloat(amount) || 0;

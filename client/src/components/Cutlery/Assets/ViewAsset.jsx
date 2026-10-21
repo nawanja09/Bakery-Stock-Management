@@ -40,7 +40,7 @@ const ViewAsset = () => {
   };
 
   if (loading) {
-    return <div className="loading">Loading asset details...</div>;
+    return <div className="loading" role="status" aria-live="polite">Loading asset details...</div>;
   }
 
   if (!asset) {

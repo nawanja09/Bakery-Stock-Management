@@ -112,7 +112,7 @@ const WastageHistory = () => {
   };
 
   if (loading) return (
-    <div className="loading-container">
+    <div className="loading-container" role="status" aria-live="polite">
       <div className="loading-spinner"></div>
       <p>Loading wastage records...</p>
     </div>
@@ -220,7 +220,7 @@ const WastageHistory = () => {
             </div>
             <div className="modal-body">
               {modalLoading && (
-                <div className="loading-container">
+                <div className="loading-container" role="status" aria-live="polite">
                   <div className="loading-spinner"></div>
                   <p>Loading details...</p>
                 </div>

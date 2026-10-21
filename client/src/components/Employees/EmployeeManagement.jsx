@@ -11,6 +11,7 @@ import './EmployeeManagement.css';
 import api from '../../api';
 
 import { useConfirm } from '../common/ui';
+import useDialog from '../common/ui/useDialog';
 const EMPTY_FORM = {
   employee_name: '',
   employee_code: '',
@@ -181,6 +182,13 @@ const EmployeeManagement = () => {
     resetForm();
   };
 
+  const addModalRef = useRef(null);
+  const editModalRef = useRef(null);
+  const viewModalRef = useRef(null);
+  useDialog(addModalRef, { open: showAddModal, onClose: submitting ? undefined : closeAllModals, initialFocus: '.em-modal-body' });
+  useDialog(editModalRef, { open: showEditModal && Boolean(currentEmployee), onClose: submitting ? undefined : closeAllModals, initialFocus: '.em-modal-body' });
+  useDialog(viewModalRef, { open: showViewModal && Boolean(currentEmployee), onClose: closeAllModals, initialFocus: '.em-view-body' });
+
   const openAddModal = () => {
     resetForm();
     setShowAddModal(true);
@@ -270,7 +278,7 @@ const EmployeeManagement = () => {
   if (loading) {
     return (
       <div className="page-shell employee-management-container">
-        <div className="loading" style={{ margin: 'auto' }}>Loading employees...</div>
+        <div className="loading" role="status" aria-live="polite" style={{ margin: 'auto' }}>Loading employees...</div>
       </div>
     );
   }
@@ -448,7 +456,7 @@ const EmployeeManagement = () => {
       {/* Add Employee Modal */}
       {showAddModal && (
         <div className="em-modal-overlay">
-          <div className="em-modal-content">
+          <div ref={addModalRef} className="em-modal-content" role="dialog" aria-modal="true" tabIndex={-1}>
             <div className="em-modal-header">
               <h3><FontAwesomeIcon icon={faIdBadge} /> Add Employee</h3>
               <button className="em-btn-close" onClick={closeAllModals}>
@@ -591,7 +599,7 @@ const EmployeeManagement = () => {
       {/* Edit Employee Modal */}
       {showEditModal && currentEmployee && (
         <div className="em-modal-overlay">
-          <div className="em-modal-content">
+          <div ref={editModalRef} className="em-modal-content" role="dialog" aria-modal="true" tabIndex={-1}>
             <div className="em-modal-header">
               <h3><FontAwesomeIcon icon={faEdit} /> Edit Employee</h3>
               <button className="em-btn-close" onClick={closeAllModals}>
@@ -729,7 +737,7 @@ const EmployeeManagement = () => {
       {/* View Employee Modal (read-only) */}
       {showViewModal && currentEmployee && (
         <div className="em-modal-overlay">
-          <div className="em-modal-content">
+          <div ref={viewModalRef} className="em-modal-content" role="dialog" aria-modal="true" tabIndex={-1}>
             <div className="em-modal-header">
               <h3><FontAwesomeIcon icon={faEye} /> Employee Details</h3>
               <button className="em-btn-close" onClick={closeAllModals}>

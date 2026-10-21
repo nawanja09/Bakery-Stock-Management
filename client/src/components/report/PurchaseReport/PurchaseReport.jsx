@@ -425,7 +425,7 @@ const PurchaseReport = () => {
 
       {/* Results */}
       {loading ? (
-        <div className="loading-state">Loading purchase invoices...</div>
+        <div className="loading-state" role="status" aria-live="polite">Loading purchase invoices...</div>
       ) : sortedInvoices.length > 0 ? (
         <>
           <div className="card" style={{ padding: 'var(--spacing-lg)' }}>

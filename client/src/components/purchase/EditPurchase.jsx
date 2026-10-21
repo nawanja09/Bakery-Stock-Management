@@ -13,6 +13,7 @@ import {
   purchaseItemSelectStyles
 } from './PurchaseItemSelect';
 import { fetchVatRate, DEFAULT_VAT_RATE } from '../../utils/vatRate';
+import { formatPurchasingCurrency as formatCurrency } from '../../utils/formatters';
 
 // props.embeddedId / props.onSaved / props.onCancel are optional.
 // When absent (standalone route usage via /purchase/edit/:id), behavior is unchanged.
@@ -520,15 +521,6 @@ const EditPurchase = ({ embeddedId, onSaved, onCancel, isRmAdjustment = false } 
     }
   };
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-LK', {
-      style: 'currency',
-      currency: 'LKR',
-      minimumFractionDigits: 4,
-      maximumFractionDigits: 4
-    }).format(amount).replace('LKR', 'Rs.');
-  };
-
   // Create item options for react-select with proper formatting
   const itemOptions = itemsList.map(item => ({
     value: item.id,
@@ -575,7 +567,7 @@ const EditPurchase = ({ embeddedId, onSaved, onCancel, isRmAdjustment = false } 
 
   if (loading) {
     return (
-      <div className="loading-container">
+      <div className="loading-container" role="status" aria-live="polite">
         <div className="loading-spinner"></div>
         <p>Loading purchase data...</p>
       </div>

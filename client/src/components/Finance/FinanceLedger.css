@@ -27,12 +27,12 @@
 .cash-ledger-page .cash-ledger-header-actions > .btn { flex: 0 0 auto; }
 .cash-ledger-page .cash-ledger-header-actions > .report-filter-select { min-width: 190px; flex: 0 0 190px; }
 .cash-ledger-page .page-header h2 {
-	color: var(--cash-navy) !important;
+	color: var(--cash-navy);
 	font-size: clamp(1.35rem, 2vw, 1.7rem);
 	letter-spacing: -0.01em;
 }
 .cash-ledger-page .page-header h2 svg { color: var(--cash-blue); }
-.cash-ledger-page .cash-ledger-header-actions > label { color: var(--cash-muted) !important; }
+.cash-ledger-page .cash-ledger-header-actions > label { color: var(--cash-muted); }
 
 .cash-ledger-page .card {
 	border-color: var(--cash-border);
@@ -49,8 +49,8 @@
 
 .cash-ledger-balance-card {
 	min-height: 132px;
-	margin-bottom: 0 !important;
-	border-left: 4px solid var(--cash-blue) !important;
+	margin-bottom: 0;
+	border-left: 4px solid var(--cash-blue);
 }
 .cash-ledger-balance-icon {
 	width: 72px;
@@ -60,31 +60,31 @@
 	flex: 0 0 72px;
 	border-radius: 12px;
 	background: var(--cash-blue-soft);
-	color: var(--cash-blue) !important;
-	font-size: 30px !important;
-	opacity: 1 !important;
+	color: var(--cash-blue);
+	font-size: 30px;
+	opacity: 1;
 }
 .cash-ledger-balance-label,
 .cash-ledger-total-label {
-	color: var(--cash-muted) !important;
-	font-size: 0.75rem !important;
-	font-weight: 700 !important;
+	color: var(--cash-muted);
+	font-size: 0.75rem;
+	font-weight: 700;
 	letter-spacing: 0.06em;
 	text-transform: uppercase;
 }
 .cash-ledger-balance-value {
-	color: var(--cash-navy) !important;
-	font-size: clamp(1.75rem, 3vw, 2.15rem) !important;
+	color: var(--cash-navy);
+	font-size: clamp(1.75rem, 3vw, 2.15rem);
 	line-height: 1.2;
 	letter-spacing: -0.02em;
 }
-.cash-ledger-balance-value.is-negative { color: var(--cash-red) !important; }
+.cash-ledger-balance-value.is-negative { color: var(--cash-red); }
 
 .cash-ledger-summary {
-	display: grid !important;
+	display: grid;
 	grid-template-columns: repeat(2, minmax(0, 1fr));
-	gap: 14px !important;
-	margin-bottom: 0 !important;
+	gap: 14px;
+	margin-bottom: 0;
 }
 .cash-ledger-total-card {
 	min-height: 104px;
@@ -100,17 +100,17 @@
 }
 .cash-ledger-debit-card::before { background: var(--cash-green); }
 .cash-ledger-credit-card::before { background: var(--cash-red); }
-.cash-ledger-debit-card .cash-ledger-total-value { color: var(--cash-green) !important; }
-.cash-ledger-credit-card .cash-ledger-total-value { color: var(--cash-red) !important; }
+.cash-ledger-debit-card .cash-ledger-total-value { color: var(--cash-green); }
+.cash-ledger-credit-card .cash-ledger-total-value { color: var(--cash-red); }
 .cash-ledger-total-value {
 	color: var(--cash-navy);
-	font-size: 1.25rem !important;
+	font-size: 1.25rem;
 	line-height: 1.3;
 }
 
 .cash-ledger-page .filters-section {
-	padding: 12px 14px !important;
-	margin-bottom: 0 !important;
+	padding: 12px 14px;
+	margin-bottom: 0;
 	box-shadow: var(--shadow-sm);
 }
 .cash-ledger-page .ledger-filter-row {
@@ -197,9 +197,9 @@
 .cash-ledger-table-card .cash-ledger-table td:nth-child(5) { width: 10%; }
 .cash-ledger-table-card .cash-ledger-table th:nth-child(6),
 .cash-ledger-table-card .cash-ledger-table td:nth-child(6) {
-	width: 17% !important;
-	min-width: 0 !important;
-	max-width: none !important;
+	width: 17%;
+	min-width: 0;
+	max-width: none;
 }
 .cash-ledger-table-card .cash-ledger-table .fl-remark-cell,
 .cash-ledger-table-card .cash-ledger-table .fl-remark-header { overflow-wrap: anywhere; }
@@ -272,7 +272,7 @@
 
 .bank-ledger-page .page-header { min-height: 46px; margin-bottom: 2px; }
 .bank-ledger-page .page-header h2 {
-	color: var(--bank-navy) !important;
+	color: var(--bank-navy);
 	font-size: clamp(1.35rem, 2vw, 1.7rem);
 	letter-spacing: -0.01em;
 }
@@ -286,7 +286,7 @@
 	flex-wrap: nowrap;
 }
 .bank-ledger-page .bank-ledger-header-actions > .btn { flex: 0 0 auto; white-space: nowrap; }
-.bank-ledger-page .bank-ledger-header-actions > label { color: var(--bank-muted) !important; }
+.bank-ledger-page .bank-ledger-header-actions > label { color: var(--bank-muted); }
 .bank-ledger-page .bank-ledger-header-actions > .report-filter-select { min-width: 260px; flex: 0 1 340px; }
 
 .bank-ledger-page .card {
@@ -302,8 +302,8 @@
 }
 .bank-ledger-balance-card {
 	min-height: 132px;
-	margin-bottom: 0 !important;
-	border-left: 4px solid var(--bank-blue) !important;
+	margin-bottom: 0;
+	border-left: 4px solid var(--bank-blue);
 }
 .bank-ledger-balance-icon {
 	width: 72px;
@@ -313,30 +313,30 @@
 	flex: 0 0 72px;
 	border-radius: 12px;
 	background: var(--bank-blue-soft);
-	color: var(--bank-blue) !important;
-	font-size: 30px !important;
-	opacity: 1 !important;
+	color: var(--bank-blue);
+	font-size: 30px;
+	opacity: 1;
 }
 .bank-ledger-balance-label,
 .bank-ledger-total-label {
-	color: var(--bank-muted) !important;
-	font-size: 0.75rem !important;
-	font-weight: 700 !important;
+	color: var(--bank-muted);
+	font-size: 0.75rem;
+	font-weight: 700;
 	letter-spacing: 0.06em;
 	text-transform: uppercase;
 }
 .bank-ledger-balance-value {
-	color: var(--bank-navy) !important;
-	font-size: clamp(1.75rem, 3vw, 2.15rem) !important;
+	color: var(--bank-navy);
+	font-size: clamp(1.75rem, 3vw, 2.15rem);
 	line-height: 1.2;
 	letter-spacing: -0.02em;
 }
-.bank-ledger-balance-value.is-negative { color: var(--bank-red) !important; }
+.bank-ledger-balance-value.is-negative { color: var(--bank-red); }
 .bank-ledger-summary {
-	display: grid !important;
+	display: grid;
 	grid-template-columns: repeat(2, minmax(0, 1fr));
-	gap: 14px !important;
-	margin-bottom: 0 !important;
+	gap: 14px;
+	margin-bottom: 0;
 }
 .bank-ledger-kpi-row:not(:has(.bank-ledger-balance-card)) .bank-ledger-summary { grid-column: 1 / -1; }
 .bank-ledger-total-card {
@@ -353,16 +353,16 @@
 }
 .bank-ledger-debit-card::before { background: var(--bank-green); }
 .bank-ledger-credit-card::before { background: var(--bank-red); }
-.bank-ledger-debit-card .bank-ledger-total-value { color: var(--bank-green) !important; }
-.bank-ledger-credit-card .bank-ledger-total-value { color: var(--bank-red) !important; }
+.bank-ledger-debit-card .bank-ledger-total-value { color: var(--bank-green); }
+.bank-ledger-credit-card .bank-ledger-total-value { color: var(--bank-red); }
 .bank-ledger-total-value {
 	color: var(--bank-navy);
-	font-size: 1.25rem !important;
+	font-size: 1.25rem;
 	line-height: 1.3;
 }
 .bank-ledger-page .filters-section {
-	padding: 12px 14px !important;
-	margin-bottom: 0 !important;
+	padding: 12px 14px;
+	margin-bottom: 0;
 	box-shadow: var(--shadow-sm);
 }
 .bank-ledger-page .ledger-filter-row {
@@ -487,19 +487,19 @@
 
 @media (max-width: 560px) {
 	.bank-ledger-page .page-header {
-		align-items: flex-start !important;
+		align-items: flex-start;
 		flex-direction: column;
 		gap: 12px;
 	}
 	.bank-ledger-page .bank-ledger-header-actions { width: 100%; justify-content: flex-start; }
 	.bank-ledger-page .bank-ledger-header-actions > .btn { flex: 1 1 auto; }
 	.bank-ledger-page .bank-ledger-header-actions > .report-filter-select { min-width: 0; flex: 1 1 100%; width: 100%; }
-	.bank-ledger-balance-card { gap: 14px !important; padding: 18px !important; }
+	.bank-ledger-balance-card { gap: 14px; padding: 18px; }
 	.bank-ledger-balance-icon {
 		width: 56px;
 		height: 56px;
 		flex-basis: 56px;
-		font-size: 24px !important;
+		font-size: 24px;
 	}
 	.bank-ledger-summary { grid-template-columns: 1fr; }
 	.bank-ledger-kpi-row { grid-template-columns: 1fr; }
@@ -516,17 +516,17 @@
 
 @media (max-width: 560px) {
 	.cash-ledger-page .page-header {
-		align-items: flex-start !important;
+		align-items: flex-start;
 		flex-direction: column;
 		gap: 12px;
 	}
 	.cash-ledger-page .cash-ledger-header-actions { width: 100%; overflow-x: auto; }
-	.cash-ledger-balance-card { gap: 14px !important; padding: 18px !important; }
+	.cash-ledger-balance-card { gap: 14px; padding: 18px; }
 	.cash-ledger-balance-icon {
 		width: 56px;
 		height: 56px;
 		flex-basis: 56px;
-		font-size: 24px !important;
+		font-size: 24px;
 	}
 	.cash-ledger-summary { grid-template-columns: 1fr; }
 	.cash-ledger-kpi-row { grid-template-columns: 1fr; }

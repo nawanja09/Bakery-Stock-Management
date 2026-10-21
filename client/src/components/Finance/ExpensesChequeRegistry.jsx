@@ -1,5 +1,6 @@
 // client/src/components/Finance/ExpensesChequeRegistry.jsx
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import useDialog from '../common/ui/useDialog';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faMoneyCheck,
@@ -167,6 +168,9 @@ const ExpensesChequeRegistry = () => {
     setReleasingRow(null);
     setIsReleasing(false);
   };
+
+  const releaseModalRef = useRef(null);
+  useDialog(releaseModalRef, { open: Boolean(releasingRow), onClose: isReleasing ? undefined : closeReleaseModal, initialFocus: '.ecr-release-modal-body' });
 
   const handleConfirmRelease = async () => {
     if (!releasingRow) return;
@@ -785,9 +789,10 @@ const ExpensesChequeRegistry = () => {
       </div>
 
       {/* ════════════ Quick Release Modal ════════════ */}
+      {/* Has a required date field - no close-on-overlay-click, matching the project convention for data-entry dialogs. */}
       {releasingRow && (
-        <div className="ecr-release-modal-overlay" onClick={closeReleaseModal}>
-          <div className="ecr-release-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="ecr-release-modal-overlay">
+          <div ref={releaseModalRef} className="ecr-release-modal" role="dialog" aria-modal="true" tabIndex={-1} onClick={(e) => e.stopPropagation()}>
             <div className="ecr-release-modal-header">
               <h3>
                 <FontAwesomeIcon icon={faCalendarCheck} style={{ color: '#059669', marginRight: '8px' }} />

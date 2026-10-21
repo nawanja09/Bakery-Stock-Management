@@ -156,8 +156,9 @@ const InhandEntryForm = ({ existingEntry = null, onClose, onSaved }) => {
 
   const selectedBank = bankAccounts.find(b => String(b.id) === String(formData.bank_id));
 
+  // Data-entry form - no close-on-overlay-click, matching the project convention for form dialogs.
   return (
-    <div className="ih-form-overlay" onClick={e => { if (e.target === e.currentTarget) onClose?.(); }}>
+    <div className="ih-form-overlay">
       <div className="ih-form-modal">
         {/* Header */}
         <div className="ih-form-header">

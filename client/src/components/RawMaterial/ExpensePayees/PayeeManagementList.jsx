@@ -142,7 +142,7 @@ const PayeeManagementList = () => {
 
       <div className="ui-table-card">
         {loading ? (
-          <div className="loading-state">
+          <div className="loading-state" role="status" aria-live="polite">
             <div className="loading-spinner"></div>
             Loading {pageTitle}...
           </div>

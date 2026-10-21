@@ -279,7 +279,7 @@ const StockReport = () => {
       </div>
 
       {loading ? (
-        <div className="loading-state">Loading stock data...</div>
+        <div className="loading-state" role="status" aria-live="polite">Loading stock data...</div>
       ) : filteredStockData.length > 0 ? (
         <>
           <div className="card" style={{ padding: 'var(--spacing-lg)' }}>

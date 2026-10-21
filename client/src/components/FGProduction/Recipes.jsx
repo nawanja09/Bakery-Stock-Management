@@ -18,7 +18,8 @@
 // (server-checked; useIntegrationAccess only hides the button).
 // -----------------------------------------------------------------------
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import useDialog from '../common/ui/useDialog';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faPlus, faEdit, faTrash, faFlask, faSave, faTimes, faBoxOpen
@@ -238,16 +239,8 @@ const Recipes = () => {
 
   const closeFgForm = () => setShowFgForm(false);
 
-  useEffect(() => {
-    if (!showFgForm) return undefined;
-
-    const handleEscape = (event) => {
-      if (event.key === 'Escape' && !savingFg) setShowFgForm(false);
-    };
-
-    document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
-  }, [showFgForm, savingFg]);
+  const fgFormModalRef = useRef(null);
+  useDialog(fgFormModalRef, { open: showFgForm, onClose: savingFg ? undefined : closeFgForm, initialFocus: '.fgprod-modal-body' });
 
   const handleFgFormItemChange = (opt) => {
     setFgFormItem(opt);
@@ -361,6 +354,9 @@ const Recipes = () => {
   };
 
   const closeRecipeModal = () => setRecipeModalOpen(false);
+
+  const recipeModalRef = useRef(null);
+  useDialog(recipeModalRef, { open: recipeModalOpen, onClose: savingRecipe ? undefined : closeRecipeModal, initialFocus: '.fgprod-modal-body' });
 
   const handleRecipeRmChange = (selected) => {
     const rmId = selected?.value || '';
@@ -660,9 +656,10 @@ const Recipes = () => {
       )}
 
       {/* FG Create / Edit Modal */}
+      {/* Data-entry form - no close-on-overlay-click, matching the project convention for form dialogs. */}
       {showFgForm && (
-        <div className="fgprod-modal-overlay" onClick={closeFgForm} role="presentation">
-          <div className="fgprod-modal-content" onClick={e => e.stopPropagation()}>
+        <div className="fgprod-modal-overlay" role="presentation">
+          <div ref={fgFormModalRef} className="fgprod-modal-content" role="dialog" aria-modal="true" tabIndex={-1} onClick={e => e.stopPropagation()}>
             <div className="fgprod-modal-header">
               <h3>{fgFormMode === 'create' ? 'New FG Production Item' : 'Edit FG Production Item'}</h3>
               <button className="fgprod-modal-close" onClick={closeFgForm} aria-label="Close form" title="Close form">
@@ -755,10 +752,10 @@ const Recipes = () => {
         </div>
       )}
 
-      {/* Recipe Add / Edit Modal */}
+      {/* Recipe Add / Edit Modal - data-entry form, no close-on-overlay-click, matching the project convention for form dialogs. */}
       {recipeModalOpen && (
-        <div className="fgprod-modal-overlay" onClick={closeRecipeModal}>
-          <div className="fgprod-modal-content" onClick={e => e.stopPropagation()}>
+        <div className="fgprod-modal-overlay">
+          <div ref={recipeModalRef} className="fgprod-modal-content" role="dialog" aria-modal="true" tabIndex={-1} onClick={e => e.stopPropagation()}>
             <div className="fgprod-modal-header">
               <h3>{recipeModalMode === 'add' ? 'Add RM Recipe' : 'Edit RM Recipe'}</h3>
               <button className="fgprod-modal-close" onClick={closeRecipeModal}>

@@ -195,7 +195,7 @@ const LastIssueDateReport = () => {
       {error && <div className="error-message">{error}</div>}
 
       {loading ? (
-        <div className="loading">Loading last issue date data...</div>
+        <div className="loading" role="status" aria-live="polite">Loading last issue date data...</div>
       ) : filteredRows.length > 0 ? (
         <>
           <div className="table-container">

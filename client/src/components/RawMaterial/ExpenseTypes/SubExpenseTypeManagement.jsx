@@ -162,7 +162,7 @@ const SubExpenseTypeManagement = () => {
       )}
 
       <div className="card">
-        {isLoading ? <div className="loading-state"><div className="loading-spinner" /> Loading sub expense types...</div> : (
+        {isLoading ? <div className="loading-state" role="status" aria-live="polite"><div className="loading-spinner" /> Loading sub expense types...</div> : (
           <div className="overflow-x-auto">
             <table className="erp-data-table">
               <thead><tr><th>EXPENSES TYPE</th><th>SUB EXPENSES TYPE</th><th>STATUS</th><th style={{ textAlign: 'right' }}>ACTIONS</th></tr></thead>
