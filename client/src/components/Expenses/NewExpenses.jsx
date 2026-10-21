@@ -1548,7 +1548,7 @@ const NewExpenses = () => {
                       onChange={handlePaymentTypeChange} className="payment-input" required
                     >
                       <option value="">Select Payment Type</option>
-                      {paymentTypes.filter(pt => pt.name.toLowerCase() !== 'cash').map(pt => (
+                      {paymentTypes.map(pt => (
                         <option key={pt.id} value={pt.id}>{pt.name}</option>
                       ))}
                     </select>
