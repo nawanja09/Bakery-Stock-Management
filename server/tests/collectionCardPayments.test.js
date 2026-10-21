@@ -149,6 +149,19 @@ test('approve: every POS card payment becomes its own Card Ledger entry; the tot
   assert.equal(result.approved[0].postings[0].cardPayments, 4);
 });
 
+test('approve: an order_advance dated days after the shift is still posted on the SHIFT\'s date, never its own', async () => {
+  // Verified against the live POS: an order_advance can carry the date of the
+  // FUTURE order it is for (here 25 Oct), not the day the card was actually
+  // swiped (the shift closed 6 Oct) - it is identified by the shift it was
+  // collected in, never by this date.
+  const payments = [payment({ type: 'order_advance', sale_id: null, order_id: 802, receipt_no: null, amount: 1000, date_time: '2026-10-25T14:30:00.000000Z' })];
+  const { connection, writes } = makeConnection({ payload: shiftPayload(payments, 1000), cardAmount: 1000 });
+  await approveCollections(connection, { items: [{ id: 7, version: 'v1', card_bank_account_id: 3 }], userId: 9 });
+  assert.equal(writes.card[0].params[2], '2026-10-06'); // Card Ledger transaction_date = the shift's date
+  assert.equal(writes.ccp[0][9], '2026-10-06'); // collection_card_payments.transaction_date = the shift's date
+  assert.equal(writes.ccp[0][8], '2026-10-25T14:30:00.000000Z'); // pos_date_time keeps the POS value unchanged
+});
+
 test('approve: payments that do not add up to the card total -> refused, nothing written', async () => {
   const { connection, writes } = makeConnection({ payload: shiftPayload(), cardAmount: CARD_TOTAL + 100 });
   await assert.rejects(

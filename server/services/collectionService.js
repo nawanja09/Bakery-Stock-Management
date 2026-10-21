@@ -234,10 +234,20 @@ const cardPaymentRemark = (ctx, p) => {
     + `${time ? ` ${time}` : ''} - ${ctx.ref}${ctx.row.pos_branch_name ? ` - ${ctx.row.pos_branch_name}` : ''}`;
 };
 
+// The Card Ledger transaction date of one card payment. For a "sale" its own
+// date_time is the actual payment time and is used (falling back to the
+// shift's date). For an "order_advance" date_time is the FUTURE order's own
+// date (verified: an advance collected in shift X can carry an order date
+// days later) - never the time the money was received - so it is only ever
+// identified by the shift it was collected in (shift_id), never by its own
+// date: the shift's collection date is used instead.
+const cardPaymentDate = (p, ctx) => (p.pos_type === 'order_advance' ? ctx.date : (p.date || ctx.date));
+
 const postShiftCardPayments = async (connection, ctx) => {
   for (const p of ctx.cardPayments) {
+    const date = cardPaymentDate(p, ctx);
     const cardId = await createPendingCardTransaction(connection, {
-      companyId: ctx.companyId, bankId: ctx.bankId, date: p.date || ctx.date, amount: p.amount,
+      companyId: ctx.companyId, bankId: ctx.bankId, date, amount: p.amount,
       referenceNumber: cardPaymentReference(ctx.ref, p), remark: cardPaymentRemark(ctx, p).slice(0, 255),
       departmentId: ctx.row.department_id, shiftNo: ctx.row.shift_no,
       createdBy: ctx.userId
@@ -249,7 +259,7 @@ const postShiftCardPayments = async (connection, ctx) => {
             pos_payment_method, pos_date_time, transaction_date, amount, card_transaction_id, created_by)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [ctx.row.id, ctx.lineId, posCardKey(ctx.row, p), p.pos_type, p.sale_id, p.order_id, p.receipt_no,
-          p.payment_method, p.date_time, p.date || ctx.date, p.amount, cardId, ctx.userId]
+          p.payment_method, p.date_time, date, p.amount, cardId, ctx.userId]
       );
     } catch (error) {
       if (error.code === 'ER_DUP_ENTRY') {
