@@ -383,6 +383,7 @@ const NavigationBar = () => {
   const renderVATContent = () => (
     <>
       {can('/reports/vat') && <li><NavLink to="/reports/vat" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faCalculator} /></span><span>VAT Purchasing Report</span></NavLink></li>}
+      {can('/reports/vat-exempt') && <li><NavLink to="/reports/vat-exempt" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faCalculator} /></span><span>VAT Exempt Purchasing Report</span></NavLink></li>}
       {can('/reports/purchase-vat') && <li><NavLink to="/reports/purchase-vat" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faCalculator} /></span><span>Return VAT Report</span></NavLink></li>}
     </>
   );

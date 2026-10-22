@@ -1567,6 +1567,96 @@ const getPurchaseReport = async (req, res) => {
 };
 
 // =============================================
+// VAT Exempt Purchasing Report (item-line listing)
+// =============================================
+// One row per purchased item line, carrying the item's own VAT status
+// (Items Management -> VAT Applicable / VAT Not Applicable). Defaults to
+// VAT Not Applicable (i.e. VAT-exempt) lines only, matching the report's
+// name; the vatStatus filter can widen it to VAT Applicable or All, e.g.
+// to compare the two side by side.
+const getVatExemptPurchasingReport = async (req, res) => {
+  const { startDate, endDate, companyId, supplierId, itemId } = req.query;
+  const vatStatus = String(req.query.vatStatus || 'not_applicable').toLowerCase();
+
+  try {
+    let query = `
+      SELECT
+        p.id AS purchase_id,
+        COALESCE(p.invoice_date, p.purchase_date) AS invoice_date,
+        p.invoice_no,
+        s.id AS supplier_id,
+        s.name AS supplier_name,
+        p.company_id,
+        COALESCE(c.name, 'N/A') AS company_name,
+        i.id AS item_id,
+        i.item_code,
+        COALESCE(i.name, pi.item_name) AS item_name,
+        COALESCE(i.vat_applicable, 0) AS vat_applicable,
+        pi.quantity,
+        pi.unit_price,
+        (pi.quantity * pi.unit_price) AS value_of_purchase
+      FROM purchases p
+      JOIN purchase_items pi ON pi.purchase_id = p.id
+      LEFT JOIN items i ON pi.item_id = i.id
+      JOIN supplier s ON p.supplier_id = s.id
+      LEFT JOIN company c ON p.company_id = c.id
+      WHERE ${RULES.purchases('p')}
+    `;
+
+    const params = [];
+
+    if (startDate) {
+      query += ' AND COALESCE(p.invoice_date, p.purchase_date) >= ?';
+      params.push(startDate);
+    }
+
+    if (endDate) {
+      query += ' AND COALESCE(p.invoice_date, p.purchase_date) < DATE_ADD(?, INTERVAL 1 DAY)';
+      params.push(endDate);
+    }
+
+    if (companyId) {
+      query += ' AND p.company_id = ?';
+      params.push(companyId);
+    }
+
+    if (supplierId) {
+      query += ' AND p.supplier_id = ?';
+      params.push(supplierId);
+    }
+
+    if (itemId && itemId !== 'all') {
+      query += ' AND pi.item_id = ?';
+      params.push(itemId);
+    }
+
+    if (vatStatus === 'applicable') {
+      query += ' AND COALESCE(i.vat_applicable, 0) = 1';
+    } else if (vatStatus === 'not_applicable') {
+      query += ' AND COALESCE(i.vat_applicable, 0) = 0';
+    }
+    // vatStatus === 'all' -> no VAT status filter
+
+    query += ' ORDER BY COALESCE(p.invoice_date, p.purchase_date) ASC, p.id ASC, i.name ASC';
+
+    const [rows] = await pool.query(query, params);
+
+    const data = rows.map((row) => ({
+      ...row,
+      vat_applicable: Boolean(row.vat_applicable),
+      value_of_purchase: roundMoney(row.value_of_purchase)
+    }));
+
+    const totalValue = roundMoney(moneyMath.sum(data, (r) => r.value_of_purchase));
+
+    res.json({ data, totalValue, vatStatus });
+  } catch (error) {
+    console.error('Error generating VAT exempt purchasing report:', error);
+    sendServerError(res, error);
+  }
+};
+
+// =============================================
 // Expenses Report: unified Petty Cash + Other (New Expenses) + Bank Charges listing
 // with Company / Date Range / Payee / Type filters.
 // =============================================
@@ -2133,6 +2223,7 @@ module.exports = {
   getDailyPurchaseReturnTransactions,
   getDepartmentReturnItemWiseReport,
   getPurchaseReport,
+  getVatExemptPurchasingReport,
   getExpensesReport,
   getExpenseSummaryReport,
   getExpenseSummaryDetails

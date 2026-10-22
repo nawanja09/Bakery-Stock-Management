@@ -53,6 +53,7 @@ import Damages from './components/Cutlery/Damages/Damages';
 import CutleryStockReport from './components/Cutlery/Reports/CutleryStockReport';
 
 import VATReport from './components/report/VATReport';
+import VATExemptPurchasingReport from './components/report/VATExemptPurchasingReport';
 
 import AddPurchaseReturn from './components/purchasereturn/AddPurchaseReturn';
 import PurchaseReturnHistory from './components/purchasereturn/PurchaseReturnHistory';
@@ -280,6 +281,7 @@ export const AppRoutes = () => {
             <Route path="cutlery/reports/stock" element={<CutleryStockReport />} />
 
             <Route path="reports/vat" element={<VATReport />} />
+            <Route path="reports/vat-exempt" element={<VATExemptPurchasingReport />} />
             <Route path="purchase-returns/history" element={<RawMaterialRoute><PurchaseReturnHistory /></RawMaterialRoute>} />
             <Route path="reports/purchase-vat" element={<PurchaseVATReport />} />
 

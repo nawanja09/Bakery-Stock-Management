@@ -24,6 +24,9 @@ router.get('/last-issue-date', reportController.getLastIssueDateReport);
 // Purchase Report: invoice-level listing with date range / company / supplier / payment method filters
 router.get('/purchase-report', reportController.getPurchaseReport);
 
+// VAT Exempt Purchasing Report: item-line listing filtered by the item's VAT status
+router.get('/vat-exempt-purchasing', reportController.getVatExemptPurchasingReport);
+
 // Expenses Report: unified Petty Cash + Other expenses with company / date range / payee / type filters
 router.get('/expenses-report', reportController.getExpensesReport);
 

@@ -222,6 +222,7 @@ export const ROUTE_RULES = [
   rule('/fg-production', { all: [M.FG_PRODUCTION] }),
   rule('/adjustments', { all: [M.ADJUSTMENTS] }),
   rule('/reports/vat', { all: [M.VAT] }),
+  rule('/reports/vat-exempt', { all: [M.VAT] }),
   rule('/reports/purchase-vat', { all: [M.VAT] }),
   rule('/analyst', { all: [M.ANALYST] }),
 
