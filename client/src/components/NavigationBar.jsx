@@ -18,6 +18,7 @@ import {
   faTruck,
   faBars,
   faCalculator,
+  faTags,
   faClipboardList,
   faUndo,
   faMapMarkerAlt,
@@ -108,6 +109,7 @@ const NavigationBar = () => {
                path.startsWith('/reports/stock') ||
                path.startsWith('/reports/department') || path.startsWith('/reports/purchasing') ||
                path.startsWith('/reports/purchase-report') ||
+               path.startsWith('/reports/discounted-purchases') ||
                path.startsWith('/reports/wastage') ||
                path.startsWith('/purchase-returns') || path.startsWith('/opening')) {
       setActiveModule('raw');
@@ -245,7 +247,7 @@ const NavigationBar = () => {
       {can('/returns/add') && <li><NavLink to="/returns/add" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faUndo} /></span><span>Department Return</span></NavLink></li>}
 
       {/* Reports (heading) */}
-      {canAny(['/reports/stock', '/reports/stock/items', '/purchase/history', '/reports/purchasing', '/reports/purchase-report', '/issuance/history', '/reports/department', '/wastage/history', '/reports/wastage', '/returns/history', '/reports/department-return-item-wise']) && (
+      {canAny(['/reports/stock', '/reports/stock/items', '/purchase/history', '/reports/purchasing', '/reports/purchase-report', '/reports/discounted-purchases', '/issuance/history', '/reports/department', '/wastage/history', '/reports/wastage', '/returns/history', '/reports/department-return-item-wise']) && (
         <li className={`dropdown ${activeDropdown === 'reports' ? 'active' : ''}`}>
           <div className="dropdown-header" onClick={() => toggleDropdown('reports')}>
             <span className="icon-container"><FontAwesomeIcon icon={faChartBar} /></span>
@@ -259,6 +261,7 @@ const NavigationBar = () => {
               {can('/purchase/history') && <li><NavLink to="/purchase/history" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faFileInvoice} /></span><span>Purchasing Summary</span></NavLink></li>}
               {can('/reports/purchasing') && <li><NavLink to="/reports/purchasing" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faShoppingCart} /></span><span>Purchasing Item Detail</span></NavLink></li>}
               {can('/reports/purchase-report') && <li><NavLink to="/reports/purchase-report" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faFileInvoice} /></span><span>Purchase Report</span></NavLink></li>}
+              {can('/reports/discounted-purchases') && <li><NavLink to="/reports/discounted-purchases" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faTags} /></span><span>Discounted Purchases Report</span></NavLink></li>}
               {can('/issuance/history') && <li><NavLink to="/issuance/history" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faHistory} /></span><span>RM Issue Summary</span></NavLink></li>}
               {can('/reports/department') && <li><NavLink to="/reports/department" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faShareSquare} /></span><span>RM Issue Item Detail</span></NavLink></li>}
               {can('/wastage/history') && <li><NavLink to="/wastage/history" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span className="icon-container"><FontAwesomeIcon icon={faHistory} /></span><span>RM Wastage Summary</span></NavLink></li>}

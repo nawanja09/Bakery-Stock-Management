@@ -201,6 +201,7 @@ export const ROUTE_RULES = [
   rule('/reports/department-return-item-wise', { all: RM }),
   rule('/reports/purchasing', { all: RM }),
   rule('/reports/purchase-report', { all: RM }),
+  rule('/reports/discounted-purchases', { all: RM }),
   rule('/reports/wastage', { all: RM }),
   rule('/analysis', { all: RM }),
 

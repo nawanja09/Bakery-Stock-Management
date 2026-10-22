@@ -1657,6 +1657,83 @@ const getVatExemptPurchasingReport = async (req, res) => {
 };
 
 // =============================================
+// Discounted Purchases Report: every Record Payment that applied a "Discount
+// Amount" to an invoice (purchaseController.makePayment / purchase_payment_allocations.
+// discount_amount). One row per invoice per payment event that carried a discount.
+// =============================================
+const getDiscountedPurchasesReport = async (req, res) => {
+  const { startDate, endDate, companyId, supplierId } = req.query;
+
+  try {
+    let query = `
+      SELECT
+        p.id AS purchase_id,
+        COALESCE(p.invoice_date, p.purchase_date) AS invoice_date,
+        p.invoice_no,
+        s.id AS supplier_id,
+        s.name AS supplier_name,
+        p.company_id,
+        COALESCE(c.name, 'N/A') AS company_name,
+        ph.payment_date,
+        ph.payment_method,
+        COALESCE(NULLIF(p.total_with_vat, 0), NULLIF(p.bill_amount, 0), COALESCE(p.subtotal, 0) + COALESCE(p.vat_amount, 0)) AS bill_amount,
+        (ppa.allocated_amount - ppa.discount_amount) AS payment_amount,
+        ppa.discount_amount AS discount_amount,
+        p.balance_amount AS balance_due
+      FROM purchase_payment_allocations ppa
+      JOIN payment_history ph ON ph.id = ppa.payment_history_id
+      JOIN purchases p ON p.id = ppa.purchase_id
+      JOIN supplier s ON s.id = p.supplier_id
+      LEFT JOIN company c ON c.id = p.company_id
+      WHERE ppa.discount_amount > 0.001
+        AND ${RULES.purchases('p')}
+    `;
+
+    const params = [];
+
+    if (startDate) {
+      query += ' AND ph.payment_date >= ?';
+      params.push(startDate);
+    }
+
+    if (endDate) {
+      query += ' AND ph.payment_date < DATE_ADD(?, INTERVAL 1 DAY)';
+      params.push(endDate);
+    }
+
+    if (companyId) {
+      query += ' AND p.company_id = ?';
+      params.push(companyId);
+    }
+
+    if (supplierId) {
+      query += ' AND p.supplier_id = ?';
+      params.push(supplierId);
+    }
+
+    query += ' ORDER BY ph.payment_date DESC, p.invoice_no ASC';
+
+    const [rows] = await pool.query(query, params);
+
+    const data = rows.map((row) => ({
+      ...row,
+      bill_amount: roundMoney(row.bill_amount),
+      payment_amount: roundMoney(row.payment_amount),
+      discount_amount: roundMoney(row.discount_amount),
+      balance_due: roundMoney(row.balance_due)
+    }));
+
+    const totalDiscount = roundMoney(moneyMath.sum(data, (r) => r.discount_amount));
+    const totalPaymentAmount = roundMoney(moneyMath.sum(data, (r) => r.payment_amount));
+
+    res.json({ data, totalDiscount, totalPaymentAmount });
+  } catch (error) {
+    console.error('Error generating discounted purchases report:', error);
+    sendServerError(res, error);
+  }
+};
+
+// =============================================
 // Expenses Report: unified Petty Cash + Other (New Expenses) + Bank Charges listing
 // with Company / Date Range / Payee / Type filters.
 // =============================================
@@ -2224,6 +2301,7 @@ module.exports = {
   getDepartmentReturnItemWiseReport,
   getPurchaseReport,
   getVatExemptPurchasingReport,
+  getDiscountedPurchasesReport,
   getExpensesReport,
   getExpenseSummaryReport,
   getExpenseSummaryDetails

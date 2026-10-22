@@ -518,6 +518,23 @@ const ensurePaymentHistorySchema = async () => {
   } catch (error) {
     console.warn('payment_history settlement methods check skipped:', error.message);
   }
+
+  // Record Payment form's optional "Discount Amount" - purchaseController.makePayment,
+  // migrations/043_add_discount_amount_to_payments.sql.
+  try {
+    await pool.query('ALTER TABLE payment_history ADD COLUMN IF NOT EXISTS discount_amount DECIMAL(16,4) NOT NULL DEFAULT 0.0000 AFTER amount');
+  } catch (error) {
+    try {
+      await pool.query('ALTER TABLE payment_history ADD COLUMN discount_amount DECIMAL(16,4) NOT NULL DEFAULT 0.0000 AFTER amount');
+    } catch (_) {}
+  }
+  try {
+    await pool.query('ALTER TABLE purchase_payment_allocations ADD COLUMN IF NOT EXISTS discount_amount DECIMAL(16,4) NOT NULL DEFAULT 0.0000 AFTER allocated_amount');
+  } catch (error) {
+    try {
+      await pool.query('ALTER TABLE purchase_payment_allocations ADD COLUMN discount_amount DECIMAL(16,4) NOT NULL DEFAULT 0.0000 AFTER allocated_amount');
+    } catch (_) {}
+  }
 };
 
 // Resolves once payment_history has its optional columns - tests/db wait for it.

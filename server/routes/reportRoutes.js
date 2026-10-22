@@ -27,6 +27,9 @@ router.get('/purchase-report', reportController.getPurchaseReport);
 // VAT Exempt Purchasing Report: item-line listing filtered by the item's VAT status
 router.get('/vat-exempt-purchasing', reportController.getVatExemptPurchasingReport);
 
+// Discounted Purchases Report: invoices that had a Discount Amount applied via Record Payment
+router.get('/discounted-purchases', reportController.getDiscountedPurchasesReport);
+
 // Expenses Report: unified Petty Cash + Other expenses with company / date range / payee / type filters
 router.get('/expenses-report', reportController.getExpensesReport);
 

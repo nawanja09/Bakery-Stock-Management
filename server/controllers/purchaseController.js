@@ -873,6 +873,7 @@ const makePayment = async (req, res) => {
   const {
     payment_date,
     amount,
+    discount_amount,
     payment_method,
     check_number,
     voucher_number,
@@ -892,11 +893,29 @@ const makePayment = async (req, res) => {
   if (amount !== undefined && amount !== null && amount !== '' && !moneyMath.isAmount(amount)) {
     return res.status(400).json({ error: 'amount must be a valid amount' });
   }
+  // Discount Amount (Record Payment form) is optional - blank/zero is fine,
+  // but anything provided must be a valid, non-negative amount.
+  if (discount_amount !== undefined && discount_amount !== null && discount_amount !== '') {
+    if (!moneyMath.isAmount(discount_amount)) {
+      return res.status(400).json({ error: 'discount_amount must be a valid amount' });
+    }
+    if (parseFloat(discount_amount) < 0) {
+      return res.status(400).json({ error: 'discount_amount cannot be negative' });
+    }
+  }
   if (Array.isArray(invoice_allocations)) {
     for (const allocation of invoice_allocations) {
       if (allocation && allocation.amount !== undefined && allocation.amount !== null && allocation.amount !== ''
         && !moneyMath.isAmount(allocation.amount)) {
         return res.status(400).json({ error: 'invoice_allocations[].amount must be a valid amount' });
+      }
+      if (allocation && allocation.discount !== undefined && allocation.discount !== null && allocation.discount !== '') {
+        if (!moneyMath.isAmount(allocation.discount)) {
+          return res.status(400).json({ error: 'invoice_allocations[].discount must be a valid amount' });
+        }
+        if (parseFloat(allocation.discount) < 0) {
+          return res.status(400).json({ error: 'invoice_allocations[].discount cannot be negative' });
+        }
       }
     }
   }
@@ -908,14 +927,16 @@ const makePayment = async (req, res) => {
     return res.status(error.status).json({ error: error.message });
   }
 
-  // One entry per invoice, amounts in 1/10000 units.
+  // One entry per invoice, amounts in 1/10000 units. discountUnits is the
+  // portion of that invoice's reduction that is a discount, not cash paid.
   const allocations = (Array.isArray(invoice_allocations) && invoice_allocations.length > 0
     ? invoice_allocations.map((allocation) => ({
       purchase_id: Number(allocation?.purchase_id || allocation?.id),
-      units: toUnits(allocation?.amount)
+      units: toUnits(allocation?.amount),
+      discountUnits: toUnits(allocation?.discount)
     }))
-    : id ? [{ purchase_id: Number(id), units: toUnits(amount) }] : []
-  ).filter((allocation) => allocation.units > 0);
+    : id ? [{ purchase_id: Number(id), units: toUnits(amount), discountUnits: toUnits(discount_amount) }] : []
+  ).filter((allocation) => allocation.units > 0 || allocation.discountUnits > 0);
 
   if (!payment_date) {
     return res.status(400).json({ error: 'Payment date is required' });
@@ -1025,22 +1046,34 @@ const makePayment = async (req, res) => {
         connection, currentPurchase.id, invoiceTotal, currentPurchase.paid_amount
       );
       const outstandingUnits = toUnits(reconciled.balance_amount);
-      if (allocation.units > outstandingUnits + UNIT_TOLERANCE) {
+      // The discount is not "excess" credit like an overpayment - it can only
+      // reduce what this invoice actually still owes, same as the payment.
+      if (allocation.units + allocation.discountUnits > outstandingUnits + UNIT_TOLERANCE) {
         throw new PaymentRequestError(409,
           `Invoice ${currentPurchase.invoice_no} owes Rs. ${fromUnits(Math.max(outstandingUnits, 0)).toFixed(2)}, `
-          + `less than the Rs. ${fromUnits(allocation.units).toFixed(2)} allocated to it - someone may have just paid it. `
-          + 'Refresh the invoices and try again.');
+          + `less than the Rs. ${fromUnits(allocation.units + allocation.discountUnits).toFixed(2)} (payment + discount) allocated to it - `
+          + 'someone may have just paid it. Refresh the invoices and try again.');
       }
       const applyUnits = Math.min(allocation.units, outstandingUnits);
-      if (applyUnits <= 0) continue;
-      plans.push({ purchase: currentPurchase, outstandingUnits, paidUnits: toUnits(reconciled.paid_amount), applyUnits });
+      const applyDiscountUnits = Math.min(allocation.discountUnits, outstandingUnits - applyUnits);
+      if (applyUnits <= 0 && applyDiscountUnits <= 0) continue;
+      plans.push({
+        purchase: currentPurchase, outstandingUnits, paidUnits: toUnits(reconciled.paid_amount), applyUnits, applyDiscountUnits
+      });
     }
 
     const appliedUnits = plans.reduce((sum, plan) => sum + plan.applyUnits, 0);
     if (appliedUnits <= 0) {
       throw new PaymentRequestError(400, 'Payment amount must be greater than 0');
     }
+    const appliedDiscountUnits = plans.reduce((sum, plan) => sum + plan.applyDiscountUnits, 0);
+    // Cash actually paid (posted to the Cash/Bank ledger) - the discount never moves money.
     const appliedAmount = fromUnits(appliedUnits);
+    const appliedDiscountAmount = fromUnits(appliedDiscountUnits);
+    // What payment_history.amount / purchase_payment_allocations.allocated_amount store:
+    // the total this payment event credited to the invoice(s), cash + discount, so every
+    // existing paid/due aggregation (which reads those columns) sees the discount too.
+    const totalCreditedAmount = fromUnits(appliedUnits + appliedDiscountUnits);
     const excessAmount = fromUnits(excessUnits);
 
     const supplierIdForCredit = plans[0].purchase.supplier_id || null;
@@ -1048,15 +1081,17 @@ const makePayment = async (req, res) => {
     const paymentHistoryPurchaseId = allocations[0].purchase_id;
     const normalizedPaymentMethodForHistory = normalizePaymentMethodForHistory(normalizedPaymentMethod);
 
-    // payment_history.amount = what reached the invoices. Any excess is its own
-    // supplier-credit record below, so the Supplier Ledger never counts it twice.
+    // payment_history.amount = total credited to the invoice(s) (cash + discount), so
+    // every existing paid/due aggregation that reads this column sees the discount too.
+    // discount_amount keeps just the discount portion for audit/display. Any excess
+    // (cash only) is its own supplier-credit record below, counted once, not twice.
     let paymentResult;
     try {
       [paymentResult] = await connection.query(
         `INSERT INTO payment_history
-           (purchase_id, payment_date, amount, payment_method, check_number, bank_id, voucher_number, notes, created_by, request_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [paymentHistoryPurchaseId, payment_date, appliedAmount, normalizedPaymentMethodForHistory,
+           (purchase_id, payment_date, amount, discount_amount, payment_method, check_number, bank_id, voucher_number, notes, created_by, request_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [paymentHistoryPurchaseId, payment_date, totalCreditedAmount, appliedDiscountAmount, normalizedPaymentMethodForHistory,
          check_number || null, bank_id || null, voucher_number || null, notes || null, resolvedCreatedBy, requestId]
       );
     } catch (colErr) {
@@ -1066,7 +1101,7 @@ const makePayment = async (req, res) => {
         `INSERT INTO payment_history
            (purchase_id, payment_date, amount, payment_method, check_number, notes, created_by)
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [paymentHistoryPurchaseId, payment_date, appliedAmount, normalizedPaymentMethodForHistory,
+        [paymentHistoryPurchaseId, payment_date, totalCreditedAmount, normalizedPaymentMethodForHistory,
          check_number || null, notes || null, resolvedCreatedBy]
       );
     }
@@ -1075,9 +1110,9 @@ const makePayment = async (req, res) => {
     const updatedInvoices = [];
     const invoiceNumbersForLedger = [];
 
-    for (const { purchase, outstandingUnits, paidUnits, applyUnits } of plans) {
-      const newBalanceUnits = outstandingUnits - applyUnits;
-      const newPaidUnits = paidUnits + applyUnits;
+    for (const { purchase, outstandingUnits, paidUnits, applyUnits, applyDiscountUnits } of plans) {
+      const newBalanceUnits = outstandingUnits - applyUnits - applyDiscountUnits;
+      const newPaidUnits = paidUnits + applyUnits + applyDiscountUnits;
       let newPaymentStatus = 'Non-Paid';
       if (newBalanceUnits <= 10) {
         newPaymentStatus = 'Paid';
@@ -1095,11 +1130,20 @@ const makePayment = async (req, res) => {
         [fromUnits(newPaidUnits), fromUnits(newBalanceUnits), newBalanceUnits > 0 ? 1 : 0, newPaymentStatus, purchase.id]
       );
 
-      await connection.query(
-        `INSERT INTO purchase_payment_allocations (payment_history_id, purchase_id, allocated_amount)
-         VALUES (?, ?, ?)`,
-        [paymentHistoryId, purchase.id, fromUnits(applyUnits)]
-      );
+      try {
+        await connection.query(
+          `INSERT INTO purchase_payment_allocations (payment_history_id, purchase_id, allocated_amount, discount_amount)
+           VALUES (?, ?, ?, ?)`,
+          [paymentHistoryId, purchase.id, fromUnits(applyUnits + applyDiscountUnits), fromUnits(applyDiscountUnits)]
+        );
+      } catch (colErr) {
+        if (colErr.code !== 'ER_BAD_FIELD_ERROR') throw colErr;
+        await connection.query(
+          `INSERT INTO purchase_payment_allocations (payment_history_id, purchase_id, allocated_amount)
+           VALUES (?, ?, ?)`,
+          [paymentHistoryId, purchase.id, fromUnits(applyUnits + applyDiscountUnits)]
+        );
+      }
 
       invoiceNumbersForLedger.push(purchase.invoice_no);
       updatedInvoices.push({
@@ -1108,7 +1152,9 @@ const makePayment = async (req, res) => {
         old_balance: fromUnits(outstandingUnits),
         new_balance: fromUnits(newBalanceUnits),
         payment_status: newPaymentStatus,
-        applied_amount: fromUnits(applyUnits)
+        applied_amount: fromUnits(applyUnits + applyDiscountUnits),
+        cash_applied: fromUnits(applyUnits),
+        discount_applied: fromUnits(applyDiscountUnits)
       });
     }
 
@@ -1235,13 +1281,16 @@ const makePayment = async (req, res) => {
       }
     }
 
+    const discountNote = appliedDiscountAmount > 0 ? ` A discount of Rs. ${appliedDiscountAmount.toFixed(2)} was applied.` : '';
     res.json({
-      message: supplierCredit
+      message: (supplierCredit
         ? `Payment recorded successfully! Rs. ${excessAmount.toFixed(2)} above the invoice balance was kept as supplier credit (${supplierCredit.overpayment_number}).`
-        : 'Payment recorded successfully!',
+        : 'Payment recorded successfully!') + discountNote,
       payment_id: paymentHistoryId,
       amount: fromUnits(paymentUnits),
       applied_amount: appliedAmount,
+      discount_amount: appliedDiscountAmount,
+      total_credited: totalCreditedAmount,
       supplier_credit_amount: supplierCredit ? excessAmount : 0,
       supplier_credit: supplierCredit,
       invoice_count: plans.length,

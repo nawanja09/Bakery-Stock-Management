@@ -42,6 +42,7 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
     voucher_number: '',
     check_number: '',
     amount: totalBalance,
+    discount_amount: 0,
     notes: '',
     bank_id: ''
   });
@@ -104,6 +105,7 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
       setFormData(prev => ({
         ...prev,
         amount: totalBalance,
+        discount_amount: 0,
         payment_method: paymentMethods.length > 0 ? paymentMethods[0].name : prev.payment_method
       }));
     }
@@ -118,21 +120,28 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
   if (!isOpen) return null;
 
   const computeAllocations = () => {
-    let remaining = parseFloat(formData.amount) || 0;
+    let remainingPayment = parseFloat(formData.amount) || 0;
+    let remainingDiscount = parseFloat(formData.discount_amount) || 0;
     return selectedInvoices.map(inv => {
       const bal = parseFloat(inv.balance_amount || 0);
-      const alloc = Math.min(remaining, bal);
-      remaining -= alloc;
-      return { ...inv, allocated: alloc };
+      const alloc = Math.min(remainingPayment, bal);
+      remainingPayment -= alloc;
+      // Discount can only reduce what's still owed after this payment - it
+      // is not extra money, so it never pushes the invoice into credit.
+      const balanceAfterPayment = bal - alloc;
+      const discountAlloc = Math.min(remainingDiscount, balanceAfterPayment);
+      remainingDiscount -= discountAlloc;
+      return { ...inv, allocated: alloc, discountAllocated: discountAlloc };
     });
   };
 
   const allocations = computeAllocations();
+  const totalDiscountAllocated = allocations.reduce((sum, a) => sum + a.discountAllocated, 0);
 
   const handleChange = e => {
     const { name, value } = e.target;
     setFormData(prev => {
-      const next = { ...prev, [name]: name === 'amount' ? parseFloat(value) || 0 : value };
+      const next = { ...prev, [name]: (name === 'amount' || name === 'discount_amount') ? parseFloat(value) || 0 : value };
       if (name === 'payment_method') {
         next.bank_id = '';
       }
@@ -161,6 +170,7 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
 
     if (!formData.payment_date) return showPopup('error', 'Payment date is required');
     if (formData.amount <= 0) return showPopup('error', 'Amount must be greater than 0');
+    if (formData.discount_amount < 0) return showPopup('error', 'Discount amount cannot be negative');
     if (formData.payment_method === 'Cheque' && !formData.check_number) {
       return showPopup('error', 'Cheque number is required');
     }
@@ -179,15 +189,17 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
     setSubmitting(true);
     try {
       const payloadAllocations = allocations
-        .filter((alloc) => alloc.allocated > 0)
+        .filter((alloc) => alloc.allocated > 0 || alloc.discountAllocated > 0)
         .map((alloc) => ({
           purchase_id: alloc.id,
-          amount: alloc.allocated
+          amount: alloc.allocated,
+          discount: alloc.discountAllocated
         }));
 
       console.log('📤 Sending payment payload:', {
         payment_date: formData.payment_date,
         amount: formData.amount,
+        discount_amount: formData.discount_amount,
         payment_method: formData.payment_method,
         invoice_allocations: payloadAllocations
       });
@@ -209,6 +221,7 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
       const response = await api.post('/purchases/pay-multiple', {
         payment_date: formData.payment_date,
         amount: formData.amount,
+        discount_amount: formData.discount_amount || 0,
         payment_method: normalizedPaymentMethod,
         check_number: formData.check_number || null,
         voucher_number: formData.voucher_number || null,
@@ -220,7 +233,10 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
 
       console.log('✅ Payment response:', response.data);
 
-      showPopup('success', response.data.message || `Payment of Rs. ${formData.amount.toFixed(4)} recorded successfully!`, {
+      const fallbackMessage = totalDiscountAllocated > 0
+        ? `Payment of Rs. ${formData.amount.toFixed(4)} and discount of Rs. ${totalDiscountAllocated.toFixed(4)} recorded successfully!`
+        : `Payment of Rs. ${formData.amount.toFixed(4)} recorded successfully!`;
+      showPopup('success', response.data.message || fallbackMessage, {
         title: 'Payment Successful',
         confirmText: 'OK'
       });
@@ -360,6 +376,22 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
               <span className="ipm-hint">Any amount above the invoice balance will be stored as supplier credit (Cash or Bank only).</span>
             </div>
 
+            <div className="ipm-form-group">
+              <label>Discount Amount (Optional)</label>
+              <div className="ipm-amount-wrapper">
+                <input
+                  type="number"
+                  name="discount_amount"
+                  value={formData.discount_amount}
+                  onChange={handleChange}
+                  min="0"
+                  step="0.0001"
+                  placeholder="0.00"
+                />
+              </div>
+              <span className="ipm-hint">Reduces the amount owed on this invoice, on top of the payment amount above. It cannot exceed the remaining balance.</span>
+            </div>
+
             {isChequeMethod && (
               <div style={{ padding: '8px 12px', background: '#fef3c7', color: '#92400e', borderRadius: '6px', fontSize: '13px', margin: '8px 0', borderLeft: '4px solid #f59e0b' }}>
                 ℹ️ <strong>Cheque Payment:</strong> Amount remains <strong>Pending / Unreleased</strong>. The Bank Ledger will NOT be deducted until the cheque is released.
@@ -425,6 +457,9 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
                   <div>
                     <span className="ipm-alloc-inv">{a.invoice_no}</span>
                     <span className="ipm-alloc-remaining"> — Balance: Rs. {parseFloat(a.balance_amount).toFixed(4)}</span>
+                    {a.discountAllocated > 0 && (
+                      <span className="ipm-alloc-remaining"> · Discount: Rs. {a.discountAllocated.toFixed(4)}</span>
+                    )}
                   </div>
                   <span className="ipm-alloc-amt">Rs. {a.allocated.toFixed(4)}</span>
                 </div>
