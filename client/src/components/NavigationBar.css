@@ -100,7 +100,7 @@
 .dropdown-header,
 .module-item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
   width: 100%;
   min-width: 0;
@@ -154,9 +154,9 @@
 .dropdown-header span,
 .module-item span {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: break-word;
+  line-height: 1.25;
 }
 
 .icon-container {
@@ -213,8 +213,8 @@
   margin: 4px 0 0 0;
   padding: 6px 0 0 0;
   border-left: 1px dashed rgba(156, 213, 255, 0.22);
-  margin-left: 16px;
-  padding-left: 6px;
+  margin-left: 10px;
+  padding-left: 4px;
   animation: dropdownIn 0.18s ease;
 }
 
