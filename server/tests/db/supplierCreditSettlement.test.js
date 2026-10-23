@@ -310,7 +310,7 @@ test('adjusting a discounted payment moves the cash book by the cash delta, not 
   const id = await createInvoice(10000);
 
   const paid = await call('POST', '/purchases/pay-multiple', {
-    payment_date: '2026-10-13', payment_method: 'CASH', amount: 5000,
+    payment_date: '2026-10-13', payment_method: 'CASH', amount: 5000, notes: 'Early payment discount agreed with supplier',
     invoice_allocations: [{ purchase_id: id, amount: 5000, discount: 2000 }]
   });
   assert.equal(paid.status, 200, JSON.stringify(paid.body));
@@ -324,7 +324,7 @@ test('adjusting a discounted payment moves the cash book by the cash delta, not 
 
   // Correct the cash figure from 5000 to 6000; the discount (2000) is left alone.
   const adjust = await call('PUT', `/purchases/payments/${paid.body.payment_id}-${id}/adjust`, {
-    payment_date: '2026-10-13', amount: 6000, payment_method: 'CASH'
+    payment_date: '2026-10-13', amount: 6000, payment_method: 'CASH', notes: 'Corrected the cash figure entered earlier'
   }, 'admin');
   assert.equal(adjust.status, 200, JSON.stringify(adjust.body));
 
@@ -354,7 +354,7 @@ test('a payment discount posts a balanced Dr AP / Cr Purchase-Discount-Received 
   const id = await createInvoice(10000);
 
   const paid = await call('POST', '/purchases/pay-multiple', {
-    payment_date: '2026-10-13', payment_method: 'CASH', amount: 5000,
+    payment_date: '2026-10-13', payment_method: 'CASH', amount: 5000, notes: 'Early payment discount agreed with supplier',
     invoice_allocations: [{ purchase_id: id, amount: 5000, discount: 2000 }]
   });
   assert.equal(paid.status, 200, JSON.stringify(paid.body));
@@ -389,6 +389,57 @@ test('a payment discount posts a balanced Dr AP / Cr Purchase-Discount-Received 
   // not just the 5000 cash that reached the Cash book.
   const apDebit = lines.filter((l) => l.account_code === 'ACCOUNTS-PAYABLE-RM').reduce((s, l) => s + cents(l.debit), 0);
   assert.equal(apDebit, 700000);
+});
+
+// D3 (2026-10-23, owner decision: require a reason, no RBAC change): a
+// Discount Amount writes off part of an invoice with no cash movement, so
+// whoever applies one must say why.
+test('a payment discount is refused without a reason in Notes, on both create and edit', async () => {
+  const id = await createInvoice(10000);
+  const cashBefore = await getCashBalance(companyId);
+
+  const noReason = await call('POST', '/purchases/pay-multiple', {
+    payment_date: '2026-10-13', payment_method: 'CASH', amount: 5000,
+    invoice_allocations: [{ purchase_id: id, amount: 5000, discount: 2000 }]
+  });
+  assert.equal(noReason.status, 400, JSON.stringify(noReason.body));
+  assert.match(noReason.body.error, /reason is required/i);
+  assert.equal(cents(await getCashBalance(companyId)), cents(cashBefore), 'nothing posted - the cash book is untouched');
+  const untouched = await one('SELECT paid_amount, balance_amount FROM purchases WHERE id = ?', [id]);
+  assert.equal(cents(untouched.balance_amount), 1000000, 'the invoice is untouched');
+
+  const blankReason = await call('POST', '/purchases/pay-multiple', {
+    payment_date: '2026-10-13', payment_method: 'CASH', amount: 5000, notes: '   ',
+    invoice_allocations: [{ purchase_id: id, amount: 5000, discount: 2000 }]
+  });
+  assert.equal(blankReason.status, 400, JSON.stringify(blankReason.body), 'whitespace-only notes do not count as a reason');
+
+  // A cash-only payment (no discount) still needs no reason at all.
+  const cashOnly = await call('POST', '/purchases/pay-multiple', {
+    payment_date: '2026-10-13', payment_method: 'CASH', amount: 1000,
+    invoice_allocations: [{ purchase_id: id, amount: 1000 }]
+  });
+  assert.equal(cashOnly.status, 200, JSON.stringify(cashOnly.body));
+
+  // With a reason, the discounted payment goes through...
+  const withReason = await call('POST', '/purchases/pay-multiple', {
+    payment_date: '2026-10-13', payment_method: 'CASH', amount: 4000, notes: 'Supplier agreed a discount for early settlement',
+    invoice_allocations: [{ purchase_id: id, amount: 4000, discount: 2000 }]
+  });
+  assert.equal(withReason.status, 200, JSON.stringify(withReason.body));
+
+  // ...and editing it away from its reason (blank notes) is refused too,
+  // even though the discount itself isn't changing on this edit.
+  const editNoReason = await call('PUT', `/purchases/payments/${withReason.body.payment_id}-${id}/adjust`, {
+    payment_date: '2026-10-13', amount: 4100, payment_method: 'CASH'
+  }, 'admin');
+  assert.equal(editNoReason.status, 400, JSON.stringify(editNoReason.body));
+  assert.match(editNoReason.body.error, /reason is required/i);
+
+  const editWithReason = await call('PUT', `/purchases/payments/${withReason.body.payment_id}-${id}/adjust`, {
+    payment_date: '2026-10-13', amount: 4100, payment_method: 'CASH', notes: 'Corrected the cash figure, discount unchanged'
+  }, 'admin');
+  assert.equal(editWithReason.status, 200, JSON.stringify(editWithReason.body));
 });
 
 // ------------------------------------------------------------------ order of events

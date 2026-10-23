@@ -1067,6 +1067,12 @@ const makePayment = async (req, res) => {
       throw new PaymentRequestError(400, 'Payment amount must be greater than 0');
     }
     const appliedDiscountUnits = plans.reduce((sum, plan) => sum + plan.applyDiscountUnits, 0);
+    // D3 fix (2026-10-23, owner decision): a Discount Amount writes off part of
+    // an invoice with no cash movement, so whoever applies one must say why -
+    // visible on the Discounted Purchases Report and the Audit Trail.
+    if (appliedDiscountUnits > 0 && !String(notes || '').trim()) {
+      throw new PaymentRequestError(400, 'A reason is required in Notes when a Discount Amount is applied');
+    }
     // Cash actually paid (posted to the Cash/Bank ledger) - the discount never moves money.
     const appliedAmount = fromUnits(appliedUnits);
     const appliedDiscountAmount = fromUnits(appliedDiscountUnits);
@@ -1922,6 +1928,13 @@ const adjustPurchasePayment = async (req, res) => {
     // delta only - never by the combined cash+discount delta (D1 fix).
     const cashDelta = moneyMath.round2(moneyMath.sub(appliedCashAmount, oldCashAmount));
     const discountDelta = moneyMath.round2(moneyMath.sub(cappedDiscount, oldDiscountAmount));
+
+    // D3 fix (2026-10-23, owner decision): same rule as makePayment - a
+    // discount write-off must carry a reason, including after an edit.
+    if (cappedDiscount > 0 && !String(notes || '').trim()) {
+      await connection.rollback();
+      return res.status(400).json({ error: 'A reason is required in Notes when a Discount Amount is applied' });
+    }
 
     if (hasAllocationRow) {
       await connection.query(
