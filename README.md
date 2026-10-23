@@ -26,6 +26,8 @@ A full-stack web application for running a bakery business's **stock, production
     - [Adjustments](#adjustments)
     - [VAT](#vat)
     - [Analyst](#analyst)
+    - [Audit Trail](#audit-trail)
+    - [Period Close](#period-close)
     - [Settings / Admin](#settings--admin)
   - [Roles and access control](#roles-and-access-control)
   - [Dashboard](#dashboard)
@@ -68,14 +70,14 @@ A full-stack web application for running a bakery business's **stock, production
 The left-hand navigation is grouped into the modules below. Which of them a user sees depends on their role (see [Roles and access control](#roles-and-access-control)).
 
 ### Management (master data)
-RM Items, RM Item Types, Suppliers, Departments, Companies, Payment Methods, Bank Details, Expense Types, Sub Expense Types, Expense Payees, Bank Charges Types, Receive Types, and Employee Management.
+RM Items, RM Item Types, Suppliers, Departments, Companies, Payment Methods, Bank Details, Expense Types, Sub Expense Types, Expense Payees, Bank Charges Types, Receive Types, Other Ledgers, Credit Card Rate, Employee Management, and **VAT Rate Settings** (a single management-editable, system-wide VAT rate used by purchase and expense VAT calculations, VAT reports and recipe costing).
 
 ### Raw Materials
 - **Purchasing**: add purchase invoices, purchase returns, and **Orders** (low-stock list, pending orders, completed orders; an order can be turned into a purchase invoice).
 - **Stock movements**: RM Issue (to departments), RM Wastage, Department Return.
-- **Reports**: Stock Reports, Item Wise Stock Report, Purchasing Summary / Item Detail, Purchase Report, RM Issue / Wastage / Department Return summaries and item details.
+- **Reports**: Stock Reports, Item Wise Stock Report, Purchasing Summary / Item Detail, Purchase Report, Discounted Purchases Report, RM Issue / Wastage / Department Return summaries and item details.
 - **Analysis**: Last Issued Date.
-- **Supplier payments** are made against pending invoices (including multi-invoice payments), with payment history, credit settlement and outstanding-balance tracking.
+- **Supplier payments** are made against pending invoices (including multi-invoice payments), with payment history, credit settlement, outstanding-balance tracking, and an optional per-payment **discount amount** (the discount reduces the invoice balance like cash would, but never moves ledger money - it is tracked separately for reporting, see Discounted Purchases Report).
 
 ### Expenses
 Petty Cash (vouchers and reimbursements), Bank Charges, **New Expenses** (bill entry, payment with partial-payment and overpayment handling, credit notes), Cash Expenses, **Hidden Expenses** (report-only records that do not post to the cash or bank books), and Expenses Reports.
@@ -96,10 +98,16 @@ Recipes and FG Recipes Reports. Finished-goods items for recipes come from an ex
 Stores balance adjustments, an Adjustment Summary Report, and **Inhand (Cash / Cheque)** adjustments with an approve / cancel workflow that posts to the finance ledgers.
 
 ### VAT
-VAT Purchasing Report and Return VAT Report.
+VAT Purchasing Report, **VAT Exempt Purchasing Report** (purchase item lines filtered by date, company, supplier, item and VAT status, defaulting to items marked VAT Not Applicable, with Excel export), and Return VAT Report.
 
 ### Analyst
 Income, Expenses and Balance Sheet views.
+
+### Audit Trail
+**Admin and Super Admin only.** Every sign-in, sign-out, password change, data change and refused request, newest first, with filters (event type: sign-in/out, data changes, access denied, POS/Restaurant sync) and detail view. Rows are written server-side (`server/services/auditLog.js`) and can never be edited or deleted from the UI (`audit_log` table, migration `037_audit_log.sql`).
+
+### Period Close
+**Admin and Super Admin only.** Only the current and previous month stay open for posting; older months are closed so a finished month's reports never change after the fact (`PERIOD_OPEN_MONTHS`, default 2). To correct a closed month, an Admin submits a re-open request with a reason; a **Super Admin** approves it for a limited number of hours (default 24, up to 168); while open, only an **Admin** may post or edit inside it. Enforced server-side in `server/services/periodLock.js` (`periodGuard` middleware refuses writes dated into a closed month) with no bypass. See migration `038_period_reopen_requests.sql`.
 
 ### Settings / Admin
 Change Password. The **Dashboard** link is also reachable from here.
@@ -116,8 +124,8 @@ Access is enforced in **three places**: the navigation, the React routes, and th
 | **Accountant** | Management, Raw Materials, Finance, Expenses, FG Production, VAT |
 | **View Only** (QB) | Management, Raw Materials, FG Production, Finance, Expenses, VAT, **read-only** |
 | **Finance** | Expenses only |
-| **Admin** | Everything except Analyst |
-| **Super Admin** | Everything, including Analyst |
+| **Admin** | Everything except Analyst; Audit Trail and Period Close |
+| **Super Admin** | Everything, including Analyst, Audit Trail and Period Close |
 
 Two logins hold the Accountant role: `accountant1` (Accountant 1) and `accountant2` (Accountant 2 - the former `accountant` login, renamed in place at server start-up so its id, password and history are kept). Both get exactly the Accountant grants above.
 
@@ -267,12 +275,14 @@ The client runs at `http://localhost:3000`. Log in with an account that exists i
 | --- | --- |
 | `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` | Database connection |
 | `PORT` | API port (default `5000`) |
-| `JWT_SECRET` | Secret used to sign and verify JWTs (required) |
+| `JWT_SECRET` | Secret used to sign and verify JWTs (required, 32+ bytes, must differ from `POS_SESSION_SECRET` - the server refuses to start otherwise, see `config/secrets.js`). Generate with `node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"` |
+| `POS_SESSION_SECRET` | Required alongside `JWT_SECRET`; encrypts the stored RAVON POS / Restaurant session tokens (`pos_sessions`, AES-256-GCM) |
 | `ACCOUNTANT1_PASSWORD` | Optional initial password for the `accountant1` login, used only when that user is first created. If unset, a random password is generated and printed once in the server log |
-| `RAVON_POS_API_URL` | Base URL of the Ravon Bakers POS (example value in `.env.example`: `https://pos.ravonbakers.lk`) |
-| `RAVON_POS_ITEMS_ENDPOINT` | POS items endpoint (example: `/api/items-list`) |
-| `RAVON_RESTAURANT_API_URL` | Base URL of the Ravon Bakers Restaurant system (`https://restaurant.ravonbakers.lk`). Empty = the Restaurant is skipped and reported "not configured" (POS unaffected) |
-| *(no credentials)* | There are **no** POS / Restaurant usernames, passwords or API keys in the environment (`RAVON_POS_USERNAME`, `RAVON_POS_PASSWORD`, `RAVON_POS_API_KEY`, `POS_USERNAME`, `POS_PASSWORD` are no longer read - delete them). A Finance / Accountant / Admin user's BSMS login also sends the same typed credentials once to both systems' `/api/login`; only the returned token is kept (AES-256-GCM in `pos_sessions`, key derived from `POS_SESSION_SECRET` or `JWT_SECRET`). A different POS / Restaurant password is connected once from the Collection page. No password is stored, so there is no background sync |
+| `RAVON_POS_API_URL`, `RAVON_RESTAURANT_API_URL` | Base URLs of the Ravon Bakers POS and Restaurant systems (examples: `https://pos.ravonbakers.lk`, `https://restaurant.ravonbakers.lk`). Leave the Restaurant one empty to skip it (reported "not configured"; POS unaffected) |
+| `RAVON_POS_ITEMS_ENDPOINT` | POS finished-goods items endpoint (example: `/api/items-list`) |
+| `RAVON_POS_INTEGRATION_PRIVATE_KEY`, `RAVON_RESTAURANT_INTEGRATION_PRIVATE_KEY` | **Server key mode (recommended).** Each system's private ECDSA signing key (generate a pair per system with `node scripts/generateIntegrationKeys.js`; the matching public key goes into that system's own `BSMS_INTEGRATION_PUBLIC_KEYS`). Every request is signed with a nonce + timestamp (5-minute replay window) instead of any user's password, so the Collection page works with **no** POS / Restaurant login at all, for every branch |
+| *(no credentials; per-user mode)* | With no private key set above, BSMS falls back to **per-user mode**: when a user whose role can see Collection or FG Production logs in to Stock Management, the same typed username/password are also sent once to each system's `/api/login`. Only the returned token and that user's own POS/Restaurant privileges are kept (server-side, AES-256-GCM, never sent to the browser) - the password itself is discarded, never stored, so there is no background sync. A different POS/Restaurant password is connected once from the Collection page's **Connect** action. There are **no** POS / Restaurant usernames, passwords or API keys read from the environment (`RAVON_POS_USERNAME`, `RAVON_POS_PASSWORD`, `RAVON_POS_API_KEY`, `POS_USERNAME`, `POS_PASSWORD` are not read) |
+| `RAVON_LOGIN_RELAY` | Optional, per-user mode only: `on` also sends each user's typed BSMS password to POS/Restaurant `/api/login` at BSMS login. Off by default and never auto-enables itself |
 | `RAVON_POS_LOGIN_ENDPOINT`, `RAVON_RESTAURANT_LOGIN_ENDPOINT`, `RAVON_RESTAURANT_TIMEOUT_MS`, `RAVON_INTEGRATION_SESSION_HOURS` | Optional: login path (default `/api/login`), Restaurant timeout (default `RAVON_POS_TIMEOUT_MS`), maximum session age in hours (default `24`) |
 | `RAVON_POS_SHIFT_COLLECTION_URL`, `RAVON_POS_CREDIT_PAYMENTS_URL`, `RAVON_POS_EMPLOYEE_DEDUCTIONS_URL`, `RAVON_RESTAURANT_SHIFT_COLLECTION_URL`, `RAVON_RESTAURANT_CREDIT_PAYMENTS_URL`, `RAVON_RESTAURANT_EMPLOYEE_DEDUCTIONS_URL` | Optional full-URL overrides for the three Collection endpoints of each system |
 | `RAVON_POS_COLLECTION_LOOKBACK_DAYS` | Optional: how many days back a Collection sync asks the POS for when no date range is searched (default `7`) |
@@ -280,13 +290,20 @@ The client runs at `http://localhost:3000`. Log in with an account that exists i
 | `RAVON_POS_BRANCH_DEPARTMENT_MAP` | Optional JSON for POS branch names the automatic rule cannot match, e.g. `{"Savoury": "Savory"}`. The rule itself maps `"Cafe - M"` to the existing department `"Cafe"` |
 | `RAVON_POS_TIMEZONE` | Optional: time zone used to date POS timestamps (default `Asia/Colombo`) |
 | `RAVON_POS_TIMEOUT_MS` | POS request timeout (example: `8000`) |
+| `COLLECTION_SCHEMA_MODE` | Optional: how a POS/Restaurant record that doesn't match the verified RAVON payload shape is handled - `strict` (default) quarantines it, `warn` accepts but reports it, `off` disables the check |
+| `LOGIN_MAX_FAILURES_PER_USER`, `LOGIN_MAX_FAILURES_PER_IP` | Optional login brute-force limits (`services/loginThrottle.js`): failed passwords allowed per account / per IP in 15 minutes (defaults `5` and `50`) |
+| `CORS_ORIGINS` | Comma-separated browser origin(s) allowed to call the API. **Required in production** - without it only `http://localhost:3000` is allowed and a deployed client is blocked by the browser |
+| `TRUST_PROXY` | Required when the API runs behind nginx / a load balancer, so the Audit Trail logs the real client IP and the per-IP login limit isn't shared by every user: `loopback`, a proxy count, or proxy address(es) |
+| `PERIOD_OPEN_MONTHS` | Optional: how many months stay open for posting, counting the current month (default `2`, range `1`-`24`). Older months are closed - see [Period Close](#period-close) |
+| `CASH_ALLOW_NEGATIVE` | Optional: a cash payment that would take a cash book negative is refused by default; set `on` to disable that check (e.g. while fixing opening balances) |
+| `DB_NAME_TEST` | Database used only by the MySQL-backed test suites (`server/tests/db/*`), never `DB_NAME`. Must end in `_test`; create/reset it with `node scripts/createTestDatabase.js` |
 | `PERMISSION_CACHE_TTL_MS` | Optional: how long role grants are cached (default 30000 ms) |
 | `FINANCE_PASSWORD` | Optional alternative to the CLI argument for `scripts/createFinanceUser.js` |
 
 ### Values set in code
 
 - **API base URL (client):** `client/src/api.js` sets `baseURL` to `http://localhost:5000/api`; production URLs are present there as commented-out lines. Change it for each environment.
-- **CORS origin (server):** `server/server.js` allows the origin `http://localhost:3000`; production origins are present as comments. Change it to match where the client is served.
+- **CORS origin (server):** read from `CORS_ORIGINS` (see the configuration table above) - not hardcoded.
 - **Uploads:** files are stored in `server/uploads/` and served at `/uploads`. Uploads are limited to images, 5 MB each.
 
 ---
@@ -296,7 +313,7 @@ The client runs at `http://localhost:3000`. Log in with an account that exists i
 The schema is built from several sources, so it helps to know which does what:
 
 1. **Baseline dump**, `bakery system db.sql` (62 tables, exported from MariaDB 10.4). It does not contain every table the current code uses.
-2. **Self-migrating functions** in `server/config/db.js` (`ensure…Schema()`), run on server start. They create or alter tables with `CREATE TABLE IF NOT EXISTS` and `ADD COLUMN IF NOT EXISTS`. Examples: item types, payment methods, soft-delete status, username login, the finance ledgers, expense/finance links, bank charge types, orders, income, cash expenses, sub-expense types, credit notes, employees, staff loans, intercompany transactions. `chequeReleaseService.js` also ensures its own schema at startup.
+2. **Self-migrating functions** in `server/config/db.js` (`ensure…Schema()`), run on server start. They create or alter tables with `CREATE TABLE IF NOT EXISTS` and `ADD COLUMN IF NOT EXISTS`. Examples: item types, payment methods, soft-delete status, username login, the finance ledgers, expense/finance links, bank charge types, orders, income, cash expenses, sub-expense types, credit notes, employees, staff loans, intercompany transactions, the double-entry journal, period-reopen requests, reference locks, VAT rate settings and payment discount amounts. `chequeReleaseService.js` and `services/auditLog.js` also ensure their own schema at startup.
 3. **Numbered SQL files** in `server/migrations/`. Some mirror what `db.js` applies automatically; others (for example hidden expenses, inhand adjustments, and the role/privilege tables `024` and `025`) are **not** applied automatically and must be run manually. Check the header comment of each file, and run any that your database is missing. Several numbers appear twice (for example two `001_` and two `006_` files); they are independent files.
 4. **One-off scripts** in `server/` (`migrate_adjustments.js`, `migrate_purchasing_decimals.js`, `migrate_receive_types.js`), each documented as "run once" in its header, e.g. `node migrate_receive_types.js`.
 
@@ -304,13 +321,15 @@ Practical guidance: import the dump, start the server once so the self-migrating
 
 **Ledger convention.** Cash and bank movements share one `finance_transactions` ledger: a **debit** is money in, a **credit** is money out, and `new balance = previous balance + debit − credit`.
 
+**Data integrity.** Nothing is hard-deleted: records are soft-deleted (`is_deleted` / `deleted_by` columns, migration `039_soft_delete_and_line_history.sql`), ledger rows are voided rather than removed, and replaced invoice/order lines are archived - every read filters `is_deleted = 0`. Every Cash/Bank posting is also mirrored into a balanced double-entry `journal_entries` / `journal_lines` pair (`utils/financeLedger.js`, `ensureJournalSchema` in `server/config/db.js`) for a trial-balance view alongside the per-account ledgers.
+
 ---
 
 ## Background processing and integrations
 
 - **Cheque release processor.** On startup, and then every 60 seconds, the server looks for registry cheques that are not Released / Returned / Deleted and whose release date has arrived, and posts their ledger entries. Cheques move through **Pending**, **Released** and **Returned**; the Expenses Cheque Registry also tags each cheque as an **Expense** or a **Transfer**.
 - **Bank-to-Cash cheque transfers.** The bank ledger is deducted when the transfer is created; the cash ledger is credited only when the cheque is released.
-- **Ravon Bakers POS.** Finished-goods items for FG Production are read live from the external POS through `server/services/ravonPosService.js`, using the `RAVON_POS_*` settings. The POS is the source of truth for those items; BSMS does not keep its own FG item master for recipes. If the POS is unreachable, the FG Production pages that depend on it are affected. All POS / Restaurant calls (FG items and Collection) authenticate through `server/services/integrationAuthService.js` (`posAuthService.js` is its POS-only facade) with the Finance session - there are no stored credentials. `node scripts/posCollectionProbe.js --unauth` (in `server/`) checks both hosts without credentials; `node scripts/posCollectionProbe.js --login restaurant` prompts for a login (nothing stored) and prints the real structure of the three Collection endpoints so the field mapping in `services/collectionMapper.js` can be checked.
+- **Ravon Bakers POS.** Finished-goods items for FG Production are read live from the external POS through `server/services/ravonPosService.js`, using the `RAVON_POS_*` settings. The POS is the source of truth for those items; BSMS does not keep its own FG item master for recipes. If the POS is unreachable, the FG Production pages that depend on it are affected. All POS / Restaurant calls (FG items and Collection) authenticate through `server/services/integrationAuthService.js` (`posAuthService.js` is its POS-only facade), either with a per-system signed server key (recommended - no user login involved) or with a signed-in user's own POS/Restaurant session - see [Server `.env`](#server-env) for both modes; there are no stored passwords either way. Requests are pull-based (BSMS calls RAVON; there is no inbound webhook), nonce + timestamp signed with a 5-minute replay window, and a payload that doesn't match the verified RAVON shape is quarantined rather than guessed (`COLLECTION_SCHEMA_MODE`). `node scripts/posCollectionProbe.js --unauth` (in `server/`) checks both hosts without credentials; `node scripts/posCollectionProbe.js --login restaurant` prompts for a login (nothing stored) and prints the real structure of the three Collection endpoints so the field mapping in `services/collectionMapper.js` can be checked.
 
 ---
 
@@ -341,7 +360,7 @@ node --test tests/
 node --test tests/rolePermissions.test.js
 ```
 
-The suites cover role permissions and API access rules, stock adjustments, the item / item-type / department / company controllers, low-stock orders, payment-method utilities, finance ledger date ranges, cheque release consistency and staff loans. A few of them (`staffLoans`, `chequeReleaseConsistency`, `inspectIncomeDb`) connect to the configured database.
+Around 40 suites directly under `tests/` cover role permissions and API access rules, money/decimal precision, stock rules and adjustments, the Collection module (schema validation, idempotency, card payments, credit-payment AR, versioning), audit logging, period-lock enforcement, finance ledger and cheque-release consistency, default accounts, document line history, and a block of security-focused suites (`securityCritical`, `securityHigh`, `securityPriority1`). A further set under **`tests/db/`** (soft delete, reference locks, period close, audit trail, cash balance, staff loans, supplier payments/credit settlement, stock availability/parity, collection data issues) runs only against the separate `DB_NAME_TEST` database (never `DB_NAME`) - create/reset it once with `node scripts/createTestDatabase.js`, then run with `node --test tests/db/`.
 
 **Client:**
 
@@ -350,15 +369,16 @@ cd client
 npm test
 ```
 
-Tests exist for the Orders page, the Staff Loans page, the popup component, report item selection and number formatters.
+Tests cover routing (`AppRoutes`), the Axios API wrapper, login, the navigation bar, Period Close and Period-Closed popup, Audit Trail, Card Ledger / Cash Receive / Staff Loans / Credit Card Rate Management, the Orders page, RM management lists, cutlery assets, the shared popup / confirm / route-modal UI components, report item selection, role permissions and number formatters.
 
 ---
 
 ## Deployment notes
 
 - Build the client with `npm run build` in `client/` and serve the output from any static host.
-- Point `client/src/api.js` at your API URL and set the CORS origin in `server/server.js` to your client's URL before building / starting.
-- Use a strong, private `JWT_SECRET`, keep `.env` out of version control, and run the API with a process manager rather than `nodemon` (`npm start` uses `nodemon`).
+- Point `client/src/api.js` at your API URL and set `CORS_ORIGINS` to your client's URL before building / starting.
+- Use strong, private values for `JWT_SECRET` and `POS_SESSION_SECRET` (they must differ from each other), keep `.env` out of version control, and run the API with a process manager rather than `nodemon` (`npm start` uses `nodemon`).
+- Set `TRUST_PROXY` when running behind nginx / a load balancer, so the Audit Trail and login throttling see the real client IP.
 - Back up the database before applying manual migrations.
 
 ---
@@ -367,7 +387,7 @@ Tests exist for the Orders page, the Staff Loans page, the popup component, repo
 
 Released under the MIT License for academic and portfolio use.
 
-**Nawanjana Nethmini** (Nethmini M. A. N. Herath), BSc (Hons) IT, SLIIT
+**Nawanjana Nethmini** (Nethmini M. A. N.), BSc (Hons) IT, SLIIT
 
 - Email: nawanjananethmi2000@gmail.com
 - LinkedIn: [linkedin.com/in/nawanjana-nethmini](https://www.linkedin.com/in/nawanjana-nethmini)
