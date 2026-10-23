@@ -12,7 +12,7 @@ Severity key: **[CRITICAL]** exploitable now, direct financial/data loss · **[H
 
 | ID | Sev | Title | Status |
 |---|---|---|---|
-| **D1** | **CRITICAL** | Editing a discounted payment moves the Cash/Bank ledger by the wrong amount, in the wrong direction | open |
+| **D1** | **CRITICAL** | Editing a discounted payment moves the Cash/Bank ledger by the wrong amount, in the wrong direction | **Fixed** 2026-10-23 (commit `8ecf56c`) |
 | **D2** | **HIGH** | Payment discounts never reach the Domain-3 double-entry journal; no "Discount Received" account exists | open |
 | **D3** | **MEDIUM** | A payment's Discount Amount can retire up to 100% of an invoice with no cash movement, no reason, and no second approver | open (business decision needed, like R2) |
 
@@ -23,8 +23,13 @@ All three trace to one commit, `5d7e650` ("add Discounted Purchases Report and s
 ## [CRITICAL]
 
 ### D1: `PUT /payments/:id/adjust` corrupts the Cash/Bank ledger for any payment that carried a discount
+> **Fixed (2026-10-23, commit `8ecf56c`).** `adjustPurchasePayment` now reads the allocation row's `discount_amount` and computes `oldCashAmount = oldCombinedAmount - oldDiscountAmount` before anything else. The request may optionally carry its own `discount_amount` (omitted/blank = "leave this payment's discount exactly as it is", matching `makePayment`'s convention); the new discount and cash are each capped against the invoice's real remaining balance (`cappedDiscount`, then `appliedCashAmount`), exactly as `makePayment` already does. The Cash/Bank ledger - the live `finance_transactions` row, `cash_accounts`/`bank_details.current_balance`, and a brand-new ledger row when the payment method is switched - now moves by `cashDelta` (`appliedCashAmount - oldCashAmount`) only; `payment_history.amount`/`purchase_payment_allocations.allocated_amount` keep tracking the combined cash+discount figure (`combinedDelta`), consistent with every other reader of those columns (`reconcilePurchasePaymentState`, the Analyst balance sheet, the Discounted Purchases Report). The `purchase_payment_adjustments` audit-trail row now logs the combined before/after instead of comparing a combined old figure to a cash-only new one.
+> - **Regression test:** `tests/db/supplierCreditSettlement.test.js` ("adjusting a discounted payment moves the cash book by the cash delta, not the combined delta") - a Rs. 10,000 invoice paid Rs. 5,000 cash + Rs. 2,000 discount, then the cash figure corrected to Rs. 6,000. Fails on the pre-fix code (ledger would move backwards by 1,000 and the discount would be wiped to 0); passes now (ledger drops by exactly 1,000 more, discount stays at 2,000).
+> - Full unit suite 324/325 (the one failure is a pre-existing, unrelated flake in `purchaseReturnController`/`stockAvailability` tests - not touched by this fix) and the DB tests for supplier payments and payment adjustments all pass.
+> - **Still open:** the production data-check SQL below, to find rows corrupted by an edit of a discounted payment made before this fix (there should be none yet, since the Discount Amount field itself only shipped in `5d7e650`, 2026-10-22 - but check before relying on it).
+> - **Not done here:** D2 (the discount's own journal/"Discount Received" entry) and D3 (reason/approval control on a discount) are unrelated gaps, still open below.
 
-**Where:** `server/controllers/purchaseController.js`, `adjustPurchasePayment` (`:1789-1935`), reached from the client's "Purchasing Payment Adjustment" tab, gated to the `Adjustments` module (`config/rolePermissions.js:140`, same roles as Stock Adjustments).
+**Where (original finding, `a7110a8`):** `server/controllers/purchaseController.js`, `adjustPurchasePayment` (`:1789-1935`), reached from the client's "Purchasing Payment Adjustment" tab, gated to the `Adjustments` module (`config/rolePermissions.js:140`, same roles as Stock Adjustments).
 
 `makePayment` keeps the cash and discount portions of a payment separate everywhere that matters: the Cash/Bank ledger is only ever credited `appliedAmount` (cash), while `purchase_payment_allocations.allocated_amount` and `payment_history.amount` store the **combined** cash+discount figure, because that is what the invoice's outstanding balance must shrink by (`:1193-1204`, `:1092-1095`).
 
@@ -218,7 +223,7 @@ if (!canDiscount && allocations.some(a => a.discountUnits > 0)) {
 
 | When | Action |
 |---|---|
-| **Now** | D1 (ledger-corruption fix in `adjustPurchasePayment`) — this is actively miscrediting the books every time a discounted payment is edited. Run the D1 data-check SQL to find any already-corrupted rows. |
+| **Done** | D1 (ledger-corruption fix in `adjustPurchasePayment`, commit `8ecf56c`, 2026-10-23). **Still to do:** run the D1 data-check SQL on production to confirm no row was corrupted by an edit made between `5d7e650` (2026-10-22) and this fix. |
 | **This week** | D2 (discount journal leg + `PURCHASE-DISCOUNT-RECEIVED` account). |
 | **Needs an owner decision, like R2** | D3 (reason requirement and/or role restriction on discounts). |
 
