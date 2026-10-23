@@ -346,6 +346,51 @@ test('adjusting a discounted payment moves the cash book by the cash delta, not 
   assert.equal(cents(invoiceAfterAdjust.balance_amount), 200000, '10000 - 6000 cash - 2000 discount = 2000');
 });
 
+// D2 (2026-10-23): a payment discount must post its own balanced journal
+// entry (Dr Accounts-Payable-RM / Cr Purchase-Discount-Received) - the GL
+// must not move by the cash portion alone, or Accounts-Payable there would
+// no longer reconcile with the real invoice balance reduction.
+test('a payment discount posts a balanced Dr AP / Cr Purchase-Discount-Received journal entry', async () => {
+  const id = await createInvoice(10000);
+
+  const paid = await call('POST', '/purchases/pay-multiple', {
+    payment_date: '2026-10-13', payment_method: 'CASH', amount: 5000,
+    invoice_allocations: [{ purchase_id: id, amount: 5000, discount: 2000 }]
+  });
+  assert.equal(paid.status, 200, JSON.stringify(paid.body));
+
+  const lines = (await pool.query(
+    `SELECT je.reference_type, jl.account_code, jl.debit, jl.credit
+       FROM journal_entries je JOIN journal_lines jl ON jl.entry_id = je.id
+      WHERE je.reference_id = ? AND je.reference_type IN ('PURCHASE_PAYMENT', 'PURCHASE_PAYMENT_DISCOUNT')
+      ORDER BY je.id, jl.id`,
+    [paid.body.payment_id]
+  ))[0];
+
+  // Every entry balances on its own (the chokepoint's own invariant)...
+  const byEntry = new Map();
+  for (const l of lines) {
+    const key = l.reference_type;
+    const prev = byEntry.get(key) || { debit: 0, credit: 0 };
+    byEntry.set(key, { debit: prev.debit + cents(l.debit), credit: prev.credit + cents(l.credit) });
+  }
+  assert.equal(byEntry.get('PURCHASE_PAYMENT').debit, byEntry.get('PURCHASE_PAYMENT').credit);
+  assert.equal(byEntry.get('PURCHASE_PAYMENT_DISCOUNT').debit, byEntry.get('PURCHASE_PAYMENT_DISCOUNT').credit);
+
+  // ...and the discount entry is specifically Dr AP 2000 / Cr Discount-Received 2000.
+  const discountLines = lines.filter((l) => l.reference_type === 'PURCHASE_PAYMENT_DISCOUNT');
+  assert.deepEqual(
+    discountLines.map((l) => [l.account_code, cents(l.debit), cents(l.credit)]).sort(),
+    [['ACCOUNTS-PAYABLE-RM', 200000, 0], ['PURCHASE-DISCOUNT-RECEIVED', 0, 200000]].sort()
+  );
+
+  // Combined across both entries, Accounts-Payable-RM is debited 7000 total
+  // (5000 cash + 2000 discount) - matching the invoice's real balance drop,
+  // not just the 5000 cash that reached the Cash book.
+  const apDebit = lines.filter((l) => l.account_code === 'ACCOUNTS-PAYABLE-RM').reduce((s, l) => s + cents(l.debit), 0);
+  assert.equal(apDebit, 700000);
+});
+
 // ------------------------------------------------------------------ order of events
 
 test('settle from the advance first, then pay the rest: the balance is right and an overpayment is refused', async () => {

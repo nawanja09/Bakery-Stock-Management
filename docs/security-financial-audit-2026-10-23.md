@@ -13,7 +13,7 @@ Severity key: **[CRITICAL]** exploitable now, direct financial/data loss · **[H
 | ID | Sev | Title | Status |
 |---|---|---|---|
 | **D1** | **CRITICAL** | Editing a discounted payment moves the Cash/Bank ledger by the wrong amount, in the wrong direction | **Fixed** 2026-10-23 (commit `8ecf56c`) |
-| **D2** | **HIGH** | Payment discounts never reach the Domain-3 double-entry journal; no "Discount Received" account exists | open |
+| **D2** | **HIGH** | Payment discounts never reach the Domain-3 double-entry journal; no "Discount Received" account exists | **Fixed** 2026-10-23 (commit pending) |
 | **D3** | **MEDIUM** | A payment's Discount Amount can retire up to 100% of an invoice with no cash movement, no reason, and no second approver | open (business decision needed, like R2) |
 
 All three trace to one commit, `5d7e650` ("add Discounted Purchases Report and support for discount amounts in payments"), which added `discount_amount` to `payment_history` and `purchase_payment_allocations` (migration `043_add_discount_amount_to_payments.sql`) and wired it through `purchaseController.makePayment` — but not through the older `purchaseController.adjustPurchasePayment` ("Purchasing Payment Adjustment" screen), which predates discounts and was not updated.
@@ -141,8 +141,12 @@ WHERE ppa.discount_amount > 0.009;
 ## [HIGH]
 
 ### D2: Payment discounts are invisible to the Domain-3 double-entry journal; there is no "Discount Received" account
+> **Fixed (2026-10-23).** `financeLedger.js`'s `CONTRA_ACCOUNT_RULES` gained a `/discount/i` → `PURCHASE-DISCOUNT-RECEIVED` rule, placed before the general `/purchase/i` rule (order matters - first match wins). `makePayment` now calls the already-exported `postJournalEntry` directly, right after the cash/bank `postLedger()` call, whenever `appliedDiscountAmount > 0`: `Dr ACCOUNTS-PAYABLE-RM / Cr PURCHASE-DISCOUNT-RECEIVED` for the discount amount, with `referenceType: 'PURCHASE_PAYMENT_DISCOUNT'` so it's distinguishable from the cash entry. `adjustPurchasePayment` (D1) got the same treatment for its own `discountDelta` - the *change* in discount on an edit, not the whole figure again, so re-editing the same payment never double-posts; a decrease posts the mirror image via the existing negative-delta convention `postJournalEntry` already supports.
+> - **Regression test:** `tests/db/supplierCreditSettlement.test.js` ("a payment discount posts a balanced Dr AP / Cr Purchase-Discount-Received journal entry") - a Rs. 5,000 cash + Rs. 2,000 discount payment now produces two balanced journal entries (`PURCHASE_PAYMENT`, `PURCHASE_PAYMENT_DISCOUNT`), and `ACCOUNTS-PAYABLE-RM` is debited 7,000 in total across both - matching the invoice's real balance reduction, not just the 5,000 that reached the Cash book.
+> - Full unit suite 324/325 (the same pre-existing, unrelated flake noted under D1) and the DB tests for supplier payments/credit settlement/payment adjustments all pass.
+> - **Not done here:** D3 (reason/approval control on a discount) is a separate, still-open question for the owner.
 
-**Where:** `server/controllers/purchaseController.js:1193-1204` (`makePayment`'s `postLedger` call) and `server/utils/financeLedger.js:76-120` (`CONTRA_ACCOUNT_RULES`, `postJournalEntry`).
+**Where (original finding, `a7110a8`):** `server/controllers/purchaseController.js:1193-1204` (`makePayment`'s `postLedger` call) and `server/utils/financeLedger.js:76-120` (`CONTRA_ACCOUNT_RULES`, `postJournalEntry`).
 
 The 2026-10-20 pass added exactly one chokepoint for the GL: every `recordCashTransaction`/`recordBankTransaction` call also writes a balanced `journal_entries`/`journal_lines` pair (`audit_report.md` §H3). `makePayment` only ever calls that chokepoint with `credit: appliedAmount` — the cash portion. The discount portion reduces `purchases.balance_amount` (the real AP sub-ledger) by an extra amount that the journal's `ACCOUNTS-PAYABLE-RM` account never hears about, and no account anywhere records "Rs. X was forgiven by the supplier" as income. Every discount-bearing payment from now on leaves the journal's AP control account overstated, by exactly the running total of discounts taken, against the real outstanding-invoices figure — the exact "Debits = Credits... cannot be proven" gap H3 was built to close, reopened for this one new code path.
 
@@ -223,8 +227,7 @@ if (!canDiscount && allocations.some(a => a.discountUnits > 0)) {
 
 | When | Action |
 |---|---|
-| **Done** | D1 (ledger-corruption fix in `adjustPurchasePayment`, commit `8ecf56c`, 2026-10-23). **Still to do:** run the D1 data-check SQL on production to confirm no row was corrupted by an edit made between `5d7e650` (2026-10-22) and this fix. |
-| **This week** | D2 (discount journal leg + `PURCHASE-DISCOUNT-RECEIVED` account). |
+| **Done** | D1 (ledger-corruption fix in `adjustPurchasePayment`, commit `8ecf56c`, 2026-10-23); D2 (discount journal leg + `PURCHASE-DISCOUNT-RECEIVED` account, 2026-10-23). **Still to do:** run the D1 data-check SQL on production to confirm no row was corrupted by an edit made between `5d7e650` (2026-10-22) and the D1 fix; D2's journal only covers payments made (or edited) from this fix onward - it does not back-fill a journal entry for any discount already recorded between `5d7e650` and now. |
 | **Needs an owner decision, like R2** | D3 (reason requirement and/or role restriction on discounts). |
 
 *Line numbers are for `a7110a8`. This report only covers code changed since `audit_report.md`'s 2026-10-20 baseline — it does not re-state or re-verify findings already closed or accepted there.*

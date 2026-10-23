@@ -78,6 +78,11 @@ const CONTRA_ACCOUNT_RULES = [
   [/opening/i, 'OPENING-BALANCE-EQUITY'],
   [/transfer|withdrawal|deposit/i, 'TRANSFER-CLEARING'],
   [/advance/i, 'SUPPLIER-ADVANCES'],
+  // Domain 3 D2 fix (2026-10-23): a supplier payment discount - must come
+  // before the general /purchase/i rule below, or it would land on
+  // ACCOUNTS-PAYABLE-RM too and cancel itself out instead of recognising the
+  // discount as its own income line.
+  [/discount/i, 'PURCHASE-DISCOUNT-RECEIVED'],
   [/purchase/i, 'ACCOUNTS-PAYABLE-RM'],
   [/collection/i, 'ACCOUNTS-RECEIVABLE'],
   [/loan/i, 'STAFF-LOANS-RECEIVABLE'],

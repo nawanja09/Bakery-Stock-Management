@@ -4,7 +4,7 @@ const { sendServerError, ClientError } = require('../utils/safeError');
 const { actorId } = require('../utils/actor');
 const { archiveLines } = require('../services/lineHistory');
 const { normalizePaymentMethodValue } = require('../utils/paymentMethodUtils');
-const { recordCashTransaction, recordBankTransaction, refreshBalancesOfReference } = require('../utils/financeLedger');
+const { recordCashTransaction, recordBankTransaction, refreshBalancesOfReference, postJournalEntry } = require('../utils/financeLedger');
 const { checkDuplicateReference, DuplicateReferenceError } = require('../services/referenceValidationService');
 const { isRmAdjustmentRequest, recordRmAdjustment, sameItems, sameValue } = require('../utils/rmAdjustmentAudit');
 const { SETTLEMENT_PAYMENT_METHODS, isSettlementPaymentMethod } = require('../services/settlementPaymentMethods');
@@ -1203,6 +1203,27 @@ const makePayment = async (req, res) => {
       createdBy: resolvedCreatedBy
     });
 
+    // Domain 3 D2 fix: the discount portion moves no cash, so it never goes
+    // through postLedger()/finance_transactions - but it still needs its own
+    // balanced journal entry, or the GL's Accounts-Payable account never
+    // reconciles with the real AP reduction once a discount is taken, and no
+    // "discount received" income is ever recognised. Independent of payment
+    // method (Cheque/Credit have no cash/bank row at all here, but the
+    // invoice's balance still drops by the discount).
+    if (appliedDiscountAmount > 0) {
+      await postJournalEntry(connection, {
+        date: payment_date,
+        accountCode: 'ACCOUNTS-PAYABLE-RM',
+        debit: appliedDiscountAmount,
+        credit: 0,
+        transactionType: 'RM Purchase Discount',
+        remark: `Discount received${invoiceNumberForLedger ? ` - Invoice ${invoiceNumberForLedger}` : ''}`,
+        referenceType: 'PURCHASE_PAYMENT_DISCOUNT',
+        referenceId: paymentHistoryId,
+        createdBy: resolvedCreatedBy
+      });
+    }
+
     // Excess above what the invoices owe: kept as supplier credit (the payment
     // screen says so), recorded and posted exactly like an Advance Payment so
     // it can be settled against the supplier's next invoices.
@@ -1929,6 +1950,26 @@ const adjustPurchasePayment = async (req, res) => {
       [payment_date, newTransactionAmount, cappedDiscount, methodForHistory, voucher_number || null,
        normalizedMethod === 'BANK_TRANSFER' ? bank_id : null, notes || null, paymentId]
     );
+
+    // Domain 3 D2 fix: keep the discount's journal entry (makePayment) in step
+    // with an edit here too - post the CHANGE in discount, not the whole
+    // figure again, so re-editing the same payment never double-posts. A
+    // decrease (discount removed/lowered) posts the mirror image (credit AP /
+    // debit the discount account), same convention postJournalEntry already
+    // uses for any other negative delta.
+    if (discountDelta !== 0) {
+      await postJournalEntry(connection, {
+        date: payment_date,
+        accountCode: 'ACCOUNTS-PAYABLE-RM',
+        debit: discountDelta,
+        credit: 0,
+        transactionType: 'RM Purchase Discount',
+        remark: `Discount adjustment - Invoice ${purchase.invoice_no} (Payment #${paymentId})`,
+        referenceType: 'PURCHASE_PAYMENT_DISCOUNT',
+        referenceId: paymentId,
+        createdBy: actorId(req)
+      });
+    }
 
     // Recompute this invoice's paid/balance/status from the real allocations.
     const reconciled = await reconcilePurchasePaymentState(connection, purchaseId, invoiceTotal, purchase.paid_amount);
