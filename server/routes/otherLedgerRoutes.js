@@ -20,5 +20,6 @@ router.get('/:id/balance', ...financeReadAccess, controller.getOtherLedgerBalanc
 router.get('/:id/transactions', ...financeReadAccess, controller.getOtherLedgerTransactions);
 router.put('/:id', ...financeWriteAccess, controller.updateOtherLedger);
 router.patch('/:id/status', ...financeWriteAccess, controller.setOtherLedgerStatus);
+router.post('/:id/opening-balance', ...financeWriteAccess, controller.setOtherLedgerOpeningBalance);
 
 module.exports = router;

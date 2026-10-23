@@ -29,7 +29,7 @@ const GUARDED_PREFIXES = [
   '/purchases', '/purchase-returns', '/returns', '/issuances', '/wastages', '/opening-balance', '/adjustments',
   '/suppliers/pay-now', '/suppliers/settle-credit',
   '/expenses', '/new-expenses', '/cash-expenses', '/hidden-expenses',
-  '/finance', '/staff-loans', '/incomes', '/inhand', '/collections/approve'
+  '/finance', '/staff-loans', '/incomes', '/inhand', '/collections/approve', '/other-ledgers'
 ];
 
 // Body fields that are the date a record is booked on. (invoice_date is the

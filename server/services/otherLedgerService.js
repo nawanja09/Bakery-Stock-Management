@@ -37,6 +37,7 @@ const SOURCE_BANK_ISSUED = 'BANK_ISSUED';
 const SOURCE_COLLECTION_AR = 'COLLECTION_AR';
 const SOURCE_COLLECTION_SHORT_EXCESS = 'COLLECTION_SHORT_EXCESS';
 const SOURCE_COLLECTION_AR_SETTLEMENT = 'COLLECTION_AR_SETTLEMENT'; // Credit Payment: AR Account CREDIT
+const SOURCE_OPENING_BALANCE = 'OPENING_BALANCE'; // no real backing record - see setOpeningBalance
 const AR_ACCOUNT_NAME = 'AR Account';
 const SHORT_EXCESS_ACCOUNT_NAME = 'Short/Excess Account';
 const OTHER_LEDGER_RECEIVE_TYPE = 'Other Ledger'; // finance_transactions.transaction_type for receipts
@@ -269,6 +270,68 @@ const getLedgerBalance = async (queryable, otherLedgerId, companyId = null) => {
   return round2(rows[0]?.balance);
 };
 
+/**
+ * Sets (or replaces) the Opening Balance for a ledger + company pair. Unlike
+ * the Cash Ledger opening balance, this is allowed even when the pair
+ * already has other entries (e.g. a system account such as AR Account, which
+ * is posted to from the moment Collection exists) - its date must simply be
+ * earlier than every other active entry for that pair, so the ledger
+ * statement's running balance still starts from it, in order. A prior
+ * opening balance is voided and replaced (editable any time, not just while
+ * it is the sole entry). `amount` is always the ledger's own normal-balance
+ * direction (other_ledgers.normal_balance) and must not be negative. Does
+ * not touch Cash or Bank - Other Ledgers are their own sub-ledgers, not a
+ * cash position. Requires an open connection; the caller commits / rolls back.
+ * @returns {Promise<number>} the ledger's new balance for that company
+ */
+const setOpeningBalance = async (connection, { otherLedgerId, companyId, date, amount, createdBy = null }) => {
+  if (companyId === undefined || companyId === null || companyId === '') {
+    throw new OtherLedgerError('Company is required');
+  }
+  const ledger = await getLedgerById(connection, otherLedgerId, { forUpdate: true });
+  if (!ledger) throw new OtherLedgerError('Other Ledger not found', 404);
+  if (!(await isLedgerLinkedToCompany(connection, otherLedgerId, companyId))) {
+    throw new OtherLedgerError(`"${ledger.name}" is not linked to the selected company. Link it under Other Ledgers management first.`);
+  }
+  if (amount === undefined || amount === null || amount === '' || !Number.isFinite(Number(amount))) {
+    throw new OtherLedgerError('A valid opening balance amount is required');
+  }
+  const value = round2(amount);
+  if (value < 0) throw new OtherLedgerError('A valid opening balance amount is required');
+  if (!date) throw new OtherLedgerError('Date is required');
+
+  const [rows] = await connection.query(
+    `SELECT id, source_type, transaction_date FROM other_ledger_transactions
+      WHERE other_ledger_id = ? AND company_id = ? AND status = 1 FOR UPDATE`,
+    [otherLedgerId, companyId]
+  );
+  const priorOpening = rows.find((r) => r.source_type === SOURCE_OPENING_BALANCE);
+  const others = rows.filter((r) => r.source_type !== SOURCE_OPENING_BALANCE);
+  if (others.length > 0) {
+    const earliest = others.reduce((min, r) => (r.transaction_date < min ? r.transaction_date : min), others[0].transaction_date);
+    const earliestYmd = earliest instanceof Date ? earliest.toISOString().slice(0, 10) : String(earliest).slice(0, 10);
+    if (!(date < earliestYmd)) {
+      throw new OtherLedgerError(
+        `"${ledger.name}" has an entry dated ${earliestYmd} for this Company - the opening balance date must be earlier than that.`
+      );
+    }
+  }
+  if (priorOpening) {
+    await connection.query('UPDATE other_ledger_transactions SET status = 0 WHERE id = ?', [priorOpening.id]);
+  }
+
+  const isDebit = (ledger.normal_balance || 'DEBIT') !== 'CREDIT';
+  const insertId = await insertImpactRow(connection, {
+    otherLedgerId, date, debit: isDebit ? value : 0, credit: isDebit ? 0 : value,
+    sourceType: SOURCE_OPENING_BALANCE, sourceId: 0, companyId, referenceNo: null, remark: 'Opening Balance', createdBy
+  });
+  // source_id must be unique per source_type (uq_olt_source): an opening
+  // balance has no real backing record, so it simply points at its own row.
+  await connection.query('UPDATE other_ledger_transactions SET source_id = ? WHERE id = ?', [insertId, insertId]);
+
+  return getLedgerBalance(connection, otherLedgerId, companyId);
+};
+
 /** Signed effect of one row on a ledger with this normal balance. */
 const balanceEffect = (row, normalBalance = 'DEBIT') => {
   const debit = Number(row.debit) || 0;
@@ -297,6 +360,7 @@ module.exports = {
   SOURCE_COLLECTION_AR,
   SOURCE_COLLECTION_SHORT_EXCESS,
   SOURCE_COLLECTION_AR_SETTLEMENT,
+  SOURCE_OPENING_BALANCE,
   AR_ACCOUNT_NAME,
   SHORT_EXCESS_ACCOUNT_NAME,
   OTHER_LEDGER_RECEIVE_TYPE,
@@ -319,6 +383,7 @@ module.exports = {
   recalculateCashBalance,
   BALANCE_EFFECT_SQL,
   getLedgerBalance,
+  setOpeningBalance,
   balanceEffect,
   withRunningBalance
 };

@@ -10,6 +10,7 @@ const {
   OtherLedgerError,
   normalizeName,
   getLedgerBalance,
+  setOpeningBalance,
   withRunningBalance,
   BALANCE_EFFECT_SQL,
   round2
@@ -364,12 +365,38 @@ const getOtherLedgerTransactions = async (req, res) => {
   }
 };
 
+// POST /api/other-ledgers/:id/opening-balance  { company_id, date, amount }
+// Per ledger + company; may be set (or replaced) even when other entries
+// already exist, as long as its date is earlier than all of them - see
+// services/otherLedgerService.setOpeningBalance. Does not touch Cash or Bank.
+const setOtherLedgerOpeningBalance = async (req, res) => {
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    const balance = await setOpeningBalance(connection, {
+      otherLedgerId: req.params.id,
+      companyId: optionalId(req.body?.company_id),
+      date: req.body?.date,
+      amount: req.body?.amount,
+      createdBy: req.user?.userId ?? null
+    });
+    await connection.commit();
+    res.status(201).json({ message: 'Opening balance set successfully', balance });
+  } catch (error) {
+    await connection.rollback();
+    sendError(res, error, 'Failed to set the Other Ledger opening balance');
+  } finally {
+    connection.release();
+  }
+};
+
 module.exports = {
   getOtherLedgers,
   getActiveOtherLedgers,
   createOtherLedger,
   updateOtherLedger,
   setOtherLedgerStatus,
+  setOtherLedgerOpeningBalance,
   getOtherLedgerBalance,
   getOtherLedgerTransactions
 };

@@ -1983,4 +1983,23 @@ const ensureCardReversalSchema = async () => {
 
 pool.cardReversalSchemaReady = pool.cardCommissionSchemaReady.then(ensureCardReversalSchema);
 
+// Other Ledgers: Opening Balance (one per ledger + company, set before any
+// other entry exists - same rule as the Cash Ledger opening balance). It is a
+// standalone other_ledger_transactions row (source_id = its own id, so the
+// existing UNIQUE KEY uq_olt_source never collides); it does not touch Cash
+// or Bank - Other Ledgers are their own sub-ledgers, not a cash position.
+const ensureOtherLedgerOpeningBalanceSchema = async () => {
+  try {
+    await pool.query(
+      "ALTER TABLE other_ledger_transactions MODIFY COLUMN source_type "
+      + "ENUM('CASH_RECEIVE','CASH_ISSUED','COLLECTION_AR','COLLECTION_SHORT_EXCESS','COLLECTION_AR_SETTLEMENT','BANK_RECEIVE','BANK_ISSUED','OPENING_BALANCE') NOT NULL"
+    );
+    console.log('Other Ledgers opening balance schema ready');
+  } catch (error) {
+    console.warn('Other Ledgers opening balance schema check skipped:', error.message);
+  }
+};
+
+pool.otherLedgerOpeningBalanceSchemaReady = pool.collectionsSchemaReady.then(ensureOtherLedgerOpeningBalanceSchema);
+
 module.exports = pool;

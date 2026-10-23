@@ -10,6 +10,8 @@ const assert = require('node:assert/strict');
 let ledgerStatus = 1;
 let existingImpact = null;
 let mappedCompanies = [1, 2]; // other_ledger_company_map rows for ledger 3
+let existingOlt = []; // other_ledger_transactions rows for the opening-balance "any entry yet?" check
+let ledgerBalanceStub = 0; // what getLedgerBalance's query returns
 const writes = [];
 const state = { commits: 0, rollbacks: 0 };
 
@@ -39,8 +41,11 @@ const connection = {
     if (/FROM finance_transactions WHERE account_type = 'BANK' AND bank_id = \? AND status = 1 FOR UPDATE/.test(s)) return [[{ current_balance: 50000 }]];
     if (/^UPDATE bank_details/.test(s)) { writes.push({ table: 'bank-balance', params }); return [{}]; }
     if (/SELECT id FROM company/.test(s)) return [[{ id: 1 }]];
-    if (/FROM other_ledgers WHERE id = \?/.test(s)) return [[{ id: 3, name: 'Director', status: ledgerStatus }]];
+    if (/FROM other_ledgers WHERE id = \?/.test(s)) return [[{ id: 3, name: 'Director', status: ledgerStatus, normal_balance: 'DEBIT' }]];
     if (/FROM other_ledger_transactions WHERE source_type = \? AND source_id = \?/.test(s)) return [existingImpact ? [existingImpact] : []];
+    if (/FROM other_ledger_transactions\s+WHERE other_ledger_id = \? AND company_id = \? AND status = 1 FOR UPDATE/.test(s)) return [existingOlt];
+    if (/^UPDATE other_ledger_transactions SET source_id = \?/.test(s)) { writes.push({ table: 'opening-source-id', params }); return [{}]; }
+    if (/SELECT COALESCE\(SUM\(.*\), 0\) AS balance\s+FROM other_ledger_transactions/.test(s)) return [[{ balance: ledgerBalanceStub }]];
     return [[]];
   },
   async beginTransaction() {},
@@ -54,6 +59,7 @@ require.cache[dbPath] = { id: dbPath, filename: dbPath, loaded: true, exports: {
 
 const finance = require('../controllers/financeController');
 const issued = require('../controllers/cashOtherLedgerController');
+const otherLedgerController = require('../controllers/otherLedgerController');
 const svc = require('../services/otherLedgerService');
 
 const run = async (handler, body = {}, params = {}) => {
@@ -62,7 +68,10 @@ const run = async (handler, body = {}, params = {}) => {
   await handler({ body, params, query: {}, user: { userId: 7 } }, res);
   return out;
 };
-const reset = () => { writes.length = 0; state.commits = 0; state.rollbacks = 0; ledgerStatus = 1; existingImpact = null; mappedCompanies = [1, 2]; };
+const reset = () => {
+  writes.length = 0; state.commits = 0; state.rollbacks = 0; ledgerStatus = 1; existingImpact = null;
+  mappedCompanies = [1, 2]; existingOlt = []; ledgerBalanceStub = 0;
+};
 
 // finance_transactions INSERT params: [company, date, type, ref, invoice, party, direction, remark, debit, credit, balance_after, refType, refId, createdBy]
 const financeRow = () => writes.find((w) => w.table === 'finance').params;
@@ -270,6 +279,81 @@ test('system accounts (Collection) are linked to the posting company on use', as
   const ledger = await svc.requireSystemLedger(connection, 'AR Account', { companyId: 2 });
   assert.equal(ledger.id, 20);
   assert.deepEqual(writes.find((w) => w.table === 'map').params, [20, 2]);
+});
+
+// ---- Opening Balance (one per ledger + company; allowed even with existing entries, as long as its date is earliest) ----
+
+test('Opening balance: first entry for a ledger + company creates a standalone entry, no Cash / Bank touched', async () => {
+  reset(); mappedCompanies = [1]; ledgerBalanceStub = 5000;
+  const r = await run(otherLedgerController.setOtherLedgerOpeningBalance, { company_id: 1, date: '2026-10-01', amount: 5000 }, { id: 3 });
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  assert.equal(r.body.balance, 5000);
+  const o = oltRow(); // [ledger, date, debit, credit, srcType, srcId, company, ref, remark, createdBy]
+  assert.equal(o[0], 3); // ledger id comes from req.params.id
+  assert.equal(o[2], 5000); assert.equal(o[3], 0); // DEBIT-normal: amount on the debit side
+  assert.equal(o[4], 'OPENING_BALANCE');
+  assert.equal(o[6], 1); // company
+  assert.equal(o[8], 'Opening Balance');
+  const sourceIdFix = writes.find((w) => w.table === 'opening-source-id').params;
+  assert.deepEqual(sourceIdFix, [9, 9]); // source_id set to its own (stubbed) insert id
+  assert.equal(writes.some((w) => w.table === 'finance'), false);
+  assert.equal(state.commits, 1);
+});
+
+test('Opening balance: allowed even when other entries already exist, as long as its date is earlier than all of them', async () => {
+  reset(); mappedCompanies = [1]; ledgerBalanceStub = 5500;
+  existingOlt = [{ id: 50, source_type: 'CASH_RECEIVE', transaction_date: '2026-09-15' }];
+  const r = await run(otherLedgerController.setOtherLedgerOpeningBalance, { company_id: 1, date: '2026-09-01', amount: 100 }, { id: 3 });
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  assert.equal(writes.some((w) => w.table === 'void-olt'), false); // no prior opening balance to void
+  assert.ok(writes.some((w) => w.table === 'olt'));
+});
+
+test('Opening balance: refused when its date is not earlier than an existing entry for that ledger + company', async () => {
+  reset(); mappedCompanies = [1]; existingOlt = [{ id: 50, source_type: 'CASH_RECEIVE', transaction_date: '2026-09-15' }];
+  for (const date of ['2026-09-15', '2026-09-20']) { // same date, and a later one
+    const r = await run(otherLedgerController.setOtherLedgerOpeningBalance, { company_id: 1, date, amount: 100 }, { id: 3 });
+    assert.equal(r.status, 400);
+    assert.match(r.body.error, /must be earlier than that/);
+  }
+  assert.equal(writes.length, 0);
+});
+
+test('Opening balance: editing it again voids the old one first (its own date never blocks the replacement)', async () => {
+  reset(); mappedCompanies = [1]; existingOlt = [{ id: 50, source_type: 'OPENING_BALANCE' }]; ledgerBalanceStub = 8000;
+  const r = await run(otherLedgerController.setOtherLedgerOpeningBalance, { company_id: 1, date: '2026-10-01', amount: 8000 }, { id: 3 });
+  assert.equal(r.status, 201);
+  assert.deepEqual(writes.find((w) => w.table === 'void-olt').params, [50]);
+  assert.ok(writes.some((w) => w.table === 'olt'));
+});
+
+test('Opening balance: a ledger not linked to the company is refused', async () => {
+  reset(); mappedCompanies = [2];
+  const r = await run(otherLedgerController.setOtherLedgerOpeningBalance, { company_id: 1, date: '2026-10-01', amount: 100 }, { id: 3 });
+  assert.equal(r.status, 400);
+  assert.match(r.body.error, /not linked to the selected company/);
+  assert.equal(writes.length, 0);
+});
+
+test('Opening balance: company, date and a non-negative amount are required', async () => {
+  reset(); mappedCompanies = [1];
+  for (const [body, msg] of [
+    [{ date: '2026-10-01', amount: 100 }, /Company is required/],
+    [{ company_id: 1, amount: 100 }, /Date is required/],
+    [{ company_id: 1, date: '2026-10-01' }, /valid opening balance amount/],
+    [{ company_id: 1, date: '2026-10-01', amount: -5 }, /valid opening balance amount/]
+  ]) {
+    const r = await run(otherLedgerController.setOtherLedgerOpeningBalance, body, { id: 3 });
+    assert.equal(r.status, 400, JSON.stringify({ body, got: r.body }));
+    assert.match(r.body.error, msg);
+  }
+  assert.equal(writes.length, 0);
+});
+
+test('Opening balance: 0 is a valid amount', async () => {
+  reset(); mappedCompanies = [1]; ledgerBalanceStub = 0;
+  const r = await run(otherLedgerController.setOtherLedgerOpeningBalance, { company_id: 1, date: '2026-10-01', amount: 0 }, { id: 3 });
+  assert.equal(r.status, 201, JSON.stringify(r.body));
 });
 
 test('company balance only counts that company', async () => {

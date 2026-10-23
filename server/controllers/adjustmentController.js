@@ -28,11 +28,13 @@ const getFinancialAdjustmentRecord = async (connection, category, source, id, fo
          c.name AS company_name, ct.bank_id, bd.bank_name, bd.account_number,
          'Visa Card Payment' AS receive_type, ct.reference_number, ct.amount,
          ct.remark, ct.status, ct.transaction_date AS transaction_date, ct.realisation_id,
+         cr.finance_transaction_id,
          u.name AS created_by_name
        FROM card_transactions ct
        LEFT JOIN company c ON c.id = ct.company_id
        LEFT JOIN bank_details bd ON bd.id = ct.bank_id
        LEFT JOIN users u ON u.id = ct.created_by
+       LEFT JOIN card_realisations cr ON cr.id = ct.realisation_id
        WHERE ct.id = ?${forUpdate ? ' FOR UPDATE' : ''}`
     : `SELECT ft.id, 'finance' AS source, ft.transaction_date AS date, ft.company_id,
          c.name AS company_name, ft.bank_id, bd.bank_name, bd.account_number,
@@ -200,7 +202,11 @@ const updateFinancialAdjustmentRecord = async (req, res) => {
         });
       } else {
         await checkDuplicateReference(connection, normalizedReference, {
-          includeLedger: true, table: 'card_transactions', id
+          includeLedger: true, table: 'card_transactions', id,
+          // Realised: its own realisation already posted a Bank Ledger row
+          // carrying this same reference - exclude it, or keeping the
+          // reference unchanged would flag the receipt's own ledger row.
+          excludeFinanceTransactionId: existing.finance_transaction_id || null
         });
         const [duplicates] = await connection.query(
           'SELECT id FROM card_transactions WHERE LOWER(TRIM(reference_number)) = LOWER(?) AND id <> ? LIMIT 1',

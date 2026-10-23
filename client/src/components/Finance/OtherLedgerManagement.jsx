@@ -7,7 +7,7 @@
 // Company-wise: each ledger is linked to the companies that may post to it, and
 // its balance is shown per company (companies are never added together).
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { FiSearch, FiPlus, FiEdit, FiToggleLeft, FiToggleRight } from 'react-icons/fi';
+import { FiSearch, FiPlus, FiEdit, FiToggleLeft, FiToggleRight, FiDollarSign } from 'react-icons/fi';
 import api from '../../api';
 import { usePopup } from '../context/PopupContext';
 import usePermissions from '../../hooks/usePermissions';
@@ -30,6 +30,11 @@ const OtherLedgerManagement = () => {
   const [editCompanyIds, setEditCompanyIds] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [openingFor, setOpeningFor] = useState(null); // the ledger an Opening Balance is being set for, or null
+  const [openingCompanyId, setOpeningCompanyId] = useState('');
+  const [openingDate, setOpeningDate] = useState('');
+  const [openingAmount, setOpeningAmount] = useState('');
+  const [savingOpening, setSavingOpening] = useState(false);
 
   const fetchAll = useCallback(async () => {
     try {
@@ -123,6 +128,36 @@ const OtherLedgerManagement = () => {
     setEditName(record.name);
     setEditCompanyIds((record.companies || []).map((c) => c.id));
     setShowAddForm(false);
+    setOpeningFor(null);
+  };
+
+  const openOpeningBalance = (record) => {
+    setOpeningFor(record);
+    setOpeningCompanyId((record.companies || [])[0]?.id ?? '');
+    setOpeningDate(''); // must predate every other entry for the chosen company - no safe default
+    setOpeningAmount('');
+    setShowAddForm(false);
+    setEditingRecord(null);
+  };
+
+  const handleSetOpeningBalance = async (e) => {
+    e.preventDefault();
+    const amt = parseFloat(openingAmount);
+    if (!openingCompanyId) return showPopup('error', 'Select a company');
+    if (Number.isNaN(amt) || amt < 0) return showPopup('error', 'Enter a valid opening balance');
+    setSavingOpening(true);
+    try {
+      await api.post(`/other-ledgers/${openingFor.id}/opening-balance`, {
+        company_id: openingCompanyId, date: openingDate, amount: amt
+      });
+      showPopup('success', `Opening balance set for "${openingFor.name}"`);
+      setOpeningFor(null);
+      await fetchAll();
+    } catch (err) {
+      showPopup('error', err.response?.data?.error || 'Failed to set opening balance');
+    } finally {
+      setSavingOpening(false);
+    }
   };
 
   const filteredRecords = useMemo(() => {
@@ -137,7 +172,7 @@ const OtherLedgerManagement = () => {
       <div className="filters-section" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
         <h2 style={{ margin: 0, color: 'var(--color-heading)' }}>Other Ledgers</h2>
         {canWrite && (
-          <button className="btn btn-primary" onClick={() => { setShowAddForm(true); setEditingRecord(null); }}>
+          <button className="btn btn-primary" onClick={() => { setShowAddForm(true); setEditingRecord(null); setOpeningFor(null); }}>
             <FiPlus size={16} /> Add Other Ledger
           </button>
         )}
@@ -184,6 +219,37 @@ const OtherLedgerManagement = () => {
         </div>
       )}
 
+      {openingFor && (
+        <div className="card" style={{ padding: '14px 18px', borderLeft: '4px solid var(--color-success)' }}>
+          <form onSubmit={handleSetOpeningBalance} style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <label style={{ fontWeight: 600, fontSize: 'var(--font-size-sm)', whiteSpace: 'nowrap', color: 'var(--color-text-secondary)' }}>
+              Opening balance for: <em style={{ color: 'var(--color-text-primary)', fontStyle: 'normal' }}>{openingFor.name}</em>
+            </label>
+            <select
+              required value={openingCompanyId} onChange={(e) => setOpeningCompanyId(e.target.value)}
+              style={{ ...inputStyle, flex: '0 0 160px', border: '1px solid var(--color-border)' }}
+            >
+              <option value="" disabled>Select company</option>
+              {(openingFor.companies || []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            <input
+              type="date" required aria-label="Opening balance date" value={openingDate} onChange={(e) => setOpeningDate(e.target.value)}
+              style={{ ...inputStyle, flex: '0 0 160px', border: '1px solid var(--color-border)' }}
+            />
+            <input
+              type="number" min="0" step="0.01" required placeholder="Opening amount" autoFocus
+              value={openingAmount} onChange={(e) => setOpeningAmount(e.target.value)}
+              style={{ ...inputStyle, flex: '0 0 180px', border: '1px solid var(--color-border)' }}
+            />
+            <button type="submit" className="btn btn-primary" disabled={savingOpening}>{savingOpening ? 'Saving…' : 'Save'}</button>
+            <button type="button" className="btn btn-secondary" onClick={() => setOpeningFor(null)}>Cancel</button>
+            <span className="text-muted font-sm" style={{ flexBasis: '100%' }}>
+              The date must be earlier than this Other Ledger's earliest entry for the chosen company, if it has any.
+            </span>
+          </form>
+        </div>
+      )}
+
       <div className="card">
         {loading ? (
           <div className="loading-state" role="status" aria-live="polite"><div className="loading-spinner"></div>Loading Other Ledgers…</div>
@@ -199,7 +265,7 @@ const OtherLedgerManagement = () => {
                   <th>NAME</th>
                   <th>COMPANIES</th>
                   <th style={{ textAlign: 'right' }}>BALANCE (PER COMPANY)</th>
-                  <th style={{ textAlign: 'center' }}>EDIT</th>
+                  <th style={{ textAlign: 'center' }}>ACTIONS</th>
                   <th>STATUS</th>
                 </tr>
               </thead>
@@ -223,9 +289,18 @@ const OtherLedgerManagement = () => {
                       ))}
                     </td>
                     <td style={{ textAlign: 'center' }}>
-                      {canWrite && !rec.is_system ? (
-                        <button type="button" className="btn-icon edit" onClick={() => openEdit(rec)} title="Edit"><FiEdit size={14} /></button>
-                      ) : '—'}
+                      {!canWrite ? '—' : (
+                        <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
+                          {!rec.is_system && (
+                            <button type="button" className="btn-icon edit" onClick={() => openEdit(rec)} title="Edit"><FiEdit size={14} /></button>
+                          )}
+                          {(rec.companies || []).length > 0 && (
+                            <button type="button" className="btn-icon edit" onClick={() => openOpeningBalance(rec)} title="Set Opening Balance">
+                              <FiDollarSign size={14} />
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </td>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

@@ -28,7 +28,28 @@ const conn = {
 
     if (s.startsWith("SELECT ct.id, 'card' AS source")) {
       const c = db.card.find((x) => String(x.id) === String(params[0]));
-      return [c ? [{ ...c }] : []];
+      if (!c) return [[]];
+      const real = c.realisation_id ? db.realisations.find((r) => r.id === c.realisation_id) : null;
+      return [[{ ...c, finance_transaction_id: real ? real.finance_transaction_id : null }]];
+    }
+    if (s.startsWith('INSERT INTO reference_locks')) return [{}];
+    if (s.startsWith('SELECT id FROM ?? WHERE LOWER(TRIM(??)) = LOWER(?)')) {
+      // checkDuplicateReference's generic per-table check: params = [table, column, ref, ...excludeIds]
+      const [table, , ref, ...excludeIds] = params;
+      if (table === 'finance_transactions') {
+        const excluded = excludeIds.map(String);
+        const match = db.ledger.find((r) => r.status === 1
+          && String(r.reference_number || '').toLowerCase() === String(ref).toLowerCase()
+          && !excluded.includes(String(r.id)));
+        return [match ? [{ id: match.id }] : []];
+      }
+      return [[]]; // the other 10 reference-validation tables: no collisions in these tests
+    }
+    if (s.startsWith('SELECT id FROM card_transactions WHERE LOWER(TRIM(reference_number)) = LOWER(?) AND id <> ?')) {
+      const [ref, excludeId] = params;
+      const match = db.card.find((c) => String(c.id) !== String(excludeId)
+        && String(c.reference_number || '').toLowerCase() === String(ref).toLowerCase());
+      return [match ? [{ id: match.id }] : []];
     }
     if (s === 'SELECT id FROM company WHERE id = ? AND is_deleted = 0') {
       const c = db.company.find((x) => x.id === params[0]);
@@ -153,14 +174,17 @@ const newCard = (over = {}) => {
   return row.id;
 };
 
-const realiseInto = (cardId, { realisationId, totalAmount, commissionAmount, realiseAmount, remainingBalance, financeTransactionId = 1 }) => {
+const realiseInto = (cardId, {
+  realisationId, totalAmount, commissionAmount, realiseAmount, remainingBalance,
+  financeTransactionId = 1, ledgerReference = null
+}) => {
   db.realisations.push({
     id: realisationId, company_id: 1, bank_id: 1, realise_date: '2026-10-02',
     total_amount: totalAmount, commission_amount: commissionAmount, realise_amount: realiseAmount,
-    remaining_balance: remainingBalance, reference_number: null,
+    remaining_balance: remainingBalance, reference_number: ledgerReference,
     finance_transaction_id: financeTransactionId, commission_expense_id: null, bank_charge_expense_id: null, status: 1
   });
-  db.ledger.push({ id: financeTransactionId, bank_id: 1, debit: realiseAmount, credit: 0, status: 1 });
+  db.ledger.push({ id: financeTransactionId, bank_id: 1, debit: realiseAmount, credit: 0, status: 1, reference_number: ledgerReference });
   const card = db.card.find((c) => c.id === cardId);
   Object.assign(card, { status: 'Completed', realisation_id: realisationId });
 };
@@ -243,6 +267,23 @@ test('Completed: saving with the SAME Company / Bank Account is fine (not a chan
   realiseInto(id, { realisationId: 1, totalAmount: 10000, commissionAmount: 200, realiseAmount: 9700, remainingBalance: 100 });
   const { status } = await call(id, baseBody({ remark: 'typo' })); // company_id: 1, bank_id: 1 - unchanged
   assert.equal(status, 200);
+});
+
+test('Completed: keeping the same Reference No. unchanged does not flag its own realisation Bank Ledger row as a duplicate', async () => {
+  const id = newCard({ referenceNumber: 'VCP-1' });
+  realiseInto(id, { realisationId: 1, totalAmount: 10000, commissionAmount: 200, realiseAmount: 9700, remainingBalance: 100, ledgerReference: 'VCP-1' });
+  const { status, payload } = await call(id, baseBody({ reference_number: 'VCP-1', remark: 'typo fix' }));
+  assert.equal(status, 200, JSON.stringify(payload));
+  assert.equal(db.card[0].remark, 'typo fix');
+});
+
+test('Completed: a Reference No. that collides with an UNRELATED Bank Ledger row is still refused', async () => {
+  const id = newCard({ referenceNumber: 'VCP-1' });
+  realiseInto(id, { realisationId: 1, totalAmount: 10000, commissionAmount: 200, realiseAmount: 9700, remainingBalance: 100, ledgerReference: 'VCP-1' });
+  db.ledger.push({ id: 99, bank_id: 1, debit: 500, credit: 0, status: 1, reference_number: 'OTHER-REF' });
+  const { status, payload } = await call(id, baseBody({ reference_number: 'OTHER-REF' }));
+  assert.equal(status, 400);
+  assert.match(payload.error, /Duplicate reference number/);
 });
 
 test('an unknown Company, or a Bank Account that does not belong to it, is refused', async () => {

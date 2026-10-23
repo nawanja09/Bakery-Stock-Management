@@ -57,6 +57,10 @@ const committedReader = (connection) => {
  * @param {Object} excludeConfig - Configuration to exclude the current record being updated
  * @param {string} excludeConfig.table - The name of the table to exclude from the check
  * @param {number|string} excludeConfig.id - The ID of the record to exclude in the table
+ * @param {number|string} [excludeConfig.excludeFinanceTransactionId] - Also exclude this one
+ *   finance_transactions row (only used when includeLedger is true) - for a record whose own
+ *   table isn't finance_transactions but that has its own linked ledger row carrying the same
+ *   reference (e.g. a realised card receipt's Bank Ledger posting).
  * @throws {DuplicateReferenceError} If the reference number already exists
  */
 const checkDuplicateReference = async (connection, referenceNo, excludeConfig = {}) => {
@@ -107,6 +111,15 @@ const checkDuplicateReference = async (connection, referenceNo, excludeConfig = 
     if (excludeConfig.table === table && excludeConfig.id) {
       query += ` AND id != ?`;
       params.push(excludeConfig.id);
+    }
+    // A record whose own primary table isn't finance_transactions can still have
+    // ITS OWN linked finance_transactions row (e.g. a card receipt's realisation
+    // posts a Bank Ledger row carrying the same reference) - exclude that one too,
+    // or editing the record while keeping its own reference unchanged would flag
+    // its own linked ledger row as a duplicate.
+    if (table === 'finance_transactions' && excludeConfig.excludeFinanceTransactionId) {
+      query += ` AND id != ?`;
+      params.push(excludeConfig.excludeFinanceTransactionId);
     }
 
     query += ` LIMIT 1`;
