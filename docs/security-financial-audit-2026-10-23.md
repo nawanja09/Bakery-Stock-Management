@@ -13,7 +13,7 @@ Severity key: **[CRITICAL]** exploitable now, direct financial/data loss · **[H
 | ID | Sev | Title | Status |
 |---|---|---|---|
 | **D1** | **CRITICAL** | Editing a discounted payment moves the Cash/Bank ledger by the wrong amount, in the wrong direction | **Fixed** 2026-10-23 (commit `8ecf56c`) |
-| **D2** | **HIGH** | Payment discounts never reach the Domain-3 double-entry journal; no "Discount Received" account exists | **Fixed** 2026-10-23 (commit pending) |
+| **D2** | **HIGH** | Payment discounts never reach the Domain-3 double-entry journal; no "Discount Received" account exists | **Fixed** 2026-10-23 (commit `8cf7a87`) |
 | **D3** | **MEDIUM** | A payment's Discount Amount can retire up to 100% of an invoice with no cash movement, no reason, and no second approver | open (business decision needed, like R2) |
 
 All three trace to one commit, `5d7e650` ("add Discounted Purchases Report and support for discount amounts in payments"), which added `discount_amount` to `payment_history` and `purchase_payment_allocations` (migration `043_add_discount_amount_to_payments.sql`) and wired it through `purchaseController.makePayment` — but not through the older `purchaseController.adjustPurchasePayment` ("Purchasing Payment Adjustment" screen), which predates discounts and was not updated.
@@ -227,7 +227,7 @@ if (!canDiscount && allocations.some(a => a.discountUnits > 0)) {
 
 | When | Action |
 |---|---|
-| **Done** | D1 (ledger-corruption fix in `adjustPurchasePayment`, commit `8ecf56c`, 2026-10-23); D2 (discount journal leg + `PURCHASE-DISCOUNT-RECEIVED` account, 2026-10-23). **Still to do:** run the D1 data-check SQL on production to confirm no row was corrupted by an edit made between `5d7e650` (2026-10-22) and the D1 fix; D2's journal only covers payments made (or edited) from this fix onward - it does not back-fill a journal entry for any discount already recorded between `5d7e650` and now. |
+| **Done** | D1 (ledger-corruption fix in `adjustPurchasePayment`, commit `8ecf56c`, 2026-10-23); D2 (discount journal leg + `PURCHASE-DISCOUNT-RECEIVED` account, commit `8cf7a87`, 2026-10-23). **Still to do:** run the D1 data-check SQL on production to confirm no row was corrupted by an edit made between `5d7e650` (2026-10-22) and the D1 fix; D2's journal only covers payments made (or edited) from this fix onward - it does not back-fill a journal entry for any discount already recorded between `5d7e650` and now. |
 | **Needs an owner decision, like R2** | D3 (reason requirement and/or role restriction on discounts). |
 
 *Line numbers are for `a7110a8`. This report only covers code changed since `audit_report.md`'s 2026-10-20 baseline — it does not re-state or re-verify findings already closed or accepted there.*
