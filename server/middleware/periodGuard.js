@@ -52,6 +52,7 @@ const RECORD_DATES = [
   { path: /^\/adjustments\/(\d+)\/approve$/, table: 'stock_adjustments', column: 'date' },
   { path: /^\/adjustments\/records\/[^/]+\/finance\/(\d+)$/, table: 'finance_transactions', column: 'transaction_date' },
   { path: /^\/adjustments\/records\/[^/]+\/card\/(\d+)$/, table: 'card_transactions', column: 'transaction_date' },
+  { path: /^\/finance\/card-ledger\/realisations\/(\d+)$/, table: 'card_realisations', column: 'realise_date' },
   { path: /^\/new-expenses\/(\d+)$/, table: 'expenses', column: 'bill_date' },
   { path: /^\/expenses\/petty-cash\/voucher\/(\d+)$/, table: 'petty_cash_vouchers', column: 'voucher_date' },
   { path: /^\/expenses\/petty-cash\/reimbursement\/(\d+)$/, table: 'petty_cash_reimbursements', column: 'reimbursement_date' },

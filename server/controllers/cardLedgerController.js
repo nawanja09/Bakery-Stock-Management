@@ -10,7 +10,9 @@
 
 const pool = require('../config/db');
 const moneyMath = require('../utils/money');
-const { realiseCardTransactions, previewCommission, displayRemark } = require('../services/cardLedgerService');
+const {
+  realiseCardTransactions, previewCommission, displayRemark, reverseCardRealisation, editCardRealisation
+} = require('../services/cardLedgerService');
 const { HttpError } = require('../utils/staffLoanUtils');
 
 // Pending: one row per card transaction.
@@ -82,6 +84,9 @@ const filterClauses = (query, completed) => {
   const clauses = [];
   const params = [];
   if (!completed) clauses.push("ct.status = 'Pending'");
+  // A reversed realisation (Reverse to Pending, Admin / Super Admin) is kept for
+  // audit but drops out of the Completed tab - its card rows are Pending again.
+  if (completed) clauses.push('COALESCE(cr.status, 1) = 1');
 
   if (query.companyId) { clauses.push(`${alias}.company_id = ?`); params.push(query.companyId); }
   if (query.bankId) { clauses.push(`${alias}.bank_id = ?`); params.push(query.bankId); }
@@ -220,4 +225,57 @@ const realiseTransactions = async (req, res) => {
   }
 };
 
-module.exports = { getCardTransactions, getCommissionPreview, realiseTransactions };
+// DELETE /api/finance/card-ledger/realisations/:id
+// Reverse a Completed realisation back to Pending (Admin / Super Admin only,
+// see routes). Voids the Bank Ledger debit and the linked Hidden Expenses
+// (soft - nothing is ever hard-deleted) and puts every card transaction it
+// covered back to Pending so it can be corrected and re-realised.
+const reverseRealisation = async (req, res) => {
+  let connection;
+  try {
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+    const outcome = await reverseCardRealisation(connection, {
+      realisationId: req.params.id,
+      userId: req.user?.userId ?? null
+    });
+    await connection.commit();
+    res.json({ message: 'Card realisation reversed to Pending', ...outcome });
+  } catch (error) {
+    if (connection) await connection.rollback().catch(() => {});
+    sendError(res, error, 'Failed to reverse the card realisation');
+  } finally {
+    if (connection) connection.release();
+  }
+};
+
+// PUT /api/finance/card-ledger/realisations/:id
+//   { total_amount, expected_commission, realise_amount, department_id }
+// Edit a Completed realisation's figures (Super Admin only, see routes).
+const updateRealisation = async (req, res) => {
+  let connection;
+  try {
+    const body = req.body || {};
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+    const outcome = await editCardRealisation(connection, {
+      realisationId: req.params.id,
+      totalAmount: body.total_amount,
+      commissionAmount: body.expected_commission,
+      realiseAmount: body.realise_amount,
+      departmentId: body.department_id,
+      userId: req.user?.userId ?? null
+    });
+    await connection.commit();
+    res.json({ message: 'Card realisation updated', ...outcome });
+  } catch (error) {
+    if (connection) await connection.rollback().catch(() => {});
+    sendError(res, error, 'Failed to update the card realisation');
+  } finally {
+    if (connection) connection.release();
+  }
+};
+
+module.exports = {
+  getCardTransactions, getCommissionPreview, realiseTransactions, reverseRealisation, updateRealisation
+};

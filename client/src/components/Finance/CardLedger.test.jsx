@@ -331,4 +331,92 @@ describe('CardLedger page', () => {
     expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
     expect(screen.queryByRole('button', { name: /Realise/ })).not.toBeInTheDocument();
   });
+
+  const openCompleted = async () => {
+    renderPage();
+    await screen.findByText('VCP-1');
+    fireEvent.click(screen.getByRole('tab', { name: /Completed/ }));
+    await screen.findByText('OLD-1');
+  };
+
+  test('Completed Actions column: Accountant sees neither Reverse nor Edit', async () => {
+    setUser('Accountant');
+    await openCompleted();
+    expect(screen.queryByText('Actions')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Reverse realisation/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Edit realisation/)).not.toBeInTheDocument();
+  });
+
+  test('Completed Actions column: Admin sees only Reverse', async () => {
+    setUser('Admin');
+    await openCompleted();
+    expect(screen.getByText('Actions')).toBeInTheDocument();
+    expect(screen.getAllByLabelText(/Reverse realisation/).length).toBe(2);
+    expect(screen.queryByLabelText(/Edit realisation/)).not.toBeInTheDocument();
+  });
+
+  test('Completed Actions column: Super Admin sees both Reverse and Edit', async () => {
+    setUser('Super Admin');
+    await openCompleted();
+    expect(screen.getAllByLabelText(/Reverse realisation/).length).toBe(2);
+    expect(screen.getAllByLabelText(/Edit realisation/).length).toBe(2);
+  });
+
+  test('Reverse: confirms, calls DELETE and refreshes both tabs', async () => {
+    setUser('Super Admin');
+    jest.spyOn(window, 'confirm').mockReturnValue(true);
+    api.delete.mockResolvedValue({ data: { message: 'Card realisation reversed to Pending' } });
+    await openCompleted();
+
+    const before = api.get.mock.calls.length;
+    fireEvent.click(screen.getAllByLabelText(/Reverse realisation/)[0]);
+    await waitFor(() => expect(api.delete).toHaveBeenCalledWith('/finance/card-ledger/realisations/9'));
+    await waitFor(() => expect(api.get.mock.calls.length).toBeGreaterThan(before)); // both tabs re-fetched
+    expect(await screen.findByText('Card realisation reversed to Pending')).toBeInTheDocument();
+  });
+
+  test('Reverse: declining the confirmation sends nothing', async () => {
+    setUser('Admin');
+    jest.spyOn(window, 'confirm').mockReturnValue(false);
+    await openCompleted();
+    fireEvent.click(screen.getAllByLabelText(/Reverse realisation/)[0]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(api.delete).not.toHaveBeenCalled();
+  });
+
+  test('Edit: a multi-card realisation keeps Branch / Department and Total Transaction Amount read-only', async () => {
+    setUser('Super Admin');
+    await openCompleted();
+    fireEvent.click(screen.getAllByLabelText(/Edit realisation 9$/)[0]);
+    const dialog = await screen.findByRole('dialog', { name: 'Edit Card Realisation' });
+    expect(within(dialog).getByLabelText(/^Total Transaction Amount/)).toHaveAttribute('readonly');
+    expect(within(dialog).getByLabelText('Branch / Department')).toHaveAttribute('readonly');
+    expect(within(dialog).getByLabelText(/^Expected Commission/)).not.toHaveAttribute('readonly');
+    expect(within(dialog).getByLabelText(/^Realise Amount/)).not.toHaveAttribute('readonly');
+  });
+
+  test('Edit: a single-card realisation - Remaining Balance recalculates; over-limit is refused; success saves', async () => {
+    setUser('Super Admin');
+    api.put.mockResolvedValue({ data: { message: 'Card realisation updated' } });
+    await openCompleted();
+    fireEvent.click(screen.getAllByLabelText(/Edit realisation 8$/)[0]);
+    const dialog = await screen.findByRole('dialog', { name: 'Edit Card Realisation' });
+
+    expect(within(dialog).getByLabelText(/^Total Transaction Amount/)).not.toHaveAttribute('readonly');
+    const commission = within(dialog).getByLabelText(/^Expected Commission/);
+    const remaining = within(dialog).getByLabelText('Remaining Balance / Bank Charge');
+    fireEvent.change(commission, { target: { value: '5000' } }); // total 5000, realise 4000 -> would be negative
+    expect(remaining).toHaveValue('-4,000.00');
+    fireEvent.click(within(dialog).getByRole('button', { name: /Save/ }));
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(/cannot be more than/);
+    expect(api.put).not.toHaveBeenCalled();
+
+    fireEvent.change(commission, { target: { value: '200' } }); // total 5000, realise 4000 -> remaining 800
+    expect(remaining).toHaveValue('800.00');
+    fireEvent.click(within(dialog).getByRole('button', { name: /Save/ }));
+    await waitFor(() => expect(api.put).toHaveBeenCalledWith('/finance/card-ledger/realisations/8', {
+      total_amount: '5000', expected_commission: '200', realise_amount: '4000'
+    }));
+    expect(await screen.findByText('Card realisation updated')).toBeInTheDocument();
+  });
 });

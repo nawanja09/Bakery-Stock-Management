@@ -42,7 +42,7 @@
 // commission_expense_id / bank_charge_expense_id are UNIQUE, so a repeated
 // request (retry, double click, refresh) is refused and writes nothing.
 
-const { recordBankTransaction } = require('../utils/financeLedger');
+const { recordBankTransaction, rebuildBalanceAfter } = require('../utils/financeLedger');
 const {
   HttpError, parseDateOnly, parseId, parsePositiveMoney, dbToCents, centsToNumber, formatCents
 } = require('../utils/staffLoanUtils');
@@ -286,6 +286,27 @@ const bankChargeDescription = (realisationId, { totalCents, realiseCents, commis
   (`Card Ledger realisation #${realisationId} - Total ${formatCents(totalCents)} - Realised ${formatCents(realiseCents)}`
     + ` - Commission ${formatCents(commission)}`).slice(0, DESCRIPTION_MAX);
 
+/**
+ * Like parsePositiveMoney, but 0 is allowed (Expected Commission / Remaining
+ * Balance can legitimately be edited down to zero).
+ */
+const parseNonNegativeMoney = (value, label = 'Amount') => {
+  if (value === undefined || value === null || String(value).trim() === '') {
+    return { error: `${label} is required` };
+  }
+  const text = typeof value === 'number' ? String(value) : String(value).trim();
+  if (/^-/.test(text)) return { error: `${label} cannot be negative` };
+  const match = /^(\d*)(?:\.(\d*))?$/.exec(text);
+  if (!match || (match[1] === '' && (match[2] === undefined || match[2] === ''))) {
+    return { error: `${label} must be a valid number` };
+  }
+  const integerPart = match[1] || '0';
+  const fractionPart = match[2] || '';
+  if (fractionPart.length > 2) return { error: `${label} can have at most 2 decimal places` };
+  if (integerPart.replace(/^0+(?=\d)/, '').length > 12) return { error: `${label} is too large` };
+  return { cents: Number(integerPart) * 100 + Number(fractionPart.padEnd(2, '0')) };
+};
+
 const insertHiddenExpense = async (connection, { date, cents, type, description, companyId, reference, userId }) => {
   const [hidden] = await connection.query(
     `INSERT INTO hidden_expenses
@@ -456,6 +477,200 @@ const realiseCardTransactions = async (connection, {
   };
 };
 
+/**
+ * Reverses a Completed realisation back to Pending (Admin / Super Admin only -
+ * enforced by the route). Voids the Bank Ledger debit (finance_transactions,
+ * same convention as every other void in this app) and soft-deletes the
+ * linked Hidden Expenses (no hard delete), marks the realisation reversed
+ * (kept for audit, never deleted - it drops out of the Completed tab) and
+ * puts every card transaction it covered back to Pending so it can be
+ * corrected and re-realised. Requires an open DB transaction on `connection`;
+ * the caller commits / rolls back.
+ */
+const reverseCardRealisation = async (connection, { realisationId, userId = null } = {}) => {
+  const id = parseId(realisationId);
+  if (!id) throw new HttpError(400, 'Invalid realisation');
+
+  const [rows] = await connection.query(
+    `SELECT id, bank_id, company_id, finance_transaction_id, hidden_expense_id,
+            commission_expense_id, bank_charge_expense_id, status
+       FROM card_realisations WHERE id = ? FOR UPDATE`,
+    [id]
+  );
+  if (rows.length === 0) throw new HttpError(404, 'Realisation not found');
+  const realisation = rows[0];
+  if (Number(realisation.status ?? 1) !== 1) throw new HttpError(409, 'This realisation has already been reversed');
+
+  const [cards] = await connection.query(
+    'SELECT id FROM card_transactions WHERE realisation_id = ? FOR UPDATE',
+    [id]
+  );
+
+  let bankBalance = null;
+  if (realisation.finance_transaction_id) {
+    await connection.query(
+      'UPDATE finance_transactions SET status = 0 WHERE id = ? AND status = 1',
+      [realisation.finance_transaction_id]
+    );
+    bankBalance = await rebuildBalanceAfter(connection, 'BANK', realisation.bank_id);
+  }
+
+  for (const expenseId of [realisation.commission_expense_id, realisation.bank_charge_expense_id, realisation.hidden_expense_id]) {
+    if (expenseId) {
+      await connection.query('UPDATE hidden_expenses SET is_deleted = 1 WHERE id = ? AND is_deleted = 0', [expenseId]);
+    }
+  }
+
+  await connection.query(
+    'UPDATE card_realisations SET status = 0, reversed_by = ?, reversed_at = NOW() WHERE id = ?',
+    [userId, id]
+  );
+
+  await connection.query(
+    `UPDATE card_transactions
+        SET status = 'Pending', realise_date = NULL, realisation_id = NULL,
+            realised_by = NULL, realised_at = NULL, commission_rate = NULL
+      WHERE realisation_id = ?`,
+    [id]
+  );
+
+  return { realisationId: id, bankId: realisation.bank_id, transactionIds: cards.map((c) => c.id), bankBalance };
+};
+
+const editDescription = (realisationId, label) =>
+  `Card Ledger realisation #${realisationId} - ${label} edited by Super Admin`.slice(0, DESCRIPTION_MAX);
+
+/**
+ * Edits a Completed realisation's figures (Super Admin only - enforced by the
+ * route): Total Transaction Amount, Expected Commission and Realise Amount.
+ * Remaining Balance / Bank Charge is always recalculated (Total - Realise -
+ * Expected Commission >= 0), same rule as a normal realise. Branch /
+ * Department and Total Transaction Amount can only change when the
+ * realisation covers a single card transaction - there is otherwise no
+ * single row they could apply to. Keeps the Bank Ledger debit and the two
+ * linked Hidden Expenses in sync. Requires an open DB transaction on
+ * `connection`; the caller commits / rolls back.
+ */
+const editCardRealisation = async (connection, {
+  realisationId, totalAmount, commissionAmount, realiseAmount, departmentId, userId = null
+} = {}) => {
+  const id = parseId(realisationId);
+  if (!id) throw new HttpError(400, 'Invalid realisation');
+
+  const [rows] = await connection.query(
+    `SELECT id, company_id, bank_id, DATE_FORMAT(realise_date, '%Y-%m-%d') AS realise_date,
+            reference_number, finance_transaction_id, commission_expense_id, bank_charge_expense_id, status
+       FROM card_realisations WHERE id = ? FOR UPDATE`,
+    [id]
+  );
+  if (rows.length === 0) throw new HttpError(404, 'Realisation not found');
+  const realisation = rows[0];
+  if (Number(realisation.status ?? 1) !== 1) throw new HttpError(409, 'A reversed realisation cannot be edited');
+
+  const [cards] = await connection.query(
+    'SELECT id, amount, department_id FROM card_transactions WHERE realisation_id = ? FOR UPDATE',
+    [id]
+  );
+  if (cards.length === 0) throw new HttpError(404, 'No card transactions are linked to this realisation');
+
+  const total = parsePositiveMoney(totalAmount, 'Total Transaction Amount');
+  if (total.error) throw new HttpError(400, total.error);
+  const commission = parseNonNegativeMoney(commissionAmount, 'Expected Commission');
+  if (commission.error) throw new HttpError(400, commission.error);
+  const realise = parsePositiveMoney(realiseAmount, 'Realise Amount');
+  if (realise.error) throw new HttpError(400, realise.error);
+  const newDepartmentId = parseOptionalDepartment(departmentId);
+
+  const existingTotalCents = cards.reduce((sum, c) => sum + dbToCents(c.amount), 0);
+  const changesSingleRowFields = total.cents !== existingTotalCents
+    || (newDepartmentId !== null && Number(newDepartmentId) !== Number(cards[0]?.department_id));
+  if (changesSingleRowFields && cards.length !== 1) {
+    throw new HttpError(400, 'Total Transaction Amount and Branch / Department can only be edited when the realisation covers a single card transaction');
+  }
+
+  const remainingCents = total.cents - realise.cents - commission.cents;
+  if (remainingCents < 0) {
+    throw new HttpError(
+      400,
+      `Realise Amount + Expected Commission cannot be more than Total Transaction Amount Rs. ${formatCents(total.cents)}`
+    );
+  }
+
+  await connection.query(
+    `UPDATE card_realisations
+        SET total_amount = ?, commission_amount = ?, realise_amount = ?, remaining_balance = ?,
+            updated_by = ?, updated_at = NOW()
+      WHERE id = ?`,
+    [centsToNumber(total.cents), centsToNumber(commission.cents), centsToNumber(realise.cents), centsToNumber(remainingCents), userId, id]
+  );
+
+  if (cards.length === 1) {
+    const card = cards[0];
+    const updates = [];
+    const params = [];
+    if (dbToCents(card.amount) !== total.cents) { updates.push('amount = ?'); params.push(centsToNumber(total.cents)); }
+    if (newDepartmentId !== null && Number(newDepartmentId) !== Number(card.department_id)) {
+      updates.push('department_id = ?'); params.push(newDepartmentId);
+    }
+    if (updates.length > 0) {
+      params.push(card.id);
+      await connection.query(`UPDATE card_transactions SET ${updates.join(', ')} WHERE id = ?`, params);
+    }
+  }
+
+  let bankBalance = null;
+  if (realisation.finance_transaction_id) {
+    await connection.query(
+      'UPDATE finance_transactions SET debit = ? WHERE id = ? AND status = 1',
+      [centsToNumber(realise.cents), realisation.finance_transaction_id]
+    );
+    bankBalance = await rebuildBalanceAfter(connection, 'BANK', realisation.bank_id);
+  }
+
+  const expense = { date: realisation.realise_date, companyId: realisation.company_id, reference: realisation.reference_number, userId };
+
+  if (commission.cents > 0) {
+    if (realisation.commission_expense_id) {
+      await connection.query('UPDATE hidden_expenses SET amount = ?, description = ? WHERE id = ?',
+        [centsToNumber(commission.cents), editDescription(id, COMMISSION_EXPENSE_TYPE), realisation.commission_expense_id]);
+    } else {
+      const newId = await insertHiddenExpense(connection, {
+        ...expense, cents: commission.cents, type: COMMISSION_EXPENSE_TYPE, description: editDescription(id, COMMISSION_EXPENSE_TYPE)
+      });
+      await connection.query('UPDATE card_realisations SET commission_expense_id = ? WHERE id = ?', [newId, id]);
+    }
+  } else if (realisation.commission_expense_id) {
+    await connection.query('UPDATE hidden_expenses SET is_deleted = 1 WHERE id = ? AND is_deleted = 0', [realisation.commission_expense_id]);
+    await connection.query('UPDATE card_realisations SET commission_expense_id = NULL WHERE id = ?', [id]);
+  }
+
+  if (remainingCents > 0) {
+    if (realisation.bank_charge_expense_id) {
+      await connection.query('UPDATE hidden_expenses SET amount = ?, description = ? WHERE id = ?',
+        [centsToNumber(remainingCents), editDescription(id, BANK_CHARGE_EXPENSE_TYPE), realisation.bank_charge_expense_id]);
+    } else {
+      const newId = await insertHiddenExpense(connection, {
+        ...expense, cents: remainingCents, type: BANK_CHARGE_EXPENSE_TYPE, description: editDescription(id, BANK_CHARGE_EXPENSE_TYPE)
+      });
+      await connection.query('UPDATE card_realisations SET bank_charge_expense_id = ? WHERE id = ?', [newId, id]);
+    }
+  } else if (realisation.bank_charge_expense_id) {
+    await connection.query('UPDATE hidden_expenses SET is_deleted = 1 WHERE id = ? AND is_deleted = 0', [realisation.bank_charge_expense_id]);
+    await connection.query('UPDATE card_realisations SET bank_charge_expense_id = NULL WHERE id = ?', [id]);
+  }
+
+  return {
+    realisationId: id,
+    bankBalance,
+    totals: {
+      totalTransactionAmount: centsToNumber(total.cents),
+      expectedCommission: centsToNumber(commission.cents),
+      realiseAmount: centsToNumber(realise.cents),
+      remainingBalance: centsToNumber(remainingCents)
+    }
+  };
+};
+
 module.exports = {
   CARD_LEDGER_TRANSACTION_TYPE,
   CARD_LEDGER_REFERENCE_TYPE,
@@ -469,5 +684,7 @@ module.exports = {
   parseRealiseRequest,
   calculateCommission,
   previewCommission,
-  realiseCardTransactions
+  realiseCardTransactions,
+  reverseCardRealisation,
+  editCardRealisation
 };

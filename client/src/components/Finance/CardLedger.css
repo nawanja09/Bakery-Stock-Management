@@ -171,6 +171,16 @@
   border: 1px solid #fecaca; color: var(--color-danger-dark); font-size: 0.875rem;
 }
 
+/* Completed tab: Reverse / Edit actions (Admin / Super Admin only). */
+.cl-actions-col { width: 76px; text-align: center; white-space: nowrap; }
+.cl-icon-btn {
+  display: inline-grid; place-items: center; width: 30px; height: 30px; margin: 0 2px;
+  border: 1px solid var(--color-border-strong); border-radius: 7px; background: #fff;
+  color: var(--color-gray-700); cursor: pointer; transition: background .16s ease, color .16s ease, border-color .16s ease;
+}
+.cl-icon-btn:hover { background: var(--color-surface-hover); color: var(--color-primary); border-color: var(--color-primary); }
+.cl-icon-btn-danger:hover { color: var(--color-danger-dark); border-color: var(--color-danger); }
+
 /* Horizontal filter row: as many filters per line as the width allows. */
 .cl-filters-row { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
 .cl-muted { color: var(--color-text-secondary); font-style: italic; }

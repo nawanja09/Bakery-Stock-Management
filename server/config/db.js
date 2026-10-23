@@ -1959,4 +1959,28 @@ const ensureCardCommissionSchema = async () => {
 pool.cardCommissionSchemaReady = Promise.all([cardLedgerReady, pool.collectionsSchemaReady])
   .then(ensureCardCommissionSchema);
 
+// Card Ledger: reverse (Completed -> Pending, Admin / Super Admin) and edit a
+// realisation's figures (Super Admin). status 1 = active, 0 = reversed - kept
+// for audit, never deleted (same convention as finance_transactions / other
+// ledger tables). Additive only.
+const ensureCardReversalSchema = async () => {
+  try {
+    for (const ddl of [
+      "ALTER TABLE card_realisations ADD COLUMN IF NOT EXISTS status TINYINT(1) NOT NULL DEFAULT 1 AFTER bank_charge_expense_id",
+      "ALTER TABLE card_realisations ADD COLUMN IF NOT EXISTS reversed_by INT NULL AFTER status",
+      "ALTER TABLE card_realisations ADD COLUMN IF NOT EXISTS reversed_at TIMESTAMP NULL AFTER reversed_by",
+      "ALTER TABLE card_realisations ADD COLUMN IF NOT EXISTS updated_by INT NULL AFTER reversed_at",
+      "ALTER TABLE card_realisations ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER updated_by",
+      "ALTER TABLE card_realisations ADD KEY idx_card_real_status (status)"
+    ]) {
+      try { await pool.query(ddl); } catch (ddlErr) { /* already applied */ }
+    }
+    console.log('Card Ledger reverse / edit schema ready');
+  } catch (error) {
+    console.warn('Card Ledger reverse / edit schema check skipped:', error.message);
+  }
+};
+
+pool.cardReversalSchemaReady = pool.cardCommissionSchemaReady.then(ensureCardReversalSchema);
+
 module.exports = pool;

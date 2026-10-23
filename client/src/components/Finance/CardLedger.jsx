@@ -22,14 +22,20 @@
 // every change this page re-reads the API.
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCreditCard, faSpinner, faCheck, faTimes } from '@fortawesome/free-solid-svg-icons';
+import { faCreditCard, faSpinner, faCheck, faTimes, faRotateLeft, faPen } from '@fortawesome/free-solid-svg-icons';
 import api from '../../api';
 import useDialog from '../common/ui/useDialog';
 import { usePopup } from '../context/PopupContext';
+import { useConfirm } from '../common/ui';
 import './FinanceForm.css';
 import './CardLedger.css';
 
 const WRITE_ROLES = ['Admin', 'Super Admin', 'Accountant'];
+// Completed -> Pending (Reverse): Admin / Super Admin only. Editing a Completed
+// realisation's own figures: Super Admin only - both narrower than ordinary
+// Finance write access (WRITE_ROLES above).
+const REVERSE_ROLES = ['Admin', 'Super Admin'];
+const SUPER_ADMIN_ROLE = 'Super Admin';
 const NO_DEPARTMENT = 'none';
 
 const getStoredUserRole = () => {
@@ -122,7 +128,10 @@ const DimensionFilters = ({ idPrefix, departments, departmentId, onDepartment, s
 
 const CardLedger = () => {
   const { showPopup } = usePopup();
+  const confirm = useConfirm();
   const canWrite = WRITE_ROLES.includes(getStoredUserRole());
+  const canReverse = REVERSE_ROLES.includes(getStoredUserRole());
+  const canEditCompleted = getStoredUserRole() === SUPER_ADMIN_ROLE;
 
   const [tab, setTab] = useState('Pending');
   const [companies, setCompanies] = useState([]);
@@ -145,6 +154,14 @@ const CardLedger = () => {
   const completedShiftNo = useDebounced(completedShift.trim());
   const [completed, setCompleted] = useState({ transactions: [], totals: null });
   const [loadingCompleted, setLoadingCompleted] = useState(false);
+
+  // ---- Edit a Completed realisation (Super Admin only) ----
+  const [editRow, setEditRow] = useState(null); // the realisation row being edited, or null
+  const [editForm, setEditForm] = useState({ totalAmount: '', commissionAmount: '', realiseAmount: '', departmentId: '' });
+  const [editError, setEditError] = useState('');
+  const [editing, setEditing] = useState(false);
+  const editDialogRef = useRef(null);
+  useDialog(editDialogRef, { open: !!editRow, onClose: () => closeEdit() });
 
   // ---- Realise modal ----
   const [realiseOpen, setRealiseOpen] = useState(false);
@@ -200,6 +217,70 @@ const CardLedger = () => {
 
   useEffect(() => { setLoadingPending(true); fetchPending(); }, [fetchPending]);
   useEffect(() => { fetchCompleted(); }, [fetchCompleted]);
+
+  // ---------------------------------------------------- reverse (Admin / Super Admin)
+  const handleReverse = async (row) => {
+    if (!await confirm(
+      `Reverse this realisation (Rs. ${fmtMoney(row.total_amount)}, realised ${fmtDate(row.realise_date)})? `
+      + 'Its Bank Ledger entry and Hidden Expenses will be voided and its card transaction(s) will go back to Pending.'
+    )) return;
+    try {
+      await api.delete(`/finance/card-ledger/realisations/${row.id}`);
+      showPopup('success', 'Card realisation reversed to Pending');
+      await Promise.all([fetchPending(), fetchCompleted()]);
+    } catch (error) {
+      showPopup('error', error.response?.data?.error || 'Failed to reverse the card realisation');
+    }
+  };
+
+  // ---------------------------------------------------- edit a Completed row (Super Admin)
+  const editSingleCard = editRow?.cards?.length === 1 ? editRow.cards[0] : null;
+
+  const openEdit = (row) => {
+    setEditRow(row);
+    setEditForm({
+      totalAmount: String(row.total_amount ?? ''),
+      commissionAmount: String(row.commission_amount ?? '0'),
+      realiseAmount: String(row.realise_amount ?? ''),
+      departmentId: row.cards?.length === 1 ? String(row.cards[0].department_id || '') : ''
+    });
+    setEditError('');
+  };
+  const closeEdit = () => { if (!editing) { setEditRow(null); setEditError(''); } };
+
+  const editRemaining = useMemo(() => {
+    const total = parseFloat(editForm.totalAmount);
+    const commission = parseFloat(editForm.commissionAmount);
+    const realiseAmt = parseFloat(editForm.realiseAmount);
+    if (!Number.isFinite(total) || !Number.isFinite(commission) || !Number.isFinite(realiseAmt)) return null;
+    return Math.round((total - commission - realiseAmt) * 100) / 100;
+  }, [editForm]);
+
+  const handleEditSubmit = async (event) => {
+    event.preventDefault();
+    if (editing) return;
+    if (editRemaining !== null && editRemaining < 0) {
+      return setEditError('Realise Amount + Expected Commission cannot be more than Total Transaction Amount');
+    }
+    setEditing(true);
+    setEditError('');
+    try {
+      const body = {
+        total_amount: editForm.totalAmount,
+        expected_commission: editForm.commissionAmount,
+        realise_amount: editForm.realiseAmount
+      };
+      if (editSingleCard && editForm.departmentId) body.department_id = Number(editForm.departmentId);
+      await api.put(`/finance/card-ledger/realisations/${editRow.id}`, body);
+      showPopup('success', 'Card realisation updated');
+      setEditRow(null);
+      await fetchCompleted();
+    } catch (error) {
+      setEditError(error.response?.data?.error || 'Failed to update the card realisation');
+    } finally {
+      setEditing(false);
+    }
+  };
 
   useEffect(() => {
     api.get('/finance/bank/accounts/all')
@@ -453,6 +534,7 @@ const CardLedger = () => {
   };
   const setCompletedFilter = (name) => (e) => { setCompletedFilters((p) => ({ ...p, [name]: e.target.value })); };
   const pendingCols = canWrite ? 9 : 8;
+  const completedCols = (canReverse || canEditCompleted) ? 9 : 8;
 
   return (
     <div className="page-container cl-page">
@@ -669,11 +751,12 @@ const CardLedger = () => {
                       <th className="cl-num">Expected Commission</th>
                       <th className="cl-num">Realise Amount</th>
                       <th className="cl-num">Remaining Balance / Bank Charge</th>
+                      {(canReverse || canEditCompleted) && <th className="cl-actions-col">Actions</th>}
                     </tr>
                   </thead>
                   <tbody>
                     {completed.transactions.length === 0 ? (
-                      <tr><td colSpan={8} className="cl-empty">No completed card transactions.</td></tr>
+                      <tr><td colSpan={completedCols} className="cl-empty">No completed card transactions.</td></tr>
                     ) : completed.transactions.map((row) => (
                       <tr key={row.id}>
                         <td className="cl-stack">
@@ -691,6 +774,20 @@ const CardLedger = () => {
                         <td className="cl-num">{row.commission_amount === null || row.commission_amount === undefined ? '—' : fmtMoney(row.commission_amount)}</td>
                         <td className="cl-num">{fmtMoney(row.realise_amount)}</td>
                         <td className="cl-num">{fmtMoney(row.remaining_balance)}</td>
+                        {(canReverse || canEditCompleted) && (
+                          <td className="cl-actions-col">
+                            {canEditCompleted && (
+                              <button type="button" className="cl-icon-btn" title="Edit" aria-label={`Edit realisation ${row.id}`} onClick={() => openEdit(row)}>
+                                <FontAwesomeIcon icon={faPen} />
+                              </button>
+                            )}
+                            {canReverse && (
+                              <button type="button" className="cl-icon-btn cl-icon-btn-danger" title="Reverse to Pending" aria-label={`Reverse realisation ${row.id} to Pending`} onClick={() => handleReverse(row)}>
+                                <FontAwesomeIcon icon={faRotateLeft} />
+                              </button>
+                            )}
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
@@ -702,6 +799,7 @@ const CardLedger = () => {
                         <td className="cl-num cl-total">{fmtMoney(completed.totals.commission_amount)}</td>
                         <td className="cl-num cl-total">{fmtMoney(completed.totals.realise_amount)}</td>
                         <td className="cl-num cl-total">{fmtMoney(completed.totals.remaining_balance)}</td>
+                        {(canReverse || canEditCompleted) && <td />}
                       </tr>
                     </tfoot>
                   )}
@@ -876,6 +974,111 @@ const CardLedger = () => {
                 <button type="button" className="btn btn-secondary" onClick={closeRealise} disabled={realising}>Cancel</button>
                 <button type="submit" className="btn btn-primary" disabled={realising || preview.loading}>
                   {realising ? <><FontAwesomeIcon icon={faSpinner} spin /> Realising...</> : <><FontAwesomeIcon icon={faCheck} /> Confirm Realise</>}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ------------------------- EDIT CARD REALISATION (Super Admin) ------------------------- */}
+      {editRow && (
+        <div className="cl-modal-overlay">
+          <div ref={editDialogRef} className="cl-modal" role="dialog" aria-modal="true" aria-labelledby="cl-edit-title">
+            <div className="cl-modal-header">
+              <div>
+                <h3 id="cl-edit-title">Edit Card Realisation</h3>
+                <div className="cl-modal-sub">Realised {fmtDate(editRow.realise_date)} &middot; {(editRow.departments || []).join(', ') || 'Not assigned'}</div>
+              </div>
+              <button type="button" className="cl-modal-close" onClick={closeEdit} aria-label="Close" disabled={editing}>
+                <FontAwesomeIcon icon={faTimes} />
+              </button>
+            </div>
+            <form onSubmit={handleEditSubmit} noValidate>
+              <div className="cl-modal-body">
+                <div className="form-group">
+                  <label htmlFor="cl-edit-department">Branch / Department</label>
+                  {editSingleCard ? (
+                    <select
+                      id="cl-edit-department"
+                      value={editForm.departmentId}
+                      onChange={(e) => setEditForm((f) => ({ ...f, departmentId: e.target.value }))}
+                      className="form-input"
+                    >
+                      <option value="">Not assigned</option>
+                      {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </select>
+                  ) : (
+                    <input id="cl-edit-department" type="text" readOnly tabIndex={-1} value={(editRow.departments || []).join(', ') || 'Not assigned'} className="form-input cl-readonly" />
+                  )}
+                  {!editSingleCard && <span className="form-helper">Only editable when the realisation covers a single card transaction.</span>}
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="cl-edit-total">Total Transaction Amount <span className="required">*</span></label>
+                  <input
+                    id="cl-edit-total"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    inputMode="decimal"
+                    value={editForm.totalAmount}
+                    onChange={(e) => setEditForm((f) => ({ ...f, totalAmount: e.target.value }))}
+                    readOnly={!editSingleCard}
+                    tabIndex={editSingleCard ? 0 : -1}
+                    className={`form-input cl-amount-input ${editSingleCard ? '' : 'cl-readonly'}`}
+                  />
+                  {!editSingleCard && <span className="form-helper">Only editable when the realisation covers a single card transaction.</span>}
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="cl-edit-commission">Expected Commission <span className="required">*</span></label>
+                  <input
+                    id="cl-edit-commission"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    inputMode="decimal"
+                    value={editForm.commissionAmount}
+                    onChange={(e) => setEditForm((f) => ({ ...f, commissionAmount: e.target.value }))}
+                    className="form-input cl-amount-input"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="cl-edit-realise">Realise Amount <span className="required">*</span></label>
+                  <input
+                    id="cl-edit-realise"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    inputMode="decimal"
+                    value={editForm.realiseAmount}
+                    onChange={(e) => setEditForm((f) => ({ ...f, realiseAmount: e.target.value }))}
+                    className="form-input cl-amount-input"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="cl-edit-remaining">Remaining Balance / Bank Charge</label>
+                  <input
+                    id="cl-edit-remaining"
+                    type="text"
+                    readOnly
+                    tabIndex={-1}
+                    value={editRemaining === null ? '' : fmtMoney(editRemaining)}
+                    className={`form-input cl-amount-input cl-readonly ${editRemaining !== null && editRemaining < 0 ? 'cl-input-invalid' : ''}`}
+                  />
+                  <span className="form-helper">Total Transaction Amount &minus; Realise Amount &minus; Expected Commission (recalculated automatically).</span>
+                </div>
+
+                {editError && <div className="cl-modal-error" role="alert">{editError}</div>}
+              </div>
+
+              <div className="cl-modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={closeEdit} disabled={editing}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={editing}>
+                  {editing ? <><FontAwesomeIcon icon={faSpinner} spin /> Saving...</> : <><FontAwesomeIcon icon={faCheck} /> Save</>}
                 </button>
               </div>
             </form>

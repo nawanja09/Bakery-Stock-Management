@@ -48,6 +48,13 @@ const conn = {
       return [{}];
     }
     if (s.startsWith('UPDATE bank_details SET current_balance')) return [{}];
+    // rebuildBalanceAfter (utils/financeLedger): row balance_after rewrite (not tracked
+    // in this fake - no test asserts on it) + the bank's recomputed total.
+    if (s.startsWith('UPDATE finance_transactions ft')) return [{}];
+    if (s.includes('FROM finance_transactions WHERE account_type = ? AND bank_id = ? AND status = 1') && !s.includes('transaction_date')) {
+      const sum = db.ledger.filter(r => r.bank_id === params[1] && r.status === 1).reduce((a, r) => a + r.debit - r.credit, 0);
+      return [[{ balance: sum }]];
+    }
 
     if (s.startsWith('SELECT id, name FROM departments WHERE is_deleted = 0 AND id IN')) {
       return [params[0].filter(id => db.departments[id]).map(id => ({ id, name: db.departments[id] }))];
@@ -107,6 +114,70 @@ const conn = {
       Object.assign(c, { status: 'Completed', realise_date, realisation_id, department_id, commission_rate });
       return [{ affectedRows: 1 }];
     }
+
+    // ---- Reverse (Completed -> Pending) / Edit a realisation ----
+    if (s.includes('FROM card_realisations WHERE id = ? FOR UPDATE')) {
+      const r = db.realisations.find(x => x.id === params[0]);
+      return [r ? [{ ...r }] : []];
+    }
+    if (s.includes('FROM card_transactions WHERE realisation_id = ? FOR UPDATE')) {
+      return [db.card.filter(c => c.realisation_id === params[0]).map(c => ({ ...c }))];
+    }
+    if (s.startsWith('UPDATE finance_transactions SET status = 0')) {
+      const row = db.ledger.find(r => r.id === params[0] && r.status === 1);
+      if (row) row.status = 0;
+      return [{ affectedRows: row ? 1 : 0 }];
+    }
+    if (s.startsWith('UPDATE finance_transactions SET debit = ?')) {
+      const row = db.ledger.find(r => r.id === params[1] && r.status === 1);
+      if (row) row.debit = params[0];
+      return [{ affectedRows: row ? 1 : 0 }];
+    }
+    if (s.startsWith('UPDATE hidden_expenses SET is_deleted = 1')) {
+      const row = db.hidden.find(h => h.id === params[0]);
+      if (row) row.is_deleted = 1;
+      return [{ affectedRows: row ? 1 : 0 }];
+    }
+    if (s.startsWith('UPDATE hidden_expenses SET amount = ?, description = ?')) {
+      const row = db.hidden.find(h => h.id === params[2]);
+      if (row) Object.assign(row, { amount: params[0], description: params[1] });
+      return [{ affectedRows: row ? 1 : 0 }];
+    }
+    if (s.startsWith('UPDATE card_realisations SET status = 0')) {
+      const r = db.realisations.find(x => x.id === params[1]);
+      if (r) Object.assign(r, { status: 0, reversed_by: params[0] });
+      return [{}];
+    }
+    if (s.startsWith('UPDATE card_realisations SET total_amount = ?')) {
+      const [total_amount, commission_amount, realise_amount, remaining_balance, updated_by, id] = params;
+      const r = db.realisations.find(x => x.id === id);
+      if (r) Object.assign(r, { total_amount, commission_amount, realise_amount, remaining_balance, updated_by });
+      return [{}];
+    }
+    if (/^UPDATE card_realisations SET (commission|bank_charge)_expense_id/.test(s)) {
+      const field = s.includes('commission_expense_id') ? 'commission_expense_id' : 'bank_charge_expense_id';
+      const isNull = s.includes('= NULL');
+      const r = db.realisations.find(x => x.id === params[isNull ? 0 : 1]);
+      if (r) r[field] = isNull ? null : params[0];
+      return [{}];
+    }
+    if (s.startsWith("UPDATE card_transactions SET status = 'Pending'")) {
+      db.card.filter(c => c.realisation_id === params[0]).forEach(c => Object.assign(c, {
+        status: 'Pending', realise_date: null, realisation_id: null, realised_by: null, realised_at: null, commission_rate: null
+      }));
+      return [{}];
+    }
+    if (s.startsWith('UPDATE card_transactions SET amount') || s.startsWith('UPDATE card_transactions SET department_id')) {
+      const hasAmount = s.includes('amount = ?');
+      const hasDept = s.includes('department_id = ?');
+      const id = params[params.length - 1];
+      const c = db.card.find(x => x.id === id);
+      if (c) {
+        if (hasAmount) c.amount = params[0];
+        if (hasDept) c.department_id = params[hasAmount ? 1 : 0];
+      }
+      return [{ affectedRows: c ? 1 : 0 }];
+    }
     throw new Error('Unhandled SQL in fake: ' + s.slice(0, 100));
   }
 };
@@ -117,7 +188,7 @@ require.cache[dbModulePath] = { id: dbModulePath, filename: dbModulePath, loaded
 const svc = require('../services/cardLedgerService');
 const rates = require('../services/creditCardRateService');
 
-const bankBalance = (bankId = 1) => db.ledger.filter(r => r.bank_id === bankId).reduce((a, r) => a + r.debit - r.credit, 0);
+const bankBalance = (bankId = 1) => db.ledger.filter(r => r.bank_id === bankId && r.status === 1).reduce((a, r) => a + r.debit - r.credit, 0);
 const newCard = (over = {}) => svc.createPendingCardTransaction(conn, {
   companyId: 1, bankId: 1, date: '2026-10-01', amount: 10000, referenceNumber: null, remark: 'Visa', createdBy: 1,
   departmentId: 1, shiftNo: '0104', ...over
@@ -134,6 +205,25 @@ const realise = async (transactionIds, realiseAmount, realiseDate = '2026-10-02'
 };
 const nothingWritten = () => db.ledger.length + db.hidden.length + db.realisations.length === 0
   && db.card.every(c => c.status === 'Pending');
+
+const reverse = async (realisationId, userId = 9) => {
+  const snapshot = JSON.stringify(db);
+  try {
+    return await svc.reverseCardRealisation(conn, { realisationId, userId });
+  } catch (e) {
+    db = JSON.parse(snapshot);
+    throw e;
+  }
+};
+const editRealisation = async (realisationId, fields, userId = 9) => {
+  const snapshot = JSON.stringify(db);
+  try {
+    return await svc.editCardRealisation(conn, { realisationId, userId, ...fields });
+  } catch (e) {
+    db = JSON.parse(snapshot);
+    throw e;
+  }
+};
 
 test.beforeEach(() => { db = fresh(); });
 
@@ -385,6 +475,113 @@ test('displayRemark drops the collection card label, Sale ID and Shift No; user 
   assert.equal(svc.displayRemark('Collection - Card (CP-55)'), 'CP-55');
   assert.equal(svc.displayRemark('Visa settlement SHIFT-9 manual'), 'Visa settlement SHIFT-9 manual');
   assert.equal(svc.displayRemark(null), '');
+});
+
+test('reverse: voids the Bank Ledger debit, soft-deletes both Hidden Expenses, reverts the card to Pending', async () => {
+  const id = await newCard({ referenceNumber: 'VCP-1' });
+  const out = await realise([id], '9700');
+  const r = db.realisations[0];
+  assert.equal(bankBalance(), 9700);
+
+  const result = await reverse(r.id);
+  assert.deepEqual(result, { realisationId: r.id, bankId: 1, transactionIds: [id], bankBalance: 0 });
+  assert.equal(db.ledger[0].status, 0);
+  assert.equal(bankBalance(), 0);
+  assert.deepEqual(db.hidden.map(h => h.is_deleted), [1, 1]);
+  assert.deepEqual({ status: r.status, by: r.reversed_by }, { status: 0, by: 9 });
+  assert.deepEqual(
+    { status: db.card[0].status, realisation_id: db.card[0].realisation_id, rate: db.card[0].commission_rate, out },
+    { status: 'Pending', realisation_id: null, rate: null, out }
+  );
+});
+
+test('reverse: an already-reversed realisation is refused; unknown id is 404', async () => {
+  const id = await newCard();
+  await realise([id], '9700');
+  const r = db.realisations[0];
+  await reverse(r.id);
+  await assert.rejects(reverse(r.id), (e) => e.status === 409);
+  await assert.rejects(reverse(9999), (e) => e.status === 404);
+});
+
+test('reverse: the card can be selected and re-realised afterwards', async () => {
+  const id = await newCard({ referenceNumber: 'VCP-9' });
+  await realise([id], '9700');
+  await reverse(db.realisations[0].id);
+  assert.equal(db.card[0].status, 'Pending');
+
+  const out = await realise([id], '9600', '2026-10-05');
+  assert.equal(out.totals.realiseAmount, 9600);
+  assert.equal(db.realisations.length, 2); // the reversed one is kept, a new one is created
+  assert.equal(bankBalance(), 9600);
+});
+
+test('edit: a single-card realisation - Total / Commission / Realise Amount update the ledger and both Hidden Expenses', async () => {
+  const id = await newCard({ referenceNumber: 'VCP-1', amount: 10000 });
+  await realise([id], '9700'); // commission 200, bank charge 100
+  const r = db.realisations[0];
+
+  const out = await editRealisation(r.id, { totalAmount: '10000', commissionAmount: '250', realiseAmount: '9600' });
+  assert.deepEqual(out.totals, { totalTransactionAmount: 10000, expectedCommission: 250, realiseAmount: 9600, remainingBalance: 150 });
+  assert.equal(db.ledger[0].debit, 9600); // Bank Ledger follows the new Realise Amount
+  assert.equal(bankBalance(), 9600);
+  assert.deepEqual(db.hidden.map(h => h.amount), [250, 150]); // same two Hidden Expenses, updated in place
+  assert.deepEqual(
+    { total: r.total_amount, commission: r.commission_amount, realise: r.realise_amount, remaining: r.remaining_balance, editor: r.updated_by },
+    { total: 10000, commission: 250, realise: 9600, remaining: 150, editor: 9 }
+  );
+});
+
+test('edit: Expected Commission down to 0 soft-deletes the commission Hidden Expense; a new Remaining Balance creates one', async () => {
+  const id = await newCard();
+  await realise([id], '9800'); // commission 200, remaining 0 -> no bank charge expense created
+  const r = db.realisations[0];
+  assert.equal(db.hidden.length, 1);
+
+  await editRealisation(r.id, { totalAmount: '10000', commissionAmount: '0', realiseAmount: '9800' });
+  assert.equal(db.hidden[0].is_deleted, 1); // the old commission expense is gone (soft)
+  assert.equal(r.commission_expense_id, null);
+  assert.equal(db.hidden.length, 2);
+  const bankCharge = db.hidden[1];
+  assert.deepEqual([bankCharge.type, bankCharge.amount, bankCharge.is_deleted], ['Credit Card Bank Charge', 200, undefined]);
+  assert.equal(r.bank_charge_expense_id, bankCharge.id);
+});
+
+test('edit: Realise Amount + Expected Commission cannot exceed Total Transaction Amount', async () => {
+  const id = await newCard();
+  await realise([id], '9700');
+  const r = db.realisations[0];
+  await assert.rejects(editRealisation(r.id, { totalAmount: '10000', commissionAmount: '300', realiseAmount: '9800' }),
+    (e) => e.status === 400 && /cannot be more than Total Transaction Amount Rs\. 10,000\.00/.test(e.message));
+  assert.equal(r.realise_amount, 9700); // nothing changed
+});
+
+test('edit: Total Transaction Amount and Branch / Department are refused on a multi-card realisation; Commission / Realise Amount still work', async () => {
+  const a = await newCard({ amount: 6000, departmentId: 1 });
+  const b = await newCard({ amount: 4000, departmentId: 1 });
+  await realise([a, b], '9700'); // total 10000, commission 200
+  const r = db.realisations[0];
+
+  await assert.rejects(editRealisation(r.id, { totalAmount: '11000', commissionAmount: '200', realiseAmount: '9700' }),
+    (e) => e.status === 400 && /single card transaction/.test(e.message));
+  await assert.rejects(editRealisation(r.id, { totalAmount: '10000', commissionAmount: '200', realiseAmount: '9700', departmentId: 2 }),
+    (e) => e.status === 400 && /single card transaction/.test(e.message));
+
+  const out = await editRealisation(r.id, { totalAmount: '10000', commissionAmount: '250', realiseAmount: '9650' });
+  assert.deepEqual(out.totals.expectedCommission, 250);
+  assert.equal(db.card[0].amount, 6000); // underlying card rows untouched
+  assert.equal(db.card[1].amount, 4000);
+});
+
+test('edit: a reversed realisation cannot be edited; an unknown id is 404', async () => {
+  const id = await newCard();
+  await realise([id], '9700');
+  const r = db.realisations[0];
+  await reverse(r.id);
+  await assert.rejects(editRealisation(r.id, { totalAmount: '10000', commissionAmount: '200', realiseAmount: '9700' }),
+    (e) => e.status === 409);
+  await assert.rejects(editRealisation(9999, { totalAmount: '10000', commissionAmount: '200', realiseAmount: '9700' }),
+    (e) => e.status === 404);
 });
 
 test('parseRatePercent: numeric 0 - 100 with at most 2 decimals', () => {
