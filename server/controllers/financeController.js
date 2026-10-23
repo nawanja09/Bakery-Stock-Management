@@ -812,6 +812,7 @@ module.exports = {
   getBankLedger,
   getBankAccounts,
   getAllBankAccounts,
+  isCompanyBankAccount,
   receiveBank,
   issueBank,
   transferFunds,

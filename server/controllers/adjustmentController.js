@@ -10,6 +10,7 @@ const { softDelete } = require('../services/softDelete');
 const { getItemStock } = require('../services/rmStockService');
 const { postJournalEntry } = require('../utils/financeLedger');
 const { editCardRealisation } = require('../services/cardLedgerService');
+const { isCompanyBankAccount } = require('./financeController');
 
 const FINANCIAL_ADJUSTMENT_CATEGORIES = new Set(['Cash Receive', 'Bank Receive']);
 const FINANCIAL_ADJUSTMENT_SOURCES = new Set(['finance', 'card']);
@@ -116,7 +117,7 @@ const getFinancialAdjustmentRecordDetail = async (req, res) => {
 
 const updateFinancialAdjustmentRecord = async (req, res) => {
   const { category, source, id } = req.params;
-  const { date, amount, receive_type, reference_number, remark } = req.body;
+  const { date, amount, receive_type, reference_number, remark, company_id, bank_id } = req.body;
   if (!FINANCIAL_ADJUSTMENT_CATEGORIES.has(category) || !FINANCIAL_ADJUSTMENT_SOURCES.has(source) ||
       (source === 'card' && category !== 'Bank Receive')) {
     return res.status(400).json({ error: 'Invalid financial adjustment record' });
@@ -146,6 +147,17 @@ const updateFinancialAdjustmentRecord = async (req, res) => {
   if (String(receive_type).trim().length > 50) {
     return res.status(400).json({ error: 'Receive type cannot exceed 50 characters' });
   }
+  const normalizedCompanyId = Number(company_id);
+  if (!Number.isInteger(normalizedCompanyId) || normalizedCompanyId <= 0) {
+    return res.status(400).json({ error: 'Company is required' });
+  }
+  let normalizedBankId = null;
+  if (category === 'Bank Receive') {
+    normalizedBankId = Number(bank_id);
+    if (!Number.isInteger(normalizedBankId) || normalizedBankId <= 0) {
+      return res.status(400).json({ error: 'Bank Account is required' });
+    }
+  }
 
   let connection;
   try {
@@ -157,6 +169,29 @@ const updateFinancialAdjustmentRecord = async (req, res) => {
       return res.status(404).json({ error: 'Receive record not found' });
     }
     const existing = rows[0];
+
+    const [companyRows] = await connection.query('SELECT id FROM company WHERE id = ? AND is_deleted = 0', [normalizedCompanyId]);
+    if (!companyRows.length) {
+      await connection.rollback();
+      return res.status(400).json({ error: 'Select a valid Company' });
+    }
+    if (category === 'Bank Receive' && !await isCompanyBankAccount(connection, normalizedBankId, normalizedCompanyId)) {
+      await connection.rollback();
+      return res.status(400).json({ error: 'Select a valid Bank Account for the selected Company' });
+    }
+    const companyChanged = normalizedCompanyId !== Number(existing.company_id);
+    const bankChanged = category === 'Bank Receive' && normalizedBankId !== Number(existing.bank_id);
+    // A realised card receipt already posted its Bank Ledger debit and Hidden
+    // Expenses under the OLD Company / Bank Account: moving it would mean
+    // unwinding and re-posting that whole realisation, not a field correction.
+    // Reverse it to Pending in Card Ledger first (Admin / Super Admin), then
+    // the Company / Bank Account are free to change here.
+    if (source === 'card' && existing.status !== 'Pending' && (companyChanged || bankChanged)) {
+      await connection.rollback();
+      return res.status(400).json({
+        error: 'Company and Bank Account cannot be changed on a realised card receipt - reverse it to Pending in Card Ledger first'
+      });
+    }
 
     if (normalizedReference) {
       if (source === 'finance') {
@@ -183,18 +218,24 @@ const updateFinancialAdjustmentRecord = async (req, res) => {
       receive_type: existing.receive_type,
       reference_number: existing.reference_number,
       amount: moneyMath.round2(existing.amount || 0),
-      remark: existing.remark
+      remark: existing.remark,
+      company_id: Number(existing.company_id),
+      ...(category === 'Bank Receive' ? { bank_id: Number(existing.bank_id) } : {})
     };
     const updatedValues = {
       date,
       receive_type: String(receive_type).trim(),
       reference_number: normalizedReference,
       amount: normalizedAmount,
-      remark: normalizedRemark
+      remark: normalizedRemark,
+      company_id: normalizedCompanyId,
+      ...(category === 'Bank Receive' ? { bank_id: normalizedBankId } : {})
     };
     // Cash / Bank Receives classified as an Other Ledger keep that classification:
     // the Other Ledger entry is linked to this row, so the type cannot be swapped
     // to a Receive Type here (and no plain receipt may take the reserved type).
+    // Its Company is likewise fixed here - Other Ledgers are company-scoped from
+    // their own management screen (Finance -> Other Ledgers), not from this editor.
     let linkedOtherLedgerImpact = null;
     const otherLedgerSourceType = category === 'Cash Receive'
       ? otherLedgerService.SOURCE_CASH_RECEIVE : otherLedgerService.SOURCE_BANK_RECEIVE;
@@ -213,19 +254,31 @@ const updateFinancialAdjustmentRecord = async (req, res) => {
             : `"${reserved}" is reserved for Other Ledger receipts`
         });
       }
+      if (linkedOtherLedgerImpact && companyChanged) {
+        await connection.rollback();
+        return res.status(400).json({ error: 'The Company of an Other Ledger receipt cannot be changed here' });
+      }
     }
     const changed = Object.keys(updatedValues).some((key) => !sameValue(originalValues[key], updatedValues[key]));
     if (source === 'finance') {
       await connection.query(
         `UPDATE finance_transactions
          SET transaction_date = ?, transaction_type = ?, reference_number = ?, debit = ?,
-             credit = 0, remark = ?, balance_after = 0
+             credit = 0, remark = ?, balance_after = 0, company_id = ?, bank_id = ?
          WHERE id = ?`,
         [updatedValues.date, updatedValues.receive_type, updatedValues.reference_number,
-          updatedValues.amount, updatedValues.remark, id]
+          updatedValues.amount, updatedValues.remark, normalizedCompanyId,
+          category === 'Bank Receive' ? normalizedBankId : null, id]
       );
-      await recalculateFinanceAccountBalance(connection, category === 'Cash Receive' ? 'CASH' : 'BANK',
-        category === 'Cash Receive' ? existing.company_id : existing.bank_id);
+      // Company / Bank Account can move the row to a different account: both the
+      // account it left and the one it joined need their running balance redone.
+      const accountType = category === 'Cash Receive' ? 'CASH' : 'BANK';
+      const oldAccountId = category === 'Cash Receive' ? existing.company_id : existing.bank_id;
+      const newAccountId = category === 'Cash Receive' ? normalizedCompanyId : normalizedBankId;
+      await recalculateFinanceAccountBalance(connection, accountType, newAccountId);
+      if (Number(oldAccountId) !== Number(newAccountId)) {
+        await recalculateFinanceAccountBalance(connection, accountType, oldAccountId);
+      }
       // Keep the linked Other Ledger entry (if any) in step with its source row:
       // updated in place, never duplicated. No-op for every other receipt.
       if (linkedOtherLedgerImpact) {
@@ -259,12 +312,15 @@ const updateFinancialAdjustmentRecord = async (req, res) => {
         });
       }
       // amount is included even when editCardRealisation already set it above -
-      // same value, so this is a harmless no-op in that case.
+      // same value, so this is a harmless no-op in that case. company_id / bank_id
+      // only ever differ from the existing row while it is still Pending (checked
+      // above), so this never moves an already-posted realisation's figures.
       await connection.query(
         `UPDATE card_transactions
-         SET transaction_date = ?, reference_number = ?, amount = ?, remark = ?
+         SET transaction_date = ?, reference_number = ?, amount = ?, remark = ?, company_id = ?, bank_id = ?
          WHERE id = ?`,
-        [updatedValues.date, updatedValues.reference_number, updatedValues.amount, updatedValues.remark, id]
+        [updatedValues.date, updatedValues.reference_number, updatedValues.amount, updatedValues.remark,
+          normalizedCompanyId, normalizedBankId, id]
       );
     }
 

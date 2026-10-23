@@ -13,6 +13,11 @@ const assert = require('node:assert/strict');
 
 const fresh = () => ({
   card: [], ledger: [], hidden: [], realisations: [], rmAdjustments: [],
+  company: [{ id: 1, name: 'JH' }, { id: 2, name: 'RD' }],
+  bankDetails: [
+    { id: 1, company: 'JH', status: 'Active', record_status: 1 },
+    { id: 2, company: 'RD', status: 'Active', record_status: 1 }
+  ],
   nextLedger: 1, nextHidden: 1
 });
 let db = fresh();
@@ -24,6 +29,17 @@ const conn = {
     if (s.startsWith("SELECT ct.id, 'card' AS source")) {
       const c = db.card.find((x) => String(x.id) === String(params[0]));
       return [c ? [{ ...c }] : []];
+    }
+    if (s === 'SELECT id FROM company WHERE id = ? AND is_deleted = 0') {
+      const c = db.company.find((x) => x.id === params[0]);
+      return [c ? [{ id: c.id }] : []];
+    }
+    if (s.startsWith('SELECT bd.id FROM bank_details bd')) {
+      const bank = db.bankDetails.find((b) => b.id === params[0]);
+      const company = db.company.find((c) => c.id === params[1]);
+      const ok = !!bank && !!company && bank.company.toLowerCase().trim() === company.name.toLowerCase().trim()
+        && bank.status === 'Active' && (bank.record_status ?? 1) === 1;
+      return [ok ? [{ id: bank.id }] : []];
     }
     if (s === 'SELECT commission_amount, realise_amount FROM card_realisations WHERE id = ?') {
       const r = db.realisations.find((x) => x.id === params[0]);
@@ -93,9 +109,9 @@ const conn = {
       return [{ affectedRows: c ? 1 : 0 }];
     }
     if (s.startsWith('UPDATE card_transactions SET transaction_date = ?, reference_number = ?, amount = ?, remark = ?')) {
-      const [transaction_date, reference_number, amount, remark, id] = params;
+      const [transaction_date, reference_number, amount, remark, company_id, bank_id, id] = params;
       const c = db.card.find((x) => String(x.id) === String(id));
-      if (c) Object.assign(c, { transaction_date, reference_number, amount, remark });
+      if (c) Object.assign(c, { transaction_date, reference_number, amount, remark, company_id, bank_id });
       return [{ affectedRows: c ? 1 : 0 }];
     }
     throw new Error('Unhandled SQL in fake: ' + s.slice(0, 120));
@@ -150,7 +166,7 @@ const realiseInto = (cardId, { realisationId, totalAmount, commissionAmount, rea
 };
 
 const baseBody = (over = {}) => ({
-  date: '2026-10-01', amount: '10000', receive_type: 'Visa Card Payment', ...over
+  date: '2026-10-01', amount: '10000', receive_type: 'Visa Card Payment', company_id: 1, bank_id: 1, ...over
 });
 
 test.beforeEach(() => { db = fresh(); });
@@ -204,6 +220,40 @@ test('Completed, multi-card realisation, amount changed: refused - nothing writt
   assert.match(payload.error, /single card transaction/);
   assert.equal(db.card[0].amount, 6000); // untouched
   assert.equal(db.realisations[0].total_amount, 10000);
+});
+
+test('Pending: Company and Bank Account can be moved to another valid pair', async () => {
+  const id = newCard();
+  const { status, payload } = await call(id, baseBody({ company_id: 2, bank_id: 2 }));
+  assert.equal(status, 200, JSON.stringify(payload));
+  assert.deepEqual([db.card[0].company_id, db.card[0].bank_id], [2, 2]);
+});
+
+test('Completed: Company / Bank Account cannot be changed - reverse to Pending first', async () => {
+  const id = newCard();
+  realiseInto(id, { realisationId: 1, totalAmount: 10000, commissionAmount: 200, realiseAmount: 9700, remainingBalance: 100 });
+  const { status, payload } = await call(id, baseBody({ company_id: 2, bank_id: 2 }));
+  assert.equal(status, 400);
+  assert.match(payload.error, /reverse it to Pending/);
+  assert.deepEqual([db.card[0].company_id, db.card[0].bank_id], [1, 1]); // untouched
+});
+
+test('Completed: saving with the SAME Company / Bank Account is fine (not a change)', async () => {
+  const id = newCard();
+  realiseInto(id, { realisationId: 1, totalAmount: 10000, commissionAmount: 200, realiseAmount: 9700, remainingBalance: 100 });
+  const { status } = await call(id, baseBody({ remark: 'typo' })); // company_id: 1, bank_id: 1 - unchanged
+  assert.equal(status, 200);
+});
+
+test('an unknown Company, or a Bank Account that does not belong to it, is refused', async () => {
+  const id = newCard();
+  const bad1 = await call(id, baseBody({ company_id: 999 }));
+  assert.equal(bad1.status, 400);
+  assert.match(bad1.payload.error, /valid Company/);
+
+  const bad2 = await call(id, baseBody({ company_id: 1, bank_id: 2 })); // bank 2 belongs to company 2
+  assert.equal(bad2.status, 400);
+  assert.match(bad2.payload.error, /valid Bank Account/);
 });
 
 test('unknown record id is 404', async () => {
