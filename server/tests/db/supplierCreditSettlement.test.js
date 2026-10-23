@@ -303,6 +303,49 @@ test('Purchasing Payment adjustments list cash payments but not settlements, and
   assert.equal(cashDetail.status, 200, JSON.stringify(cashDetail.body));
 });
 
+// D1 (2026-10-23): a payment's allocated_amount/payment_history.amount hold
+// cash + discount COMBINED; adjustPurchasePayment must move the Cash/Bank
+// ledger by the CASH delta only, never by the combined delta.
+test('adjusting a discounted payment moves the cash book by the cash delta, not the combined delta', async () => {
+  const id = await createInvoice(10000);
+
+  const paid = await call('POST', '/purchases/pay-multiple', {
+    payment_date: '2026-10-13', payment_method: 'CASH', amount: 5000,
+    invoice_allocations: [{ purchase_id: id, amount: 5000, discount: 2000 }]
+  });
+  assert.equal(paid.status, 200, JSON.stringify(paid.body));
+  assert.equal(cents(paid.body.applied_amount), 500000, 'applied_amount is the cash portion only');
+  assert.equal(cents(paid.body.discount_amount), 200000);
+  assert.equal(cents(paid.body.total_credited), 700000, 'total_credited is cash + discount combined');
+
+  const cashAfterFirstPayment = await getCashBalance(companyId);
+  const invoiceAfterFirstPayment = await one('SELECT balance_amount FROM purchases WHERE id = ?', [id]);
+  assert.equal(cents(invoiceAfterFirstPayment.balance_amount), 300000, '10000 - 5000 cash - 2000 discount = 3000');
+
+  // Correct the cash figure from 5000 to 6000; the discount (2000) is left alone.
+  const adjust = await call('PUT', `/purchases/payments/${paid.body.payment_id}-${id}/adjust`, {
+    payment_date: '2026-10-13', amount: 6000, payment_method: 'CASH'
+  }, 'admin');
+  assert.equal(adjust.status, 200, JSON.stringify(adjust.body));
+
+  const cashAfterAdjust = await getCashBalance(companyId);
+  // The cash book must move by exactly -1000 (one more 1000 paid out), never
+  // by +1000 (the bug: it used to read the combined 7000->6000 "delta" as a
+  // CASH movement and credited the book backwards by the discount amount).
+  assert.equal(cents(cashAfterAdjust), cents(cashAfterFirstPayment) - 100000,
+    'cash book should drop by exactly the extra 1000 cash, not move by the discount');
+
+  const allocation = await one(
+    'SELECT allocated_amount, discount_amount FROM purchase_payment_allocations WHERE payment_history_id = ? AND purchase_id = ?',
+    [paid.body.payment_id, id]
+  );
+  assert.equal(cents(allocation.discount_amount), 200000, 'discount is preserved, not discarded');
+  assert.equal(cents(allocation.allocated_amount), 800000, '6000 cash + 2000 discount');
+
+  const invoiceAfterAdjust = await one('SELECT balance_amount, paid_amount FROM purchases WHERE id = ?', [id]);
+  assert.equal(cents(invoiceAfterAdjust.balance_amount), 200000, '10000 - 6000 cash - 2000 discount = 2000');
+});
+
 // ------------------------------------------------------------------ order of events
 
 test('settle from the advance first, then pay the rest: the balance is right and an overpayment is refused', async () => {

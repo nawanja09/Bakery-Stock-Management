@@ -1788,7 +1788,7 @@ const getPaymentAdjustmentDetail = async (req, res) => {
 // check_number remain immutable; other payment details may be corrected.
 const adjustPurchasePayment = async (req, res) => {
   const [paymentId, purchaseId] = String(req.params.id).split('-').map(Number);
-  const { payment_date, amount, payment_method, voucher_number, bank_id, notes } = req.body;
+  const { payment_date, amount, discount_amount, payment_method, voucher_number, bank_id, notes } = req.body;
 
   if (!paymentId || !purchaseId) {
     return res.status(400).json({ error: 'Invalid payment adjustment reference' });
@@ -1799,6 +1799,15 @@ const adjustPurchasePayment = async (req, res) => {
   const newAmount = moneyMath.isAmount(amount) ? moneyMath.round2(amount) : NaN;
   if (!Number.isFinite(newAmount) || newAmount <= 0) {
     return res.status(400).json({ error: 'Payment Amount must be a valid amount greater than 0' });
+  }
+  // Discount Amount is optional here too (purchaseController.makePayment's field) -
+  // omitted/blank means "leave this payment's discount exactly as it is".
+  let newDiscountAmount = null;
+  if (discount_amount !== undefined && discount_amount !== null && discount_amount !== '') {
+    if (!moneyMath.isAmount(discount_amount) || parseFloat(discount_amount) < 0) {
+      return res.status(400).json({ error: 'Discount amount must be a valid, non-negative amount' });
+    }
+    newDiscountAmount = moneyMath.round2(discount_amount);
   }
   const normalizedMethod = normalizePaymentMethodValue(payment_method);
   const validMethods = ['CASH', 'BANK_TRANSFER', 'CHEQUE', 'CREDIT'];
@@ -1858,56 +1867,86 @@ const adjustPurchasePayment = async (req, res) => {
     const invoiceTotal = resolveInvoiceTotalAmount(purchase);
 
     const [allocRows] = await connection.query(
-      'SELECT id, allocated_amount FROM purchase_payment_allocations WHERE payment_history_id = ? AND purchase_id = ? FOR UPDATE',
+      'SELECT id, allocated_amount, discount_amount FROM purchase_payment_allocations WHERE payment_history_id = ? AND purchase_id = ? FOR UPDATE',
       [paymentId, purchaseId]
     );
     const hasAllocationRow = allocRows.length > 0;
-    const oldAllocatedAmount = hasAllocationRow
+    // allocated_amount (and, before this fix, the "amount" typed on this form)
+    // is cash + discount COMBINED (purchaseController.makePayment / migration 043)
+    // - it must never be treated as cash alone, or the Cash/Bank ledger delta
+    // below would move by the discount amount too (D1).
+    const oldDiscountAmount = hasAllocationRow
+      ? parseFloat(allocRows[0].discount_amount || 0)
+      : parseFloat(payment.discount_amount || 0);
+    const oldCombinedAmount = hasAllocationRow
       ? parseFloat(allocRows[0].allocated_amount)
       : parseFloat(payment.amount);
+    const oldCashAmount = moneyMath.round2(moneyMath.sub(oldCombinedAmount, oldDiscountAmount));
+    const effectiveNewDiscount = newDiscountAmount === null ? oldDiscountAmount : newDiscountAmount;
 
     // Balance available to this invoice from every OTHER payment - i.e. what
     // the balance would be if this payment's old contribution didn't exist.
     const actualAllocatedExcludingThis = await getActualAllocatedPaidAmount(connection, purchaseId, paymentId);
     const availableBalance = Math.max(0, invoiceTotal - actualAllocatedExcludingThis);
 
-    // Cap what actually applies to the invoice at its own balance - existing
-    // behavior: any amount above that is preserved as supplier credit.
-    const appliedAmount = moneyMath.round2(moneyMath.min(newAmount, availableBalance));
-    const excessAmount = moneyMath.round2(moneyMath.sub(newAmount, appliedAmount));
+    // Cap discount, then cash, at what's left of the invoice's balance after the
+    // discount - same rule makePayment uses: the discount can only reduce what
+    // is actually still owed, it is not "excess" credit like an overpayment.
+    const cappedDiscount = moneyMath.round2(moneyMath.min(effectiveNewDiscount, availableBalance));
+    const appliedCashAmount = moneyMath.round2(moneyMath.min(newAmount, moneyMath.sub(availableBalance, cappedDiscount)));
+    const appliedAmount = moneyMath.round2(moneyMath.add(appliedCashAmount, cappedDiscount)); // new allocated_amount (combined)
+    const excessAmount = moneyMath.round2(moneyMath.sub(newAmount, appliedCashAmount)); // cash only, unchanged semantics
+
+    // The Cash/Bank ledger (and the Domain-3 journal) must move by the CASH
+    // delta only - never by the combined cash+discount delta (D1 fix).
+    const cashDelta = moneyMath.round2(moneyMath.sub(appliedCashAmount, oldCashAmount));
+    const discountDelta = moneyMath.round2(moneyMath.sub(cappedDiscount, oldDiscountAmount));
 
     if (hasAllocationRow) {
       await connection.query(
-        'UPDATE purchase_payment_allocations SET allocated_amount = ? WHERE id = ?',
-        [appliedAmount, allocRows[0].id]
+        'UPDATE purchase_payment_allocations SET allocated_amount = ?, discount_amount = ? WHERE id = ?',
+        [appliedAmount, cappedDiscount, allocRows[0].id]
       );
     } else {
       await connection.query(
-        'INSERT INTO purchase_payment_allocations (payment_history_id, purchase_id, allocated_amount) VALUES (?, ?, ?)',
-        [paymentId, purchaseId, appliedAmount]
+        'INSERT INTO purchase_payment_allocations (payment_history_id, purchase_id, allocated_amount, discount_amount) VALUES (?, ?, ?, ?)',
+        [paymentId, purchaseId, appliedAmount, cappedDiscount]
       );
     }
 
-    // Keep the overall payment_history record (the full transaction amount)
-    // in step with this invoice's change - it moves by the same amount the
-    // user's entered figure moved by for this invoice. Other invoices in a
-    // split payment, if any, are never touched by this adjustment.
+    // Keep the overall payment_history record (the full transaction amount,
+    // cash + discount combined) in step with this invoice's change - it moves
+    // by the same amount this invoice's own allocation moved by. Other
+    // invoices in a split payment, if any, are never touched by this
+    // adjustment.
     const oldTransactionAmount = parseFloat(payment.amount) || 0;
-    const totalDelta = moneyMath.round2(moneyMath.sub(newAmount, oldAllocatedAmount));
-    const newTransactionAmount = moneyMath.round2(moneyMath.add(oldTransactionAmount, totalDelta));
+    const combinedDelta = moneyMath.round2(moneyMath.sub(appliedAmount, oldCombinedAmount));
+    const newTransactionAmount = moneyMath.round2(moneyMath.add(oldTransactionAmount, combinedDelta));
 
     await connection.query(
-      `UPDATE payment_history SET payment_date = ?, amount = ?, payment_method = ?,
+      `UPDATE payment_history SET payment_date = ?, amount = ?, discount_amount = ?, payment_method = ?,
        voucher_number = ?, bank_id = ?, notes = ? WHERE id = ?`,
-      [payment_date, newTransactionAmount, methodForHistory, voucher_number || null,
+      [payment_date, newTransactionAmount, cappedDiscount, methodForHistory, voucher_number || null,
        normalizedMethod === 'BANK_TRANSFER' ? bank_id : null, notes || null, paymentId]
     );
 
     // Recompute this invoice's paid/balance/status from the real allocations.
     const reconciled = await reconcilePurchasePaymentState(connection, purchaseId, invoiceTotal, purchase.paid_amount);
 
-    // Sync the linked Cash/Bank ledger entry by the same delta, once, so the
-    // account balance reflects the adjustment exactly - never double-posted.
+    // Cash-only total for this whole payment_history row (every invoice in a
+    // split payment, not just this one) - what the Cash/Bank ledger row for
+    // this payment is actually allowed to hold. Needed only when there is no
+    // existing ledger row to adjust by a delta (below); other invoices' own
+    // allocations are untouched by this request.
+    const [cashTotalRows] = await connection.query(
+      'SELECT COALESCE(SUM(allocated_amount - discount_amount), 0) AS cash_total FROM purchase_payment_allocations WHERE payment_history_id = ?',
+      [paymentId]
+    );
+    const newCashTransactionAmount = moneyMath.round2(cashTotalRows[0]?.cash_total ?? appliedCashAmount);
+
+    // Sync the linked Cash/Bank ledger entry by the same CASH delta, once, so
+    // the account balance reflects the adjustment exactly - never double-
+    // posted, and never moved by the discount portion (D1 fix).
     let ledgerUpdated = false;
     const [finRows] = await connection.query(
       `SELECT id, credit, account_type, company_id, bank_id FROM finance_transactions
@@ -1918,7 +1957,7 @@ const adjustPurchasePayment = async (req, res) => {
       : normalizedMethod === 'BANK_TRANSFER' ? 'BANK' : null;
     if (finRows.length > 0 && targetAccountType) {
       const fin = finRows[0];
-      const newCredit = moneyMath.round2(moneyMath.add(fin.credit, totalDelta));
+      const newCredit = moneyMath.round2(moneyMath.add(fin.credit, cashDelta));
       const targetBankId = targetAccountType === 'BANK' ? Number(bank_id) : null;
       await connection.query(
         `UPDATE finance_transactions SET credit = ?, transaction_date = ?, account_type = ?,
@@ -1936,7 +1975,7 @@ const adjustPurchasePayment = async (req, res) => {
           [parseFloat(fin.credit) || 0, fin.company_id]
         );
       } else if (sameCashAccount) {
-        await connection.query('UPDATE cash_accounts SET current_balance = current_balance - ? WHERE company_id = ?', [totalDelta, fin.company_id]);
+        await connection.query('UPDATE cash_accounts SET current_balance = current_balance - ? WHERE company_id = ?', [cashDelta, fin.company_id]);
       }
       if (fin.account_type === 'BANK' && fin.bank_id && !sameBankAccount) {
         await connection.query(
@@ -1944,7 +1983,7 @@ const adjustPurchasePayment = async (req, res) => {
           [parseFloat(fin.credit) || 0, fin.bank_id]
         );
       } else if (sameBankAccount) {
-        await connection.query('UPDATE bank_details SET current_balance = current_balance - ? WHERE id = ?', [totalDelta, fin.bank_id]);
+        await connection.query('UPDATE bank_details SET current_balance = current_balance - ? WHERE id = ?', [cashDelta, fin.bank_id]);
       }
       if (targetAccountType === 'CASH' && !sameCashAccount) {
         await connection.query(
@@ -1970,7 +2009,7 @@ const adjustPurchasePayment = async (req, res) => {
     } else if (finRows.length === 0 && targetAccountType === 'CASH' && purchase.company_id) {
       await recordCashTransaction(connection, {
         companyId: purchase.company_id, date: payment_date,
-        remark: `Supplier payment - Invoice ${purchase.invoice_no}`, credit: newTransactionAmount,
+        remark: `Supplier payment - Invoice ${purchase.invoice_no}`, credit: newCashTransactionAmount,
         transactionType: 'RM Purchase Payment', referenceNumber: voucher_number || payment.check_number || null,
         invoiceNumber: purchase.invoice_no, partyName: null, referenceType: 'PURCHASE_PAYMENT',
         referenceId: paymentId, createdBy: payment.created_by, periodActor: actorId(req)
@@ -1979,7 +2018,7 @@ const adjustPurchasePayment = async (req, res) => {
     } else if (finRows.length === 0 && targetAccountType === 'BANK') {
       await recordBankTransaction(connection, {
         bankId: Number(bank_id), date: payment_date,
-        remark: `Supplier payment - Invoice ${purchase.invoice_no}`, credit: newTransactionAmount,
+        remark: `Supplier payment - Invoice ${purchase.invoice_no}`, credit: newCashTransactionAmount,
         transactionType: 'RM Purchase Payment', referenceNumber: voucher_number || payment.check_number || null,
         invoiceNumber: purchase.invoice_no, partyName: null, referenceType: 'PURCHASE_PAYMENT',
         referenceId: paymentId, createdBy: payment.created_by, periodActor: actorId(req)
@@ -2029,8 +2068,8 @@ const adjustPurchasePayment = async (req, res) => {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Adjusted', ?, ?)`,
       [
         paymentId, purchaseId, purchase.invoice_no, purchase.supplier_id, supplierName, voucher_number || null,
-        payment.payment_date, payment_date, oldAllocatedAmount, newAmount,
-        moneyMath.round2(moneyMath.sub(newAmount, oldAllocatedAmount)),
+        payment.payment_date, payment_date, oldCombinedAmount, appliedAmount,
+        combinedDelta,
         excessAmount > 0 ? `Rs. ${excessAmount.toFixed(2)} recorded as supplier credit${overpaymentRecord ? ` (${overpaymentRecord.overpayment_number})` : ''}` : null,
         actorId(req)
       ]
