@@ -19,6 +19,7 @@ const VATExemptPurchasingReport = () => {
   // Replaces the old Item Category filter: driven by Items Management's own
   // VAT status column (VAT Applicable / VAT Not Applicable) rather than item type.
   const [vatStatusFilter, setVatStatusFilter] = useState('not_applicable');
+  const [supplierVatStatusFilter, setSupplierVatStatusFilter] = useState('all');
   const [selectedItem, setSelectedItem] = useState(ALL_ITEMS_OPTION);
 
   const [suppliers, setSuppliers] = useState([]);
@@ -65,7 +66,7 @@ const VATExemptPurchasingReport = () => {
   const fetchReport = async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ startDate, endDate, vatStatus: vatStatusFilter });
+      const params = new URLSearchParams({ startDate, endDate, vatStatus: vatStatusFilter, supplierVatStatus: supplierVatStatusFilter });
       if (companyFilter) params.append('companyId', companyFilter);
       if (supplierFilter) params.append('supplierId', supplierFilter);
       if (selectedItem && selectedItem.value !== 'all') params.append('itemId', selectedItem.value);
@@ -90,7 +91,7 @@ const VATExemptPurchasingReport = () => {
     }
 
     const worksheetData = [[
-      'Invoice Date', 'Invoice Number', 'Name of the Supplier', 'Item Name',
+      'Invoice Date', 'Invoice Number', 'Name of the Supplier', 'Supplier VAT Status', 'Item Name',
       'VAT Status', 'Value of Purchase (Rs.)'
     ]];
 
@@ -99,6 +100,7 @@ const VATExemptPurchasingReport = () => {
         row.invoice_date ? format(new Date(row.invoice_date), 'dd/MM/yyyy') : 'N/A',
         row.invoice_no || 'N/A',
         row.supplier_name || 'N/A',
+        row.supplier_vat_registered ? 'VAT Registered' : 'Not VAT Registered',
         row.item_name || 'N/A',
         row.vat_applicable ? 'VAT Applicable' : 'VAT Not Applicable',
         toExportNumber(row.value_of_purchase, 2)
@@ -106,11 +108,11 @@ const VATExemptPurchasingReport = () => {
     });
 
     worksheetData.push([]);
-    worksheetData.push(['TOTAL', '', '', '', '', toExportNumber(totalValue, 2)]);
+    worksheetData.push(['TOTAL', '', '', '', '', '', toExportNumber(totalValue, 2)]);
 
     const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
     worksheet['!cols'] = [
-      { wch: 14 }, { wch: 16 }, { wch: 28 }, { wch: 26 }, { wch: 18 }, { wch: 20 }
+      { wch: 14 }, { wch: 16 }, { wch: 28 }, { wch: 18 }, { wch: 26 }, { wch: 18 }, { wch: 20 }
     ];
 
     const workbook = XLSX.utils.book_new();
@@ -202,6 +204,19 @@ const VATExemptPurchasingReport = () => {
         </div>
 
         <div className="report-filter-group">
+          <label className="report-filter-label">Supplier VAT Status</label>
+          <select
+            value={supplierVatStatusFilter}
+            onChange={(e) => setSupplierVatStatusFilter(e.target.value)}
+            className="report-filter-select"
+          >
+            <option value="all">All Suppliers</option>
+            <option value="registered">VAT Registered</option>
+            <option value="not_registered">Not VAT Registered</option>
+          </select>
+        </div>
+
+        <div className="report-filter-group">
           <label className="report-filter-label">
             <FontAwesomeIcon icon={faBoxOpen} className="filter-icon" /> Item
           </label>
@@ -251,6 +266,7 @@ const VATExemptPurchasingReport = () => {
                   <th className="text-left">Invoice Date</th>
                   <th className="text-left">Invoice Number</th>
                   <th className="text-left">Name of the Supplier</th>
+                  <th className="text-left">Supplier VAT Status</th>
                   <th className="text-left">Item Name</th>
                   <th className="text-left">VAT Status</th>
                   <th className="text-right">Value of Purchase (Rs.)</th>
@@ -262,6 +278,11 @@ const VATExemptPurchasingReport = () => {
                     <td className="text-left">{row.invoice_date ? format(new Date(row.invoice_date), 'dd/MM/yyyy') : 'N/A'}</td>
                     <td className="text-left">{row.invoice_no || 'N/A'}</td>
                     <td className="text-left">{row.supplier_name || 'N/A'}</td>
+                    <td className="text-left">
+                      <span className={`badge ${row.supplier_vat_registered ? 'badge-success' : 'badge-neutral'}`}>
+                        {row.supplier_vat_registered ? 'VAT Registered' : 'Not VAT Registered'}
+                      </span>
+                    </td>
                     <td className="text-left">{row.item_name || 'N/A'}</td>
                     <td className="text-left">
                       <span className={`badge ${row.vat_applicable ? 'badge-success' : 'badge-neutral'}`}>
@@ -274,7 +295,7 @@ const VATExemptPurchasingReport = () => {
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan="5" className="text-right"><strong>TOTAL</strong></td>
+                  <td colSpan="6" className="text-right"><strong>TOTAL</strong></td>
                   <td className="report-table-value-numeric"><strong>{formatNumber(totalValue, 2, 2)}</strong></td>
                 </tr>
               </tfoot>

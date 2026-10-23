@@ -1577,6 +1577,7 @@ const getPurchaseReport = async (req, res) => {
 const getVatExemptPurchasingReport = async (req, res) => {
   const { startDate, endDate, companyId, supplierId, itemId } = req.query;
   const vatStatus = String(req.query.vatStatus || 'not_applicable').toLowerCase();
+  const supplierVatStatus = String(req.query.supplierVatStatus || 'all').toLowerCase();
 
   try {
     let query = `
@@ -1586,6 +1587,7 @@ const getVatExemptPurchasingReport = async (req, res) => {
         p.invoice_no,
         s.id AS supplier_id,
         s.name AS supplier_name,
+        COALESCE(s.vat_registered, 0) AS supplier_vat_registered,
         p.company_id,
         COALESCE(c.name, 'N/A') AS company_name,
         i.id AS item_id,
@@ -1637,6 +1639,13 @@ const getVatExemptPurchasingReport = async (req, res) => {
     }
     // vatStatus === 'all' -> no VAT status filter
 
+    if (supplierVatStatus === 'registered') {
+      query += ' AND COALESCE(s.vat_registered, 0) = 1';
+    } else if (supplierVatStatus === 'not_registered') {
+      query += ' AND COALESCE(s.vat_registered, 0) = 0';
+    }
+    // supplierVatStatus === 'all' -> no supplier VAT registration filter
+
     query += ' ORDER BY COALESCE(p.invoice_date, p.purchase_date) ASC, p.id ASC, i.name ASC';
 
     const [rows] = await pool.query(query, params);
@@ -1644,12 +1653,13 @@ const getVatExemptPurchasingReport = async (req, res) => {
     const data = rows.map((row) => ({
       ...row,
       vat_applicable: Boolean(row.vat_applicable),
+      supplier_vat_registered: Boolean(row.supplier_vat_registered),
       value_of_purchase: roundMoney(row.value_of_purchase)
     }));
 
     const totalValue = roundMoney(moneyMath.sum(data, (r) => r.value_of_purchase));
 
-    res.json({ data, totalValue, vatStatus });
+    res.json({ data, totalValue, vatStatus, supplierVatStatus });
   } catch (error) {
     console.error('Error generating VAT exempt purchasing report:', error);
     sendServerError(res, error);
