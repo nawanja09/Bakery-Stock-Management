@@ -128,13 +128,15 @@ const FinancialReceiptAdjustmentEditor = ({ embeddedId, category, source, onCanc
             onChange={(event) => change('remark', event.target.value)} />
         </label>
       </div>
-      {source === 'card' && form.status !== 'Pending' && (
-        <div className="alert-message info">This card receipt has been completed in the Card Ledger and is read-only.</div>
+      {source === 'card' && form.status && form.status !== 'Pending' && (
+        <div className="alert-message info">
+          This card receipt is {form.status} in the Card Ledger. Amount changes only apply when its realisation covers a single transaction.
+        </div>
       )}
       {error && <div className="alert-message error">{error}</div>}
       <div className="form-actions">
         <button type="button" className="btn btn-secondary" onClick={onCancel}>Cancel</button>
-        <button type="submit" className="btn btn-primary" disabled={saving || (source === 'card' && form.status !== 'Pending')}>
+        <button type="submit" className="btn btn-primary" disabled={saving}>
           {saving ? 'Saving…' : 'Save Adjustment'}
         </button>
       </div>

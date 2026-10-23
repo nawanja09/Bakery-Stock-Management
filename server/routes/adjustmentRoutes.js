@@ -3,6 +3,7 @@ const router = express.Router();
 const adjustmentController = require('../controllers/adjustmentController');
 const authenticate = require('../middleware/authenticate');
 const { adjustmentsAccess } = require('../middleware/moduleAccess');
+const requireRoles = require('../middleware/requireRoles');
 
 // Adjustments module is off-limits to Store Keeper and View Only accounts - enforced here
 // so direct API/URL access is blocked, not just the UI menu.
@@ -15,9 +16,11 @@ router.get('/', adjustmentController.getAdjustments);
 router.get('/summary/:category', adjustmentController.getRmAdjustmentSummary);
 
 // Financial receive records remain in their original finance/card ledger tables.
+// Editing a Cash Receive / Bank Receive entry - Pending or Completed - is Super
+// Admin only, narrower than ordinary Adjustments access (every other route here).
 router.get('/records/:category', adjustmentController.getFinancialAdjustmentRecords);
 router.get('/records/:category/:source/:id', adjustmentController.getFinancialAdjustmentRecordDetail);
-router.put('/records/:category/:source/:id', adjustmentController.updateFinancialAdjustmentRecord);
+router.put('/records/:category/:source/:id', requireRoles('Super Admin'), adjustmentController.updateFinancialAdjustmentRecord);
 
 // Create a new adjustment
 router.post('/', adjustmentController.createAdjustment);

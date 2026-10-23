@@ -7,6 +7,8 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSearch, faArrowLeft, faSpinner, faInbox } from '@fortawesome/free-solid-svg-icons';
 import api from '../../api';
+import usePermissions from '../../hooks/usePermissions';
+import { ROLES } from '../../config/rolePermissions';
 import EditPurchase from '../purchase/EditPurchase';
 import EditIssuance from '../issuance/EditIssuance';
 import EditWastage from '../wastage/EditWastage';
@@ -160,6 +162,9 @@ const CATEGORY_CONFIG = {
       row.company_name?.toLowerCase().includes(term) ||
       row.receive_type?.toLowerCase().includes(term) ||
       row.remark?.toLowerCase().includes(term),
+    // Every entry, Pending or Completed (card) / posted (finance), can be
+    // edited - but only by Super Admin.
+    superAdminOnly: true,
     Editor: FinancialReceiptAdjustmentEditor,
   },
   'Bank Receive': {
@@ -184,14 +189,17 @@ const CATEGORY_CONFIG = {
       row.bank_name?.toLowerCase().includes(term) ||
       row.receive_type?.toLowerCase().includes(term) ||
       row.remark?.toLowerCase().includes(term),
-    canEdit: (row) => row.source !== 'card' || row.can_edit === 1 || row.can_edit === true,
-    lockedReason: 'Only pending card receive records can be adjusted.',
+    // Every entry, Pending or Completed (card) / posted (finance), can be
+    // edited - but only by Super Admin.
+    superAdminOnly: true,
     Editor: FinancialReceiptAdjustmentEditor,
   },
 };
 
 const CategoryAdjustmentPanel = ({ category, onAdjustmentSaved }) => {
   const config = CATEGORY_CONFIG[category];
+  const { role } = usePermissions();
+  const isSuperAdmin = role === ROLES.SUPER_ADMIN;
 
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -356,8 +364,8 @@ const CategoryAdjustmentPanel = ({ category, onAdjustmentSaved }) => {
                       type="button"
                       className="btn btn-sm btn-primary"
                       onClick={() => { setSelectedId(String(row.id)); setSelectedSource(row.source || 'finance'); }}
-                      disabled={config.canEdit ? !config.canEdit(row) : false}
-                      title={config.canEdit && !config.canEdit(row) ? config.lockedReason : undefined}
+                      disabled={config.superAdminOnly && !isSuperAdmin}
+                      title={config.superAdminOnly && !isSuperAdmin ? 'Only Super Admin can edit this record' : undefined}
                     >
                       Edit
                     </button>

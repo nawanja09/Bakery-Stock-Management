@@ -9,6 +9,7 @@ const { actorId, approverName } = require('../utils/actor');
 const { softDelete } = require('../services/softDelete');
 const { getItemStock } = require('../services/rmStockService');
 const { postJournalEntry } = require('../utils/financeLedger');
+const { editCardRealisation } = require('../services/cardLedgerService');
 
 const FINANCIAL_ADJUSTMENT_CATEGORIES = new Set(['Cash Receive', 'Bank Receive']);
 const FINANCIAL_ADJUSTMENT_SOURCES = new Set(['finance', 'card']);
@@ -25,7 +26,7 @@ const getFinancialAdjustmentRecord = async (connection, category, source, id, fo
     ? `SELECT ct.id, 'card' AS source, ct.transaction_date AS date, ct.company_id,
          c.name AS company_name, ct.bank_id, bd.bank_name, bd.account_number,
          'Visa Card Payment' AS receive_type, ct.reference_number, ct.amount,
-         ct.remark, ct.status, ct.transaction_date AS transaction_date,
+         ct.remark, ct.status, ct.transaction_date AS transaction_date, ct.realisation_id,
          u.name AS created_by_name
        FROM card_transactions ct
        LEFT JOIN company c ON c.id = ct.company_id
@@ -80,7 +81,7 @@ const getFinancialAdjustmentRecords = async (req, res) => {
         `SELECT ct.id, 'card' AS source, DATE_FORMAT(ct.transaction_date, '%Y-%m-%d') AS date,
             ct.company_id, c.name AS company_name, ct.bank_id, bd.bank_name, bd.account_number,
             'Visa Card Payment' AS receive_type, ct.reference_number, ct.amount, ct.remark,
-            ct.status, u.name AS created_by_name, (ct.status = 'Pending') AS can_edit
+            ct.status, u.name AS created_by_name, 1 AS can_edit
          FROM card_transactions ct
          LEFT JOIN company c ON c.id = ct.company_id
          LEFT JOIN bank_details bd ON bd.id = ct.bank_id
@@ -156,10 +157,6 @@ const updateFinancialAdjustmentRecord = async (req, res) => {
       return res.status(404).json({ error: 'Receive record not found' });
     }
     const existing = rows[0];
-    if (source === 'card' && existing.status !== 'Pending') {
-      await connection.rollback();
-      return res.status(409).json({ error: 'Only pending card receive records can be adjusted' });
-    }
 
     if (normalizedReference) {
       if (source === 'finance') {
@@ -238,10 +235,35 @@ const updateFinancialAdjustmentRecord = async (req, res) => {
         });
       }
     } else {
+      // A card receipt stays editable after it is realised (Completed): date,
+      // reference and remark are plain corrections. An amount change on an
+      // already-realised row, though, must also keep its realisation, the Bank
+      // Ledger debit and the linked Hidden Expenses in step - so it goes
+      // through the same cascade as Card Ledger -> Completed -> Edit (Super
+      // Admin only there too), which also enforces "single card transaction
+      // in the realisation" the same way Card Ledger's own Edit does.
+      const amountChanged = normalizedAmount !== moneyMath.round2(existing.amount || 0);
+      if (existing.status !== 'Pending' && amountChanged) {
+        const [realisationRows] = await connection.query(
+          'SELECT commission_amount, realise_amount FROM card_realisations WHERE id = ?',
+          [existing.realisation_id]
+        );
+        if (!realisationRows.length) throw new Error('This card receipt has no linked realisation to update');
+        const realisation = realisationRows[0];
+        await editCardRealisation(connection, {
+          realisationId: existing.realisation_id,
+          totalAmount: updatedValues.amount,
+          commissionAmount: realisation.commission_amount ?? 0,
+          realiseAmount: realisation.realise_amount,
+          userId: req.user?.userId ?? null
+        });
+      }
+      // amount is included even when editCardRealisation already set it above -
+      // same value, so this is a harmless no-op in that case.
       await connection.query(
         `UPDATE card_transactions
          SET transaction_date = ?, reference_number = ?, amount = ?, remark = ?
-         WHERE id = ? AND status = 'Pending'`,
+         WHERE id = ?`,
         [updatedValues.date, updatedValues.reference_number, updatedValues.amount, updatedValues.remark, id]
       );
     }
@@ -262,7 +284,8 @@ const updateFinancialAdjustmentRecord = async (req, res) => {
     if (connection) await connection.rollback();
     console.error('Error updating financial adjustment record:', error);
     const duplicate = error.name === 'DuplicateReferenceError' || /duplicate reference/i.test(error.message);
-    res.status(duplicate ? 400 : 500).json({ error: error.message || 'Unable to update receive record' });
+    const status = Number.isInteger(error.status) ? error.status : (duplicate ? 400 : 500);
+    res.status(status).json({ error: error.message || 'Unable to update receive record' });
   } finally {
     if (connection) connection.release();
   }

@@ -14,6 +14,8 @@ import {
   faChevronRight, faSearch, faTimes
 } from '@fortawesome/free-solid-svg-icons';
 import api from '../../../api';
+import usePermissions from '../../../hooks/usePermissions';
+import { ROLES } from '../../../config/rolePermissions';
 import { formatCurrency, formatNumber } from '../../../utils/formatters';
 import ExpenseBillAdjustmentEditor from '../ExpenseBillAdjustmentEditor';
 import FinancialReceiptAdjustmentEditor from '../FinancialReceiptAdjustmentEditor';
@@ -100,6 +102,8 @@ export const RECORD_TAB_CONFIG = {
 
 const RecordAdjustmentsTab = ({ category }) => {
   const config = RECORD_TAB_CONFIG[category];
+  const { role } = usePermissions();
+  const isSuperAdmin = role === ROLES.SUPER_ADMIN;
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState(EMPTY_FILTERS);
@@ -139,7 +143,10 @@ const RecordAdjustmentsTab = ({ category }) => {
   if (!config) return null;
 
   const hasExpenseEdit = category === 'Expense Bill';
-  const hasFinancialEdit = ['Cash Receive', 'Bank Receive'].includes(category);
+  // Every Cash Receive / Bank Receive entry, Pending or Completed, can be
+  // edited - but only by Super Admin, so the column/button is hidden for
+  // everyone else rather than shown disabled.
+  const hasFinancialEdit = isSuperAdmin && ['Cash Receive', 'Bank Receive'].includes(category);
   const hasLegacyAuditColumns = !['Petty Cash Voucher', 'Expense Bill', 'Cash Receive', 'Bank Receive'].includes(category);
   const colCount = config.columns.length + (hasExpenseEdit || hasFinancialEdit ? 1 : 0) + (hasLegacyAuditColumns ? 2 : 0);
   const searchTerm = filters.search.trim().toLowerCase();
@@ -250,8 +257,7 @@ const RecordAdjustmentsTab = ({ category }) => {
                       {hasFinancialEdit && <td><button
                         type="button"
                         className="btn btn-sm btn-primary"
-                        disabled={r.source === 'card' && r.card_status !== 'Pending'}
-                        title={r.source === 'card' && r.card_status !== 'Pending' ? 'Completed card receipts cannot be edited' : 'Edit this receive record'}
+                        title="Edit this receive record"
                         onClick={() => setEditingFinancialRecord({
                           id: String(r.source_record_id),
                           source: r.source
