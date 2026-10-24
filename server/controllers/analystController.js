@@ -210,6 +210,40 @@ const getBalanceSheet = async (req, res) => {
     if (!isValidDate(date)) return res.status(400).json({ error: 'A valid selected date is required' });
     const [cashRows] = await pool.query(`SELECT c.id AS company_id, c.name, COALESCE(SUM(ft.debit - ft.credit), 0) AS balance FROM company c LEFT JOIN finance_transactions ft ON ft.company_id = c.id AND ft.account_type = 'CASH' AND ft.status = 1 AND ft.transaction_date <= ? GROUP BY c.id, c.name ORDER BY c.id`, [date]);
     const [bankRows] = await pool.query(`SELECT bd.id, bd.bank_name, bd.account_number, bd.company, COALESCE(SUM(ft.debit - ft.credit), 0) AS balance FROM bank_details bd LEFT JOIN finance_transactions ft ON ft.bank_id = bd.id AND ft.account_type = 'BANK' AND ft.status = 1 AND ft.transaction_date <= ? WHERE bd.status = 'Active' AND COALESCE(bd.record_status, 1) = 1 GROUP BY bd.id, bd.bank_name, bd.account_number, bd.company ORDER BY bd.id`, [date]);
+    // Other Ledgers (Finance -> Other Ledgers): every ledger is debit-normal
+    // (see otherLedgerService.js), so balance = SUM(debit - credit) and a
+    // positive balance is money that ledger's counterparty owes back to us -
+    // an asset, same convention as the Cash/Bank rows above.
+    const [otherLedgerRows] = await pool.query(`
+      SELECT ol.id, ol.name,
+        COALESCE(SUM(olt.debit - olt.credit), 0) AS balance
+      FROM other_ledgers ol
+      LEFT JOIN other_ledger_transactions olt
+        ON olt.other_ledger_id = ol.id AND olt.status = 1 AND DATE(olt.transaction_date) <= ?
+      WHERE ol.status = 1
+      GROUP BY ol.id, ol.name
+      ORDER BY ol.id`, [date]);
+    // Card Ledger: a card transaction is a receivable from the bank until it
+    // is realised (migrations/024_card_ledger.sql). As of the selected date,
+    // still-outstanding = never realised, or realised after that date.
+    const [cardLedgerRows] = await pool.query(`
+      SELECT COALESCE(SUM(ct.amount), 0) AS pending_card_receivable
+      FROM card_transactions ct
+      LEFT JOIN card_realisations cr ON cr.id = ct.realisation_id
+      WHERE DATE(ct.transaction_date) <= ?
+        AND (ct.realisation_id IS NULL OR DATE(cr.realise_date) > ?)`, [date, date]);
+    // Staff Loans (Finance -> Staff Loans): outstanding = loan_amount minus
+    // repayments made on or before the selected date - a receivable from staff.
+    const [staffLoanRows] = await pool.query(`
+      SELECT COALESCE(SUM(GREATEST(sl.loan_amount - COALESCE(rep.total_repaid, 0), 0)), 0) AS staff_loan_balance
+      FROM staff_loans sl
+      LEFT JOIN (
+        SELECT staff_loan_id, SUM(amount) AS total_repaid
+        FROM staff_loan_repayments
+        WHERE received_date <= ?
+        GROUP BY staff_loan_id
+      ) rep ON rep.staff_loan_id = sl.id
+      WHERE sl.issued_date <= ?`, [date, date]);
     const [storesRows] = await pool.query(`
       SELECT COALESCE(SUM(closing_balance * COALESCE(unit_price, 0)), 0) AS stores_value
       FROM (
@@ -321,13 +355,34 @@ const getBalanceSheet = async (req, res) => {
             AND DATE(p.purchase_date) <= ?
             AND COALESCE(p.deleted, 0) = 0
         )`, [date, date]);
+    // New Expenses (bills entered under Expenses -> New Expenses, e.g. VAT /
+    // EPF / ETF Payable, utilities, insurance, ...): a genuine liability for
+    // any bill not yet fully paid as of the selected date. Paid-to-date is
+    // reconstructed from allocations dated on/before the date, the same
+    // as-of-date approach PURCHASE_POSITIONS_SQL uses for purchases, so a
+    // bill paid off after the selected date still shows as outstanding here.
+    const [newExpensesPayableRows] = await pool.query(`
+      SELECT COALESCE(SUM(GREATEST(e.total_bill_amount - COALESCE(paid.amount, 0), 0)), 0) AS new_expenses_payable
+      FROM expenses e
+      LEFT JOIN (
+        SELECT epa.expense_id, SUM(epa.amount) AS amount
+        FROM expense_payment_allocations epa
+        JOIN expense_payments ep ON ep.id = epa.payment_id
+        WHERE ep.payment_date <= ?
+        GROUP BY epa.expense_id
+      ) paid ON paid.expense_id = e.id
+      WHERE e.is_deleted = 0
+        AND DATE(e.bill_date) <= ?`, [date, date]);
     const cashBooks = cashRows.map(row => ({ companyId: row.company_id, name: row.name, balance: number(row.balance) }));
     const cashBookJH = cashBooks.find(row => /jh/i.test(row.name))?.balance || 0;
     const cashBookRD = cashBooks.find(row => /rd/i.test(row.name))?.balance || 0;
     const cashBookTotal = moneyMath.add(cashBookJH, cashBookRD);
     const totalBankValues = moneyMath.sum(bankRows, (row) => row.balance);
+    const otherLedgers = otherLedgerRows.map(row => ({ id: row.id, name: row.name, balance: number(row.balance) }));
+    const totalOtherLedgers = moneyMath.sum(otherLedgers, (row) => row.balance);
+    const cardLedgerReceivable = number(cardLedgerRows[0]?.pending_card_receivable);
+    const staffLoanReceivable = number(staffLoanRows[0]?.staff_loan_balance);
     const storesValue = number(storesRows[0]?.stores_value);
-    const totalAssets = moneyMath.add(cashBookTotal, storesValue, totalBankValues);
     const totalPurchasingValue = number(purchasingRows[0]?.total_purchasing_value);
     const totalPurchasingCompleted = number(purchasingRows[0]?.total_purchasing_completed);
     const totalPurchasingPending = number(purchasingRows[0]?.total_purchasing_pending);
@@ -348,15 +403,25 @@ const getBalanceSheet = async (req, res) => {
     // so it remains a direct cross-check for existing consumers and the Supplier Ledger.
     const outstandingInvoices = totalPurchasingPending;
     const purchasingPayable = outstandingInvoices;
+    // Advance payments and overpayments are credit the suppliers owe back to
+    // us (we already paid that cash out, in full or in excess, against
+    // nothing we still owe) - an asset, not a liability. Counting them as a
+    // liability used to double-subtract them from the net balance.
     const purchasingAdvancePaymentBalance = number(advanceRows[0]?.advance_payment_balance);
     const purchasingOverpayment = moneyMath.add(number(excessPaymentRows[0]?.payment_overpayment),
       number(purchasingRows[0]?.return_overpayment));
-    const totalPayables = moneyMath.add(purchasingPayable, purchasingOverpayment);
+    const totalSupplierCredits = moneyMath.add(purchasingAdvancePaymentBalance, purchasingOverpayment);
+    const newExpensesPayable = number(newExpensesPayableRows[0]?.new_expenses_payable);
+    const totalAssets = moneyMath.add(cashBookTotal, storesValue, totalBankValues, totalSupplierCredits,
+      totalOtherLedgers, cardLedgerReceivable, staffLoanReceivable);
+    const totalPayables = moneyMath.add(purchasingPayable, newExpensesPayable);
     const netBalance = moneyMath.sub(totalAssets, totalPayables);
     res.json({
       date, cashBookJH, cashBookRD, cashBookTotal, cashBooks,
       storesValue, banks: bankRows.map(row => ({ ...row, balance: number(row.balance) })),
       totalBankValues,
+      otherLedgers, totalOtherLedgers, cardLedgerReceivable, staffLoanReceivable,
+      newExpensesPayable,
       totalAssets, outstandingInvoices, purchasingPayable,
       totalPurchasingValue, totalPurchasingCompleted, totalPurchasingPending,
       completedPurchasingCount, pendingPurchasingCount,
@@ -367,7 +432,9 @@ const getBalanceSheet = async (req, res) => {
         completedCount: completedPurchasingCount,
         pendingCount: pendingPurchasingCount
       },
-      purchasingAdvancePaymentBalance, purchasingOverpayment, totalPayables, netBalance,
+      purchasingAdvancePaymentBalance, purchasingOverpayment, totalSupplierCredits,
+      totalAvailablePendingCredits: totalSupplierCredits,
+      totalPayables, netBalance,
       // kept for backward compatibility with any other consumer of this endpoint
       totalFinancialPosition: totalAssets
     });

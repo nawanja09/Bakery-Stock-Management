@@ -341,12 +341,24 @@ const BalanceSheet = ({ selectedDate, setSelectedDate, balance, loading, error, 
                   <BsRow key={bank.id || index} label={`${bank.bank_name} - ${bank.account_number}${bank.company ? ` (${bank.company})` : ''}`} value={bank.balance} indent />
                 ))}
                 <BsRow label="Total of Bank Value" value={balance.totalBankValues} tone="subtotal" indent />
+                <BsSubheadRow label="4. Supplier Advance & Credit Balance" />
+                <BsRow label="Purchasing Advance Payment Balance" value={balance.purchasingAdvancePaymentBalance} indent />
+                <BsRow label="Overpayment / Unallocated Credit" value={balance.purchasingOverpayment} indent />
+                <BsRow label="Total Supplier Credits" value={balance.totalSupplierCredits} tone="subtotal" indent />
+                <BsSubheadRow label="5. Other Ledgers" />
+                {balance.otherLedgers && balance.otherLedgers.map((ledger) => (
+                  <BsRow key={ledger.id} label={ledger.name} value={ledger.balance} indent />
+                ))}
+                <BsRow label="Total of Other Ledgers" value={balance.totalOtherLedgers} tone="subtotal" indent />
+                <BsSubheadRow label="6. Card Ledger" />
+                <BsRow label="Pending Card Receivable (not yet realised to bank)" value={balance.cardLedgerReceivable} indent />
+                <BsSubheadRow label="7. Staff Loans" />
+                <BsRow label="Staff Loan Receivable (outstanding)" value={balance.staffLoanReceivable} indent />
                 <BsRow label="Total Value" value={balance.totalAssets} tone="total" />
 
                 <BsSectionRow label="PAYABLES / LIABILITIES" />
                 <BsRow label={`Pending / Outstanding (${balance.pendingPurchasingCount || 0} invoices)`} value={balance.totalPurchasingPending} indent />
-                <BsRow label="Purchasing Advance Payment Balance" value={balance.purchasingAdvancePaymentBalance} indent />
-                <BsRow label="Total Available Pending Credits" value={balance.totalAvailablePendingCredits} indent />
+                <BsRow label="New Expenses Payable (VAT / EPF / ETF / other unpaid bills)" value={balance.newExpensesPayable} indent />
 
                 <tr className={`bs-row bs-row--net ${netPositive ? 'bs-row--net-positive' : 'bs-row--net-negative'}`}>
                   <td className="bs-row-label">NET BALANCE</td>
