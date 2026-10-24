@@ -52,7 +52,7 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
   const paymentRequestIdRef = useRef(null);
   const dialogRef = useRef(null);
   // Escape closes (not while saving); focus moves in; Tab and page scroll stay put.
-  useDialog(dialogRef, { open: Boolean(isOpen), onClose: submitting ? undefined : onClose });
+  useDialog(dialogRef, { open: Boolean(isOpen), onClose: submitting ? undefined : onClose, initialFocus: '.ipm-amount-group' });
   const [bankAccounts, setBankAccounts] = useState([]);
   const [loadingBanks, setLoadingBanks] = useState(false);
   const [cashBalance, setCashBalance] = useState(null);
@@ -353,7 +353,7 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
               </div>
             </div>
 
-            <div className="ipm-form-group">
+            <div className="ipm-form-group ipm-amount-group">
               <label>Payment Amount *</label>
               <div className="ipm-amount-wrapper">
                 <input
@@ -361,6 +361,7 @@ const InvoicePaymentModal = ({ isOpen, onClose, selectedInvoices = [], supplierN
                   name="amount"
                   value={formData.amount}
                   onChange={handleChange}
+                  onFocus={(e) => e.target.select()}
                   min="0.0001"
                   step="0.0001"
                   required
