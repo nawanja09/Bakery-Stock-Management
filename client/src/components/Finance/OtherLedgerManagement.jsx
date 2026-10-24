@@ -144,7 +144,7 @@ const OtherLedgerManagement = () => {
     e.preventDefault();
     const amt = parseFloat(openingAmount);
     if (!openingCompanyId) return showPopup('error', 'Select a company');
-    if (Number.isNaN(amt) || amt < 0) return showPopup('error', 'Enter a valid opening balance');
+    if (Number.isNaN(amt)) return showPopup('error', 'Enter a valid opening balance');
     setSavingOpening(true);
     try {
       await api.post(`/other-ledgers/${openingFor.id}/opening-balance`, {
@@ -237,14 +237,14 @@ const OtherLedgerManagement = () => {
               style={{ ...inputStyle, flex: '0 0 160px', border: '1px solid var(--color-border)' }}
             />
             <input
-              type="number" min="0" step="0.01" required placeholder="Opening amount" autoFocus
+              type="number" step="0.01" required placeholder="Opening amount" autoFocus
               value={openingAmount} onChange={(e) => setOpeningAmount(e.target.value)}
               style={{ ...inputStyle, flex: '0 0 180px', border: '1px solid var(--color-border)' }}
             />
             <button type="submit" className="btn btn-primary" disabled={savingOpening}>{savingOpening ? 'Saving…' : 'Save'}</button>
             <button type="button" className="btn btn-secondary" onClick={() => setOpeningFor(null)}>Cancel</button>
             <span className="text-muted font-sm" style={{ flexBasis: '100%' }}>
-              The date must be earlier than this Other Ledger's earliest entry for the chosen company, if it has any.
+              The date must be earlier than this Other Ledger's earliest entry for the chosen company, if it has any. You can enter a negative amount to open overdrawn.
             </span>
           </form>
         </div>

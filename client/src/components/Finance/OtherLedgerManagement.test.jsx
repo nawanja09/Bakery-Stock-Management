@@ -71,12 +71,25 @@ describe('OtherLedgerManagement - Opening Balance', () => {
     expect(await screen.findByText(/the opening balance date must be earlier than that/)).toBeInTheDocument();
   });
 
-  test('a negative amount is rejected client-side; nothing is sent', async () => {
+  test('a negative amount is allowed, letting the ledger open overdrawn', async () => {
     renderPage();
     await screen.findByText('Director');
     fireEvent.click(screen.getAllByTitle('Set Opening Balance')[0]);
     await screen.findByText(/Opening balance for:/);
+    fireEvent.change(screen.getByLabelText('Opening balance date'), { target: { value: '2026-01-01' } });
     fireEvent.change(screen.getByPlaceholderText('Opening amount'), { target: { value: '-5' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/other-ledgers/3/opening-balance', {
+      company_id: 1, date: '2026-01-01', amount: -5
+    }));
+  });
+
+  test('a non-numeric amount is rejected client-side; nothing is sent', async () => {
+    renderPage();
+    await screen.findByText('Director');
+    fireEvent.click(screen.getAllByTitle('Set Opening Balance')[0]);
+    await screen.findByText(/Opening balance for:/);
+    fireEvent.change(screen.getByPlaceholderText('Opening amount'), { target: { value: 'abc' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(await screen.findByText('Enter a valid opening balance')).toBeInTheDocument();
     expect(api.post).not.toHaveBeenCalled();

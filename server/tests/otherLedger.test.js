@@ -335,13 +335,12 @@ test('Opening balance: a ledger not linked to the company is refused', async () 
   assert.equal(writes.length, 0);
 });
 
-test('Opening balance: company, date and a non-negative amount are required', async () => {
+test('Opening balance: company, date and a valid amount are required', async () => {
   reset(); mappedCompanies = [1];
   for (const [body, msg] of [
     [{ date: '2026-10-01', amount: 100 }, /Company is required/],
     [{ company_id: 1, amount: 100 }, /Date is required/],
-    [{ company_id: 1, date: '2026-10-01' }, /valid opening balance amount/],
-    [{ company_id: 1, date: '2026-10-01', amount: -5 }, /valid opening balance amount/]
+    [{ company_id: 1, date: '2026-10-01' }, /valid opening balance amount/]
   ]) {
     const r = await run(otherLedgerController.setOtherLedgerOpeningBalance, body, { id: 3 });
     assert.equal(r.status, 400, JSON.stringify({ body, got: r.body }));
@@ -354,6 +353,15 @@ test('Opening balance: 0 is a valid amount', async () => {
   reset(); mappedCompanies = [1]; ledgerBalanceStub = 0;
   const r = await run(otherLedgerController.setOtherLedgerOpeningBalance, { company_id: 1, date: '2026-10-01', amount: 0 }, { id: 3 });
   assert.equal(r.status, 201, JSON.stringify(r.body));
+});
+
+test('Opening balance: a negative amount is allowed and posts to the opposite (non-normal) side', async () => {
+  reset(); mappedCompanies = [1]; ledgerBalanceStub = -5000;
+  const r = await run(otherLedgerController.setOtherLedgerOpeningBalance, { company_id: 1, date: '2026-10-01', amount: -5000 }, { id: 3 });
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  assert.equal(r.body.balance, -5000);
+  const o = oltRow(); // [ledger, date, debit, credit, srcType, srcId, company, ref, remark, createdBy]
+  assert.equal(o[2], 0); assert.equal(o[3], 5000); // DEBIT-normal ledger, negative amount -> credit side, as magnitude
 });
 
 test('company balance only counts that company', async () => {

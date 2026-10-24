@@ -279,9 +279,11 @@ const getLedgerBalance = async (queryable, otherLedgerId, companyId = null) => {
  * statement's running balance still starts from it, in order. A prior
  * opening balance is voided and replaced (editable any time, not just while
  * it is the sole entry). `amount` is always the ledger's own normal-balance
- * direction (other_ledgers.normal_balance) and must not be negative. Does
- * not touch Cash or Bank - Other Ledgers are their own sub-ledgers, not a
- * cash position. Requires an open connection; the caller commits / rolls back.
+ * direction (other_ledgers.normal_balance); a negative amount posts to the
+ * opposite side so the ledger can open overdrawn (e.g. a Director or AR
+ * account that starts in deficit). Does not touch Cash or Bank - Other
+ * Ledgers are their own sub-ledgers, not a cash position. Requires an open
+ * connection; the caller commits / rolls back.
  * @returns {Promise<number>} the ledger's new balance for that company
  */
 const setOpeningBalance = async (connection, { otherLedgerId, companyId, date, amount, createdBy = null }) => {
@@ -297,7 +299,6 @@ const setOpeningBalance = async (connection, { otherLedgerId, companyId, date, a
     throw new OtherLedgerError('A valid opening balance amount is required');
   }
   const value = round2(amount);
-  if (value < 0) throw new OtherLedgerError('A valid opening balance amount is required');
   if (!date) throw new OtherLedgerError('Date is required');
 
   const [rows] = await connection.query(
@@ -320,9 +321,13 @@ const setOpeningBalance = async (connection, { otherLedgerId, companyId, date, a
     await connection.query('UPDATE other_ledger_transactions SET status = 0 WHERE id = ?', [priorOpening.id]);
   }
 
-  const isDebit = (ledger.normal_balance || 'DEBIT') !== 'CREDIT';
+  // Positive posts on the ledger's normal-balance side; negative flips to the
+  // opposite side (as its absolute magnitude) so the ledger can open overdrawn.
+  const normalIsDebit = (ledger.normal_balance || 'DEBIT') !== 'CREDIT';
+  const isDebit = value >= 0 ? normalIsDebit : !normalIsDebit;
+  const magnitude = Math.abs(value);
   const insertId = await insertImpactRow(connection, {
-    otherLedgerId, date, debit: isDebit ? value : 0, credit: isDebit ? 0 : value,
+    otherLedgerId, date, debit: isDebit ? magnitude : 0, credit: isDebit ? 0 : magnitude,
     sourceType: SOURCE_OPENING_BALANCE, sourceId: 0, companyId, referenceNo: null, remark: 'Opening Balance', createdBy
   });
   // source_id must be unique per source_type (uq_olt_source): an opening
